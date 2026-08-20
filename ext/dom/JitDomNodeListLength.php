@@ -31,8 +31,10 @@ final class JitDomNodeListLength
         // not for childNodes lists which have their own per-instance length slot.
         // A childNodes list has PROP_CHILD_NODES_OWNER set; check at runtime to
         // avoid reading the wrong count after XPath rewrites the global (#32620).
+        // Live getElementsByTagName length uses GLOBAL_COUNT whenever the global exists;
+        // do not gate on lastLoadWasPureUserScript() — appendChild may run after other
+        // DOM ops that clear that compile-time flag while the global stays live (#28605).
         if (JitDomDocumentMethodKernel::shouldUse($context)
-            && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
             && null !== $context->module->getNamedGlobal(DomUserScriptLiveTagListLlvm::GLOBAL_COUNT)
         ) {
             $classId = $objectType->lookup(self::CLASS_NODELIST);
@@ -40,15 +42,32 @@ final class JitDomNodeListLength
                 $objectType->defineProperty($classId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
             }
             $ownerSlot = $objectType->propertySlotFor($obj, self::CLASS_NODELIST, VmDom::PROP_CHILD_NODES_OWNER);
-            $ownerPtr = $context->builder->load($ownerSlot);
+            $ownerValuePtrRaw = $context->builder->load($ownerSlot);
             $voidPtr = $context->getTypeFromString('void*');
-            $hasOwner = $context->builder->icmp(
-                Builder::INT_NE,
-                $ownerPtr,
+            $valuePtrTy = $context->getTypeFromString('__value__*');
+            $objPtrTy = $context->getTypeFromString('__object__*');
+            // childNodes lists store an owner DOM node in the slot; tag-name lists only
+            // get an empty __value__ box from initEmptyValueProperties (#28605).
+            $slotNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $ownerValuePtrRaw,
                 $voidPtr->constNull()
             );
-            $bbInstance = BasicBlockHelper::append($context, 'dom_nll_instance');
+            $bbCheckOwnerObj = BasicBlockHelper::append($context, 'dom_nll_chk_owner_obj');
             $bbGlobal = BasicBlockHelper::append($context, 'dom_nll_global');
+            $context->builder->branchIf($slotNull, $bbGlobal, $bbCheckOwnerObj);
+
+            $context->builder->positionAtEnd($bbCheckOwnerObj);
+            $ownerObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $context->builder->pointerCast($ownerValuePtrRaw, $valuePtrTy)
+            );
+            $hasOwner = $context->builder->icmp(
+                Builder::INT_NE,
+                $ownerObj,
+                $objPtrTy->constNull()
+            );
+            $bbInstance = BasicBlockHelper::append($context, 'dom_nll_instance');
             $bbMerge = BasicBlockHelper::append($context, 'dom_nll_merge');
             $context->builder->branchIf($hasOwner, $bbInstance, $bbGlobal);
 

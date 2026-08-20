@@ -186,11 +186,14 @@ final class JitDomXPathQueryUserScript
     {
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_NODELIST);
-        $list = $objectType->allocate($classId);
-        $objectType->markObjectConstructed($list);
+        if (!$objectType->hasProperty($classId, VmDom::PROP_CHILD_NODES_OWNER)) {
+            $objectType->defineProperty($classId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
+        }
         if (!$objectType->hasProperty($classId, 'length')) {
             $objectType->defineProperty($classId, 'length', JITVariable::TYPE_NATIVE_LONG);
         }
+        $list = $objectType->allocate($classId);
+        $objectType->markObjectConstructed($list);
         $lengthVar = new JITVariable(
             $context,
             JITVariable::TYPE_NATIVE_LONG,

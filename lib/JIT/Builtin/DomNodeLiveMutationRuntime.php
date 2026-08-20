@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\DomUserScriptLiveTagListLlvm;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\dom\DomExceptionConstants;
 use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
@@ -274,6 +275,7 @@ final class DomNodeLiveMutationRuntime
                 if (!self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0])) {
                     self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
                 }
+                DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $extraArgs[0]);
 
                 return self::nullValuePtr($context);
             }

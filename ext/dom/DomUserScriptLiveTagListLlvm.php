@@ -114,13 +114,10 @@ final class DomUserScriptLiveTagListLlvm
 
     public static function incrementForChildArg(Context $context, \PHPCompiler\JIT\Variable $childArg): void
     {
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_TAG)
-            || null === $context->module->getNamedGlobal(self::GLOBAL_COUNT)
-        ) {
-            return;
-        }
+        self::ensureGlobals($context);
         $lit = \PHPCompiler\JIT\JitStringBuiltinArg::compileTimeLiteral($childArg)
-            ?? $childArg->compileTimeString;
+            ?? $childArg->compileTimeString
+            ?? $childArg->compileTimeDomTagName;
         if (null !== $lit) {
             $childTag = $context->builder->load(
                 $context->constantStringFromString(strtolower($lit))
