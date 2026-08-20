@@ -243,7 +243,10 @@ final class StringVarExport
 
         $context->builder->positionAtEnd($doubleBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $arg);
-        $doubleStr = ZendDoubleStringRuntime::format($context, $doubleVal);
+        // php_var_export_ex uses PG(serialize_precision) then forces a decimal so
+        // re-import stays float (VmVarExportFloat / #32746) — not echo precision.
+        $doubleRaw = ZendDoubleStringRuntime::formatH($context, $doubleVal);
+        $doubleStr = self::ensureVarExportFloatDecimal($context, $doubleRaw);
         $doubleEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
@@ -297,6 +300,249 @@ final class StringVarExport
             $i64->constInt(\strlen($text), false),
             $context->builder->pointerCast($context->constantFromString($text), $i8p)
         );
+    }
+
+    /**
+     * Thin AOT peer of {@see \PHPCompiler\ext\standard\VmVarExportFloat::format} decimal rule (#32746).
+     *
+     * `42` → `42.0`; `1E+2` → `1.0E+2`; leave `1.5` / `NAN` / `INF` unchanged.
+     */
+    private static function ensureVarExportFloatDecimal(Context $context, Value $formatted): Value
+    {
+        self::ensureVarExportFloatDecimalHelper($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_var_export_float_decimal'),
+            $formatted
+        );
+    }
+
+    private static function ensureVarExportFloatDecimalHelper(Context $context): void
+    {
+        $name = '__compiler_var_export_float_decimal';
+        $existing = $context->module->getNamedFunction($name);
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $existing);
+
+            return;
+        }
+
+        StringDir::ensureLinked($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $map = $context->structFieldMap['__string__'];
+
+        $fn = null !== $existing
+            ? $existing
+            : $context->module->addFunction(
+                $name,
+                $context->context->functionType($strPtr, false, $strPtr)
+            );
+
+        $savedBuilder = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $b = $context->builder;
+
+        $entry = $fn->appendBasicBlock('ve_fdec_entry');
+        $nullIn = $fn->appendBasicBlock('ve_fdec_null');
+        $scanInit = $fn->appendBasicBlock('ve_fdec_scan_init');
+        $scanHead = $fn->appendBasicBlock('ve_fdec_scan_head');
+        $scanBody = $fn->appendBasicBlock('ve_fdec_scan_body');
+        $checkE = $fn->appendBasicBlock('ve_fdec_check_e');
+        $foundDot = $fn->appendBasicBlock('ve_fdec_found_dot');
+        $foundE = $fn->appendBasicBlock('ve_fdec_found_e');
+        $scanNext = $fn->appendBasicBlock('ve_fdec_scan_next');
+        $scanDone = $fn->appendBasicBlock('ve_fdec_scan_done');
+        $keepAsIs = $fn->appendBasicBlock('ve_fdec_keep');
+        $insertBeforeE = $fn->appendBasicBlock('ve_fdec_insert_e');
+        $appendDot0 = $fn->appendBasicBlock('ve_fdec_append');
+        $done = $fn->appendBasicBlock('ve_fdec_done');
+
+        $b->positionAtEnd($entry);
+        $arg = $fn->getParam(0);
+        $b->branchIf(
+            $b->icmp(Builder::INT_EQ, $arg, $strPtr->constNull()),
+            $nullIn,
+            $scanInit
+        );
+
+        $b->positionAtEnd($nullIn);
+        $nullStr = self::constExportString($context, 'NULL');
+        $nullEnd = $b->getInsertBlock();
+        $b->branch($done);
+
+        $b->positionAtEnd($scanInit);
+        $len = $b->load($b->structGep($arg, $map['length']));
+        $data = $b->pointerCast($b->structGep($arg, $map['value']), $i8p);
+        $ePosPtr = $b->alloca($i64);
+        $hasDotPtr = $b->alloca($i8);
+        $iPtr = $b->alloca($i64);
+        $b->store($len, $ePosPtr); // sentinel: no E
+        $b->store($i8->constInt(0, false), $hasDotPtr);
+        $b->store($i64->constInt(0, false), $iPtr);
+        $b->branch($scanHead);
+
+        $b->positionAtEnd($scanHead);
+        $i = $b->load($iPtr);
+        $b->branchIf($b->icmp(Builder::INT_ULT, $i, $len), $scanBody, $scanDone);
+
+        $b->positionAtEnd($scanBody);
+        $c = $b->load($b->gep($data, $i));
+        $b->branchIf(
+            $b->icmp(Builder::INT_EQ, $c, $i8->constInt(\ord('.'), false)),
+            $foundDot,
+            $checkE
+        );
+
+        $b->positionAtEnd($foundDot);
+        $b->store($i8->constInt(1, false), $hasDotPtr);
+        $b->branch($scanNext);
+
+        $b->positionAtEnd($checkE);
+        $isE = $b->or(
+            $b->icmp(Builder::INT_EQ, $c, $i8->constInt(\ord('e'), false)),
+            $b->icmp(Builder::INT_EQ, $c, $i8->constInt(\ord('E'), false))
+        );
+        $b->branchIf($isE, $foundE, $scanNext);
+
+        $b->positionAtEnd($foundE);
+        $b->store($i, $ePosPtr);
+        $b->branch($scanDone);
+
+        $b->positionAtEnd($scanNext);
+        $b->store($b->add($i, $i64->constInt(1, false)), $iPtr);
+        $b->branch($scanHead);
+
+        $b->positionAtEnd($scanDone);
+        $hasDot = $b->icmp(Builder::INT_NE, $b->load($hasDotPtr), $i8->constInt(0, false));
+        $ePos = $b->load($ePosPtr);
+        $hasE = $b->icmp(Builder::INT_ULT, $ePos, $len);
+        // Already has '.': keep (1.5, NAN has letters but no '.' — handled below).
+        // NAN/INF/-INF: no '.', no 'e'/'E' → would append ".0"; detect via non-digit body.
+        $needInsertE = $fn->appendBasicBlock('ve_fdec_need_insert');
+        $needAppend = $fn->appendBasicBlock('ve_fdec_need_append');
+        $b->branchIf($hasDot, $keepAsIs, $needInsertE);
+
+        $b->positionAtEnd($needInsertE);
+        $b->branchIf($hasE, $insertBeforeE, $needAppend);
+
+        $b->positionAtEnd($needAppend);
+        // Skip NAN / INF / -INF / -NAN (letters, no E) — VmVarExportFloat returns early.
+        $isAlphaTok = $b->or(
+            $b->and(
+                $b->icmp(Builder::INT_EQ, $len, $i64->constInt(3, false)),
+                $b->or(
+                    $b->and(
+                        $b->icmp(Builder::INT_EQ, $b->load($data), $i8->constInt(\ord('N'), false)),
+                        $b->and(
+                            $b->icmp(Builder::INT_EQ, $b->load($b->gep($data, $i64->constInt(1, false))), $i8->constInt(\ord('A'), false)),
+                            $b->icmp(Builder::INT_EQ, $b->load($b->gep($data, $i64->constInt(2, false))), $i8->constInt(\ord('N'), false))
+                        )
+                    ),
+                    $b->and(
+                        $b->icmp(Builder::INT_EQ, $b->load($data), $i8->constInt(\ord('I'), false)),
+                        $b->and(
+                            $b->icmp(Builder::INT_EQ, $b->load($b->gep($data, $i64->constInt(1, false))), $i8->constInt(\ord('N'), false)),
+                            $b->icmp(Builder::INT_EQ, $b->load($b->gep($data, $i64->constInt(2, false))), $i8->constInt(\ord('F'), false))
+                        )
+                    )
+                )
+            ),
+            $b->and(
+                $b->icmp(Builder::INT_EQ, $len, $i64->constInt(4, false)),
+                $b->and(
+                    $b->icmp(Builder::INT_EQ, $b->load($data), $i8->constInt(\ord('-'), false)),
+                    $b->or(
+                        $b->and(
+                            $b->icmp(Builder::INT_EQ, $b->load($b->gep($data, $i64->constInt(1, false))), $i8->constInt(\ord('I'), false)),
+                            $b->and(
+                                $b->icmp(Builder::INT_EQ, $b->load($b->gep($data, $i64->constInt(2, false))), $i8->constInt(\ord('N'), false)),
+                                $b->icmp(Builder::INT_EQ, $b->load($b->gep($data, $i64->constInt(3, false))), $i8->constInt(\ord('F'), false))
+                            )
+                        ),
+                        $b->and(
+                            $b->icmp(Builder::INT_EQ, $b->load($b->gep($data, $i64->constInt(1, false))), $i8->constInt(\ord('N'), false)),
+                            $b->and(
+                                $b->icmp(Builder::INT_EQ, $b->load($b->gep($data, $i64->constInt(2, false))), $i8->constInt(\ord('A'), false)),
+                                $b->icmp(Builder::INT_EQ, $b->load($b->gep($data, $i64->constInt(3, false))), $i8->constInt(\ord('N'), false))
+                            )
+                        )
+                    )
+                )
+            )
+        );
+        $b->branchIf($isAlphaTok, $keepAsIs, $appendDot0);
+
+        $b->positionAtEnd($keepAsIs);
+        $keepEnd = $b->getInsertBlock();
+        $b->branch($done);
+
+        // Insert ".0" before E: mantissa + ".0" + rest from E.
+        $b->positionAtEnd($insertBeforeE);
+        $outLenE = $b->add($len, $i64->constInt(2, false));
+        $outE = $b->call($context->lookupFunction('__string__alloc'), $outLenE);
+        $outEChars = $b->pointerCast($b->structGep($outE, $map['value']), $i8p);
+        $context->intrinsic->builder = $b;
+        $context->intrinsic->memcpy(
+            $outEChars,
+            $data,
+            $b->truncOrBitCast($ePos, $sizeT),
+            false
+        );
+        $b->store($i8->constInt(\ord('.'), false), $b->gep($outEChars, $ePos));
+        $b->store(
+            $i8->constInt(\ord('0'), false),
+            $b->gep($outEChars, $b->add($ePos, $i64->constInt(1, false)))
+        );
+        $restLen = $b->sub($len, $ePos);
+        $context->intrinsic->memcpy(
+            $b->gep($outEChars, $b->add($ePos, $i64->constInt(2, false))),
+            $b->gep($data, $ePos),
+            $b->truncOrBitCast($restLen, $sizeT),
+            false
+        );
+        $insertEnd = $b->getInsertBlock();
+        $b->branch($done);
+
+        $b->positionAtEnd($appendDot0);
+        $suffix = self::constExportString($context, '.0');
+        $sufMap = $map;
+        $sufLen = $b->load($b->structGep($suffix, $sufMap['length']));
+        $outLen = $b->add($len, $sufLen);
+        $outA = $b->call($context->lookupFunction('__string__alloc'), $outLen);
+        $outAChars = $b->pointerCast($b->structGep($outA, $map['value']), $i8p);
+        $sufChars = $b->pointerCast($b->structGep($suffix, $map['value']), $i8p);
+        $context->intrinsic->builder = $b;
+        $context->intrinsic->memcpy(
+            $outAChars,
+            $data,
+            $b->truncOrBitCast($len, $sizeT),
+            false
+        );
+        $context->intrinsic->memcpy(
+            $b->gep($outAChars, $len),
+            $sufChars,
+            $b->truncOrBitCast($sufLen, $sizeT),
+            false
+        );
+        $appendEnd = $b->getInsertBlock();
+        $b->branch($done);
+
+        $b->positionAtEnd($done);
+        $phi = $b->phi($strPtr);
+        $phi->addIncoming($nullStr, $nullEnd);
+        $phi->addIncoming($arg, $keepEnd);
+        $phi->addIncoming($outE, $insertEnd);
+        $phi->addIncoming($outA, $appendEnd);
+        $b->returnValue($phi);
+
+        $context->builder->clearInsertionPosition();
+        $context->builder = $savedBuilder;
+        $context->registerFunction($name, $fn);
     }
 
     /**
