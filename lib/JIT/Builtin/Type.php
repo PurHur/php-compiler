@@ -49,36 +49,14 @@ class Type extends Builtin {
             $fntypeDeployPath
         );
         $this->context->registerFunction('__compiler_phpc_deploy_path', $fnDeployPath);
-        $fntypeNumberFormat = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('double'),
-            $this->context->getTypeFromString('int64'),
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('int64')
-        );
-        $fnNumberFormat = $this->context->module->addFunction('__compiler_number_format', $fntypeNumberFormat);
-        $this->context->registerFunction('__compiler_number_format', $fnNumberFormat);
-        $f64 = $this->context->getTypeFromString('double');
-        $fntypeSprintf = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('int64'),
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnSprintf = $this->context->module->addFunction('__compiler_sprintf', $fntypeSprintf);
-        $this->context->registerFunction('__compiler_sprintf', $fnSprintf);
-        $fntypePrintf = $this->context->context->functionType(
-            $this->context->getTypeFromString('int64'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('int64'),
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnPrintf = $this->context->module->addFunction('__compiler_printf', $fntypePrintf);
-        $this->context->registerFunction('__compiler_printf', $fnPrintf);
+        // __compiler_sprintf / __compiler_printf / __compiler_number_format always-on shells
+        // removed (#32921): StringFormat owns the ABI (getNamedFunction first, then
+        // addFunction if absent; Type::initialize still ensureLinked). Thin AOT already
+        // calls StringFormat::implementIfDeclared from JitSprintf / JitPrintf /
+        // JitNumberFormat (#13571). Leftover Type empty decls vs Runtime ABI drift mint
+        // sprintf.1 / number_format.1 (#31894 / #32122; float→string path #31963).
+        // User-script sprintf()/printf()/number_format() stay SprintfJitHelper /
+        // NumberFormatRuntime.
         $fntypeSscanf = $this->context->context->functionType(
             $this->context->getTypeFromString('int64'),
             false,
@@ -674,6 +652,7 @@ class Type extends Builtin {
         );
         $fnStrptime = $this->context->module->addFunction('__compiler_strptime', $fntypeStrptime);
         $this->context->registerFunction('__compiler_strptime', $fnStrptime);
+        $f64 = $this->context->getTypeFromString('double');
         $fntypeDiFmt = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -1104,6 +1083,7 @@ class Type extends Builtin {
         StringJsonEncode::ensureLinked($this->context);
         StringJsonDecode::ensureLinked($this->context);
         StringXmlrpc::ensureLinked($this->context);
+        StringFormat::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);

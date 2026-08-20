@@ -13,8 +13,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_sprintf/printf/number_format via SprintfJitHelper PHP (#9131, #20841).
+ * JIT/AOT link for __compiler_sprintf/printf/number_format via SprintfJitHelper PHP (#9131, #20841, #32921).
  *
+ * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\SprintfJitHelper}
  * via {@see JitVmHelperLink} (Bin2hex #20452 / HashEquals #20469 — no thin identity stubs).
  * php-src: ext/standard/formatted_print.c — sprintf / printf / number_format
