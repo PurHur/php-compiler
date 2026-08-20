@@ -48,11 +48,12 @@ final class JitDomGetNodePath
     {
         // Prefer the owning document's loadXML literal — lastCompileTimeXml is the *last*
         // load and steals C14N of earlier documents (#32978).
+        // Do not fall back to $result->compileTimeDomLoadXml: FETCH temps are reused across
+        // documents and keep the previous stamp (#32987).
         $xml = null !== $document
             ? (JitDomLoadXMLUserScript::compileTimeXmlFor($document) ?? $document->compileTimeDomLoadXml)
             : null;
-        $xml ??= $result->compileTimeDomLoadXml
-            ?? JitDomLoadXMLUserScript::unambiguousCompileTimeXml();
+        $xml ??= JitDomLoadXMLUserScript::unambiguousCompileTimeXml();
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }

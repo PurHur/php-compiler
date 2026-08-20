@@ -46,6 +46,14 @@ final class JitDomLoadXMLUserScript
     /** Context from the last {@see rememberCompileTimeXmlFor} — for mutation refresh (#32978). */
     private static ?Context $lastRememberContext = null;
 
+    /** CV name of the in-flight loadXML() receiver (METHODCALL_INIT) (#32987). */
+    private static ?string $pendingLoadXmlReceiverVarName = null;
+
+    public static function setPendingLoadXmlReceiverVarName(?string $name): void
+    {
+        self::$pendingLoadXmlReceiverVarName = (null !== $name && '' !== $name) ? $name : null;
+    }
+
     /**
      * Set when appendChild/insertBefore/replaceChild/removeChild (etc.) rewrote the
      * live tree after a pure loadXML — C14N/C14NFile must not fold the original literal (#32972).
@@ -357,35 +365,39 @@ final class JitDomLoadXMLUserScript
         self::$xmlByToken[$token] = $xml;
     }
 
-    /** Copy {@see JITVariable::$compileTimeDomLoadXml} onto named document locals (#32978). */
+    /** Copy {@see JITVariable::$compileTimeDomLoadXml} onto named document locals (#32978 / #32987). */
     private static function propagateCompileTimeDomLoadXmlToAliases(
         Context $context,
         JITVariable $document,
         string $xml
     ): void {
+        $pendingName = self::$pendingLoadXmlReceiverVarName;
+        self::$pendingLoadXmlReceiverVarName = null;
         if (!isset($context->namedVariableBindings) || !\is_array($context->namedVariableBindings)) {
             return;
         }
         $docVal = $document->value ?? null;
-        foreach ($context->namedVariableBindings as $bound) {
+        foreach ($context->namedVariableBindings as $name => $bound) {
             if (!$bound instanceof JITVariable) {
                 continue;
             }
+            $stamp = false;
             if ($bound === $document) {
-                $bound->compileTimeDomLoadXml = $xml;
+                $stamp = true;
+            } elseif (null !== $docVal && $bound->value === $docVal) {
+                $stamp = true;
+            } elseif (null !== $pendingName && $name === $pendingName) {
+                // Prefer the METHODCALL receiver CV over sibling DOMDocument locals (#32987).
+                $stamp = true;
+            }
+            if (!$stamp) {
                 continue;
             }
-            if (null !== $docVal && $bound->value === $docVal) {
-                $bound->compileTimeDomLoadXml = $xml;
-                continue;
+            $bound->compileTimeDomLoadXml = $xml;
+            if (null === self::$xmlByReceiver) {
+                self::$xmlByReceiver = new \SplObjectStorage();
             }
-            if (null !== $bound->compileTimeDomLoadXml) {
-                continue;
-            }
-            $class = strtolower(str_replace('/', '\\', ltrim((string) ($bound->classUserType ?? ''), '\\')));
-            if ('' !== $class && str_contains($class, 'document') && !str_contains($class, 'element')) {
-                $bound->compileTimeDomLoadXml = $xml;
-            }
+            self::$xmlByReceiver[$bound] = $xml;
         }
     }
 

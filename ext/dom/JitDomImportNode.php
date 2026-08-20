@@ -40,7 +40,7 @@ final class JitDomImportNode
         }
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            return self::invokeUserScriptMaterialize($context, $args[0]);
+            return self::invokeUserScriptMaterialize($context, $args[0], $args[1]);
         }
 
         DomImportNodeRuntime::ensureLinked($context);
@@ -137,12 +137,15 @@ final class JitDomImportNode
     /**
      * Thin AOT: clone via user-script materialize (nodeName/tagName/INNER_XML slots).
      * NestedJIT object returns abort on property fetch (#29853 / #32350).
+     *
+     * Prefer the *source node* compile-time tag/inner (#32987) — lastCompileTimeXml is
+     * the globally last loadXML and is wrong when importing across two documents.
      */
     private static function invokeUserScriptMaterialize(
         Context $context,
-        JITVariable $documentVar
+        JITVariable $documentVar,
+        JITVariable $sourceNode
     ): Value {
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
         $tag = 'div';
@@ -150,12 +153,23 @@ final class JitDomImportNode
         $inner = '';
         $id = 'target';
         $fromXml = false;
-        if (null !== $xml) {
-            $root = self::parseCompileTimeXmlRoot($xml);
-            if (null !== $root) {
-                $tag = $root['tag'];
-                $inner = $root['inner'];
-                $fromXml = true;
+        $srcTag = $sourceNode->compileTimeDomTagName ?? null;
+        if (null !== $srcTag && '' !== $srcTag) {
+            $tag = $srcTag;
+            $inner = $sourceNode->compileTimeDomInnerXml ?? '';
+            $fromXml = true;
+        }
+        if (!$fromXml) {
+            $xml = $sourceNode->compileTimeDomLoadXml
+                ?? JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
+                ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+            if (null !== $xml) {
+                $root = self::parseCompileTimeXmlRoot($xml);
+                if (null !== $root) {
+                    $tag = $root['tag'];
+                    $inner = $root['inner'];
+                    $fromXml = true;
+                }
             }
         }
         if (!$fromXml && null !== $html) {
