@@ -203,6 +203,13 @@ final class HelperRuntimeCache
         // encode/decode into user module (peer #26868).
         'phpcompiler\\ext\\standard\\quotprintjithelper::encode' => true,
         'phpcompiler\\ext\\standard\\quotprintjithelper::decode' => true,
+        // #32741 — prelinked StatPathJitHelper unit.o embeds VmOpenBasedir::check which reads
+        // as always-active under thin AOT (is_file/file_exists/is_dir always false); NestedJIT
+        // current source (stat kernel only, peer isReadable) into the user module.
+        'phpcompiler\\ext\\standard\\statpathjithelper::exists' => true,
+        'phpcompiler\\ext\\standard\\statpathjithelper::isfile' => true,
+        'phpcompiler\\ext\\standard\\statpathjithelper::isdir' => true,
+        'phpcompiler\\ext\\standard\\statpathjithelper::islink' => true,
     ];
 
     private static bool $loggedHit = false;
