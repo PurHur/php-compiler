@@ -505,6 +505,8 @@ final class BuiltinInternalArgInfo
             'version_compare' => 'int|bool',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#27906)
             'php_sapi_name' => 'string|false',
+            // ext/standard/info.stub.php — InternalArgInfo empty return; Zend : bool (#24508)
+            'phpcredits' => 'bool',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend array|float (#27906)
             'gettimeofday' => 'array|float',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend : mixed (#28023)

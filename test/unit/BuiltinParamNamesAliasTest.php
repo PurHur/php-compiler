@@ -2804,6 +2804,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'what', 'phpinfo'));
     }
 
+    /** @covers issue #24508 */
+    public function testPhpcreditsZendStubNamedFlagsParam(): void
+    {
+        $names = BuiltinParamNames::forFunction('phpcredits');
+        self::assertSame(['flags='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'phpcredits'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $flag)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'flag', 'phpcredits'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('phpcredits'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('phpcredits'));
+    }
+
     /** @covers issue #23275 / #25147 */
     public function testMktimeGmmktimeZendStubNamedParams(): void
     {

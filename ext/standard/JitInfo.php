@@ -93,7 +93,8 @@ final class JitInfo
         $context->builder->call($context->lookupFunction('__compiler_phpcredits'), $flags);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+        // php-src ext/standard/info.c PHP_FUNCTION(phpcredits) — RETURN_TRUE (#24508)
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
 
         return $ptr;
     }

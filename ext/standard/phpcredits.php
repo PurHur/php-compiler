@@ -38,6 +38,10 @@ final class phpcredits extends Internal
             }
         }
         VmInfo::phpcredits($flags);
+        if (null !== $frame->returnVar) {
+            // php-src ext/standard/info.c PHP_FUNCTION(phpcredits) — RETURN_TRUE (#24508)
+            $frame->returnVar->bool(true);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
