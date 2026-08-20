@@ -144,6 +144,20 @@ class Context {
     public array $dateTimeLocalInstants = [];
 
     /**
+     * New DateInterval result — construct stamps parsed duration onto the local (#32699).
+     */
+    public ?Operand $lastDateIntervalNewResultOp = null;
+
+    public ?Variable $lastDateIntervalNewResultVar = null;
+
+    /**
+     * Local name → parsed DateInterval state for format() (#32699).
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    public array $dateIntervalLocalStates = [];
+
+    /**
      * New DateTimeZone result operand/var — construct stamps zone id onto the local (#29732).
      */
     public ?Operand $lastDateTimeZoneNewResultOp = null;
@@ -1663,6 +1677,7 @@ class Context {
         $this->functionProxies['datetimeimmutable::__construct'] = new Call\DateTimeImmutableConstruct();
         $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
         $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();
+        $this->functionProxies['dateinterval::format'] = new Call\DateIntervalFormat();
         $this->functionProxies['dateperiod::__construct'] = new Call\DatePeriodConstruct();
         if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
             $this->functionProxies['dateperiod::createfromiso8601string'] = new Call\DatePeriodCreateFromISO8601String();

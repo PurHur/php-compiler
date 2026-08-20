@@ -23,6 +23,7 @@ final class BuiltinParamNames
             'datetimeimmutable::__construct' => ['datetime', 'timezone'],
             'datetime::format' => ['format'],
             'datetimeimmutable::format' => ['format'],
+            'dateinterval::format' => ['format'],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says modify (#23685)
             'datetime::modify',
             'datetimeimmutable::modify' => ['modifier'],

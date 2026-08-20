@@ -11951,6 +11951,10 @@ class JIT {
                         $this->context->scope->toCall,
                         $callArgs
                     );
+                    $this->syncDateIntervalConstructMetaToAliases(
+                        $this->context->scope->toCall,
+                        $callArgs
+                    );
                     $this->context->callerStrictTypes = $prevStrict;
                     break;
                     } finally {
@@ -12264,6 +12268,10 @@ class JIT {
                         $this->calleeReturnsByRef($this->context->scope->toCall)
                     );
                     $this->syncDateTimeConstructMetaToAliases(
+                        $this->context->scope->toCall,
+                        $callArgs
+                    );
+                    $this->syncDateIntervalConstructMetaToAliases(
                         $this->context->scope->toCall,
                         $callArgs
                     );
@@ -12744,6 +12752,10 @@ class JIT {
                                 ) {
                                     $this->context->lastDateTimeNewResultOp = $resultOp;
                                     $this->context->lastDateTimeNewResultVar = $this->context->getVariableFromOp($resultOp);
+                                }
+                                if (0 === strcasecmp($resolvedName, 'DateInterval')) {
+                                    $this->context->lastDateIntervalNewResultOp = $resultOp;
+                                    $this->context->lastDateIntervalNewResultVar = $this->context->getVariableFromOp($resultOp);
                                 }
                             } elseif (
                                 null !== ($inheritedCtor = $this->context->type->object->inheritedConstructorProxyLc($resolvedName))
@@ -19203,6 +19215,55 @@ class JIT {
         $this->context->lastDateTimeNewResultVar = null;
     }
 
+    /**
+     * Rebind `new DateInterval` result so format() sees compileTimeDateInterval (#32699).
+     *
+     * @param list<JIT\Variable|array{unpack: JIT\Variable}> $callArgs
+     */
+    private function syncDateIntervalConstructMetaToAliases(?JIT\Call $toCall, array $callArgs): void
+    {
+        if (!$toCall instanceof JIT\Call\DateIntervalConstruct) {
+            return;
+        }
+        if ([] === $callArgs) {
+            return;
+        }
+        $first = $callArgs[0];
+        if (is_array($first)) {
+            $first = $first['unpack'] ?? null;
+        }
+        if (!$first instanceof JIT\Variable || !\is_array($first->compileTimeDateInterval)) {
+            return;
+        }
+        $stamp = static function (JIT\Variable $bound) use ($first): void {
+            $bound->compileTimeDateInterval = $first->compileTimeDateInterval;
+            $bound->classUserType = $first->classUserType ?? 'DateInterval';
+        };
+        $stamp($first);
+        $resultVar = $this->context->lastDateIntervalNewResultVar;
+        if ($resultVar instanceof JIT\Variable) {
+            $stamp($resultVar);
+        }
+        $resultOp = $this->context->lastDateIntervalNewResultOp;
+        if ($resultOp instanceof \PHPCfg\Operand) {
+            $this->context->scope->variables[$resultOp] = $first;
+            $name = JIT\OperandName::resolve($resultOp);
+            if (null !== $name && '' !== $name) {
+                $resolved = $this->context->resolveRefAliasName($name);
+                $this->context->bindVariableByName($resolved, $first);
+                $this->context->dateIntervalLocalStates[$resolved] = $first->compileTimeDateInterval;
+            }
+        }
+        foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+            if ($bound === $first || 'DateInterval' === ($bound->classUserType ?? '')) {
+                $stamp($bound);
+                $this->context->dateIntervalLocalStates[$boundName] = $first->compileTimeDateInterval;
+            }
+        }
+        $this->context->lastDateIntervalNewResultOp = null;
+        $this->context->lastDateIntervalNewResultVar = null;
+    }
+
     /** Copy compile-time instant onto `$dt->format()` / getTimestamp receivers (#32691). */
     private function applyDateTimeLocalInstantToReceiver(Operand $receiverOp, JIT\Variable $receiverVar): void
     {
@@ -19219,6 +19280,24 @@ class JIT {
         $receiverVar->compileTimeTimezoneName = $instant['timezone'];
         if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
             $receiverVar->classUserType = 'DateTime';
+        }
+    }
+
+    /** Copy construct stamp onto `$i->format()` receivers (#32699). */
+    private function applyDateIntervalStateToReceiver(Operand $receiverOp, JIT\Variable $receiverVar): void
+    {
+        $recvName = JIT\OperandName::resolve($receiverOp);
+        if (null === $recvName || '' === $recvName) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($recvName);
+        $state = $this->context->dateIntervalLocalStates[$resolved] ?? null;
+        if (!\is_array($state)) {
+            return;
+        }
+        $receiverVar->compileTimeDateInterval = $state;
+        if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
+            $receiverVar->classUserType = 'DateInterval';
         }
     }
 
@@ -21028,10 +21107,25 @@ class JIT {
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
         $methodLcEarlyDispatch = strtolower($methodName);
         $this->applyDateTimeLocalInstantToReceiver($receiverOp, $receiverVar);
+        $this->applyDateIntervalStateToReceiver($receiverOp, $receiverVar);
         $recvHintLc = strtolower(ltrim(
             (string) ($receiverVar->classUserType ?? $receiverOp->type?->userType ?? ''),
             '\\'
         ));
+        // Typed DateInterval::format() — ExternalMethod previously wrote empty (#32699).
+        if (
+            'format' === $methodLcEarlyDispatch
+            && (
+                'dateinterval' === $recvHintLc
+                || \is_array($receiverVar->compileTimeDateInterval)
+            )
+            && $this->context->functionIsRegistered('dateinterval::format')
+        ) {
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy('dateinterval::format');
+            $this->context->scope->args = [$receiverVar];
+
+            return;
+        }
         // Typed DateTime(Immutable)::getOffset() — do not steal DateTimeZone proxy (#30761).
         if (
             'getoffset' === $methodLcEarlyDispatch
