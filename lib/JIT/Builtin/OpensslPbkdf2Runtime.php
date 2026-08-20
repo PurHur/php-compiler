@@ -10,11 +10,15 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT openssl_pbkdf2() via HMAC built from {@see __compiler_hash} (#32410).
+ * JIT/AOT openssl_pbkdf2() via HMAC built from {@see __compiler_hash} (#32410, #32870).
  *
  * hash() / openssl_digest AOT is green; hash_hmac()/hash_pbkdf2() HashCrypto (HMAC /
  * PKCS5_PBKDF2_HMAC) SIGSEGV under AOT. NestedJIT of VmHashNative::hashPbkdf2 also
  * SIGSEGVs (#16075). This kernel uses only __compiler_hash + LLVM loops.
+ *
+ * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
+ * an empty shell (#32870 / peer #32866) — leftover Type decls mint openssl_pbkdf2.1
+ * (#31894 / #32122).
  *
  * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pbkdf2) / PKCS5_PBKDF2_HMAC
  */
@@ -74,10 +78,31 @@ final class OpensslPbkdf2Runtime
             return;
         }
 
-        $fn = $context->lookupFunction($name);
+        $fn = self::declareAbi($context, $name, $probe);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function declareAbi(Context $context, string $name, ?LlvmFunction $probe): LlvmFunction
+    {
+        if (null !== $probe) {
+            return $probe;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType(
+            $strPtr,
+            false,
+            $strPtr,
+            $strPtr,
+            $i64,
+            $i64,
+            $strPtr
+        );
+
+        return $context->module->addFunction($name, $ft);
     }
 
     private static function ensureHex2binFunction(Context $context): void

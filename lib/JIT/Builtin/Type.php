@@ -537,18 +537,11 @@ class Type extends Builtin {
         );
         $fnOpensslDigest = $this->context->module->addFunction('__compiler_openssl_digest', $fntypeOpensslDigest);
         $this->context->registerFunction('__compiler_openssl_digest', $fnOpensslDigest);
-        // openssl_pbkdf2 — HMAC over __compiler_hash (hex) + LLVM hex-decode (#32410)
-        $fntypeOpensslPbkdf2 = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $strPtr,
-            $strPtr,
-            $i64,
-            $i64,
-            $strPtr
-        );
-        $fnOpensslPbkdf2 = $this->context->module->addFunction('__compiler_openssl_pbkdf2', $fntypeOpensslPbkdf2);
-        $this->context->registerFunction('__compiler_openssl_pbkdf2', $fnOpensslPbkdf2);
+        // __compiler_openssl_pbkdf2 always-on shell removed (#32870): NestedJIT/AOT
+        // bridge is OpensslPbkdf2Runtime (getNamedFunction first; user-script
+        // openssl_pbkdf2() still ensureLinked from ext/openssl/openssl_pbkdf2.php).
+        // Leftover Type empty decls vs Runtime ABI drift mint openssl_pbkdf2.1
+        // (#31894 / #32122).
         // __compiler_openssl_get_cipher_methods / __compiler_openssl_get_md_methods always-on
         // shells removed (#32451): user-script openssl_get_*_methods() stays
         // JitOpensslMethods / OpensslMethodsJitHelper / OpensslCipherRegistry.
