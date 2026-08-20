@@ -18,6 +18,7 @@ final class ArrayFilterRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayFilterRuntime.php');
         $this->assertStringContainsString('ArrayFilterJitHelper', $runtime);
+        $this->assertStringContainsString('ArrayFilterLlvm::filterPackedWithClosure', $runtime);
         $this->assertStringContainsString('nativeListToHashTable', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildFilterArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);

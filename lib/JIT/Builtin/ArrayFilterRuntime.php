@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\ArrayFilterCallbackPolicy;
+use PHPCompiler\JIT\ArrayFilterLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -38,6 +41,20 @@ final class ArrayFilterRuntime
             $context->lookupFunction(self::ABI_FILTER),
             self::argToHashtable($context, $array)
         );
+    }
+
+    public static function filterWithClosure(
+        Context $context,
+        JITVariable $array,
+        JITVariable $callback
+    ): Value {
+        if (!ArrayFilterCallbackPolicy::isClosureJitLowerable($callback)) {
+            throw new \LogicException(ArrayFilterCallbackPolicy::jitRejectionMessage());
+        }
+        NestedClosureInvokeLlvm::ensureLinked($context);
+        $ht = self::argToHashtable($context, $array);
+
+        return ArrayFilterLlvm::filterPackedWithClosure($context, $ht, $callback);
     }
 
     private static function argToHashtable(Context $context, JITVariable $arg): Value
