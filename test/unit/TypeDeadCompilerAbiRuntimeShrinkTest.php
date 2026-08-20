@@ -44,7 +44,7 @@ final class TypeDeadCompilerAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_xmlrpc_encode_value'", $type);
+        // __compiler_xmlrpc_encode_value always-on shell removed (#32902); ownership in StringXmlrpc.
         $this->assertStringContainsString("registerFunction('__compiler_number_format'", $type);
     }
 
