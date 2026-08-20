@@ -1270,6 +1270,9 @@ final class BuiltinParamNames
                 // php-src ext/standard/basic_functions.stub.php — ?string $type = null (#23381)
                 // InternalArgInfo still says resouce_type (typo) / resource_type.
                 return ['type='];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says who (#23943)
+            case 'getrusage':
+                return ['mode='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says res (#23342)
             case 'get_resource_type':
                 return ['resource'];

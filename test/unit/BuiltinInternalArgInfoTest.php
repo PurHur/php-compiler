@@ -954,6 +954,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getrusage'));
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says who (#23943). */
+    public function testGetrusageNamedParamReflectionStub(): void
+    {
+        $this->assertSame(['mode='], BuiltinParamNames::forFunction('getrusage'));
+    }
+
     /** php-src ext/posix/posix.stub.php — InternalArgInfo return array (missing |false) (#28783). */
     public function testPosixTimesReflectionReturnUnion(): void
     {
