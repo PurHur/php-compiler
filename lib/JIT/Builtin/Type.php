@@ -1307,26 +1307,13 @@ class Type extends Builtin {
         // __compiler_sys_get_temp_dir always-on shell removed (#32438): user-script
         // sys_get_temp_dir() stays SysGetTempDirJitHelper / SysGetTempDirRuntime
         // (NestedJIT leaf is __compiler_sys_get_temp_dir_leaf). Peer mkdir drop.
-        $i64 = $this->context->getTypeFromString('int64');
-        $fntypeGetprotobynumber = $this->context->context->functionType($strPtr, false, $i64);
-        $fnGetprotobynumber = $this->context->module->addFunction(
-            '__compiler_getprotobynumber',
-            $fntypeGetprotobynumber
-        );
-        $this->context->registerFunction('__compiler_getprotobynumber', $fnGetprotobynumber);
-        $fntypeGetservbyport = $this->context->context->functionType($strPtr, false, $i64, $strPtr);
-        $fnGetservbyport = $this->context->module->addFunction(
-            '__compiler_getservbyport',
-            $fntypeGetservbyport
-        );
-        $this->context->registerFunction('__compiler_getservbyport', $fnGetservbyport);
-        $valuePtr = $this->context->getTypeFromString('__value__*');
-        $fntypeGetprotobyname = $this->context->context->functionType($void, false, $strPtr, $valuePtr);
-        $fnGetprotobyname = $this->context->module->addFunction('__phpc_getprotobyname', $fntypeGetprotobyname);
-        $this->context->registerFunction('__phpc_getprotobyname', $fnGetprotobyname);
-        $fntypeGetservbyname = $this->context->context->functionType($void, false, $strPtr, $strPtr, $valuePtr);
-        $fnGetservbyname = $this->context->module->addFunction('__phpc_getservbyname', $fntypeGetservbyname);
-        $this->context->registerFunction('__phpc_getservbyname', $fnGetservbyname);
+        // __compiler_getprotobynumber / __compiler_getservbyport / __phpc_getprotobyname /
+        // __phpc_getservbyname always-on shells removed (#32701): user-script
+        // getprotobynumber()/getservbyport()/getprotobyname()/getservbyname() stay
+        // NetworkServicesJitHelper / NetworkServicesNameLookupJitHelper / JitNetworkServices.
+        // NestedJIT/AOT bridges are StringNetworkServicesStringReturn /
+        // StringNetworkServicesNameLookup (getNamedFunction first). Leftover Type
+        // addFunction vs Runtime ABI drift mints name.1 (#31894 / #32122).
         // __compiler_tempnam / __compiler_ftok always-on shells removed (#32438):
         // user-script tempnam() stays TempnamJitHelper; ftok() stays FtokJitHelper
         // / FtokRuntime::ensureLinked / NestedJIT JitFtokKernel. FsDirRuntime owns

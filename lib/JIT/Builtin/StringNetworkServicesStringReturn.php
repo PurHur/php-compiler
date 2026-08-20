@@ -17,6 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Host-derived tables are NestedJIT'd from in-memory source via
  * {@see JitVmHelperLink::ensureCompiledFromSource} (peer GetClass #24976 / NameLookup #26247).
  * php-src: ext/standard/network.c — PHP_FUNCTION(getprotobynumber) / getservbyport
+ * Type always-on shells dropped (#32701): bridges declare module-locally (getNamedFunction first).
  */
 final class StringNetworkServicesStringReturn
 {
@@ -53,10 +54,19 @@ final class StringNetworkServicesStringReturn
     private static function implementGetprotobynumberBridge(Context $context): void
     {
         $abiName = '__compiler_getprotobynumber';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($strPtr, false, $i64);
-        $fn = $context->module->addFunction($abiName, $ft);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('getprotobynumber_bridge_entry');
         $context->builder->positionAtEnd($entry);
@@ -71,10 +81,19 @@ final class StringNetworkServicesStringReturn
     private static function implementGetservbyportBridge(Context $context): void
     {
         $abiName = '__compiler_getservbyport';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($strPtr, false, $i64, $strPtr);
-        $fn = $context->module->addFunction($abiName, $ft);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('getservbyport_bridge_entry');
         $context->builder->positionAtEnd($entry);
