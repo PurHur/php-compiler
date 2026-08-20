@@ -18,6 +18,24 @@ final class DateTimeFormatAot84Test extends TestCase
         );
         $this->assertStringContainsString('tryFormatCivilLiteral', $source);
         $this->assertStringContainsString('#27192', $source);
+        $this->assertStringContainsString('compileTimeTimezoneName', $source);
+    }
+
+    public function testConstructDoesNotStampTimezoneOnCompileTimeString(): void
+    {
+        $source = (string) file_get_contents(
+            dirname(__DIR__, 2).'/ext/standard/JitDateTimeConstruct.php'
+        );
+        $this->assertStringContainsString("\$args[0]->compileTimeDateTimeTimestamp = \$parsed['timestamp'];", $source);
+        $this->assertStringContainsString("\$args[0]->compileTimeTimezoneName = \$parsed['timezone'];", $source);
+        $this->assertStringNotContainsString(
+            "\$args[0]->compileTimeLong = \$parsed['timestamp'];",
+            $source
+        );
+        $this->assertStringNotContainsString(
+            "\$args[0]->compileTimeString = \$parsed['timezone'];",
+            $source
+        );
     }
 
     public function testJitDateExposesCivilLiteralForDateTimeFormat(): void

@@ -1128,13 +1128,18 @@ final class JitDateMutation
             return $slot;
         }
         $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
-        $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        $timestamp = ReflectionSetup::integerPropertyAsI64(
-            $context,
-            $obj,
-            $layout,
-            DateTimeSupport::TS_PROPERTY
-        );
+        $i64 = $context->getTypeFromString('int64');
+        if (null !== $args[0]->compileTimeDateTimeTimestamp) {
+            $timestamp = $i64->constInt($args[0]->compileTimeDateTimeTimestamp, true);
+        } else {
+            $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+            $timestamp = ReflectionSetup::integerPropertyAsI64(
+                $context,
+                $obj,
+                $layout,
+                DateTimeSupport::TS_PROPERTY
+            );
+        }
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeLong($context, $slot, $timestamp);
 
