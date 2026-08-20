@@ -9719,6 +9719,22 @@ class JIT {
                             $this->maybeRefreshIncludeBindingsBeforeUse();
                             break;
                         }
+                        // In-place `C::$s .= …`: FETCH + dead CONCAT into the fetch temp — same
+                        // ephemeral trap; must store via staticPropertyGlobal (#32899 / peer #32889).
+                        if (
+                            (int) $op->arg1 === (int) $op->arg2
+                            && null !== $left->staticPropertyGlobal
+                        ) {
+                            $newVal = $this->compileConcatIntoNewString(
+                                $left,
+                                $right,
+                                $leftOp,
+                                $rightOp
+                            );
+                            $this->assignOperand($destOp, $newVal, true);
+                            $this->maybeRefreshIncludeBindingsBeforeUse();
+                            break;
+                        }
                         // Always use entry-alloca for dead-operand concat results.
                         // assignOperand creates KIND_VALUE variables whose free() is a
                         // no-op, leaking the allocated string and corrupting the heap on
@@ -9779,6 +9795,32 @@ class JIT {
                     ) {
                         // Zend: Cannot use assign-op operators with string offsets (#22897).
                         JIT\StringOffsetHelper::emitAssignOpError($this->context);
+                        break;
+                    }
+                    // Class static property lvalues: do not promote away staticPropertyGlobal
+                    // (#32899 / #32035 coalesce peer).
+                    $leftLive = $this->context->hasVariableOp($leftProbeOp)
+                        ? $this->context->getVariableFromOp($leftProbeOp)
+                        : null;
+                    $inPlaceStaticProp = (int) $op->arg1 === (int) $op->arg2
+                        && null !== $leftLive
+                        && null !== $leftLive->staticPropertyGlobal;
+                    if (null !== $result->staticPropertyGlobal || $inPlaceStaticProp) {
+                        if ($inPlaceStaticProp && null === $result->staticPropertyGlobal) {
+                            $result = $leftLive;
+                            $this->context->setVariableOp($destOp, $result);
+                        }
+                        $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                        $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                        JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $left);
+                        $newVal = $this->compileConcatIntoNewString(
+                            $left,
+                            $right,
+                            $block->getOperand($op->arg2),
+                            $block->getOperand($op->arg3)
+                        );
+                        $this->assignOperand($destOp, $newVal, true);
+                        $this->maybeRefreshIncludeBindingsBeforeUse();
                         break;
                     }
                     if (Variable::TYPE_STRING === $result->type && Variable::KIND_VALUE === $result->kind) {
