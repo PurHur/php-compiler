@@ -351,28 +351,32 @@ final class JitValueBox
                 }
                 if (Variable::KIND_VALUE === $value->kind) {
                     // Untyped callee formals arrive as by-value __value__ at the LLVM edge.
-                    BasicBlockHelper::repositionToLastOpenIfInsertLost($context);
-                    if (!BasicBlockHelper::unsealAndContinue($context)) {
-                        BasicBlockHelper::ensureOpenInsertBlock($context, 'assign_formal_ptr');
-                    }
-                    $slot = self::alloc($context);
+                    // Script globals and other slots use __value__** — fall through to
+                    // valuePtrFromVariable (loads before structGep). #32660 regressed i10/i08.
                     $valTyName = $context->getStringFromType($value->value->typeOf());
-                    if ('__value__' === $valTyName) {
-                        $context->builder->store($value->value, $slot);
-                    } else {
-                        self::copyFromPointer(
+                    if ('__value__' === $valTyName || '__value__*' === $valTyName) {
+                        BasicBlockHelper::repositionToLastOpenIfInsertLost($context);
+                        if (!BasicBlockHelper::unsealAndContinue($context)) {
+                            BasicBlockHelper::ensureOpenInsertBlock($context, 'assign_formal_ptr');
+                        }
+                        $slot = self::alloc($context);
+                        if ('__value__' === $valTyName) {
+                            $context->builder->store($value->value, $slot);
+                        } else {
+                            self::copyFromPointer(
+                                $context,
+                                $slot,
+                                self::normalizeValuePtr($context, $value->value)
+                            );
+                        }
+                        self::copyIntoPointer(
                             $context,
-                            $slot,
-                            self::normalizeValuePtr($context, $value->value)
+                            $destPtr,
+                            self::pointer($context, $slot)
                         );
-                    }
-                    self::copyIntoPointer(
-                        $context,
-                        $destPtr,
-                        self::pointer($context, $slot)
-                    );
 
-                    return;
+                        return;
+                    }
                 }
                 self::copyIntoPointer(
                     $context,
