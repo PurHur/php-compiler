@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_public_encrypt() — asymmetric public-key encryption (php-src ext/openssl/xp.c; #6666).
+ * openssl_public_encrypt() — asymmetric public-key encryption (php-src ext/openssl/openssl.c; #6666 VM, JIT/AOT #32713).
  */
 final class openssl_public_encrypt extends Internal
 {
@@ -54,8 +54,19 @@ final class openssl_public_encrypt extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_public_encrypt() is not implemented for JIT in this compiler build (issue #6666)'
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError(
+                'openssl_public_encrypt() expects 3 or 4 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::publicEncrypt(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3] ?? null
         );
     }
 }

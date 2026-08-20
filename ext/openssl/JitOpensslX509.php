@@ -23,8 +23,9 @@ use PHPLLVM\Value;
  * openssl_csr_get_subject() (#32692 leftover of #6421),
  * openssl_csr_export() (#32697 leftover of #6421),
  * openssl_csr_export_to_file() (#32697 leftover of #6421),
- * openssl_pkey_export() (#32705 leftover of #6295), and
- * openssl_pkey_export_to_file() (#32705 leftover of #20287).
+ * openssl_pkey_export() (#32705 leftover of #6295),
+ * openssl_pkey_export_to_file() (#32705 leftover of #20287), and
+ * openssl_public_encrypt() (#32713 leftover of #6666).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -38,6 +39,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_csr_export_to_file)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_pkey_export) / PEM_write_bio_PrivateKey
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_pkey_export_to_file)
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_public_encrypt) / EVP_PKEY_encrypt
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -399,6 +401,69 @@ final class JitOpensslX509
         $context->builder->positionAtEnd($doneBlock);
 
         return $ptr;
+    }
+
+    /**
+     * openssl_public_encrypt() — bake {@see VmOpensslPkeyNative::encrypt} into &$encrypted.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_public_encrypt) / EVP_PKEY_encrypt
+     * By-ref $encrypted is written via __value__writeString (peer {@see self::pkeyExport}).
+     *
+     * PKCS#1 padding is non-deterministic; baking a ciphertext is still correct for a
+     * compiled binary (fixed bytes every run). Repros should assert bool + length.
+     */
+    public static function publicEncrypt(
+        Context $context,
+        JITVariable $data,
+        JITVariable $encrypted,
+        JITVariable $key,
+        ?JITVariable $padding = null
+    ): Value {
+        $plain = JitStringArg::compileTimeLiteral($data);
+        if (null === $plain) {
+            throw new \LogicException(
+                'openssl_public_encrypt() data must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32713)'
+            );
+        }
+        $pem = JitStringArg::compileTimeLiteral($key);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_public_encrypt() key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32713)'
+            );
+        }
+        $pad = OpensslConstants::OPENSSL_PKCS1_PADDING;
+        if (null !== $padding) {
+            $padLit = self::compileTimeInt($padding);
+            if (null === $padLit) {
+                throw new \LogicException(
+                    'openssl_public_encrypt() padding must be a compile-time int '
+                    .'for JIT/AOT in this compiler build (issue #32713)'
+                );
+            }
+            $pad = $padLit;
+        }
+
+        if (!VmOpensslPkeyNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $cipher = VmOpensslPkeyNative::encrypt($plain, $pem, $pad);
+        if (false === $cipher) {
+            return self::boxedFalse($context);
+        }
+
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $encrypted);
+        $str = $context->builder->load($context->constantStringFromString($cipher));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $outPtr,
+            $str
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
+
+        return self::boxedBool($context, true);
     }
 
     /**
