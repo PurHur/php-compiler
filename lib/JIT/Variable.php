@@ -610,6 +610,12 @@ final class Variable {
             $type = self::TYPE_NATIVE_LONG;
         } elseif ('int1' === $llvmType) {
             $type = self::TYPE_NATIVE_BOOL;
+        } elseif ('i8*' === $llvmType || 'char*' === $llvmType || 'int8*' === $llvmType) {
+            // Writable string-offset lvalue from ValueBoxDimWrite / StringOffsetHelper (#32764).
+            // Function-static string dims often have CFG-unknown result ops; without this,
+            // getTypeFromType yields TYPE_VALUE and isWritableCharOffsetLvalue rejects the
+            // char pointer so `$s[i]='Z'` is a no-op (#32814).
+            $type = self::TYPE_STRING;
         } else {
             $type = self::getTypeFromType($op->type);
         }

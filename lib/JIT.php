@@ -9099,10 +9099,18 @@ class JIT {
                     // function-static arrays are often CFG-typed string while the box holds a HT).
                     // Array-default function-statics are retyped to TYPE_ARRAY in DECLARE (#32806);
                     // do not skip script-local string dims via functionStaticGlobal (#32804 regression).
+                    // String-default function-statics often stay CFG-unknown: take ValueBoxDimWrite
+                    // for functionStaticGlobal unless CFG says array (#32814).
                     if (
                         $forWrite
                         && Variable::TYPE_VALUE === $value->type
-                        && JIT\ValueBoxDimWrite::containerCfgIsString($containerOp->type ?? null)
+                        && (
+                            JIT\ValueBoxDimWrite::containerCfgIsString($containerOp->type ?? null)
+                            || (
+                                $value->functionStaticGlobal
+                                && !JIT\ValueBoxDimWrite::containerCfgIsArray($containerOp->type ?? null)
+                            )
+                        )
                         && Variable::TYPE_STRING !== $dim->type
                         && Variable::TYPE_OBJECT !== $dim->type
                     ) {

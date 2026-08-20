@@ -107,11 +107,18 @@ final class FunctionStaticHelper
                 break;
             case Variable::TYPE_STRING:
                 // fromLiteral string slots are `__string__**` (alloca); writeString wants `*`.
+                // Always separate before storing into the function-static VALUE box — a bare
+                // constantString pointer is immutable, so later `$s[i]='Z'` via ValueBoxDimWrite
+                // appears to succeed but leaves the slot unchanged (#32814).
                 $strPtr = JitStringArg::lower($context, $default, 'function-static string');
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $strPtr
+                );
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),
                     $destPtr,
-                    $strPtr
+                    $owned
                 );
                 break;
             case Variable::TYPE_OBJECT:

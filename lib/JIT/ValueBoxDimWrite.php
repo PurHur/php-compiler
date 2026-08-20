@@ -86,4 +86,12 @@ final class ValueBoxDimWrite
     {
         return null !== $type && \PHPTypes\Type::TYPE_STRING === $type->type;
     }
+
+    /**
+     * True when CFG types the dim container as array (function-static array defaults, #32806).
+     */
+    public static function containerCfgIsArray(?\PHPTypes\Type $type): bool
+    {
+        return null !== $type && \PHPTypes\Type::TYPE_ARRAY === $type->type;
+    }
 }
