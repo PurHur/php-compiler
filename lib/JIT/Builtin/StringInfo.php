@@ -12,8 +12,10 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for __compiler_phpversion / __compiler_extension_loaded / … via InfoJitHelper PHP (#9148, #13803).
+ * JIT/AOT link for __compiler_phpversion / __compiler_extension_loaded / … via InfoJitHelper PHP (#9148, #13803, #32839).
  *
+ * Owns info ABI module-locally (getNamedFunction first) after Type always-on shells
+ * dropped (#32839 / #32122 name.1 class).
  * Thin {@see JitVmHelperLink} glue; standalone php_sapi_name uses a compile-time constant (#15633).
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmInfo}.
  * php-src: ext/standard/info.c
