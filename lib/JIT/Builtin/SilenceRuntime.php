@@ -12,11 +12,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT `@` silence + error_reporting via ErrorSilenceJitHelper PHP (#9197, #12809, #22751).
+ * JIT/AOT `@` silence + error_reporting via ErrorSilenceJitHelper PHP (#9197, #12809, #22751, #32779).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathModf #22519).
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\ErrorSilenceJitHelper}; thin LLVM bridges
  * forward the ABI. Replaces LLVM globals phpc_ini_silence_* and phpc_ini_error_reporting for silence paths.
+ * Owns begin/end silence + error_reporting ABI module-locally (getNamedFunction first)
+ * after Type always-on shells dropped (#32779 / #32122 name.1 class).
  * php-src: Zend/zend_execute.c — ZEND_SILENCE
  */
 final class SilenceRuntime

@@ -18,11 +18,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for ini_get/ini_set/ini_restore via IniJitHelper PHP (#9249, #21200).
+ * JIT/AOT link for ini_get/ini_set/ini_restore via IniJitHelper PHP (#9249, #21200, #32779).
  *
  * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\IniJitHelper}
  * via {@see JitVmHelperLink} (IncludePath #20877 / RandomBytes #21186 shape — no thin
  * false/nop stub fork). Semantics match {@see \PHPCompiler\ext\standard\VmIni}.
+ * Owns `__compiler_ini_*` ABI module-locally (getNamedFunction first) after Type
+ * always-on shells dropped (#32779 / #32122 name.1 class).
  * php-src: ext/standard/ini.c, main/php_ini.c
  */
 final class IniRuntime
