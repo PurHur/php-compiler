@@ -9,9 +9,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_hash_hmac_algos via HashAlgosJitHelper PHP (#18908, #19355, #20050, #20652, #28750, #30794).
+ * JIT/AOT link for __compiler_hash_hmac_algos via HashAlgosJitHelper PHP (#18908, #19355, #20050, #20652, #28750, #30794, #32875).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (password_algos #9908 / nextafter #28716 shape).
+ * Module-local ABI owner (ensureBridge getNamedFunction first): Builtin\Type no longer
+ * always-declares an empty shell (#32875 / peer #32451) — leftover Type decls mint
+ * hash_hmac_algos.1 (#31894 / #32122).
  * NestedJIT-safe inline list in {@see \PHPCompiler\ext\hash\HashAlgosJitHelper} — not cross-dir
  * {@see \PHPCompiler\ext\standard\HashAlgosRegistry} class consts (#30794).
  * SSOT for VM: {@see \PHPCompiler\ext\standard\VmHash::hmacAlgos()}

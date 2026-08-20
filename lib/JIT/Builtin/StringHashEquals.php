@@ -10,10 +10,13 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_hash_equals via HashEqualsJitHelper PHP (#9164, #20065, #20469).
+ * JIT/AOT link for __compiler_hash_equals via HashEqualsJitHelper PHP (#9164, #20065, #20469, #32875).
  *
  * Embed + thin standalone AOT: {@see HashEqualsJitHelper} via {@see JitVmHelperLink}
  * (Bin2hex #20452 / Addslashes #18391 shape — no hand-written XOR kernel).
+ * Module-local ABI owner (ensureBridge getNamedFunction first): Builtin\Type no longer
+ * always-declares an empty shell (#32875 / peer #32451) — leftover Type decls mint
+ * hash_equals.1 (#31894 / #32122).
  * SSOT: {@see \PHPCompiler\ext\standard\VmHash::equals}.
  * php-src: ext/hash/hash.c — hash_equals()
  */
