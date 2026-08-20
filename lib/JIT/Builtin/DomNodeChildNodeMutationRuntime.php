@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
+use PHPCompiler\ext\dom\JitDomChildNodeSiblingInsert;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\dom\JitDomGetNodePath;
@@ -73,14 +74,24 @@ final class DomNodeChildNodeMutationRuntime
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_childnode_'.$kind);
             $parent = self::loadParentObject($context, $receiver);
-            $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
             if ('before' === $kind || 'after' === $kind) {
                 if (!self::trySyncSiblingInsertInnerXml($context, $kind, $receiver, $parent, $extraArgs)) {
-                    // Fallback: prepend/append when compile-time anchor/index is unknown.
+                    $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
+                    $newChildVar = $extraArgs[0];
                     if ('before' === $kind) {
-                        DomNodeLiveMutationRuntime::invokePrepend($context, $extraArgCount, $parentVar, ...$extraArgs);
+                        JitDomChildNodeSiblingInsert::invokeBefore(
+                            $context,
+                            $parentVar,
+                            $newChildVar,
+                            $receiver
+                        );
                     } else {
-                        DomNodeLiveMutationRuntime::invokeAppend($context, $extraArgCount, $parentVar, ...$extraArgs);
+                        JitDomChildNodeSiblingInsert::invokeAfter(
+                            $context,
+                            $parentVar,
+                            $newChildVar,
+                            $receiver
+                        );
                     }
                 }
             } else {
