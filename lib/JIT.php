@@ -7551,6 +7551,29 @@ class JIT {
     }
 
     /**
+     * Lower a ?? / ??= arm at a pre-built entry BB after the test BB is sealed (#32880).
+     *
+     * Compiling arms before {@see Builder::branchIf} leaves the test BB open; NestedJIT /
+     * {@see JIT\BasicBlockHelper::ensureOpenInsertBlock} can resume into it (often
+     * {@code prop_value_done} after {@code new}) and plant a second terminator.
+     *
+     * @param list<Variable> $args
+     */
+    public function compileSubBlockAtEntry(
+        PHPLLVM\Value $func,
+        Block $block,
+        PHPLLVM\BasicBlock $entryBlock,
+        Variable ...$args
+    ): PHPLLVM\BasicBlock {
+        $limit = $block->nOpCodes;
+        if ($limit > 0 && OpCode::TYPE_JUMP === $block->opCodes[$limit - 1]->type) {
+            --$limit;
+        }
+
+        return $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, true, ...$args);
+    }
+
+    /**
      * Inline an included compilation unit at a dedicated entry block (issue #568 / MiniWebApp templates).
      */
     public function compileIncludedAtEntry(
@@ -11039,8 +11062,26 @@ class JIT {
                     // Branch from the block that defined $condition (e.g. sg_sk_done after $_SERVER['key']).
                     // Repositioning to $branchBlock caused invalid LLVM when ?? left uses multi-block reads (#866).
                     $coalesceTestBlock = $builder->getInsertBlock();
-                    $leftTail = JIT\CoalesceHelper::compileBranch($this, $func, $op->block1);
-                    $rightTail = JIT\CoalesceHelper::compileBranch($this, $func, $op->block2);
+                    // Seal the test BB before lowering arms (#32880). Compiling
+                    // PROPERTY_FETCH_WRITE first left prop_value_done open after `new`;
+                    // NestedJIT ensureOpenInsertBlock resumed there and planted a second br.
+                    if (!$func instanceof PHPLLVM\Value\Function_) {
+                        throw new \LogicException('TYPE_COALESCE expects an LLVM function');
+                    }
+                    self::$blockNumber++;
+                    $leftEntry = $func->appendBasicBlock('coalesce_left_' . self::$blockNumber);
+                    self::$blockNumber++;
+                    $rightEntry = $func->appendBasicBlock('coalesce_right_' . self::$blockNumber);
+                    $builder->positionAtEnd($coalesceTestBlock);
+                    if (null !== $coalesceTestBlock->getTerminator()) {
+                        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'coalesce_test_resume');
+                        $coalesceTestBlock = $builder->getInsertBlock() ?? $coalesceTestBlock;
+                        $builder->positionAtEnd($coalesceTestBlock);
+                    }
+                    // Do not free php-cfg "dead" operands here; ?? temps are used on branch/merge blocks (#99).
+                    $builder->branchIf($condition, $leftEntry, $rightEntry);
+                    $leftTail = JIT\CoalesceHelper::compileBranch($this, $func, $op->block1, $leftEntry);
+                    $rightTail = JIT\CoalesceHelper::compileBranch($this, $func, $op->block2, $rightEntry);
                     // Both branches compile; right-side literal metadata must not fold builtins (#764).
                     if ($this->context->hasVariableOp($coalesceResult)) {
                         $coalesceVar = $this->context->getVariableFromOp($coalesceResult);
@@ -11048,11 +11089,6 @@ class JIT {
                         $coalesceVar->compileTimeConstantName = null;
                         $coalesceVar->compileTimeEnumCase = null;
                     }
-                    $leftEntry = $this->jitBranchEntryBlock($op->block1, $func);
-                    $rightEntry = $this->jitBranchEntryBlock($op->block2, $func);
-                    $builder->positionAtEnd($coalesceTestBlock);
-                    // Do not free php-cfg "dead" operands here; ?? temps are used on branch/merge blocks (#99).
-                    $builder->branchIf($condition, $leftEntry, $rightEntry);
                     if (null !== $op->block3) {
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'coalesce_merge');
                         $builder->positionAtEnd($leftTail);

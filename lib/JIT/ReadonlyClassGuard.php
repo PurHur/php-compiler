@@ -497,9 +497,11 @@ final class ReadonlyClassGuard
         // insert BB yields parentless IR (untyped ctor promotion, #32349).
         // A premature `ret void` after the VALUE-slot GEP must be unsealed on the
         // *same* BB (values like the slot pointer must dominate the store).
+        // Do NOT erase a real branchIf (?? test BB sealed before ??= arms) — that
+        // orphaned coalesce_left/right and always took the write path (#32880).
         $entry = BasicBlockHelper::tryGetInsertBlock($context);
         if (null !== $entry && null !== $entry->getTerminator()) {
-            BasicBlockHelper::unsealAndContinue($context);
+            BasicBlockHelper::positionAfterPrematureVoidReturn($context, 'readonly_store_unseal');
             $entry = BasicBlockHelper::tryGetInsertBlock($context);
         }
         if (null === $entry) {
