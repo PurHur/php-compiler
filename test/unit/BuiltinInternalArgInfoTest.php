@@ -1722,6 +1722,7 @@ final class BuiltinInternalArgInfoTest extends TestCase
         foreach (['file_get_contents', 'fread', 'fgets'] as $f) {
             $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
         }
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('mime_content_type'));
         foreach (['file_put_contents', 'fwrite'] as $f) {
             $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
         }

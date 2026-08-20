@@ -182,6 +182,8 @@ final class BuiltinInternalArgInfo
             'file_get_contents', 'fread', 'fgets' => 'string|false',
             'fgetcsv' => 'array|false',
             'file_put_contents', 'fwrite', 'fputcsv' => 'int|false',
+            // ext/standard/file.stub.php — InternalArgInfo return string (missing |false) (#28341)
+            'mime_content_type' => 'string|false',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25750)
             'stream_get_contents' => 'string|false',
             // ext/standard/streamsfuncs.stub.php — InternalArgInfo return int (missing |false) (#27739)
