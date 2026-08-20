@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\DateIntervalFormatRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -26,8 +27,44 @@ final class JitDateIntervalFormat
     private const TYPE_ERROR =
         'date_interval_format(): Argument #1 ($object) must be of type DateInterval, %s given';
 
+    /**
+     * DateInterval::format($this, $format) — bake from construct stamp when possible (#32699).
+     *
+     * php-src: ext/date/php_date.c — zim_DateInterval_format
+     */
+    public static function invokeMethod(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if (2 !== $argc) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf(
+                    'DateInterval::format() expects exactly 1 argument, %d given',
+                    max(0, $argc - 1)
+                )
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dateinterval_format_argc_cont');
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ptr,
+                $context->builder->load($context->constantStringFromString(''))
+            );
+
+            return $ptr;
+        }
+
+        return self::invoke($context, $args[0], $args[1]);
+    }
+
     public static function invoke(Context $context, JITVariable $intervalArg, JITVariable $formatArg): Value
     {
+        $baked = self::tryCompileTimeFormat($context, $intervalArg, $formatArg);
+        if (null !== $baked) {
+            return $baked;
+        }
+
         DateIntervalFormatRuntime::ensureLinked($context);
 
         $format = JitStringBuiltinArg::lower(
@@ -76,6 +113,35 @@ final class JitDateIntervalFormat
         return JitValueBox::pointer($context, $slot);
     }
 
+    /** @return Value|null */
+    private static function tryCompileTimeFormat(
+        Context $context,
+        JITVariable $intervalArg,
+        JITVariable $formatArg
+    ): ?Value {
+        $state = $intervalArg->compileTimeDateInterval;
+        if (!\is_array($state)) {
+            return null;
+        }
+        $fmtLit = JitStringBuiltinArg::compileTimeLiteral($formatArg) ?? $formatArg->compileTimeString;
+        if (!\is_string($fmtLit)) {
+            return null;
+        }
+        if (!\array_key_exists('days', $state)) {
+            $state['days'] = false;
+        }
+        $formatted = VmDateInterval::format($state, $fmtLit);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $context->builder->load($context->constantStringFromString($formatted))
+        );
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
+
+        return $ptr;
+    }
+
     private static function requireDateIntervalObject(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_OBJECT === $arg->type) {
@@ -96,9 +162,11 @@ final class JitDateIntervalFormat
             $context->builder->structGep($valuePtr, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
+        // AOT boxes TYPE_OBJECT|IS_REFCOUNTED (0x85); compare the low 7 bits (#32688 / #32699).
+        $typeMasked = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $typeMasked,
             $i8->constInt(VmVariable::TYPE_OBJECT, false)
         );
         $okBlock = BasicBlockHelper::append($context, 'di_fmt_obj_ok');
@@ -190,9 +258,10 @@ final class JitDateIntervalFormat
         );
         $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
+        $typeMasked = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isInt = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $typeMasked,
             $i8->constInt(VmVariable::TYPE_INTEGER, false)
         );
         $intBlock = BasicBlockHelper::append($context, 'di_fmt_days_int');
