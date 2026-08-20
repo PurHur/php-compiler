@@ -30,6 +30,7 @@ final class SerializeNestedJitHelper
             return $value->toBool() ? 'b:1;' : 'b:0;';
         }
         if (2 === $t) {
+            // Top-level floats use ZendDoubleStringRuntime::formatSerializeWire (#31963).
             return 'd:'.((string) $value->toFloat()).';';
         }
         if (4 === $t) {
@@ -52,12 +53,43 @@ final class SerializeNestedJitHelper
             if (1 === $kt) {
                 $body .= 'i:'.((string) $key->toInt()).';';
             } else {
+                // Peer StrtrArrayJitHelper (#27056): (string) $pair[0] — not toString()
+                // (NestedJIT HT keys: toString() → "" ; (string) embeds content) (#32911).
                 $body .= self::quote((string) $key);
             }
             $val = $pair[1];
             $t = $val->type & 0x7f;
             if (6 === $t || 7 === $t) {
-                $body .= self::encodeHashtable($val->toArray(), $flags) ?? 'N;';
+                // NestedJIT: $val->toArray() / exportKeyValuePairs on pair values SIGABRT
+                // (#27031 / #32911). Peer JsonEncodeNestedJitHelper #27182: value-foreach
+                // packed chunks. Assoc nested string keys still need a follow-up.
+                $inner = '';
+                $in = 0;
+                $had = '0';
+                foreach ($val as $elem) {
+                    $had = '1';
+                    $inner .= 'i:'.((string) $in).';';
+                    $et = $elem->type & 0x7f;
+                    if (1 === $et) {
+                        $inner .= 'i:'.((string) $elem->toInt()).';';
+                    } elseif (0 === $et) {
+                        $inner .= 'N;';
+                    } elseif (3 === $et) {
+                        $inner .= $elem->toBool() ? 'b:1;' : 'b:0;';
+                    } elseif (4 === $et) {
+                        $inner .= self::quote($elem->toString());
+                    } elseif (2 === $et) {
+                        $inner .= 'd:'.((string) $elem->toFloat()).';';
+                    } else {
+                        $inner .= 'i:'.((string) $elem->toInt()).';';
+                    }
+                    ++$in;
+                }
+                if ('1' === $had) {
+                    $body .= 'a:'.((string) $in).':{'.$inner.'}';
+                } else {
+                    $body .= 'N;';
+                }
             } elseif (1 === $t) {
                 $body .= 'i:'.((string) $val->toInt()).';';
             } elseif (0 === $t) {
@@ -69,8 +101,32 @@ final class SerializeNestedJitHelper
             } elseif (4 === $t) {
                 $body .= self::quote($val->toString());
             } else {
-                // Peer #27182: helper-runtime / NestedJIT may lack type 6/7 on values.
-                $body .= 'i:'.((string) $val->toInt()).';';
+                // #27182: NestedJIT nested HTs often lack type 6/7 — value-foreach.
+                $inner = '';
+                $in = 0;
+                $had = '0';
+                foreach ($val as $elem) {
+                    $had = '1';
+                    $inner .= 'i:'.((string) $in).';';
+                    $et = $elem->type & 0x7f;
+                    if (1 === $et) {
+                        $inner .= 'i:'.((string) $elem->toInt()).';';
+                    } elseif (0 === $et) {
+                        $inner .= 'N;';
+                    } elseif (3 === $et) {
+                        $inner .= $elem->toBool() ? 'b:1;' : 'b:0;';
+                    } elseif (4 === $et) {
+                        $inner .= self::quote($elem->toString());
+                    } else {
+                        $inner .= 'i:'.((string) $elem->toInt()).';';
+                    }
+                    ++$in;
+                }
+                if ('1' === $had) {
+                    $body .= 'a:'.((string) $in).':{'.$inner.'}';
+                } else {
+                    $body .= 'N;';
+                }
             }
             ++$n;
         }
@@ -81,16 +137,22 @@ final class SerializeNestedJitHelper
     /**
      * Serialize string wire `s:len:"…";` (length-prefixed — no escape).
      *
+     * NestedJIT: `\strlen` on HT-key casts is 0 while content still embeds in concat
+     * (#21900 / #32911). Count with isset on a twin string — indexing the wire
+     * payload itself can clear it for later concat (peer StrtrArrayJitHelper #27056).
+     *
      * @param mixed $s NestedJIT toString may yield null
      */
     private static function quote($s): string
     {
         if (null === $s) {
             $s = '';
-        } else {
-            $s = $s.'';
         }
-        $n = \strlen($s);
+        $walk = $s.'';
+        $n = 0;
+        while (isset($walk[$n])) {
+            ++$n;
+        }
 
         return 's:'.((string) $n).':"'.$s.'";';
     }

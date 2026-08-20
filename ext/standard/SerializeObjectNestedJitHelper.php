@@ -37,9 +37,14 @@ final class SerializeObjectNestedJitHelper
         $body = '';
         $n = 0;
         foreach ($props->exportKeyValuePairs(true) as $pair) {
-            // NestedJIT: (string) cast on pair slots (peer StrtrArrayJitHelper #27056).
+            // Peer SerializeNestedJitHelper / StrtrArrayJitHelper (#32911 / #27056).
             $ks = (string) $pair[0];
-            $body .= 's:'.((string) \strlen($ks)).':"'.$ks.'";';
+            $walk = $ks.'';
+            $klen = 0;
+            while (isset($walk[$klen])) {
+                ++$klen;
+            }
+            $body .= 's:'.((string) $klen).':"'.$ks.'";';
             $val = $pair[1];
             $t = $val->type & 0x7f;
             if (1 === $t) {
@@ -51,8 +56,16 @@ final class SerializeObjectNestedJitHelper
             } elseif (2 === $t) {
                 $body .= 'd:'.((string) $val->toFloat()).';';
             } elseif (4 === $t) {
-                $vs = (string) $val;
-                $body .= 's:'.((string) \strlen($vs)).':"'.$vs.'";';
+                $vs = $val->toString();
+                if (null === $vs) {
+                    $vs = '';
+                }
+                $vwalk = $vs.'';
+                $vlen = 0;
+                while (isset($vwalk[$vlen])) {
+                    ++$vlen;
+                }
+                $body .= 's:'.((string) $vlen).':"'.$vs.'";';
             } else {
                 $body .= 'i:'.((string) $val->toInt()).';';
             }
