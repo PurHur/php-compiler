@@ -11,6 +11,7 @@ use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\dom\JitDomGetNodePath;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\ext\dom\JitDomNodeChildProperty;
+use PHPCompiler\ext\dom\JitDomReplaceChild;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
@@ -97,8 +98,16 @@ final class DomNodeChildNodeMutationRuntime
                     );
                 }
             } else {
-                // replaceWith: replace parent InnerXml with the new node markup (#26752).
-                self::storeInnerXmlFromArgs($context, $parent, $extraArgs);
+                // replaceWith: LiveSlots + InnerXml sibling-preserving rewrite (#32822 /
+                // peer replaceChild #32784). storeInnerXmlFromArgs alone wiped siblings
+                // and left held childNodes pins on the old node.
+                $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
+                JitDomReplaceChild::syncUserScriptReplaceSlotsPublic(
+                    $context,
+                    $parentVar,
+                    $extraArgs[0],
+                    $receiver
+                );
             }
 
             return self::nullValuePtr($context);
