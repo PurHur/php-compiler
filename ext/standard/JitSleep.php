@@ -43,6 +43,7 @@ final class JitSleep
 
     public static function timeNanosleep(Context $context, Value $seconds, Value $nanoseconds): Value
     {
+        // TimeSleepRuntime owns ABI after Type always-on drop (#32721).
         TimeSleepRuntime::ensureLinked($context);
 
         $ok = $context->builder->call(
@@ -61,6 +62,7 @@ final class JitSleep
 
     public static function timeSleepUntil(Context $context, JITVariable $arg): Value
     {
+        // TimeSleepRuntime owns ABI after Type always-on drop (#32721).
         TimeSleepRuntime::ensureLinked($context);
 
         $target = JitFdiv::lowerSingleOperand($context, $arg, 1, 'timestamp', 'time_sleep_until', 'float');

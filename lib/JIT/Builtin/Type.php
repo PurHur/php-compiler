@@ -726,19 +726,12 @@ class Type extends Builtin {
         // Type addFunction vs Runtime ABI drift mints hrtime_ns.1 (#31894 / #32122).
         // Ns return ABI stays on the owner: i64 vs double per
         // CompilerVersion::supportsHrtimeAsNumberFloat() (#26910).
-        $i32 = $this->context->getTypeFromString('int32');
-        $fntypeTimeNanosleep = $this->context->context->functionType($i32, false, $i64, $i64);
-        $fnTimeNanosleep = $this->context->module->addFunction(
-            '__compiler_time_nanosleep',
-            $fntypeTimeNanosleep
-        );
-        $this->context->registerFunction('__compiler_time_nanosleep', $fnTimeNanosleep);
-        $fntypeTimeSleepUntil = $this->context->context->functionType($i32, false, $double);
-        $fnTimeSleepUntil = $this->context->module->addFunction(
-            '__compiler_time_sleep_until',
-            $fntypeTimeSleepUntil
-        );
-        $this->context->registerFunction('__compiler_time_sleep_until', $fnTimeSleepUntil);
+        // __compiler_time_nanosleep / __compiler_time_sleep_until always-on shells
+        // removed (#32721): user-script time_nanosleep()/time_sleep_until() stay
+        // JitSleep / SleepJitHelper / VmSleepPure (php-src ext/standard/basic_functions.c).
+        // NestedJIT/AOT bridge is TimeSleepRuntime (getNamedFunction first +
+        // JitVmHelperLink::ensureBridge). Leftover Type addFunction vs Runtime ABI
+        // drift mints time_nanosleep.1 (#31894 / #32122).
         $fntypePasswordRandomBytes = $this->context->context->functionType($strPtr, false, $i64);
         $fnPasswordRandomBytes = $this->context->module->addFunction(
             '__compiler_password_random_bytes',

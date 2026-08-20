@@ -39,6 +39,7 @@ final class TimeSleepRuntimeStandaloneTest extends TestCase
         try {
             $runtime = new Runtime(Runtime::MODE_AOT);
             $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+            TimeSleepRuntime::ensureLinked($ctx);
             foreach (['__compiler_time_nanosleep', '__compiler_time_sleep_until'] as $name) {
                 $fn = $ctx->lookupFunction($name);
                 $this->assertNotNull($fn, $name);
@@ -46,6 +47,7 @@ final class TimeSleepRuntimeStandaloneTest extends TestCase
             }
             $runtimeSource = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/TimeSleepRuntime.php');
             $this->assertStringNotContainsString('TimeSleepRuntimeLibcBridge', $runtimeSource);
+            $this->assertStringContainsString('#32721', $runtimeSource);
         } finally {
             if (false === $prevEmit || null === $prevEmit) {
                 \putenv('PHP_COMPILER_EMIT_HELPER_LINK=');
