@@ -10,10 +10,15 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for openssl_digest() via OpensslDigestJitHelper PHP (#21081, #22554).
+ * JIT/AOT link for openssl_digest() via OpensslDigestJitHelper PHP (#21081, #22554, #32868).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathModf #22519).
  * Peer of {@see OpensslEncryptRuntime}. SSOT: {@see \PHPCompiler\ext\openssl\VmOpenssl::digest}
+ *
+ * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
+ * an empty shell (#32868 / peer #32866) — leftover Type decls mint openssl_digest.1
+ * (#31894 / #32122).
+ *
  * php-src: ext/openssl/openssl.c
  */
 final class OpensslDigestRuntime
@@ -77,10 +82,35 @@ final class OpensslDigestRuntime
             return;
         }
 
-        $fn = $context->lookupFunction($name);
+        $fn = self::declareAbi($context, $name, $probe);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function declareAbi(Context $context, string $name, ?LlvmFunction $probe): LlvmFunction
+    {
+        if (null !== $probe) {
+            return $probe;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+
+        $ft = match ($name) {
+            '__compiler_openssl_digest' => $context->context->functionType(
+                $strPtr,
+                false,
+                $strPtr,
+                $strPtr,
+                $i64
+            ),
+            default => throw new \LogicException(
+                'OpensslDigestRuntime unknown ABI '.$name.' (#32868)'
+            ),
+        };
+
+        return $context->module->addFunction($name, $ft);
     }
 
     private static function implementDigestBridge(Context $context, LlvmFunction $fn): void
