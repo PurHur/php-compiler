@@ -9,11 +9,14 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_strip_tags via StripTagsJitHelper PHP (#9196, #21711).
+ * JIT/AOT link for __compiler_strip_tags via StripTagsJitHelper PHP (#9196, #21711, #32971).
  *
- * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
- * env clear — no hand-rolled NestedJit compile loop). Peer: StringVersionCompare #21706 /
- * StringUrldecode #21686 / StringCslashes #21617.
+ * Owns the ABI module-locally: {@see getNamedFunction} first, then
+ * {@see JitVmHelperLink::ensureBridge} (addFunction if absent). Do not re-add empty
+ * always-on shells in {@see Type} — leftover decls mint strip_tags.1 (#31894 / #32122).
+ * Nested helper compile: HelperRuntimeCache + user-script env clear — no hand-rolled
+ * NestedJit compile loop. Peer: StringVersionCompare #21706 / StringUrldecode #21686 /
+ * StringCslashes #21617 / StringVarExport #32941.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(strip_tags)
  */

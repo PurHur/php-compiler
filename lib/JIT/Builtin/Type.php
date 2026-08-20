@@ -87,14 +87,12 @@ class Type extends Builtin {
         // Type::register still ensureLinked via IniRuntime). Leftover Type empty decls
         // vs Runtime ABI drift mints ini_get.1 / begin_silence.1 (#31894 / #32122).
         // User-script ini_get()/ini_set()/@ stay IniJitHelper / ErrorSilenceJitHelper.
-        $fntypeStripTags = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnStripTags = $this->context->module->addFunction('__compiler_strip_tags', $fntypeStripTags);
-        $this->context->registerFunction('__compiler_strip_tags', $fnStripTags);
+        // __compiler_strip_tags always-on shell removed (#32971): StringStripTags owns
+        // the ABI (getNamedFunction first, then addFunction if absent via
+        // JitVmHelperLink::ensureBridge; Type::initialize still ensureLinked). Thin AOT
+        // already calls StringStripTags::ensureLinked from ext/standard/strip_tags.php.
+        // Leftover Type empty decls vs Runtime ABI drift mint strip_tags.1 (#31894 / #32122).
+        // User-script strip_tags() stays StripTagsJitHelper / VmString.
         $i64 = $this->context->getTypeFromString('int64');
         $fntypeUtf8Strlen = $this->context->context->functionType(
             $i64,
@@ -1035,6 +1033,7 @@ class Type extends Builtin {
         StringVarExport::ensureLinked($this->context);
         StringPrintR::ensureLinked($this->context);
         StringVarDump::ensureLinked($this->context);
+        StringStripTags::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
