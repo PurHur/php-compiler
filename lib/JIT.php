@@ -10827,6 +10827,10 @@ class JIT {
                         JIT\StringOffsetHelper::emitAssignOpError($this->context);
                         break;
                     }
+                    // FETCH_DIM_W assign-op ($a[i] += n): hydrate orphan box before the read (#32789).
+                    if (null !== $binLeft->writableHt) {
+                        JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $binLeft);
+                    }
                     $this->assignOperand(
                         $binDestOp,
                         $this->compileBinaryOp(
@@ -19860,7 +19864,8 @@ class JIT {
 
         if ($this->isIncDecValueBoxLvalue($read, $readOp)) {
             $this->guardIncDecResourceOperand($read, $increment, $readOp);
-            JIT\HashTableHelper::hydrateIndexWriteLvalue($this->context, $read);
+            // Index / string-key / value-box-key FETCH_DIM_W (#32305, #32789).
+            JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $read);
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $cur = $this->readIncDecValueBoxLong($read, $readPtr, $increment);
             if (!$prefix) {
@@ -19878,7 +19883,7 @@ class JIT {
             }
             $write = $this->context->getVariableFromOpInScopes($writeOp);
             if ($write !== $read) {
-                JIT\HashTableHelper::hydrateIndexWriteLvalue($this->context, $write);
+                JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $write);
             }
             $writePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $write);
             // zend_operators.c decrement_function IS_NULL is a no-op (#32297 / #7435).
@@ -19909,7 +19914,7 @@ class JIT {
                 // zend_operators.c IS_DOUBLE ± 1.0; else zend_operators.h long overflow (#32281 / #29144).
                 JIT\JitIncDec::writeValueBoxIncDec($this->context, $read, $cur, $writePtr, $increment);
             }
-            JIT\HashTableHelper::commitIndexWriteLvalue($this->context, $write);
+            JIT\HashTableHelper::commitDimWriteLvalue($this->context, $write);
             $this->invalidateScriptGlobalCompileTimeMetadata($write);
             if ($prefix) {
                 $newVar = new Variable(
