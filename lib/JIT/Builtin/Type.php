@@ -141,17 +141,11 @@ class Type extends Builtin {
         // User-script get_include_path()/set_include_path()/
         // stream_resolve_include_path() stay IncludePathJitHelper /
         // IncludePathResolveJitHelper.
-        $fntypeGetMetaTags = $this->context->context->functionType(
-            $this->context->getTypeFromString('__hashtable__*'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('int1')
-        );
-        $fnGetMetaTags = $this->context->module->addFunction(
-            '__compiler_get_meta_tags',
-            $fntypeGetMetaTags
-        );
-        $this->context->registerFunction('__compiler_get_meta_tags', $fnGetMetaTags);
+        // __compiler_get_meta_tags always-on shell removed (#33035): MetaTagsRuntime
+        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
+        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // get_meta_tags.1 (#31894 / #32122). User-script get_meta_tags() stays
+        // MetaTagsJitHelper / VmMetaTags.
         $fntypeGetHeaders = $this->context->context->functionType(
             $this->context->getTypeFromString('__hashtable__*'),
             false,
@@ -1022,6 +1016,7 @@ class Type extends Builtin {
         StringReadfile::ensureLinked($this->context);
         StringFileGetContents::ensureLinked($this->context);
         MimeContentTypeRuntime::ensureLinked($this->context);
+        MetaTagsRuntime::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);

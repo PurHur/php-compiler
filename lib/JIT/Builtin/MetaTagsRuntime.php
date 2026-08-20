@@ -4,32 +4,35 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_get_meta_tags via MetaTagsJitHelper PHP (#9338, #26568).
+ * JIT/AOT link for __compiler_get_meta_tags via MetaTagsJitHelper (#9338, #26568, #33035).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GcCollectCyclesCollectRuntime #26532).
- * Replaces ~650-line LLVM HTML walker; SSOT {@see \PHPCompiler\ext\standard\VmMetaTags}.
+ * Owns ABI module-locally (getNamedFunction first, addFunction if absent). Do not re-add
+ * Type always-on shells — leftover decls mint get_meta_tags.1 (#31894 / #32122).
+ * Call-site ensureLinked restores the caller insert block (peer GetHeadersRuntime #27317).
  * php-src: ext/standard/php_meta_tags.c — PHP_FUNCTION(get_meta_tags)
  */
 final class MetaTagsRuntime
 {
     private const ABI_NAME = '__compiler_get_meta_tags';
-
     private const HELPER_PATH = '/ext/standard/MetaTagsJitHelper.php';
-
     private const GET_META_TAGS_HELPER = 'PHPCompiler\\ext\\standard\\MetaTagsJitHelper::getMetaTags';
 
     /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::GET_META_TAGS_HELPER,
-    ];
+    private const COMPILED_HELPERS = [self::GET_META_TAGS_HELPER];
 
     public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
     {
         self::implement($context);
     }
@@ -43,10 +46,15 @@ final class MetaTagsRuntime
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementGetMetaTagsBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementGetMetaTagsBridge(Context $context): void
@@ -73,8 +81,7 @@ final class MetaTagsRuntime
             self::helperFunction($context, self::GET_META_TAGS_HELPER),
             [$fn->getParam(0), $fn->getParam(1)]
         );
-        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
-        $context->builder->returnValue($ht);
+        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
         $context->registerFunction(self::ABI_NAME, $fn);
     }
 
