@@ -151,11 +151,7 @@ final class JitDomInsertBefore
         $context->builder->branchIf($shouldSetFec, $setFec, $afterFec);
 
         $context->builder->positionAtEnd($setFec);
-        $objectType->propertyStore(
-            JitDomParentChildLinkLayout::firstElementChildSlot($context, $parent),
-            $newJit,
-            JITVariable::TYPE_VALUE
-        );
+        JitDomParentChildLinkLayout::storeFirstElementChild($context, $parent, $newJit);
         $context->builder->branch($afterFec);
 
         $context->builder->positionAtEnd($afterFec);

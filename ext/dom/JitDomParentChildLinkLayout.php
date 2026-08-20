@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * Parent firstChild/lastChild slot layout for thin-AOT DOM trees (#32611).
  *
- * DOMDocument stores child edges on {@see DOMNode} (peer {@see JitDomAppendChildUserScript}).
+ * DOMDocument stores child edges on {@see DOMDocument} (peer {@see JitDomAppendChildUserScript}).
  * DOMElement createElement nodes use {@see DOMElement} — DOMNode firstChild clobbers tagName (#32361).
  *
  * php-src: ext/dom/node.c dom_node_children / xmlAddChild
@@ -32,6 +32,7 @@ final class JitDomParentChildLinkLayout
         $objectType = $context->type->object;
         $nodeClassId = $objectType->lookup(self::CLASS_NODE);
         $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
         foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
             if (!$objectType->hasProperty($nodeClassId, $prop)) {
                 $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
@@ -39,9 +40,15 @@ final class JitDomParentChildLinkLayout
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
+            if (!$objectType->hasProperty($docClassId, $prop)) {
+                $objectType->defineProperty($docClassId, $prop, JITVariable::TYPE_VALUE);
+            }
         }
         if (!$objectType->hasProperty($elementClassId, VmDom::PROP_FIRST_ELEMENT_CHILD)) {
             $objectType->defineProperty($elementClassId, VmDom::PROP_FIRST_ELEMENT_CHILD, JITVariable::TYPE_VALUE);
+        }
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_FIRST_ELEMENT_CHILD)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_FIRST_ELEMENT_CHILD, JITVariable::TYPE_VALUE);
         }
     }
 
@@ -77,12 +84,9 @@ final class JitDomParentChildLinkLayout
 
     public static function loadFirstElementChild(Context $context, Value $parent, string $labelPrefix): Value
     {
-        self::ensureChildEdgeProperties($context);
-
-        return self::loadLink(
+        return self::loadParentElementChildEdge(
             $context,
             $parent,
-            self::CLASS_ELEMENT,
             VmDom::PROP_FIRST_ELEMENT_CHILD,
             $labelPrefix.'_fec'
         );
@@ -99,6 +103,36 @@ final class JitDomParentChildLinkLayout
         );
     }
 
+    public static function storeFirstElementChild(Context $context, Value $parent, JITVariable $value): void
+    {
+        self::ensureChildEdgeProperties($context);
+        $isDoc = self::isDocument($context, $parent, 'dom_pcl_store_fec');
+        $bbDoc = BasicBlockHelper::append($context, 'dom_pcl_store_fec_doc');
+        $bbEl = BasicBlockHelper::append($context, 'dom_pcl_store_fec_el');
+        $merge = BasicBlockHelper::append($context, 'dom_pcl_store_fec_done');
+        $context->builder->branchIf($isDoc, $bbDoc, $bbEl);
+
+        $objectType = $context->type->object;
+
+        $context->builder->positionAtEnd($bbDoc);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($parent, self::CLASS_DOCUMENT, VmDom::PROP_FIRST_ELEMENT_CHILD),
+            $value,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($bbEl);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($parent, self::CLASS_ELEMENT, VmDom::PROP_FIRST_ELEMENT_CHILD),
+            $value,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+    }
+
     private static function loadChildEdge(Context $context, Value $parent, string $prop, string $labelPrefix): Value
     {
         self::ensureChildEdgeProperties($context);
@@ -113,7 +147,7 @@ final class JitDomParentChildLinkLayout
         $objPtrTy = $context->getTypeFromString('__object__*');
 
         $context->builder->positionAtEnd($bbDoc);
-        $docVal = self::loadLinkFlat($context, $parent, self::CLASS_NODE, $prop, $labelPrefix.'_read_doc');
+        $docVal = self::loadLinkFlat($context, $parent, self::CLASS_DOCUMENT, $prop, $labelPrefix.'_read_doc');
         $context->builder->branch($bbDocDone);
 
         $context->builder->positionAtEnd($bbEl);
@@ -151,7 +185,7 @@ final class JitDomParentChildLinkLayout
 
         $context->builder->positionAtEnd($bbDoc);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($parent, self::CLASS_NODE, $prop),
+            $objectType->propertySlotFor($parent, self::CLASS_DOCUMENT, $prop),
             $value,
             JITVariable::TYPE_VALUE
         );
@@ -168,6 +202,45 @@ final class JitDomParentChildLinkLayout
         $context->builder->positionAtEnd($merge);
     }
 
+    private static function loadParentElementChildEdge(
+        Context $context,
+        Value $parent,
+        string $prop,
+        string $labelPrefix
+    ): Value {
+        self::ensureChildEdgeProperties($context);
+        $isDoc = self::isDocument($context, $parent, $labelPrefix);
+        $bbDoc = BasicBlockHelper::append($context, $labelPrefix.'_doc');
+        $bbEl = BasicBlockHelper::append($context, $labelPrefix.'_el');
+        $bbDocDone = BasicBlockHelper::append($context, $labelPrefix.'_doc_done');
+        $bbElDone = BasicBlockHelper::append($context, $labelPrefix.'_el_done');
+        $merge = BasicBlockHelper::append($context, $labelPrefix.'_merge');
+        $context->builder->branchIf($isDoc, $bbDoc, $bbEl);
+
+        $objPtrTy = $context->getTypeFromString('__object__*');
+
+        $context->builder->positionAtEnd($bbDoc);
+        $docVal = self::loadLinkFlat($context, $parent, self::CLASS_DOCUMENT, $prop, $labelPrefix.'_read_doc');
+        $context->builder->branch($bbDocDone);
+
+        $context->builder->positionAtEnd($bbEl);
+        $elVal = self::loadLinkFlat($context, $parent, self::CLASS_ELEMENT, $prop, $labelPrefix.'_read_el');
+        $context->builder->branch($bbElDone);
+
+        $context->builder->positionAtEnd($bbDocDone);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($bbElDone);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($objPtrTy);
+        $phi->addIncoming($docVal, $bbDocDone);
+        $phi->addIncoming($elVal, $bbElDone);
+
+        return $phi;
+    }
+
     private static function childEdgeSlotPhi(Context $context, Value $parent, string $prop, string $labelPrefix): Value
     {
         self::ensureChildEdgeProperties($context);
@@ -182,7 +255,7 @@ final class JitDomParentChildLinkLayout
         $objectType = $context->type->object;
 
         $context->builder->positionAtEnd($bbDoc);
-        $docSlot = $objectType->propertySlotFor($parent, self::CLASS_NODE, $prop);
+        $docSlot = $objectType->propertySlotFor($parent, self::CLASS_DOCUMENT, $prop);
         $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($bbEl);
