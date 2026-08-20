@@ -65,6 +65,17 @@ final class ObjectInstancePropertyLlvm
         if (\PHPCompiler\ext\dom\JitDomChildNodesProperty::isDomChildNodesProperty($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomChildNodesProperty::fetch($object, $obj);
         }
+        if (!$forWrite) {
+            $asProps = \PHPCompiler\VM\ArrayObjectJitHelper::tryPropertyFetchRead(
+                $object,
+                $obj,
+                $class,
+                $name
+            );
+            if (null !== $asProps) {
+                return $asProps;
+            }
+        }
 
         return self::propertyFetchDeclaredSlot($object, $obj, $class, $name, $classId, $forWrite);
     }
