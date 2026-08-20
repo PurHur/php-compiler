@@ -65,6 +65,7 @@ final class PregJitHelper
         if (0 === $code) {
             return 0;
         }
+        PregAotFastPath::syncCaptureGroupCapsAfterMatch($pattern);
 
         return 1;
     }
