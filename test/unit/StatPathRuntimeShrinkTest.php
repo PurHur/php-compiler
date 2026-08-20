@@ -97,6 +97,8 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('phpc_stat_mode_kernel', $source);
         $this->assertStringContainsString('phpc_access_kernel', $source);
         $this->assertStringNotContainsString('VmStatPath::', $source);
+        // NestedJIT VmOpenBasedir statics read as active under thin AOT (#32741); VM call sites enforce.
+        $this->assertStringNotContainsString('VmOpenBasedir::', $source);
         $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStatKernel.php');
         $this->assertStringContainsString("lookupFunction(\$statFn)", $kernel);
         $this->assertStringContainsString("lookupFunction('access')", $kernel);
