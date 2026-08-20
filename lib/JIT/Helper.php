@@ -317,20 +317,35 @@ return_string:
             || OpCode::TYPE_NOT_EQUAL === $opcode->type
             || OpCode::TYPE_NOT_IDENTICAL === $opcode->type
         ) {
+            $isIdenticalOp = OpCode::TYPE_IDENTICAL === $opcode->type
+                || OpCode::TYPE_NOT_IDENTICAL === $opcode->type;
             $negate = OpCode::TYPE_NOT_EQUAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type;
             // Only native TYPE_STRING literals — VALUE boxes can carry compileTimeString
             // from boxed string literals; loadValue then yields `__value__` / `__value__*`
             // and VmStringCompare::identical structGep crashes (#24429 sockets SIGSEGV).
+            // Loose == must numeric-convert (Zend compare_function), not identical (#32883).
             if (
                 null !== $right->compileTimeString
                 && Variable::TYPE_STRING === $right->type
                 && JitValueBox::isValueOperand($left)
             ) {
-                $result = JitStringCompare::identicalStringToValue(
-                    $this->context,
-                    $rightValue,
-                    $left
-                );
+                if ($isIdenticalOp) {
+                    $result = JitStringCompare::identicalStringToValue(
+                        $this->context,
+                        $rightValue,
+                        $left
+                    );
+                } else {
+                    $boxedObjEq = $this->tryValueBoxObjectStringLooseEqual($opcode, $left, $rightValue);
+                    if (null !== $boxedObjEq) {
+                        return $boxedObjEq;
+                    }
+                    $asDouble = \PHPCompiler\VM\VmValueCompare::stringToDouble($this->context, $rightValue);
+                    $result = $this->context->builder->and(
+                        \PHPCompiler\VM\VmValueCompare::stringIsNumeric($this->context, $rightValue),
+                        JitValueCompare::looseEqualValueToNativeDouble($this->context, $left, $asDouble)
+                    );
+                }
                 if ($negate) {
                     $result = $this->context->builder->xor(
                         $result,
@@ -344,11 +359,23 @@ return_string:
                 && Variable::TYPE_STRING === $left->type
                 && JitValueBox::isValueOperand($right)
             ) {
-                $result = JitStringCompare::identicalStringToValue(
-                    $this->context,
-                    $leftValue,
-                    $right
-                );
+                if ($isIdenticalOp) {
+                    $result = JitStringCompare::identicalStringToValue(
+                        $this->context,
+                        $leftValue,
+                        $right
+                    );
+                } else {
+                    $boxedObjEq = $this->tryValueBoxObjectStringLooseEqual($opcode, $right, $leftValue);
+                    if (null !== $boxedObjEq) {
+                        return $boxedObjEq;
+                    }
+                    $asDouble = \PHPCompiler\VM\VmValueCompare::stringToDouble($this->context, $leftValue);
+                    $result = $this->context->builder->and(
+                        \PHPCompiler\VM\VmValueCompare::stringIsNumeric($this->context, $leftValue),
+                        JitValueCompare::looseEqualValueToNativeDouble($this->context, $right, $asDouble)
+                    );
+                }
                 if ($negate) {
                     $result = $this->context->builder->xor(
                         $result,
@@ -945,20 +972,36 @@ restart:
                 goto return_bool;
         }
         if (Variable::TYPE_STRING === $leftType && Variable::TYPE_VALUE === $rightType) {
-            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
-                $boxedObjEq = $this->tryValueBoxObjectStringLooseEqual($opcode, $right, $leftValue);
-                if (null !== $boxedObjEq) {
-                    return $boxedObjEq;
-                }
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = JitStringCompare::identicalValueToString($this->context, $right, $leftValue);
                 goto return_bool;
             }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $same = JitStringCompare::identicalValueToString($this->context, $right, $leftValue);
                 $result = $this->context->builder->xor(
                     $same,
                     $this->context->getTypeFromString('int1')->constInt(1, false)
                 );
+                goto return_bool;
+            }
+            // Loose == / != : numeric-string ⊙ boxed float/long (Zend compare_function, #32883).
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $boxedObjEq = $this->tryValueBoxObjectStringLooseEqual($opcode, $right, $leftValue);
+                if (null !== $boxedObjEq) {
+                    return $boxedObjEq;
+                }
+                $asDouble = \PHPCompiler\VM\VmValueCompare::stringToDouble($this->context, $leftValue);
+                $eq = $this->context->builder->and(
+                    \PHPCompiler\VM\VmValueCompare::stringIsNumeric($this->context, $leftValue),
+                    JitValueCompare::looseEqualValueToNativeDouble($this->context, $right, $asDouble)
+                );
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $eq = $this->context->builder->xor(
+                        $eq,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                }
+                $result = $eq;
                 goto return_bool;
             }
             // NestedJIT string-offset fetch is TYPE_VALUE; `$ch < '0'` is STRING?VALUE (#27239).
@@ -996,12 +1039,6 @@ restart:
             }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_STRING === $rightType) {
-            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
-                $boxedObjEq = $this->tryValueBoxObjectStringLooseEqual($opcode, $left, $rightValue);
-                if (null !== $boxedObjEq) {
-                    return $boxedObjEq;
-                }
-            }
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = JitStringCompare::identicalStringToValue(
                     $this->context,
@@ -1016,27 +1053,25 @@ restart:
                 }
                 goto return_bool;
             }
+            // Loose == / != : boxed float/long ⊙ numeric-string (Zend compare_function, #32883).
+            // Prior spaceship path compared float→string form ("1.5" vs "1.500…") and mismatched Zend.
             if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                Builtin\SpaceshipRuntime::ensureLinked($this->context);
-                $tmp = JitValueBox::alloc($this->context);
-                $this->context->builder->call(
-                    $this->context->lookupFunction('__value__writeString'),
-                    JitValueBox::pointer($this->context, $tmp),
-                    $rightValue
+                $boxedObjEq = $this->tryValueBoxObjectStringLooseEqual($opcode, $left, $rightValue);
+                if (null !== $boxedObjEq) {
+                    return $boxedObjEq;
+                }
+                $asDouble = \PHPCompiler\VM\VmValueCompare::stringToDouble($this->context, $rightValue);
+                $eq = $this->context->builder->and(
+                    \PHPCompiler\VM\VmValueCompare::stringIsNumeric($this->context, $rightValue),
+                    JitValueCompare::looseEqualValueToNativeDouble($this->context, $left, $asDouble)
                 );
-                $cmp = Builtin\SpaceshipRuntime::callValueSpaceship(
-                    $this->context,
-                    JitValueBox::valuePtrFromVariable($this->context, $left),
-                    JitValueBox::pointer($this->context, $tmp)
-                );
-                $zero = $cmp->typeOf()->constInt(0, false);
-                $result = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
                 if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                    $result = $this->context->builder->xor(
-                        $result,
+                    $eq = $this->context->builder->xor(
+                        $eq,
                         $this->context->getTypeFromString('int1')->constInt(1, false)
                     );
                 }
+                $result = $eq;
                 goto return_bool;
             }
             // VALUE < STRING — e.g. `$date[$i] < '0'` after offset fetch (#27239 Strptime emit).
@@ -2137,12 +2172,13 @@ restart:
             if (null !== $stringDouble) {
                 return $stringDouble;
             }
+            // Unlike types: === / !== stay false/true; == / != handled above (#32883).
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
-            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = $falseVal;
                 goto return_bool;
             }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                 goto return_bool;
             }
@@ -2160,11 +2196,11 @@ restart:
                 return $stringDouble;
             }
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
-            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = $falseVal;
                 goto return_bool;
             }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                 goto return_bool;
             }
@@ -2660,9 +2696,22 @@ return_bool:
         $this->context->builder->branch($doneBb);
 
         $this->context->builder->positionAtEnd($strBb);
-        $strResult = JitStringCompare::identicalStringToValue($this->context, $nativeStr, $boxed);
-        if (OpCode::TYPE_NOT_EQUAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-            $strResult = $this->context->builder->xor($strResult, $i1->constInt(1, false));
+        // Non-object VALUE (float/long/string/…) vs native string: loose == must
+        // numeric-convert (Zend compare_function), not identical (#32883).
+        if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+            $asDouble = \PHPCompiler\VM\VmValueCompare::stringToDouble($this->context, $nativeStr);
+            $strResult = $this->context->builder->and(
+                \PHPCompiler\VM\VmValueCompare::stringIsNumeric($this->context, $nativeStr),
+                JitValueCompare::looseEqualValueToNativeDouble($this->context, $boxed, $asDouble)
+            );
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $strResult = $this->context->builder->xor($strResult, $i1->constInt(1, false));
+            }
+        } else {
+            $strResult = JitStringCompare::identicalStringToValue($this->context, $nativeStr, $boxed);
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $strResult = $this->context->builder->xor($strResult, $i1->constInt(1, false));
+            }
         }
         $strEnd = $this->context->builder->getInsertBlock();
         $this->context->builder->branch($doneBb);
@@ -2897,8 +2946,30 @@ return_bool:
         $isArith = JitValueNumeric::isArithOpcode($opcode->type);
         $isSpaceship = OpCode::TYPE_SPACESHIP === $opcode->type;
         $isOrdered = self::isOrderedCompareOpcode($opcode->type);
-        if (!$isArith && !$isSpaceship && !$isOrdered) {
+        $isEqual = OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type;
+        if (!$isArith && !$isSpaceship && !$isOrdered && !$isEqual) {
             return null;
+        }
+        // Loose == / != : numeric-string ↔ native double (Zend compare_function, #32883).
+        if ($isEqual) {
+            $eq = JitValueCompare::looseEqualStringToNativeDouble(
+                $this->context,
+                $stringStruct,
+                $doubleVal
+            );
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $eq = $this->context->builder->xor(
+                    $eq,
+                    $this->context->getTypeFromString('int1')->constInt(1, false)
+                );
+            }
+
+            return new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $eq
+            );
         }
         $stringDouble = JitLongArg::lowerStringToDouble($this->context, $stringStruct);
         $left = $stringIsLeft ? $stringDouble : $doubleVal;

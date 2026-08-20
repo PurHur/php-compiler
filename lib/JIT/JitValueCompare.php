@@ -264,6 +264,22 @@ final class JitValueCompare
         return VmValueCompare::looseEqualStringToNativeLong($context, $strPtr, $nativeLong);
     }
 
+    public static function looseEqualStringToNativeDouble(
+        Context $context,
+        Value $strPtr,
+        Value $nativeDouble
+    ): Value {
+        return VmValueCompare::looseEqualStringToNativeDouble($context, $strPtr, $nativeDouble);
+    }
+
+    public static function notLooseEqualStringToNativeDouble(
+        Context $context,
+        Value $strPtr,
+        Value $nativeDouble
+    ): Value {
+        return VmValueCompare::notLooseEqualStringToNativeDouble($context, $strPtr, $nativeDouble);
+    }
+
     public static function looseEqualStringToString(
         Context $context,
         Value $leftStr,
