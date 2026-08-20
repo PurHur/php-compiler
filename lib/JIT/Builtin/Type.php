@@ -563,17 +563,11 @@ class Type extends Builtin {
         $fntypeUuencode = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnUuencode = $this->context->module->addFunction('__compiler_convert_uuencode', $fntypeUuencode);
         $this->context->registerFunction('__compiler_convert_uuencode', $fnUuencode);
-        $fntypeQuotPrint = $this->context->context->functionType($strPtr, false, $strPtr);
-        $fnQuotEncode = $this->context->module->addFunction(
-            '__compiler_quoted_printable_encode',
-            $fntypeQuotPrint
-        );
-        $this->context->registerFunction('__compiler_quoted_printable_encode', $fnQuotEncode);
-        $fnQuotDecode = $this->context->module->addFunction(
-            '__compiler_quoted_printable_decode',
-            $fntypeQuotPrint
-        );
-        $this->context->registerFunction('__compiler_quoted_printable_decode', $fnQuotDecode);
+        // __compiler_quoted_printable_encode / __compiler_quoted_printable_decode
+        // always-on shells removed (#32882): NestedJIT/AOT bridge is StringQuotPrint
+        // (JitVmHelperLink::ensureBridge; Type::initialize still ensureLinked). Leftover
+        // Type empty decls vs Runtime ABI drift mint quoted_printable_encode.1
+        // (#31894 / #32122).
         $fntypeUtf8Latin1 = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnUtf8Encode = $this->context->module->addFunction('__compiler_utf8_encode', $fntypeUtf8Latin1);
         $this->context->registerFunction('__compiler_utf8_encode', $fnUtf8Encode);
@@ -1167,6 +1161,7 @@ class Type extends Builtin {
         StringHashEquals::ensureLinked($this->context);
         StringHashHmacAlgos::ensureLinked($this->context);
         StringHashAlgos::ensureLinked($this->context);
+        StringQuotPrint::ensureLinked($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
