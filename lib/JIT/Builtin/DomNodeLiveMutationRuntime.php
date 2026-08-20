@@ -12,7 +12,9 @@ use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\dom\JitDomInsertBeforeLiveSlots;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
+use PHPCompiler\ext\dom\JitDomParentChildLinkLayout;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
@@ -275,6 +277,46 @@ final class DomNodeLiveMutationRuntime
                 if (!self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0])) {
                     self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
                 }
+                DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $extraArgs[0]);
+
+                return self::nullValuePtr($context);
+            }
+            // #32828: Element single-object prepend — insertBefore LiveSlots (peer
+            // append #29048 / insertBefore #32801). NestedJIT + syncChildLinkSlots
+            // set first=last=newChild and collapsed refetch_len to 1.
+            if (
+                'prepend' === $kind
+                && 1 === $extraArgCount
+                && \in_array($extraArgs[0]->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)
+            ) {
+                $parentObj = self::receiverObject($context, $receiver);
+                $childObj = self::mutationArgObject($context, $extraArgs[0]);
+                self::assertTreeMutationChildBeforeLiveSlots($context, $parentObj, $childObj);
+                JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
+                $objPtrTy = $context->getTypeFromString('__object__*');
+                $first = JitDomParentChildLinkLayout::loadFirstChild(
+                    $context,
+                    $parentObj,
+                    'dom_prepend'
+                );
+                $firstNull = $context->builder->icmp(Builder::INT_EQ, $first, $objPtrTy->constNull());
+                $bbAppend = BasicBlockHelper::append($context, 'dom_prepend_empty_append');
+                $bbInsert = BasicBlockHelper::append($context, 'dom_prepend_ib');
+                $bbDone = BasicBlockHelper::append($context, 'dom_prepend_done');
+                // php-src: prepend onto empty parent ≡ append; else insertBefore(new, firstChild).
+                $context->builder->branchIf($firstNull, $bbAppend, $bbInsert);
+
+                $context->builder->positionAtEnd($bbInsert);
+                JitDomInsertBeforeLiveSlots::sync($context, $parentObj, $childObj, $first);
+                $context->builder->branch($bbDone);
+
+                $context->builder->positionAtEnd($bbAppend);
+                JitDomAppendChildLiveSlots::sync($context, $parentObj, $childObj);
+                $context->builder->branch($bbDone);
+
+                $context->builder->positionAtEnd($bbDone);
+                self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
+                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
                 DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $extraArgs[0]);
 
                 return self::nullValuePtr($context);
