@@ -2543,6 +2543,9 @@ final class BuiltinParamNames
             // php-src ext/standard/info.stub.php — InternalArgInfo still says flag (#24508)
             case 'phpcredits':
                 return ['flags='];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still ident/option (#24379)
+            case 'openlog':
+                return ['prefix', 'flags', 'facility'];
         }
 
         return null;

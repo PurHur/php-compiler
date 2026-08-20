@@ -52,7 +52,7 @@ final class JitSyslog
             null,
             false
         );
-        $opt = self::lowerI32($context, $option, 'openlog', 1, 'option');
+        $opt = self::lowerI32($context, $option, 'openlog', 1, 'flags');
         $fac = self::lowerI32($context, $facility, 'openlog', 2, 'facility');
 
         $context->builder->call(

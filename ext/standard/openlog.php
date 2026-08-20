@@ -42,7 +42,7 @@ final class openlog extends Internal
             'prefix',
             false
         );
-        $option = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'openlog', 1, 'option');
+        $option = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'openlog', 1, 'flags');
         $facility = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'openlog', 2, 'facility');
         $frame->returnVar->bool(VmSyslog::openlog($ident, $option, $facility));
     }
