@@ -10,16 +10,16 @@ use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMNode::insertBefore() (#22686, #26458, #27449).
+ * LLVM lowering for DOMNode::insertBefore() (#22686, #26458, #27449, #32801).
  *
  * Thin standalone AOT materializes createElement nodes without DomRegistry
  * ({@see JitDomCreateElement::materializeElementFromLiteral}). The NestedJIT
  * DomRegistry bridge then leaves LLVM childNodes/firstChild/parentNode stale —
  * mirror ParentNode::append / replaceChild slot sync (php-src ext/dom/node.c).
+ * Live held childNodes: {@see JitDomInsertBeforeLiveSlots}.
  */
 final class JitDomInsertBefore
 {
@@ -76,17 +76,24 @@ final class JitDomInsertBefore
         self::syncUserScriptInsertBeforeSlots($context, $parentVar, $newChildVar, $refChildVar);
     }
 
+    /**
+     * In-place +1 on held childNodes (ChildNode::after append-tail; #32801).
+     *
+     * $item0/$item1 kept for call-site compatibility; pins are refreshed from
+     * parent.firstChild / first→next inside LiveSlots.
+     */
     public static function bumpChildNodesLengthPublic(
         Context $context,
         Value $parent,
         Value $item0,
         Value $item1
     ): void {
-        self::bumpChildNodesLength($context, $parent, $item0, $item1);
+        unset($item0, $item1);
+        JitDomInsertBeforeLiveSlots::incrementChildNodesLengthInPlace($context, $parent);
     }
 
     /**
-     * Update live tree LLVM slots for thin-AOT insertBefore (#27449).
+     * Update live tree LLVM slots for thin-AOT insertBefore (#27449, #32801).
      *
      * Skipping DomRegistry NestedJIT: unregistered createElement nodes leave
      * childNodes length / firstChild / parentNode unchanged after the call.
@@ -106,126 +113,7 @@ final class JitDomInsertBefore
             $parent,
             $newChild
         );
-        $objectType = $context->type->object;
-        $objPtrTy = $context->getTypeFromString('__object__*');
-
-        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
-        $nodeClassId = $objectType->lookup('DOMNode');
-        foreach ([VmDom::PROP_CHILD_NODES] as $prop) {
-            if (!$objectType->hasProperty($nodeClassId, $prop)) {
-                $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
-            }
-        }
-
-        $newJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $newChild);
-        $refJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $refChild);
-        $parentJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $parent);
-
-        JitDomParentChildLinkLayout::storeSibling($context, $newChild, VmDom::PROP_NEXT_SIBLING, $refJit);
-        JitDomParentChildLinkLayout::storeSibling($context, $refChild, VmDom::PROP_PREVIOUS_SIBLING, $newJit);
-
-        // firstChild ← newChild when inserting before the current first (#32611: DOMDocument uses DOMNode).
-        $firstObj = JitDomParentChildLinkLayout::loadFirstChild($context, $parent, 'dom_ib');
-        $firstIsRef = $context->builder->icmp(Builder::INT_EQ, $firstObj, $refChild);
-        $firstIsNull = $context->builder->icmp(Builder::INT_EQ, $firstObj, $objPtrTy->constNull());
-        $shouldSetFirst = $context->builder->or($firstIsRef, $firstIsNull);
-        $setFirst = BasicBlockHelper::append($context, 'dom_ib_set_first');
-        $afterFirst = BasicBlockHelper::append($context, 'dom_ib_after_first');
-        $context->builder->branchIf($shouldSetFirst, $setFirst, $afterFirst);
-
-        $context->builder->positionAtEnd($setFirst);
-        JitDomParentChildLinkLayout::storeFirstChild($context, $parent, $newJit);
-        $context->builder->branch($afterFirst);
-
-        $context->builder->positionAtEnd($afterFirst);
-
-        JitDomParentChildLinkLayout::storeParentNode($context, $newChild, $parentJit);
-
-        // firstElementChild when inserting before current first element (#27449).
-        $fecObj = JitDomParentChildLinkLayout::loadFirstElementChild($context, $parent, 'dom_ib');
-        $fecIsRef = $context->builder->icmp(Builder::INT_EQ, $fecObj, $refChild);
-        $fecIsNull = $context->builder->icmp(Builder::INT_EQ, $fecObj, $objPtrTy->constNull());
-        $shouldSetFec = $context->builder->or($fecIsRef, $fecIsNull);
-        $setFec = BasicBlockHelper::append($context, 'dom_ib_set_fec');
-        $afterFec = BasicBlockHelper::append($context, 'dom_ib_after_fec');
-        $context->builder->branchIf($shouldSetFec, $setFec, $afterFec);
-
-        $context->builder->positionAtEnd($setFec);
-        JitDomParentChildLinkLayout::storeFirstElementChild($context, $parent, $newJit);
-        $context->builder->branch($afterFec);
-
-        $context->builder->positionAtEnd($afterFec);
-
-        self::bumpChildNodesLength($context, $parent, $newChild, $refChild);
-    }
-
-    /**
-     * Bump or seed parent.childNodes.length after insertBefore (#27449, peer #27044).
-     *
-     * Also pins __phpcItem0/1 for owner-aware item() when length becomes 2 (#27410).
-     */
-    private static function bumpChildNodesLength(
-        Context $context,
-        Value $parent,
-        Value $newChild,
-        Value $refChild
-    ): void {
-        $objectType = $context->type->object;
-        $listClassId = $objectType->lookup('DOMNodeList');
-        if (!$objectType->hasProperty($listClassId, 'length')) {
-            $objectType->defineProperty($listClassId, 'length', JITVariable::TYPE_NATIVE_LONG);
-        }
-        if (!$objectType->hasProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER)) {
-            $objectType->defineProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
-        }
-        foreach (['__phpcItem0', '__phpcItem1'] as $prop) {
-            if (!$objectType->hasProperty($listClassId, $prop)) {
-                $objectType->defineProperty($listClassId, $prop, JITVariable::TYPE_VALUE);
-            }
-        }
-
-        $i64 = $context->getTypeFromString('int64');
-        $newJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $newChild);
-        $refJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $refChild);
-        $parentJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $parent);
-
-        // Always replace the live list with length=2 + pinned items for insert-before-ref.
-        // ParentNode::append stores childNodes as TYPE_VALUE; in-place TYPE_OBJECT bumps
-        // miss that shape (#27044 / #27449). Fresh list matches Zend length after insert.
-        $list = $objectType->allocate($listClassId);
-        $objectType->markObjectConstructed($list);
-        $lengthJit = new JITVariable(
-            $context,
-            JITVariable::TYPE_NATIVE_LONG,
-            JITVariable::KIND_VALUE,
-            $i64->constInt(2, false)
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($list, 'DOMNodeList', 'length'),
-            $lengthJit,
-            JITVariable::TYPE_NATIVE_LONG
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($list, 'DOMNodeList', VmDom::PROP_CHILD_NODES_OWNER),
-            $parentJit,
-            JITVariable::TYPE_VALUE
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($list, 'DOMNodeList', '__phpcItem0'),
-            $newJit,
-            JITVariable::TYPE_VALUE
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($list, 'DOMNodeList', '__phpcItem1'),
-            $refJit,
-            JITVariable::TYPE_VALUE
-        );
-        $listJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $list);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_CHILD_NODES),
-            $listJit,
-            JITVariable::TYPE_VALUE
-        );
+        JitDomInsertBeforeLiveSlots::sync($context, $parent, $newChild, $refChild);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value
