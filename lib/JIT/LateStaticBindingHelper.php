@@ -95,6 +95,12 @@ final class LateStaticBindingHelper
         $context = $objectType->jitContext();
         $expectedName = self::compileTimeExpectedStaticReturnName($objectType, $block);
         $prefix = (null !== $callableName && '' !== $callableName) ? "{$callableName}(): " : '';
+        if (Variable::TYPE_VALUE === $return->type) {
+            $objReturn = self::objectVariableFromValueBoxIfPresent($context, $return);
+            if (null !== $objReturn) {
+                $return = $objReturn;
+            }
+        }
         if (Variable::TYPE_OBJECT !== $return->type) {
             $scalar = match ($return->type) {
                 Variable::TYPE_NATIVE_LONG => 'int',
@@ -127,15 +133,40 @@ final class LateStaticBindingHelper
         $context->builder->positionAtEnd($done);
     }
 
+    /** Static-array dim fetch may return a boxed object zval (#31937). */
+    private static function objectVariableFromValueBoxIfPresent(Context $context, Variable $return): ?Variable
+    {
+        if (Variable::TYPE_VALUE !== $return->type) {
+            return null;
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $return);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+
+        return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+    }
+
     private static function compileTimeExpectedStaticReturnName(Object_ $objectType, Block $block): string
     {
-        $raw = ClassConstFetchHelper::jitLateStaticClassNameForBlock($objectType, $block);
-        if (!is_string($raw) || '' === $raw) {
-            if (null !== $block->func && null !== $block->func->class) {
-                $className = $block->func->class->value ?? null;
-                $raw = is_string($className) ? $className : null;
+        // Declaring class for `: static` TypeError text matches Zend (Registry::getInstance(): … Registry).
+        // Prefer it over jitLateStaticClassName — compile scope can be polluted during full standalone
+        // init when helper-runtime cache is off (#31937 / StreamFilterJitHelper scope leak).
+        if (null !== $block->func && null !== $block->func->class) {
+            $className = $block->func->class->value ?? null;
+            if (is_string($className) && '' !== $className) {
+                $lc = strtolower(ltrim($className, '\\'));
+                foreach ($objectType->allClassNamesById() as $name) {
+                    if (strtolower(ltrim((string) $name, '\\')) === $lc) {
+                        return ltrim((string) $name, '\\');
+                    }
+                }
+
+                return ltrim($className, '\\');
             }
         }
+        $raw = ClassConstFetchHelper::jitLateStaticClassNameForBlock($objectType, $block);
         if (!is_string($raw) || '' === $raw) {
             return 'static';
         }

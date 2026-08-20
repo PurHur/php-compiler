@@ -7382,6 +7382,24 @@ class Object_ extends Type {
         ObjectExitStatusLlvm::emitExitStatusObjectGuard($this, $context, $objPtr, $typeErrorGiven);
     }
 
+    public function propertyFetchByRuntimeReceiverClass(
+        PHPLLVM\Value $obj,
+        string $name,
+        bool $forWrite = false
+    ): Variable {
+        $fetched = ObjectInstancePropertyLlvm::propertyFetchByRuntimeReceiverClass(
+            $this,
+            $obj,
+            $name,
+            $forWrite
+        );
+        if (null === $fetched) {
+            throw new \LogicException("Property {$name} not found on any declared class");
+        }
+
+        return $fetched;
+    }
+
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name, bool $forWrite = false): Variable
     {
         $classId = $this->lookup('' !== $class ? $class : 'stdclass');

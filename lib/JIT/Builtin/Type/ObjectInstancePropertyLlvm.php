@@ -76,6 +76,13 @@ final class ObjectInstancePropertyLlvm
     ): Variable {
         $context = $object->jitContext();
         $className = $object->classNameForId($classId);
+        $classLc = strtolower(ltrim($class, '\\'));
+        if (\in_array($classLc, ['static', 'self', 'parent'], true)) {
+            $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name, $forWrite);
+            if (null !== $runtimeFetch) {
+                return $runtimeFetch;
+            }
+        }
         $nameId = $object->propNameIdFor($name);
         $hasProp = false;
         if (null !== $nameId) {
@@ -92,7 +99,7 @@ final class ObjectInstancePropertyLlvm
             // same name (e.g. user `C::$x` while writing `stdClass::$x`) and skip defineProperty,
             // so later property_exists() folds false for the dynamic class (#32688 / #10643).
             if (!$object->allowsDynamicProperties($classId)) {
-                $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name);
+                $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name, $forWrite);
                 if (null !== $runtimeFetch) {
                     return $runtimeFetch;
                 }
@@ -198,12 +205,25 @@ final class ObjectInstancePropertyLlvm
     }
 
     /**
+     * Property fetch/write on a receiver PHPCfg typed as `static` — use __object__.class_id (#31937).
+     */
+    public static function propertyFetchByRuntimeReceiverClass(
+        Object_ $object,
+        Value $obj,
+        string $name,
+        bool $forWrite = false
+    ): ?Variable {
+        return self::tryPropertyFetchByRuntimeClass($object, $obj, $name, $forWrite);
+    }
+
+    /**
      * When the static declaring class lacks a JIT slot, resolve via runtime class_id (#17391).
      */
     private static function tryPropertyFetchByRuntimeClass(
         Object_ $object,
         Value $obj,
-        string $name
+        string $name,
+        bool $forWrite = false
     ): ?Variable {
         $candidates = [];
         foreach ($object->allClassNamesById() as $id => $className) {
@@ -229,7 +249,7 @@ final class ObjectInstancePropertyLlvm
             foreach ($candidates as $id => $className) {
                 $classLc = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
                 if ('dom\\attr' === $classLc || 'domattr' === $classLc) {
-                    return self::propertyFetchOrdinary($object, $obj, $className, $name, $id);
+                    return self::propertyFetchOrdinary($object, $obj, $className, $name, $id, $forWrite);
                 }
             }
         }
@@ -237,10 +257,10 @@ final class ObjectInstancePropertyLlvm
             $classId = array_key_first($candidates);
             $className = $candidates[$classId];
 
-            return self::propertyFetchOrdinary($object, $obj, $className, $name, $classId);
+            return self::propertyFetchOrdinary($object, $obj, $className, $name, $classId, $forWrite);
         }
 
-        return self::propertyFetchByRuntimeClassDispatch($object, $obj, $name, $candidates);
+        return self::propertyFetchByRuntimeClassDispatch($object, $obj, $name, $candidates, $forWrite);
     }
 
     /**
@@ -250,7 +270,8 @@ final class ObjectInstancePropertyLlvm
         Object_ $object,
         Value $obj,
         string $name,
-        array $candidates
+        array $candidates,
+        bool $forWrite = false
     ): Variable {
         $context = $object->jitContext();
         $map = $context->structFieldMap['__object__'];
@@ -286,7 +307,7 @@ final class ObjectInstancePropertyLlvm
                 : $fn->appendBasicBlock('prop_fetch_rt_try_'.$classId);
             $context->builder->branchIf($match, $caseBlock, $nextBlock);
             $context->builder->positionAtEnd($caseBlock);
-            $fetched = self::propertyFetchOrdinary($object, $obj, $className, $name, $classId);
+            $fetched = self::propertyFetchOrdinary($object, $obj, $className, $name, $classId, $forWrite);
             self::boxFetchedPropertyIntoValue($object, $resultSlot, $fetched, $fetched->objectPropertyType ?? $fetched->type);
             $context->builder->branch($done);
             $checkBlock = $nextBlock;

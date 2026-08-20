@@ -12980,6 +12980,33 @@ class JIT {
                     $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                     $forDimWrite = $this->varFetchDestUsedAsDimWriteContainer($block, $i, (int) $op->arg1);
                     if ($name instanceof Operand\Literal) {
+                        // PHPCfg types `new static()` receivers as static — skip declaring-class
+                        // guards that target a bogus "static" ClassEntry (#31937).
+                        if ('static' === strtolower(ltrim($declaringClass, '\\'))) {
+                            JIT\LazyObjectHelper::emitEnsureInitialized(
+                                $this->context,
+                                $this->loadPropertyFetchReceiver($obj)
+                            );
+                            $fetched = $this->context->type->object->propertyFetchByRuntimeReceiverClass(
+                                $receiver,
+                                $name->value,
+                                $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1)
+                            );
+                            JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
+                            if ($forDimWrite) {
+                                if ($this->varFetchDestUsedAsDimRwContainer($block, $i, (int) $op->arg1)) {
+                                    JIT\TypedPropertyUninitGuard::emitBeforeRead($this->context, $fetched);
+                                } else {
+                                    JIT\TypedPropertyUninitGuard::emitBeforeDimWrite($this->context, $fetched);
+                                }
+                            }
+                            if ($forceBranchMerge) {
+                                $this->assignOperand($result, $fetched, true);
+                            } else {
+                                $this->context->scope->variables[$result] = $fetched;
+                            }
+                            break;
+                        }
                         $classId = $this->context->type->object->lookup($declaringClass);
                         // Static via -> / ?->: visibility Error for inaccessible statics (#30017).
                         // Notice is VM-complete; JIT mid-body Notice SEGVs under MCJIT (pre-existing).
@@ -14244,6 +14271,18 @@ class JIT {
     private function resolvePropertyDeclaringClass(Operand $obj, Block $block, ?string $propName): string
     {
         $declaringClass = $obj->type->userType ?? null;
+        if (null !== $declaringClass && '' !== $declaringClass) {
+            $pseudoLc = strtolower(ltrim($declaringClass, '\\'));
+            // self/parent: compile-time scope is enough. static: scope->calledClassName is the
+            // declaring class at JIT time, not get_called_class() — leave "static" for runtime
+            // property dispatch by __object__.class_id (#31937).
+            if (\in_array($pseudoLc, ['self', 'parent'], true)) {
+                $declaringClass = $this->resolveJitStaticScopeClass(
+                    $block,
+                    new Operand\Literal($declaringClass)
+                );
+            }
+        }
         if (null === $declaringClass || '' === $declaringClass) {
             $operandName = strtolower(JIT\OperandName::resolve($obj) ?? '');
             if ('script' === $operandName) {
