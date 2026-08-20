@@ -64,6 +64,21 @@ final class JitDomReplaceChild
     }
 
     /**
+     * Thin-AOT ChildNode::replaceWith LiveSlots + InnerXml (#32822 / peer #32817).
+     *
+     * {@see DomNodeChildNodeMutationRuntime} previously only rewrote parent InnerXml
+     * to the replacement markup, leaving held childNodes pins stale.
+     */
+    public static function syncUserScriptReplaceSlotsPublic(
+        Context $context,
+        JITVariable $parentVar,
+        JITVariable $newChildVar,
+        JITVariable $oldChildVar
+    ): void {
+        self::syncUserScriptReplaceSlots($context, $parentVar, $newChildVar, $oldChildVar);
+    }
+
+    /**
      * Splice newChild into oldChild's place for thin-AOT replaceChild (#27216 / #28671).
      *
      * Skipping DomRegistry NestedJIT: segfaults on LLVM-materialized createElement

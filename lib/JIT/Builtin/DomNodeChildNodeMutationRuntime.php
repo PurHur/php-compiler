@@ -13,7 +13,7 @@ use PHPCompiler\ext\dom\JitDomGetNodePath;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\ext\dom\JitDomNodeChildProperty;
 use PHPCompiler\ext\dom\JitDomRemoveChildLiveSlots;
-use PHPCompiler\ext\dom\JitDomReplaceChildLiveSlots;
+use PHPCompiler\ext\dom\JitDomReplaceChild;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
@@ -53,7 +53,8 @@ final class DomNodeChildNodeMutationRuntime
             $child = self::receiverObject($context, $receiver);
             // InnerXml is best-effort for saveXML (#26752). It must not replace
             // LiveSlots — held `$parent->childNodes` stayed at pre-remove length
-            // when siblings remain (#32821 / peer #32774 / #32817).
+            // when siblings remain (#32821 / peer #32774 / #32817). replaceWith
+            // LiveSlots landed in #32822; remove still used syncChildNodesLengthSlot(0).
             self::trySyncRemoveInnerXml($context, $parent, $receiver);
             JitDomRemoveChildLiveSlots::sync($context, $parent, $child);
             DomUserScriptElementCacheLlvm::invalidateIfElement($context, $child);
@@ -104,64 +105,22 @@ final class DomNodeChildNodeMutationRuntime
                     );
                 }
             } else {
-                // replaceWith: InnerXml splice is best-effort for saveXML (#26752).
-                // Always run LiveSlots so held childNodes pins update (#32821).
-                self::trySyncReplaceWithInnerXml($context, $receiver, $parent, $extraArgs);
-                $oldChild = self::receiverObject($context, $receiver);
-                $newChild = self::receiverObject($context, $extraArgs[0]);
-                $childCount = null;
-                $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
-                if (null !== $xml && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
-                    $childCount = \count(DomParseSimpleXmlJitHelper::directChildNodesArgv($xml));
-                }
-                JitDomReplaceChildLiveSlots::sync($context, $parent, $newChild, $oldChild, $childCount);
-                DomUserScriptElementCacheLlvm::invalidateIfElement($context, $oldChild);
+                // replaceWith: LiveSlots + InnerXml sibling-preserving rewrite (#32822 /
+                // peer replaceChild #32784). storeInnerXmlFromArgs alone wiped siblings
+                // and left held childNodes pins on the old node.
+                $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
+                JitDomReplaceChild::syncUserScriptReplaceSlotsPublic(
+                    $context,
+                    $parentVar,
+                    $extraArgs[0],
+                    $receiver
+                );
             }
 
             return self::nullValuePtr($context);
         }
 
         return DomInstanceMethodRuntime::invoke($context, $extraArgCount, $kind, $receiver, ...$extraArgs);
-    }
-
-    /**
-     * Splice ChildNode::replaceWith args into parent PROP_USER_SCRIPT_INNER_XML
-     * without wiping siblings (#32821 / peer #28671 replaceChild).
-     *
-     * @param list<Variable> $extraArgs
-     */
-    private static function trySyncReplaceWithInnerXml(
-        Context $context,
-        Variable $receiver,
-        Value $parent,
-        array $extraArgs
-    ): bool {
-        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
-            return false;
-        }
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xml || '' === trim($xml)) {
-            return false;
-        }
-        $markup = self::compileTimeMarkupFromArgs($extraArgs);
-        if (null === $markup) {
-            return false;
-        }
-        $parentInner = self::compileTimeParentInnerXml();
-        if (null === $parentInner) {
-            return false;
-        }
-        $index = self::resolveReceiverChunkIndex($receiver, $parentInner);
-        if (null === $index) {
-            return false;
-        }
-        $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, $markup);
-        if (null === $inner) {
-            return false;
-        }
-        JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
-
-        return true;
     }
 
     /** Drop the removed child's chunk from PROP_USER_SCRIPT_INNER_XML (#32821 / #32774). */
