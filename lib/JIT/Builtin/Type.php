@@ -606,14 +606,11 @@ class Type extends Builtin {
         // bridge is StringInfo (getNamedFunction first; Type::initialize still
         // ensureLinked). Leftover Type empty decls vs Runtime ABI drift mints
         // phpversion.1 (#31894 / #32122).
-        // __compiler_version_compare stays always-on for now — StringVersionCompare
-        // owns the body but ensureLinked is only from JitInfo (follow-up shrink).
-        $fntypeVersionCompare = $this->context->context->functionType($i64, false, $strPtr, $strPtr);
-        $fnVersionCompare = $this->context->module->addFunction(
-            '__compiler_version_compare',
-            $fntypeVersionCompare
-        );
-        $this->context->registerFunction('__compiler_version_compare', $fnVersionCompare);
+        // __compiler_version_compare always-on shell removed (#32843): user-script
+        // version_compare() stays JitInfo / VersionCompareJitHelper (php-src
+        // ext/standard/versioning.c). NestedJIT/AOT bridge is StringVersionCompare
+        // (getNamedFunction first; Type::initialize still ensureLinked). Leftover
+        // Type empty decls vs Runtime ABI drift mints version_compare.1 (#31894 / #32122).
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
         // __compiler_gettimeofday_array / __compiler_gettimeofday_float always-on
         // shells removed (#32683): user-script gettimeofday() stays JitGettimeofday /
@@ -1277,6 +1274,7 @@ class Type extends Builtin {
         StringGetenvAll::ensureLinked($this->context);
         ListUnpackRuntime::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
+        StringVersionCompare::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
         DirectoryIteratorSnapshotRuntime::ensureLinked($this->context);
