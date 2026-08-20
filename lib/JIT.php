@@ -22247,6 +22247,13 @@ class JIT {
             } elseif ('isequalnode' === $methodLc && $this->context->functionIsRegistered('domnode::isequalnode')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
+            } elseif ('issamenode' === $methodLc) {
+                // documentElement temps lose DOMElement userType → :object (#32957 / peer #21687).
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::issamenode');
+                if ($this->context->functionIsRegistered('domnode::issamenode')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('toggleattribute' === $methodLc && $this->context->functionIsRegistered('domelement::toggleattribute')) {
                 $className = 'DOMElement';
                 $declaringClassLc = 'domelement';

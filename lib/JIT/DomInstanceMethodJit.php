@@ -238,10 +238,20 @@ final class DomInstanceMethodJit
         'domdocumentfragment::clonenode' => true,
         'domattr::clonenode' => true,
         'domnode::contains' => true,
+        'domelement::contains' => true,
+        'domdocument::contains' => true,
         'domnode::comparedocumentposition' => true,
+        'domelement::comparedocumentposition' => true,
+        'domdocument::comparedocumentposition' => true,
         'domnode::getrootnode' => true,
+        'domelement::getrootnode' => true,
+        'domdocument::getrootnode' => true,
         'domnode::isequalnode' => true,
+        'domelement::isequalnode' => true,
+        'domdocument::isequalnode' => true,
         'domnode::issamenode' => true,
+        'domelement::issamenode' => true,
+        'domdocument::issamenode' => true,
         'domnode::c14n' => true,
         'domelement::c14n' => true,
         'domdocument::c14n' => true,
@@ -863,27 +873,42 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domnode::contains' === $lc) {
+            if ('domnode::contains' === $lc
+                || 'domelement::contains' === $lc
+                || 'domdocument::contains' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomNodeContains();
 
                 return;
             }
-            if ('domnode::comparedocumentposition' === $lc) {
+            if ('domnode::comparedocumentposition' === $lc
+                || 'domelement::comparedocumentposition' === $lc
+                || 'domdocument::comparedocumentposition' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomNodeCompareDocumentPosition();
 
                 return;
             }
-            if ('domnode::getrootnode' === $lc) {
+            if ('domnode::getrootnode' === $lc
+                || 'domelement::getrootnode' === $lc
+                || 'domdocument::getrootnode' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomNodeGetRootNode();
 
                 return;
             }
-            if ('domnode::isequalnode' === $lc) {
+            if ('domnode::isequalnode' === $lc
+                || 'domelement::isequalnode' === $lc
+                || 'domdocument::isequalnode' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomNodeIsEqualNode();
 
                 return;
             }
-            if ('domnode::issamenode' === $lc) {
+            if ('domnode::issamenode' === $lc
+                || 'domelement::issamenode' === $lc
+                || 'domdocument::issamenode' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomNodeIsSameNode();
 
                 return;
@@ -1239,10 +1264,20 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocumentfragment::clonenode');
             self::ensureProxy($context, 'domattr::clonenode');
             self::ensureProxy($context, 'domnode::contains');
+            self::ensureProxy($context, 'domelement::contains');
+            self::ensureProxy($context, 'domdocument::contains');
             self::ensureProxy($context, 'domnode::comparedocumentposition');
+            self::ensureProxy($context, 'domelement::comparedocumentposition');
+            self::ensureProxy($context, 'domdocument::comparedocumentposition');
             self::ensureProxy($context, 'domnode::getrootnode');
+            self::ensureProxy($context, 'domelement::getrootnode');
+            self::ensureProxy($context, 'domdocument::getrootnode');
             self::ensureProxy($context, 'domnode::isequalnode');
+            self::ensureProxy($context, 'domelement::isequalnode');
+            self::ensureProxy($context, 'domdocument::isequalnode');
             self::ensureProxy($context, 'domnode::issamenode');
+            self::ensureProxy($context, 'domelement::issamenode');
+            self::ensureProxy($context, 'domdocument::issamenode');
             self::ensureProxy($context, 'domnode::c14n');
             self::ensureProxy($context, 'domelement::c14n');
             self::ensureProxy($context, 'domdocument::c14n');
