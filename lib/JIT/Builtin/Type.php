@@ -631,15 +631,12 @@ class Type extends Builtin {
         // NestedJIT/AOT bridge is TimeSleepRuntime (getNamedFunction first +
         // JitVmHelperLink::ensureBridge). Leftover Type addFunction vs Runtime ABI
         // drift mints time_nanosleep.1 (#31894 / #32122).
-        $fntypePasswordRandomBytes = $this->context->context->functionType($strPtr, false, $i64);
-        $fnPasswordRandomBytes = $this->context->module->addFunction(
-            '__compiler_password_random_bytes',
-            $fntypePasswordRandomBytes
-        );
-        $this->context->registerFunction('__compiler_password_random_bytes', $fnPasswordRandomBytes);
-        $fntypeLibcrypt = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
-        $fnLibcrypt = $this->context->module->addFunction('__compiler_libcrypt', $fntypeLibcrypt);
-        $this->context->registerFunction('__compiler_libcrypt', $fnLibcrypt);
+        // __compiler_password_random_bytes / __compiler_libcrypt always-on shells
+        // removed (#32851): NestedJIT/AOT bridges are PasswordRandomBytesRuntime /
+        // LibcryptRuntime (getNamedFunction first; Type::initialize still ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint password_random_bytes.1 /
+        // libcrypt.1 (#31894 / #32122). password_hash/verify/crypt/* stay always-on —
+        // PasswordCryptoRuntime still lookupFunctions those ABIs (follow-up shrink).
         $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64, $i64);
         $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);
         $this->context->registerFunction('__compiler_password_hash', $fnPasswordHash);
@@ -1275,6 +1272,8 @@ class Type extends Builtin {
         ListUnpackRuntime::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
         StringVersionCompare::ensureLinked($this->context);
+        LibcryptRuntime::ensureLinked($this->context);
+        PasswordRandomBytesRuntime::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
         DirectoryIteratorSnapshotRuntime::ensureLinked($this->context);
