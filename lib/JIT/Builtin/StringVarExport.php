@@ -20,14 +20,15 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_var_export via VarExportJitHelper PHP (#9189, #13349, #19430, #20589).
+ * JIT/AOT link for __compiler_var_export via VarExportJitHelper PHP (#9189, #13349, #19430, #20589, #32941).
  *
+ * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Embed: NestedJIT {@see VarExportJitHelper} (php-in-PHP).
  * Thin standalone AOT: scalar LLVM bridge — NestedJIT of the helper segfaults without
  * Runtime->vm (peer StringPrintR #24266 / StringVarDump #23540; #26855).
  * String scalars use pure-LLVM quote/escape (not NestedJIT addslashes — #27574).
  * SSOT: {@see \PHPCompiler\ext\standard\VmVarExport::formatVariable()}.
- * php-src: ext/standard/var.c — php_var_export_ex
+ * php-src: ext/standard/var.c — php_var_export_ex / PHP_FUNCTION(var_export)
  */
 final class StringVarExport
 {

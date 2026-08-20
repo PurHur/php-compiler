@@ -73,27 +73,14 @@ class Type extends Builtin {
         // Leftover Type empty decls vs Runtime ABI drift mint pack.1 / unpack.1
         // (#31894 / #32122). User-script pack()/unpack() stay PackJitHelper /
         // UnpackJitHelper.
-        $fntypeVarExport = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnVarExport = $this->context->module->addFunction('__compiler_var_export', $fntypeVarExport);
-        $this->context->registerFunction('__compiler_var_export', $fnVarExport);
-        $fntypePrintR = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnPrintR = $this->context->module->addFunction('__compiler_print_r', $fntypePrintR);
-        $this->context->registerFunction('__compiler_print_r', $fnPrintR);
-        $fntypeVarDump = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnVarDump = $this->context->module->addFunction('__compiler_var_dump', $fntypeVarDump);
-        $this->context->registerFunction('__compiler_var_dump', $fnVarDump);
+        // __compiler_var_export / __compiler_print_r / __compiler_var_dump always-on
+        // shells removed (#32941): StringVarExport / StringPrintR / StringVarDump own
+        // the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
+        // still ensureLinked). Thin AOT already calls ensureLinked from JitVarExport /
+        // JitPrintR / JitVarDump. Leftover Type empty decls vs Runtime ABI drift mint
+        // var_export.1 / print_r.1 / var_dump.1 (#31894 / #32122). User-script
+        // var_export()/print_r()/var_dump() stay VarExportJitHelper / PrintRJitHelper /
+        // VarDumpJitHelper (thin scalar bridge; non-scalar needs Runtime->vm — #23540).
         // __compiler_ini_{get,cfg_get,set,restore} / __compiler_error_reporting /
         // __compiler_begin_silence / __compiler_end_silence always-on shells removed
         // (#32779): IniRuntime / SilenceRuntime own the ABI (getNamedFunction first;
@@ -1045,6 +1032,9 @@ class Type extends Builtin {
         Sscanf::ensureLinked($this->context);
         StringPack::ensureLinked($this->context);
         StringUnpack::ensureLinked($this->context);
+        StringVarExport::ensureLinked($this->context);
+        StringPrintR::ensureLinked($this->context);
+        StringVarDump::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
