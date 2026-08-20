@@ -518,12 +518,10 @@ class Type extends Builtin {
             $fntypeHashHmacAlgos
         );
         $this->context->registerFunction('__compiler_hash_algos', $fnHashAlgos);
-        $fntypeOpensslSign = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $i64);
-        $fnOpensslSign = $this->context->module->addFunction('__compiler_openssl_sign', $fntypeOpensslSign);
-        $this->context->registerFunction('__compiler_openssl_sign', $fnOpensslSign);
-        $fntypeOpensslVerify = $this->context->context->functionType($i32, false, $strPtr, $strPtr, $strPtr, $i64);
-        $fnOpensslVerify = $this->context->module->addFunction('__compiler_openssl_verify', $fntypeOpensslVerify);
-        $this->context->registerFunction('__compiler_openssl_verify', $fnOpensslVerify);
+        // __compiler_openssl_sign / __compiler_openssl_verify always-on shells removed
+        // (#32866): NestedJIT/AOT bridge is OpensslSignRuntime (getNamedFunction first;
+        // Type::initialize still ensureLinked). Leftover Type empty decls vs Runtime
+        // ABI drift mint openssl_sign.1 (#31894 / #32122).
         // __compiler_openssl_encrypt / __compiler_openssl_decrypt /
         // __compiler_openssl_encrypt_take_tag / __compiler_openssl_encrypt_tag_is_null
         // always-on shells removed (#32859): NestedJIT/AOT bridge is OpensslEncryptRuntime
@@ -1211,6 +1209,7 @@ class Type extends Builtin {
         PasswordRandomBytesRuntime::ensureLinked($this->context);
         PasswordCryptoRuntime::ensureLinked($this->context);
         OpensslEncryptRuntime::ensureLinked($this->context);
+        OpensslSignRuntime::ensureLinked($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
