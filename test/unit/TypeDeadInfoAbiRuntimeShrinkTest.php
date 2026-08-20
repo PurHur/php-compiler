@@ -53,9 +53,9 @@ final class TypeDeadInfoAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_version_compare'", $type);
         $this->assertStringContainsString("registerFunction('__compiler_password_hash'", $type);
         $this->assertStringContainsString('StringInfo::ensureLinked', $type);
+        $this->assertStringContainsString('StringVersionCompare::ensureLinked', $type);
     }
 
     public function testRuntimeOwnerDeclaresInfoAbisModuleLocally(): void

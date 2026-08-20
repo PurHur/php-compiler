@@ -12,11 +12,15 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_version_compare via VersionCompareJitHelper PHP (#9813, #26866).
+ * JIT/AOT link for __compiler_version_compare via VersionCompareJitHelper PHP (#9813, #26866, #32843).
  *
  * Custom bridge (peer MathBaseConvertRuntime #26884): pass `__string__*` straight through —
  * the generic helper-link coerce path left NestedJIT seeing empty / wrong compare results
  * under thin AOT so unequal versions compared as 0 (#26866).
+ *
+ * Module-local ABI owner (getNamedFunction first): Builtin\Type no longer always-declares
+ * an empty shell (#32843 / peer #32839) — leftover Type decls mint version_compare.1
+ * (#31894 / #32122).
  *
  * SSOT algorithm: {@see \PHPCompiler\ext\standard\VersionCompareJitHelper} (NestedJIT-safe;
  * do not call VmInfo from the helper).
