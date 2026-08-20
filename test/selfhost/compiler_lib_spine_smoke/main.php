@@ -6094,6 +6094,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomElementHasAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementHasAttributeNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementRemoveAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementRemoveAttributeNS.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomElementRemoveAttributeNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetAttributeNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetAttributeNode.php';
