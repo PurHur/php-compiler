@@ -33,6 +33,7 @@ final class StrReplaceRuntimeShrinkTest extends TestCase
         $this->assertSame('heLLo', StrReplaceJitHelper::replaceArgv('l', 'L', 'hello'));
         $this->assertSame(0, StrReplaceJitHelper::takeLastCount());
         $this->assertSame('hell0 w0rld', StrReplaceJitHelper::replaceArgv('o', '0', 'hello world'));
+        $this->assertSame('zw!', StrReplaceJitHelper::replaceArgv('xy', 'zw', 'xy!'));
         $this->assertSame('hello', StrReplaceJitHelper::replaceArgv('', 'X', 'hello'));
 
         $ssotCount = 0;

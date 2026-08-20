@@ -10,11 +10,10 @@ namespace PHPCompiler\ext\standard;
  * SSOT: {@see VmString::strReplace()} / {@see VmString::strIreplace()}
  * php-src: ext/standard/string.c — php_str_replace, php_str_replace_in_subject
  *
- * NestedJIT user-script AOT (#23912 / peer #23871 / #27079):
- * - Never index with `$s[$i+$j]`; walk with `++` only.
- * - Never search a reassigned suffix — NestedJIT sticky-reads the matched byte
- *   ("hell0 w0000"). Walk the original `$subject` only.
- * - No int `$count++` / marker appends in the match arm (NestedJIT segfault/abort).
+ * NestedJIT user-script AOT (#23912 / peer #23871 / #27079 / #32621):
+ * - Match via {@see findAt()} + {@see slice()} like {@see ExplodeJitHelper} / VmString::findSubstring
+ *   — the inline subject walk sticky-reads `$subject[$hi]` when `$hi > $i` under NestedJIT.
+ * - No int `$count++` in the match arm (NestedJIT segfault/abort).
  * - No `\strlen`/`\strpos`/`\substr` / explode+implode lowering for this helper.
  * - No `VmString::*` calls from NestedJIT path (#27079 — empty AOT for ireplace).
  */
@@ -29,32 +28,18 @@ final class StrReplaceJitHelper
             return $subject;
         }
         $searchLen = self::byteLen($search);
-        $subjectLen = self::byteLen($subject);
         $out = '';
-        $i = 0;
-        while ($i < $subjectLen) {
-            $matched = true;
-            $j = 0;
-            $hi = $i;
-            while ($j < $searchLen) {
-                if ($hi >= $subjectLen || $subject[$hi] !== $search[$j]) {
-                    $matched = false;
-                    break;
-                }
-                ++$j;
-                ++$hi;
+        $offset = 0;
+        $len = self::byteLen($subject);
+        while ($offset < $len) {
+            $pos = self::findAt($subject, $search, $offset);
+            if ($pos < 0) {
+                $out = self::concat($out, self::slice($subject, $offset, $len - $offset));
+                break;
             }
-            if ($matched) {
-                $out = self::concat($out, $replace);
-                $k = 0;
-                while ($k < $searchLen) {
-                    ++$i;
-                    ++$k;
-                }
-            } else {
-                $out = self::concat($out, $subject[$i]);
-                ++$i;
-            }
+            $out = self::concat($out, self::slice($subject, $offset, $pos - $offset));
+            $out = self::concat($out, $replace);
+            $offset = $pos + $searchLen;
         }
 
         return $out;
@@ -67,37 +52,24 @@ final class StrReplaceJitHelper
             return $subject;
         }
         $searchLen = self::byteLen($search);
-        $subjectLen = self::byteLen($subject);
         $out = '';
-        $i = 0;
-        while ($i < $subjectLen) {
-            $matched = true;
-            $j = 0;
-            $hi = $i;
-            while ($j < $searchLen) {
-                if ($hi >= $subjectLen || !self::asciiFoldEq($subject[$hi], $search[$j])) {
-                    $matched = false;
-                    break;
-                }
-                ++$j;
-                ++$hi;
+        $offset = 0;
+        $len = self::byteLen($subject);
+        while ($offset < $len) {
+            $pos = self::findAtI($subject, $search, $offset);
+            if ($pos < 0) {
+                $out = self::concat($out, self::slice($subject, $offset, $len - $offset));
+                break;
             }
-            if ($matched) {
-                $out = self::concat($out, $replace);
-                $k = 0;
-                while ($k < $searchLen) {
-                    ++$i;
-                    ++$k;
-                }
-            } else {
-                $out = self::concat($out, $subject[$i]);
-                ++$i;
-            }
+            $out = self::concat($out, self::slice($subject, $offset, $pos - $offset));
+            $out = self::concat($out, $replace);
+            $offset = $pos + $searchLen;
         }
 
         return $out;
     }
 
+    /** NestedJIT-safe byte length (no \strlen). */
     private static function byteLen(string $s): int
     {
         $n = 0;
@@ -106,6 +78,90 @@ final class StrReplaceJitHelper
         }
 
         return $n;
+    }
+
+    /**
+     * Find needle at/after offset; -1 if missing.
+     * Walks with separate cursors — no `$s[$i+$j]` (#27079).
+     */
+    private static function findAt(string $haystack, string $needle, int $offset): int
+    {
+        $hayLen = self::byteLen($haystack);
+        $needleLen = self::byteLen($needle);
+        if ($needleLen < 1 || $offset > $hayLen) {
+            return -1;
+        }
+        $i = $offset;
+        while ($i < $hayLen) {
+            $matched = true;
+            $j = 0;
+            $hi = $i;
+            while ($j < $needleLen) {
+                if ($hi >= $hayLen || $haystack[$hi] !== $needle[$j]) {
+                    $matched = false;
+                    break;
+                }
+                ++$j;
+                ++$hi;
+            }
+            if ($matched) {
+                return $i;
+            }
+            ++$i;
+        }
+
+        return -1;
+    }
+
+    private static function findAtI(string $haystack, string $needle, int $offset): int
+    {
+        $hayLen = self::byteLen($haystack);
+        $needleLen = self::byteLen($needle);
+        if ($needleLen < 1 || $offset > $hayLen) {
+            return -1;
+        }
+        $i = $offset;
+        while ($i < $hayLen) {
+            $matched = true;
+            $j = 0;
+            $hi = $i;
+            while ($j < $needleLen) {
+                if ($hi >= $hayLen || !self::asciiFoldEq($haystack[$hi], $needle[$j])) {
+                    $matched = false;
+                    break;
+                }
+                ++$j;
+                ++$hi;
+            }
+            if ($matched) {
+                return $i;
+            }
+            ++$i;
+        }
+
+        return -1;
+    }
+
+    /** Build a byte slice via concat (no \substr). */
+    private static function slice(string $s, int $start, int $len): string
+    {
+        if ($len <= 0) {
+            return '';
+        }
+        $strLen = self::byteLen($s);
+        if ($start >= $strLen) {
+            return '';
+        }
+        $out = '';
+        $i = $start;
+        $taken = 0;
+        while ($taken < $len && isset($s[$i])) {
+            $out = self::concat($out, $s[$i]);
+            ++$i;
+            ++$taken;
+        }
+
+        return $out;
     }
 
     private static function concat(string $left, string $right): string
