@@ -161,15 +161,12 @@ class Type extends Builtin {
         // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // file_put_contents.1 (#31894 / #32122). User-script file_put_contents() stays
         // FilePutContentsJitHelper / VmFs::filePutContents.
-        $fntypeFwrite = $this->context->context->functionType(
-            $i64,
-            false,
-            $i64,
-            $this->context->getTypeFromString('__string__*'),
-            $i64
-        );
-        $fnCompilerFwrite = $this->context->module->addFunction('__compiler_fwrite', $fntypeFwrite);
-        $this->context->registerFunction('__compiler_fwrite', $fnCompilerFwrite);
+        // __compiler_fwrite always-on shell removed (#33048): StreamIoRuntime owns the
+        // ABI (getNamedFunction first, then addFunction if absent via
+        // ensureRuntimeAbiDeclared / implementFwriteBridge; Type::initialize still
+        // StreamIo::ensureLinked → StreamIoJit → StreamIoRuntime). Leftover Type empty
+        // decls vs Runtime ABI drift mint fwrite.1 (#31894 / #32122). User-script
+        // fwrite() stays JitFwrite / StreamIoJitHelper / JitStreamIoKernel.
         $strPtr = $this->context->getTypeFromString('__string__*');
         $fntypeFopen = $this->context->context->functionType(
             $i64,

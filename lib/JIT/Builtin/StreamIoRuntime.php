@@ -18,8 +18,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT stream I/O ABI (#10326, #20943, #26929).
+ * JIT/AOT stream I/O ABI (#10326, #20943, #26929, #33048).
  *
+ * Owns `__compiler_fwrite` (and peer fopen/fread/tmpfile/popen/stream_supports) ABI
+ * module-locally: {@see getNamedFunction} first, then {@see addFunction} if absent.
+ * Do not re-add empty always-on shells in {@see Type} — leftover decls mint fwrite.1
+ * (#31894 / #32122).
  * Embed: NestedJIT {@see StreamIoJitHelper} via {@see JitVmHelperLink}.
  * Thin standalone / user-script AOT: {@see JitStreamIoKernel} libc + handle-table
  * (NestedJIT VmFs::fopen is ExternalMethod → handle 0; blocks fsync/fwrite, #16075 / #26929).

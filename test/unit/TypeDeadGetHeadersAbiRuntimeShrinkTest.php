@@ -31,8 +31,8 @@ final class TypeDeadGetHeadersAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (#33043 already dropped file_put_contents).
-        $this->assertStringContainsString("registerFunction('__compiler_fwrite'", $type);
+        // Next leftover sentinel after #33048 dropped fwrite.
+        $this->assertStringContainsString("registerFunction('__compiler_fopen'", $type);
         $this->assertStringContainsString('GetHeadersRuntime::ensureLinked', $type);
     }
 
