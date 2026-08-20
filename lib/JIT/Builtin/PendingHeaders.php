@@ -29,6 +29,8 @@ final class PendingHeaders
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
+        // Replace thin-AOT no-op link stubs before exit()/main flush (#1974 / #20932).
+        PendingHeadersRuntime::ensureLinked($context);
         if (null !== $context->headerPreFlushFunc) {
             $context->builder->call($context->headerPreFlushFunc);
         }

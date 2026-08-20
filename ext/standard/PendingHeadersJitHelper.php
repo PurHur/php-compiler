@@ -47,9 +47,9 @@ final class PendingHeadersJitHelper
             return;
         }
         self::maybeSetLocationStatus($line);
-        if (!self::$queueEnabled) {
-            return;
-        }
+        // Always arm the queue on header() — NestedJIT static $queueEnabled set from
+        // __superglobals__refresh was not visible to a later addHeader under thin AOT (#1974).
+        self::$queueEnabled = true;
         $name = self::headerNameFromLine($line);
         if (0 !== $replace && null !== $name) {
             self::removeHeader($name);
@@ -95,28 +95,24 @@ final class PendingHeadersJitHelper
 
     public static function flushResponseHeaders(): void
     {
-        if (self::$flushed) {
-            return;
-        }
-        if (!self::isWebResponseEnvPresent()) {
-            self::$flushed = true;
-
-            return;
-        }
+        // NestedJIT fwrite/printf/echo do not reach process stdout under thin AOT
+        // (#1974). The LLVM ABI bridge prints Status + queued lines via printf(3).
+        self::$headers = [];
         self::$flushed = true;
-        $wrote = false;
-        $status = HttpResponseJitHelper::getStatusRaw();
-        if ($status >= 100 && $status <= 599) {
-            fwrite(STDOUT, 'Status: '.$status."\r\n");
-            $wrote = true;
+    }
+
+    /**
+     * Header lines for LLVM CGI flush — no GATEWAY_INTERFACE gate (unlike headers_list()).
+     *
+     * @return HashTable|null
+     */
+    public static function snapshotHeadersTable(): ?HashTable
+    {
+        if ([] === self::$headers) {
+            return null;
         }
-        foreach (self::$headers as $line) {
-            fwrite(STDOUT, $line."\r\n");
-            $wrote = true;
-        }
-        if ($wrote) {
-            fwrite(STDOUT, "\r\n");
-        }
+
+        return VmFs::stringListToArray(self::$headers);
     }
 
     public static function addSetcookie(

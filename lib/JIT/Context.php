@@ -2118,8 +2118,11 @@ class Context {
                 $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
                 if (!$this->isThinStandaloneAotMain()) {
                     $emitInStandaloneMain(fn () => ExceptionBridge::emitAbortIfPendingForStandaloneMain($this));
-                    $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitFlushForStandalone($this));
                 }
+                // Thin AOT skipped this flush, so header() without exit produced no CGI Status
+                // (header_redirect.phpt / #1974). emitFlushForStandalone no-ops unless the
+                // PendingHeaders helper was NestedJIT-linked (header()/exit).
+                $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitFlushForStandalone($this));
             }
             if (!$this->isThinStandaloneAotMain()) {
                 // User __destruct before __shutdown__ frees compile-time strings / sg_* (#4013).

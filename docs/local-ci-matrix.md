@@ -177,7 +177,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `EXAMPLES_AOT_SMOKE_ONLY` | unset | `examples-aot-smoke.sh` | Slice e.g. `003` only ([#738](https://github.com/PurHur/php-compiler/issues/738), [#683](https://github.com/PurHur/php-compiler/issues/683)) |
 | `DEPLOY_SMOKE_GATE` | `1` | `ci-local.sh` | `deploy-smoke.sh` 001/002 after `examples-aot-smoke` when LLVM ready ([#718](https://github.com/PurHur/php-compiler/issues/718), [#737](https://github.com/PurHur/php-compiler/issues/737)); 003 execute when `DEPLOY_SMOKE_003_EXECUTE=1` or `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#745](https://github.com/PurHur/php-compiler/issues/745)) |
 | `DEPLOY_SMOKE_003_EXECUTE` | `1` | `deploy-smoke.sh`, `ci-local.sh` | Default-on 003 deploy execute E2E ([#1530](https://github.com/PurHur/php-compiler/issues/1530)); also runs when `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#745](https://github.com/PurHur/php-compiler/issues/745)) |
-| `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 005 deploy + `PHPC_DEPLOY_ROOT` session flash CGI ([#1893](https://github.com/PurHur/php-compiler/issues/1893)); VM curls stay on `SESSIONS_WEB_SMOKE_GATE=1` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
+| `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `1` | `deploy-smoke.sh`, `ci-local.sh` | Default-on 005 deploy + `PHPC_DEPLOY_ROOT` session flash CGI ([#1974](https://github.com/PurHur/php-compiler/issues/1974), [#1893](https://github.com/PurHur/php-compiler/issues/1893)); set `0` to skip; VM curls stay on `SESSIONS_WEB_SMOKE_GATE=1` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
 | `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 006 deploy + `PHPC_DEPLOY_ROOT` multipart upload CGI ([#2028](https://github.com/PurHur/php-compiler/issues/2028)); VM curls stay on `FILE_UPLOAD_WEB_SMOKE_GATE=1` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)) |
 | `THROWSWEB_SERVE_AOT_SMOKE_GATE` | `1` | `ci-local.sh` (`ci_run_throws_web_serve_aot_smoke`) | `examples-web-smoke.sh --throws-only --aot` — 007 `phpc serve --aot` caught invalid POST ([#2390](https://github.com/PurHur/php-compiler/issues/2390), [#2387](https://github.com/PurHur/php-compiler/issues/2387)); set `0` to skip |
 | `THROWSWEB_SERVE_JIT_SMOKE_GATE` | `1` | `ci-fast.sh` (`ci_run_throws_web_serve_jit_smoke`) | `examples-web-smoke.sh --throws-only --jit` — 007 `phpc serve --jit` caught invalid POST ([#2435](https://github.com/PurHur/php-compiler/issues/2435), [#2408](https://github.com/PurHur/php-compiler/issues/2408)); set `0` to skip |
@@ -297,15 +297,15 @@ Progressive ladder (VM → AOT link → AOT execute → deploy CGI). Probe with 
 | AOT serve | `SESSIONS_WEB_SERVE_AOT_SMOKE_GATE` | `1` | `ci-local.sh` · `examples-web-smoke.sh --sessions-only --aot` ([#2333](https://github.com/PurHur/php-compiler/issues/2333), [#2371](https://github.com/PurHur/php-compiler/issues/2371)); set `0` to skip |
 | AOT link | `SESSIONS_WEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test005SessionsWebAotLink` ([#1946](https://github.com/PurHur/php-compiler/issues/1946)) |
 | AOT execute | `SESSIONS_WEB_AOT_SMOKE_GATE` | `1` | `SessionsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh` ([#1891](https://github.com/PurHur/php-compiler/issues/1891) ✅, [#1923](https://github.com/PurHur/php-compiler/issues/1923)) |
-| Deploy CGI | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `0` | `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all` ([#1893](https://github.com/PurHur/php-compiler/issues/1893), [#1962](https://github.com/PurHur/php-compiler/issues/1962), [#2077](https://github.com/PurHur/php-compiler/issues/2077)) |
+| Deploy CGI | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `1` | `make deploy-smoke-all` / `./script/deploy-smoke.sh --example 005` ([#1974](https://github.com/PurHur/php-compiler/issues/1974), [#1893](https://github.com/PurHur/php-compiler/issues/1893), [#2077](https://github.com/PurHur/php-compiler/issues/2077)); set `0` to skip |
 
-Stages 2–4 require LLVM 9. Execute landed ([#1891](https://github.com/PurHur/php-compiler/issues/1891)); AOT execute default-on ([#1923](https://github.com/PurHur/php-compiler/issues/1923)); deploy gate default-on tracked in [#1967](https://github.com/PurHur/php-compiler/issues/1967).
+Stages 2–4 require LLVM 9. Execute landed ([#1891](https://github.com/PurHur/php-compiler/issues/1891)); AOT execute default-on ([#1923](https://github.com/PurHur/php-compiler/issues/1923)); deploy CGI default-on ([#1974](https://github.com/PurHur/php-compiler/issues/1974)).
 
 ```bash
 ./phpc doctor --gates | grep -E 'SESSIONS_WEB|005-SessionsWeb'
 SESSIONS_WEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter SessionsWebAotExecuteTest
 SESSIONS_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh
-SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
+./script/deploy-smoke.sh --example 005
 ```
 
 ## 006-FileUploadWeb gates ([#1999](https://github.com/PurHur/php-compiler/issues/1999), [#2009](https://github.com/PurHur/php-compiler/issues/2009))

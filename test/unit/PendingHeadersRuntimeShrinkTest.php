@@ -30,6 +30,10 @@ final class PendingHeadersRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('fillThinAotLinkStubs', $source);
+        $header = (string) file_get_contents(__DIR__.'/../../ext/standard/header_.php');
+        $this->assertStringContainsString('PendingHeadersRuntime::ensureLinked', $header);
+        $pending = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeaders.php');
+        $this->assertStringContainsString('PendingHeadersRuntime::ensureLinked', $pending);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);

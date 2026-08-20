@@ -835,11 +835,11 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2085', $doc);
     }
 
-    public function testCiDefaultsEnvDefinesSessionsWebDeploySmokeGateOff(): void
+    public function testCiDefaultsEnvDefinesSessionsWebDeploySmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'SESSIONS_WEB_DEPLOY_SMOKE_GATE="${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}"',
+            'SESSIONS_WEB_DEPLOY_SMOKE_GATE="${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-1}"',
             $defaults
         );
     }
