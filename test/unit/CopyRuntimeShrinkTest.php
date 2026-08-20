@@ -43,6 +43,11 @@ final class CopyRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/CopyJitHelper.php');
         $this->assertStringContainsString('TriggerErrorJitHelper::warning', $source);
         $this->assertStringNotContainsString('trigger_error', $source);
+        // NestedJIT-safe: file_get_contents/file_put_contents leaves, not unbound @\copy (#32466).
+        $this->assertStringContainsString('file_get_contents', $source);
+        $this->assertStringContainsString('file_put_contents', $source);
+        $this->assertStringNotContainsString('return VmFs::copy', $source);
+        $this->assertStringNotContainsString('VmFs::copy($from', $source);
     }
 
     public function testCopyJitHelperMatchesVmFs(): void
