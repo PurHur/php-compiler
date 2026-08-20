@@ -2594,6 +2594,11 @@ class Context {
             case Type::TYPE_STRING:
                 return $this->getTypeFromString('__string__*');
             case Type::TYPE_OBJECT:
+                // PHPTypes Type::fromDecl('mixed') mis-parses as object userType mixed (#12348 / #32728).
+                if ('mixed' === strtolower((string) ($type->userType ?? ''))) {
+                    return $this->getTypeFromString('__value__');
+                }
+
                 return $this->getTypeFromString('__object__*');
             case Type::TYPE_ARRAY:
                 return $this->getTypeFromString('__hashtable__*');

@@ -14389,14 +14389,27 @@ class JIT {
             return null;
         }
         if ($returnType instanceof Op\Type\Literal) {
+            // PHPTypes Type::fromDecl('mixed') mis-parses as object userType mixed (#12348 / #32728).
+            if ('mixed' === strtolower($returnType->name)) {
+                return Type::mixed();
+            }
+
             return Type::fromDecl($returnType->name);
         }
         if ($returnType instanceof Op\Type\Reference && null !== $returnType->declaration) {
             $inner = $returnType->declaration;
             if ($inner instanceof \PHPCfg\Operand\Literal) {
+                if (is_string($inner->value) && 'mixed' === strtolower($inner->value)) {
+                    return Type::mixed();
+                }
+
                 return Type::fromDecl($inner->value);
             }
             if ($inner instanceof Op\Type\Literal) {
+                if ('mixed' === strtolower($inner->name)) {
+                    return Type::mixed();
+                }
+
                 return Type::fromDecl($inner->name);
             }
             try {
@@ -14472,6 +14485,12 @@ class JIT {
                 $callback = '__string__*';
                 break;
             case Type::TYPE_OBJECT:
+                // PHPTypes Type::fromDecl('mixed') → object userType mixed (#12348 / #32728).
+                // Must use boxed `__value__`, not `__object__*` (offsetGet(): mixed returned the receiver).
+                if ('mixed' === strtolower((string) ($type->userType ?? ''))) {
+                    $callback = '__value__';
+                    break;
+                }
                 // NestedJIT: VM Variable returns match param ABI (#16565 / #20785).
                 // Without this, UnserializeJitHelper::decode lowers as __object__* and
                 // thin-AOT always-helper bridges fail module verify (peer Serialize #20773).
@@ -15205,7 +15224,7 @@ class JIT {
             }
         }
         if ($cfgFunc->returnType instanceof Op\Type\Literal) {
-            switch ($cfgFunc->returnType->name) {
+            switch (strtolower($cfgFunc->returnType->name)) {
                 case 'void':
                 case 'never':
                     return 'void';
@@ -15221,6 +15240,9 @@ class JIT {
                     return '__object__*';
                 case 'array':
                     return '__hashtable__*';
+                case 'mixed':
+                    // Avoid Type::fromDecl('mixed') → __object__* (#12348 / #32728).
+                    return '__value__';
                 default:
                     return '__value__';
             }
