@@ -725,6 +725,9 @@ final class BuiltinParamNames
             // php-src ext/standard/array.stub.php — array $array, int $case = CASE_LOWER; InternalArgInfo still says input (#25500)
             case 'array_change_key_case':
                 return ['array', 'case='];
+            // php-src ext/standard/array.stub.php — array $array; InternalArgInfo still says input (#26171)
+            case 'array_count_values':
+                return ['array'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says input/search_value/sort_flags (#23274)
             case 'array_keys':
                 return ['array', 'filter_value=', 'strict='];
