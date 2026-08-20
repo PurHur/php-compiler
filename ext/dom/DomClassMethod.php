@@ -61,7 +61,7 @@ abstract class DomClassMethod extends VmClassMethod
      *
      * php-src: ext/dom/php_dom.stub.php — living AdjacentPosition vs legacy string
      */
-    protected function adjacentPositionArg(
+    public static function adjacentPositionArg(
         ObjectEntry $receiver,
         Variable $var,
         string $method,

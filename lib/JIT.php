@@ -21333,6 +21333,18 @@ class JIT {
             } elseif ('toggleattribute' === $methodLc && $this->context->functionIsRegistered('domelement::toggleattribute')) {
                 $className = 'DOMElement';
                 $declaringClassLc = 'domelement';
+            } elseif (
+                'insertadjacentelement' === $methodLc
+                || 'insertadjacenttext' === $methodLc
+                || 'insertadjacenthtml' === $methodLc
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::'.$methodLc);
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\element::'.$methodLc);
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmlelement::'.$methodLc);
+                if ($this->context->functionIsRegistered('domelement::'.$methodLc)) {
+                    $className = 'DOMElement';
+                    $declaringClassLc = 'domelement';
+                }
             } elseif ('setidattribute' === $methodLc
                 || 'setidattributens' === $methodLc
                 || 'setidattributenode' === $methodLc
@@ -21678,6 +21690,15 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\xmldocument::'.$methodLc);
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\document::'.$methodLc);
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::'.$methodLc);
+                }
+                if (
+                    'insertadjacentelement' === $methodLc
+                    || 'insertadjacenttext' === $methodLc
+                    || 'insertadjacenthtml' === $methodLc
+                ) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::'.$methodLc);
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\element::'.$methodLc);
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmlelement::'.$methodLc);
                 }
                 // setIdAttribute* on child-property temps (:object) (#29257, #29284).
                 if (

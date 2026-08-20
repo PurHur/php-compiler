@@ -661,6 +661,98 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMElement::insertAdjacentElement() — user-script AOT (php-src ext/dom/php_dom.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function insertAdjacentElement(VmContext $ctx, ObjectEntry $element, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMElement::insertAdjacentElement', $extra, 2);
+        $position = DomClassMethod::adjacentPositionArg(
+            $element,
+            $extra[0] ?? self::missingArg('insertAdjacentElement', 0),
+            'insertAdjacentElement',
+            VmDomJitFrame::executingFrame()
+        );
+        $nodeVar = ($extra[1] ?? self::missingArg('insertAdjacentElement', 1))->resolveIndirect();
+        $result = new Variable();
+        if (Variable::TYPE_NULL === $nodeVar->type) {
+            $result->null();
+
+            return $result;
+        }
+        if (Variable::TYPE_OBJECT !== $nodeVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMElement::insertAdjacentElement(): Argument #2 ($element) must be of type ?DOMElement, %s given',
+                VmDom::typeLabel($nodeVar)
+            ));
+        }
+        $nodeElement = VariableObject::entry($nodeVar);
+        $inserted = VmDom::insertAdjacentElement($ctx, $element, $position, $nodeElement);
+        if (null === $inserted) {
+            $result->null();
+        } else {
+            $result->object($inserted);
+        }
+
+        return $result;
+    }
+
+    /**
+     * DOMElement::insertAdjacentText() — user-script AOT (php-src ext/dom/element.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function insertAdjacentText(VmContext $ctx, ObjectEntry $element, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMElement::insertAdjacentText', $extra, 2);
+        $position = DomClassMethod::adjacentPositionArg(
+            $element,
+            $extra[0] ?? self::missingArg('insertAdjacentText', 0),
+            'insertAdjacentText',
+            VmDomJitFrame::executingFrame()
+        );
+        $data = self::stringArg(
+            $extra[1] ?? self::missingArg('insertAdjacentText', 1),
+            'DOMElement::insertAdjacentText',
+            1,
+            'data'
+        );
+        VmDom::insertAdjacentText($ctx, $element, $position, $data);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * DOMElement::insertAdjacentHTML() — user-script AOT (php-src PHP-8.5+ php_dom.stub.php).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function insertAdjacentHTML(VmContext $ctx, ObjectEntry $element, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMElement::insertAdjacentHTML', $extra, 2);
+        $position = self::stringArg(
+            $extra[0] ?? self::missingArg('insertAdjacentHTML', 0),
+            'DOMElement::insertAdjacentHTML',
+            0,
+            'position'
+        );
+        $html = self::stringArg(
+            $extra[1] ?? self::missingArg('insertAdjacentHTML', 1),
+            'DOMElement::insertAdjacentHTML',
+            1,
+            'html'
+        );
+        VmDom::insertAdjacentHTML($ctx, $element, $position, $html);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function importNode(VmContext $ctx, ObjectEntry $document, array $extra): Variable

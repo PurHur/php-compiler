@@ -14,6 +14,7 @@ use PHPCompiler\JIT\Builtin\DomGetElementsByTagNameRuntime;
 use PHPCompiler\JIT\Builtin\DomAdoptNodeRuntime;
 use PHPCompiler\JIT\Builtin\DomAttrIsIdRuntime;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
+use PHPCompiler\JIT\Builtin\DomInsertAdjacentRuntime;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Builtin\DomLivingApiRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLFileRuntime;
@@ -153,6 +154,40 @@ final class JitDomDocumentMethodKernel
             $context->getTypeFromString('__object__*'),
             'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::importNodeArgv',
             '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureInsertAdjacentElementBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomInsertAdjacentRuntime::ABI_ELEMENT,
+            'dom_insert_adjacent_element_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomInsertAdjacentJitHelper::insertAdjacentElementArgv',
+            '/ext/dom/DomInsertAdjacentJitHelper.php'
+        );
+    }
+
+    public static function ensureInsertAdjacentTextBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomInsertAdjacentRuntime::ABI_TEXT,
+            'dom_insert_adjacent_text_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomInsertAdjacentJitHelper::insertAdjacentTextArgv',
+            '/ext/dom/DomInsertAdjacentJitHelper.php'
         );
     }
 
