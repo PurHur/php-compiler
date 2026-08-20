@@ -44,7 +44,7 @@ final class FilterRelocateRuntimeShrinkTest extends TestCase
     {
         $this->assertSame(274, \PHPCompiler\ext\filter\FilterConstants::idForName('validate_email'));
         $this->assertSame(272, \PHPCompiler\ext\filter\FilterConstants::idForName('validate_regexp'));
-        $this->assertSame(257, \PHPCompiler\ext\filter\FilterConstants::idForName('validate_int'));
+        $this->assertSame(257, \PHPCompiler\ext\filter\FilterConstants::idForName('int'));
         $this->assertContains('validate_email', \PHPCompiler\ext\filter\FilterConstants::supportedFilterNames());
         $this->assertContains('validate_regexp', \PHPCompiler\ext\filter\FilterConstants::supportedFilterNames());
     }
