@@ -134,6 +134,26 @@ final class PregAotFastPath
     }
 
     /**
+     * Thin AOT: NestedJIT sometimes leaves {@see $capCount} at 1 after a capturing match
+     * (cap0 filled, cap1 empty) — promote before thinMatchExCap* reads (#24115 / j08_preg).
+     */
+    public static function syncCaptureGroupCapsAfterMatch(string $pattern): void
+    {
+        if (self::$capCount >= 2 || 1 !== self::$capCount || '' === self::$cap0) {
+            return;
+        }
+        $kind = self::patternKind($pattern);
+        $hasGroup = (3 === $kind || 5 === $kind || 7 === $kind
+            || 11 === $kind || 13 === $kind || 15 === $kind);
+        if (!$hasGroup) {
+            return;
+        }
+        self::$cap1 = self::$cap0;
+        self::$capCount = 2;
+        self::rememberNamedCapAfterMatch($pattern, 1);
+    }
+
+    /**
      * NestedJIT may drop {@see $kindName} across calls — re-bind name by exact pattern (#28611).
      */
     private static function rememberNamedCapAfterMatch(string $pattern, int $rc): void
