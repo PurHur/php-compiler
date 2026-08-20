@@ -6206,6 +6206,7 @@ require_once __DIR__.'/../../../lib/JIT/HashTableShiftLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTablePopLastLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayMapLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayReduceLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/ArrayFilterLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableSliceLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableChunkLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableKeysLlvm.php';

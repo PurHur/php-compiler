@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Func\PHP;
+use PHPCompiler\JIT\ArrayFilterCallbackPolicy;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ArrayFilterRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -126,9 +127,20 @@ final class array_filter extends Internal
             if (JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
                 return ArrayFilterRuntime::filterDefault($context, $args[0]);
             }
-            throw new \LogicException(
-                'array_filter() with a callback is not supported by the JIT compiler in this build'
-            );
+            if (ArrayFilterCallbackPolicy::isClosureJitLowerable($callback)) {
+                if ($argc >= 3) {
+                    $mode = $args[2]->compileTimeLong;
+                    if (null === $mode || 0 !== $mode) {
+                        throw new \LogicException(
+                            'array_filter() Closure callbacks with ARRAY_FILTER_USE_KEY/BOTH '
+                            .'are not supported by JIT/AOT in this compiler build'
+                        );
+                    }
+                }
+
+                return ArrayFilterRuntime::filterWithClosure($context, $args[0], $callback);
+            }
+            throw new \LogicException(ArrayFilterCallbackPolicy::jitRejectionMessage());
         }
 
         return ArrayFilterRuntime::filterDefault($context, $args[0]);
