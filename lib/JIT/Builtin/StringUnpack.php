@@ -12,11 +12,12 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_unpack via UnpackJitHelper PHP (#9543, #25830).
+ * JIT/AOT link for __compiler_unpack via UnpackJitHelper PHP (#9543, #25830, #32936).
  *
+ * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle}
  * (UnpackEngine → UnpackJitHelper) in one NestedJIT scope (peer StringVfscanf #25718).
- * php-src: ext/standard/pack.c — php_unpack()
+ * php-src: ext/standard/pack.c — PHP_FUNCTION(unpack) / php_unpack()
  */
 final class StringUnpack
 {
