@@ -100,6 +100,8 @@ final class JitPropertyExists
         $stringBlock = BasicBlockHelper::append($context, 'prop_exists_str');
         $errBlock = BasicBlockHelper::append($context, 'prop_exists_err');
         $mergeBlock = BasicBlockHelper::append($context, 'prop_exists_merge');
+        $i1 = $context->getTypeFromString('int1');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $i1);
 
         $context->builder->branchIf($isNull, $nullBlock, $notNull);
 
@@ -121,6 +123,7 @@ final class JitPropertyExists
             $obj
         );
         $objResult = self::forObject($context, $objVar, $propertyArg, $propLiteral);
+        $context->builder->store($objResult, $resultSlot);
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($notObject);
@@ -132,20 +135,17 @@ final class JitPropertyExists
             // Runtime helper — autoloads like zend_lookup_class (#26407).
             $strResult = self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
         } else {
-            $i1 = $context->getTypeFromString('int1');
             $strResult = $i1->constInt(0, false);
         }
+        $context->builder->store($strResult, $resultSlot);
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($errBlock);
         self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
 
         $context->builder->positionAtEnd($mergeBlock);
-        $phi = $context->builder->phi($objResult->typeOf());
-        $phi->addIncoming($objResult, $objectBlock);
-        $phi->addIncoming($strResult, $stringBlock);
 
-        return $phi;
+        return $context->builder->load($resultSlot);
     }
 
     private static function routeThroughPhpHelper(

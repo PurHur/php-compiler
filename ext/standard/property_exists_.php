@@ -60,7 +60,6 @@ final class property_exists_ extends Internal
 
             return $i1->constInt(0, false);
         }
-        self::jitPropertyNameArg($context, $args[1]);
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             self::emitJitTypeErrorAndAbort($context, \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'null'));
             $i1 = $context->getTypeFromString('int1');
