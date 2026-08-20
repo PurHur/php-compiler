@@ -12983,25 +12983,17 @@ class JIT {
                     $forWritePreview = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                     if ('object' === strtolower(ltrim($declaringClass, '\\'))) {
                         $stdClassId = $this->context->type->object->lookup('stdClass');
-                        $nullsafeRemapToStdClass = $nullsafeRuntimeObjectReceiver;
-                        if ($nullsafeRemapToStdClass && $this->context->hasVariableOpInScopes($obj)) {
-                            $recvTagged = $this->context->getVariableFromOpInScopes($obj)->classUserType ?? null;
-                            if (
-                                is_string($recvTagged)
-                                && '' !== $recvTagged
-                                && 'object' !== strtolower($recvTagged)
-                            ) {
-                                $declaringClass = $recvTagged;
-                                $nullsafeRemapToStdClass = false;
-                            }
-                        }
+                        $nullsafeEnumPseudoProp = $nullsafeRuntimeObjectReceiver
+                            && null !== $propName
+                            && \in_array($propName, ['name', 'value'], true)
+                            && [] !== $this->context->type->object->registeredEnumClassIds();
                         if (
                             $forWritePreview
                             || (
                                 null !== $propName
                                 && $this->context->type->object->hasProperty($stdClassId, $propName)
                             )
-                            || $nullsafeRemapToStdClass
+                            || $nullsafeEnumPseudoProp
                         ) {
                             $declaringClass = 'stdClass';
                         }
@@ -14395,8 +14387,36 @@ class JIT {
         if (0 === strcasecmp(ltrim($declaringClass, '\\'), 'simplemxml_element')) {
             $declaringClass = 'SimpleXMLElement';
         }
+        // Prior ?-> on null leaves CFG userType null/object while the live CV holds a user
+        // class after reassignment — do not stdClass-remap (#32749, same as #29748 hooks).
+        $declaringClass = $this->recoverPropertyDeclaringClassFromReceiverVar($obj, $declaringClass);
 
         return $declaringClass;
+    }
+
+    /**
+     * When CFG collapsed receiver userType to generic object/null, use JIT classUserType.
+     */
+    private function recoverPropertyDeclaringClassFromReceiverVar(Operand $obj, string $declaringClass): string
+    {
+        $lc = strtolower(ltrim($declaringClass, '\\'));
+        if (!\in_array($lc, ['object', 'stdclass', ''], true)) {
+            return $declaringClass;
+        }
+        if (!$this->context->hasVariableOpInScopes($obj)) {
+            return $declaringClass;
+        }
+        $recv = $this->context->getVariableFromOpInScopes($obj);
+        $tagged = $recv->classUserType ?? null;
+        if (!is_string($tagged) || '' === $tagged) {
+            return $declaringClass;
+        }
+        $tagLc = strtolower(ltrim($tagged, '\\'));
+        if ('' === $tagLc || \in_array($tagLc, ['object', 'stdclass'], true)) {
+            return $declaringClass;
+        }
+
+        return ltrim($tagged, '\\');
     }
 
     private function externalPropertyDeclaringClassFallback(string $scopeClass, string $propName): ?string

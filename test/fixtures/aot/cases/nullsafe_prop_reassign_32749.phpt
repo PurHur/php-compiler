@@ -1,14 +1,13 @@
 --TEST--
-AOT: nullsafe ?-> after reassigning a prior nullsafe receiver prints property (#32749)
+AOT: ?-> after prior nullsafe on same local then reassignment prints property (#32749)
 --FILE--
 <?php
 class C {
-    public $x = 5;
+    public int $x = 5;
 }
-
 $c = null;
 echo $c?->x ?? 'n';
-$c = new C;
+$c = new C();
 echo $c?->x;
 --EXPECT--
 n5
