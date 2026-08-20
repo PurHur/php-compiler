@@ -130,7 +130,8 @@ final class ReflectionBuiltinHelper
         $exists = false;
         if ($object->hasUserDeclaredClass($className) || $object->isInterfaceClassLc($lc)) {
             $classId = $object->lookup($className);
-            $exists = $object->hasMethod($classId, $method);
+            $exists = \PHPCompiler\JIT\MagicMethodDispatch::hasInstanceMethod($object, $classId, $method)
+                || $object->hasMethod($classId, $method);
         } elseif (null !== $context->runtime->vmContext && isset($context->runtime->vmContext->classes[$lc])) {
             $exists = \PHPCompiler\ext\standard\VmReflection::methodExistsOnClass(
                 $context->runtime->vmContext->classes[$lc],

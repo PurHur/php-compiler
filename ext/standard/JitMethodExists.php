@@ -39,14 +39,12 @@ final class JitMethodExists
 
             return $i1->constInt(0, false);
         }
-        $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
-        if (null !== $classLiteral) {
-            // Runtime helper — autoloads like zend_lookup_class (#26407). Compile-time
-            // fold would skip registered autoloaders for not-yet-loaded class strings.
-            return self::routeThroughPhpHelper($context, $objectOrClass, $methodArg);
+        $folded = self::tryFoldSameUnitClassString($context, $objectOrClass, $methodArg, $methodLiteral);
+        if (null !== $folded) {
+            return $folded;
         }
-
-        throw new \LogicException('method_exists() requires a string literal class name in this compiler build');
+        // Runtime helper — autoloads like zend_lookup_class (#26407, #32701).
+        return self::routeThroughPhpHelper($context, $objectOrClass, $methodArg);
     }
 
     private static function invokeFromValueBox(
@@ -113,14 +111,8 @@ final class JitMethodExists
         $context->builder->branchIf($isString, $stringBlock, $errBlock);
 
         $context->builder->positionAtEnd($stringBlock);
-        $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
-        if (null !== $classLiteral) {
-            // Runtime helper — autoloads like zend_lookup_class (#26407).
-            $strResult = self::routeThroughPhpHelper($context, $objectOrClass, $methodArg);
-        } else {
-            $i1 = $context->getTypeFromString('int1');
-            $strResult = $i1->constInt(0, false);
-        }
+        $folded = self::tryFoldSameUnitClassString($context, $objectOrClass, $methodArg, $methodLiteral);
+        $strResult = $folded ?? self::routeThroughPhpHelper($context, $objectOrClass, $methodArg);
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($errBlock);
@@ -132,6 +124,33 @@ final class JitMethodExists
         $phi->addIncoming($strResult, $stringBlock);
 
         return $phi;
+    }
+
+    /**
+     * Same-unit class string: LLVM object table. NestedJIT VmReflection misses AOT
+     * classes and returned false (#32701 leftover of #31966). Autoload for
+     * not-yet-loaded names still uses the runtime helper (#26407).
+     */
+    private static function tryFoldSameUnitClassString(
+        Context $context,
+        JITVariable $objectOrClass,
+        JITVariable $methodArg,
+        ?string $methodLiteral
+    ): ?Value {
+        $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
+        $methodLiteral = $methodLiteral ?? JitStringArg::compileTimeLiteral($methodArg);
+        if (null === $classLiteral || null === $methodLiteral) {
+            return null;
+        }
+        $object = $context->type->object;
+        if (
+            !$object->hasUserDeclaredClass($classLiteral)
+            && !$object->isInterfaceClassLc(strtolower(ltrim($classLiteral, '\\')))
+        ) {
+            return null;
+        }
+
+        return ReflectionBuiltinHelper::methodExistsLiteral($context, $classLiteral, $methodLiteral);
     }
 
     private static function routeThroughPhpHelper(

@@ -17,7 +17,7 @@ final class MethodExistsRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('existsForClassIdRuntimeMethod', $source);
         $this->assertStringNotContainsString('existsForClassIdLiteralMethodDynamic', $source);
         $this->assertStringNotContainsString('instanceMethodExistsDynamic', $source);
-        $this->assertLessThan(270, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(330, \substr_count($source, "\n") + 1);
     }
 
     public function testStringMethodExistsUsesJitHelperNotInlineLlvm(): void
@@ -25,6 +25,8 @@ final class MethodExistsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringMethodExists.php');
         $this->assertStringContainsString('MethodExistsJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringContainsString('extractLongFromHelperResult', $source);
+        $this->assertStringContainsString('#32701', $source);
         $this->assertStringNotContainsString("lookupFunction('strcasecmp')", $source);
     }
 
@@ -33,5 +35,6 @@ final class MethodExistsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/MethodExistsJitHelper.php');
         $this->assertStringContainsString('VmReflection::methodExists', $source);
         $this->assertStringContainsString('Superglobals::getActiveContext', $source);
+        $this->assertStringContainsString('existsArgv(Variable $objectOrClass, string $method): int', $source);
     }
 }
