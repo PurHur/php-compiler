@@ -32,7 +32,9 @@ use PHPLLVM\Value;
  * openssl_dh_compute_key() (#32771 leftover of #6596),
  * openssl_pkey_derive() (#32852 leftover of #15428), and
  * openssl_spki_verify() (#32776 leftover of #8690);
- * openssl_spki_export() (#32787 leftover of #6423).
+ * openssl_spki_export() (#32787 leftover of #6423);
+ * openssl_spki_export_challenge() (#32792 leftover of #6423);
+ * openssl_spki_new() (#32892 leftover of #8690).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -54,6 +56,8 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_pkey_derive) / EVP_PKEY_derive
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_verify) / NETSCAPE_SPKI_verify
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_export) / NETSCAPE_SPKI_get_pubkey
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_export_challenge) / NETSCAPE_SPKI_get_challenge
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_new) / NETSCAPE_SPKI_sign
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -756,6 +760,70 @@ final class JitOpensslX509
         }
 
         return self::boxedString($context, $shared);
+    }
+
+    /**
+     * openssl_spki_new() — bake {@see VmOpensslSpkiNative::spkiNew}.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_spki_new) /
+     * NETSCAPE_SPKI_new + NETSCAPE_SPKI_sign + NETSCAPE_SPKI_b64_encode
+     * Private key and challenge must be compile-time string literals; optional digest is a
+     * compile-time int ({@see OpensslConstants::OPENSSL_ALGO_*}) or string name. Default digest
+     * matches VM ({@see OpensslConstants::OPENSSL_ALGO_MD5}).
+     */
+    public static function spkiNew(
+        Context $context,
+        JITVariable $privateKey,
+        JITVariable $challenge,
+        ?JITVariable $digestAlgo = null
+    ): Value {
+        $pem = JitStringArg::compileTimeLiteral($privateKey);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_spki_new() private_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32892)'
+            );
+        }
+        $chal = JitStringArg::compileTimeLiteral($challenge);
+        if (null === $chal) {
+            throw new \LogicException(
+                'openssl_spki_new() challenge must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32892)'
+            );
+        }
+
+        $algorithm = OpensslConstants::OPENSSL_ALGO_MD5;
+        if (null !== $digestAlgo) {
+            $algoInt = self::compileTimeInt($digestAlgo);
+            if (null !== $algoInt) {
+                $algorithm = $algoInt;
+            } else {
+                $algoStr = JitStringArg::compileTimeLiteral($digestAlgo);
+                if (null === $algoStr) {
+                    throw new \LogicException(
+                        'openssl_spki_new() digest_algo must be a compile-time int or string '
+                        .'for JIT/AOT in this compiler build (issue #32892)'
+                    );
+                }
+                $algorithm = $algoStr;
+            }
+        }
+
+        if (!VmOpensslSpkiNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $digestName = VmOpenssl::resolveDigestName($algorithm, 'openssl_spki_new', null);
+        if (false === $digestName) {
+            return self::boxedFalse($context);
+        }
+
+        $spkac = VmOpensslSpkiNative::spkiNew($pem, $chal, $digestName);
+        if (false === $spkac) {
+            return self::boxedFalse($context);
+        }
+
+        return self::boxedString($context, $spkac);
     }
 
     /**
