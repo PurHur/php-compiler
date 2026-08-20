@@ -14,7 +14,7 @@ final class UsortRuntimeShrinkTest extends TestCase
     public function testUsortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/UsortRuntime.php');
-        $this->assertStringContainsString('UsortJitHelper', $runtime);
+        $this->assertStringContainsString('UsortPackedLlvm::sortPackedWithClosure', $runtime);
         $this->assertStringContainsString('SortRuntime::sortPacked', $runtime);
         $this->assertStringContainsString('KeySortRuntime::ksortByKey', $runtime);
         $this->assertStringContainsString('__hashtable__sortStringKeyValues', $runtime);
@@ -36,6 +36,7 @@ final class UsortRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('$ht->assignPackedList($values)', $helper);
         $this->assertStringContainsString('$ht->reorderKeyedPairs($pairs)', $helper);
         $this->assertStringContainsString('VmClosureInvoke', $helper);
+        $this->assertStringContainsString('invokeVariableTwo', $helper);
 
         $usort = (string) file_get_contents(__DIR__.'/../../ext/standard/usort_.php');
         $this->assertStringContainsString('UsortRuntime::usortPacked', $usort);

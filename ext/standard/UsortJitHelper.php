@@ -52,10 +52,9 @@ final class UsortJitHelper
         $n = \count($values);
         for ($i = 0; $i < $n - 1; ++$i) {
             for ($j = 0; $j < $n - $i - 1; ++$j) {
-                // SSOT coerce (bool Deprecated / object Warning) — not raw toInt() (#29089, #29124).
-                $cmp = VmClosureCall::coerceUserSortCallbackResult(
-                    VmClosureInvoke::invokeVariable($closure, $values[$j], $values[$j + 1])
-                );
+                // invokeVariableTwo — fixed arity for NestedJIT; variadic invokeVariable dropped
+                // the comparator arg under thin AOT (#26954 regression).
+                $cmp = VmClosureInvoke::invokeVariableTwo($closure, $values[$j], $values[$j + 1]);
                 if ($cmp > 0) {
                     $tmp = $values[$j];
                     $values[$j] = $values[$j + 1];
@@ -91,9 +90,7 @@ final class UsortJitHelper
             for ($j = 0; $j < $n - $i - 1; ++$j) {
                 $left = $pairs[$j];
                 $right = $pairs[$j + 1];
-                $cmp = VmClosureCall::coerceUserSortCallbackResult(
-                    VmClosureInvoke::invokeVariable($closure, $left[0], $right[0])
-                );
+                $cmp = VmClosureInvoke::invokeVariableTwo($closure, $left[0], $right[0]);
                 if ($cmp > 0) {
                     $pairs[$j] = $right;
                     $pairs[$j + 1] = $left;
@@ -127,9 +124,7 @@ final class UsortJitHelper
             for ($j = 0; $j < $n - $i - 1; ++$j) {
                 $left = $pairs[$j];
                 $right = $pairs[$j + 1];
-                $cmp = VmClosureCall::coerceUserSortCallbackResult(
-                    VmClosureInvoke::invokeVariable($closure, $left[1], $right[1])
-                );
+                $cmp = VmClosureInvoke::invokeVariableTwo($closure, $left[1], $right[1]);
                 if ($cmp > 0) {
                     $pairs[$j] = $right;
                     $pairs[$j + 1] = $left;
