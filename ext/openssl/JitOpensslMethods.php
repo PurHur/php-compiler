@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
-use PHPCompiler\JIT\Builtin\OpensslMethodsCrypto;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitBoolArg;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -16,17 +14,40 @@ use PHPLLVM\Value;
  * LLVM lowering for openssl_get_cipher_methods()/openssl_get_md_methods() (#21103),
  * openssl_get_curve_names() (#6560 VM, JIT/AOT #32364), and
  * openssl_get_cert_locations() (#6560 VM, JIT/AOT #32388).
+ *
+ * Cipher/md method lists are baked at compile time (peer curveNames / certLocations).
+ * NestedJIT via {@see OpensslMethodsJitHelper} still references stale prelinked units
+ * whose TU omits {@see OpensslCipherRegistry} const initializers (#32650, re-#30148).
  */
 final class JitOpensslMethods
 {
     public static function cipherMethods(Context $context, ?JITVariable $aliases = null): Value
     {
-        return self::invoke($context, '__compiler_openssl_get_cipher_methods', 'openssl_get_cipher_methods', $aliases);
+        if (null !== $aliases) {
+            JitBoolArg::lowerCoerce(
+                $context,
+                $aliases,
+                'openssl_get_cipher_methods(): Argument #1 ($aliases)'
+            );
+        }
+        // Aliases flag is ignored in this build (OpensslCipherRegistry::cipherMethods).
+        $htVar = HashTableHelper::variableFromVmHashTable($context, VmOpenssl::cipherMethods(false));
+
+        return $htVar->value;
     }
 
     public static function mdMethods(Context $context, ?JITVariable $aliases = null): Value
     {
-        return self::invoke($context, '__compiler_openssl_get_md_methods', 'openssl_get_md_methods', $aliases);
+        if (null !== $aliases) {
+            JitBoolArg::lowerCoerce(
+                $context,
+                $aliases,
+                'openssl_get_md_methods(): Argument #1 ($aliases)'
+            );
+        }
+        $htVar = HashTableHelper::variableFromVmHashTable($context, VmOpenssl::mdMethods(false));
+
+        return $htVar->value;
     }
 
     /**
@@ -52,36 +73,5 @@ final class JitOpensslMethods
         $htVar = HashTableHelper::variableFromVmHashTable($context, VmOpenssl::certLocations());
 
         return $htVar->value;
-    }
-
-    private static function invoke(
-        Context $context,
-        string $abi,
-        string $function,
-        ?JITVariable $aliases
-    ): Value {
-        OpensslMethodsCrypto::ensureLinked($context);
-
-        $aliasesI64 = null === $aliases
-            ? $context->getTypeFromString('int64')->constInt(0, false)
-            : $context->builder->zExt(
-                JitBoolArg::lowerCoerce(
-                    $context,
-                    $aliases,
-                    sprintf('%s(): Argument #1 ($aliases)', $function)
-                ),
-                $context->getTypeFromString('int64')
-            );
-
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $raw = $context->builder->call($context->lookupFunction($abi), $aliasesI64);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $ptr,
-            $raw
-        );
-
-        return $ptr;
     }
 }
