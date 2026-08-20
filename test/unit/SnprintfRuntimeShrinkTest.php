@@ -18,6 +18,27 @@ final class SnprintfRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('LibcExtern::ensureSnprintf', $runtime);
         $this->assertStringContainsString('#32092', $runtime);
         $this->assertStringContainsString("lookupFunction('snprintf')", $runtime);
+        // %s/%S must stringify float/int before libc snprintf (#33010).
+        $this->assertStringContainsString('#33010', $runtime);
+        $this->assertStringContainsString('ZendDoubleStringRuntime::formatGcvt', $runtime);
+        $this->assertStringContainsString('emitStoreIsStringConversionSpec', $runtime);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSprintf.php');
+        $this->assertStringContainsString('parseConversionSpecs', $jit);
+        $this->assertStringContainsString('formatWithFmtLiteral', $jit);
+        $this->assertStringContainsString('#33010', $jit);
+    }
+
+    public function testParseConversionSpecsDetectsStringAndFloat(): void
+    {
+        require_once __DIR__.'/../../ext/standard/JitSprintf.php';
+        $p = \PHPCompiler\ext\standard\JitSprintf::parseConversionSpecs('%s');
+        $this->assertSame(['s'], $p);
+        $this->assertSame(['s'], \PHPCompiler\ext\standard\JitSprintf::parseConversionSpecs("%s\n"));
+        $this->assertSame(['f'], \PHPCompiler\ext\standard\JitSprintf::parseConversionSpecs('%.1f'));
+        $this->assertSame(['s'], \PHPCompiler\ext\standard\JitSprintf::parseConversionSpecs('%10s'));
+        $this->assertSame(['*', 's'], \PHPCompiler\ext\standard\JitSprintf::parseConversionSpecs('%*s'));
+        $this->assertSame(['d'], \PHPCompiler\ext\standard\JitSprintf::parseConversionSpecs('%d seconds'));
+        $this->assertSame([], \PHPCompiler\ext\standard\JitSprintf::parseConversionSpecs('%%'));
     }
 
     public function testLibcExternDropsAlwaysOnSnprintf(): void

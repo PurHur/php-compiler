@@ -4,22 +4,39 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\VmResourceIdString;
 use PHPLLVM\Value;
 
 /**
  * LLVM JIT/AOT helper for sprintf() (%s, %d, %f, %%).
+ *
+ * php-src ext/standard/formatted_print.c — conversion specifier drives coercion (#33010).
  */
 final class JitSprintf
 {
     public static function formatWithFmt(Context $context, Value $fmt, JITVariable ...$args): Value
     {
-        $wrapped = [new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $fmt)];
+        return self::formatWithFmtLiteral($context, $fmt, null, ...$args);
+    }
 
-        return self::format($context, ...array_merge($wrapped, $args));
+    /** Prefer when the format literal is known so %s can stringify float/int (#33010). */
+    public static function formatWithFmtLiteral(
+        Context $context,
+        Value $fmt,
+        ?string $fmtLiteral,
+        JITVariable ...$args
+    ): Value {
+        $wrapped = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $fmt);
+        if (null !== $fmtLiteral) {
+            $wrapped->compileTimeString = $fmtLiteral;
+        }
+
+        return self::format($context, $wrapped, ...$args);
     }
 
     public static function format(Context $context, JITVariable ...$args): Value
@@ -60,13 +77,14 @@ final class JitSprintf
         // Multi-arg: direct libc snprintf — bypasses broken NestedJIT pack path.
         // At compile time we know arg count and types, so we emit a single
         // snprintf(buf, size, fmt_nul, typed1, typed2, ...) call.
+        // %s/%S must stringify float/int first (php-src formatted_print.c) (#33010).
         \PHPCompiler\JIT\LibcExtern::ensureSnprintf($context);
+        ZendDoubleStringRuntime::ensureLinked($context);
 
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $charPtr = $context->getTypeFromString('char*');
-        $strPtr = $context->getTypeFromString('__string__*');
 
         $fmtNul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $fmt);
 
@@ -82,8 +100,10 @@ final class JitSprintf
             $fmtNul,
         ];
         $toFree = [];
+        $specs = self::parseConversionSpecs($args[0]->compileTimeString);
         for ($i = 0; $i < $numArgs; ++$i) {
-            $extracted = self::extractSnprintfArg($context, $args[$i + 1], $toFree);
+            $spec = $specs[$i] ?? null;
+            $extracted = self::extractSnprintfArg($context, $args[$i + 1], $toFree, $spec);
             $snprintfArgs[] = $extracted;
         }
 
@@ -108,15 +128,82 @@ final class JitSprintf
     }
 
     /**
+     * Conversion specifiers for value args (excludes %% and width/precision * args).
+     *
+     * @return list<string>
+     */
+    public static function parseConversionSpecs(?string $fmt): array
+    {
+        if (null === $fmt || '' === $fmt) {
+            return [];
+        }
+        $specs = [];
+        $len = \strlen($fmt);
+        for ($i = 0; $i < $len; ++$i) {
+            if ('%' !== $fmt[$i]) {
+                continue;
+            }
+            ++$i;
+            if ($i >= $len) {
+                break;
+            }
+            if ('%' === $fmt[$i]) {
+                continue;
+            }
+            while ($i < $len && \str_contains("#0-+ '", $fmt[$i])) {
+                ++$i;
+            }
+            if ($i < $len && '*' === $fmt[$i]) {
+                // Width from next arg — not a value conversion; skip consuming a value spec slot
+                // by recording a star marker so arg indexing stays aligned with snprintf.
+                $specs[] = '*';
+                ++$i;
+            } else {
+                while ($i < $len && \ctype_digit($fmt[$i])) {
+                    ++$i;
+                }
+            }
+            if ($i < $len && '.' === $fmt[$i]) {
+                ++$i;
+                if ($i < $len && '*' === $fmt[$i]) {
+                    $specs[] = '*';
+                    ++$i;
+                } else {
+                    while ($i < $len && \ctype_digit($fmt[$i])) {
+                        ++$i;
+                    }
+                }
+            }
+            if ($i < $len) {
+                $specs[] = $fmt[$i];
+            }
+        }
+
+        return $specs;
+    }
+
+    private static function isStringConversionSpec(?string $spec): bool
+    {
+        return 's' === $spec || 'S' === $spec;
+    }
+
+    /**
      * Extract a typed value from a JIT variable for use as a snprintf vararg.
      *
      * Returns i64 for longs/bools, double for floats, char* for strings.
+     * For %s/%S, float/int are stringified first (#33010).
      * String args are NUL-terminated into a malloc'd buffer tracked in $toFree.
      *
      * @param Value[] $toFree collects malloc'd buffers to free after snprintf
      */
-    private static function extractSnprintfArg(Context $context, JITVariable $arg, array &$toFree): Value
-    {
+    private static function extractSnprintfArg(
+        Context $context,
+        JITVariable $arg,
+        array &$toFree,
+        ?string $spec = null
+    ): Value {
+        $asString = self::isStringConversionSpec($spec);
+
         // When inference says native type but storage is __value__*, read from the box.
         if (null === $arg->valueBoxAliasPtr
             && \in_array($arg->type, [
@@ -133,10 +220,15 @@ final class JitSprintf
             $valuePtr = JitValueBox::normalizeValuePtr($context, $arg->value);
             switch ($arg->type) {
                 case JITVariable::TYPE_NATIVE_DOUBLE:
-                    return $context->builder->call(
+                    $dbl = $context->builder->call(
                         $context->lookupFunction('__value__readDouble'),
                         $valuePtr
                     );
+                    if ($asString) {
+                        return self::doubleAsSnprintfString($context, $dbl, $toFree);
+                    }
+
+                    return $dbl;
                 case JITVariable::TYPE_STRING:
                     $strVal = $context->builder->call(
                         $context->lookupFunction('__value__readString'),
@@ -151,18 +243,33 @@ final class JitSprintf
 
                     return $nul;
                 default:
-                    return $context->builder->call(
+                    $lng = $context->builder->call(
                         $context->lookupFunction('__value__readLong'),
                         $valuePtr
                     );
+                    if ($asString) {
+                        return self::longAsSnprintfString($context, $lng, $toFree);
+                    }
+
+                    return $lng;
             }
         }
         switch ($arg->type) {
             case JITVariable::TYPE_NATIVE_LONG:
             case JITVariable::TYPE_NATIVE_BOOL:
-                return $context->helper->loadValue($arg);
+                $lng = $context->helper->loadValue($arg);
+                if ($asString) {
+                    return self::longAsSnprintfString($context, $lng, $toFree);
+                }
+
+                return $lng;
             case JITVariable::TYPE_NATIVE_DOUBLE:
-                return $context->helper->loadValue($arg);
+                $dbl = $context->helper->loadValue($arg);
+                if ($asString) {
+                    return self::doubleAsSnprintfString($context, $dbl, $toFree);
+                }
+
+                return $dbl;
             case JITVariable::TYPE_STRING:
                 $str = $context->helper->loadValue($arg);
                 $owned = $context->builder->call(
@@ -175,14 +282,40 @@ final class JitSprintf
                 return $nul;
             case JITVariable::TYPE_VALUE:
                 $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
-
-                return $context->builder->call(
+                $lng = $context->builder->call(
                     $context->lookupFunction('__value__readLong'),
                     $valuePtr
                 );
+                if ($asString) {
+                    return self::longAsSnprintfString($context, $lng, $toFree);
+                }
+
+                return $lng;
             default:
                 return $context->helper->loadValue($arg);
         }
+    }
+
+    /** @param Value[] $toFree */
+    private static function doubleAsSnprintfString(Context $context, Value $dbl, array &$toFree): Value
+    {
+        $str = ZendDoubleStringRuntime::formatGcvt($context, $dbl);
+        $sep = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        $nul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $sep);
+        $toFree[] = $nul;
+
+        return $nul;
+    }
+
+    /** @param Value[] $toFree */
+    private static function longAsSnprintfString(Context $context, Value $lng, array &$toFree): Value
+    {
+        $str = VmResourceIdString::formatBoxedNativeLong($context, $lng);
+        $sep = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        $nul = \PHPCompiler\JIT\Builtin\SprintfSnprintfRuntime::nullTerminatedCopyPublic($context, $sep);
+        $toFree[] = $nul;
+
+        return $nul;
     }
 
     public static function writeArg(Context $context, Value $slot, JITVariable $arg): void

@@ -59,8 +59,14 @@ final class JitPrintf
         }
 
         // Multi-arg: format via JitSprintf (direct snprintf), then echo the result.
+        // Pass format literal so %s can stringify float/int (#33010).
         \PHPCompiler\JIT\Builtin\StringFormat::ensureRuntimeHelpersPublic($context);
-        $formatted = JitSprintf::formatWithFmt($context, $fmt, ...array_slice($args, 1));
+        $formatted = JitSprintf::formatWithFmtLiteral(
+            $context,
+            $fmt,
+            $args[0]->compileTimeString,
+            ...\array_slice($args, 1)
+        );
 
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
