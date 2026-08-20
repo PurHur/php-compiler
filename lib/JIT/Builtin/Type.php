@@ -607,12 +607,10 @@ class Type extends Builtin {
         // bridge is PasswordCryptoRuntime (getNamedFunction first; Type::initialize
         // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // password_hash.1 (#31894 / #32122).
-        $fntypeStrtr = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr);
-        $fnStrtr = $this->context->module->addFunction('__compiler_strtr', $fntypeStrtr);
-        $this->context->registerFunction('__compiler_strtr', $fnStrtr);
-        $fntypeStrtrArray = $this->context->context->functionType($strPtr, false, $strPtr, $htPtr);
-        $fnStrtrArray = $this->context->module->addFunction('__compiler_strtr_array', $fntypeStrtrArray);
-        $this->context->registerFunction('__compiler_strtr_array', $fnStrtrArray);
+        // __compiler_strtr / __compiler_strtr_array always-on shells removed (#32858):
+        // NestedJIT/AOT bridge is StringStrtr (getNamedFunction first; Type::initialize
+        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // strtr.1 (#31894 / #32122).
         $fntypeUuencode = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnUuencode = $this->context->module->addFunction('__compiler_convert_uuencode', $fntypeUuencode);
         $this->context->registerFunction('__compiler_convert_uuencode', $fnUuencode);
@@ -1213,6 +1211,7 @@ class Type extends Builtin {
         PasswordRandomBytesRuntime::ensureLinked($this->context);
         PasswordCryptoRuntime::ensureLinked($this->context);
         OpensslEncryptRuntime::ensureLinked($this->context);
+        StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
         DirectoryIteratorSnapshotRuntime::ensureLinked($this->context);
