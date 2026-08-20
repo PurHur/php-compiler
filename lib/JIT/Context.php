@@ -441,6 +441,14 @@ class Context {
     public array $foreachDatePeriodSnapshotHts = [];
 
     /**
+     * DOMNodeList / DOMNamedNodeMap foreach — snapshot to hashtable, then iterate.
+     * Keyed by {@see foreachSlotMapKey()}, value is the snapshot HT JitVariable.
+     *
+     * @var array<string, Variable>
+     */
+    public array $foreachDomNodeListSlots = [];
+
+    /**
      * IteratorAggregate foreach slots that unwrap getIterator() then walk `__spl_ht`
      * on the inner ArrayIterator (#26785). Keyed by {@see foreachSlotMapKey()}.
      *

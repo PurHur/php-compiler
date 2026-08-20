@@ -91,8 +91,19 @@ final class VmIteratorForeach
         if ($context->functionIsRegistered($classLc.'::rewind')) {
             return false;
         }
+        // DOM IteratorAggregate classes return InternalIterator, not ArrayIterator —
+        // no __spl_ht on the inner object (php-src ext/dom/php_dom.stub.php; #32707).
+        if (self::isDomIteratorAggregate($classLc)) {
+            return false;
+        }
 
         return true;
+    }
+
+    /** DOM IteratorAggregate classes whose getIterator() returns InternalIterator, not ArrayIterator. */
+    private static function isDomIteratorAggregate(string $classLc): bool
+    {
+        return \PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::isDomNodeListForeach($classLc);
     }
 
     private static function hashtableFromAggregateInner(Context $context, JitVariable $slotKey): JitVariable
@@ -291,6 +302,14 @@ final class VmIteratorForeach
     public static function compileReset(Context $context, JitVariable $array, ?string $containerUserType = null): void
     {
         $slotKey = $array;
+        // DOMNodeList / DOMNamedNodeMap: compile-time snapshot when available (#32707).
+        if (\PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::isDomNodeListForeach($containerUserType)) {
+            if (\PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::canLower($context, $array)) {
+                \PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::compileReset($context, $array, $slotKey);
+
+                return;
+            }
+        }
         // SimpleXMLElement host-tree snapshot before object-property / Iterator stubs (#27535).
         if (SimpleXmlForeachSnapshot::canLower($array)) {
             SimpleXmlForeachSnapshot::compileReset($context, $array, $slotKey);
@@ -349,6 +368,11 @@ final class VmIteratorForeach
         ?string $containerUserType = null
     ): \PHPLLVM\Value {
         $slotKey = $array;
+        if (isset($context->foreachDomNodeListSlots[$context->foreachSlotMapKey($slotKey)])) {
+            $snapshotHt = $context->foreachDomNodeListSlots[$context->foreachSlotMapKey($slotKey)];
+
+            return self::compileValidHashtable($context, $snapshotHt, $slotKey);
+        }
         if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
 
@@ -589,6 +613,11 @@ final class VmIteratorForeach
         ?string $containerUserType = null
     ): JitVariable {
         $slotKey = $array;
+        if (isset($context->foreachDomNodeListSlots[$context->foreachSlotMapKey($slotKey)])) {
+            $snapshotHt = $context->foreachDomNodeListSlots[$context->foreachSlotMapKey($slotKey)];
+
+            return self::compileKeyHashtable($context, $snapshotHt, $slotKey);
+        }
         if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
 
@@ -765,6 +794,11 @@ final class VmIteratorForeach
         ?string $containerUserType = null
     ): JitVariable {
         $slotKey = $array;
+        if (isset($context->foreachDomNodeListSlots[$context->foreachSlotMapKey($slotKey)])) {
+            $snapshotHt = $context->foreachDomNodeListSlots[$context->foreachSlotMapKey($slotKey)];
+
+            return self::compileValueHashtable($context, $snapshotHt, $slotKey);
+        }
         if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
 
