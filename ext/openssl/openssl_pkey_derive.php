@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkey_derive() — EVP_PKEY_derive (php-src ext/openssl/openssl.c / pkey.c; issue #15428, #26689, #27685).
+ * openssl_pkey_derive() — EVP_PKEY_derive (php-src ext/openssl/openssl.c / pkey.c; #15428 VM, JIT/AOT #32852).
  *
  * Args are untyped zvals in php-src (`zend_parse_parameters(..., "zz|l")`); invalid scalars soft-fail
  * to false via php_openssl_pkey_from_zval — not TypeError.
@@ -69,8 +69,18 @@ final class openssl_pkey_derive extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_pkey_derive() is not implemented for JIT in this compiler build (issue #15428)'
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'openssl_pkey_derive() expects 2 or 3 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::pkeyDerive(
+            $context,
+            $args[0],
+            $args[1],
+            3 === $argc ? $args[2] : null
         );
     }
 

@@ -29,7 +29,8 @@ use PHPLLVM\Value;
  * openssl_private_encrypt() (#32757 leftover of #6666),
  * openssl_private_decrypt() (#32759 leftover of #6666),
  * openssl_public_decrypt() (#32761 leftover of #6666),
- * openssl_dh_compute_key() (#32771 leftover of #6596), and
+ * openssl_dh_compute_key() (#32771 leftover of #6596),
+ * openssl_pkey_derive() (#32852 leftover of #15428), and
  * openssl_spki_verify() (#32776 leftover of #8690);
  * openssl_spki_export() (#32787 leftover of #6423).
  *
@@ -50,6 +51,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_private_decrypt) / EVP_PKEY_decrypt
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_public_decrypt) / EVP_PKEY_verify_recover
  * php-src: ext/openssl/openssl_backend_v3.c — PHP_FUNCTION(openssl_dh_compute_key) / EVP_PKEY_derive
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_pkey_derive) / EVP_PKEY_derive
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_verify) / NETSCAPE_SPKI_verify
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_export) / NETSCAPE_SPKI_get_pubkey
  *
@@ -698,6 +700,57 @@ final class JitOpensslX509
         }
 
         $shared = VmOpensslPkeyDeriveNative::dhComputeKey($pem, $pub);
+        if (false === $shared) {
+            return self::boxedFalse($context);
+        }
+
+        return self::boxedString($context, $shared);
+    }
+
+    /**
+     * openssl_pkey_derive() — bake {@see VmOpensslPkeyDeriveNative::derive}.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkey_derive) / EVP_PKEY_derive
+     * Public + private keys are PEM string literals (same coerce surface as thin AOT
+     * {@see self::dhComputeKey}). Optional $key_length must be a compile-time int.
+     */
+    public static function pkeyDerive(
+        Context $context,
+        JITVariable $publicKey,
+        JITVariable $privateKey,
+        ?JITVariable $keyLength = null
+    ): Value {
+        $pub = JitStringArg::compileTimeLiteral($publicKey);
+        if (null === $pub) {
+            throw new \LogicException(
+                'openssl_pkey_derive() public_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32852)'
+            );
+        }
+        $priv = JitStringArg::compileTimeLiteral($privateKey);
+        if (null === $priv) {
+            throw new \LogicException(
+                'openssl_pkey_derive() private_key must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32852)'
+            );
+        }
+        $len = 0;
+        if (null !== $keyLength) {
+            $lenLit = self::compileTimeInt($keyLength);
+            if (null === $lenLit) {
+                throw new \LogicException(
+                    'openssl_pkey_derive() key_length must be a compile-time int '
+                    .'for JIT/AOT in this compiler build (issue #32852)'
+                );
+            }
+            $len = $lenLit;
+        }
+
+        if (!VmOpensslPkeyDeriveNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $shared = VmOpensslPkeyDeriveNative::derive($pub, $priv, $len);
         if (false === $shared) {
             return self::boxedFalse($context);
         }
