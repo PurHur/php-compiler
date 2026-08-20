@@ -184,13 +184,24 @@ final class JitDomReplaceChild
         if (null === $newTag || '' === $newTag) {
             return;
         }
-        $replacement = '<'.$newTag.'/>';
+        // createElement($name, $value) stamps escaped text on compileTimeDomInnerXml (#32903).
+        $newInner = $newChildVar->compileTimeDomInnerXml ?? '';
+        $replacement = '' === $newInner
+            ? '<'.$newTag.'/>'
+            : '<'.$newTag.'>'.$newInner.'</'.$newTag.'>';
 
         if (null !== $xml && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
-            $index = $oldChildVar->compileTimeDomChildIndex ?? null;
+            // item($N) ARG_SEND temps often drop compileTimeDomChildIndex (#32903).
+            $index = $oldChildVar->compileTimeDomChildIndex
+                ?? JitDomNodeListItem::$lastFetchedChildIndex
+                ?? JitDomNodeChildProperty::$lastFetchedChildIndex
+                ?? null;
             if (null === $index) {
-                $oldTag = $oldChildVar->compileTimeDomTagName ?? null;
+                $oldTag = $oldChildVar->compileTimeDomTagName
+                    ?? JitDomNodeListItem::$lastFetchedTagName
+                    ?? JitDomNodeChildProperty::$lastFetchedTagName
+                    ?? null;
                 if (null !== $oldTag) {
                     foreach ($nodes as $i => $node) {
                         if ('element' === $node['kind'] && strtolower($oldTag) === $node['data']) {

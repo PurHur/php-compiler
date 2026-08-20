@@ -15,11 +15,21 @@ use PHPLLVM\Value;
 /** LLVM lowering for DOMNodeList::item() (#18493, #27410). */
 final class JitDomNodeListItem
 {
+    /**
+     * Last compile-time item($N) index — replaceChild ARG_SEND temps often lose
+     * {@see JITVariable::$compileTimeDomChildIndex} (#32903 / peer firstChild #28671).
+     */
+    public static ?int $lastFetchedChildIndex = null;
+
+    public static ?string $lastFetchedTagName = null;
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 2) {
             throw new \LogicException('DOMNodeList::item() expects receiver and index');
         }
+
+        self::rememberCompileTimeChildIndex($context, $args[1]);
 
         if (JitDomNodeListItemUserScript::shouldUse($context)) {
             $us = JitDomNodeListItemUserScript::tryInvoke($context, ...$args);
@@ -50,6 +60,52 @@ final class JitDomNodeListItem
         }
 
         return $result;
+    }
+
+    /**
+     * Record item($N) when $N is an LLVM i64 constant (#32903 / #32831).
+     *
+     * Also mirrors onto {@see JitDomNodeChildProperty} statics so ChildNode /
+     * replaceChild InnerXml helpers share one fallback.
+     */
+    private static function rememberCompileTimeChildIndex(Context $context, JITVariable $indexArg): void
+    {
+        $index = null;
+        if (
+            null !== $indexArg->value
+            && \PHPLLVM\Value::KIND_CONSTANT_INT === $indexArg->value->getKind()
+        ) {
+            $index = $indexArg->compileTimeLong;
+            if (null === $index && null !== $indexArg->compileTimeString && is_numeric($indexArg->compileTimeString)) {
+                $index = (int) $indexArg->compileTimeString;
+            }
+            if (null === $index) {
+                $index = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($indexArg->value->value);
+            }
+        }
+        if (null === $index || $index < 0) {
+            return;
+        }
+        self::$lastFetchedChildIndex = $index;
+        JitDomNodeChildProperty::$lastFetchedChildIndex = $index;
+
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (
+            null === $xml
+            || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+        ) {
+            return;
+        }
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        if (!isset($nodes[$index]) || 'element' !== ($nodes[$index]['kind'] ?? null)) {
+            return;
+        }
+        $tag = $nodes[$index]['data'] ?? null;
+        if (null === $tag || '' === $tag) {
+            return;
+        }
+        self::$lastFetchedTagName = $tag;
+        JitDomNodeChildProperty::$lastFetchedTagName = $tag;
     }
 
     private static function invokeOwnerAware(

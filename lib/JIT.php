@@ -12500,6 +12500,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $callArgs
                     );
+                    $this->propagateDomNodeListItemCompileTimeChildIndex(
+                        $block->getOperand($op->arg1),
+                        $callArgs
+                    );
                     $this->propagateDomCloneNodeCompileTimeTag(
                         $block->getOperand($op->arg1)
                     );
@@ -14882,6 +14886,65 @@ class JIT {
             $inner = htmlspecialchars($valueArg->compileTimeString, ENT_QUOTES | ENT_XML1, 'UTF-8');
         }
         $resultVar->compileTimeDomInnerXml = $inner;
+    }
+
+    /**
+     * Stamp childNodes->item(N) compile-time index for thin-AOT replaceChild InnerXml (#32903).
+     *
+     * LiveSlots already refresh held pins (#32784); saveXML still reads PROP_USER_SCRIPT_INNER_XML.
+     * Without this index, {@see \PHPCompiler\ext\dom\JitDomReplaceChild} leaves seeded InnerXml
+     * unchanged so serialization keeps the replaced sibling.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private function propagateDomNodeListItemCompileTimeChildIndex(Operand $result, array $callArgs): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomNodeListItem)) {
+            return;
+        }
+        $indexArg = $callArgs[1] ?? null;
+        if (!$indexArg instanceof Variable) {
+            return;
+        }
+        // Peer JitDomNodeListItemUserScript / #32831: only stamp when the index is a
+        // true LLVM i64 constant — loop `$i` keeps stale compileTimeLong=0 as KIND_VALUE.
+        $index = null;
+        if (
+            null !== $indexArg->value
+            && \PHPLLVM\Value::KIND_CONSTANT_INT === $indexArg->value->getKind()
+        ) {
+            $index = $indexArg->compileTimeLong;
+            if (null === $index && null !== $indexArg->compileTimeString && is_numeric($indexArg->compileTimeString)) {
+                $index = (int) $indexArg->compileTimeString;
+            }
+            if (null === $index) {
+                $index = (int) $this->context->llvm->lib->LLVMConstIntGetSExtValue($indexArg->value->value);
+            }
+        }
+        if (null === $index || $index < 0) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $resultVar->compileTimeDomChildIndex = $index;
+
+        $xml = \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (
+            null === $xml
+            || !\PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+        ) {
+            return;
+        }
+        $nodes = \PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        if (!isset($nodes[$index]) || 'element' !== ($nodes[$index]['kind'] ?? null)) {
+            return;
+        }
+        $tag = $nodes[$index]['data'] ?? null;
+        if (null !== $tag && '' !== $tag && null === $resultVar->compileTimeDomTagName) {
+            $resultVar->compileTimeDomTagName = $tag;
+        }
     }
 
     /**
