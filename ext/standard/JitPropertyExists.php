@@ -144,11 +144,56 @@ final class JitPropertyExists
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($errBlock);
-        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
+        self::emitBoxedScalarTypeErrorAndAbort($context, $kind);
 
         $context->builder->positionAtEnd($mergeBlock);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /** Map value-box type tag to Zend given-type label (Z_PARAM_OBJ_OR_STR) (#33054 leftover). */
+    private static function emitBoxedScalarTypeErrorAndAbort(Context $context, Value $kind): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $intBlock = BasicBlockHelper::append($context, 'prop_exists_te_int');
+        $afterInt = BasicBlockHelper::append($context, 'prop_exists_te_after_int');
+        $boolBlock = BasicBlockHelper::append($context, 'prop_exists_te_bool');
+        $afterBool = BasicBlockHelper::append($context, 'prop_exists_te_after_bool');
+        $floatBlock = BasicBlockHelper::append($context, 'prop_exists_te_float');
+        $mixedBlock = BasicBlockHelper::append($context, 'prop_exists_te_mixed');
+
+        // Value-box tags use JIT TYPE_NATIVE_* (bool=2, double=3) — not VM TYPE_BOOLEAN.
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NATIVE_LONG & 0x7f, false)
+        );
+        $context->builder->branchIf($isInt, $intBlock, $afterInt);
+        $context->builder->positionAtEnd($intBlock);
+        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'int'));
+
+        $context->builder->positionAtEnd($afterInt);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NATIVE_BOOL & 0x7f, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+        $context->builder->positionAtEnd($boolBlock);
+        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'bool'));
+
+        $context->builder->positionAtEnd($afterBool);
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE & 0x7f, false)
+        );
+        $context->builder->branchIf($isFloat, $floatBlock, $mixedBlock);
+        $context->builder->positionAtEnd($floatBlock);
+        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'float'));
+
+        $context->builder->positionAtEnd($mixedBlock);
+        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
     }
 
     private static function routeThroughPhpHelper(
