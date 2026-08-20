@@ -13,12 +13,17 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Pure-LLVM LEAVES_ONLY flatten for RecursiveIteratorIterator thin AOT (#26775, #27257).
+ * Pure-LLVM LEAVES_ONLY flatten for RecursiveIteratorIterator thin AOT (#26775, #27257, #33024).
  *
  * Values go into packed `__spl_ht`; original leaf keys into parallel `__spl_keys` so
  * `iterator_to_array()` overwrites match Zend (parent scalar key 0 then child key 0).
+ *
+ * Thin AOT call-site {@see ensureLinked} must {@see BasicBlockHelper::scopeLoweringToFunction}
+ * so BasicBlockHelper::append / HashTableHelper::addElement do not steal into the in-flight
+ * user fn while still referencing walk params (#33024 / peer #32994 / #27211).
  *
  * Host/VM SSOT: {@see \PHPCompiler\VM\RecursiveLeavesFlattenJitHelper}.
  *
@@ -51,7 +56,6 @@ final class RecursiveLeavesFlattenRuntime
         }
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
-        $savedActive = $context->activeFunction;
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $void = $context->context->voidType();
 
@@ -64,14 +68,15 @@ final class RecursiveLeavesFlattenRuntime
         // void flatten(src, out_values, out_keys)
         $ft = $context->context->functionType($void, false, $htPtr, $htPtr, $htPtr);
         $fn = null !== $probe ? $probe : $context->module->addFunction(self::ABI, $ft);
-        $entry = $fn->appendBasicBlock('rii_flatten_entry');
+        // Mid-construct ensureLinked: loweringLlvmFunction is the user fn (#33024 / #32994).
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI, static function () use ($context, $fn, $walkFn): void {
+            $entry = $fn->appendBasicBlock('rii_flatten_entry');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->call($walkFn, $fn->getParam(0), $fn->getParam(1), $fn->getParam(2));
+            $context->builder->returnVoid();
+        });
         $context->registerFunction(self::ABI, $fn);
-        $context->activeFunction = self::ABI;
-        $context->builder->positionAtEnd($entry);
-        $context->builder->call($walkFn, $fn->getParam(0), $fn->getParam(1), $fn->getParam(2));
-        $context->builder->returnVoid();
 
-        $context->activeFunction = $savedActive;
         if (null !== $savedBlock) {
             BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
@@ -79,23 +84,22 @@ final class RecursiveLeavesFlattenRuntime
         }
     }
 
-    private static function emitWalk(Context $context, Value $walkFn): void
+    private static function emitWalk(Context $context, LlvmFunction $walkFn): void
     {
         if ($walkFn->countBasicBlocks() > 0) {
             return;
         }
-        $savedActive = $context->activeFunction;
-        $context->activeFunction = self::WALK_ABI;
-        $entry = $walkFn->appendBasicBlock('rii_walk_entry');
-        $context->builder->positionAtEnd($entry);
+        BasicBlockHelper::scopeLoweringToFunction($context, $walkFn, self::WALK_ABI, static function () use ($context, $walkFn): void {
+            $entry = $walkFn->appendBasicBlock('rii_walk_entry');
+            $context->builder->positionAtEnd($entry);
 
-        $src = $walkFn->getParam(0);
-        $outValues = $walkFn->getParam(1);
-        $outKeys = $walkFn->getParam(2);
-        self::walkPacked($context, $walkFn, $src, $outValues, $outKeys);
-        self::walkStringKeys($context, $walkFn, $src, $outValues, $outKeys);
-        $context->builder->returnVoid();
-        $context->activeFunction = $savedActive;
+            $src = $walkFn->getParam(0);
+            $outValues = $walkFn->getParam(1);
+            $outKeys = $walkFn->getParam(2);
+            self::walkPacked($context, $walkFn, $src, $outValues, $outKeys);
+            self::walkStringKeys($context, $walkFn, $src, $outValues, $outKeys);
+            $context->builder->returnVoid();
+        });
     }
 
     private static function walkPacked(
