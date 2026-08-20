@@ -43,7 +43,7 @@ final class TypeDeadVarAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_convert_uuencode'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_utf8_strlen'", $type);
         $this->assertStringContainsString('StringVarExport::ensureLinked', $type);
         $this->assertStringContainsString('StringPrintR::ensureLinked', $type);
         $this->assertStringContainsString('StringVarDump::ensureLinked', $type);

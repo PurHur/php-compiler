@@ -48,7 +48,7 @@ final class TypeDeadEnvLocalAbiRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function ensureExternalFunction', $type);
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_convert_uuencode'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_utf8_strlen'", $type);
         $this->assertStringContainsString('EnvLocalRuntime::ensureLinked', $type);
     }
 
