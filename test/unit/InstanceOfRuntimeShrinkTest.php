@@ -20,6 +20,11 @@ final class InstanceOfRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('valueBoxRhsKind', $source);
         $this->assertStringContainsString('JitVmHelperLink', $source);
         $this->assertStringContainsString('jitRhsTypeIsInvalidClass', $source);
+        // Runtime class-string RHS: tolower snapshot + memcmp + emitWithRhsClassId (#32775).
+        $this->assertStringContainsString('memcmp', $source);
+        $this->assertStringContainsString('allDeclaredClassLowerNames', $source);
+        $this->assertStringContainsString('emitWithRhsClassId', $source);
+        $this->assertStringContainsString('pointerFromStringConstant', $source);
     }
 
     public function testInstanceOfHelperSharesErrorMessageWithVm(): void

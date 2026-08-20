@@ -14,7 +14,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * instanceof lowering for literal and dynamic class operands (#4339, #10078, #32766).
+ * instanceof lowering for literal and dynamic class operands (#4339, #10078, #32766, #32775).
  *
  * SSOT: {@see \PHPCompiler\VM\InstanceOfClassName}, {@see \PHPCompiler\VM\InstanceOfJitHelper}
  */
@@ -173,31 +173,132 @@ final class InstanceOfHelper
 
     private static function emitWithClassNameString(Context $context, Variable $expr, Value $classNameStr): Variable
     {
-        // ensureStrcasecmpLinked builds a bridge body then clearInsertionPosition — restore
-        // the caller's block or subsequent compares become parentless (#32766).
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        StringCaseCompare::ensureStrcasecmpLinked($context);
-        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        // Match JitMethodExists::existsForRuntimeClassNameLiteralMethod — both sides are
-        // __string__.value GEPs from constantStringFromString / runtime __string__* (#32701).
-        $objectType = $context->type->object;
-        $i1 = $context->getTypeFromString('int1');
-        $acc = $i1->constInt(0, false);
-        $classData = self::stringDataPtr($context, $classNameStr);
-        foreach ($objectType->allClassNamesById() as $name) {
-            $lit = $context->builder->load($context->constantStringFromString((string) $name));
-            $cmp = $context->builder->call(
-                $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
-                $classData,
-                self::stringDataPtr($context, $lit)
-            );
-            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $context->constantFromInteger(0, 'int32'));
-            $check = $objectType->emitInstanceOf($expr, $name);
-            $bool = self::nativeBoolValue($context, $check);
-            $acc = $context->builder->select($isMatch, $bool, $acc);
-        }
+        // Length-exact __string__ payloads: memcmp + length gate against declared names,
+        // then emitWithRhsClassId (#32775). Avoid __compiler_strcasecmp — its stringFromCstr
+        // bridge returns 0 for every pair when both sides are synthesized from i8* here.
+        // Case-insensitive match: compare against the lowercase registry key (PHP class names
+        // are case-insensitive) after ASCII-tolower of a stack snapshot.
+        $map = $context->structFieldMap['__string__'];
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $nameLen = $context->builder->load($context->builder->structGep($classNameStr, $map['length']));
+        $nameLenSize = $nameLen->typeOf() === $sizeT
+            ? $nameLen
+            : $context->builder->zExt($nameLen, $sizeT);
+        $nameData = $context->builder->pointerCast(
+            $context->builder->structGep($classNameStr, $map['value']),
+            $i8p
+        );
 
-        return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $acc);
+        LibcExtern::ensureMemcpyDecl($context);
+        LibcExtern::ensureMemcmpDecl($context);
+
+        $bufSize = 256;
+        $buf = $context->builder->alloca($i8->arrayType($bufSize), 1, 'instanceof_class_name');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $maxCopy = $sizeT->constInt($bufSize - 1, false);
+        $copyLen = $context->builder->select(
+            $context->builder->icmp(Builder::INT_UGE, $nameLenSize, $maxCopy),
+            $maxCopy,
+            $nameLenSize
+        );
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $bufPtr,
+            $nameData,
+            $copyLen
+        );
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->inBoundsGEP($bufPtr, $copyLen)
+        );
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $lowerLoop = $fn->appendBasicBlock('instanceof_cname_tolower_loop');
+        $lowerBody = $fn->appendBasicBlock('instanceof_cname_tolower_body');
+        $lowerDone = $fn->appendBasicBlock('instanceof_cname_tolower_done');
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($sizeT->constInt(0, false), $idxSlot);
+        $context->builder->branch($lowerLoop);
+        $context->builder->positionAtEnd($lowerLoop);
+        $idx = $context->builder->load($idxSlot);
+        $cont = $context->builder->icmp(Builder::INT_ULT, $idx, $copyLen);
+        $context->builder->branchIf($cont, $lowerBody, $lowerDone);
+        $context->builder->positionAtEnd($lowerBody);
+        $bytePtr = $context->builder->inBoundsGEP($bufPtr, $idx);
+        $byte = $context->builder->load($bytePtr);
+        $isUpper = $context->builder->and(
+            $context->builder->icmp(Builder::INT_UGE, $byte, $i8->constInt(ord('A'), false)),
+            $context->builder->icmp(Builder::INT_ULE, $byte, $i8->constInt(ord('Z'), false))
+        );
+        $lowered = $context->builder->add($byte, $i8->constInt(32, false));
+        $context->builder->store(
+            $context->builder->select($isUpper, $lowered, $byte),
+            $bytePtr
+        );
+        $context->builder->store(
+            $context->builder->add($idx, $sizeT->constInt(1, false)),
+            $idxSlot
+        );
+        $context->builder->branch($lowerLoop);
+        $context->builder->positionAtEnd($lowerDone);
+
+        $objectType = $context->type->object;
+        $done = $fn->appendBasicBlock('instanceof_cname_done');
+        $idSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt(-1, false), $idSlot);
+
+        $check = $lowerDone;
+        $hasCase = false;
+        foreach ($objectType->allDeclaredClassLowerNames() as $declLc) {
+            $classId = $objectType->classIdForLowerName($declLc);
+            if (null === $classId || '' === $declLc) {
+                continue;
+            }
+            $hasCase = true;
+            $case = $fn->appendBasicBlock('instanceof_cname_'.$classId);
+            $next = $fn->appendBasicBlock('instanceof_cname_try_'.$classId);
+            $context->builder->positionAtEnd($check);
+            $expectedLen = \strlen($declLc);
+            $lenEq = $context->builder->icmp(
+                Builder::INT_EQ,
+                $nameLenSize,
+                $sizeT->constInt($expectedLen, false)
+            );
+            $cmp = $context->builder->call(
+                $context->lookupFunction('memcmp'),
+                $bufPtr,
+                $context->pointerFromStringConstant($declLc),
+                $nameLenSize
+            );
+            $strEq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+            $isMatch = $context->builder->and($lenEq, $strEq);
+            $context->builder->branchIf($isMatch, $case, $next);
+            $context->builder->positionAtEnd($case);
+            $context->builder->store(
+                $context->constantFromInteger($classId, 'int64'),
+                $idSlot
+            );
+            $context->builder->branch($done);
+            $check = $next;
+        }
+        if (!$hasCase) {
+            $context->builder->positionAtEnd($check);
+            $context->builder->branch($done);
+        } else {
+            $context->builder->positionAtEnd($check);
+            $context->builder->branch($done);
+        }
+        $context->builder->positionAtEnd($done);
+
+        return self::emitWithRhsClassId(
+            $context,
+            $expr,
+            $context->builder->load($idSlot)
+        );
     }
 
     private static function emitWithRhsClassId(Context $context, Variable $expr, Value $rhsClassId): Variable
@@ -286,17 +387,6 @@ final class InstanceOfHelper
         return $context->builder->call(
             $fn,
             $context->builder->trunc($typeByte, $i8)
-        );
-    }
-
-    /** `__string__.value` as i8* for `__compiler_strcasecmp` (peer JitMethodExists, #32766). */
-    private static function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $map = $context->structFieldMap['__string__'];
-
-        return $context->builder->pointerCast(
-            $context->builder->structGep($strPtr, $map['value']),
-            $context->getTypeFromString('int8*')
         );
     }
 
