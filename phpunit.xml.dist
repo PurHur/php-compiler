@@ -1253,6 +1253,7 @@
             <file>./test/aot/DateGetLastErrorsAotTest.php</file>
             <file>./test/aot/TimezoneAbbreviationsListAotTest.php</file>
             <file>./test/aot/SessionCookieCachePathAotTest.php</file>
+            <file>./test/aot/SessionStartDefaultPathAotTest.php</file>
             <file>./test/aot/DirFactoryAotTest.php</file>
             <file>./test/aot/GzwriteBytesAotTest.php</file>
             <file>./test/aot/ExtensionLoadedObStartNamed23359AotTest.php</file>
