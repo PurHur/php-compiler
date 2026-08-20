@@ -9,9 +9,9 @@ use PHPCompiler\ext\session\SessionFileStorage;
 /**
  * session_create_id() semantics for compiled JIT/AOT modules (#9500, php-in-PHP).
  *
- * Nested-JIT must not call {@see VmSession::createId()} — static method return is
- * mis-lowered to the VmSession class object (AOT abort in randomIdString; #21892).
- * Keep generate/bin_to_readable logic here using {@see random_bytes()} (#1974).
+ * Thin AOT SSOT for sid entropy is LLVM {@see \PHPCompiler\JIT\Builtin\SessionCreateIdRuntime}
+ * (`__compiler_random_bytes` + LLVM bin_to_readable) — NestedJIT `\random_bytes` /
+ * binToReadable inside this helper still yields near-constant entropy (#21900 / #33023).
  *
  * php-src: ext/session/session.c — php_session_create_id / bin_to_readable
  */
@@ -27,14 +27,26 @@ final class SessionCreateIdJitHelper
 
     public static function randomIdString(): string
     {
-        return self::generateId();
+        // Prefer LLVM `phpc_session_random_id_string` (CSPRNG via `__compiler_random_bytes`).
+        // NestedJIT `\random_bytes` inside this helper still yields near-constant entropy (#21900 / #33023).
+        return self::sidFromEntropy(\random_bytes(self::SID_LENGTH));
+    }
+
+    /**
+     * php-src bin_to_readable over CSPRNG bytes — NestedJIT-safe (no random_bytes) (#33023).
+     *
+     * LLVM bridge feeds `__compiler_random_bytes` output here so sid entropy matches user-script AOT.
+     */
+    public static function sidFromEntropy(string $bytes): string
+    {
+        return self::binToReadable($bytes, self::SID_LENGTH, self::SID_BITS_PER_CHAR);
     }
 
     /** @return string|null null when php-src session_create_id() would return false */
     public static function createIdNullable(?string $prefix): ?string
     {
         if (null === $prefix || '' === $prefix) {
-            return self::generateId();
+            return self::randomIdString();
         }
         if (\strlen($prefix) > VmSession::MAX_ID_LEN) {
             throw new \ValueError(
@@ -55,18 +67,11 @@ final class SessionCreateIdJitHelper
      *
      * Thin user-script AOT (#27258 / #26773): call only after the LLVM bridge has
      * rejected null/empty prefixes; do not NestedJIT preg_replace / char-class loops.
+     * Prefer LLVM concat of prefix + `phpc_session_random_id_string` (#33023).
      */
     public static function createIdWithPrefix(string $prefix): string
     {
-        return $prefix.self::generateId();
-    }
-
-    private static function generateId(): string
-    {
-        // Fixed 26-char sid (php-src alphabet). NestedJIT random_bytes/time/LCG paths
-        // are corrupt or LLVM-verify-unsafe here (#21900); uniqueness is not required for
-        // SessionsWeb AOT smoke (fresh PHP_COMPILER_SESSION_DIR per run).
-        return 'abcdefghij0123456789KL-nop';
+        return $prefix.self::randomIdString();
     }
 
     /** php-src ext/session/session.c bin_to_readable(). */
