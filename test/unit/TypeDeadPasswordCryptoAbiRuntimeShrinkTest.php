@@ -46,7 +46,7 @@ final class TypeDeadPasswordCryptoAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_file_get_contents'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_mime_content_type'", $type);
         $this->assertStringContainsString('PasswordCryptoRuntime::ensureLinked', $type);
     }
 

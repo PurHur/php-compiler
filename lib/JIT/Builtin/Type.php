@@ -122,16 +122,11 @@ class Type extends Builtin {
         // ABI (getNamedFunction first, then addFunction if absent; Type::initialize still
         // ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint readfile.1
         // (#31894 / #32122). User-script readfile() stays ReadfileJitHelper / VmFs.
-        $fntypeFileGetContents = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnFileGetContents = $this->context->module->addFunction(
-            '__compiler_file_get_contents',
-            $fntypeFileGetContents
-        );
-        $this->context->registerFunction('__compiler_file_get_contents', $fnFileGetContents);
+        // __compiler_file_get_contents always-on shell removed (#33030): StringFileGetContents
+        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
+        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // file_get_contents.1 (#31894 / #32122). User-script file_get_contents() stays
+        // FileGetContentsJitHelper / VmFs.
         // __compiler_include_path_init / __compiler_get_include_path /
         // __compiler_set_include_path / __compiler_restore_include_path /
         // __compiler_stream_resolve_include_path always-on shells removed
@@ -1030,6 +1025,7 @@ class Type extends Builtin {
         StringUtf8Latin1::ensureLinked($this->context);
         StringUtf8Runtime::ensureLinked($this->context);
         StringReadfile::ensureLinked($this->context);
+        StringFileGetContents::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
