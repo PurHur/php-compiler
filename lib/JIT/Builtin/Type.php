@@ -118,13 +118,10 @@ class Type extends Builtin {
         // removed (#32729): EnvLocalRuntime / JitEnvLocalKernel own the ABI
         // (getNamedFunction first; Type::register still ensureLinked). Leftover Type
         // empty decls vs Runtime ABI drift mints env_local_lookup.1 (#31894 / #32122).
-        $fntypeReadfile = $this->context->context->functionType(
-            $i64,
-            false,
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnReadfile = $this->context->module->addFunction('__compiler_readfile', $fntypeReadfile);
-        $this->context->registerFunction('__compiler_readfile', $fnReadfile);
+        // __compiler_readfile always-on shell removed (#33021): StringReadfile owns the
+        // ABI (getNamedFunction first, then addFunction if absent; Type::initialize still
+        // ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint readfile.1
+        // (#31894 / #32122). User-script readfile() stays ReadfileJitHelper / VmFs.
         $fntypeFileGetContents = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -1032,6 +1029,7 @@ class Type extends Builtin {
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
         StringUtf8Runtime::ensureLinked($this->context);
+        StringReadfile::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
