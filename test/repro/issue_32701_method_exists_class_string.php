@@ -1,4 +1,5 @@
 <?php
+// #32701 AOT: method_exists() class string, runtime name, boxed instance (ext/standard/class.c)
 class C
 {
     public function foo() {}
