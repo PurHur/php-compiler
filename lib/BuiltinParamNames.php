@@ -1089,6 +1089,9 @@ final class BuiltinParamNames
                     'validate_sid=',
                     'update_timestamp=',
                 ];
+            // php-src ext/standard/assert.stub.php — InternalArgInfo still says what (#23942)
+            case 'assert_options':
+                return ['option', 'value='];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says error_type (#23402)
             case 'trigger_error':
                 return ['message', 'error_level'];

@@ -6243,6 +6243,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23942 — php-src ext/standard/assert.stub.php option/value (not what). */
+    public function testAssertOptionsStubNamesTypesAndReturn(): void
+    {
+        $names = BuiltinParamNames::forFunction('assert_options');
+        self::assertSame(['option', 'value='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'option', 'assert_options'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'value', 'assert_options'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'what', 'assert_options'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('assert_options'));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('assert_options', 0));
+        self::assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('assert_options', 1));
+        self::assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('assert_options'));
+    }
+
     /** @covers issue #28916 */
     public function testInetPtonNtopStubNamesAndStringFalseReturn(): void
     {

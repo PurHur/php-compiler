@@ -645,6 +645,8 @@ final class BuiltinInternalArgInfo
             'cli_set_process_title' => 'bool',
             // ext/standard/assert.stub.php — InternalArgInfo return int; Zend bool (#28335)
             'assert' => 'bool',
+            // ext/standard/assert.stub.php — InternalArgInfo omits return; Zend mixed (#23942)
+            'assert_options' => 'mixed',
             // ext/standard/array.stub.php — InternalArgInfo omits return; Zend string|int|false (#25582)
             'array_search' => 'string|int|false',
             default => null,
@@ -1336,6 +1338,13 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
             'json_decode' => 1 === $index ? '?bool' : null,
             'json_encode' => 0 === $index ? 'mixed' : null,
+            // ext/standard/assert.stub.php — int $option, mixed $value = UNKNOWN (#23942)
+            // InternalArgInfo still names arg1 `what` and leaves $value untyped.
+            'assert_options' => match ($index) {
+                0 => 'int',
+                1 => 'mixed',
+                default => null,
+            },
             // ext/standard/basic_functions.stub.php — mixed $value; string $data; array $options (#23260)
             // InternalArgInfo still variable (untyped) / variable_representation+allowed_classes (bool|array).
             'serialize' => 0 === $index ? 'mixed' : null,
