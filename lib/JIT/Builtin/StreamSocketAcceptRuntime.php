@@ -10,8 +10,10 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream_socket_accept() via StreamSocketAcceptJitHelper (#15346, #25183).
+ * JIT/AOT link for stream_socket_accept() via StreamSocketAcceptJitHelper (#15346, #25183, #32807).
  *
+ * Owns `__compiler_stream_socket_accept` ABI module-locally (getNamedFunction first)
+ * after Type always-on shells dropped (#32807 / #32122 name.1 class).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StreamSocketGetName #24850 / StreamPath #25139).
  * php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_socket_accept)
  */
