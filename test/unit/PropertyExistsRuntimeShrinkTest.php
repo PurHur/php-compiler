@@ -15,6 +15,8 @@ final class PropertyExistsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringPropertyExists::invoke', $source);
         $this->assertStringContainsString('propertyExistsLiteral', $source);
         $this->assertStringContainsString('#31966', $source);
+        $this->assertStringContainsString('#32688', $source);
+        $this->assertStringContainsString('0x7f', $source);
         $this->assertStringNotContainsString("lookupFunction('strcasecmp')", $source);
         $this->assertStringNotContainsString('existsForClassIdRuntimeProperty', $source);
         $this->assertStringNotContainsString('forClassLiteralRuntimeProperty', $source);

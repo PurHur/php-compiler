@@ -86,6 +86,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'pow_operator_int_31966.phpt',
         'base_convert_255_31966.phpt',
         'property_exists_static_31966.phpt',
+        'property_exists_boxed_instance_32688.phpt',
         'function_static_string_write_31966.phpt',
         'function_static_array_inc_32305.phpt',
         'static_property_assign_ref_32036.phpt',
