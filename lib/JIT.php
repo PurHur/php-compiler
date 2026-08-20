@@ -8672,11 +8672,26 @@ class JIT {
                     }
                     $staticVar = $this->ensureJitFunctionStatic($storageKey);
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                        $staticDefaultVm = $block->constants[$op->arg3];
+                        // php-cfg types `static $a = ['x']` as scalar string while the default is
+                        // string[] — that sent dim writes into ValueBoxDimWrite (#32800 / #32806).
+                        if (VM\Variable::TYPE_ARRAY === $staticDefaultVm->type) {
+                            $arrayType = new Type(Type::TYPE_ARRAY);
+                            $destOp->type = $arrayType;
+                            $typedSlot = $block->slotForOperand($destOp);
+                            if (null !== $typedSlot) {
+                                foreach ($block->scopedOperands() as $scopeOp) {
+                                    if ($block->slotForOperand($scopeOp) === $typedSlot) {
+                                        $scopeOp->type = $arrayType;
+                                    }
+                                }
+                            }
+                        }
                         JIT\FunctionStaticHelper::emitLazyInit(
                             $this->context,
                             $storageKey,
                             $staticVar,
-                            $this->jitVariableFromVmConstant($block->constants[$op->arg3])
+                            $this->jitVariableFromVmConstant($staticDefaultVm)
                         );
                     }
                     $this->context->setVariableOp($destOp, $staticVar);
@@ -9082,12 +9097,11 @@ class JIT {
                     // VALUE box + CFG string: do not ensureHashtablePointer (#32764 / #22646 write).
                     // String/object dims are array keys — never string-byte offsets (#32798;
                     // function-static arrays are often CFG-typed string while the box holds a HT).
-                    // Int dims on functionStaticGlobal must still use the HT path (#32800 SEGV):
-                    // `static $a=['x']; $a[0]='y'` was taking fetchStringOffsetWriteLvalue.
+                    // Array-default function-statics are retyped to TYPE_ARRAY in DECLARE (#32806);
+                    // do not skip script-local string dims via functionStaticGlobal (#32804 regression).
                     if (
                         $forWrite
                         && Variable::TYPE_VALUE === $value->type
-                        && !$value->functionStaticGlobal
                         && JIT\ValueBoxDimWrite::containerCfgIsString($containerOp->type ?? null)
                         && Variable::TYPE_STRING !== $dim->type
                         && Variable::TYPE_OBJECT !== $dim->type
