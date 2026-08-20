@@ -580,12 +580,10 @@ class Type extends Builtin {
         );
         $fnUudecode = $this->context->module->addFunction('__compiler_convert_uudecode', $fntypeUudecode);
         $this->context->registerFunction('__compiler_convert_uudecode', $fnUudecode);
-        $fntypeAddcslashes = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
-        $fnAddcslashes = $this->context->module->addFunction('__compiler_addcslashes', $fntypeAddcslashes);
-        $this->context->registerFunction('__compiler_addcslashes', $fnAddcslashes);
-        $fntypeStripcslashes = $this->context->context->functionType($strPtr, false, $strPtr);
-        $fnStripcslashes = $this->context->module->addFunction('__compiler_stripcslashes', $fntypeStripcslashes);
-        $this->context->registerFunction('__compiler_stripcslashes', $fnStripcslashes);
+        // __compiler_addcslashes / __compiler_stripcslashes always-on shells removed
+        // (#32893): NestedJIT/AOT bridge is StringCslashes (JitVmHelperLink::ensureBridge;
+        // Type::initialize still ensureLinked / ensureStripcslashes). Leftover Type empty
+        // decls vs Runtime ABI drift mint addcslashes.1 (#31894 / #32122).
         // __compiler_substr_replace always-on shell removed (#32250): user-script
         // substr_replace() stays VmString / ext/standard/substr_replace.php. No
         // NestedJIT lookupFunction remains.
@@ -1162,6 +1160,7 @@ class Type extends Builtin {
         StringHashAlgos::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
+        StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
