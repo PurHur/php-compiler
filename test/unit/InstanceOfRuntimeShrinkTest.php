@@ -20,6 +20,11 @@ final class InstanceOfRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('valueBoxRhsKind', $source);
         $this->assertStringContainsString('JitVmHelperLink', $source);
         $this->assertStringContainsString('jitRhsTypeIsInvalidClass', $source);
+        // #32766: length-aware strncasecmp against allDeclaredClassLowerNames.
+        $this->assertStringContainsString('allDeclaredClassLowerNames', $source);
+        $this->assertStringContainsString('ABI_STRNCASECMP', $source);
+        $this->assertStringContainsString('restoreInsertBlock', $source);
+        $this->assertStringContainsString('valueBoxRhsKind', $source);
     }
 
     public function testInstanceOfHelperSharesErrorMessageWithVm(): void
@@ -54,6 +59,15 @@ final class InstanceOfRuntimeShrinkTest extends TestCase
         $this->assertSame(
             InstanceOfJitHelper::RHS_KIND_INVALID,
             InstanceOfJitHelper::valueBoxRhsKind(VmVariable::TYPE_ARRAY)
+        );
+        // JIT boxes store TYPE_STRING|IS_REFCOUNTED (0x80) — must still classify (#32766).
+        $this->assertSame(
+            InstanceOfJitHelper::RHS_KIND_STRING,
+            InstanceOfJitHelper::valueBoxRhsKind(JitVariable::TYPE_STRING)
+        );
+        $this->assertSame(
+            InstanceOfJitHelper::RHS_KIND_OBJECT,
+            InstanceOfJitHelper::valueBoxRhsKind(JitVariable::TYPE_OBJECT)
         );
     }
 }

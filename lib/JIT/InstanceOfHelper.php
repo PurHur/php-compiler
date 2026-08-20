@@ -166,21 +166,71 @@ final class InstanceOfHelper
 
     private static function emitWithClassNameString(Context $context, Variable $expr, Value $classNameStr): Variable
     {
-        StringCaseCompare::ensureStrcasecmpLinked($context);
-        // __compiler_strcasecmp after LibcExtern always-on drop (#31787).
+        // ensureStrncasecmpLinked clears insert when it emits the bridge (#31682 / #32766).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringCaseCompare::ensureStrncasecmpLinked($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+
+        // __string__ payloads are length-prefixed and NOT NUL-terminated (__string__init
+        // memcpy's exactly length bytes). Use length-aware strncasecmp + equal-length
+        // guard. Resolve against allDeclaredClassLowerNames like dynamic `new $class`
+        // (#32766 / #4242).
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($classNameStr, $strMap['length'])
+        );
+        $namePtr = $context->builder->pointerCast(
+            $context->builder->structGep($classNameStr, $strMap['value']),
+            $context->getTypeFromString('int8*')
+        );
         $objectType = $context->type->object;
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
-        $acc = $i1->constInt(0, false);
-        foreach ($objectType->allClassNamesById() as $name) {
-            $lit = $context->builder->load($context->constantStringFromString($name));
-            $cmp = $context->builder->call($context->lookupFunction(StringCaseCompare::ABI_STRCASECMP), $classNameStr, $lit);
-            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $context->constantFromInteger(0, 'int32'));
-            $check = $objectType->emitInstanceOf($expr, $name);
-            $bool = self::nativeBoolValue($context, $check);
-            $acc = $context->builder->select($isMatch, $bool, $acc);
+        $sizeT = $context->getTypeFromString('size_t');
+        $sentinel = $i64->constInt(-1, true);
+        $rhsClassId = $sentinel;
+        $strncasecmp = $context->lookupFunction(StringCaseCompare::ABI_STRNCASECMP);
+        foreach ($objectType->allDeclaredClassLowerNames() as $declLc) {
+            $classId = $objectType->classIdForLowerName($declLc);
+            if (null === $classId) {
+                continue;
+            }
+            $expectedLen = \strlen($declLc);
+            $expected = $context->builder->pointerCast(
+                $context->constantFromString($declLc),
+                $context->getTypeFromString('int8*')
+            );
+            $lenEq = $context->builder->icmp(
+                Builder::INT_EQ,
+                $nameLen,
+                $context->constantFromInteger($expectedLen, 'int64')
+            );
+            $cmp = $context->builder->call(
+                $strncasecmp,
+                $namePtr,
+                $expected,
+                $context->builder->zExt(
+                    $context->constantFromInteger($expectedLen, 'int64'),
+                    $sizeT
+                )
+            );
+            $cmpEq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+            $isMatch = $context->builder->and($lenEq, $cmpEq);
+            $idVal = $context->constantFromInteger($classId, 'int64');
+            $rhsClassId = $context->builder->select($isMatch, $idVal, $rhsClassId);
         }
 
-        return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $acc);
+        $known = $context->builder->icmp(Builder::INT_NE, $rhsClassId, $sentinel);
+        $check = self::emitWithRhsClassId($context, $expr, $rhsClassId);
+        $checkBool = self::nativeBoolValue($context, $check);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $context->builder->select($known, $checkBool, $i1->constInt(0, false))
+        );
     }
 
     private static function emitWithRhsClassId(Context $context, Variable $expr, Value $rhsClassId): Variable
@@ -239,6 +289,8 @@ final class InstanceOfHelper
 
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
+        // ensureBridge already restores the caller insert block (#21972). Clearing it
+        // here made the subsequent valueBoxRhsKind call parentless (#32766).
         JitVmHelperLink::ensureBridge(
             $context,
             $abiName,
@@ -250,7 +302,6 @@ final class InstanceOfHelper
             self::COMPILED_HELPERS,
             '#10078'
         );
-        $context->builder->clearInsertionPosition();
     }
 
     private static function callValueBoxRhsKind(Context $context, Value $typeByte): Value

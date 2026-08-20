@@ -34,13 +34,17 @@ final class InstanceOfJitHelper
 
     /**
      * Value-box RHS dispatch: string class name, object class, or invalid (#4339).
+     *
+     * JIT stores refcounted kinds as {@see \PHPCompiler\JIT\Variable::TYPE_STRING}|0x80
+     * (etc.); mask before comparing to VM type tags (#32766).
      */
     public static function valueBoxRhsKind(int $typeByte): int
     {
-        if (Variable::TYPE_STRING === $typeByte) {
+        $kind = $typeByte & 0x7f;
+        if (Variable::TYPE_STRING === $kind) {
             return self::RHS_KIND_STRING;
         }
-        if (Variable::TYPE_OBJECT === $typeByte) {
+        if (Variable::TYPE_OBJECT === $kind) {
             return self::RHS_KIND_OBJECT;
         }
 
