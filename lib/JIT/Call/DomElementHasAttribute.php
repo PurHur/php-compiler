@@ -27,15 +27,28 @@ final class DomElementHasAttribute implements Call
             throw new \LogicException('Dom\\Element::hasAttribute() expects receiver and name');
         }
         $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        $present = null !== $nameLit
-            && DomUserScriptAttributeCacheLlvm::hasPresentLiteral('', $nameLit);
-
-        $slot = JitValueBox::alloc($context);
         $i64 = $context->getTypeFromString('int64');
+        $slot = JitValueBox::alloc($context);
+        if (null === $nameLit) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                JitValueBox::pointer($context, $slot),
+                $i64->constInt(0, false)
+            );
+
+            return JitValueBox::normalizeValuePtr($context, $slot);
+        }
+        $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $isPresent = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $attr,
+            $objPtr->constNull()
+        );
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             JitValueBox::pointer($context, $slot),
-            $i64->constInt($present ? 1 : 0, false)
+            $context->builder->zExt($isPresent, $i64)
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);

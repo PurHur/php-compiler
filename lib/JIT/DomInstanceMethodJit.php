@@ -137,6 +137,9 @@ final class DomInstanceMethodJit
         'domelement::getattributenodens' => true,
         'domelement::setattributenodens' => true,
         'domelement::setattributenode' => true,
+        'domelement::removeattributenode' => true,
+        'dom\\element::removeattributenode' => true,
+        'dom\\htmlelement::removeattributenode' => true,
         // setIdAttribute* — dedicated true/false ABI (NestedJIT bool unsafe; #29257, #29284).
         'domelement::setidattribute' => true,
         'domelement::setidattributens' => true,
@@ -547,6 +550,14 @@ final class DomInstanceMethodJit
             }
             if ('domelement::setattributenode' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementSetAttributeNode();
+
+                return;
+            }
+            if ('domelement::removeattributenode' === $lc
+                || 'dom\\element::removeattributenode' === $lc
+                || 'dom\\htmlelement::removeattributenode' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomElementRemoveAttributeNode();
 
                 return;
             }
@@ -1311,6 +1322,9 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::getattributenodens');
             self::ensureProxy($context, 'domelement::setattributenodens');
             self::ensureProxy($context, 'domelement::setattributenode');
+            self::ensureProxy($context, 'domelement::removeattributenode');
+            self::ensureProxy($context, 'dom\\element::removeattributenode');
+            self::ensureProxy($context, 'dom\\htmlelement::removeattributenode');
             self::ensureProxy($context, 'domelement::setidattribute');
             self::ensureProxy($context, 'domelement::setidattributens');
             self::ensureProxy($context, 'domelement::setidattributenode');
@@ -1373,7 +1387,7 @@ final class DomInstanceMethodJit
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
         'domcdatasection' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcharacterdata' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
-        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getelementsbytagnamens', 'getnodepath', 'getlineno', 'insertadjacentelement', 'insertadjacenttext', 'insertadjacenthtml'],
+        'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'removeattributenode', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getelementsbytagnamens', 'getnodepath', 'getlineno', 'insertadjacentelement', 'insertadjacenttext', 'insertadjacenthtml'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],

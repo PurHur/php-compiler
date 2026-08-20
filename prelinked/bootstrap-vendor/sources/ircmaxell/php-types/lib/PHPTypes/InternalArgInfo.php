@@ -1292,7 +1292,7 @@ class InternalArgInfo
         'DOMElement::hasAttributeNS' => ['bool', 'namespaceuri' => 'string', 'localname' => 'string'],
         'DomElement::remove_attribute' => ['bool', 'name' => 'string'],
         'DOMElement::removeAttribute' => ['bool', 'name' => 'string'],
-        'DOMElement::removeAttributeNode' => ['bool', 'oldnode' => 'domattr'],
+        'DOMElement::removeAttributeNode' => ['DOMAttr', 'oldnode' => 'domattr'],
         'DOMElement::removeAttributeNS' => ['bool', 'namespaceuri' => 'string', 'localname' => 'string'],
         'DomElement::set_attribute' => ['DomAttribute', 'name' => 'string', 'value' => 'string'],
         'DOMElement::setAttribute' => ['DOMAttr', 'name' => 'string', 'value' => 'string'],
