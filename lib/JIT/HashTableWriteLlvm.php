@@ -2077,6 +2077,84 @@ final class HashTableWriteLlvm
     }
 
     /**
+     * Hydrate any FETCH_DIM_W orphan box before assign-op / ++ reads (#32789, #32305).
+     *
+     * {@see prepareIndexWrite} / {@see prepareStringKeyWrite} / {@see prepareValueBoxKeyWrite}
+     * allocate an empty `__value__`; ZEND_ASSIGN_DIM_OP and ZEND_POST_INC need the live slot.
+     *
+     * @see php-src Zend/zend_vm_def.h ZEND_ASSIGN_DIM_OP / ZEND_FETCH_DIM_W
+     */
+    public static function hydrateDimWriteLvalue(Context $context, Variable $lvalue): void
+    {
+        if (null === $lvalue->writableHt) {
+            return;
+        }
+        if (null !== $lvalue->writableIndex) {
+            self::hydrateIndexWriteLvalue($context, $lvalue);
+
+            return;
+        }
+        if (null !== $lvalue->writableStringKey) {
+            $tmp = HashTableReadLlvm::readStringKeyToValueBox(
+                $context,
+                $lvalue->writableHt,
+                $lvalue->writableStringKey
+            );
+            JitValueBox::copyFromPointer(
+                $context,
+                $lvalue->value,
+                JitValueBox::pointer($context, $tmp->value)
+            );
+
+            return;
+        }
+        if (null !== $lvalue->writableValueBoxKey) {
+            $tmp = HashTableReadLlvm::readValueBoxKeyToValueBox(
+                $context,
+                $lvalue->writableHt,
+                $lvalue->writableValueBoxKey,
+                null
+            );
+            JitValueBox::copyFromPointer(
+                $context,
+                $lvalue->value,
+                JitValueBox::pointer($context, $tmp->value)
+            );
+        }
+    }
+
+    /** Commit a FETCH_DIM_W ++/-- / assign-op box back into the hashtable (#32789, #32305). */
+    public static function commitDimWriteLvalue(Context $context, Variable $lvalue): void
+    {
+        if (null === $lvalue->writableHt) {
+            return;
+        }
+        if (null !== $lvalue->writableIndex) {
+            self::commitIndexWriteLvalue($context, $lvalue);
+
+            return;
+        }
+        if (null !== $lvalue->writableStringKey) {
+            self::setAtStringKey(
+                $context,
+                $lvalue->writableHt,
+                $lvalue->writableStringKey,
+                $lvalue
+            );
+
+            return;
+        }
+        if (null !== $lvalue->writableValueBoxKey) {
+            self::setValueBoxKey(
+                $context,
+                $lvalue->writableHt,
+                $lvalue->writableValueBoxKey,
+                $lvalue
+            );
+        }
+    }
+
+    /**
      * TYPE_OBJECT dim write: resource → index lvalue; else Illegal offset TypeError (#29550).
      */
     public static function prepareResourceOrIllegalObjectKeyWrite(
