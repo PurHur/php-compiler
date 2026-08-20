@@ -80,11 +80,12 @@ final class htmlentities extends Internal
 
             return $unreachable;
         }
-        if (self::jitEffectiveArgc($argc, $args) >= 3) {
-            throw new \LogicException(
-                'htmlentities() JIT only supports string and optional flags in this compiler build'
-            );
+        $folded = self::tryCompileTimeHtmlentities($context, $args);
+        if (null !== $folded) {
+            return $folded;
         }
+
+        self::assertJitUtf8Encoding($args, $argc);
 
         // Soft-null outside strict_types; strict → TypeError (#31212 / peer htmlspecialchars).
         if ($argc >= 2
@@ -103,15 +104,6 @@ final class htmlentities extends Internal
             throw new \LogicException('htmlentities() flags must be an integer in this compiler build');
         }
 
-        $literal = null;
-        if (JITVariable::TYPE_VALUE !== $args[0]->type) {
-            $maybeLiteral = $args[0]->compileTimeString ?? null;
-            // Fold proven compile-time strings: KIND_VALUE immediates and TYPE_STRING
-            // stack slots (peer htmlspecialchars #25345 / #26889).
-            if (null !== $maybeLiteral && self::isCompileTimeFoldableString($args[0])) {
-                $literal = $maybeLiteral;
-            }
-        }
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $flagsKnown = $argc < 2;
         if ($argc >= 2) {
@@ -126,14 +118,6 @@ final class htmlentities extends Internal
                 }
             }
         }
-        if (null !== $literal && $flagsKnown && self::jitEffectiveArgc($argc, $args) <= 2) {
-            return $context->builder->load(
-                $context->constantStringFromString(
-                    VmString::htmlentities($literal, $flags, 'UTF-8', true)
-                )
-            );
-        }
-
         \PHPCompiler\JIT\Builtin\HtmlEntitiesJit::ensureLinked($context);
         $str = self::jitStringArg($context, $args[0], 0, 'string');
         $flagsLlvm = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
@@ -150,6 +134,110 @@ final class htmlentities extends Internal
         }
 
         return JitHtmlentities::escape($context, $str, $flagsLlvm);
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function tryCompileTimeHtmlentities(Context $context, array $args): ?Value
+    {
+        $argc = \count($args);
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (null === $literal || !self::isCompileTimeFoldableString($args[0])) {
+            return null;
+        }
+
+        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
+        if ($argc >= 2) {
+            if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+                return null;
+            }
+            $flagsVal = self::compileTimeLong($context, $args[1]);
+            if (null === $flagsVal) {
+                return null;
+            }
+            $flags = $flagsVal;
+        }
+
+        $encoding = 'UTF-8';
+        if ($argc >= 3 && !self::encodingArgIsNull($args[2])) {
+            $encodingLit = JitStringArg::compileTimeLiteral($args[2]);
+            if (null === $encodingLit || JITVariable::KIND_VALUE !== $args[2]->kind) {
+                return null;
+            }
+            $encoding = $encodingLit;
+        }
+
+        $doubleEncode = true;
+        if ($argc >= 4) {
+            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
+                return null;
+            }
+            $doubleEncodeVal = self::compileTimeBool($context, $args[3]);
+            if (null === $doubleEncodeVal) {
+                return null;
+            }
+            $doubleEncode = $doubleEncodeVal;
+        }
+
+        return $context->builder->load(
+            $context->constantStringFromString(
+                VmString::htmlentities($literal, $flags, $encoding, $doubleEncode)
+            )
+        );
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function assertJitUtf8Encoding(array $args, int $argc): void
+    {
+        if ($argc < 3 || self::encodingArgIsNull($args[2])) {
+            return;
+        }
+        $encodingLit = JitStringArg::compileTimeLiteral($args[2]);
+        if (null === $encodingLit) {
+            throw new \LogicException(
+                'htmlentities() JIT encoding must be a compile-time string in this compiler build'
+            );
+        }
+        if (0 !== strcasecmp($encodingLit, 'UTF-8')) {
+            throw new \LogicException(
+                'htmlentities() JIT only supports UTF-8 encoding in this compiler build'
+            );
+        }
+    }
+
+    private static function compileTimeBool(Context $context, JITVariable $var): ?bool
+    {
+        if (null !== $var->compileTimeLong) {
+            return 0 !== $var->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $var->type
+            && JITVariable::KIND_VALUE === $var->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return 0 !== (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+            }
+        }
+        $name = $var->compileTimeConstantName ?? null;
+        if (null !== $name) {
+            $lc = strtolower($name);
+            if ('true' === $lc) {
+                return true;
+            }
+            if ('false' === $lc) {
+                return false;
+            }
+        }
+        if (null !== $name && null !== $context->runtime->vmContext) {
+            $phpVar = $context->runtime->vmContext->constantFetch($name);
+            if (null !== $phpVar && Variable::TYPE_BOOLEAN === $phpVar->resolveIndirect()->type) {
+                return $phpVar->resolveIndirect()->toBool();
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -235,18 +323,6 @@ final class htmlentities extends Internal
         }
 
         return $encVar->toString();
-    }
-
-    /**
-     * @param list<JITVariable> $args
-     */
-    private static function jitEffectiveArgc(int $argc, array $args): int
-    {
-        if ($argc >= 3 && self::encodingArgIsNull($args[2])) {
-            return 2;
-        }
-
-        return $argc;
     }
 
     private static function encodingArgIsNull(JITVariable $var): bool
