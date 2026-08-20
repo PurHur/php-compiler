@@ -146,6 +146,11 @@ class Type extends Builtin {
         // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // get_meta_tags.1 (#31894 / #32122). User-script get_meta_tags() stays
         // MetaTagsJitHelper / VmMetaTags.
+        // __compiler_error_log always-on shell removed (#33044): StringErrorLog
+        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
+        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // error_log.1 (#31894 / #32122). User-script error_log() stays
+        // ErrorLogJitHelper / VmErrorLog.
         $fntypeGetHeaders = $this->context->context->functionType(
             $this->context->getTypeFromString('__hashtable__*'),
             false,
@@ -171,13 +176,6 @@ class Type extends Builtin {
         );
         $fnCompilerFwrite = $this->context->module->addFunction('__compiler_fwrite', $fntypeFwrite);
         $this->context->registerFunction('__compiler_fwrite', $fnCompilerFwrite);
-        $fntypeErrorLog = $this->context->context->functionType(
-            $this->context->getTypeFromString('int1'),
-            false,
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnErrorLog = $this->context->module->addFunction('__compiler_error_log', $fntypeErrorLog);
-        $this->context->registerFunction('__compiler_error_log', $fnErrorLog);
         $strPtr = $this->context->getTypeFromString('__string__*');
         $fntypeFopen = $this->context->context->functionType(
             $i64,
@@ -1011,6 +1009,7 @@ class Type extends Builtin {
         StringFilePutContents::ensureLinked($this->context);
         MimeContentTypeRuntime::ensureLinked($this->context);
         MetaTagsRuntime::ensureLinked($this->context);
+        StringErrorLog::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
