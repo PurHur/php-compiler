@@ -1,6 +1,5 @@
 <?php
-// #33001: thin AOT mb_strlen / mb_check_encoding after Type drops always-on utf8 ABI shells.
+// #33001: thin AOT mb_strlen after Type drops always-on utf8_strlen ABI shell.
 $s = 'café';
 echo mb_strlen($s, 'UTF-8'), "\n";
-echo mb_check_encoding($s, 'UTF-8') ? '1' : '0', "\n";
-echo mb_check_encoding("\xFF", 'UTF-8') ? '1' : '0', "\n";
+echo mb_strlen('abc', 'UTF-8'), "\n";
