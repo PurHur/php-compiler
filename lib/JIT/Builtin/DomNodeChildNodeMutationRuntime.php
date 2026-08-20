@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
+use PHPCompiler\ext\dom\DomUserScriptElementCacheLlvm;
 use PHPCompiler\ext\dom\JitDomChildNodeSiblingInsert;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\dom\JitDomGetNodePath;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\ext\dom\JitDomNodeChildProperty;
+use PHPCompiler\ext\dom\JitDomRemoveChildLiveSlots;
+use PHPCompiler\ext\dom\JitDomReplaceChildLiveSlots;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
@@ -47,9 +50,13 @@ final class DomNodeChildNodeMutationRuntime
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_childnode_remove');
             $parent = self::loadParentObject($context, $receiver);
-            // Only-child / full-replace: clear parent inner markup for saveXML (#26752).
-            JitDomCreateElement::storeUserScriptInnerXml($context, $parent, '');
-            self::syncChildNodesLengthSlot($context, $parent, 0);
+            $child = self::receiverObject($context, $receiver);
+            // InnerXml is best-effort for saveXML (#26752). It must not replace
+            // LiveSlots — held `$parent->childNodes` stayed at pre-remove length
+            // when siblings remain (#32821 / peer #32774 / #32817).
+            self::trySyncRemoveInnerXml($context, $parent, $receiver);
+            JitDomRemoveChildLiveSlots::sync($context, $parent, $child);
+            DomUserScriptElementCacheLlvm::invalidateIfElement($context, $child);
 
             return self::nullValuePtr($context);
         }
@@ -97,8 +104,18 @@ final class DomNodeChildNodeMutationRuntime
                     );
                 }
             } else {
-                // replaceWith: replace parent InnerXml with the new node markup (#26752).
-                self::storeInnerXmlFromArgs($context, $parent, $extraArgs);
+                // replaceWith: InnerXml splice is best-effort for saveXML (#26752).
+                // Always run LiveSlots so held childNodes pins update (#32821).
+                self::trySyncReplaceWithInnerXml($context, $receiver, $parent, $extraArgs);
+                $oldChild = self::receiverObject($context, $receiver);
+                $newChild = self::receiverObject($context, $extraArgs[0]);
+                $childCount = null;
+                $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+                if (null !== $xml && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+                    $childCount = \count(DomParseSimpleXmlJitHelper::directChildNodesArgv($xml));
+                }
+                JitDomReplaceChildLiveSlots::sync($context, $parent, $newChild, $oldChild, $childCount);
+                DomUserScriptElementCacheLlvm::invalidateIfElement($context, $oldChild);
             }
 
             return self::nullValuePtr($context);
@@ -107,29 +124,74 @@ final class DomNodeChildNodeMutationRuntime
         return DomInstanceMethodRuntime::invoke($context, $extraArgCount, $kind, $receiver, ...$extraArgs);
     }
 
-    /** @param list<Variable> $extraArgs */
-    private static function storeInnerXmlFromArgs(Context $context, Value $parent, array $extraArgs): void
-    {
-        $pieces = [];
-        foreach ($extraArgs as $arg) {
-            if (Variable::TYPE_STRING === $arg->type) {
-                $lit = $arg->compileTimeString ?? null;
-                if (null === $lit) {
-                    return;
-                }
-                $pieces[] = $lit;
-                continue;
-            }
-            if (!\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
-                return;
-            }
-            $tag = $arg->compileTimeDomTagName ?? null;
-            if (null === $tag || '' === $tag) {
-                return;
-            }
-            $pieces[] = '<'.$tag.'/>';
+    /**
+     * Splice ChildNode::replaceWith args into parent PROP_USER_SCRIPT_INNER_XML
+     * without wiping siblings (#32821 / peer #28671 replaceChild).
+     *
+     * @param list<Variable> $extraArgs
+     */
+    private static function trySyncReplaceWithInnerXml(
+        Context $context,
+        Variable $receiver,
+        Value $parent,
+        array $extraArgs
+    ): bool {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return false;
         }
-        JitDomCreateElement::storeUserScriptInnerXml($context, $parent, implode('', $pieces));
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === trim($xml)) {
+            return false;
+        }
+        $markup = self::compileTimeMarkupFromArgs($extraArgs);
+        if (null === $markup) {
+            return false;
+        }
+        $parentInner = self::compileTimeParentInnerXml();
+        if (null === $parentInner) {
+            return false;
+        }
+        $index = self::resolveReceiverChunkIndex($receiver, $parentInner);
+        if (null === $index) {
+            return false;
+        }
+        $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, $markup);
+        if (null === $inner) {
+            return false;
+        }
+        JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+
+        return true;
+    }
+
+    /** Drop the removed child's chunk from PROP_USER_SCRIPT_INNER_XML (#32821 / #32774). */
+    private static function trySyncRemoveInnerXml(
+        Context $context,
+        Value $parent,
+        Variable $receiver
+    ): bool {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return false;
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === trim($xml)) {
+            return false;
+        }
+        $parentInner = self::compileTimeParentInnerXml();
+        if (null === $parentInner) {
+            return false;
+        }
+        $index = self::resolveReceiverChunkIndex($receiver, $parentInner);
+        if (null === $index) {
+            return false;
+        }
+        $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, '');
+        if (null === $inner) {
+            return false;
+        }
+        JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+
+        return true;
     }
 
     /**
@@ -271,38 +333,6 @@ final class DomNodeChildNodeMutationRuntime
         $phi->addIncoming($parentObj, $readBlock);
 
         return $phi;
-    }
-
-    private static function syncChildNodesLengthSlot(Context $context, Value $parent, int $length): void
-    {
-        $objectType = $context->type->object;
-        $nodeClassId = $objectType->lookup('DOMNode');
-        $listClassId = $objectType->lookup('DOMNodeList');
-        if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
-            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, Variable::TYPE_VALUE);
-        }
-        if (!$objectType->hasProperty($listClassId, 'length')) {
-            $objectType->defineProperty($listClassId, 'length', Variable::TYPE_NATIVE_LONG);
-        }
-        $list = $objectType->allocate($listClassId);
-        $objectType->markObjectConstructed($list);
-        $lengthVar = new Variable(
-            $context,
-            Variable::TYPE_NATIVE_LONG,
-            Variable::KIND_VALUE,
-            $context->getTypeFromString('int64')->constInt($length, false)
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($list, 'DOMNodeList', 'length'),
-            $lengthVar,
-            Variable::TYPE_NATIVE_LONG
-        );
-        $listJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $list);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_CHILD_NODES),
-            $listJit,
-            Variable::TYPE_VALUE
-        );
     }
 
     private static function receiverObject(Context $context, Variable $receiver): Value
