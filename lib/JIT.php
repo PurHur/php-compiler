@@ -12871,6 +12871,19 @@ class JIT {
                     ) {
                         $nonObjectLabel = null;
                     }
+                    // `$c = new C` after an earlier ?-> on the same CV: CFG userType stays
+                    // generic/nullable while classUserType on the binding names the runtime class (#32749).
+                    if ($this->context->hasVariableOp($obj)) {
+                        $recvTagged = $this->context->getVariableFromOp($obj)->classUserType ?? null;
+                        if (
+                            is_string($recvTagged)
+                            && '' !== $recvTagged
+                            && !\in_array(strtolower(ltrim($recvTagged, '\\')), ['object', 'stdclass'], true)
+                        ) {
+                            $nonObjectLabel = null;
+                            $obj->type = new Type(Type::TYPE_OBJECT, [], $recvTagged);
+                        }
+                    }
                     // Nested ?->: prior nullsafe result Temporaries are often typed TYPE_NULL even
                     // though the fetch arm runs only after a runtime non-null check and the JIT
                     // receiver is a VALUE/OBJECT box (#26818).
@@ -12887,11 +12900,17 @@ class JIT {
                         $nullsafeRecvVar = $this->context->getVariableFromOpInScopes($obj);
                         // Ignore isNullConstant: the nullsafe null arm may set it on the shared
                         // merge slot before the fetch arm is compiled (#26818).
-                        $nullsafeRuntimeObjectReceiver = \in_array(
-                            $nullsafeRecvVar->type,
-                            [Variable::TYPE_VALUE, Variable::TYPE_OBJECT],
-                            true
-                        );
+                        $recvClassUserType = $nullsafeRecvVar->classUserType ?? '';
+                        $nullsafeConcreteClass = is_string($recvClassUserType)
+                            && '' !== $recvClassUserType
+                            && !\in_array(strtolower(ltrim($recvClassUserType, '\\')), ['object', 'stdclass'], true);
+                        if (!$nullsafeConcreteClass) {
+                            $nullsafeRuntimeObjectReceiver = \in_array(
+                                $nullsafeRecvVar->type,
+                                [Variable::TYPE_VALUE, Variable::TYPE_OBJECT],
+                                true
+                            );
+                        }
                     }
                     if (null !== $nonObjectLabel && null !== $propName && !$nullsafeRuntimeObjectReceiver) {
                         $destSlot = (int) $op->arg1;
@@ -12964,13 +12983,25 @@ class JIT {
                     $forWritePreview = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                     if ('object' === strtolower(ltrim($declaringClass, '\\'))) {
                         $stdClassId = $this->context->type->object->lookup('stdClass');
+                        $nullsafeRemapToStdClass = $nullsafeRuntimeObjectReceiver;
+                        if ($nullsafeRemapToStdClass && $this->context->hasVariableOpInScopes($obj)) {
+                            $recvTagged = $this->context->getVariableFromOpInScopes($obj)->classUserType ?? null;
+                            if (
+                                is_string($recvTagged)
+                                && '' !== $recvTagged
+                                && 'object' !== strtolower($recvTagged)
+                            ) {
+                                $declaringClass = $recvTagged;
+                                $nullsafeRemapToStdClass = false;
+                            }
+                        }
                         if (
                             $forWritePreview
                             || (
                                 null !== $propName
                                 && $this->context->type->object->hasProperty($stdClassId, $propName)
                             )
-                            || $nullsafeRuntimeObjectReceiver
+                            || $nullsafeRemapToStdClass
                         ) {
                             $declaringClass = 'stdClass';
                         }
@@ -14332,6 +14363,18 @@ class JIT {
         }
         if (null === $declaringClass && null !== $block->func && null !== $block->func->class) {
             $declaringClass = $block->func->class->value;
+        }
+        // Prior nullsafe on the same CV leaves CFG userType generic "object" even after
+        // `$c = new C` refreshed classUserType on the binding (#32749, #29748 pattern).
+        if (
+            (null === $declaringClass || '' === $declaringClass || 'object' === strtolower(ltrim($declaringClass, '\\')))
+            && $this->context->hasVariableOpInScopes($obj)
+        ) {
+            $recv = $this->context->getVariableFromOpInScopes($obj);
+            $tagged = $recv->classUserType ?? null;
+            if (is_string($tagged) && '' !== $tagged && 'object' !== strtolower($tagged)) {
+                $declaringClass = $tagged;
+            }
         }
         if (null !== $declaringClass && '' !== $declaringClass && '' !== $this->context->scope->className) {
             $funcClassLc = strtolower(ltrim($declaringClass, '\\'));
@@ -18093,9 +18136,22 @@ class JIT {
                     $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
                     $result->compileTimeConstantName = $value->compileTimeConstantName;
                     $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+                    $result->isNullConstant = false;
+                    $this->syncCompileTimeString($result, $value, $force);
                     $this->syncCompileTimeBcmathNumber($result, $value, $force);
                     $this->syncCompileTimeDomTagName($result, $value, $force);
                     $this->syncCompileTimeDatePeriod($result, $value, $force);
+                    $objectUserType = $value->classUserType ?? null;
+                    if (is_string($objectUserType) && '' !== $objectUserType) {
+                        $resultOp->type = new Type(Type::TYPE_OBJECT, [], $objectUserType);
+                    }
+                    $resolved = JIT\OperandName::resolve($resultOp);
+                    if (null !== $resolved && '' !== $resolved) {
+                        $this->context->bindVariableByName(
+                            $this->context->resolveRefAliasName($resolved),
+                            $result
+                        );
+                    }
 
                     return;
                 case Variable::TYPE_VALUE:
@@ -18526,9 +18582,22 @@ class JIT {
                 $value
             );
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
+            $result->isNullConstant = false;
+            $this->syncCompileTimeString($result, $value, $force);
             $this->syncCompileTimeBcmathNumber($result, $value, $force);
             $this->syncCompileTimeDomTagName($result, $value, $force);
             $this->syncCompileTimeDatePeriod($result, $value, $force);
+            $objectUserType = $value->classUserType ?? null;
+            if (is_string($objectUserType) && '' !== $objectUserType) {
+                $resultOp->type = new Type(Type::TYPE_OBJECT, [], $objectUserType);
+            }
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($resolved),
+                    $result
+                );
+            }
             $this->recordListUnpackAssignSlot($resultOp, $result);
             $result->addref();
 
@@ -25510,6 +25579,9 @@ class JIT {
         Variable $dest,
         Variable $source
     ): void {
+        if (null !== $source->classUserType) {
+            $dest->classUserType = $source->classUserType;
+        }
         if (null !== $source->compileTimeString) {
             $dest->compileTimeString = $source->compileTimeString;
 
