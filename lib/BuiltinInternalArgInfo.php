@@ -294,6 +294,8 @@ final class BuiltinInternalArgInfo
             'str_ireplace', 'substr_replace' => 'array|string',
             // ext/standard/type.stub.php — aliases absent from InternalArgInfo; Zend : bool (#28312)
             'is_integer', 'is_long', 'is_double' => 'bool',
+            // ext/standard/type.stub.php — doubleval alias absent from InternalArgInfo; Zend : float (#26110)
+            'doubleval' => 'float',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471, #28569)
             'finfo_open' => 'finfo|false',
             'finfo_file', 'finfo_buffer' => 'string|false',
@@ -1005,6 +1007,8 @@ final class BuiltinInternalArgInfo
             'is_numeric', 'is_string', 'is_int', 'is_integer', 'is_long', 'is_float', 'is_double',
             'is_bool', 'is_null', 'is_array', 'is_object', 'is_resource', 'is_scalar'
                 => 0 === $index ? 'mixed' : null,
+            // ext/standard/type.stub.php — doubleval alias absent from InternalArgInfo; Zend mixed $value (#26110)
+            'doubleval' => 0 === $index ? 'mixed' : null,
             // ext/standard/type.stub.php — mixed $value; untyped &$callable_name (InternalArgInfo string) (#28312, #30242)
             'is_callable' => match ($index) {
                 0 => 'mixed',
