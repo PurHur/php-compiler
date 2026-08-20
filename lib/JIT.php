@@ -9737,6 +9737,8 @@ class JIT {
                     }
                     $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                    // FETCH_DIM_W orphan box — ZEND_ASSIGN_DIM_OP for .= (#32789).
+                    JIT\HashTableHelper::hydrateIndexWriteLvalue($this->context, $left);
                     if (null !== $result->objectPropertySlot) {
                         $this->compileObjectPropertyConcatOp($result, $left, $right);
                     } elseif (Variable::TYPE_VALUE === $result->type || JIT\JitValueBox::isValueOperand($result)) {
@@ -9755,6 +9757,10 @@ class JIT {
                             $this->context,
                             $this->valueBoxPointer($result)
                         );
+                        // In-place .= into FETCH_DIM_W must commit the orphan box (#32789).
+                        if (null !== $result->writableHt) {
+                            JIT\HashTableHelper::commitIndexWriteLvalue($this->context, $result);
+                        }
                         if (null !== ($newVal->compileTimeString ?? null)) {
                             $result->compileTimeString = $newVal->compileTimeString;
                         }
@@ -10741,11 +10747,14 @@ class JIT {
                         JIT\StringOffsetHelper::emitAssignOpError($this->context);
                         break;
                     }
+                    $powLeft = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    // FETCH_DIM_W orphan box — ZEND_ASSIGN_DIM_OP for **= (#32789).
+                    JIT\HashTableHelper::hydrateIndexWriteLvalue($this->context, $powLeft);
                     $pow = new \PHPCompiler\ext\standard\pow();
                     $this->context->powReturnValueBox = true;
                     $powResult = $pow->call(
                         $this->context,
-                        $this->context->getVariableFromOp($block->getOperand($op->arg2)),
+                        $powLeft,
                         $this->context->getVariableFromOp($block->getOperand($op->arg3))
                     );
                     $this->context->powReturnValueBox = false;
@@ -10827,6 +10836,8 @@ class JIT {
                         JIT\StringOffsetHelper::emitAssignOpError($this->context);
                         break;
                     }
+                    // FETCH_DIM_W orphan box is empty until hydrate — ZEND_ASSIGN_DIM_OP (#32789 / peer #32305).
+                    JIT\HashTableHelper::hydrateIndexWriteLvalue($this->context, $binLeft);
                     $this->assignOperand(
                         $binDestOp,
                         $this->compileBinaryOp(

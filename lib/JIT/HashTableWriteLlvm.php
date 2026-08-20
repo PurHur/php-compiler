@@ -2035,45 +2035,106 @@ final class HashTableWriteLlvm
     }
 
     /**
-     * Copy the packed slot into a FETCH_DIM_W lvalue box so ++/-- sees the current long (#32305).
+     * Copy the current HT entry into a FETCH_DIM_W lvalue box so ++/-- and
+     * assign-op (`+=` / `-=` / …) see the existing element rather than the
+     * orphan empty box from {@see prepareIndexWrite} / {@see prepareStringKeyWrite}.
      *
-     * @see php-src Zend/zend_vm_def.h ZEND_FETCH_DIM_W / ZEND_POST_INC
+     * @see php-src Zend/zend_vm_def.h ZEND_FETCH_DIM_W / ZEND_POST_INC / ZEND_ASSIGN_DIM_OP
+     * @see #32305 (inc/dec) · #32789 (assign-op)
      */
     public static function hydrateIndexWriteLvalue(Context $context, Variable $lvalue): void
     {
-        if (null === $lvalue->writableHt || null === $lvalue->writableIndex) {
+        if (null === $lvalue->writableHt) {
             return;
         }
-        $ht = $lvalue->writableHt;
-        $index = $lvalue->writableIndex;
-        $tag = 'idxhyd'.(string) self::nextSeq();
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $ht,
-            $index
-        );
-        $miss = BasicBlockHelper::append($context, 'ht_idx_hyd_miss_'.$tag);
-        $fill = BasicBlockHelper::append($context, 'ht_idx_hyd_fill_'.$tag);
-        $context->builder->branchIf($isSet, $fill, $miss);
-        $context->builder->positionAtEnd($miss);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setNullAt'),
-            $ht,
-            $index
-        );
-        $context->builder->branch($fill);
-        $context->builder->positionAtEnd($fill);
-        $entry = HashTableReadLlvm::listEntryPointer($context, $ht, $index);
-        JitValueBox::copyFromPointer($context, $lvalue->value, $entry);
+        if (null !== $lvalue->writableIndex) {
+            $ht = $lvalue->writableHt;
+            $index = $lvalue->writableIndex;
+            $tag = 'idxhyd'.(string) self::nextSeq();
+            $isSet = $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
+            );
+            $miss = BasicBlockHelper::append($context, 'ht_idx_hyd_miss_'.$tag);
+            $fill = BasicBlockHelper::append($context, 'ht_idx_hyd_fill_'.$tag);
+            $context->builder->branchIf($isSet, $fill, $miss);
+            $context->builder->positionAtEnd($miss);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setNullAt'),
+                $ht,
+                $index
+            );
+            $context->builder->branch($fill);
+            $context->builder->positionAtEnd($fill);
+            $entry = HashTableReadLlvm::listEntryPointer($context, $ht, $index);
+            JitValueBox::copyFromPointer($context, $lvalue->value, $entry);
+
+            return;
+        }
+        if (null !== $lvalue->writableStringKey) {
+            $ht = $lvalue->writableHt;
+            $keyStr = $lvalue->writableStringKey;
+            $tag = 'skhyd'.(string) self::nextSeq();
+            $isSet = $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                $ht,
+                $keyStr
+            );
+            $miss = BasicBlockHelper::append($context, 'ht_sk_hyd_miss_'.$tag);
+            $fill = BasicBlockHelper::append($context, 'ht_sk_hyd_fill_'.$tag);
+            $context->builder->branchIf($isSet, $fill, $miss);
+            $context->builder->positionAtEnd($miss);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyNull'),
+                $ht,
+                $keyStr
+            );
+            $context->builder->branch($fill);
+            $context->builder->positionAtEnd($fill);
+            $entry = $context->builder->call(
+                $context->lookupFunction('__hashtable__readStringKeyValue'),
+                $ht,
+                $keyStr
+            );
+            JitValueBox::copyFromPointer($context, $lvalue->value, $entry);
+
+            return;
+        }
+        if (null !== $lvalue->writableValueBoxKey) {
+            $tmp = HashTableReadLlvm::readValueBoxKeyToValueBox(
+                $context,
+                $lvalue->writableHt,
+                $lvalue->writableValueBoxKey,
+                null
+            );
+            JitValueBox::copyFromPointer(
+                $context,
+                $lvalue->value,
+                JitValueBox::pointer($context, $tmp->value)
+            );
+        }
     }
 
-    /** Store a FETCH_DIM_W ++/-- box back into the packed hashtable (#32305). */
+    /** Store a FETCH_DIM_W ++/-- / assign-op box back into the hashtable (#32305, #32789). */
     public static function commitIndexWriteLvalue(Context $context, Variable $lvalue): void
     {
-        if (null === $lvalue->writableHt || null === $lvalue->writableIndex) {
+        if (null === $lvalue->writableHt) {
             return;
         }
-        self::setAtIndex($context, $lvalue->writableHt, $lvalue->writableIndex, $lvalue);
+        if (null !== $lvalue->writableIndex) {
+            self::setAtIndex($context, $lvalue->writableHt, $lvalue->writableIndex, $lvalue);
+
+            return;
+        }
+        if (null !== $lvalue->writableStringKey) {
+            self::setAtStringKey($context, $lvalue->writableHt, $lvalue->writableStringKey, $lvalue);
+
+            return;
+        }
+        if (null !== $lvalue->writableValueBoxKey) {
+            self::setValueBoxKey($context, $lvalue->writableHt, $lvalue->writableValueBoxKey, $lvalue);
+        }
     }
 
     /**
