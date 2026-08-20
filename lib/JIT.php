@@ -22007,6 +22007,19 @@ class JIT {
                     return;
                 }
             }
+            if (
+                'c14nfile' === $methodLcEarly
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14nfile');
+                if ($this->context->functionIsRegistered('domnode::c14nfile')) {
+                    $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::c14nfile');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             // ?-> fetch blocks compile against a null-typed receiver slot; at runtime the
             // branch is only taken when the receiver is a real object (zend_compile.c).
             $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLcEarly);
@@ -22272,6 +22285,13 @@ class JIT {
                 // Same untyped documentElement path: without remap, C14N prints "Object" (#32961).
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
                 if ($this->context->functionIsRegistered('domnode::c14n')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
+            } elseif ('c14nfile' === $methodLc) {
+                // Peer C14N — without remap, compile aborts object::c14nfile() (#32964).
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14nfile');
+                if ($this->context->functionIsRegistered('domnode::c14nfile')) {
                     $className = 'DOMNode';
                     $declaringClassLc = 'domnode';
                 }
@@ -22663,6 +22683,11 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::c14n');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::c14n');
+                }
+                if ('c14nfile' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14nfile');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::c14nfile');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::c14nfile');
                 }
                 // hasChildNodes on documentElement/firstChild temps (:object) — php-src node.c.
                 if ('haschildnodes' === $methodLc) {
@@ -23112,6 +23137,16 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
             if ($this->context->functionIsRegistered('domnode::c14n')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::c14n');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        // Peer C14N — without force-bind, compile aborts object::c14nfile() (#32964).
+        if ('c14nfile' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14nfile');
+            if ($this->context->functionIsRegistered('domnode::c14nfile')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::c14nfile');
                 $this->context->scope->args = [$receiverVar];
 
                 return;

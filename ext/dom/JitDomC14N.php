@@ -53,6 +53,12 @@ final class JitDomC14N
         );
     }
 
+    /** Public fold for {@see JitDomC14NFile} (#32964). */
+    public static function tryFoldCanonical(JITVariable $receiver, ?JITVariable $exclusiveArg = null): ?string
+    {
+        return self::tryCompileTimeFold($receiver, $exclusiveArg);
+    }
+
     /**
      * Fold documentElement / annotated-node C14N from the last pure loadXML (#32961).
      */
