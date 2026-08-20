@@ -209,6 +209,31 @@ final class boolval extends Internal
         );
         $objectTruthy = $context->builder->or($isObject, $isEnum);
 
+        // Boxed strings: JUMPIF must use zend_is_true(IS_STRING), not the array fallback
+        // (readHashtable on a string box → garbage → always-false) (#32920 / peer #27410).
+        // readString returns null for non-strings; substitute an empty alloc so the select
+        // operand stays expression-shaped (no mid-BB terminators).
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $strPtr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $emptyStr = $context->builder->call(
+            $context->lookupFunction('__string__alloc'),
+            $context->getTypeFromString('size_t')->constInt(0, false)
+        );
+        $strIsNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $strPtr,
+            $strPtr->typeOf()->constNull()
+        );
+        $safeStr = $context->builder->select($strIsNull, $emptyStr, $strPtr);
+        $stringTruthy = self::stringTruthy($context, $safeStr);
+
         // Boxed arrays: JUMPIF uses this select path, not TYPE_CAST_BOOL (#32475).
         // php-src: Zend/zend_operators.c convert_to_boolean IS_ARRAY.
         $htPtr = $context->builder->call(
@@ -226,7 +251,11 @@ final class boolval extends Internal
             $context->builder->select(
                 $isInt,
                 $intTruthy,
-                $context->builder->select($objectTruthy, $true, $arrayTruthy)
+                $context->builder->select(
+                    $objectTruthy,
+                    $true,
+                    $context->builder->select($isString, $stringTruthy, $arrayTruthy)
+                )
             )
         );
 
