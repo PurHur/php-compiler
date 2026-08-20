@@ -289,6 +289,17 @@ final class JitDomGetElementById
         }
 
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+        if (null === $parsed || $parsed['id'] !== $idLit) {
+            // Full html/body documents may remember a different "first" id; re-scan (#32996).
+            $htmlLit = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+            if (null !== $htmlLit && '' !== trim($htmlLit)) {
+                $byId = DomParseSimpleHtmlJitHelper::parseIdElementArgv($htmlLit, $idLit);
+                if (null !== $byId) {
+                    $parsed = $byId;
+                    JitDomLoadHTMLUserScript::rememberCompileTimeParsed($parsed);
+                }
+            }
+        }
         if (null === $parsed) {
             if ('missing' === $idLit) {
                 return self::boxNullResult($context);

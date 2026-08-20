@@ -9,6 +9,7 @@ namespace PHPCompiler\ext\dom;
  *
  * Handles single-element documents like {@code <p id="target">hello</p>}
  * and unclosed variants {@code <div id="x">} (libxml EOF auto-close; #25988).
+ * Full {@code <html><body>…} documents: first nested id-bearing element (#32996).
  */
 final class DomParseSimpleHtmlJitHelper
 {
@@ -33,15 +34,115 @@ final class DomParseSimpleHtmlJitHelper
         }
         $id = self::extractIdAttribute($openTag);
         if (null === $id) {
+            // Root is html/body/wrapper without id — scan descendants (#32996).
+            return self::parseFirstNestedIdElement($trimmed);
+        }
+
+        return self::elementRecordFromOpenTag($trimmed, $tag, $id, $gt);
+    }
+
+    /**
+     * Locate a specific id= element inside a compile-time HTML literal (#32996).
+     *
+     * @return array{tag: string, id: string, text: string}|null
+     */
+    public static function parseIdElementArgv(string $html, string $wantId): ?array
+    {
+        if ('' === $wantId) {
             return null;
         }
+        $trimmed = trim($html);
+        if ('' === $trimmed || '<' !== $trimmed[0]) {
+            return null;
+        }
+
+        return self::scanIdElements($trimmed, $wantId);
+    }
+
+    /**
+     * @return array{tag: string, id: string, text: string}|null
+     */
+    private static function parseFirstNestedIdElement(string $html): ?array
+    {
+        return self::scanIdElements($html, null);
+    }
+
+    /**
+     * Preg-free scan for an opening tag with id=. When {@see $wantId} is null, return the first hit.
+     *
+     * @return array{tag: string, id: string, text: string}|null
+     */
+    private static function scanIdElements(string $html, ?string $wantId): ?array
+    {
+        $len = \strlen($html);
+        $pos = 0;
+        while ($pos < $len) {
+            $lt = strpos($html, '<', $pos);
+            if (false === $lt || $lt + 1 >= $len) {
+                break;
+            }
+            $next = $html[$lt + 1];
+            // Skip closers, comments/doctype (!), and processing instructions (?).
+            if ('/' === $next || '!' === $next || '?' === $next) {
+                $pos = $lt + 2;
+                continue;
+            }
+            $gt = strpos($html, '>', $lt + 1);
+            if (false === $gt || $gt <= $lt + 1) {
+                break;
+            }
+            $openTag = substr($html, $lt + 1, $gt - $lt - 1);
+            // Strip trailing '/' from empty-element open tags.
+            if ($openTag !== '' && '/' === $openTag[\strlen($openTag) - 1]) {
+                $openTag = rtrim(substr($openTag, 0, -1));
+            }
+            $space = strpos($openTag, ' ');
+            $tag = strtolower(false === $space ? $openTag : substr($openTag, 0, $space));
+            if ('' === $tag) {
+                $pos = $gt + 1;
+                continue;
+            }
+            $id = self::extractIdAttribute($openTag);
+            if (null === $id) {
+                $pos = $gt + 1;
+                continue;
+            }
+            if (null !== $wantId) {
+                $decodedId = VmDom::decodeHtmlCharacterReferences($id);
+                $decodedWant = VmDom::decodeHtmlCharacterReferences($wantId);
+                if ($decodedId !== $decodedWant) {
+                    $pos = $gt + 1;
+                    continue;
+                }
+            }
+            $relative = substr($html, $lt);
+            $relGt = strpos($relative, '>');
+            if (false === $relGt) {
+                break;
+            }
+
+            return self::elementRecordFromOpenTag($relative, $tag, $id, $relGt);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{tag: string, id: string, text: string}
+     */
+    private static function elementRecordFromOpenTag(
+        string $fromOpen,
+        string $tag,
+        string $id,
+        int $gt
+    ): array {
         $close = '</'.$tag.'>';
-        $closePos = stripos($trimmed, $close, $gt + 1);
+        $closePos = stripos($fromOpen, $close, $gt + 1);
         if (false === $closePos) {
             // Unclosed non-optional tags: libxml auto-closes at EOF (#25988).
-            $text = substr($trimmed, $gt + 1);
+            $text = substr($fromOpen, $gt + 1);
         } else {
-            $text = substr($trimmed, $gt + 1, $closePos - $gt - 1);
+            $text = substr($fromOpen, $gt + 1, $closePos - $gt - 1);
         }
         // Match VmDom::loadHTML / libxml htmlReadMemory entity expansion (#20260).
         $text = VmDom::decodeHtmlCharacterReferences($text);
