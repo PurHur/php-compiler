@@ -7,39 +7,28 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: gettimeofday() excess argc → ArgumentCountError (#30682).
+ * AOT: gettimeofday() array + float execute paths (#3208 / #30682 follow-up).
  *
- * php-src: ext/standard/microtime.c
- *
- * Valid 0/1-arg array/float paths are covered by {@see GettimeofdayAotExecuteTest}.
+ * php-src: ext/standard/microtime.c — PHP_FUNCTION(gettimeofday)
  *
  * @group llvm
  * @group aot
  */
-final class Issue30682GettimeofdayExcessArgcAotTest extends TestCase
+final class GettimeofdayAotExecuteTest extends TestCase
 {
-    public function testAotExcessArgcCatchableUnderTry(): void
+    public function testAotArrayAndFloatPaths(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
         $root = dirname(__DIR__, 2);
-        $src = sys_get_temp_dir().'/phpc_30682_try_'.getmypid().'.php';
-        $bin = sys_get_temp_dir().'/phpc_30682_try_'.getmypid().'.bin';
+        $src = sys_get_temp_dir().'/phpc_gtv_exec_'.getmypid().'.php';
+        $bin = sys_get_temp_dir().'/phpc_gtv_exec_'.getmypid().'.bin';
         file_put_contents($src, <<<'PHP'
 <?php
-try {
-    gettimeofday(false, 1);
-    echo "hi NO_THROW\n";
-} catch (ArgumentCountError $e) {
-    echo 'hi ', $e->getMessage(), "\n";
-}
-try {
-    gettimeofday(false, 1, 2);
-    echo "hi3 NO_THROW\n";
-} catch (ArgumentCountError $e) {
-    echo 'hi3 ', $e->getMessage(), "\n";
-}
+echo count(gettimeofday()) === 4 ? "keys\n" : "bad\n";
+echo gettimeofday(true) > 946684800 ? "float\n" : "bad\n";
+echo array_key_exists('sec', gettimeofday()) ? "sec\n" : "bad\n";
 PHP);
         $compile = 'PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
@@ -52,12 +41,7 @@ PHP);
                 $runOut = [];
                 exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
                 $this->assertSame(0, $runRc, 'run '.$i.': '.implode("\n", $runOut));
-                $this->assertSame(
-                    "hi gettimeofday() expects at most 1 argument, 2 given\n"
-                    ."hi3 gettimeofday() expects at most 1 argument, 3 given\n",
-                    implode("\n", $runOut)."\n",
-                    'run '.$i
-                );
+                $this->assertSame("keys\nfloat\nsec\n", implode("\n", $runOut)."\n", 'run '.$i);
             }
         } finally {
             @unlink($src);
