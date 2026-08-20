@@ -198,7 +198,7 @@ final class JitDate
 
     public static function hrtime(Context $context, Value $asNumber): Value
     {
-        StringHrtime::ensureLinked($context);
+        StringHrtime::ensureLinked($context); // Type always-on shells dropped (#32712)
 
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);

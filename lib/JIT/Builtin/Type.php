@@ -9,7 +9,6 @@
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\Builtin;
 
 class Type extends Builtin {
@@ -720,18 +719,13 @@ class Type extends Builtin {
         // bridge is StringGettimeofday (getNamedFunction first + JitVmHelperLink).
         // Leftover Type addFunction vs Runtime ABI drift mints gettimeofday_array.1
         // (#31894 / #32122).
-        $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        // Match JitDate::hrtime / StringHrtimeRuntime: i64 on 64-bit (writeLong), double on 32-bit
-        // (writeDouble). Hardcoding double broke AOT module verify via writeLong (#26910).
-        $hrtimeNsRet = CompilerVersion::supportsHrtimeAsNumberFloat()
-            ? $double
-            : $this->context->getTypeFromString('int64');
-        $fntypeHrtimeNs = $this->context->context->functionType($hrtimeNsRet, false);
-        $fnHrtimeNs = $this->context->module->addFunction('__compiler_hrtime_ns', $fntypeHrtimeNs);
-        $this->context->registerFunction('__compiler_hrtime_ns', $fnHrtimeNs);
-        $fntypeHrtimePair = $this->context->context->functionType($htPtr, false);
-        $fnHrtimePair = $this->context->module->addFunction('__compiler_hrtime_pair', $fntypeHrtimePair);
-        $this->context->registerFunction('__compiler_hrtime_pair', $fnHrtimePair);
+        // __compiler_hrtime_ns / __compiler_hrtime_pair always-on shells removed
+        // (#32712): user-script hrtime() stays JitDate / HrtimeJitHelper /
+        // VmHrtimeNative (php-src ext/standard/hrtime.c). NestedJIT/AOT bridge is
+        // StringHrtimeRuntime (getNamedFunction first + JitVmHelperLink). Leftover
+        // Type addFunction vs Runtime ABI drift mints hrtime_ns.1 (#31894 / #32122).
+        // Ns return ABI stays on the owner: i64 vs double per
+        // CompilerVersion::supportsHrtimeAsNumberFloat() (#26910).
         $i32 = $this->context->getTypeFromString('int32');
         $fntypeTimeNanosleep = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnTimeNanosleep = $this->context->module->addFunction(

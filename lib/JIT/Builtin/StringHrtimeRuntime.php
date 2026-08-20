@@ -12,6 +12,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_hrtime_ns / __compiler_hrtime_pair via HrtimeJitHelper (#9182, #21378).
+ * Type.php always-on empty shells dropped (#32712 / re-#32122); this file owns the ABI.
  *
  * Nested helper compile: {@see JitVmHelperLink::ensureCompiled} (HelperRuntimeCache + user-script
  * env clear — no hand-rolled NestedJit putenv). Peer: StringClockGettimeRuntime #21270.
@@ -53,9 +54,13 @@ final class StringHrtimeRuntime
 
         self::ensureJitHelperCompiled($context);
 
+        $htPtr = $context->getTypeFromString('__hashtable__*');
         $fn = null !== $probe
             ? $probe
-            : $context->lookupFunction($abiName);
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($htPtr, false)
+            );
 
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');

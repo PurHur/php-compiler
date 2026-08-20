@@ -31,11 +31,12 @@ final class StringHrtimeRuntimeStandaloneTest extends TestCase
         }
     }
 
-    /** Type.php declaration must agree with JitDate boxing (#26910). */
+    /** StringHrtimeRuntime declaration must agree with JitDate boxing (#26910, #32712). */
     public function testHrtimeNsDeclarationMatchesPlatformAbi(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+        StringHrtime::ensureLinked($ctx);
         $fn = $ctx->lookupFunction('__compiler_hrtime_ns');
         $this->assertNotNull($fn);
         $retTy = $fn->typeOf();
