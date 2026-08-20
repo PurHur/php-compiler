@@ -294,6 +294,24 @@ final class SplDllistJitHelper
         return self::compileShift($context, $receiver);
     }
 
+    /**
+     * php-src zim_SplDoublyLinkedList_count — zend_hash_num_elements on storage (#32910).
+     */
+    public static function compileCount(Context $context, JITVariable $receiver): Value
+    {
+        $ht = self::htPtr($context, self::loadObject($context, $receiver));
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong(
+            $context,
+            $slot,
+            $context->builder->truncOrBitCast($n, $context->getTypeFromString('int64'))
+        );
+
+        return $slot;
+    }
+
     private static function htVar(Context $context, Value $obj): JITVariable
     {
         return $context->type->object->splBackingHashtable(

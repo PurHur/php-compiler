@@ -91,6 +91,14 @@ final class SplDllistMethod implements Call
                 0,
                 static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileBottom($ctx, $self)
             ),
+            // php-src zim_SplDoublyLinkedList_count — Countable (#32910)
+            'count' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::count',
+                0,
+                static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileCount($ctx, $self)
+            ),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),
