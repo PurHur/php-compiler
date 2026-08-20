@@ -22254,6 +22254,13 @@ class JIT {
                     $className = 'DOMNode';
                     $declaringClassLc = 'domnode';
                 }
+            } elseif ('c14n' === $methodLc) {
+                // Same :object receiver hole — without remap, echo prints Object (#32961).
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
+                if ($this->context->functionIsRegistered('domnode::c14n')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('toggleattribute' === $methodLc && $this->context->functionIsRegistered('domelement::toggleattribute')) {
                 $className = 'DOMElement';
                 $declaringClassLc = 'domelement';
@@ -22678,6 +22685,12 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getlineno');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::getlineno');
                 }
+                if ('c14n' === $methodLc) {
+                    // documentElement temps (:object) — peer getLineNo / isSameNode (#32961).
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::c14n');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::c14n');
+                }
                 if ('hasfeature' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domimplementation::hasfeature');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\implementation::hasfeature');
@@ -22813,6 +22826,12 @@ class JIT {
                 }
                 if ('getlineno' === $methodLc && $this->context->functionIsRegistered('domnode::getlineno')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::getlineno');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('c14n' === $methodLc && $this->context->functionIsRegistered('domnode::c14n')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::c14n');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -23147,6 +23166,15 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::getlineno');
             if ($this->context->functionIsRegistered('domnode::getlineno')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::getlineno');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('c14n' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
+            if ($this->context->functionIsRegistered('domnode::c14n')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::c14n');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
