@@ -484,13 +484,6 @@ final class UnsetHelperLlvm
             return;
         }
         $receiver = self::loadPropertyReceiver($context, $containerOp);
-        $null = new Variable(
-            $context,
-            Variable::TYPE_NULL,
-            Variable::KIND_VALUE,
-            $context->getTypeFromString('__value__*')->constNull()
-        );
-        $null->isNullConstant = true;
         if ($dimOp instanceof Literal) {
             if (PropertyHookDispatch::emitVirtualHookUnsetGuard(
                 $context,
@@ -500,7 +493,8 @@ final class UnsetHelperLlvm
             )) {
                 return;
             }
-            $prop = $context->type->object->propertyFetch($receiver, $declaringClass, $dimOp->value);
+            // forWrite: skip typed-null → value-box rewrite so objectPropertyType stays native (#33007).
+            $prop = $context->type->object->propertyFetch($receiver, $declaringClass, $dimOp->value, true);
             if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
                 // Match assign order: readonly before asymmetric (#29273 / zend_object_handlers.c).
                 DynamicObjectReadonlyGuard::emitBeforePropertyStore(
@@ -527,12 +521,13 @@ final class UnsetHelperLlvm
                 ) {
                     return;
                 }
+                // Zend zend_std_unset_property → IS_UNDEF (ObjectEntry::unsetProperty; #4863 / #33007).
+                // Storing TYPE_NULL left TypedPropertyUninitGuard silent (checks TYPE_UNDEFINED).
                 ReadonlyClassGuard::emitStoreUnlessPending(
                     $context,
-                    static function () use ($context, $prop, $null): void {
-                        $context->type->object->propertyStore(
+                    static function () use ($context, $prop): void {
+                        $context->type->object->propertyMarkUndefined(
                             $prop->objectPropertySlot,
-                            $null,
                             $prop->objectPropertyType
                         );
                     }
@@ -571,10 +566,9 @@ final class UnsetHelperLlvm
             }
             ReadonlyClassGuard::emitStoreUnlessPending(
                 $context,
-                static function () use ($context, $prop, $null): void {
-                    $context->type->object->propertyStore(
+                static function () use ($context, $prop): void {
+                    $context->type->object->propertyMarkUndefined(
                         $prop->objectPropertySlot,
-                        $null,
                         $prop->objectPropertyType
                     );
                 }

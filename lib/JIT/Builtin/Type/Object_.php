@@ -7505,6 +7505,51 @@ class Object_ extends Type {
                 return $i1->constInt(0, false);
             }
         }
+        // Check the declared slot directly — do not propertyFetch (typed-native null raises; #33007).
+        $nameId = $this->propNameIdFor($name);
+        if (null !== $nameId) {
+            foreach ($this->properties[$classId] as $propset) {
+                if ($propset[0] !== $nameId) {
+                    continue;
+                }
+                $slot = $this->propertySlotPtr($obj, $propset[3]);
+                $voidPtr = $this->context->getTypeFromString('void*');
+                $slotVal = $this->context->builder->pointerCast(
+                    $this->context->builder->load($slot),
+                    $voidPtr
+                );
+                $notNull = $this->context->builder->icmp(
+                    PHPLLVM\Builder::INT_NE,
+                    $slotVal,
+                    $voidPtr->constNull()
+                );
+                if (Variable::TYPE_VALUE !== $propset[2]) {
+                    return $notNull;
+                }
+                $valueType = $this->context->getTypeFromString('__value__');
+                $storage = BasicBlockHelper::entryAlloca($this->context, $valueType);
+                $valueMap = $this->context->structFieldMap['__value__'];
+                $i8 = $this->context->getTypeFromString('int8');
+                $this->context->builder->store(
+                    $i8->constInt(Variable::TYPE_NULL, false),
+                    $this->context->builder->structGep($storage, $valueMap['type'])
+                );
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__object__load_value_slot'),
+                    $slot,
+                    $storage
+                );
+                $typeByte = $this->context->builder->load(
+                    $this->context->builder->structGep($storage, $valueMap['type'])
+                );
+                $nullType = $i8->constInt(Variable::TYPE_NULL, false);
+                $undefType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false);
+                $notNullTy = $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $typeByte, $nullType);
+                $notUndef = $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $typeByte, $undefType);
+
+                return $this->context->builder->and($notNullTy, $notUndef);
+            }
+        }
         $prop = $this->propertyFetch($obj, $class, $name);
         if (Variable::TYPE_VALUE === $prop->type) {
             $valueMap = $this->context->structFieldMap['__value__'];
@@ -7518,6 +7563,22 @@ class Object_ extends Type {
             $notUndef = $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $typeByte, $undefType);
 
             return $this->context->builder->and($notNull, $notUndef);
+        }
+        // Native / string / object slots: isset is false when the void* slot is null
+        // (unset / never-assigned typed natives; #33007). Do not loadValue — that yields i64
+        // for int64* slots and fails module verify against void* null.
+        if (null !== $prop->objectPropertySlot) {
+            $voidPtr = $this->context->getTypeFromString('void*');
+            $slotVal = $this->context->builder->pointerCast(
+                $this->context->builder->load($prop->objectPropertySlot),
+                $voidPtr
+            );
+
+            return $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_NE,
+                $slotVal,
+                $voidPtr->constNull()
+            );
         }
         // isset is BP_VAR_IS — do not raise typed-uninit Error (#29688).
         $savedClass = $prop->objectPropertyClassName;
@@ -7634,6 +7695,50 @@ class Object_ extends Type {
             Variable::TYPE_VALUE,
             Variable::KIND_VARIABLE,
             $destSlot
+        );
+    }
+
+    /**
+     * Declared-property unset → UNDEF slot (zend_std_unset_property / ObjectEntry::unsetProperty).
+     *
+     * Value-boxed slots get a heap {@see __value__} with {@see VmVariable::TYPE_UNDEFINED} so
+     * {@see TypedPropertyUninitGuard} fires on read (#4863, #33007). Native scalar slots store a
+     * null void* — fetch treats null + typed-init-guard as uninitialized (#33007).
+     */
+    public function propertyMarkUndefined(PHPLLVM\Value $slot, int $propertyType): void
+    {
+        $voidPtr = $this->context->getTypeFromString('void*');
+        if (\in_array($propertyType, [
+            Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::TYPE_NATIVE_DOUBLE,
+        ], true)) {
+            $this->context->builder->store($voidPtr->constNull(), $slot);
+
+            return;
+        }
+
+        BasicBlockHelper::ensureOpenInsertBlock($this->context, 'property_mark_undefined');
+        if (null === BasicBlockHelper::tryGetInsertBlock($this->context)) {
+            return;
+        }
+        $valueType = $this->context->getTypeFromString('__value__');
+        $heapVal = $this->context->memory->malloc($valueType);
+        $heapPtr = $this->context->builder->pointerCast(
+            $heapVal,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(
+                \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
+                false
+            ),
+            $this->context->builder->structGep($heapVal, $valueMap['type'])
+        );
+        $this->context->builder->store(
+            $this->context->builder->pointerCast($heapPtr, $voidPtr),
+            $slot
         );
     }
 
