@@ -162,8 +162,32 @@ final class JitDomCloneNode
         );
         JitDomCreateElement::storeUserScriptInnerXml($context, $obj, $spec['inner']);
         JitDomCreateElement::storeUserScriptXmlnsAttr($context, $obj, $spec['attrs']);
+        // Seed firstChild/lastChild/sibling LiveSlots — materialize alone leaves them
+        // unset and AOT firstChild walks SIGSEGV (php-src xmlDocCopyNode; #32949 / #32355).
+        $outer = self::outerMarkupFromSpec($spec);
+        JitDomDocumentElement::syncChildrenFromXmlPublic(
+            $context,
+            $obj,
+            $outer,
+            '/'.$spec['tag']
+        );
 
         return $obj;
+    }
+
+    /**
+     * Full element outer markup for {@see JitDomDocumentElement::syncChildrenFromXmlPublic}.
+     *
+     * @param array{kind: string, tag: string, attrs: string, inner: string, text: string} $spec
+     */
+    private static function outerMarkupFromSpec(array $spec): string
+    {
+        $open = '<'.$spec['tag'].$spec['attrs'];
+        if ('' === $spec['inner']) {
+            return $open.'/>';
+        }
+
+        return $open.'>'.$spec['inner'].'</'.$spec['tag'].'>';
     }
 
     private static function compileTimeDeep(?JITVariable $arg): bool

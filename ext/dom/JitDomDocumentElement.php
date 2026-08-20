@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -102,6 +103,11 @@ final class JitDomDocumentElement
         if ([] === $children) {
             // Empty elements still need a live NodeList — skipping left
             // DOMNode::$childNodes unset and ->length SIGSEGVd on AOT.
+            // Also null first/last — allocate() leaves VALUE slots uninitialized;
+            // shallow cloneNode(false) reads firstChild and SIGSEGVs (#32949).
+            self::ensureLinkProps($context);
+            self::storeNullChildEdge($context, $element, VmDom::PROP_FIRST_CHILD);
+            self::storeNullChildEdge($context, $element, VmDom::PROP_LAST_CHILD);
             self::storeChildNodesLength($context, $element, 0);
 
             return;
@@ -341,5 +347,29 @@ final class JitDomDocumentElement
                 JITVariable::TYPE_VALUE
             );
         }
+    }
+
+    /** Boxed null into a DOMElement child edge (peer createElement attributes null). */
+    private static function storeNullChildEdge(
+        \PHPCompiler\JIT\Context $context,
+        Value $element,
+        string $prop
+    ): void {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+        $nullVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $slot
+        );
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($element, self::CLASS_ELEMENT, $prop),
+            $nullVar,
+            JITVariable::TYPE_VALUE
+        );
     }
 }
