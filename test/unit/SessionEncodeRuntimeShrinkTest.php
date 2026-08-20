@@ -9,23 +9,24 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** session_encode LLVM wire (#33005); decode NestedJIT helper (#9440, #22076). */
+/** session_encode/decode LLVM wire (#33005 / #33008); VM helper remains for NestedJIT/VM SSOT. */
 final class SessionEncodeRuntimeShrinkTest extends TestCase
 {
-    public function testSessionEncodeRuntimeUsesJitHelperNotLlvmWireLoop(): void
+    public function testSessionEncodeRuntimeUsesLlvmWireNotNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionEncodeRuntime.php');
-        $this->assertStringContainsString('SessionEncodeJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('implementEncodeWireBridge', $source);
         $this->assertStringContainsString('emitEncodeWireString', $source);
+        $this->assertStringContainsString('emitParseWireHashtable', $source);
+        $this->assertStringContainsString('implementEncodeWireBridge', $source);
+        $this->assertStringContainsString('implementDecodeWireBridge', $source);
+        $this->assertStringNotContainsString('SessionEncodeJitHelper', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('emitDecodeWire', $source);
         $this->assertStringNotContainsString('__phpc_unser_parse_item', $source);
         $this->assertStringNotContainsString('__compiler_serialize_value', $source);
-        $this->assertLessThan(370, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
     }
 
     public function testSessionEncodeJitHelperRoundTripMatchesVmSessionSerializer(): void

@@ -6,8 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\JIT\LibcExtern;
@@ -16,37 +14,28 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for session_encode()/session_decode() (#6086, #9440, #22076, #33005).
+ * JIT/AOT link for session_encode()/session_decode() (#6086, #9440, #22076, #33005, #33008).
  *
  * Encode: LLVM wire walk via {@see \PHPCompiler\ext\standard\JitSessionStorageKernel::emitEncodeWireString}
  * (same as save_to_disk — NestedJIT encodeWire sees strlen=0 on HT keys, #21900).
- * Decode: NestedJIT {@see SessionEncodeJitHelper::decodeWire} / {@see VmSessionSerializer}.
+ * Decode: LLVM wire parse via {@see \PHPCompiler\ext\standard\JitSessionStorageKernel::emitParseWireHashtable}
+ * (same as load_from_disk — NestedJIT decodeWire fails thin AOT, #33008).
  * Thin AOT call-site {@see ensureLinked} must {@see BasicBlockHelper::scopeLoweringToFunction}
  * so BasicBlockHelper::append does not steal into the in-flight user fn (#32994 / peer #27211).
  * php-src: ext/session/session.c — php_session_encode / php_session_decode
  */
 final class SessionEncodeRuntime
 {
-    private const HELPER_PATH = '/ext/standard/SessionEncodeJitHelper.php';
-
-    private const DECODE_WIRE = 'PHPCompiler\\ext\\standard\\SessionEncodeJitHelper::decodeWire';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::DECODE_WIRE,
-    ];
-
     public static function ensureLinked(Context $context): void
     {
-        // Save before StorageKernel/NestedJIT — they clear the insert block (#32994).
+        // Save before StorageKernel — they clear the insert block (#32994).
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
 
         StringUnserialize::ensureLinked($context);
         SessionStorageGlobals::ensureGlobals($context);
-        // Merge bridge for session_decode apply (#26088).
+        // Merge bridge for session_decode apply (#26088) + LLVM wire encode/decode (#33005 / #33008).
         \PHPCompiler\ext\standard\JitSessionStorageKernel::ensureLinked($context);
 
-        self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, 'phpc_session_encode_wire', self::implementEncodeWireBridge(...));
         self::implementIfMissing($context, 'phpc_session_decode_wire', self::implementDecodeWireBridge(...));
         self::implementIfMissing($context, '__phpc_session_encode_apply', self::implementEncodeApplyBridge(...));
@@ -128,20 +117,12 @@ final class SessionEncodeRuntime
     {
         $entry = $fn->appendBasicBlock('se_wire_dec_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $decodedRaw = JitNestedHelperCoerce::callHelper(
+        // LLVM wire parse — NestedJIT decodeWire fails thin AOT (#21900 / #33008).
+        // Same path as phpc_session_load_from_disk; empty payload → empty HT (Zend true).
+        $decoded = \PHPCompiler\ext\standard\JitSessionStorageKernel::emitParseWireHashtable(
             $context,
-            self::helperFunction($context, self::DECODE_WIRE),
-            [$fn->getParam(0)]
+            $fn->getParam(0)
         );
-        $decoded = JitNestedHelperCoerce::coerceToHashtablePtr($context, $decodedRaw);
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $decodedRaw);
-        $failBb = $fn->appendBasicBlock('se_wire_dec_bridge_fail');
-        $okBb = $fn->appendBasicBlock('se_wire_dec_bridge_ok');
-        $context->builder->branchIf($isNull, $failBb, $okBb);
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($htPtr->constNull());
-        $context->builder->positionAtEnd($okBb);
         $context->builder->returnValue($decoded);
     }
 
@@ -300,28 +281,6 @@ final class SessionEncodeRuntime
         return $htPtr->constNull();
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after SessionEncodeJitHelper compile (#9440)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#22076'
-        );
-    }
-
     private static function registerLinkedRuntime(Context $context): void
     {
         foreach ([
@@ -332,7 +291,7 @@ final class SessionEncodeRuntime
         ] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after SessionEncodeRuntime bridge (#9440)');
+                throw new \LogicException($name.' missing after SessionEncodeRuntime bridge (#9440 / #33008)');
             }
             $context->registerFunction($name, $fn);
         }
