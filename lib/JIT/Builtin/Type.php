@@ -173,17 +173,14 @@ class Type extends Builtin {
         // Type::initialize still StreamIo::ensureLinked). Leftover Type empty decls vs
         // Runtime ABI drift mint fopen.1 (#31894 / #32122). User-script fopen() stays
         // JitStreamIoKernel / StreamIoJitHelper / VmFs.
+        // __compiler_fread always-on shell removed (#33055): StreamIoRuntime owns the
+        // ABI (getNamedFunction first, then addFunction if absent via declareRuntimeFn
+        // + implementNullableStringBridge; Type::initialize still StreamIo::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint fread.1 (#31894 / #32122).
+        // User-script fread() stays StreamIoJitHelper / JitStreamIoKernel.
         $fntypeTmpfile = $this->context->context->functionType($i64, false);
         $fnTmpfile = $this->context->module->addFunction('__compiler_tmpfile', $fntypeTmpfile);
         $this->context->registerFunction('__compiler_tmpfile', $fnTmpfile);
-        $fntypeFread = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $i64,
-            $i64
-        );
-        $fnFread = $this->context->module->addFunction('__compiler_fread', $fntypeFread);
-        $this->context->registerFunction('__compiler_fread', $fnFread);
         $fntypeFclose = $this->context->context->functionType($i32, false, $i64);
         $fnFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
         $this->context->registerFunction('__compiler_fclose', $fnFclose);
