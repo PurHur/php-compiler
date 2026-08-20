@@ -26,6 +26,8 @@ final class DomImportNodeRuntime
 
     public const ABI_SET_ATTRIBUTE_NODE = '__phpc_dom_set_attribute_node';
 
+    public const ABI_REMOVE_ATTRIBUTE_NODE = '__phpc_dom_remove_attribute_node';
+
     private const HELPER_PATH = '/ext/dom/DomImportNodeJitHelper.php';
 
     private const HELPER = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::importNodeArgv';
@@ -38,6 +40,8 @@ final class DomImportNodeRuntime
 
     private const HELPER_SET_ATTR_NODE = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::setAttributeNodeArgv';
 
+    private const HELPER_REMOVE_ATTR_NODE = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::removeAttributeNodeArgv';
+
     private const HELPER_CREATE_ATTR_NS = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::createAttributeNSArgv';
 
     private const HELPER_CREATE_ATTR = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::createAttributeArgv';
@@ -49,6 +53,7 @@ final class DomImportNodeRuntime
         self::HELPER_GET_ATTR_NODE_NS,
         self::HELPER_SET_ATTR_NODE_NS,
         self::HELPER_SET_ATTR_NODE,
+        self::HELPER_REMOVE_ATTR_NODE,
         self::HELPER_CREATE_ATTR_NS,
         self::HELPER_CREATE_ATTR,
     ];
@@ -209,6 +214,28 @@ final class DomImportNodeRuntime
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#20676'
+        );
+    }
+
+    public static function ensureRemoveAttributeNodeLinked(Context $context): void
+    {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureRemoveAttributeNodeBridge($context);
+
+            return;
+        }
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_REMOVE_ATTRIBUTE_NODE,
+            'dom_remove_attribute_node_bridge',
+            [$objPtr, $objPtr],
+            $objPtr,
+            self::HELPER_REMOVE_ATTR_NODE,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#32707'
         );
     }
 }

@@ -27,7 +27,8 @@ final class JitDomRequireDomNodeArg
         JITVariable $arg,
         string $function,
         int $userArgIndex,
-        string $paramName
+        string $paramName,
+        string $expectedClass = 'DOMNode'
     ): bool {
         if (!self::isCompileTimeNull($arg)) {
             return false;
@@ -37,10 +38,11 @@ final class JitDomRequireDomNodeArg
         ExceptionBridge::emitTypeErrorAndAbort(
             $context,
             \sprintf(
-                '%s(): Argument #%d ($%s) must be of type DOMNode, null given',
+                '%s(): Argument #%d ($%s) must be of type %s, null given',
                 $function,
                 $userArgIndex,
-                $paramName
+                $paramName,
+                $expectedClass
             )
         );
 

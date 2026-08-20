@@ -335,6 +335,20 @@ final class JitDomDocumentMethodKernel
         );
     }
 
+    public static function ensureRemoveAttributeNodeBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        self::ensureBridge(
+            $context,
+            DomImportNodeRuntime::ABI_REMOVE_ATTRIBUTE_NODE,
+            'dom_remove_attribute_node_user_script',
+            [$objPtr, $objPtr],
+            $objPtr,
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::removeAttributeNodeArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
     public static function ensureFirstChildBridge(Context $context): void
     {
         self::ensureBridge(

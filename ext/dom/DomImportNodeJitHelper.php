@@ -118,4 +118,15 @@ final class DomImportNodeJitHelper
 
         return $var->toObject();
     }
+
+    /** DOMElement::removeAttributeNode() — JIT/AOT (php-src element.c). */
+    public static function removeAttributeNodeArgv(ObjectEntry $element, ObjectEntry $attr): ObjectEntry
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($element->id) ?? $element;
+        $attrCanon = DomRegistry::entry($attr->id) ?? $attr;
+        $var = VmDom::removeAttributeNode($ctx, $canonical, $attrCanon);
+
+        return $var->toObject();
+    }
 }

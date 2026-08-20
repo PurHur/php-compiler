@@ -193,6 +193,30 @@ final class DomUserScriptAttributeCacheLlvm
         return $context->builder->load($global);
     }
 
+    /**
+     * Compile-time (namespace, localName) pairs that already have a module global.
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    public static function literalKeys(Context $context): array
+    {
+        $keys = [];
+        foreach (self::state($context)['slotByKey'] as $key => $_) {
+            $parts = explode("\0", $key, 2);
+            $keys[] = [$parts[0], $parts[1] ?? ''];
+        }
+
+        return $keys;
+    }
+
+    /** Runtime-only: store null in the Attr slot without compile-time presentByKey fold. */
+    public static function nullSlot(Context $context, string $namespace, string $localName): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $global = self::slotGlobal($context, $namespace, $localName);
+        $context->builder->store($objPtr->constNull(), $global);
+    }
+
     /** @return array{slotByKey: array<string, Value>, presentByKey: array<string, true>, valueByKey: array<string, string>, idBearingByKey: array<string, true>, lastCreateNamespace: ?string, lastCreateLocalName: ?string} */
     private static function &state(Context $context): array
     {

@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Builder;
@@ -897,6 +898,87 @@ final class JitDomAttributeNodeNS
         JitValueBox::writeBool($context, $slot, $i1->constInt(1, false));
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    /**
+     * DOMElement::removeAttributeNode() — user-script AOT (php-src element.c php_dom_remove_attribute_node).
+     */
+    public static function invokeRemoveAttributeNode(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattrnode_cont');
+        if (!VmClassMethod::requireExactJitUserArgCount(
+            $context,
+            $args,
+            'DOMElement::removeAttributeNode',
+            1
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        if (JitDomRequireDomNodeArg::guardOrAbort(
+            $context,
+            $args[1],
+            'DOMElement::removeAttributeNode',
+            1,
+            'attr',
+            'DOMAttr'
+        )) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            return self::invokeRemoveAttributeNodeUserScript($context, ...$args);
+        }
+        DomImportNodeRuntime::ensureRemoveAttributeNodeLinked($context);
+        $element = self::loadObjectArg($context, $args[0], 'DOMElement::removeAttributeNode() receiver');
+        $attr = self::loadObjectArg($context, $args[1], 'DOMElement::removeAttributeNode() attr');
+        $removed = $context->builder->call(
+            $context->lookupFunction(DomImportNodeRuntime::ABI_REMOVE_ATTRIBUTE_NODE),
+            $element,
+            $attr
+        );
+
+        return self::boxObjectResult($context, $removed);
+    }
+
+    private static function invokeRemoveAttributeNodeUserScript(Context $context, JITVariable ...$args): Value
+    {
+        $attr = self::loadObjectArg($context, $args[1], 'DOMElement::removeAttributeNode() attr');
+        $i1 = $context->getTypeFromString('int1');
+        $foundSlot = BasicBlockHelper::entryAlloca($context, $i1);
+        $context->builder->store($i1->constInt(0, false), $foundSlot);
+        $seq = 0;
+        foreach (DomUserScriptAttributeCacheLlvm::literalKeys($context) as [$ns, $local]) {
+            $existing = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, $ns, $local);
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $existing, $attr);
+            $hit = BasicBlockHelper::append($context, 'dom_rmattrnode_hit_'.$seq);
+            $cont = BasicBlockHelper::append($context, 'dom_rmattrnode_cont_'.$seq);
+            $context->builder->branchIf($isMatch, $hit, $cont);
+            $context->builder->positionAtEnd($hit);
+            DomUserScriptAttributeCacheLlvm::nullSlot($context, $ns, $local);
+            if ('' === $ns && 'id' === $local) {
+                DomUserScriptElementCacheLlvm::clearId($context);
+            }
+            $context->builder->store($i1->constInt(1, false), $foundSlot);
+            $context->builder->branch($cont);
+            $context->builder->positionAtEnd($cont);
+            $seq++;
+        }
+        $found = $context->builder->load($foundSlot);
+        $ok = BasicBlockHelper::append($context, 'dom_rmattrnode_ok');
+        $missing = BasicBlockHelper::append($context, 'dom_rmattrnode_missing');
+        $context->builder->branchIf($found, $ok, $missing);
+        $context->builder->positionAtEnd($missing);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Not Found Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::NOT_FOUND_ERR
+        );
+        $context->builder->positionAtEnd($ok);
+
+        return self::boxObjectResult($context, $attr);
     }
 
     /**
