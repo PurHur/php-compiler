@@ -47,16 +47,19 @@ final class StreamReadRuntime
 
     public const STREAM_COPY_TO_STREAM = 'PHPCompiler\\ext\\standard\\StreamReadJitHelper::streamCopyToStreamArgv';
 
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
+    /**
+     * NestedJIT from {@see StreamReadJitHelper} only — ftell/fseek ABI helpers live on
+     * {@see StreamIoJitHelper} (php://memory via {@see JitMemoryStreamHelper}, #25299).
+     *
+     * @var list<string>
+     */
+    private const STREAM_READ_COMPILED_HELPERS = [
         self::FLOCK,
         self::FPASSTHRU,
         self::FTRUNCATE,
-        self::FTELL,
         self::FGETC,
         self::FGETS,
         self::STREAM_GET_LINE,
-        self::FSEEK,
         self::STREAM_GET_CONTENTS,
         self::STREAM_COPY_TO_STREAM,
     ];
@@ -160,6 +163,10 @@ final class StreamReadRuntime
 
     public static function helperFunction(Context $context, string $logical): LlvmFunction
     {
+        if (self::FTELL === $logical || self::FSEEK === $logical) {
+            return StreamIoRuntime::lookupStreamIoHelper($context, $logical);
+        }
+
         self::ensureJitHelperCompiled($context);
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
@@ -175,7 +182,7 @@ final class StreamReadRuntime
         JitVmHelperLink::ensureCompiled(
             $context,
             self::HELPER_PATH,
-            self::COMPILED_HELPERS,
+            self::STREAM_READ_COMPILED_HELPERS,
             '#20982'
         );
     }
