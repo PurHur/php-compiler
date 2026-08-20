@@ -121,6 +121,27 @@ final class JitDomReplaceChildLiveSlots
     }
 
     /**
+     * Public entry for ParentNode::replaceChildren held-list refresh (#32846).
+     *
+     * Absolute length + `__phpcItem*` pins on the existing list object (or seed when
+     * absent). Do not allocate a fresh childNodes — that leaves held `$list` stale
+     * and refetch item() SIGSEGV (#32846 / peer #32784).
+     *
+     * @param int $childCount Post-replace childNodes length (0 clears pins)
+     */
+    public static function refreshHeldChildNodes(
+        Context $context,
+        Value $owner,
+        int $childCount,
+        Value $newFirst,
+        Value $newSecond
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rch_held');
+        self::ensureLayout($context);
+        self::refreshChildNodesListInPlace($context, $owner, $childCount, $newFirst, $newSecond);
+    }
+
+    /**
      * Refresh pins / length on the existing childNodes list without replacing the
      * list object — held `$list` must observe the splice (#32784 / #32774 peer).
      *

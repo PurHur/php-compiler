@@ -15,6 +15,7 @@ use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\dom\JitDomInsertBeforeLiveSlots;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\ext\dom\JitDomParentChildLinkLayout;
+use PHPCompiler\ext\dom\JitDomReplaceChildLiveSlots;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
@@ -181,9 +182,11 @@ final class DomNodeLiveMutationRuntime
             if ('replacechildren' === $kind) {
                 // Arity 0: skip NestedJIT — empty replaceChildren aborted in thin AOT (#29409).
                 // Non-empty: NestedJIT + INNER_XML overwrite (saveXML reads INNER_XML).
+                // #32846: never syncChildNodesLengthSlot here — that allocates a fresh
+                // DOMNodeList and leaves held `$list = childNodes` with stale pins / SIGSEGV.
                 if (0 === $extraArgCount) {
                     self::clearChildLinkSlots($context, $receiver);
-                    self::syncChildNodesLengthSlot($context, $receiver, 0);
+                    self::refreshHeldChildNodesAfterReplace($context, $receiver, 0, null, null);
                     self::syncUserScriptInnerXmlReplaceFromArgs($context, $receiver, []);
 
                     return self::nullValuePtr($context);
@@ -196,15 +199,19 @@ final class DomNodeLiveMutationRuntime
                         $llvmArgs[] = self::mutationArgObject($context, $arg);
                     }
                     $context->builder->call($context->lookupFunction($abi), ...$llvmArgs);
-                    $firstArg = $extraArgs[0];
-                    $lastArg = $extraArgs[\count($extraArgs) - 1];
-                    $firstChildObj = self::childObjectForSlotSync($context, $firstArg);
-                    $lastChildObj = self::childObjectForSlotSync($context, $lastArg);
-                    if (null !== $firstChildObj && null !== $lastChildObj) {
-                        self::syncChildLinkSlots($context, $receiver, $firstChildObj, $lastChildObj);
+                    $childObjs = [];
+                    foreach ($extraArgs as $arg) {
+                        $childObjs[] = self::mutationArgObject($context, $arg);
                     }
+                    self::syncReplaceChildrenChildChain($context, $receiver, $childObjs);
                     self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
-                    self::syncChildNodesLengthSlot($context, $receiver, $extraArgCount);
+                    self::refreshHeldChildNodesAfterReplace(
+                        $context,
+                        $receiver,
+                        $extraArgCount,
+                        $childObjs[0],
+                        $childObjs[1] ?? null
+                    );
                     self::syncUserScriptInnerXmlReplaceFromArgs($context, $receiver, $extraArgs);
 
                     return self::nullValuePtr($context);
@@ -217,21 +224,27 @@ final class DomNodeLiveMutationRuntime
                     self::receiverObject($context, $receiver)
                 );
                 self::clearChildLinkSlots($context, $receiver);
-                self::syncChildNodesLengthSlot($context, $receiver, 0);
+                self::refreshHeldChildNodesAfterReplace($context, $receiver, 0, null, null);
                 self::syncUserScriptInnerXmlReplaceFromArgs($context, $receiver, []);
 
                 $firstArg = $extraArgs[0];
                 $lastArg = $extraArgs[\count($extraArgs) - 1];
                 $firstChildObj = null;
                 $lastChildObj = null;
+                $secondChildObj = null;
+                $childIdx = 0;
                 foreach ($extraArgs as $arg) {
                     $appended = self::invokeUserScriptMutationArg($context, 'append', $receiver, $arg);
                     if (Variable::TYPE_STRING === $arg->type) {
+                        $materialized = self::childObjectForSlotSync($context, $arg);
                         if ($arg === $firstArg) {
-                            $firstChildObj = self::childObjectForSlotSync($context, $arg);
+                            $firstChildObj = $materialized;
                         }
                         if ($arg === $lastArg) {
-                            $lastChildObj = self::childObjectForSlotSync($context, $arg);
+                            $lastChildObj = $materialized;
+                        }
+                        if (1 === $childIdx) {
+                            $secondChildObj = $materialized;
                         }
                     } else {
                         if ($arg === $firstArg) {
@@ -240,13 +253,23 @@ final class DomNodeLiveMutationRuntime
                         if ($arg === $lastArg) {
                             $lastChildObj = $appended;
                         }
+                        if (1 === $childIdx) {
+                            $secondChildObj = $appended;
+                        }
                     }
+                    ++$childIdx;
                 }
                 if (null !== $firstChildObj && null !== $lastChildObj) {
                     self::syncChildLinkSlots($context, $receiver, $firstChildObj, $lastChildObj);
                 }
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
-                self::syncChildNodesLengthSlot($context, $receiver, $extraArgCount);
+                self::refreshHeldChildNodesAfterReplace(
+                    $context,
+                    $receiver,
+                    $extraArgCount,
+                    $firstChildObj,
+                    $secondChildObj ?? ($extraArgCount >= 2 ? $lastChildObj : null)
+                );
                 self::syncUserScriptInnerXmlReplaceFromArgs($context, $receiver, $extraArgs);
 
                 return self::nullValuePtr($context);
@@ -513,6 +536,93 @@ final class DomNodeLiveMutationRuntime
             $objectType->propertyStore(
                 $objectType->propertySlotFor($receiverObj, 'DOMElement', $prop),
                 $nullVar,
+                Variable::TYPE_VALUE
+            );
+        }
+    }
+
+    /**
+     * Absolute length + pins on the held childNodes list after replaceChildren (#32846).
+     *
+     * Peer {@see JitDomReplaceChildLiveSlots::refreshHeldChildNodes}: never allocate a
+     * fresh list via {@see syncChildNodesLengthSlot}.
+     */
+    private static function refreshHeldChildNodesAfterReplace(
+        Context $context,
+        Variable $receiver,
+        int $childCount,
+        ?Value $firstChildObj,
+        ?Value $secondChildObj
+    ): void {
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $parentObj = self::receiverObject($context, $receiver);
+        $first = $firstChildObj ?? $objPtrTy->constNull();
+        $second = $secondChildObj ?? $objPtrTy->constNull();
+        JitDomReplaceChildLiveSlots::refreshHeldChildNodes(
+            $context,
+            $parentObj,
+            $childCount,
+            $first,
+            $second
+        );
+    }
+
+    /**
+     * Wire first/last + sibling + parentNode for replaceChildren object args (#32846).
+     *
+     * NestedJIT mutates the PHP tree; thin-AOT item()/held lists read LLVM slots.
+     *
+     * @param list<Value> $childObjs
+     */
+    private static function syncReplaceChildrenChildChain(
+        Context $context,
+        Variable $receiver,
+        array $childObjs
+    ): void {
+        if ([] === $childObjs) {
+            self::clearChildLinkSlots($context, $receiver);
+
+            return;
+        }
+        $n = \count($childObjs);
+        self::syncChildLinkSlots($context, $receiver, $childObjs[0], $childObjs[$n - 1]);
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        foreach ([VmDom::PROP_NEXT_SIBLING, VmDom::PROP_PREVIOUS_SIBLING] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, Variable::TYPE_VALUE);
+            }
+        }
+        $nullSlot = JitValueBox::alloc($context);
+        $nullPtr = JitValueBox::pointer($context, $nullSlot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+        $nullVar = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $nullPtr)
+        );
+        for ($i = 0; $i < $n; ++$i) {
+            $prev = 0 === $i ? $nullVar : new Variable(
+                $context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $childObjs[$i - 1]
+            );
+            $next = ($i === $n - 1) ? $nullVar : new Variable(
+                $context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $childObjs[$i + 1]
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($childObjs[$i], 'DOMElement', VmDom::PROP_PREVIOUS_SIBLING),
+                $prev,
+                Variable::TYPE_VALUE
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($childObjs[$i], 'DOMElement', VmDom::PROP_NEXT_SIBLING),
+                $next,
                 Variable::TYPE_VALUE
             );
         }
