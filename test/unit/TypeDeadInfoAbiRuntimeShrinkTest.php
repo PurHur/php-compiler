@@ -53,7 +53,7 @@ final class TypeDeadInfoAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_fwrite'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_fopen'", $type);
         $this->assertStringContainsString('StringInfo::ensureLinked', $type);
         $this->assertStringContainsString('StringVersionCompare::ensureLinked', $type);
     }
