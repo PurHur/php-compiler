@@ -3392,6 +3392,25 @@ class Context {
                     if ($this->aliasVariableOpFromSlot($block, $op)) {
                         return $this->scope->variables[$op];
                     }
+                    $slot = $block->slotForOperand($op);
+                    if (null !== $slot && null !== $block->func) {
+                        foreach ($block->func->params as $param) {
+                            $pname = OperandName::resolve($param->result);
+                            if (null === $pname || '' === $pname) {
+                                continue;
+                            }
+                            if ($block->slotForOperand($param->result) !== $slot) {
+                                continue;
+                            }
+                            $resolved = $this->resolveRefAliasName($pname);
+                            if (isset($this->namedVariableBindings[$resolved])) {
+                                $bound = $this->namedVariableBindings[$resolved];
+                                $this->scope->variables[$op] = $bound;
+
+                                return $bound;
+                            }
+                        }
+                    }
                 }
                 // Temporaries can be introduced by CFG transforms after scope variable allocation.
                 // Treat unknown temporaries as boxed __value__ slots to keep self-host emit paths alive.
@@ -3417,6 +3436,31 @@ class Context {
                 throw new \LogicException('BoundVariable SCOPE_OBJECT without $this in JIT scope');
             } else {
                 throw new \LogicException("Unknown variable referenced: " . get_class($op));
+            }
+        }
+
+        if ($this->scope->variables->contains($op)) {
+            $block = $this->jitCurrentBlock;
+            if (null !== $block && null !== $block->func) {
+                $slot = $block->slotForOperand($op);
+                if (null !== $slot) {
+                    foreach ($block->func->params as $param) {
+                        $pname = OperandName::resolve($param->result);
+                        if (null === $pname || '' === $pname) {
+                            continue;
+                        }
+                        if ($block->slotForOperand($param->result) !== $slot) {
+                            continue;
+                        }
+                        $resolved = $this->resolveRefAliasName($pname);
+                        if (isset($this->namedVariableBindings[$resolved])) {
+                            $bound = $this->namedVariableBindings[$resolved];
+                            $this->scope->variables[$op] = $bound;
+
+                            return $bound;
+                        }
+                    }
+                }
             }
         }
 

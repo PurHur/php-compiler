@@ -207,6 +207,13 @@ final class JitValueBox
         if ('__object__*' === $context->getStringFromType($valueTy)) {
             return self::valuePtrFromObjectParam($context, $var->value);
         }
+        // LLVM by-value __value__ formals (KIND_VALUE): store into a reachable alloca
+        // before returning its pointer — sealed insert BBs left the slot null and by-ref
+        // `$r = $v` copied TYPE_NULL into the caller lvalue (e06_byref, #32654).
+        BasicBlockHelper::repositionToLastOpenIfInsertLost($context);
+        if (!BasicBlockHelper::unsealAndContinue($context)) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'value_ptr_mat');
+        }
         $slot = self::alloc($context);
         $context->builder->store($var->value, $slot);
 
@@ -291,14 +298,74 @@ final class JitValueBox
     public static function assignToPointer(Context $context, Value $destPtr, Variable $value): void
     {
         $destPtr = self::normalizeValuePtr($context, $destPtr);
+        if (null !== $value->compileTimeLong) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                $destPtr,
+                $context->getTypeFromString('int64')->constInt($value->compileTimeLong, false)
+            );
+
+            return;
+        }
         switch ($value->type) {
             case Variable::TYPE_VALUE:
+                if (
+                    Variable::KIND_VARIABLE === $value->kind
+                ) {
+                    $llvmType = $context->getStringFromType($value->value->typeOf());
+                    if ('__value__' === $llvmType || '__value__*' === $llvmType) {
+                        // Use the CV stack slot directly — valuePtrFromVariable may box the
+                        // LLVM formal into a fresh null alloca (e06_byref `$r = $v`).
+                        BasicBlockHelper::repositionToLastOpenIfInsertLost($context);
+                        if (!BasicBlockHelper::unsealAndContinue($context)) {
+                            BasicBlockHelper::ensureOpenInsertBlock($context, 'assign_cv_box');
+                        }
+                        self::copyIntoPointer(
+                            $context,
+                            $destPtr,
+                            '__value__' === $llvmType
+                                ? self::pointer($context, $value->value)
+                                : self::normalizeValuePtr($context, $value->value)
+                        );
+
+                        return;
+                    }
+                }
                 if (
                     Variable::KIND_VALUE === $value->kind
                     && '__value__' === $context->getStringFromType($value->value->typeOf())
                 ) {
+                    BasicBlockHelper::repositionToLastOpenIfInsertLost($context);
+                    if (!BasicBlockHelper::unsealAndContinue($context)) {
+                        BasicBlockHelper::ensureOpenInsertBlock($context, 'assign_formal_box');
+                    }
                     $slot = self::alloc($context);
                     $context->builder->store($value->value, $slot);
+                    self::copyIntoPointer(
+                        $context,
+                        $destPtr,
+                        self::pointer($context, $slot)
+                    );
+
+                    return;
+                }
+                if (Variable::KIND_VALUE === $value->kind) {
+                    // Untyped callee formals arrive as by-value __value__ at the LLVM edge.
+                    BasicBlockHelper::repositionToLastOpenIfInsertLost($context);
+                    if (!BasicBlockHelper::unsealAndContinue($context)) {
+                        BasicBlockHelper::ensureOpenInsertBlock($context, 'assign_formal_ptr');
+                    }
+                    $slot = self::alloc($context);
+                    $valTyName = $context->getStringFromType($value->value->typeOf());
+                    if ('__value__' === $valTyName) {
+                        $context->builder->store($value->value, $slot);
+                    } else {
+                        self::copyFromPointer(
+                            $context,
+                            $slot,
+                            self::normalizeValuePtr($context, $value->value)
+                        );
+                    }
                     self::copyIntoPointer(
                         $context,
                         $destPtr,
