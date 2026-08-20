@@ -527,16 +527,10 @@ class Type extends Builtin {
         // always-on shells removed (#32859): NestedJIT/AOT bridge is OpensslEncryptRuntime
         // (getNamedFunction first; Type::initialize still ensureLinked). Leftover Type
         // empty decls vs Runtime ABI drift mint openssl_encrypt.1 (#31894 / #32122).
-        // openssl_digest — NestedJIT OpensslDigestJitHelper (#21081)
-        $fntypeOpensslDigest = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $strPtr,
-            $strPtr,
-            $i64
-        );
-        $fnOpensslDigest = $this->context->module->addFunction('__compiler_openssl_digest', $fntypeOpensslDigest);
-        $this->context->registerFunction('__compiler_openssl_digest', $fnOpensslDigest);
+        // __compiler_openssl_digest always-on shell removed (#32868): NestedJIT/AOT
+        // bridge is OpensslDigestRuntime (getNamedFunction first; Type::initialize still
+        // ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // openssl_digest.1 (#31894 / #32122).
         // openssl_pbkdf2 — HMAC over __compiler_hash (hex) + LLVM hex-decode (#32410)
         $fntypeOpensslPbkdf2 = $this->context->context->functionType(
             $strPtr,
@@ -1210,6 +1204,7 @@ class Type extends Builtin {
         PasswordCryptoRuntime::ensureLinked($this->context);
         OpensslEncryptRuntime::ensureLinked($this->context);
         OpensslSignRuntime::ensureLinked($this->context);
+        OpensslDigestRuntime::ensureLinked($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
