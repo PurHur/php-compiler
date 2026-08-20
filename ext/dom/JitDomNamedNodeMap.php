@@ -120,7 +120,14 @@ final class JitDomNamedNodeMap
         $objectType = $context->type->object;
         self::ensureLayout($objectType, $objectType->lookup(self::CLASS_MAP));
 
-        $indexLit = $args[1]->compileTimeLong;
+        // Fold only LLVM i64 constants — loop `$i` keeps stale compileTimeLong (#32831).
+        $indexLit = null;
+        if (
+            null !== $args[1]->value
+            && \PHPLLVM\Value::KIND_CONSTANT_INT === $args[1]->value->getKind()
+        ) {
+            $indexLit = $args[1]->compileTimeLong;
+        }
         if (null !== $indexLit) {
             return self::boxPinnedOrNull($context, $map, (int) $indexLit);
         }
