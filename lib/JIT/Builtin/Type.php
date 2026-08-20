@@ -597,44 +597,24 @@ class Type extends Builtin {
         // NestedJIT/AOT bridge is StringMicrotime (getNamedFunction first +
         // JitVmHelperLink::ensureBridge). Leftover Type addFunction vs Runtime ABI
         // drift mints microtime_float.1 (#31894 / #32122).
-        $double = $this->context->getTypeFromString('double');
-        $fntypePhpversion = $this->context->context->functionType($strPtr, false, $strPtr);
-        $fnPhpversion = $this->context->module->addFunction('__compiler_phpversion', $fntypePhpversion);
-        $this->context->registerFunction('__compiler_phpversion', $fnPhpversion);
-        $fntypePhpSapi = $this->context->context->functionType($strPtr, false);
-        $fnPhpSapi = $this->context->module->addFunction('__compiler_php_sapi_name', $fntypePhpSapi);
-        $this->context->registerFunction('__compiler_php_sapi_name', $fnPhpSapi);
-        $fntypeZendVersion = $this->context->context->functionType($strPtr, false);
-        $fnZendVersion = $this->context->module->addFunction('__compiler_zend_version', $fntypeZendVersion);
-        $this->context->registerFunction('__compiler_zend_version', $fnZendVersion);
-        $fntypePhpUname = $this->context->context->functionType($strPtr, false, $strPtr);
-        $fnPhpUname = $this->context->module->addFunction('__compiler_php_uname', $fntypePhpUname);
-        $this->context->registerFunction('__compiler_php_uname', $fnPhpUname);
+        // __compiler_phpversion / __compiler_php_sapi_name / __compiler_zend_version /
+        // __compiler_php_uname / __compiler_extension_loaded /
+        // __compiler_get_loaded_extensions / __compiler_get_extension_funcs always-on
+        // shells removed (#32839): user-script phpversion()/php_sapi_name()/zend_version()/
+        // php_uname()/extension_loaded()/get_loaded_extensions()/get_extension_funcs()
+        // stay JitInfo / InfoJitHelper (php-src ext/standard/info.c). NestedJIT/AOT
+        // bridge is StringInfo (getNamedFunction first; Type::initialize still
+        // ensureLinked). Leftover Type empty decls vs Runtime ABI drift mints
+        // phpversion.1 (#31894 / #32122).
+        // __compiler_version_compare stays always-on for now — StringVersionCompare
+        // owns the body but ensureLinked is only from JitInfo (follow-up shrink).
         $fntypeVersionCompare = $this->context->context->functionType($i64, false, $strPtr, $strPtr);
         $fnVersionCompare = $this->context->module->addFunction(
             '__compiler_version_compare',
             $fntypeVersionCompare
         );
         $this->context->registerFunction('__compiler_version_compare', $fnVersionCompare);
-        $fntypeExtensionLoaded = $this->context->context->functionType($i32, false, $strPtr);
-        $fnExtensionLoaded = $this->context->module->addFunction(
-            '__compiler_extension_loaded',
-            $fntypeExtensionLoaded
-        );
-        $this->context->registerFunction('__compiler_extension_loaded', $fnExtensionLoaded);
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypeLoadedExtensions = $this->context->context->functionType($htPtr, false, $i32);
-        $fnLoadedExtensions = $this->context->module->addFunction(
-            '__compiler_get_loaded_extensions',
-            $fntypeLoadedExtensions
-        );
-        $this->context->registerFunction('__compiler_get_loaded_extensions', $fnLoadedExtensions);
-        $fntypeExtensionFuncs = $this->context->context->functionType($htPtr, false, $strPtr);
-        $fnExtensionFuncs = $this->context->module->addFunction(
-            '__compiler_get_extension_funcs',
-            $fntypeExtensionFuncs
-        );
-        $this->context->registerFunction('__compiler_get_extension_funcs', $fnExtensionFuncs);
         // __compiler_gettimeofday_array / __compiler_gettimeofday_float always-on
         // shells removed (#32683): user-script gettimeofday() stays JitGettimeofday /
         // GettimeofdayJitHelper (php-src ext/standard/microtime.c). NestedJIT/AOT
