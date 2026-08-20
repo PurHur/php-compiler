@@ -61,7 +61,10 @@ final class JitDomDocumentElement
             self::PROP_DOCUMENT_ELEMENT,
             $docClassId
         );
-        if (null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
+        // Prefer JIT.php's annotate with the owning document Variable (#32978).
+        // When that path is unavailable, only annotate from an unambiguous literal —
+        // never lastCompileTimeXml after a second loadXML.
+        if (null !== JitDomLoadXMLUserScript::unambiguousCompileTimeXml()
             || null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
         ) {
             JitDomGetNodePath::annotateDocumentElement($result);

@@ -12333,6 +12333,11 @@ class JIT {
                         $this->context->scope->toCall,
                         $callArgs
                     );
+                    $this->syncDomLoadXmlTokenToAliases(
+                        $this->context->scope->toCall,
+                        $callArgs,
+                        $callOperands
+                    );
                     $this->context->callerStrictTypes = $prevStrict;
                     break;
                     } finally {
@@ -12653,6 +12658,11 @@ class JIT {
                         $this->context->scope->toCall,
                         $callArgs
                     );
+                    $this->syncDomLoadXmlTokenToAliases(
+                        $this->context->scope->toCall,
+                        $callArgs,
+                        $callOperands
+                    );
                     $this->propagateXmlReaderFactoryResultType(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
@@ -12667,6 +12677,10 @@ class JIT {
                     );
                     $this->attachBoundClosureInvokeMetadata($block, $op);
                     $this->propagateDomCreateElementCompileTimeTag(
+                        $block->getOperand($op->arg1),
+                        $callArgs
+                    );
+                    $this->propagateDomImportNodeCompileTimeTag(
                         $block->getOperand($op->arg1),
                         $callArgs
                     );
@@ -13772,6 +13786,18 @@ class JIT {
                             $this->context->scope->variables[$result] = $fetched;
                         }
                         $this->applyExternalPropertyResultType($result, $declaringClass, $name->value);
+                        // Multi-doc loadXML: stamp documentElement with the owning document's
+                        // XML token so C14N does not use lastCompileTimeXml (#32978).
+                        if (
+                            'documentelement' === strtolower((string) $name->value)
+                            && $this->context->hasVariableOp($obj)
+                            && $this->context->hasVariableOp($result)
+                        ) {
+                            \PHPCompiler\ext\dom\JitDomGetNodePath::annotateDocumentElement(
+                                $this->context->getVariableFromOp($result),
+                                $this->context->getVariableFromOp($obj)
+                            );
+                        }
                     } else {
                         $nameVar = $this->context->getVariableFromOp($name);
                         $fetched = $this->context->type->object->propertyFetchDynamic(
@@ -15025,6 +15051,44 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * Remember importNode($src) tag/inner on the result for appendChild C14N refresh (#32978).
+     *
+     * Prefers pending metadata from user-script materialize; falls back to the source
+     * node's compile-time DOM annotations.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private function propagateDomImportNodeCompileTimeTag(Operand $result, array $callArgs): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentImportNode)) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $pending = \PHPCompiler\ext\dom\JitDomImportNode::takePendingCompileTime();
+        if (null !== $pending) {
+            $resultVar->compileTimeDomTagName = $pending['tag'];
+            $resultVar->compileTimeDomInnerXml = $pending['inner'];
+
+            return;
+        }
+        $nodeArg = $callArgs[1] ?? null;
+        if (!$nodeArg instanceof Variable) {
+            return;
+        }
+        $tag = $nodeArg->compileTimeDomTagName;
+        if (null === $tag || '' === $tag) {
+            return;
+        }
+        $resultVar->compileTimeDomTagName = $tag;
+        $resultVar->compileTimeDomInnerXml = $nodeArg->compileTimeDomInnerXml ?? '';
+        $resultVar->compileTimeDomNodePath = $nodeArg->compileTimeDomNodePath;
+        $resultVar->compileTimeDomChildIndex = $nodeArg->compileTimeDomChildIndex;
     }
 
     /**
@@ -19432,6 +19496,9 @@ class JIT {
         if ($force || null !== $src->compileTimeDomElementId) {
             $dest->compileTimeDomElementId = $src->compileTimeDomElementId;
         }
+        if ($force || null !== $src->compileTimeDomXmlToken) {
+            $dest->compileTimeDomXmlToken = $src->compileTimeDomXmlToken;
+        }
     }
 
     private function syncCompileTimeDatePeriod(Variable $dest, Variable $src, bool $force): void
@@ -19856,6 +19923,77 @@ class JIT {
         $this->context->lastDateTimeZoneNewResultOp = null;
         $this->context->lastDateTimeZoneNewResultVar = null;
         $this->context->lastAssignedDateTimeZoneLocalName = null;
+    }
+
+    /**
+     * After DOMDocument::loadXML(), stamp the loadXML token onto the named local /
+     * ARG_SEND aliases so a later `$doc->documentElement->C14N()` fold uses that
+     * document's literal — not lastCompileTimeXml after a second loadXML (#32978).
+     *
+     * @param list<JIT\Variable|array{unpack: JIT\Variable}> $callArgs
+     * @param list<\PHPCfg\Operand|null>|null $callOperands
+     */
+    private function syncDomLoadXmlTokenToAliases(
+        ?JIT\Call $toCall,
+        array $callArgs,
+        ?array $callOperands = null
+    ): void {
+        if (!$toCall instanceof JIT\Call\DomDocumentLoadXML) {
+            return;
+        }
+        if ([] === $callArgs) {
+            return;
+        }
+        $first = $callArgs[0];
+        if (\is_array($first)) {
+            $first = $first['unpack'] ?? null;
+        }
+        if (!$first instanceof Variable || null === $first->compileTimeDomXmlToken) {
+            return;
+        }
+        $token = $first->compileTimeDomXmlToken;
+        $stamp = static function (Variable $bound) use ($token, $first): void {
+            $bound->compileTimeDomXmlToken = $token;
+            // Keep SplObjectStorage in sync for compileTimeXmlFor() (#32978).
+            \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::bindCompileTimeXmlToken($bound, $first);
+        };
+        $stamp($first);
+        if (null !== $callOperands && isset($callOperands[0]) && $callOperands[0] instanceof \PHPCfg\Operand) {
+            $op = $callOperands[0];
+            if ($this->context->hasVariableOp($op)) {
+                $stamp($this->context->getVariableFromOp($op));
+            }
+            $name = JIT\OperandName::resolve($op);
+            if (null !== $name && '' !== $name) {
+                $resolved = $this->context->resolveRefAliasName($name);
+                if (isset($this->context->namedVariableBindings[$resolved])) {
+                    $stamp($this->context->namedVariableBindings[$resolved]);
+                }
+            }
+        }
+        // ARG_SEND often uses a KIND_VALUE load of the local alloca — pointer identity
+        // does not match the named KIND_VARIABLE. Stamp the unique untokened DOMDocument
+        // local (first loadXML → $a; second → $b) (#32978).
+        $candidates = [];
+        foreach ($this->context->namedVariableBindings as $bound) {
+            if ($bound === $first || null !== $bound->compileTimeDomXmlToken) {
+                continue;
+            }
+            if ($bound->value === $first->value) {
+                $stamp($bound);
+                continue;
+            }
+            $class = strtolower(str_replace('/', '\\', ltrim(
+                (string) ($bound->classUserType ?? $bound->compileTimeString ?? ''),
+                '\\'
+            )));
+            if ('domdocument' === $class || 'dom\\xmldocument' === $class) {
+                $candidates[] = $bound;
+            }
+        }
+        if (1 === \count($candidates)) {
+            $stamp($candidates[0]);
+        }
     }
 
     /**
@@ -26097,6 +26235,11 @@ class JIT {
         }
         if (null !== $source->compileTimeString) {
             $dest->compileTimeString = $source->compileTimeString;
+            // DOMDocument locals keep class name in compileTimeString; still copy the
+            // loadXML token so multi-doc C14N does not fall back to last (#32978).
+            if (null !== $source->compileTimeDomXmlToken && null === $dest->compileTimeDomXmlToken) {
+                $dest->compileTimeDomXmlToken = $source->compileTimeDomXmlToken;
+            }
 
             return;
         }
@@ -26128,6 +26271,9 @@ class JIT {
         }
         if (null !== $source->compileTimeDomElementId && null === $dest->compileTimeDomElementId) {
             $dest->compileTimeDomElementId = $source->compileTimeDomElementId;
+        }
+        if (null !== $source->compileTimeDomXmlToken && null === $dest->compileTimeDomXmlToken) {
+            $dest->compileTimeDomXmlToken = $source->compileTimeDomXmlToken;
         }
         $this->foldCompileTimeStringFromSlot($block, $sourceSlot, $dest);
     }

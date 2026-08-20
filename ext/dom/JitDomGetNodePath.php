@@ -44,11 +44,23 @@ final class JitDomGetNodePath
         self::$lastInner = $inner;
     }
 
-    public static function annotateDocumentElement(JITVariable $result): void
+    /**
+     * Annotate a documentElement fetch with the owning document's loadXML literal (#32474 / #32978).
+     *
+     * When {@see $document} is known, bind its xml token so a later loadXML on another
+     * document cannot poison C14N / getNodePath folds via lastCompileTimeXml().
+     */
+    public static function annotateDocumentElement(JITVariable $result, ?JITVariable $document = null): void
     {
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $xml = null !== $document
+            ? JitDomLoadXMLUserScript::compileTimeXmlFor($document)
+            : null;
+        $xml ??= JitDomLoadXMLUserScript::unambiguousCompileTimeXml();
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
+        }
+        if (null !== $document) {
+            JitDomLoadXMLUserScript::bindCompileTimeXmlToken($result, $document);
         }
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         $path = '/'.$tag;
@@ -57,6 +69,7 @@ final class JitDomGetNodePath
         $result->compileTimeDomInnerXml = $inner;
         $result->compileTimeDomTagName = $tag;
         $result->compileTimeDomLineNo = JitDomGetLineNo::rootLineNo(
+            // Prefer the document-specific source when the token still maps to $xml.
             JitDomLoadXMLUserScript::lastCompileTimeXmlSource() ?? $xml
         );
         // Drop stale firstChild/lastChild hints so documentElement->cloneNode()
@@ -71,7 +84,8 @@ final class JitDomGetNodePath
 
     public static function annotateChildFetch(JITVariable $result, string $propName): void
     {
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($result)
+            ?? JitDomLoadXMLUserScript::unambiguousCompileTimeXml();
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }

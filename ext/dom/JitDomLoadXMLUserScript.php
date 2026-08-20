@@ -76,6 +76,9 @@ final class JitDomLoadXMLUserScript
 
     /**
      * Compile-time XML for a specific DOMDocument receiver (stylesheet vs source doc) (#27392).
+     *
+     * Also resolves documentElement / child temps stamped with {@see JITVariable::$compileTimeDomXmlToken}
+     * so C14N does not fall back to the last loadXML literal (#32978).
      */
     public static function compileTimeXmlFor(?JITVariable $document): ?string
     {
@@ -85,12 +88,108 @@ final class JitDomLoadXMLUserScript
         if (null !== self::$xmlByReceiver && isset(self::$xmlByReceiver[$document])) {
             return self::$xmlByReceiver[$document];
         }
+        $domToken = $document->compileTimeDomXmlToken;
+        if (null !== $domToken && isset(self::$xmlByToken[$domToken])) {
+            return self::$xmlByToken[$domToken];
+        }
         $token = $document->compileTimeString;
         if (null !== $token && isset(self::$xmlByToken[$token])) {
             return self::$xmlByToken[$token];
         }
 
         return null;
+    }
+
+    /**
+     * Sole remembered loadXML literal, or null when zero / ambiguous (#32978).
+     *
+     * Prefer {@see compileTimeXmlFor()} when the receiver is known; use this only as a
+     * safe fallback so a second loadXML cannot poison an earlier document's C14N fold.
+     */
+    public static function unambiguousCompileTimeXml(): ?string
+    {
+        $seen = [];
+        foreach (self::$xmlByToken as $xml) {
+            $seen[$xml] = true;
+        }
+        if (1 === \count($seen)) {
+            return array_key_first($seen);
+        }
+        if (0 === \count($seen) && null !== self::$lastCompileTimeXml) {
+            return self::$lastCompileTimeXml;
+        }
+
+        return null;
+    }
+
+    /** Stamp a node Variable with the owning document's loadXML token (#32978). */
+    public static function bindCompileTimeXmlToken(JITVariable $node, ?JITVariable $document): void
+    {
+        if (null === $document) {
+            return;
+        }
+        $token = $document->compileTimeDomXmlToken;
+        if (null === $token || !isset(self::$xmlByToken[$token])) {
+            // Document may only be in SplObjectStorage (pre-token path).
+            $xml = self::compileTimeXmlFor($document);
+            if (null === $xml) {
+                return;
+            }
+            $token = '__phpc_domxml_'.(++self::$xmlTokenSeq);
+            self::$xmlByToken[$token] = $xml;
+            $document->compileTimeDomXmlToken = $token;
+        }
+        $node->compileTimeDomXmlToken = $token;
+    }
+
+    /**
+     * loadXML often stamps an SSA temp while `$doc->documentElement` reads the named
+     * local (different Variable object). Copy the token onto unbound named
+     * DOMDocument locals (#32978).
+     */
+    public static function propagateXmlTokenToNamedDocumentLocals(Context $context, JITVariable $stamped): void
+    {
+        $token = $stamped->compileTimeDomXmlToken;
+        if (null === $token || !isset(self::$xmlByToken[$token])) {
+            return;
+        }
+        $xml = self::$xmlByToken[$token];
+        if (null === self::$xmlByReceiver) {
+            self::$xmlByReceiver = new \SplObjectStorage();
+        }
+        self::$xmlByReceiver[$stamped] = $xml;
+
+        $candidates = [];
+        foreach ($context->namedVariableBindings as $var) {
+            if (!$var instanceof JITVariable || $var === $stamped) {
+                continue;
+            }
+            if (null !== $var->compileTimeDomXmlToken) {
+                continue;
+            }
+            if (!self::looksLikeDomDocumentVariable($var)) {
+                continue;
+            }
+            $candidates[] = $var;
+        }
+        // `$a = new DOMDocument; $a->loadXML(...)` — and `$a=new;$b=new;$a->loadXML`
+        // while `$b` still lacks classUserType / already has a token.
+        if (1 === \count($candidates)) {
+            $candidates[0]->compileTimeDomXmlToken = $token;
+            self::$xmlByReceiver[$candidates[0]] = $xml;
+        }
+    }
+
+    private static function looksLikeDomDocumentVariable(JITVariable $var): bool
+    {
+        if (!\in_array($var->type, [JITVariable::TYPE_OBJECT, JITVariable::TYPE_VALUE], true)) {
+            return false;
+        }
+        $class = strtolower(str_replace('/', '\\', ltrim((string) $var->classUserType, '\\')));
+
+        // Require explicit DOMDocument classUserType so a second unbound `new` without a
+        // class tag does not compete with the loadXML receiver (#32978).
+        return 'domdocument' === $class || 'dom\\xmldocument' === $class;
     }
 
     /**
@@ -152,12 +251,14 @@ final class JitDomLoadXMLUserScript
     }
 
     /**
-     * Rebuild {@see $lastCompileTimeXml} after a root-inner rewrite so C14N fold
-     * sees appendChild/insertBefore/replaceChild/removeChild (#32972).
+     * Rebuild compile-time XML after a root-inner rewrite so C14N fold
+     * sees appendChild/insertBefore/replaceChild/removeChild (#32972 / #32978).
+     *
+     * @param string|null $baseXml document-specific literal; defaults to last only when unambiguous
      */
-    public static function refreshCompileTimeXmlWithRootInner(string $newInner): void
+    public static function refreshCompileTimeXmlWithRootInner(string $newInner, ?string $baseXml = null): void
     {
-        $xml = self::$lastCompileTimeXml;
+        $xml = $baseXml ?? self::unambiguousCompileTimeXml() ?? self::$lastCompileTimeXml;
         if (null === $xml || '' === trim($xml)) {
             return;
         }
@@ -167,7 +268,7 @@ final class JitDomLoadXMLUserScript
         }
         $tag = $parsed['tag'];
         $attrs = $parsed['attrs'];
-        self::commitRefreshedCompileTimeXml('<'.$tag.$attrs.'>'.$newInner.'</'.$tag.'>');
+        self::commitRefreshedCompileTimeXml('<'.$tag.$attrs.'>'.$newInner.'</'.$tag.'>', $xml);
     }
 
     /**
@@ -196,7 +297,7 @@ final class JitDomLoadXMLUserScript
      */
     private static function mutateCompileTimeXmlRootAttribute(callable $mutate): void
     {
-        $xml = self::$lastCompileTimeXml;
+        $xml = self::unambiguousCompileTimeXml() ?? self::$lastCompileTimeXml;
         if (null === $xml || '' === trim($xml)) {
             return;
         }
@@ -216,14 +317,21 @@ final class JitDomLoadXMLUserScript
         if (!\is_string($new) || '' === $new) {
             return;
         }
-        self::commitRefreshedCompileTimeXml($new);
+        self::commitRefreshedCompileTimeXml($new, $xml);
     }
 
-    /** Keep lastCompileTimeXml + per-receiver/token maps in sync after a fold refresh. */
-    private static function commitRefreshedCompileTimeXml(string $newXml): void
+    /**
+     * Keep lastCompileTimeXml + per-receiver/token maps in sync after a fold refresh.
+     *
+     * @param string|null $oldXml specific literal being replaced (multi-doc safe) (#32978)
+     */
+    private static function commitRefreshedCompileTimeXml(string $newXml, ?string $oldXml = null): void
     {
-        $old = self::$lastCompileTimeXml;
-        self::$lastCompileTimeXml = $newXml;
+        $old = $oldXml ?? self::$lastCompileTimeXml;
+        // Only advance the global last pointer when it matched the refreshed doc.
+        if (null === $oldXml || self::$lastCompileTimeXml === $oldXml) {
+            self::$lastCompileTimeXml = $newXml;
+        }
         // Fold may use the refreshed literal.
         self::$treeMutatedSinceLoad = false;
         self::$lastLoadWasPureUserScript = true;
@@ -261,7 +369,7 @@ final class JitDomLoadXMLUserScript
         JitDomXPathRegisterUserScript::reset();
     }
 
-    /** Bind compile-time XML to the loadXML() document receiver (#27392). */
+    /** Bind compile-time XML to the loadXML() document receiver (#27392 / #32978). */
     public static function rememberCompileTimeXmlFor(JITVariable $document, string $xml, ?string $sourceXml = null): void
     {
         self::$lastCompileTimeXml = $xml;
@@ -275,6 +383,7 @@ final class JitDomLoadXMLUserScript
         // ('DOMDocument') used elsewhere; index under a dedicated token only.
         $token = '__phpc_domxml_'.(++self::$xmlTokenSeq);
         self::$xmlByToken[$token] = $xml;
+        $document->compileTimeDomXmlToken = $token;
     }
 
     public static function rememberLivingDocumentClass(string $documentClass): void
@@ -356,6 +465,7 @@ final class JitDomLoadXMLUserScript
         // DomLoadXMLRuntime cannot run VmDom::loadXML (no preg_match in lean helpers).
 
         self::rememberCompileTimeXmlFor($args[0], $lit, $sourceXml);
+        self::propagateXmlTokenToNamedDocumentLocals($context, $args[0]);
         self::$lastDocumentClass = self::CLASS_DOCUMENT;
         self::markLastLoadPureUserScript();
         // Declare textContent/nodeValue on DOMElement so forWrite hasProperty skips
@@ -473,6 +583,7 @@ final class JitDomLoadXMLUserScript
             JITVariable::KIND_VALUE,
             $element
         );
+        JitDomLoadXMLUserScript::bindCompileTimeXmlToken($elemJit, $receiver);
         $objectType->propertyStore(
             $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCUMENT_ELEMENT),
             $elemJit,

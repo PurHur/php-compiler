@@ -158,6 +158,12 @@ final class Variable {
     public ?int $compileTimeDomElementId = null;
 
     /**
+     * Token into {@see \PHPCompiler\ext\dom\JitDomLoadXMLUserScript} xmlByToken for the
+     * owning document's loadXML literal — survives refresh; not lastCompileTimeXml (#32978).
+     */
+    public ?string $compileTimeDomXmlToken = null;
+
+    /**
      * DatePeriod end-date form — ordered Unix timestamps for foreach snapshot (#26772).
      *
      * @var list<int>|null

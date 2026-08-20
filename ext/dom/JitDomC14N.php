@@ -90,7 +90,7 @@ final class JitDomC14N
         }
 
         $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
-            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+            ?? JitDomLoadXMLUserScript::unambiguousCompileTimeXml();
         if (null === $xml
             || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
             || JitDomLoadXMLUserScript::treeMutatedSinceLoad()

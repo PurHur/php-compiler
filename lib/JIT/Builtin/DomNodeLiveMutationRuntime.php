@@ -1097,13 +1097,16 @@ final class DomNodeLiveMutationRuntime
             $propVar,
             Variable::TYPE_STRING
         );
-        // Refresh C14N fold source from the known compile-time merge (#32972).
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        // Refresh C14N fold source from the known compile-time merge (#32972 / #32978).
+        // Prefer the receiver's owning document XML — lastCompileTimeXml is the wrong
+        // doc after a second loadXML.
+        $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
+            ?? JitDomLoadXMLUserScript::unambiguousCompileTimeXml();
         if (null !== $xml && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             $oldInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
             $delta = implode('', $pieces);
             $newInner = 'prepend' === $kind ? $delta.$oldInner : $oldInner.$delta;
-            JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($newInner);
+            JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($newInner, $xml);
         }
     }
 

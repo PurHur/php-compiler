@@ -40,7 +40,7 @@ final class JitDomImportNode
         }
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            return self::invokeUserScriptMaterialize($context, $args[0]);
+            return self::invokeUserScriptMaterialize($context, $args[0], $args[1]);
         }
 
         DomImportNodeRuntime::ensureLinked($context);
@@ -134,15 +134,30 @@ final class JitDomImportNode
         return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 
+    /** @var array{tag: string, inner: string}|null Pending importNode fold metadata (#32978). */
+    private static ?array $pendingCompileTime = null;
+
+    public static function takePendingCompileTime(): ?array
+    {
+        $pending = self::$pendingCompileTime;
+        self::$pendingCompileTime = null;
+
+        return $pending;
+    }
+
     /**
      * Thin AOT: clone via user-script materialize (nodeName/tagName/INNER_XML slots).
      * NestedJIT object returns abort on property fetch (#29853 / #32350).
      */
     private static function invokeUserScriptMaterialize(
         Context $context,
-        JITVariable $documentVar
+        JITVariable $documentVar,
+        JITVariable $sourceNode
     ): Value {
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        // Prefer the source node's owning document XML — lastCompileTimeXml is the
+        // wrong doc after a second loadXML (#32978).
+        $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
         $tag = 'div';
@@ -158,11 +173,19 @@ final class JitDomImportNode
                 $fromXml = true;
             }
         }
+        // Source node may already carry tag/inner from documentElement annotate.
+        if (null !== $sourceNode->compileTimeDomTagName && '' !== $sourceNode->compileTimeDomTagName) {
+            $tag = $sourceNode->compileTimeDomTagName;
+            $inner = $sourceNode->compileTimeDomInnerXml ?? $inner;
+            $fromXml = true;
+        }
         if (!$fromXml && null !== $html) {
             $tag = $html['tag'] ?? $tag;
             $text = $html['text'] ?? '';
             $id = $html['id'] ?? $id;
         }
+
+        self::$pendingCompileTime = ['tag' => $tag, 'inner' => $inner];
 
         $element = JitDomCreateElement::materializeForUserScriptDocument(
             $context,
