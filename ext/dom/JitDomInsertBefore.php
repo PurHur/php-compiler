@@ -46,6 +46,8 @@ final class JitDomInsertBefore
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             self::syncUserScriptInsertBeforeSlots($context, $args[0], $args[1], $args[2]);
+            // LiveSlots refresh held pins (#32801); saveXML still reads INNER_XML (#32940 / peer #32903).
+            self::syncUserScriptInnerXml($context, $args[0], $args[1], $args[2]);
             DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $args[1]);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_insert_before_post');
 
@@ -114,6 +116,71 @@ final class JitDomInsertBefore
             $newChild
         );
         JitDomInsertBeforeLiveSlots::sync($context, $parent, $newChild, $refChild);
+    }
+
+    /**
+     * Splice createElement markup into parent PROP_USER_SCRIPT_INNER_XML (#32940).
+     *
+     * Peer {@see JitDomReplaceChild::syncUserScriptInnerXml}: item($N) ARG_SEND
+     * temps often drop compileTimeDomChildIndex — use lastFetched* fallbacks.
+     * Only called from {@see invoke} (not ChildNode::before, which owns its own
+     * InnerXml path via DomNodeChildNodeMutationRuntime).
+     */
+    private static function syncUserScriptInnerXml(
+        Context $context,
+        JITVariable $parentVar,
+        JITVariable $newChildVar,
+        JITVariable $refChildVar
+    ): void {
+        $newTag = $newChildVar->compileTimeDomTagName ?? null;
+        if (null === $newTag || '' === $newTag) {
+            return;
+        }
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === trim($xml)) {
+            return;
+        }
+        $newInner = $newChildVar->compileTimeDomInnerXml ?? '';
+        $markup = '' === $newInner
+            ? '<'.$newTag.'/>'
+            : '<'.$newTag.'>'.$newInner.'</'.$newTag.'>';
+        $parentInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        $index = $refChildVar->compileTimeDomChildIndex
+            ?? JitDomNodeListItem::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$lastFetchedChildIndex
+            ?? null;
+        if (null === $index) {
+            $refTag = $refChildVar->compileTimeDomTagName
+                ?? JitDomNodeListItem::$lastFetchedTagName
+                ?? JitDomNodeChildProperty::$lastFetchedTagName
+                ?? null;
+            if (null !== $refTag) {
+                foreach ($nodes as $i => $node) {
+                    if ('element' === $node['kind'] && strtolower($refTag) === $node['data']) {
+                        $index = $i;
+                        break;
+                    }
+                }
+            }
+        }
+        if (null === $index) {
+            return;
+        }
+        $inner = DomParseSimpleXmlJitHelper::innerXmlInsertMarkupAt(
+            $parentInner,
+            $index,
+            $markup,
+            false
+        );
+        if (null === $inner) {
+            return;
+        }
+        $parent = self::loadObjectArg($context, $parentVar);
+        JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value
