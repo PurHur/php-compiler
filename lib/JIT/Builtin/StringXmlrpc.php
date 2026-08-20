@@ -14,8 +14,9 @@ use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_xmlrpc_* via Xmlrpc*JitHelper PHP (#19048).
+ * JIT/AOT link for __compiler_xmlrpc_* via Xmlrpc*JitHelper PHP (#19048, #32902).
  *
+ * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * php-src: ext/xmlrpc/xmlrpc.c — PHP_FUNCTION(xmlrpc_encode), xmlrpc_decode
  */
 final class StringXmlrpc

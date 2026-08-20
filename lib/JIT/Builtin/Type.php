@@ -937,23 +937,13 @@ class Type extends Builtin {
         // (JitVmHelperLink::ensureBridge / Runtime implement); Type::initialize still
         // ensureLinked. Leftover Type empty decls vs Runtime ABI drift mint
         // json_encode.1 (#31894 / #32122).
-        $fntypeXmlrpcEncodeValue = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $valuePtr
-        );
-        $fnXmlrpcEncodeValue = $this->context->module->addFunction(
-            '__compiler_xmlrpc_encode_value',
-            $fntypeXmlrpcEncodeValue
-        );
-        $this->context->registerFunction('__compiler_xmlrpc_encode_value', $fnXmlrpcEncodeValue);
-        // __compiler_xmlrpc_encode_array always-on shell removed (#32250): leftover;
-        // StringXmlrpc ABI is __compiler_xmlrpc_encode_value + __compiler_xmlrpc_decode.
-        $fnXmlrpcDecode = $this->context->module->addFunction(
-            '__compiler_xmlrpc_decode',
-            $this->context->context->functionType($void, false, $strPtr, $valuePtr)
-        );
-        $this->context->registerFunction('__compiler_xmlrpc_decode', $fnXmlrpcDecode);
+        // __compiler_xmlrpc_encode_value / __compiler_xmlrpc_decode always-on shells
+        // removed (#32902): __compiler_xmlrpc_encode_array already dropped (#32250).
+        // User-script xmlrpc_encode()/xmlrpc_decode() stay StringXmlrpc /
+        // ext/xmlrpc/JitXmlrpc. NestedJIT/AOT bridges getNamedFunction first
+        // (JitVmHelperLink::ensureBridge / decode emit addFunction if absent);
+        // Type::initialize still ensureLinked. Leftover Type empty decls vs Runtime
+        // ABI drift mint xmlrpc_encode.1 (#31894 / #32122).
         $fntypeSerializeHashtable = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -1113,6 +1103,7 @@ class Type extends Builtin {
         StringHashAlgos::ensureLinked($this->context);
         StringJsonEncode::ensureLinked($this->context);
         StringJsonDecode::ensureLinked($this->context);
+        StringXmlrpc::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
