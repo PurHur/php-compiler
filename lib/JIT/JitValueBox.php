@@ -805,14 +805,27 @@ final class JitValueBox
                 ? $var->value
                 : $context->builder->load($var->value);
         }
+        // Typed native instance props are KIND_VALUE whose LLVM value is a pointer to the
+        // scalar (int64*/double*/int1*), not the bits (#24008). Helper::loadValue loads that
+        // pointer; boxing must too or writeLong gets int64* and module verify fails (#33018).
+        $nativeTy = $context->getStringFromType($native->typeOf());
         switch ($var->type) {
             case Variable::TYPE_NATIVE_LONG:
+                if ('int64*' === $nativeTy || 'long long*' === $nativeTy) {
+                    $native = $context->builder->load($native);
+                }
                 self::writeLong($context, $slot, $native);
                 break;
             case Variable::TYPE_NATIVE_BOOL:
+                if ('int1*' === $nativeTy || 'i1*' === $nativeTy) {
+                    $native = $context->builder->load($native);
+                }
                 self::writeBool($context, $slot, $native);
                 break;
             case Variable::TYPE_NATIVE_DOUBLE:
+                if ('double*' === $nativeTy) {
+                    $native = $context->builder->load($native);
+                }
                 $context->builder->call(
                     $context->lookupFunction('__value__writeDouble'),
                     self::pointer($context, $slot),
