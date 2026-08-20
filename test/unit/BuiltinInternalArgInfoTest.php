@@ -1755,6 +1755,19 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src image.stub.php / exif.stub.php — InternalArgInfo omits |false; &$image_info untyped (#27886). */
+    public function testGetimagesizeExifImagetypeReflectionUnions(): void
+    {
+        foreach (['getimagesize', 'getimagesizefromstring'] as $f) {
+            $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+            $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride($f, 1), $f);
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($f, 1);
+            $this->assertNotNull($info, $f);
+            $this->assertSame('', $info['type'], $f);
+        }
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('exif_imagetype'));
+    }
+
     /** php-src file.stub.php — InternalArgInfo omits |false for filestat/glob (#26185). */
     public function testFilestatGlobReflectionReturnUnions(): void
     {
