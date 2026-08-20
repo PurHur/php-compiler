@@ -7,10 +7,12 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\HashTableNestedExportLlvm;
+use PHPCompiler\JIT\JsonEncodeArrayLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\Variable as JitVariable;
@@ -115,18 +117,42 @@ final class StringJsonEncode
         $i64 = $context->getTypeFromString('int64');
         JsonEncodeQuoteStringRuntime::ensureLinked($context);
         self::implementJsonEncodeValueBridge($context);
-        JitVmHelperLink::ensureBridge(
-            $context,
-            '__compiler_json_encode_array',
-            self::HT_BRIDGE_ENTRY,
-            [$htPtr, $i64],
-            $strPtr,
-            self::ENCODE_HT_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#20816'
-        );
+        self::implementJsonEncodeArrayBridge($context);
         self::registerLinkedRuntime($context);
+    }
+
+    /**
+     * Associative/packed array encoding via export pairs — bypasses NestedJIT dim-fetch (#26367).
+     */
+    private static function implementJsonEncodeArrayBridge(Context $context): void
+    {
+        $abiName = '__compiler_json_encode_array';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::HT_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        JsonEncodeQuoteStringRuntime::ensureLinked($context);
+        self::implementJsonEncodeValueBridge($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $htPtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::HT_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue(
+                JsonEncodeArrayLlvm::encode($context, $fn->getParam(0), $fn->getParam(1))
+            );
+        });
+        $context->registerFunction($abiName, $fn);
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     /**
@@ -172,6 +198,16 @@ final class StringJsonEncode
             $context->builder->structGep($valPtr, $valueMap['type'])
         );
         $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        // JIT TYPE_NATIVE_BOOL (=2) collides with VM TYPE_FLOAT — disambiguate before float (#26367).
+        $isJitBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(JitVariable::TYPE_NATIVE_BOOL, false)
+        );
+        $afterJitBoolBb = $fn->appendBasicBlock('json_enc_val_after_jit_bool');
+        $context->builder->branchIf($isJitBool, $boolCheckBb, $afterJitBoolBb);
+
+        $context->builder->positionAtEnd($afterJitBoolBb);
         $isVmFloat = $context->builder->icmp(
             Builder::INT_EQ,
             $typeKind,
@@ -196,24 +232,21 @@ final class StringJsonEncode
         $context->builder->branchIf($isString, $stringBb, $notStringBb);
 
         $context->builder->positionAtEnd($notStringBb);
-        // JIT TYPE_NATIVE_BOOL=2 collides with VM TYPE_FLOAT; __value__writeBool uses JIT tags (#26367).
-        $isJitBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeKind,
-            $i8->constInt(JitVariable::TYPE_NATIVE_BOOL, false)
-        );
         $isVmBool = $context->builder->icmp(
             Builder::INT_EQ,
             $typeKind,
             $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
         );
-        $isBool = $context->builder->or($isJitBool, $isVmBool);
-        $context->builder->branchIf($isBool, $boolCheckBb, $helperBb);
+        $context->builder->branchIf($isVmBool, $boolCheckBb, $helperBb);
 
         $context->builder->positionAtEnd($boolCheckBb);
-        $boolLong = $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr);
-        $zero = $i64->constInt(0, false);
-        $isTrue = $context->builder->icmp(Builder::INT_NE, $boolLong, $zero);
+        // __value__readLong has no TYPE_NATIVE_BOOL arm — returns 0 (#21892 / JitValueBox).
+        $boolByte = JitValueBox::readBoolByte($context, $valPtr);
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolByte,
+            $i8->constInt(0, false)
+        );
         $context->builder->branchIf($isTrue, $boolTrueBb, $boolFalseBb);
 
         $context->builder->positionAtEnd($boolTrueBb);

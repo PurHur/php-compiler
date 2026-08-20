@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\JsonEncodeQuoteStringRuntime;
 use PHPCompiler\JIT\Builtin\StringJsonEncode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -117,8 +118,9 @@ final class JitJsonEncode
 
     /**
      * Route boxed hashtables / objects — NestedJIT encodeValue quotes class names (#27020 / #28638).
+     * Also used from {@see JsonEncodeArrayLlvm} pair values (#26367).
      */
-    private static function encodeBoxedValue(Context $context, Value $valuePtr, Value $flags): Value
+    public static function encodeBoxedValue(Context $context, Value $valuePtr, Value $flags): Value
     {
         $valuePtr = JitValueBox::normalizeValuePtr($context, $valuePtr);
         $map = $context->structFieldMap['__value__'];
@@ -127,11 +129,17 @@ final class JitJsonEncode
         );
         $i8 = $context->getTypeFromString('int8');
         $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $isHt = $context->builder->icmp(
+        $isJitHt = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
             $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false)
         );
+        $isVmArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_ARRAY, false)
+        );
+        $isHt = $context->builder->or($isJitHt, $isVmArray);
         $isObj = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
@@ -162,10 +170,13 @@ final class JitJsonEncode
         $context->builder->branchIf($isHt, $htBlock, $objCheck);
 
         $context->builder->positionAtEnd($htBlock);
-        $ht = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
+        $boxedArray = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
             $valuePtr
         );
+        $ht = HashTableReadLlvm::loadHashtablePointer($context, $boxedArray);
         // Skip unconditional overlay — see encode() (#31101).
         $htResult = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
@@ -182,15 +193,11 @@ final class JitJsonEncode
         $context->builder->branchIf($isBool, $boolCheck, $valueBlock);
 
         $context->builder->positionAtEnd($boolCheck);
-        $i64 = $context->getTypeFromString('int64');
-        $boolLong = $context->builder->call(
-            $context->lookupFunction('__value__readLong'),
-            $valuePtr
-        );
+        $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
         $isTrue = $context->builder->icmp(
             Builder::INT_NE,
-            $boolLong,
-            $i64->constInt(0, false)
+            $boolByte,
+            $i8->constInt(0, false)
         );
         $context->builder->branchIf($isTrue, $boolTrueBlock, $boolFalseBlock);
 

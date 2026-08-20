@@ -1960,12 +1960,19 @@ class HashTable extends Type
         $typeByte = $this->context->builder->load($this->context->builder->structGep($value, $map['type']));
         // Mask IS_REFCOUNTED — writers may store TYPE_HASHTABLE (135) or kind 7 (#26977 /
         // JitValueBox copyFromPointer). Unmasked EQ missed kind 7 → null HT → NestedJIT abort.
+        // VM TYPE_ARRAY (6) shares the same ht pointer slot (peer ObjectStaticPropertyLlvm / #26367).
         $kind = $this->context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $isHt = $this->context->builder->icmp(
+        $isJitHt = $this->context->builder->icmp(
             Builder::INT_EQ,
             $kind,
             $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
         );
+        $isVmArray = $this->context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ARRAY, false)
+        );
+        $isHt = $this->context->builder->or($isJitHt, $isVmArray);
         $ok = $fn->appendBasicBlock('read_ht_ok');
         $empty = $fn->appendBasicBlock('read_ht_empty');
         $merge = $fn->appendBasicBlock('read_ht_merge');

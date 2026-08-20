@@ -120,15 +120,10 @@ final class HashTableExportKeyValuePairs implements Call
         $context->builder->branchIf($isNull, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        // Pass `__string__*` via separate — i8*/__string__init round-trip breaks NestedJIT
-        // string keys so exportKeyValuePairs yields empty and json_encode prints {} (#26977 /
-        // peer MathBaseConvertRuntime #26884).
+        // Match foreach key lowering — __string__separate on strKeys call-site literals
+        // yields "" keys under json_encode while FE_RESET reads the node key directly (#26367).
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
-        $keyOwned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $keyStr
-        );
-        $keyVar = self::stringPtrValueBox($context, $keyOwned);
+        $keyVar = self::stringPtrValueBox($context, $keyStr);
         $valField = $context->builder->structGep($node, $nodeMap['value']);
         $valVar = self::valueBoxFromEntry($context, $valField);
         self::appendPair($context, $result, $outIdxSlot, $keyVar, $valVar);
@@ -170,6 +165,7 @@ final class HashTableExportKeyValuePairs implements Call
         $srcPtr = JitValueBox::valuePtrFromVariable($context, $valVar);
         $slot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer($context, $slot, $srcPtr);
+        self::remapJitBoolTagForNestedJson($context, $slot);
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }
@@ -178,8 +174,35 @@ final class HashTableExportKeyValuePairs implements Call
     {
         $slot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer($context, $slot, $entryPtr);
+        self::remapJitBoolTagForNestedJson($context, $slot);
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    /** JIT TYPE_NATIVE_BOOL (=2) must look like VM TYPE_BOOLEAN (=3) to NestedJIT json_encode (#26367). */
+    private static function remapJitBoolTagForNestedJson(Context $context, Value $slot): void
+    {
+        $ptr = JitValueBox::pointer($context, $slot);
+        $map = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $typeField = $context->builder->structGep($ptr, $map['type']);
+        $typeByte = $context->builder->load($typeField);
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isJitBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $done = BasicBlockHelper::append($context, 'ht_export_remap_bool_done');
+        $rewrite = BasicBlockHelper::append($context, 'ht_export_remap_bool_do');
+        $context->builder->branchIf($isJitBool, $rewrite, $done);
+        $context->builder->positionAtEnd($rewrite);
+        $context->builder->store(
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_BOOLEAN, false),
+            $typeField
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
     }
 
     private static function longValueBox(Context $context, Value $long): Variable
