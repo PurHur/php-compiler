@@ -20,11 +20,14 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for json_decode runtime helpers via JsonDecodeJitHelper PHP (#9359, #13228, #20829, #24137).
+ * JIT/AOT link for json_decode runtime helpers via JsonDecodeJitHelper PHP (#9359, #13228, #20829, #24137, #32897).
  *
  * Embed + thin standalone AOT: single {@see __compiler_json_decode} bridge with tag dispatch
  * (Unserialize #20785 / Explode #14750 shape — no thin null stubs).
  * Validate/last_error live in {@see JsonValidateJitHelper} (separate NestedJIT TU).
+ * Module-local ABI owner (getNamedFunction first + {@see JitVmHelperLink::ensureBridge}):
+ * Builtin\Type no longer always-declares empty shells (#32897 / peer #32893) — leftover
+ * Type decls mint json_decode.1 (#31894 / #32122).
  * php-src: ext/json/php_json.c — php_json_decode_ex / php_json_validate
  */
 final class StringJsonDecode
@@ -268,6 +271,8 @@ final class StringJsonDecode
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
+        // Register before body emit — Type empty shells used to pre-register (#32897).
+        $context->registerFunction($abiName, $fn);
 
         self::ensureJitHelperCompiled($context);
 
@@ -466,7 +471,6 @@ final class StringJsonDecode
         $phi->addIncoming($castHt, $bbArrayOk);
 
         $context->builder->returnValue($context->builder->pointerCast($phi, $valuePtr));
-        $context->registerFunction($abiName, $fn);
     }
 
     /**

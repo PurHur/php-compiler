@@ -12,10 +12,12 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM json_encode string quoting — bypasses NestedJIT __string__* mis-read (#26367).
+ * LLVM json_encode string quoting — bypasses NestedJIT __string__* mis-read (#26367, #32897).
  *
  * Peer {@see SprintfSnprintfRuntime} / {@see StringStrcoll}: thin AOT keeps string
  * work on {@see __string__*} / i8* ABIs, not NestedJIT PHP string params.
+ * Module-local ABI owner for {@see self::ABI} (getNamedFunction first): Builtin\Type no
+ * longer always-declares an empty shell (#32897 / peer #32893).
  * php-src: ext/json/php_json.c — json_escape_string
  */
 final class JsonEncodeQuoteStringRuntime
@@ -55,6 +57,8 @@ final class JsonEncodeQuoteStringRuntime
         $strPtr = $context->getTypeFromString('__string__*');
         $ft = $context->context->functionType($strPtr, false, $strPtr);
         $fn = null !== $probe ? $probe : $context->module->addFunction(self::ABI, $ft);
+        // Register before body emit — Type empty shells used to pre-register (#32897).
+        $context->registerFunction(self::ABI, $fn);
         $entry = $fn->appendBasicBlock(self::ENTRY);
         $context->builder->positionAtEnd($entry);
 
