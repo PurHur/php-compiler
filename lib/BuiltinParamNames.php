@@ -2537,6 +2537,9 @@ final class BuiltinParamNames
             // php-src ext/standard/info.stub.php — InternalArgInfo still says what (#24550)
             case 'phpinfo':
                 return ['flags'];
+            // php-src ext/standard/info.stub.php — InternalArgInfo still says flag (#24508)
+            case 'phpcredits':
+                return ['flags='];
         }
 
         return null;
