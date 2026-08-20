@@ -9,8 +9,9 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_vfscanf via fgets + __compiler_sscanf (#12541, #25718, #27663).
+ * JIT/AOT link for __compiler_vfscanf via fgets + __compiler_sscanf (#12541, #25718, #27663, #32935).
  *
+ * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Prefer {@see \PHPCompiler\ext\standard\JitVfscanf} emitting fgets+sscanf in the **user**
  * function — NestedJIT parseAssignMeta aborts when entered from this ABI with outCount>0
  * (#27663). This ABI remains for inventory/ensureLinked callers.
