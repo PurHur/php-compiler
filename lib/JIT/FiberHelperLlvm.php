@@ -150,98 +150,109 @@ final class FiberHelperLlvm
         );
         $stateParam = $func->getParam(0);
         $savedBuilder = $context->builder;
+        $savedLowering = $context->loweringLlvmFunction;
+        $savedActive = $context->activeFunction;
         $context->builder = $context->context->builderCreate();
+        // parentFunction() prefers loweringLlvmFunction over the insert block (#31101).
+        // Without this, value_copy_* / ret i64 from emitSuspendPoint spill into the
+        // in-flight app fn (void @internal_N) → Module.php:180 (#32856).
+        $context->loweringLlvmFunction = $func instanceof \PHPLLVM\Value\Function_ ? $func : null;
+        $context->activeFunction = $lc;
         $context->compilingFiberResume = true;
         $context->fiberStateParam = $stateParam;
 
-        $entry = $func->appendBasicBlock('fiber_entry');
-        $context->builder->positionAtEnd($entry);
-        $points = self::collectSuspendPoints($block);
-        $n = count($points);
-        $map = $context->structFieldMap['__fiber_state__'];
-        $sizeT = $context->getTypeFromString('size_t');
-        $i1 = $context->getTypeFromString('int1');
-        $zero = $sizeT->constInt(0, false);
+        try {
+            $entry = $func->appendBasicBlock('fiber_entry');
+            $context->builder->positionAtEnd($entry);
+            $points = self::collectSuspendPoints($block);
+            $n = count($points);
+            $map = $context->structFieldMap['__fiber_state__'];
+            $sizeT = $context->getTypeFromString('size_t');
+            $i1 = $context->getTypeFromString('int1');
+            $zero = $sizeT->constInt(0, false);
 
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['done']));
-        $resumeIp = $context->builder->load($context->builder->structGep($stateParam, $map['resume_ip']));
-        $doneBb = $func->appendBasicBlock('fiber_done');
-        $switchInst = $context->builder->branchSwitch($resumeIp, $doneBb, $n);
+            $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['done']));
+            $resumeIp = $context->builder->load($context->builder->structGep($stateParam, $map['resume_ip']));
+            $doneBb = $func->appendBasicBlock('fiber_done');
+            $switchInst = $context->builder->branchSwitch($resumeIp, $doneBb, $n);
 
-        $caseBlocks = [];
-        for ($i = 0; $i < $n; ++$i) {
-            $caseBb = $func->appendBasicBlock('fiber_case_'.$i);
-            $switchInst->addCase($sizeT->constInt($i, false), $caseBb);
-            $caseBlocks[$i] = $caseBb;
-        }
+            $caseBlocks = [];
+            for ($i = 0; $i < $n; ++$i) {
+                $caseBb = $func->appendBasicBlock('fiber_case_'.$i);
+                $switchInst->addCase($sizeT->constInt($i, false), $caseBb);
+                $caseBlocks[$i] = $caseBb;
+            }
 
-        for ($i = 0; $i < $n; ++$i) {
-            $prefixEntry = self::emitPendingThrowGate(
-                $jit,
-                $func,
-                $stateParam,
-                $caseBlocks[$i]
-            );
-            $suspendIdx = $points[$i]['index'];
-            $prefixStart = self::resumePrefixStart($block, $points, $i);
-            $resumeTail = $prefixEntry;
-            if ($prefixStart < $suspendIdx) {
+            for ($i = 0; $i < $n; ++$i) {
+                $prefixEntry = self::emitPendingThrowGate(
+                    $jit,
+                    $func,
+                    $stateParam,
+                    $caseBlocks[$i]
+                );
+                $suspendIdx = $points[$i]['index'];
+                $prefixStart = self::resumePrefixStart($block, $points, $i);
+                $resumeTail = $prefixEntry;
+                if ($prefixStart < $suspendIdx) {
+                    $savedStorage = $context->scope->blockStorage;
+                    $context->scope->blockStorage = new \SplObjectStorage();
+                    $resumeTail = $jit->compileGeneratorResumePrefix($func, $block, $prefixStart, $suspendIdx, $prefixEntry);
+                    $context->builder->positionAtEnd($resumeTail);
+                    $context->scope->blockStorage = $savedStorage;
+                }
+                $context->builder->positionAtEnd($resumeTail);
+                self::emitSuspendPoint($jit, $block, $points[$i]['op'], $stateParam, $i + 1);
+            }
+
+            $context->builder->positionAtEnd($doneBb);
+            // Fiber::throw()/resume after the last suspend lands here (resume_ip == n).
+            // Inject pending throw before running the post-suspend tail (#27622).
+            $doneEntry = self::emitPendingThrowGate($jit, $func, $stateParam, $doneBb);
+            // Include last suspend STATICCALL_INIT so resume_argument is bound to Fiber::suspend() (#26801).
+            $tailStart = [] === $points ? 0 : self::opcodeIndex($block, $points[count($points) - 1]['op']);
+            $returnIdx = null;
+            foreach ($block->opCodes as $i => $op) {
+                if ($i < $tailStart) {
+                    continue;
+                }
+                if (OpCode::TYPE_RETURN === $op->type || OpCode::TYPE_RETURN_VOID === $op->type) {
+                    $returnIdx = $i;
+                    break;
+                }
+            }
+            $context->builder->positionAtEnd($doneEntry);
+            if (null !== $returnIdx && $tailStart < $returnIdx) {
                 $savedStorage = $context->scope->blockStorage;
                 $context->scope->blockStorage = new \SplObjectStorage();
-                $resumeTail = $jit->compileGeneratorResumePrefix($func, $block, $prefixStart, $suspendIdx, $prefixEntry);
-                $context->builder->positionAtEnd($resumeTail);
+                $exit = $jit->compileGeneratorResumePrefix($func, $block, $tailStart, $returnIdx, $doneEntry);
+                $context->builder->positionAtEnd($exit);
                 $context->scope->blockStorage = $savedStorage;
+                $retOp = $block->opCodes[$returnIdx];
+                if (OpCode::TYPE_RETURN === $retOp->type && null !== $retOp->arg1) {
+                    $retVar = $context->getVariableFromOp($block->getOperand($retOp->arg1));
+                    self::assignValueField(
+                        $context,
+                        $context->builder->structGep($stateParam, $map['fiber_return']),
+                        $retVar,
+                        $block->getOperand($retOp->arg1)
+                    );
+                } else {
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeNull'),
+                        JitValueBox::pointer($context, $context->builder->structGep($stateParam, $map['fiber_return']))
+                    );
+                }
             }
-            $context->builder->positionAtEnd($resumeTail);
-            self::emitSuspendPoint($jit, $block, $points[$i]['op'], $stateParam, $i + 1);
+            $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['done']));
+            $context->builder->returnValue($i64->constInt(0, false));
+        } finally {
+            $context->builder->clearInsertionPosition();
+            $context->builder = $savedBuilder;
+            $context->loweringLlvmFunction = $savedLowering;
+            $context->activeFunction = $savedActive;
+            $context->compilingFiberResume = false;
+            $context->fiberStateParam = null;
         }
-
-        $context->builder->positionAtEnd($doneBb);
-        // Fiber::throw()/resume after the last suspend lands here (resume_ip == n).
-        // Inject pending throw before running the post-suspend tail (#27622).
-        $doneEntry = self::emitPendingThrowGate($jit, $func, $stateParam, $doneBb);
-        // Include last suspend STATICCALL_INIT so resume_argument is bound to Fiber::suspend() (#26801).
-        $tailStart = [] === $points ? 0 : self::opcodeIndex($block, $points[count($points) - 1]['op']);
-        $returnIdx = null;
-        foreach ($block->opCodes as $i => $op) {
-            if ($i < $tailStart) {
-                continue;
-            }
-            if (OpCode::TYPE_RETURN === $op->type || OpCode::TYPE_RETURN_VOID === $op->type) {
-                $returnIdx = $i;
-                break;
-            }
-        }
-        $context->builder->positionAtEnd($doneEntry);
-        if (null !== $returnIdx && $tailStart < $returnIdx) {
-            $savedStorage = $context->scope->blockStorage;
-            $context->scope->blockStorage = new \SplObjectStorage();
-            $exit = $jit->compileGeneratorResumePrefix($func, $block, $tailStart, $returnIdx, $doneEntry);
-            $context->builder->positionAtEnd($exit);
-            $context->scope->blockStorage = $savedStorage;
-            $retOp = $block->opCodes[$returnIdx];
-            if (OpCode::TYPE_RETURN === $retOp->type && null !== $retOp->arg1) {
-                $retVar = $context->getVariableFromOp($block->getOperand($retOp->arg1));
-                self::assignValueField(
-                    $context,
-                    $context->builder->structGep($stateParam, $map['fiber_return']),
-                    $retVar,
-                    $block->getOperand($retOp->arg1)
-                );
-            } else {
-                $context->builder->call(
-                    $context->lookupFunction('__value__writeNull'),
-                    JitValueBox::pointer($context, $context->builder->structGep($stateParam, $map['fiber_return']))
-                );
-            }
-        }
-        $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['done']));
-        $context->builder->returnValue($i64->constInt(0, false));
-
-        $context->builder->clearInsertionPosition();
-        $context->builder = $savedBuilder;
-        $context->compilingFiberResume = false;
-        $context->fiberStateParam = null;
 
         $context->functions[$lc] = $func;
         $context->functionReturnType[$lc] = 'int64';
@@ -264,13 +275,19 @@ final class FiberHelperLlvm
         $suspendIdx = self::opcodeIndex($block, $suspendInitOp);
         $suspendReturnField = $context->builder->structGep($stateParam, $map['suspend_return']);
         $resumeArgField = $context->builder->structGep($stateParam, $map['resume_argument']);
+        // Only FUNCCALL_EXEC_RETURN carries a result temp. NORETURN may stash a
+        // line/literal in arg1 — treating that as the resume bind destination
+        // corrupts IR and SIGSEGVs at start() (#32856).
         $resultOp = null;
         for ($i = $suspendIdx; $i < count($block->opCodes); ++$i) {
             $op = $block->opCodes[$i];
-            if (OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                 if (null !== $op->arg1) {
                     $resultOp = $block->getOperand($op->arg1);
                 }
+                break;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
                 break;
             }
         }
