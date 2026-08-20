@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * mime_content_type() NestedJIT helper (#9236, #25544, #33034).
+ * mime_content_type() semantics for compiled JIT/AOT modules (#9236, php-in-PHP).
  *
- * Thin-AOT NestedJIT: host @file_get_contents (peer FileGetContentsJitHelper #29510).
- * Detection via {@see VmMime::detectFromBytes} (pure string sniff; no VmFs).
+ * SSOT: {@see VmMime::mimeContentTypeFromPath()} / {@see VmMime::detectFromBytes()}
  * php-src: ext/standard/file.c — PHP_FUNCTION(mime_content_type)
  */
 final class MimeContentTypeJitHelper
@@ -18,11 +17,11 @@ final class MimeContentTypeJitHelper
      */
     public static function mimeContentType(string $path): ?string
     {
-        $data = @\file_get_contents($path);
-        if (false === $data) {
+        $result = VmMime::mimeContentTypeFromPath($path);
+        if (false === $result) {
             return null;
         }
 
-        return VmMime::detectFromBytes($data);
+        return $result;
     }
 }

@@ -7,26 +7,31 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\MimeContentTypeJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** mime_content_type JIT helper (#9236 / #25544 / #33034). */
+/**
+ * mime_content_type JIT routes through MimeContentTypeJitHelper (#9236 / #25544 / #33034).
+ */
 final class MimeContentTypeRuntimeShrinkTest extends TestCase
 {
-    public function testMimeContentTypeJitHelperUsesFileGetContentsAndVmMimeDetect(): void
+    public function testMimeContentTypeJitHelperDelegatesToVmMime(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/MimeContentTypeJitHelper.php');
-        $this->assertStringContainsString('@\\file_get_contents', $source);
-        $this->assertStringContainsString('VmMime::detectFromBytes', $source);
-        $this->assertStringNotContainsString('VmFs::', $source);
-        $this->assertStringNotContainsString('VmMime::mimeContentTypeFromPath', $source);
-        $this->assertStringNotContainsString('eqPhp', $source);
+        $this->assertStringContainsString('VmMime::mimeContentTypeFromPath', $source);
+        $this->assertStringNotContainsString('strncmp', $source);
     }
 
-    public function testMimeContentTypeRuntimeOwnsAbi(): void
+    public function testMimeContentTypeRuntimeOwnsAbiModuleLocally(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MimeContentTypeRuntime.php');
         $this->assertStringContainsString('MimeContentTypeJitHelper', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('getNamedFunction', $source);
-        $this->assertStringContainsString('addFunction', $source);
+        $this->assertStringContainsString('#33034', $source);
+        $type = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertStringContainsString('#33034', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]__compiler_mime_content_type[\'"]/',
+            $type
+        );
     }
 
     public function testMimeContentTypeJitHelperMatchesVmMimeSemantics(): void
