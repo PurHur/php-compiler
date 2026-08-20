@@ -187,7 +187,7 @@ final class JitDomAppendChildUserScript
         );
         $listJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $list);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($oldParent, 'DOMNode', VmDom::PROP_CHILD_NODES),
+            $objectType->propertySlotFor($oldParent, 'DOMElement', VmDom::PROP_CHILD_NODES),
             $listJit,
             JITVariable::TYPE_VALUE
         );

@@ -94,7 +94,7 @@ final class JitDomRemoveChild
         );
         $listJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $list);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($parent, 'DOMNode', VmDom::PROP_CHILD_NODES),
+            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_CHILD_NODES),
             $listJit,
             JITVariable::TYPE_VALUE
         );
