@@ -514,7 +514,12 @@ class JIT {
             || null !== $this->ternaryPhiAssignSourceOperand($elseBlock, $ifMerge);
     }
 
-    /** Both ?: arms jump to a merge block whose first ECHO uses the phi alias temp (#3790, #18052). */
+    /**
+     * Both ?: arms jump to a merge that consumes the phi alias via ECHO or CONCAT (#3790, #18052, #32908).
+     *
+     * `($o ? $o->nodeName : 'null') . '!'` remaps the merge use to the fetch alias while ECHO sees
+     * only the CONCAT result — {@see mergeTernaryResultSlot} must win over {@see mergeEchoSlot}.
+     */
     private function jumpIfTargetsEchoMerge(?Block $ifBlock, ?Block $elseBlock, ?Block $jumpIfBlock = null, int $jumpIfIndex = -1): bool
     {
         $ifMerge = $this->branchJumpMergeBlock($ifBlock);
@@ -522,7 +527,7 @@ class JIT {
         if (null === $ifMerge || $ifMerge !== $elseMerge) {
             return false;
         }
-        if (null === $this->mergeEchoSlot($ifMerge)) {
+        if (null === $this->mergeTernaryResultSlot($ifMerge, $ifBlock, $elseBlock)) {
             return false;
         }
         if (null !== $this->ternaryReturnPhiOperand($ifMerge)) {
@@ -646,11 +651,11 @@ class JIT {
         return $this->ternaryEchoMergeFollowsSlotPollutingOp($jumpIfBlock, $jumpIfIndex);
     }
 
-    /** @return bool true when every ?: arm assigns a literal into the merge ECHO slot */
+    /** @return bool true when every ?: arm assigns a literal into the merge ternary-result slot */
     private function ternaryEchoMergeHasLiteralArmsOnly(Block $mergeBlock, ?Block $ifBlock, ?Block $elseBlock): bool
     {
-        $echoSlot = $this->mergeEchoSlot($mergeBlock);
-        if (null === $echoSlot) {
+        $resultSlot = $this->mergeTernaryResultSlot($mergeBlock, $ifBlock, $elseBlock);
+        if (null === $resultSlot) {
             return false;
         }
         $literalArmCount = 0;
@@ -659,7 +664,7 @@ class JIT {
                 continue;
             }
             foreach ($branch->opCodes as $branchOp) {
-                if (OpCode::TYPE_ASSIGN !== $branchOp->type || (int) $branchOp->arg2 !== $echoSlot) {
+                if (OpCode::TYPE_ASSIGN !== $branchOp->type || (int) $branchOp->arg2 !== $resultSlot) {
                     continue;
                 }
                 $rhsSlot = null !== $branchOp->arg3 ? (int) $branchOp->arg3 : (int) $branchOp->arg2;
@@ -700,8 +705,8 @@ class JIT {
     /** Literal ?: echo arms keep operand redirect; non-literal arms need stack-slot phi (#18052). */
     private function ternaryEchoMergeNeedsStackPhi(Block $mergeBlock, ?Block $ifBlock, ?Block $elseBlock): bool
     {
-        $echoSlot = $this->mergeEchoSlot($mergeBlock);
-        if (null === $echoSlot) {
+        $resultSlot = $this->mergeTernaryResultSlot($mergeBlock, $ifBlock, $elseBlock);
+        if (null === $resultSlot) {
             return false;
         }
         foreach ([$ifBlock, $elseBlock] as $branch) {
@@ -709,7 +714,7 @@ class JIT {
                 continue;
             }
             foreach ($branch->opCodes as $branchOp) {
-                if (OpCode::TYPE_ASSIGN !== $branchOp->type || (int) $branchOp->arg2 !== $echoSlot) {
+                if (OpCode::TYPE_ASSIGN !== $branchOp->type || (int) $branchOp->arg2 !== $resultSlot) {
                     continue;
                 }
                 $rhsSlot = null !== $branchOp->arg3 ? (int) $branchOp->arg3 : (int) $branchOp->arg2;
@@ -723,15 +728,16 @@ class JIT {
         return false;
     }
 
-    /** Literal assigned into the merge ECHO slot on a ?: arm (#18784). */
+    /** Literal assigned into the merge ternary-result slot on a ?: arm (#18784). */
     private function ternaryEchoBranchLiteralString(?Block $branch, Block $mergeBlock): ?string
     {
-        $echoSlot = $this->mergeEchoSlot($mergeBlock);
-        if (null === $echoSlot || null === $branch) {
+        // Single-arm probe: pass the branch as both sides so ASSIGN.arg2 matching still works.
+        $resultSlot = $this->mergeTernaryResultSlot($mergeBlock, $branch, $branch);
+        if (null === $resultSlot || null === $branch) {
             return null;
         }
         foreach ($branch->opCodes as $branchOp) {
-            if (OpCode::TYPE_ASSIGN !== $branchOp->type || (int) $branchOp->arg2 !== $echoSlot) {
+            if (OpCode::TYPE_ASSIGN !== $branchOp->type || (int) $branchOp->arg2 !== $resultSlot) {
                 continue;
             }
             $rhsSlot = null !== $branchOp->arg3 ? (int) $branchOp->arg3 : (int) $branchOp->arg2;
@@ -794,10 +800,87 @@ class JIT {
         return null;
     }
 
+    /**
+     * Merge-block slot the ?: arms assign into — ECHO arg, or CONCAT operand before ECHO (#32908).
+     *
+     * For `echo ($o ? $o->prop : 'x') . '!'` php-cfg emits CONCAT(alias, lit) then ECHO(concat).
+     * {@see mergeEchoSlot} alone returns the concat result, so arm ASSIGN.arg2 never matches and
+     * stack-phi is skipped — AOT then concat-coerces a dead fetch temp to an empty string.
+     *
+     * Chained `tern1 . '|' . tern2` emits CONCAT(prior, tern2): both sides are non-literal; prefer
+     * the side the arms actually ASSIGN into (usually the right).
+     */
+    private function mergeTernaryResultSlot(
+        Block $mergeBlock,
+        ?Block $ifBlock = null,
+        ?Block $elseBlock = null
+    ): ?int {
+        foreach ($mergeBlock->opCodes as $mergeOp) {
+            if (OpCode::TYPE_CONCAT === $mergeOp->type && null !== $mergeOp->arg2 && null !== $mergeOp->arg3) {
+                $leftSlot = (int) $mergeOp->arg2;
+                $rightSlot = (int) $mergeOp->arg3;
+                $leftLit = $mergeBlock->getOperand($leftSlot) instanceof Operand\Literal;
+                $rightLit = $mergeBlock->getOperand($rightSlot) instanceof Operand\Literal;
+                if ($leftLit && !$rightLit) {
+                    return $rightSlot;
+                }
+                if ($rightLit && !$leftLit) {
+                    return $leftSlot;
+                }
+                foreach ([$rightSlot, $leftSlot] as $cand) {
+                    if ($this->ternaryArmsAssignIntoSlot($ifBlock, $elseBlock, $cand)) {
+                        return $cand;
+                    }
+                }
+
+                return $leftSlot;
+            }
+            if (OpCode::TYPE_ECHO === $mergeOp->type && null !== $mergeOp->arg1) {
+                return (int) $mergeOp->arg1;
+            }
+        }
+
+        return null;
+    }
+
+    /** True when a ?: arm ASSIGN.arg2 targets $slot (php-cfg phi alias). */
+    private function ternaryArmsAssignIntoSlot(?Block $ifBlock, ?Block $elseBlock, int $slot): bool
+    {
+        foreach ([$ifBlock, $elseBlock] as $branch) {
+            if (null === $branch) {
+                continue;
+            }
+            foreach ($branch->opCodes as $branchOp) {
+                if (OpCode::TYPE_ASSIGN === $branchOp->type && (int) $branchOp->arg2 === $slot) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * CONCAT operands that are ?: phi aliases must read the stack-phi dest (#32908 / #18052).
+     */
+    private function resolveTernaryPhiConcatOperand(Block $block, int $slot): Operand
+    {
+        if (isset($this->context->coalesceMergeSlotOperands[$slot])) {
+            return $this->context->coalesceMergeSlotOperands[$slot];
+        }
+        if (isset($this->context->ternaryEchoPhiByAliasSlot[$slot])) {
+            return $this->context->ternaryEchoPhiByAliasSlot[$slot];
+        }
+        $op = $block->getOperand($slot);
+        assert(null !== $op);
+
+        return $op;
+    }
+
     private function ternaryEchoPhiOperand(Block $mergeBlock, ?Block $ifBlock, ?Block $elseBlock): ?Operand
     {
-        $echoSlot = $this->mergeEchoSlot($mergeBlock);
-        if (null === $echoSlot) {
+        $resultSlot = $this->mergeTernaryResultSlot($mergeBlock, $ifBlock, $elseBlock);
+        if (null === $resultSlot) {
             return null;
         }
         foreach ([$ifBlock, $elseBlock] as $branch) {
@@ -808,7 +891,7 @@ class JIT {
                 if (OpCode::TYPE_ASSIGN !== $branchOp->type) {
                     continue;
                 }
-                if ((int) $branchOp->arg2 !== $echoSlot) {
+                if ((int) $branchOp->arg2 !== $resultSlot) {
                     continue;
                 }
 
@@ -9665,8 +9748,8 @@ class JIT {
                     // prologue may already have allocated the scope slot, but in-place CONCAT into
                     // a slot that aliases the left operand corrupts the local (#23798).
                     if ($destIsDeadOperand) {
-                        $leftOp = $block->getOperand($op->arg2);
-                        $rightOp = $block->getOperand($op->arg3);
+                        $leftOp = $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg2);
+                        $rightOp = $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg3);
                         $left = $this->context->getVariableFromOp($leftOp);
                         $right = $this->context->getVariableFromOp($rightOp);
                         if (JIT\StringOffsetHelper::isWritableCharOffsetLvalue($left, $this->context)) {
@@ -9758,8 +9841,8 @@ class JIT {
                     // (c04_concat: f($s.'1',$s.'2') → " \n" under AOT, #23779).
                     if (!$this->context->hasVariableOp($destOp)) {
                         if (!$this->context->aliasVariableOpFromSlot($block, $destOp)) {
-                            $leftOp = $block->getOperand($op->arg2);
-                            $rightOp = $block->getOperand($op->arg3);
+                            $leftOp = $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg2);
+                            $rightOp = $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg3);
                             $left = $this->context->getVariableFromOp($leftOp);
                             $right = $this->context->getVariableFromOp($rightOp);
                             if (JIT\StringOffsetHelper::isWritableCharOffsetLvalue($left, $this->context)) {
@@ -9782,7 +9865,7 @@ class JIT {
                         }
                     }
                     $result = $this->context->getVariableFromOp($destOp);
-                    $leftProbeOp = $block->getOperand($op->arg2);
+                    $leftProbeOp = $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg2);
                     if (
                         JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
                         || (
@@ -9810,14 +9893,18 @@ class JIT {
                             $result = $leftLive;
                             $this->context->setVariableOp($destOp, $result);
                         }
-                        $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                        $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                        $left = $this->context->getVariableFromOp(
+                            $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg2)
+                        );
+                        $right = $this->context->getVariableFromOp(
+                            $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg3)
+                        );
                         JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $left);
                         $newVal = $this->compileConcatIntoNewString(
                             $left,
                             $right,
-                            $block->getOperand($op->arg2),
-                            $block->getOperand($op->arg3)
+                            $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg2),
+                            $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg3)
                         );
                         $this->assignOperand($destOp, $newVal, true);
                         $this->maybeRefreshIncludeBindingsBeforeUse();
@@ -9863,8 +9950,12 @@ class JIT {
                         }
                         $result = $promoted;
                     }
-                    $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                    $left = $this->context->getVariableFromOp(
+                        $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg2)
+                    );
+                    $right = $this->context->getVariableFromOp(
+                        $this->resolveTernaryPhiConcatOperand($block, (int) $op->arg3)
+                    );
                     // FETCH_DIM_W orphan — ZEND_ASSIGN_DIM_OP for .= (#32798 / leftover #32789).
                     JIT\HashTableHelper::hydrateDimWriteLvalue($this->context, $left);
                     if (null !== $result->objectPropertySlot) {
@@ -11328,9 +11419,11 @@ class JIT {
                             if (!$needsLiteralRedirect) {
                                 $this->ensureCoalesceMergeStackSlot($ternaryMergeEcho);
                             }
-                            $echoSlot = $this->mergeEchoSlot($mergeBlock);
-                            if (null !== $echoSlot && $needsStackPhi) {
-                                $this->context->coalesceMergeSlotOperands[$echoSlot] = $ternaryMergeEcho;
+                            // Map the slot the merge *consumes* (ECHO arg or CONCAT operand), not
+                            // only a trailing ECHO of a concat result (#32908).
+                            $resultSlot = $this->mergeTernaryResultSlot($mergeBlock, $op->block1, $op->block2);
+                            if (null !== $resultSlot && $needsStackPhi) {
+                                $this->context->coalesceMergeSlotOperands[$resultSlot] = $ternaryMergeEcho;
                             }
                         }
                     } elseif ($isMatchEchoMerge) {
