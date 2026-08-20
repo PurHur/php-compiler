@@ -208,6 +208,9 @@ final class HelperRuntimeCache
         // encode/decode into user module (peer #26868).
         'phpcompiler\\ext\\standard\\quotprintjithelper::encode' => true,
         'phpcompiler\\ext\\standard\\quotprintjithelper::decode' => true,
+        // #32962 — prelinked DomC14NJitHelper unit.o returns Variable as __object__* under
+        // thin AOT (echo "Object"); NestedJIT ?string helper + string→value bridge.
+        'phpcompiler\\ext\\dom\\domc14njithelper::c14nargv' => true,
         // #32741 — prelinked StatPathJitHelper unit.o embeds VmOpenBasedir::check which reads
         // as always-active under thin AOT (is_file/file_exists/is_dir always false); NestedJIT
         // current source (stat kernel only, peer isReadable) into the user module.
