@@ -13755,7 +13755,8 @@ class JIT {
                             $receiver,
                             $declaringClass,
                             $name->value,
-                            $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1)
+                            $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1),
+                            $this->context->getVariableFromOp($obj)
                         );
                         JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
                         if ($forDimWrite) {
@@ -19431,6 +19432,9 @@ class JIT {
         }
         if ($force || null !== $src->compileTimeDomElementId) {
             $dest->compileTimeDomElementId = $src->compileTimeDomElementId;
+        }
+        if ($force || null !== $src->compileTimeDomLoadXml) {
+            $dest->compileTimeDomLoadXml = $src->compileTimeDomLoadXml;
         }
     }
 
@@ -26128,6 +26132,9 @@ class JIT {
         }
         if (null !== $source->compileTimeDomElementId && null === $dest->compileTimeDomElementId) {
             $dest->compileTimeDomElementId = $source->compileTimeDomElementId;
+        }
+        if (null !== $source->compileTimeDomLoadXml && null === $dest->compileTimeDomLoadXml) {
+            $dest->compileTimeDomLoadXml = $source->compileTimeDomLoadXml;
         }
         $this->foldCompileTimeStringFromSlot($block, $sourceSlot, $dest);
     }

@@ -90,7 +90,8 @@ final class JitDomC14N
         }
 
         $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
-            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+            ?? $receiver->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::unambiguousCompileTimeXml();
         if (null === $xml
             || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
             || JitDomLoadXMLUserScript::treeMutatedSinceLoad()
@@ -125,7 +126,17 @@ final class JitDomC14N
      */
     private static function tryFoldCreateElement(JITVariable $receiver): string|false|null
     {
-        $id = $receiver->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+        // Prefer an explicit createElement id. lastId() is only for ARG_SEND copies that
+        // dropped stamps (#32973) — never for loadXML documentElement temps (#32978), or a
+        // later document's C14N folds into the previous createElement tag.
+        $id = $receiver->compileTimeDomElementId;
+        if (null === $id
+            && null === $receiver->compileTimeDomNodePath
+            && null === $receiver->compileTimeDomLoadXml
+            && null === JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
+        ) {
+            $id = JitDomCreateElementAttrs::lastId();
+        }
         $tag = $receiver->compileTimeDomTagName;
         if ((null === $tag || '' === $tag) && null !== $id) {
             $tag = JitDomCreateElementAttrs::tag($id);

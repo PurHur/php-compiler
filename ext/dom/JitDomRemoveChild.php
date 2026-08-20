@@ -39,7 +39,7 @@ final class JitDomRemoveChild
             $child = self::loadObjectArg($context, $args[1]);
             JitDomRemoveChildLiveSlots::sync($context, $parent, $child);
             DomUserScriptElementCacheLlvm::invalidateIfElement($context, $child);
-            self::syncUserScriptInnerXmlAfterRemove($context, $parent, $args[1]);
+            self::syncUserScriptInnerXmlAfterRemove($context, $args[0], $args[1]);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_remove_child_post');
 
             return self::boxObjectResult($context, $child);
@@ -68,10 +68,11 @@ final class JitDomRemoveChild
      */
     private static function syncUserScriptInnerXmlAfterRemove(
         Context $context,
-        Value $parent,
+        JITVariable $parentVar,
         JITVariable $childVar
     ): void {
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $xml = $parentVar->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }
@@ -102,8 +103,9 @@ final class JitDomRemoveChild
         }
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, '');
         if (null !== $inner) {
+            $parent = self::loadObjectArg($context, $parentVar);
             JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
-            JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner);
+            JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner, $parentVar);
         }
     }
 

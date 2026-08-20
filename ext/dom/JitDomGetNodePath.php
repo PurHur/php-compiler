@@ -44,9 +44,15 @@ final class JitDomGetNodePath
         self::$lastInner = $inner;
     }
 
-    public static function annotateDocumentElement(JITVariable $result): void
+    public static function annotateDocumentElement(JITVariable $result, ?JITVariable $document = null): void
     {
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        // Prefer the owning document's loadXML literal — lastCompileTimeXml is the *last*
+        // load and steals C14N of earlier documents (#32978).
+        $xml = null !== $document
+            ? (JitDomLoadXMLUserScript::compileTimeXmlFor($document) ?? $document->compileTimeDomLoadXml)
+            : null;
+        $xml ??= $result->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::unambiguousCompileTimeXml();
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }
@@ -56,6 +62,7 @@ final class JitDomGetNodePath
         $result->compileTimeDomNodePath = $path;
         $result->compileTimeDomInnerXml = $inner;
         $result->compileTimeDomTagName = $tag;
+        $result->compileTimeDomLoadXml = $xml;
         $result->compileTimeDomLineNo = JitDomGetLineNo::rootLineNo(
             JitDomLoadXMLUserScript::lastCompileTimeXmlSource() ?? $xml
         );
