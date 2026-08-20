@@ -15050,6 +15050,7 @@ class JIT {
         }
         $resultVar = $this->context->getVariableFromOp($result);
         $resultVar->compileTimeDomTagName = $tag;
+        $resultVar->compileTimeDomElementId = \PHPCompiler\ext\dom\JitDomCreateElementAttrs::nextId($tag);
         $valueArg = $callArgs[2] ?? null;
         $inner = '';
         if ($valueArg instanceof Variable && null !== $valueArg->compileTimeString) {
@@ -19424,6 +19425,12 @@ class JIT {
         }
         if ($force || null !== $src->compileTimeDomTextData) {
             $dest->compileTimeDomTextData = $src->compileTimeDomTextData;
+        }
+        if ($force || null !== $src->compileTimeDomAttributes) {
+            $dest->compileTimeDomAttributes = $src->compileTimeDomAttributes;
+        }
+        if ($force || null !== $src->compileTimeDomElementId) {
+            $dest->compileTimeDomElementId = $src->compileTimeDomElementId;
         }
     }
 
@@ -26115,6 +26122,12 @@ class JIT {
         }
         if (null !== $source->compileTimeDomTextData && null === $dest->compileTimeDomTextData) {
             $dest->compileTimeDomTextData = $source->compileTimeDomTextData;
+        }
+        if (null !== $source->compileTimeDomAttributes && null === $dest->compileTimeDomAttributes) {
+            $dest->compileTimeDomAttributes = $source->compileTimeDomAttributes;
+        }
+        if (null !== $source->compileTimeDomElementId && null === $dest->compileTimeDomElementId) {
+            $dest->compileTimeDomElementId = $source->compileTimeDomElementId;
         }
         $this->foldCompileTimeStringFromSlot($block, $sourceSlot, $dest);
     }

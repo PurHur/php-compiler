@@ -66,10 +66,29 @@ final class JitDomC14N
     }
 
     /**
+     * Public fold for {@see JitDomC14NFile} (#32964 / #32973).
+     *
+     * @return string|false|null
+     */
+    public static function tryFoldCanonical(JITVariable $receiver, ?JITVariable $exclusiveArg = null): string|false|null
+    {
+        if (self::exclusivePreventsFold($exclusiveArg)) {
+            return null;
+        }
+
+        return self::tryFoldCompileTime($receiver);
+    }
+
+    /**
      * @return string|false|null folded payload, false for relative-NS, null if not foldable
      */
     private static function tryFoldCompileTime(JITVariable $receiver): string|false|null
     {
+        $created = self::tryFoldCreateElement($receiver);
+        if (null !== $created) {
+            return $created;
+        }
+
         $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
             ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml
@@ -97,6 +116,65 @@ final class JitDomC14N
 
         // documentElement / :object temps after loadXML — root element (#32962).
         return self::foldHostC14N($xml, $receiver);
+    }
+
+    /**
+     * createElement('lit') [+ setAttribute lit] without loadXML (#32973).
+     *
+     * @return string|false|null
+     */
+    private static function tryFoldCreateElement(JITVariable $receiver): string|false|null
+    {
+        $id = $receiver->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+        $tag = $receiver->compileTimeDomTagName;
+        if ((null === $tag || '' === $tag) && null !== $id) {
+            $tag = JitDomCreateElementAttrs::tag($id);
+        }
+        if (null === $tag || '' === $tag) {
+            return null;
+        }
+        // Prefer loadXML annotation when present — createElement tag alone is not the root.
+        if (null !== $receiver->compileTimeDomNodePath && '' !== $receiver->compileTimeDomNodePath) {
+            return null;
+        }
+        if (null !== JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)) {
+            return null;
+        }
+        if (!class_exists(\DOMDocument::class, false) && !class_exists(\DOMDocument::class)) {
+            return null;
+        }
+        $doc = new \DOMDocument();
+        $el = @$doc->createElement($tag);
+        if (!$el instanceof \DOMElement) {
+            return null;
+        }
+        foreach ($receiver->compileTimeDomAttributes ?? [] as $name => $value) {
+            if (!\is_string($name) || !\is_string($value)) {
+                continue;
+            }
+            @$el->setAttribute($name, $value);
+        }
+        if (null !== $id) {
+            foreach (JitDomCreateElementAttrs::get($id) as $name => $value) {
+                @$el->setAttribute($name, $value);
+            }
+        }
+        $inner = $receiver->compileTimeDomInnerXml;
+        if (null !== $inner && '' !== $inner) {
+            // Text-only createElement($name, $value) — peer htmlspecialchars seed (#32361).
+            $el->appendChild($doc->createTextNode(html_entity_decode($inner, ENT_QUOTES | ENT_XML1, 'UTF-8')));
+        }
+        // libxml C14N of an unattached element is empty — attach first (Zend/php-src).
+        @$doc->appendChild($el);
+        $payload = @$el->C14N();
+        if (false === $payload) {
+            return false;
+        }
+        if (!\is_string($payload) || '' === $payload) {
+            return null;
+        }
+
+        return $payload;
     }
 
     /**

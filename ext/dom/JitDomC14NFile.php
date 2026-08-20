@@ -15,13 +15,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMNode::C14NFile() (#32964).
+ * LLVM lowering for DOMNode::C14NFile() (#32964 / #32973).
  *
- * Thin standalone AOT documentElement / createElement temps are not in NestedJIT DomRegistry.
- * Prefer compile-time folds → host C14N → {@see JitFilePutContents} (peer saveHTMLFile shape):
- * - loadXML literal + documentElement
- * - createElement(+setAttribute) materialize (no DomRegistry ObjectEntry)
- * Fall back to DomC14NFileRuntime when markup is not available.
+ * Prefer {@see JitDomC14N::tryFoldCanonical} (loadXML documentElement or
+ * createElement+setAttribute) then {@see JitFilePutContents}. Fall back to
+ * DomC14NFileRuntime for DomRegistry receivers.
  *
  * php-src: ext/dom/node.c PHP_METHOD(DOMNode, C14NFile)
  */
@@ -34,10 +32,17 @@ final class JitDomC14NFile
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_c14nfile_cont');
 
-        $folded = self::tryCompileTimeLoadXmlFold($context, ...$args)
-            ?? self::tryCompileTimeCreateElementFold($context, ...$args);
-        if (null !== $folded) {
-            return $folded;
+        $folded = JitDomC14N::tryFoldCanonical($args[0], $args[2] ?? null);
+        if (\is_string($folded)) {
+            StringFilePutContents::ensureStandaloneBodies($context);
+            $path = self::loadStringArg($context, $args[1]);
+            $data = $context->builder->load($context->constantStringFromString($folded));
+            $flags = $context->context->int64Type()->constInt(0, false);
+
+            return JitFilePutContents::invoke($context, $path, $data, $flags);
+        }
+        if (false === $folded) {
+            return self::boxBoolFalse($context);
         }
 
         DomC14NFileRuntime::ensureLinked($context);
@@ -51,97 +56,13 @@ final class JitDomC14NFile
         return self::boxIntOrFalse($context, $raw);
     }
 
-    /**
-     * loadXML literal + documentElement receiver — NestedJIT DomRegistry is empty (#32964).
-     */
-    private static function tryCompileTimeLoadXmlFold(Context $context, JITVariable ...$args): ?Value
+    private static function boxBoolFalse(Context $context): Value
     {
-        $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($args[0])
-            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xml
-            || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
-            || JitDomLoadXMLUserScript::treeMutatedSinceLoad()
-        ) {
-            return null;
-        }
-        $exclusive = self::compileTimeExclusiveFlag($args[2] ?? null);
-        $doc = new \DOMDocument();
-        if (!@$doc->loadXML($xml) || null === $doc->documentElement) {
-            return null;
-        }
-        $payload = $doc->documentElement->C14N($exclusive, false);
-        if (!\is_string($payload)) {
-            return null;
-        }
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
 
-        return self::emitFilePutContents($context, $args[1], $payload);
-    }
-
-    /**
-     * createElement(+setAttribute) materialize — no DomRegistry; c14nFileArgv stubs -1 (#32964).
-     */
-    private static function tryCompileTimeCreateElementFold(Context $context, JITVariable ...$args): ?Value
-    {
-        $tag = $args[0]->compileTimeDomTagName
-            ?? JitDomHtmlDocumentSaveHtml::lastCreateElementTag();
-        if (null === $tag || '' === $tag) {
-            return null;
-        }
-        $exclusiveArg = $args[2] ?? null;
-        if (null !== $exclusiveArg && null === $exclusiveArg->compileTimeLong) {
-            // Runtime exclusive — do not guess.
-            return null;
-        }
-        $exclusive = self::compileTimeExclusiveFlag($exclusiveArg);
-        if (!class_exists(\DOMDocument::class, false) && !class_exists(\DOMDocument::class)) {
-            return null;
-        }
-        $doc = new \DOMDocument();
-        $el = @$doc->createElement($tag);
-        if (false === $el) {
-            return null;
-        }
-        foreach (DomUserScriptAttributeCacheLlvm::literalKeys($context) as [$ns, $local]) {
-            $value = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local);
-            if (null === $value || '' === $local) {
-                continue;
-            }
-            if ('' === $ns) {
-                @$el->setAttribute($local, $value);
-            } else {
-                @$el->setAttributeNS($ns, $local, $value);
-            }
-        }
-        // Host libxml C14N returns "" until the element is in a document (php-src / libxml).
-        @$doc->appendChild($el);
-        $payload = @$el->C14N($exclusive, false);
-        if (!\is_string($payload) || '' === $payload) {
-            return null;
-        }
-
-        return self::emitFilePutContents($context, $args[1], $payload);
-    }
-
-    private static function emitFilePutContents(Context $context, JITVariable $uriArg, string $payload): Value
-    {
-        StringFilePutContents::ensureStandaloneBodies($context);
-        $path = self::loadStringArg($context, $uriArg);
-        $data = $context->builder->load($context->constantStringFromString($payload));
-        $flags = $context->context->int64Type()->constInt(0, false);
-
-        return JitFilePutContents::invoke($context, $path, $data, $flags);
-    }
-
-    private static function compileTimeExclusiveFlag(?JITVariable $arg): bool
-    {
-        if (null === $arg) {
-            return false;
-        }
-        if (null !== $arg->compileTimeLong) {
-            return 0 !== $arg->compileTimeLong;
-        }
-
-        return false;
+        return JitValueBox::pointer($context, $slot);
     }
 
     private static function boxIntOrFalse(Context $context, Value $raw): Value
@@ -151,7 +72,6 @@ final class JitDomC14NFile
         $failed = $context->builder->icmp(Builder::INT_SLT, $raw, $zero);
 
         $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
 
         $failBlock = BasicBlockHelper::append($context, 'dom_c14nfile_fail');
         $okBlock = BasicBlockHelper::append($context, 'dom_c14nfile_ok');
@@ -169,7 +89,7 @@ final class JitDomC14NFile
 
         $context->builder->positionAtEnd($doneBlock);
 
-        return $ptr;
+        return JitValueBox::pointer($context, $slot);
     }
 
     private static function exclusiveAsI64(Context $context, ?JITVariable $arg): Value

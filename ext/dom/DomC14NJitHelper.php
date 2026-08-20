@@ -8,7 +8,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 
 /**
- * DOMNode::C14N() / C14NFile() helpers for user-script AOT (#19467, #22378, #32962, #32964).
+ * DOMNode::C14N() / C14NFile() helpers for user-script AOT (#19467, #22378, #32962, #32964, #32973).
  *
  * Prefer {@see DomRegistry::entry()} when present; otherwise use the receiver (LiveSlots /
  * NestedJIT). Native {@see ?string} return (null = relative-NS false) — NestedJIT of
@@ -33,16 +33,30 @@ final class DomC14NJitHelper
     }
 
     /**
-     * DOMNode::C14NFile() NestedJIT ABI (#32964).
+     * DOMNode::C14NFile() NestedJIT ABI (#32964 / #32973).
+     *
+     * Prefer {@see JitDomC14NFile} compile-time fold for loadXML / createElement.
+     * DomRegistry / LiveSlots receivers use VmDom via active Context.
      *
      * @return int bytes written, or -1 on failure (false in PHP)
      */
-    public static function c14nFileArgv(ObjectEntry $node, string $uri, int $exclusive): int
+    public static function c14nFileArgv(Context $ctx, ObjectEntry $node, string $uri, int $exclusive): int
     {
-        // Thin AOT documentElement uses JitDomC14NFile compile-time fold; NestedJIT
-        // DomRegistry is typically empty for shadow receivers (#32964).
-        unset($node, $uri, $exclusive);
+        $canonical = DomRegistry::entry($node->id) ?? $node;
+        $bytes = VmDom::c14nFile(
+            $ctx,
+            $canonical,
+            $uri,
+            0 !== $exclusive,
+            false,
+            null,
+            null,
+            null
+        );
+        if (false === $bytes) {
+            return -1;
+        }
 
-        return -1;
+        return $bytes;
     }
 }

@@ -146,6 +146,18 @@ final class Variable {
     public ?string $compileTimeDomTextData = null;
 
     /**
+     * Attributes from setAttribute('lit','lit') on a createElement result (#32973).
+     *
+     * @var array<string, string>|null
+     */
+    public ?array $compileTimeDomAttributes = null;
+
+    /**
+     * Stable id linking createElement result ↔ setAttribute ARG_SEND copies (#32973).
+     */
+    public ?int $compileTimeDomElementId = null;
+
+    /**
      * DatePeriod end-date form — ordered Unix timestamps for foreach snapshot (#26772).
      *
      * @var list<int>|null
