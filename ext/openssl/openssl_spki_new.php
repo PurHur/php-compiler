@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_spki_new() — Netscape SPKAC generation (php-src ext/openssl/openssl.c; #8690).
+ * openssl_spki_new() — Netscape SPKAC generation (php-src ext/openssl/openssl.c; #8690 VM, JIT/AOT #32892).
  */
 final class openssl_spki_new extends Internal
 {
@@ -51,8 +51,18 @@ final class openssl_spki_new extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_spki_new() is not implemented for JIT in this compiler build (issue #8690)'
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'openssl_spki_new() expects 2 or 3 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::spkiNew(
+            $context,
+            $args[0],
+            $args[1],
+            3 === $argc ? $args[2] : null
         );
     }
 
