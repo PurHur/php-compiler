@@ -12670,6 +12670,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $callArgs
                     );
+                    $this->propagateDomImportNodeCompileTimeTag(
+                        $block->getOperand($op->arg1),
+                        $callArgs
+                    );
                     $this->propagateDomNodeListItemCompileTimeChildIndex(
                         $block->getOperand($op->arg1),
                         $callArgs
@@ -15026,6 +15030,42 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * Stamp importNode($src) tag/inner on the result so appendChild can refresh C14N (#32987).
+     *
+     * Thin-AOT importNode materializes a user-script element but the ASSIGN result Variable
+     * previously had no compileTimeDom* metadata — ParentNode sync then skipped the child
+     * and left the fold on the pre-mutation loadXML literal.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private function propagateDomImportNodeCompileTimeTag(Operand $result, array $callArgs): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentImportNode)) {
+            return;
+        }
+        $src = $callArgs[1] ?? null;
+        if (!$src instanceof Variable) {
+            return;
+        }
+        $tag = $src->compileTimeDomTagName ?? null;
+        if (null === $tag || '' === $tag) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $resultVar->compileTimeDomTagName = $tag;
+        $resultVar->compileTimeDomInnerXml = $src->compileTimeDomInnerXml ?? '';
+        // Imported node is owned by the destination document — do not keep the source
+        // document's loadXML stamp (C14N / refresh must use the append receiver).
+        $resultVar->compileTimeDomLoadXml = null;
+        if (null !== $src->compileTimeDomNodePath) {
+            $resultVar->compileTimeDomNodePath = $src->compileTimeDomNodePath;
+        }
     }
 
     /**
@@ -21801,6 +21841,11 @@ class JIT {
 
                 return;
             }
+        }
+        if ('loadxml' === strtolower($methodName)) {
+            \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::setPendingLoadXmlReceiverVarName(
+                JIT\OperandName::resolve($receiverOp)
+            );
         }
         if ('propertyisinitialized' === strtolower($methodName)) {
             $receiverVar = $this->context->getVariableFromOp($receiverOp);
