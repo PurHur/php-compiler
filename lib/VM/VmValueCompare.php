@@ -1333,6 +1333,38 @@ final class VmValueCompare
         return $context->builder->or($identical, $numericMatch);
     }
 
+    /**
+     * Loose == between native {@see __string__} and native double (#32883, Zend compare_function).
+     *
+     * Numeric strings convert via strtod; non-numeric strings never equal a float.
+     */
+    public static function looseEqualStringToNativeDouble(
+        Context $context,
+        Value $strPtr,
+        Value $nativeDouble
+    ): Value {
+        return $context->builder->and(
+            self::stringIsNumeric($context, $strPtr),
+            VmFloatCompare::relationalCompare(
+                $context,
+                OpCode::TYPE_EQUAL,
+                self::stringToDouble($context, $strPtr),
+                $nativeDouble
+            )
+        );
+    }
+
+    public static function notLooseEqualStringToNativeDouble(
+        Context $context,
+        Value $strPtr,
+        Value $nativeDouble
+    ): Value {
+        $same = self::looseEqualStringToNativeDouble($context, $strPtr, $nativeDouble);
+        $i1 = $context->getTypeFromString('int1');
+
+        return $context->builder->icmp(Builder::INT_EQ, $same, $i1->constInt(0, false));
+    }
+
     public static function stringIsNumeric(Context $context, Value $strPtr): Value
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
