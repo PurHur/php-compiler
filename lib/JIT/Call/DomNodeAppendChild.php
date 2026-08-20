@@ -41,6 +41,11 @@ final class DomNodeAppendChild implements Call
             JitDomDocumentMethodKernel::shouldUse($context)
             && \count($args) >= 2
         ) {
+            // Connected for createElement C14N fold (#32964 / #32973).
+            $meta = \PHPCompiler\ext\dom\JitDomC14NCompileTime::metaForMutation($args[1]);
+            if (null !== $meta) {
+                $meta->connected = true;
+            }
             // Pin object identity before ParentNode::append mutates slots (#27480).
             $childObj = self::loadChildObject($context, $args[1]);
             $append = new DomNodeAppend();

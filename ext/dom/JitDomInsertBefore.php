@@ -35,6 +35,12 @@ final class JitDomInsertBefore
             return JitDomRequireDomNodeArg::boxNullResult($context);
         }
 
+        // Connected for createElement C14N fold (#32964 / #32973).
+        $meta = JitDomC14NCompileTime::metaForMutation($args[1]);
+        if (null !== $meta) {
+            $meta->connected = true;
+        }
+
         // php-src: null refChild ≡ append (ext/dom/node.c). Reuse appendChild AOT path (#26458).
         if (
             \count($args) < 3

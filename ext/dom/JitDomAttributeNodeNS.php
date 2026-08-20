@@ -645,6 +645,16 @@ final class JitDomAttributeNodeNS
             if ('xmlns' === $nameLit) {
                 return self::boxBoolResult($context, true);
             }
+            // Stamp for createElement C14N/C14NFile compile-time fold (#32964 / #32973).
+            $meta = JitDomC14NCompileTime::metaForMutation($args[0]);
+            if (null !== $meta) {
+                $meta->attributes[$nameLit] = $valueLit;
+            } elseif (null !== $args[0]->compileTimeDomTagName) {
+                $meta = new \PHPCompiler\JIT\CompileTimeDomElementMeta();
+                $meta->attributes[$nameLit] = $valueLit;
+                $args[0]->compileTimeDomElementMeta = $meta;
+                JitDomC14NCompileTime::rememberCreate($meta);
+            }
             $attr = self::setAttributeLiteralReuseOrCreate($context, $nameLit, $valueLit);
             if ('id' === $nameLit) {
                 DomUserScriptElementCacheLlvm::rebindId($context, $valueLit);
@@ -884,6 +894,12 @@ final class JitDomAttributeNodeNS
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattr_cont');
         $nameLit = self::compileTimeStringArg($args[1]);
+        if (null !== $nameLit) {
+            $meta = JitDomC14NCompileTime::metaForMutation($args[0]);
+            if (null !== $meta) {
+                unset($meta->attributes[$nameLit]);
+            }
+        }
         if (null !== $nameLit && 'id' === $nameLit) {
             DomUserScriptElementCacheLlvm::clearId($context);
             $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();

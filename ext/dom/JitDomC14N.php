@@ -44,7 +44,15 @@ final class JitDomC14N
         if (self::exclusivePreventsFold($exclusiveArg)) {
             $folded = null;
         } else {
-            $folded = self::tryFoldCompileTime($args[0]);
+            $exclusive = false;
+            if (null !== $exclusiveArg && null !== $exclusiveArg->compileTimeLong) {
+                $exclusive = 0 !== $exclusiveArg->compileTimeLong;
+            }
+            // createElement + setAttribute before loadXML fallback (#32964 / #32973).
+            $folded = JitDomC14NCompileTime::tryFoldCreateElement($args[0], $exclusive);
+            if (null === $folded) {
+                $folded = self::tryFoldCompileTime($args[0]);
+            }
         }
         if (null !== $folded) {
             if (false === $folded) {

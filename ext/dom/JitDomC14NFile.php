@@ -15,11 +15,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMNode::C14NFile() (#32964).
+ * LLVM lowering for DOMNode::C14NFile() (#32964 / #32973).
  *
- * Thin standalone AOT documentElement temps are not in NestedJIT DomRegistry.
- * Prefer compile-time loadXML → host C14N → {@see JitFilePutContents} (peer saveHTMLFile
- * shape). Fall back to DomC14NFileRuntime when markup is not available.
+ * Thin standalone AOT documentElement / createElement temps are not in NestedJIT
+ * DomRegistry. Prefer compile-time host C14N → {@see JitFilePutContents} (peer
+ * saveHTMLFile). Fall back to DomC14NFileRuntime when markup is not available.
  *
  * php-src: ext/dom/node.c PHP_METHOD(DOMNode, C14NFile)
  */
@@ -31,6 +31,11 @@ final class JitDomC14NFile
             throw new \LogicException('DOMNode::C14NFile() expects receiver and uri');
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_c14nfile_cont');
+
+        $folded = self::tryCompileTimeCreateElementFold($context, ...$args);
+        if (null !== $folded) {
+            return $folded;
+        }
 
         $folded = self::tryCompileTimeLoadXmlFold($context, ...$args);
         if (null !== $folded) {
@@ -46,6 +51,25 @@ final class JitDomC14NFile
         );
 
         return self::boxIntOrFalse($context, $raw);
+    }
+
+    /**
+     * createElement + setAttribute (+ appendChild) — NestedJIT DomRegistry empty (#32964 / #32973).
+     */
+    private static function tryCompileTimeCreateElementFold(Context $context, JITVariable ...$args): ?Value
+    {
+        $exclusive = self::compileTimeExclusiveFlag($args[2] ?? null);
+        $payload = JitDomC14NCompileTime::tryFoldCreateElement($args[0], $exclusive);
+        if (null === $payload || false === $payload) {
+            return null;
+        }
+
+        StringFilePutContents::ensureStandaloneBodies($context);
+        $path = self::loadStringArg($context, $args[1]);
+        $data = $context->builder->load($context->constantStringFromString($payload));
+        $flags = $context->context->int64Type()->constInt(0, false);
+
+        return JitFilePutContents::invoke($context, $path, $data, $flags);
     }
 
     /**

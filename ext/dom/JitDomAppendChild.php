@@ -34,6 +34,12 @@ final class JitDomAppendChild
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_post_inc');
 
+        // Connected for createElement C14N fold (libxml orphans → ""; #19741 / #32964).
+        $meta = JitDomC14NCompileTime::metaForMutation($args[1]);
+        if (null !== $meta) {
+            $meta->connected = true;
+        }
+
         // #21687: mirror parentNode so contains()/getRootNode can walk after appendChild.
         if (JITVariable::TYPE_OBJECT === $args[0]->type && JITVariable::TYPE_OBJECT === $args[1]->type) {
             $parentObj = $context->helper->loadValue($args[0]);

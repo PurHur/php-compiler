@@ -121,6 +121,14 @@ final class Variable {
     public ?string $compileTimeDomTagName = null;
 
     /**
+     * Shared createElement + setAttribute / appendChild state for C14N fold (#32964 / #32973).
+     *
+     * null = not a createElement-tracked element (e.g. loadXML fetch). Non-null bag is
+     * shared across Variable sync so method-call receiver temps mutate the CV.
+     */
+    public ?CompileTimeDomElementMeta $compileTimeDomElementMeta = null;
+
+    /**
      * Escaped inner XML / text of a createElement($name, $value) result (#32361).
      */
     public ?string $compileTimeDomInnerXml = null;

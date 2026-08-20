@@ -15056,6 +15056,10 @@ class JIT {
             $inner = htmlspecialchars($valueArg->compileTimeString, ENT_QUOTES | ENT_XML1, 'UTF-8');
         }
         $resultVar->compileTimeDomInnerXml = $inner;
+        // Shared bag so setAttribute/appendChild/C14NFile on temps share tag+attrs (#32964).
+        $meta = new JIT\CompileTimeDomElementMeta($tag, $inner);
+        $resultVar->compileTimeDomElementMeta = $meta;
+        \PHPCompiler\ext\dom\JitDomC14NCompileTime::rememberCreate($meta);
     }
 
     /**
@@ -19408,6 +19412,9 @@ class JIT {
     {
         if ($force || null !== $src->compileTimeDomTagName) {
             $dest->compileTimeDomTagName = $src->compileTimeDomTagName;
+        }
+        if ($force || null !== $src->compileTimeDomElementMeta) {
+            $dest->compileTimeDomElementMeta = $src->compileTimeDomElementMeta;
         }
         if ($force || null !== $src->compileTimeDomInnerXml) {
             $dest->compileTimeDomInnerXml = $src->compileTimeDomInnerXml;
@@ -26100,6 +26107,9 @@ class JIT {
         }
         if (null !== $source->compileTimeDomTagName && null === $dest->compileTimeDomTagName) {
             $dest->compileTimeDomTagName = $source->compileTimeDomTagName;
+        }
+        if (null !== $source->compileTimeDomElementMeta && null === $dest->compileTimeDomElementMeta) {
+            $dest->compileTimeDomElementMeta = $source->compileTimeDomElementMeta;
         }
         if (null !== $source->compileTimeDomInnerXml && null === $dest->compileTimeDomInnerXml) {
             $dest->compileTimeDomInnerXml = $source->compileTimeDomInnerXml;
