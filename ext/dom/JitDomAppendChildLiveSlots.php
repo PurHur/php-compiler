@@ -108,7 +108,14 @@ final class JitDomAppendChildLiveSlots
         $context->builder->positionAtEnd($bbEmptyAfter);
         self::storeChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, $childJit);
         self::storeChildEdge($context, $parent, VmDom::PROP_LAST_CHILD, $childJit);
-        self::writeChildNodesList($context, $parent, 1, $child, null);
+        // In-place bump/seed — writeChildNodesList allocated a fresh list and left
+        // held `$list = $parent->childNodes` (length 0) stale → item(0) SIGSEGV (#32834).
+        self::incrementChildNodesLengthInPlace(
+            $context,
+            $parent,
+            $child,
+            $objPtrTy->constNull()
+        );
         self::storeParentNode($context, $child, $parent);
         $context->builder->branch($bbDone);
 
@@ -140,7 +147,14 @@ final class JitDomAppendChildLiveSlots
         self::storeChildEdge($context, $parent, VmDom::PROP_LAST_CHILD, $childJit);
         self::storeSibling($context, $child, VmDom::PROP_PREVIOUS_SIBLING, $nullBox);
         self::storeSibling($context, $child, VmDom::PROP_NEXT_SIBLING, $nullBox);
-        self::writeChildNodesList($context, $parent, 1, $child, null);
+        // Peer append-tail #29048 / empty held list #32834: refresh existing NodeList
+        // in place (0→1), do not replace the list object.
+        self::incrementChildNodesLengthInPlace(
+            $context,
+            $parent,
+            $child,
+            $objPtrTy->constNull()
+        );
         self::storeParentNode($context, $child, $parent);
         $context->builder->branch($bbDone);
 
@@ -302,7 +316,16 @@ final class JitDomAppendChildLiveSlots
         $context->builder->branchIf($missing, $bbSeed, $bbBump);
 
         $context->builder->positionAtEnd($bbSeed);
-        // No prior list (should be rare on append-tail) — seed length=2 + pins.
+        // No prior list — seed from pins. Empty→first-child seeds length=1 (#32834);
+        // append-tail seed (rare) keeps length=2 when item1 is set (#29048).
+        $item1Null = $context->builder->icmp(Builder::INT_EQ, $item1, $objPtrTy->constNull());
+        $bbSeed1 = BasicBlockHelper::append($context, 'dom_acls_inc_seed1');
+        $bbSeed2 = BasicBlockHelper::append($context, 'dom_acls_inc_seed2');
+        $context->builder->branchIf($item1Null, $bbSeed1, $bbSeed2);
+        $context->builder->positionAtEnd($bbSeed1);
+        self::writeChildNodesList($context, $owner, 1, $item0, null);
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbSeed2);
         self::writeChildNodesList($context, $owner, 2, $item0, $item1);
         $context->builder->branch($bbDone);
 
@@ -328,16 +351,14 @@ final class JitDomAppendChildLiveSlots
             $ownerJit,
             JITVariable::TYPE_VALUE
         );
-        $i0 = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $item0);
-        $i1 = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $item1);
         $objectType->propertyStore(
             $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem0'),
-            $i0,
+            self::objectOrNullVar($context, $item0),
             JITVariable::TYPE_VALUE
         );
         $objectType->propertyStore(
             $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem1'),
-            $i1,
+            self::objectOrNullVar($context, $item1),
             JITVariable::TYPE_VALUE
         );
         $context->builder->branch($bbDone);
