@@ -44,8 +44,8 @@ final class TypeDeadCompilerAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // __compiler_xmlrpc_encode_value always-on shell removed (#32902); ownership in StringXmlrpc.
-        $this->assertStringContainsString("registerFunction('__compiler_number_format'", $type);
+        // __compiler_number_format always-on shell removed (#32921); ownership in StringFormat.
+        $this->assertStringContainsString("registerFunction('__compiler_convert_uuencode'", $type);
     }
 
     public function testNoNestedJitLookupOfDroppedCompilerAbisRemains(): void
