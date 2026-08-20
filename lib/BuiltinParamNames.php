@@ -2240,6 +2240,9 @@ final class BuiltinParamNames
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str (#23919)
             case 'str_shuffle':
                 return ['string'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says charlist (#23920)
+            case 'str_word_count':
+                return ['string', 'format=', 'characters='];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/from/to (#23215)
             // ?string $to = null (#23588)
             case 'strtr':
