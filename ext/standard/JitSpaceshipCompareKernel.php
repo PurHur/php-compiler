@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\VmFloatCompare;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -21,8 +22,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Quarantined from lib/JIT/Builtin/SpaceshipCompareJit — {@see \PHPCompiler\JIT\Builtin\SpaceshipRuntime}
  * stays the thin orchestrator.
  *
- * Scalar compare semantics route through NestedJIT {@see \PHPCompiler\VM\CompareJitHelperScalars};
- * object/hashtable walks use LLVM emitters (NestedJIT ObjectEntry/HashTable IR is unsafe — #21109).
+ * Long/double scalar compares are native icmp/fcmp (NestedJIT CompareJitHelperScalars
+ * re-entered __value__spaceship → SIGSEGV — #32538 / #32860). String/object/hashtable
+ * walks stay on their existing emitters.
  *
  * php-src: Zend/zend_operators.c — compare_function / spaceship
  */
@@ -1163,17 +1165,9 @@ final class JitSpaceshipCompareKernel
 
     private static function doubleSpaceship(Context $context, Value $left, Value $right): Value
     {
-        $fn = SpaceshipRuntime::compareHelper(
-            $context,
-            'PHPCompiler\\VM\\CompareJitHelperScalars::doubleSpaceship'
-        );
-        $cmp = JitNestedHelperCoerce::callHelper($context, $fn, [$left, $right]);
-
-        return JitNestedHelperCoerce::coerceBridgeResult(
-            $context,
-            $cmp,
-            $context->getTypeFromString('int64')
-        );
+        // Native fcmp + NaN — NestedJIT doubleSpaceship → spaceshipNumeric boxes
+        // operands and calls __value__spaceship, which recurses until SIGSEGV (#32538 / #32860).
+        return VmFloatCompare::spaceship($context, $left, $right);
     }
 
     private static function doubleToLong(Context $context, Value $num): Value
