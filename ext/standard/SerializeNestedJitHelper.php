@@ -52,7 +52,9 @@ final class SerializeNestedJitHelper
             if (1 === $kt) {
                 $body .= 'i:'.((string) $key->toInt()).';';
             } else {
-                $body .= self::quote((string) $key);
+                // NestedJIT: (string)$Variable yields s:0:"…" — use toString() like
+                // JsonEncodeNestedJitHelper (#32911 / peer #27020).
+                $body .= self::quote($key->toString());
             }
             $val = $pair[1];
             $t = $val->type & 0x7f;
@@ -85,10 +87,10 @@ final class SerializeNestedJitHelper
      */
     private static function quote($s): string
     {
+        // Do not `$s.''` first — NestedJIT concat on hashtable-key toString() can
+        // zero the length field while keeping a dangling value buffer (#32911).
         if (null === $s) {
-            $s = '';
-        } else {
-            $s = $s.'';
+            return 's:0:"";';
         }
         $n = \strlen($s);
 
