@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_private_decrypt() — asymmetric private-key decryption (php-src ext/openssl/xp.c; #6666).
+ * openssl_private_decrypt() — asymmetric private-key decryption (php-src ext/openssl/openssl.c; #6666 VM, JIT/AOT #32759).
  */
 final class openssl_private_decrypt extends Internal
 {
@@ -53,8 +53,19 @@ final class openssl_private_decrypt extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_private_decrypt() is not implemented for JIT in this compiler build (issue #6666)'
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError(
+                'openssl_private_decrypt() expects 3 or 4 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::privateDecrypt(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3] ?? null
         );
     }
 }
