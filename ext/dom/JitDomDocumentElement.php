@@ -110,6 +110,7 @@ final class JitDomDocumentElement
         $objectType = $context->type->object;
         $prev = null;
         $first = null;
+        $second = null;
         $last = null;
         foreach ($children as $idx => $node) {
             $child = match ($node['kind']) {
@@ -173,6 +174,9 @@ final class JitDomDocumentElement
             }
             if (null === $first) {
                 $first = $child;
+            } elseif (null === $second) {
+                // item(1) pin — second child, not last (#32784). last==second only when length=2.
+                $second = $child;
             }
             $last = $child;
             $prev = $child;
@@ -180,14 +184,15 @@ final class JitDomDocumentElement
         if (null !== $first && null !== $last) {
             self::storeFirstLast($context, $element, $first, $last);
         }
-        self::storeChildNodesLength($context, $element, \count($children), $first, $last);
+        // Pin item0=first, item1=second (Zend item(1)); last is only for first/lastChild edges.
+        self::storeChildNodesLength($context, $element, \count($children), $first, $second);
     }
 
     /**
      * Attach a DOMNodeList with the given length for user-script childNodes (#23251).
      *
-     * Optional first/last pin {@see VmDom::PROP_CHILD_NODES_OWNER} + __phpcItemN so
-     * item(0)/item(1) work before any LiveSlots rewrite (#28672 / #27410).
+     * Optional first/second pin {@see VmDom::PROP_CHILD_NODES_OWNER} + __phpcItemN so
+     * item(0)/item(1) match Zend before any LiveSlots rewrite (#28672 / #27410 / #32784).
      */
     public static function storeChildNodesLength(
         \PHPCompiler\JIT\Context $context,
