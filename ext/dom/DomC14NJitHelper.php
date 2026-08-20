@@ -13,12 +13,11 @@ use PHPCompiler\VM\ObjectEntry;
  * Prefer {@see DomRegistry::entry()} when present; otherwise use the receiver (LiveSlots /
  * NestedJIT). Native {@see ?string} return (null = relative-NS false) — NestedJIT of
  * {@see \PHPCompiler\VM\Variable} returned `__object__*` and echo printed "Object" (#32962).
- * Peer string ABI: {@see DomXPathEvaluateJitHelper::evaluateStringArgv}.
  *
- * Pure loadXML user scripts prefer compile-time fold in {@see JitDomC14N} / {@see JitDomC14NFile}
- * (empty NestedJIT DomRegistry); this helper covers non-foldable receivers.
- * C14N returns ?string (null = relative-NS false; #32962). C14NFile ABI returns -1 when
- * DomRegistry misses (peer DomSaveHTMLFile int64 shape; #32964).
+ * Pure loadXML user scripts prefer compile-time fold in {@see JitDomC14N} / {@see JitDomC14NFile}.
+ * After tree mutations, {@see JitDomLoadXMLUserScript::markTreeMutatedSinceLoad()} +
+ * {@see JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner()} keep the fold source
+ * current (#32972) — do not host-DOMDocument here (NestedJIT cannot lower loadXML correctly).
  */
 final class DomC14NJitHelper
 {
@@ -35,10 +34,6 @@ final class DomC14NJitHelper
 
     /**
      * DOMNode::C14NFile() NestedJIT ABI (#32964).
-     *
-     * No VM Context parameter — NestedJIT int64 bridges match DomSaveHTMLFileJitHelper.
-     * Registered nodes still need a Context for VmDom; thin AOT documentElement path uses
-     * {@see JitDomC14NFile} compile-time fold instead.
      *
      * @return int bytes written, or -1 on failure (false in PHP)
      */

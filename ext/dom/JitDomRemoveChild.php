@@ -103,6 +103,7 @@ final class JitDomRemoveChild
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, '');
         if (null !== $inner) {
             JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+            JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner);
         }
     }
 
