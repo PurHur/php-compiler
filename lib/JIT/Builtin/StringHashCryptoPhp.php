@@ -10,11 +10,15 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for hash crypto via HashCryptoJitHelper PHP (#9164, #21026).
+ * JIT/AOT link for hash crypto via HashCryptoJitHelper PHP (#9164, #21026, #32876).
  *
  * Embed + thin standalone AOT: {@see HashCryptoJitHelper} via {@see JitVmHelperLink}
  * (HashEquals #20469 / HashAlgos #20652 shape — no thin-standalone libcrypto ABI fork).
  * NestedJIT leaf: {@see \phpc_hash_crypto_hash} → {@see \PHPCompiler\ext\hash\JitHashCryptoKernel} EVP.
+ *
+ * Module-local ABI owner (getNamedFunction first via ensureBridge): Builtin\Type no longer
+ * always-declares empty shells for hash/hmac/pbkdf2/hkdf (#32876) — leftover Type decls
+ * mint hash.1 (#31894 / #32122).
  */
 final class StringHashCryptoPhp
 {
