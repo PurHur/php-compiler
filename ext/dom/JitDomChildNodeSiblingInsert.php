@@ -14,6 +14,9 @@ use PHPLLVM\Value;
 /**
  * Thin-AOT ChildNode::before/after when parent may be DOMDocument (#32611).
  *
+ * {@see invokeAfter} always merges insert/append into a done block so callers can
+ * continue after LiveSlots (#32817 held childNodes).
+ *
  * php-src: ext/dom/php_dom.c dom_add_prev_sibling / dom_add_next_sibling
  */
 final class JitDomChildNodeSiblingInsert
@@ -54,6 +57,7 @@ final class JitDomChildNodeSiblingInsert
         $nextNull = $context->builder->icmp(Builder::INT_EQ, $next, $objPtrTy->constNull());
         $bbAppend = BasicBlockHelper::append($context, 'dom_cn_after_append');
         $bbInsert = BasicBlockHelper::append($context, 'dom_cn_after_insert');
+        $bbDone = BasicBlockHelper::append($context, 'dom_cn_after_done');
         $context->builder->branchIf($nextNull, $bbAppend, $bbInsert);
 
         $context->builder->positionAtEnd($bbInsert);
@@ -65,10 +69,14 @@ final class JitDomChildNodeSiblingInsert
             $nextJit
         );
         DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $newChildVar);
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbAppend);
         self::insertAfterLast($context, $parent, $newChild, $anchor);
         DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $newChildVar);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     private static function insertAfterLast(

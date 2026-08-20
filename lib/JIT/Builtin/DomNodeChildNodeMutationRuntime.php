@@ -75,24 +75,26 @@ final class DomNodeChildNodeMutationRuntime
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_childnode_'.$kind);
             $parent = self::loadParentObject($context, $receiver);
             if ('before' === $kind || 'after' === $kind) {
-                if (!self::trySyncSiblingInsertInnerXml($context, $kind, $receiver, $parent, $extraArgs)) {
-                    $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
-                    $newChildVar = $extraArgs[0];
-                    if ('before' === $kind) {
-                        JitDomChildNodeSiblingInsert::invokeBefore(
-                            $context,
-                            $parentVar,
-                            $newChildVar,
-                            $receiver
-                        );
-                    } else {
-                        JitDomChildNodeSiblingInsert::invokeAfter(
-                            $context,
-                            $parentVar,
-                            $newChildVar,
-                            $receiver
-                        );
-                    }
+                // Best-effort InnerXml splice for saveXML (#26752). Must not skip LiveSlots:
+                // success used to return early and leave held childNodes stale / item(N) SIGSEGV
+                // (#32817; peer insertBefore LiveSlots #32801 / php-src nodelist.c).
+                self::trySyncSiblingInsertInnerXml($context, $kind, $receiver, $parent, $extraArgs);
+                $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
+                $newChildVar = $extraArgs[0];
+                if ('before' === $kind) {
+                    JitDomChildNodeSiblingInsert::invokeBefore(
+                        $context,
+                        $parentVar,
+                        $newChildVar,
+                        $receiver
+                    );
+                } else {
+                    JitDomChildNodeSiblingInsert::invokeAfter(
+                        $context,
+                        $parentVar,
+                        $newChildVar,
+                        $receiver
+                    );
                 }
             } else {
                 // replaceWith: replace parent InnerXml with the new node markup (#26752).

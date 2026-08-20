@@ -114,6 +114,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'dom_createdocumentfragment_savexml.phpt',
         'dom_createentityreference_savexml.phpt',
         'dom_clonenode_savexml.phpt',
+        'dom_childnode_after_live_held.phpt',
         'dom_substringdata.phpt',
         'dom_appenddata.phpt',
         'dom_insertdata.phpt',
