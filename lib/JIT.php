@@ -17273,9 +17273,17 @@ class JIT {
             JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
             $this->preserveClosureInvokeMetadata($resultOp, $globalTarget, $value);
             $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
+            $this->syncCompileTimeString($globalTarget, $value, false);
+            $this->syncCompileTimeFloat($globalTarget, $value, false);
             $this->syncCompileTimeBcmathNumber($globalTarget, $value, false);
             $this->syncCompileTimeDomTagName($globalTarget, $value, false);
             $this->syncCompileTimeDatePeriod($globalTarget, $value, false);
+            $classTag = $value->classUserType ?? null;
+            if (is_string($classTag) && '' !== $classTag) {
+                $globalTarget->classUserType = $classTag;
+                $globalTarget->isNullConstant = false;
+                $resultOp->type = new Type(Type::TYPE_OBJECT, [], $classTag);
+            }
             $this->context->setVariableOp($resultOp, $globalTarget);
             $globalName = JIT\OperandName::resolve($resultOp);
             if (null !== $globalName && '' !== $globalName) {
@@ -17648,9 +17656,17 @@ class JIT {
                 JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
                 $this->preserveClosureInvokeMetadata($resultOp, $globalTarget, $value);
                 $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
+                $this->syncCompileTimeString($globalTarget, $value, false);
+                $this->syncCompileTimeFloat($globalTarget, $value, false);
                 $this->syncCompileTimeBcmathNumber($globalTarget, $value, false);
                 $this->syncCompileTimeDomTagName($globalTarget, $value, false);
                 $this->syncCompileTimeDatePeriod($globalTarget, $value, false);
+                $classTag = $value->classUserType ?? null;
+                if (is_string($classTag) && '' !== $classTag) {
+                    $globalTarget->classUserType = $classTag;
+                    $globalTarget->isNullConstant = false;
+                    $resultOp->type = new Type(Type::TYPE_OBJECT, [], $classTag);
+                }
                 $this->context->setVariableOp($resultOp, $globalTarget);
                 $globalName = JIT\OperandName::resolve($resultOp);
                 if (null !== $globalName && '' !== $globalName) {
