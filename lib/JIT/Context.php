@@ -1924,6 +1924,7 @@ class Context {
         Builtin\StringStrContains::ensureStandaloneBodies($this);
         Builtin\StatPathRuntime::ensureStandaloneBodies($this);
         Builtin\StringFileGetContents::ensureStandaloneBodies($this);
+        Builtin\MetaTagsRuntime::ensureStandaloneBodies($this);
         Builtin\StringHashCrypto::ensureStandaloneBodies($this);
         Builtin\MbNumericEntity::ensureStandaloneBodies($this);
         Builtin\StringReadfile::ensureStandaloneBodies($this);

@@ -12,6 +12,7 @@ use PHPUnit\Framework\TestCase;
  * NestedJIT/AOT bridge stays MetaTagsRuntime + MetaTagsJitHelper.
  * Runtime owner declares module-locally (getNamedFunction first) so leftover
  * Type empty decls cannot mint get_meta_tags.1 (#31894 / #32122).
+ * Thin standalone AOT also links via Context::ensureStandaloneBodies (#33051 / #33030).
  */
 final class TypeDeadGetMetaTagsAbiRuntimeShrinkTest extends TestCase
 {
@@ -39,9 +40,12 @@ final class TypeDeadGetMetaTagsAbiRuntimeShrinkTest extends TestCase
     public function testRuntimeOwnerDeclaresGetMetaTagsAbiModuleLocally(): void
     {
         $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MetaTagsRuntime.php');
-        $this->assertStringContainsString('#33035', $owner);
+        $this->assertStringContainsString('#33051', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
         $this->assertStringContainsString('addFunction', $owner);
+        $this->assertStringContainsString('i64ToTypedPtr', $owner);
+        $this->assertStringContainsString('ensureNativeHtInternalProxies', $owner);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $owner);
         $this->assertStringContainsString('__compiler_get_meta_tags', $owner);
         $this->assertFileExists(__DIR__.'/../../ext/standard/MetaTagsJitHelper.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitGetMetaTags.php');
@@ -51,6 +55,8 @@ final class TypeDeadGetMetaTagsAbiRuntimeShrinkTest extends TestCase
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
         $this->assertStringContainsString('MetaTagsRuntime::ensureLinked($this->context)', $type);
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('MetaTagsRuntime::ensureStandaloneBodies($this)', $context);
     }
 
     public function testNoNewRuntimeCForGetMetaTagsAbi(): void
