@@ -11358,6 +11358,21 @@ class JIT {
                     // Do not free php-cfg "dead" operands here; ?-> temps are used on branch/merge blocks (#3219).
                     $builder->branchIf($isNull, $nullEntry, $fetchEntry);
                     if (null !== $op->block3) {
+                        // Fetch arm may have rebound the result to a property-backed Variable;
+                        // reseat on a plain merge alloca before merge-block uses (#32988).
+                        $this->ensureCoalesceMergeStackSlot($nullsafeResult);
+                        if ($this->context->hasVariableOp($nullsafeResult)) {
+                            $mergeSeat = $this->context->getVariableFromOp($nullsafeResult);
+                            $mergeSeat->objectPropertySlot = null;
+                            $mergeSeat->objectPropertyType = null;
+                            $mergeSeat->objectPropertyReceiver = null;
+                            $mergeSeat->objectPropertyName = null;
+                            $mergeSeat->objectPropertyClassName = null;
+                            $mergeSeat->objectPropertyDnfArms = null;
+                            $mergeSeat->compileTimeString = null;
+                            $mergeSeat->compileTimeConstantName = null;
+                            $mergeSeat->compileTimeEnumCase = null;
+                        }
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'nullsafe_merge');
                         $builder->positionAtEnd($nullTail);
                         if (null === $nullTail->getTerminator()) {
@@ -13379,8 +13394,18 @@ class JIT {
                     if (null !== $phiDest) {
                         $result = $phiDest;
                     }
+                    // Nullsafe fetch must copy into the ?-> merge alloca — rebinding the result to
+                    // a Variable that still carries objectPropertySlot leaves a fetch-arm-only
+                    // SSA pointer that does not dominate nullsafe_merge (#32988).
+                    if (
+                        $op->nullsafeFetchPropertyRead
+                        && !$this->context->coalesceAssignTargets->contains($result)
+                    ) {
+                        $this->context->coalesceAssignTargets[$result] = true;
+                    }
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($result);
                     if ($forceBranchMerge) {
+                        $this->ensureCoalesceMergeStackSlot($result);
                         if (!$this->context->hasVariableOp($result)) {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $result);
                         }
@@ -26047,7 +26072,31 @@ class JIT {
     {
         if ($this->context->hasVariableOp($mergeOp)) {
             $var = $this->context->getVariableFromOp($mergeOp);
-            if (Variable::TYPE_VALUE === $var->type && Variable::KIND_VARIABLE === $var->kind) {
+            if (
+                Variable::TYPE_VALUE === $var->type
+                && Variable::KIND_VARIABLE === $var->kind
+            ) {
+                // Property-backed slots carry a fetch-arm-only SSA pointer (objectPropertySlot).
+                // Keep the alloca (already written by the fetch/null arm) but drop the backing so
+                // nullsafe_merge reads the stack box — otherwise Module verify fails (#32988).
+                if (
+                    null !== $var->objectPropertySlot
+                    || null !== $var->staticPropertyGlobal
+                    || null !== $var->valueBoxAliasPtr
+                    || $var->functionStaticGlobal
+                ) {
+                    $var->objectPropertySlot = null;
+                    $var->objectPropertyType = null;
+                    $var->objectPropertyReceiver = null;
+                    $var->objectPropertyName = null;
+                    $var->objectPropertyClassName = null;
+                    $var->objectPropertyDnfArms = null;
+                    $var->staticPropertyGlobal = null;
+                    $var->staticPropertyType = null;
+                    $var->valueBoxAliasPtr = null;
+                    $var->functionStaticGlobal = false;
+                }
+
                 return;
             }
         }
