@@ -29,7 +29,7 @@ final class JitEnv
     /** Zero-arg getenv() — assoc array of all variables (#5075 phase 2). */
     public static function getenvAll(Context $context): Value
     {
-        StringGetenvAll::ensureLinked($context);
+        StringGetenvAll::ensureLinked($context); // #32665 — Type always-on getenv_all dropped
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
@@ -51,7 +51,7 @@ final class JitEnv
             return self::getenvNestedLeaf($context, $nameStr, $localOnlyI8);
         }
 
-        StringGetenv::ensureLinked($context);
+        StringGetenv::ensureLinked($context); // #32665 — Type always-on getenv dropped
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(

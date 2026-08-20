@@ -33,23 +33,12 @@ class Type extends Builtin {
         $this->value->register();
         $this->object->register();
         $this->hashtable->register();
-        $i8 = $this->context->getTypeFromString('int8');
-        $fntypeGetenv = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $i8,
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnGetenv = $this->context->module->addFunction('__compiler_getenv', $fntypeGetenv);
-        $this->context->registerFunction('__compiler_getenv', $fnGetenv);
-        $fntypeGetenvAll = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnGetenvAll = $this->context->module->addFunction('__compiler_getenv_all', $fntypeGetenvAll);
-        $this->context->registerFunction('__compiler_getenv_all', $fnGetenvAll);
+        // __compiler_getenv / __compiler_getenv_all always-on shells removed (#32665):
+        // StringGetenv / StringGetenvAll own the ABI (getNamedFunction first +
+        // JitVmHelperLink bridge). User-script getenv()/putenv() stay
+        // GetenvLookupJitHelper / PutenvJitHelper / JitEnv. Leftover Type
+        // addFunction vs Runtime ABI drift mints getenv.1 (#31894 / #32122);
+        // empty Type decls were also mistaken for completed bodies (#26756).
         $fntypeDeployPath = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

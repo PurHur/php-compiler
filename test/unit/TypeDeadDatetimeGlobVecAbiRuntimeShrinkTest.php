@@ -46,7 +46,7 @@ final class TypeDeadDatetimeGlobVecAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_mktime'", $type);
+        $this->assertStringContainsString("registerFunction('__phpc_stream_path'", $type);
     }
 
     public function testRuntimeOwnersDeclareDatetimeGlobVecAbisModuleLocally(): void
