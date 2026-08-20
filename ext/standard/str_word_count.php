@@ -51,7 +51,7 @@ final class str_word_count extends Internal
         }
         $chars = '';
         if (3 === $argc) {
-            $chars = InternalStrictArg::resolveCoercibleStringArg($frame, 2, 'str_word_count', 'chars');
+            $chars = InternalStrictArg::resolveCoercibleStringArg($frame, 2, 'str_word_count', 'characters');
         }
         if (null === $frame->returnVar) {
             return;
@@ -148,7 +148,7 @@ final class str_word_count extends Internal
         $charsArg = null !== $charsCt
             ? $context->builder->load($context->constantStringFromString($charsCt))
             : (3 === $argc
-                ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'str_word_count', 2, 'chars')
+                ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'str_word_count', 2, 'characters')
                 : $context->builder->load($context->constantStringFromString('')));
 
         return $context->builder->call(
