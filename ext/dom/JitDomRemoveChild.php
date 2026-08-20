@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -13,11 +12,14 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMNode::removeChild() (#19240, #27475).
+ * LLVM lowering for DOMNode::removeChild() (#19240, #27475, #32774).
  *
- * Thin-AOT createElement + ParentNode::append writes childNodes length into
- * LLVM slots; NestedJIT DomRegistry unlink alone leaves that length stale
- * (php-src ext/dom/node.c — dom_node_remove_child).
+ * Thin standalone AOT: LiveSlots unlink + in-place childNodes length (#32774),
+ * mirroring {@see JitDomReplaceChild} (skip NestedJIT DomRegistry on LLVM-materialized
+ * nodes). Prior path called the ABI then {@see writeEmptyChildNodesList}, which
+ * replaced the live list with a fresh length-0 object — held `$list` stayed stale
+ * and refetch reported 0 while siblings remained (php-src ext/dom/node.c /
+ * nodelist.c).
  */
 final class JitDomRemoveChild
 {
@@ -31,6 +33,18 @@ final class JitDomRemoveChild
         if (JitDomRequireDomNodeArg::guardOrAbort($context, $args[1], 'DOMNode::removeChild', 1, 'child')) {
             return JitDomRequireDomNodeArg::boxNullResult($context);
         }
+
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            $parent = self::loadObjectArg($context, $args[0]);
+            $child = self::loadObjectArg($context, $args[1]);
+            JitDomRemoveChildLiveSlots::sync($context, $parent, $child);
+            DomUserScriptElementCacheLlvm::invalidateIfElement($context, $child);
+            self::syncUserScriptInnerXmlAfterRemove($context, $parent, $args[1]);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_remove_child_post');
+
+            return self::boxObjectResult($context, $child);
+        }
+
         DomNodeTreeMutationRuntime::ensureRemoveChildLinked($context);
 
         $parent = self::loadObjectArg($context, $args[0]);
@@ -42,62 +56,42 @@ final class JitDomRemoveChild
         );
         self::clearDetachedLinkSlots($context, $child);
 
-        // User-script AOT: NestedJIT updates DomRegistry but not the LLVM
-        // childNodes length written by ParentNode::append (#27475 / #27044).
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            self::writeEmptyChildNodesList($context, $parent);
-            DomUserScriptElementCacheLlvm::invalidateIfElement($context, $child);
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_remove_child_post');
-        }
-
         return self::boxObjectResult($context, $child);
     }
 
     /**
-     * Replace parent.childNodes with a length-0 list (#27475).
-     *
-     * Same shape as ChildNode::remove / zeroOldParentChildNodesLength (#27410):
-     * ParentNode::append stores TYPE_VALUE; in-place TYPE_OBJECT bumps miss it.
+     * Drop the removed child's tag from PROP_USER_SCRIPT_INNER_XML when the
+     * loadXML seed is still pure user-script (saveXML sibling fidelity).
      */
-    private static function writeEmptyChildNodesList(Context $context, Value $parent): void
-    {
-        $objectType = $context->type->object;
-        $nodeClassId = $objectType->lookup('DOMNode');
-        if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
-            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
+    private static function syncUserScriptInnerXmlAfterRemove(
+        Context $context,
+        Value $parent,
+        JITVariable $childVar
+    ): void {
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
         }
-        $listClassId = $objectType->lookup('DOMNodeList');
-        if (!$objectType->hasProperty($listClassId, 'length')) {
-            $objectType->defineProperty($listClassId, 'length', JITVariable::TYPE_NATIVE_LONG);
+        $index = $childVar->compileTimeDomChildIndex ?? null;
+        if (null === $index) {
+            $oldTag = $childVar->compileTimeDomTagName ?? null;
+            if (null !== $oldTag) {
+                $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+                foreach ($nodes as $i => $node) {
+                    if ('element' === $node['kind'] && strtolower($oldTag) === $node['data']) {
+                        $index = $i;
+                        break;
+                    }
+                }
+            }
         }
-        if (!$objectType->hasProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER)) {
-            $objectType->defineProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
+        if (null === $index) {
+            return;
         }
-        $list = $objectType->allocate($listClassId);
-        $objectType->markObjectConstructed($list);
-        $lengthJit = new JITVariable(
-            $context,
-            JITVariable::TYPE_NATIVE_LONG,
-            JITVariable::KIND_VALUE,
-            $context->getTypeFromString('int64')->constInt(0, false)
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($list, 'DOMNodeList', 'length'),
-            $lengthJit,
-            JITVariable::TYPE_NATIVE_LONG
-        );
-        $parentJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $parent);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($list, 'DOMNodeList', VmDom::PROP_CHILD_NODES_OWNER),
-            $parentJit,
-            JITVariable::TYPE_VALUE
-        );
-        $listJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $list);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_CHILD_NODES),
-            $listJit,
-            JITVariable::TYPE_VALUE
-        );
+        $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, '');
+        if (null !== $inner) {
+            JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+        }
     }
 
     /** Null parent/sibling LLVM slots on the detached node (ext/dom/node.c; #19240). */
