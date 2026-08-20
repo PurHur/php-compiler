@@ -252,72 +252,76 @@ final class DomNodeLiveMutationRuntime
                 return self::nullValuePtr($context);
             }
             $orderedArgs = 'prepend' === $kind ? array_reverse($extraArgs) : $extraArgs;
-            // #27476: Element single-object append — LLVM live-slot sync only (peer
+            // #27476 / #32838: Element object append — LLVM live-slot sync only (peer
             // insertBefore #27449). NestedJIT+syncChildLinkSlots+bump resets length to 1
-            // on same-parent moves. Document appendChild uses DomDocumentAppendChild.
-            if (
-                'append' === $kind
-                && 1 === $extraArgCount
-                && \in_array($extraArgs[0]->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)
-            ) {
+            // on same-parent moves and leaves multi-arg held lists stale (#32838).
+            // Document appendChild uses DomDocumentAppendChild.
+            if ('append' === $kind && self::canUseObjectMutationBridge($extraArgs)) {
                 // LiveSlots increments the existing childNodes list in place so held
-                // `$list = $node->childNodes` observes +1 (#29048). Do not bump here —
-                // a pre-sync bumpHeld + LiveSlots +1 would double-count.
+                // `$list = $node->childNodes` observes +N (#29048 / #32838). Do not bump
+                // here — a pre-sync bumpHeld + LiveSlots +1 would double-count.
                 // php-src Wrong Document / Hierarchy Request before LiveSlots (#30274).
                 $parentObj = self::receiverObject($context, $receiver);
-                $childObj = self::mutationArgObject($context, $extraArgs[0]);
-                self::assertTreeMutationChildBeforeLiveSlots($context, $parentObj, $childObj);
-                JitDomAppendChildLiveSlots::sync(
-                    $context,
-                    $parentObj,
-                    $childObj
-                );
-                self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
-                // Same-parent move: rebuild INNER_XML order — concat would duplicate (#31684).
-                if (!self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0])) {
-                    self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
+                foreach ($extraArgs as $arg) {
+                    $childObj = self::mutationArgObject($context, $arg);
+                    self::assertTreeMutationChildBeforeLiveSlots($context, $parentObj, $childObj);
+                    JitDomAppendChildLiveSlots::sync(
+                        $context,
+                        $parentObj,
+                        $childObj
+                    );
+                    DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $arg);
                 }
-                DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $extraArgs[0]);
+                self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
+                // Same-parent move (arity-1): rebuild INNER_XML order — concat would duplicate (#31684).
+                if (
+                    1 === $extraArgCount
+                    && self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0])
+                ) {
+                    return self::nullValuePtr($context);
+                }
+                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
 
                 return self::nullValuePtr($context);
             }
-            // #32828: Element single-object prepend — insertBefore LiveSlots (peer
+            // #32828 / #32838: Element object prepend — insertBefore LiveSlots (peer
             // append #29048 / insertBefore #32801). NestedJIT + syncChildLinkSlots
-            // set first=last=newChild and collapsed refetch_len to 1.
-            if (
-                'prepend' === $kind
-                && 1 === $extraArgCount
-                && \in_array($extraArgs[0]->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)
-            ) {
+            // set first=last=newChild and collapsed refetch_len; multi-arg left held
+            // lists stale (#32838).
+            if ('prepend' === $kind && self::canUseObjectMutationBridge($extraArgs)) {
                 $parentObj = self::receiverObject($context, $receiver);
-                $childObj = self::mutationArgObject($context, $extraArgs[0]);
-                self::assertTreeMutationChildBeforeLiveSlots($context, $parentObj, $childObj);
                 JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
                 $objPtrTy = $context->getTypeFromString('__object__*');
-                $first = JitDomParentChildLinkLayout::loadFirstChild(
-                    $context,
-                    $parentObj,
-                    'dom_prepend'
-                );
-                $firstNull = $context->builder->icmp(Builder::INT_EQ, $first, $objPtrTy->constNull());
-                $bbAppend = BasicBlockHelper::append($context, 'dom_prepend_empty_append');
-                $bbInsert = BasicBlockHelper::append($context, 'dom_prepend_ib');
-                $bbDone = BasicBlockHelper::append($context, 'dom_prepend_done');
-                // php-src: prepend onto empty parent ≡ append; else insertBefore(new, firstChild).
-                $context->builder->branchIf($firstNull, $bbAppend, $bbInsert);
+                $prependIdx = 0;
+                foreach ($orderedArgs as $arg) {
+                    $childObj = self::mutationArgObject($context, $arg);
+                    self::assertTreeMutationChildBeforeLiveSlots($context, $parentObj, $childObj);
+                    $first = JitDomParentChildLinkLayout::loadFirstChild(
+                        $context,
+                        $parentObj,
+                        'dom_prepend'
+                    );
+                    $firstNull = $context->builder->icmp(Builder::INT_EQ, $first, $objPtrTy->constNull());
+                    $bbAppend = BasicBlockHelper::append($context, 'dom_prepend_empty_append_'.$prependIdx);
+                    $bbInsert = BasicBlockHelper::append($context, 'dom_prepend_ib_'.$prependIdx);
+                    $bbDone = BasicBlockHelper::append($context, 'dom_prepend_done_'.$prependIdx);
+                    // php-src: prepend onto empty parent ≡ append; else insertBefore(new, firstChild).
+                    $context->builder->branchIf($firstNull, $bbAppend, $bbInsert);
 
-                $context->builder->positionAtEnd($bbInsert);
-                JitDomInsertBeforeLiveSlots::sync($context, $parentObj, $childObj, $first);
-                $context->builder->branch($bbDone);
+                    $context->builder->positionAtEnd($bbInsert);
+                    JitDomInsertBeforeLiveSlots::sync($context, $parentObj, $childObj, $first);
+                    $context->builder->branch($bbDone);
 
-                $context->builder->positionAtEnd($bbAppend);
-                JitDomAppendChildLiveSlots::sync($context, $parentObj, $childObj);
-                $context->builder->branch($bbDone);
+                    $context->builder->positionAtEnd($bbAppend);
+                    JitDomAppendChildLiveSlots::sync($context, $parentObj, $childObj);
+                    $context->builder->branch($bbDone);
 
-                $context->builder->positionAtEnd($bbDone);
+                    $context->builder->positionAtEnd($bbDone);
+                    DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $arg);
+                    ++$prependIdx;
+                }
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
                 self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
-                DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $extraArgs[0]);
 
                 return self::nullValuePtr($context);
             }
