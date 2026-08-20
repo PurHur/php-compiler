@@ -133,6 +133,13 @@ final class HelperRuntimeCache
         // NestedJIT of NestedJIT-safe incrementArgv/decrementArgv matches VM/JIT (O=0 OK).
         'phpcompiler\\ext\\standard\\strincdecjithelper::incrementargv' => true,
         'phpcompiler\\ext\\standard\\strincdecjithelper::decrementargv' => true,
+        // #32466 — prelinked CopyJitHelper unit.o calls VmFs::copy → PHP copy() and re-enters
+        // __compiler_copy under NestedJIT (copy returns false / SIGSEGV). NestedJIT the
+        // file_get_contents/file_put_contents leaf into the user AOT module (peer rename #29141).
+        'phpcompiler\\ext\\standard\\copyjithelper::copyargv' => true,
+        // #32466 — ChownJitHelper → PHP chown()/chgrp() re-enters __compiler_chown under NestedJIT.
+        'phpcompiler\\ext\\standard\\chownjithelper::chownargv' => true,
+        'phpcompiler\\ext\\standard\\chownjithelper::chgrpargv' => true,
         // #27069 — NestedJIT CsvStrGetcsvJitHelper (no VmFs) into user AOT; prelinked
         // CsvJitHelper TU + whole-file NestedJIT of fgetcsvArgv/VmFs SIGSEGVd.
         'phpcompiler\\ext\\standard\\csvstrgetcsvjithelper::strgetcsvargv' => true,

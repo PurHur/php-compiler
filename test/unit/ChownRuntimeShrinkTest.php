@@ -27,13 +27,13 @@ final class ChownRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ChownJitHelper::chownArgv', $source);
         $this->assertStringContainsString('ChownJitHelper::chgrpArgv', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringContainsString('invokeNestedChx', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
-        $this->assertStringNotContainsString("lookupFunction('chown')", $source);
-        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(310, \substr_count($source, "\n") + 1);
     }
 
     public function testChownJitHelperMatchesVmFs(): void

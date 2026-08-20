@@ -77,11 +77,11 @@ final class TypeDeadCopyChownAbiRuntimeShrinkTest extends TestCase
             (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CopyRuntime.php')
         );
         $this->assertStringContainsString(
-            'ChownRuntime::ensureLinked',
+            'ChownRuntime::invokeChown',
             (string) file_get_contents(__DIR__.'/../../ext/standard/JitChown.php')
         );
         $this->assertStringContainsString(
-            'ChownRuntime::ensureLinked',
+            'ChownRuntime::invokeChgrp',
             (string) file_get_contents(__DIR__.'/../../ext/standard/JitChgrp.php')
         );
         $this->assertStringContainsString(

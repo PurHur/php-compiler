@@ -7,7 +7,9 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -43,6 +45,108 @@ final class ChownRuntime
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
+    }
+
+    /** @return Value i1 — true when chown/lchown succeeds */
+    public static function invokeChown(Context $context, Value $pathStr, Value $userVal, bool $lchown): Value
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return self::invokeNestedChx($context, $pathStr, $userVal, $lchown, false);
+        }
+
+        // Thin user-script AOT: libc leaf directly (bridge→ChownJitHelper SIGABRT on int uid; #32466).
+        return self::invokeNestedChx($context, $pathStr, $userVal, $lchown, false);
+    }
+
+    /** @return Value i1 — true when chgrp/lchgrp succeeds */
+    public static function invokeChgrp(Context $context, Value $pathStr, Value $groupVal, bool $lchgrp): Value
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return self::invokeNestedChx($context, $pathStr, $groupVal, $lchgrp, true);
+        }
+
+        return self::invokeNestedChx($context, $pathStr, $groupVal, $lchgrp, true);
+    }
+
+    /** @return Value i1 — libc chown/lchown/chgrp/lchgrp leaf during NestedJIT (#32466). */
+    private static function invokeNestedChx(
+        Context $context,
+        Value $pathStr,
+        Value $idVal,
+        bool $linkOnly,
+        bool $isGrp
+    ): Value {
+        $map = $context->structFieldMap['__string__'];
+        $pathCstr = $context->builder->structGep($pathStr, $map['value']);
+        $i32 = $context->getTypeFromString('int32');
+        $uidI64 = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $idVal
+        );
+        $id32 = $context->builder->trunc($uidI64, $i32);
+
+        if ($isGrp) {
+            // Linux glibc has no `chgrp` symbol — PHP uses fchownat(AT_FDCWD, path, -1, gid, …).
+            $minusOne = $i32->constInt(-1, true);
+            $atFdcwd = $i32->constInt(-100, true);
+            $flags = $i32->constInt($linkOnly ? 0x100 : 0, false);
+            $ret = $context->builder->call(
+                self::ensureLibcFchownatDecl($context),
+                $atFdcwd,
+                $pathCstr,
+                $minusOne,
+                $id32,
+                $flags
+            );
+        } elseif ($linkOnly) {
+            $ret = $context->builder->call(
+                self::ensureLibcChxDecl($context, 'lchown'),
+                $pathCstr,
+                $id32
+            );
+        } else {
+            $ret = $context->builder->call(
+                self::ensureLibcChxDecl($context, 'chown'),
+                $pathCstr,
+                $id32
+            );
+        }
+
+        $zero = $i32->constInt(0, false);
+
+        return $context->builder->icmp(Builder::INT_EQ, $ret, $zero);
+    }
+
+    private static function ensureLibcFchownatDecl(Context $context): LlvmFunction
+    {
+        try {
+            return $context->lookupFunction('fchownat');
+        } catch (\Throwable) {
+        }
+
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $ft = $context->context->functionType($i32, false, $i32, $i8p, $i32, $i32, $i32);
+        $fn = $context->module->addFunction('fchownat', $ft);
+        $context->registerFunction('fchownat', $fn);
+
+        return $fn;
+    }
+
+    private static function ensureLibcChxDecl(Context $context, string $name): LlvmFunction
+    {
+        try {
+            return $context->lookupFunction($name);
+        } catch (\Throwable) {
+        }
+
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $ft = $context->context->functionType($i32, false, $i8p, $i32);
+        $fn = $context->module->addFunction($name, $ft);
+        $context->registerFunction($name, $fn);
+
+        return $fn;
     }
 
     public static function implement(Context $context): void
