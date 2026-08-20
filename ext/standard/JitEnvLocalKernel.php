@@ -18,7 +18,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __compiler_env_local_* via EnvLocalJitHelper PHP (#9814, #13431, #19809, #23211).
  *
  * Quarantined from lib/JIT/Builtin/EnvLocalRuntime — {@see \PHPCompiler\JIT\Builtin\EnvLocalRuntime}
- * stays the thin orchestrator.
+ * stays the thin orchestrator. Type always-on shells dropped (#32729): bridges declare
+ * module-locally (getNamedFunction first).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer HashContextEmbedBridge #23189).
  *
