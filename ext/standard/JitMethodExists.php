@@ -25,6 +25,8 @@ final class JitMethodExists
     private const OBJECT_OR_CLASS_TYPE_ERROR =
         'method_exists(): Argument #1 ($object_or_class) must be of type object|string, %s given';
 
+    private static int $blockSeq = 0;
+
     public static function invoke(Context $context, JITVariable $objectOrClass, JITVariable $methodArg): Value
     {
         $methodLiteral = JitStringArg::compileTimeLiteral($methodArg);
@@ -32,6 +34,20 @@ final class JitMethodExists
             return self::forObject($context, $objectOrClass, $methodArg, $methodLiteral);
         }
         if (JITVariable::TYPE_VALUE === $objectOrClass->type) {
+            // Boxed locals (`$n = 'C'`) carry compileTimeString; fold like is_a (#32706) instead
+            // of __value__readString — runtime read mis-lowers when a literal class-string call
+            // precedes the assign under PHP_COMPILER_HELPER_RUNTIME_O=0 (#32701).
+            $classLit = JitStringArg::compileTimeLiteral($objectOrClass) ?? $objectOrClass->compileTimeString;
+            if (\is_string($classLit) && '' !== $classLit && null !== $methodLiteral) {
+                return self::forKnownClassStringLiteral(
+                    $context,
+                    $classLit,
+                    $objectOrClass,
+                    $methodArg,
+                    $methodLiteral
+                );
+            }
+
             return self::invokeFromValueBox($context, $objectOrClass, $methodArg, $methodLiteral);
         }
         if (JITVariable::TYPE_STRING !== $objectOrClass->type) {
@@ -93,6 +109,28 @@ final class JitMethodExists
         return self::routeThroughPhpHelper($context, $objectOrClass, $methodArg);
     }
 
+    /** Folded class-string from a boxed local with a known assigned string (#32701). */
+    private static function forKnownClassStringLiteral(
+        Context $context,
+        string $classLit,
+        JITVariable $objectOrClass,
+        JITVariable $methodArg,
+        string $methodLiteral
+    ): Value {
+        if ($context->type->object->hasUserDeclaredClass($classLit)) {
+            return ReflectionBuiltinHelper::methodExistsLiteral($context, $classLit, $methodLiteral);
+        }
+        $classStr = $context->builder->load($context->constantStringFromString($classLit));
+
+        return self::existsForRuntimeClassNameLiteralMethod(
+            $context,
+            $classStr,
+            $objectOrClass,
+            $methodArg,
+            $methodLiteral
+        );
+    }
+
     private static function existsForRuntimeClassNameLiteralMethod(
         Context $context,
         Value $classStr,
@@ -130,9 +168,10 @@ final class JitMethodExists
             }
             $exists = $context->builder->select($isMatch, $classExists, $exists);
         }
-        $knownBlock = BasicBlockHelper::append($context, 'method_exists_runtime_known');
-        $autoloadBlock = BasicBlockHelper::append($context, 'method_exists_runtime_autoload');
-        $mergeBlock = BasicBlockHelper::append($context, 'method_exists_runtime_merge');
+        $tag = 'r'.(string) self::$blockSeq++;
+        $knownBlock = BasicBlockHelper::append($context, 'method_exists_runtime_known_'.$tag);
+        $autoloadBlock = BasicBlockHelper::append($context, 'method_exists_runtime_autoload_'.$tag);
+        $mergeBlock = BasicBlockHelper::append($context, 'method_exists_runtime_merge_'.$tag);
         $context->builder->branchIf($matched, $knownBlock, $autoloadBlock);
 
         $context->builder->positionAtEnd($knownBlock);
@@ -180,13 +219,14 @@ final class JitMethodExists
             $i8->constInt(JITVariable::TYPE_STRING & 0x7f, false)
         );
 
-        $nullBlock = BasicBlockHelper::append($context, 'method_exists_null');
-        $notNull = BasicBlockHelper::append($context, 'method_exists_not_null');
-        $objectBlock = BasicBlockHelper::append($context, 'method_exists_obj');
-        $notObject = BasicBlockHelper::append($context, 'method_exists_not_obj');
-        $stringBlock = BasicBlockHelper::append($context, 'method_exists_str');
-        $errBlock = BasicBlockHelper::append($context, 'method_exists_err');
-        $mergeBlock = BasicBlockHelper::append($context, 'method_exists_merge');
+        $tag = 'v'.(string) self::$blockSeq++;
+        $nullBlock = BasicBlockHelper::append($context, 'method_exists_null_'.$tag);
+        $notNull = BasicBlockHelper::append($context, 'method_exists_not_null_'.$tag);
+        $objectBlock = BasicBlockHelper::append($context, 'method_exists_obj_'.$tag);
+        $notObject = BasicBlockHelper::append($context, 'method_exists_not_obj_'.$tag);
+        $stringBlock = BasicBlockHelper::append($context, 'method_exists_str_'.$tag);
+        $errBlock = BasicBlockHelper::append($context, 'method_exists_err_'.$tag);
+        $mergeBlock = BasicBlockHelper::append($context, 'method_exists_merge_'.$tag);
         $i1 = $context->getTypeFromString('int1');
         $resultSlot = BasicBlockHelper::entryAlloca($context, $i1);
 
