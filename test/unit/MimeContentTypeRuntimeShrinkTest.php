@@ -8,25 +8,35 @@ use PHPCompiler\ext\standard\MimeContentTypeJitHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
- * mime_content_type JIT routes through MimeContentTypeJitHelper PHP (#9236 / #25544).
+ * mime_content_type JIT routes through MimeContentTypeJitHelper PHP (#9236 / #25544 / #33034).
  *
  * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (peer #25541).
+ * Runtime owns ABI module-locally with insert-block save/restore (peer StringFileGetContents).
+ * Sniff is same-file (NestedJIT cannot call VmMime across HELPER_PATH).
  */
 final class MimeContentTypeRuntimeShrinkTest extends TestCase
 {
-    public function testMimeContentTypeJitHelperDelegatesToVmMime(): void
+    public function testMimeContentTypeJitHelperUsesNestedJitFileReadAndSameFileSniff(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/MimeContentTypeJitHelper.php');
-        $this->assertStringContainsString('VmMime::mimeContentTypeFromPath', $source);
-        $this->assertStringNotContainsString('strncmp', $source);
+        $this->assertStringContainsString('@\\file_get_contents', $source);
+        $this->assertStringContainsString('self::detectFromBytes', $source);
+        $this->assertStringContainsString('#33034', $source);
+        $this->assertStringNotContainsString('VmMime::', $source);
+        $this->assertStringNotContainsString('VmFs::fileGetContents', $source);
     }
 
     public function testMimeContentTypeRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MimeContentTypeRuntime.php');
+        $this->assertStringContainsString('#33034', $source);
         $this->assertStringContainsString('MimeContentTypeJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::hasNamedBridgeEntry', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringContainsString('getNamedFunction', $source);
+        $this->assertStringContainsString('addFunction', $source);
         $this->assertStringNotContainsString("lookupFunction('strncmp')", $source);
         $this->assertStringNotContainsString('__compiler_file_get_contents', $source);
         $this->assertStringNotContainsString('literalString', $source);
@@ -34,10 +44,8 @@ final class MimeContentTypeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $lineCount = \substr_count($source, "\n") + 1;
-        $this->assertLessThan(100, $lineCount);
-        $this->assertGreaterThan(60, 186 - $lineCount);
+        $this->assertLessThan(140, $lineCount);
     }
 
     public function testMimeContentTypeJitHelperMatchesVmMimeSemantics(): void
