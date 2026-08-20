@@ -9080,11 +9080,13 @@ class JIT {
                         break;
                     }
                     // VALUE box + CFG string: do not ensureHashtablePointer (#32764 / #22646 write).
-                    // String/object dims are array keys — never string-byte offsets (#32798;
-                    // function-static arrays are often CFG-typed string while the box holds a HT).
+                    // Skip for function-static: php-cfg often types `static $a = ['x']` as scalar
+                    // string while the box holds a HT — string-offset then SEGVs (#32800).
+                    // String/object dims are always array keys (#32798).
                     if (
                         $forWrite
                         && Variable::TYPE_VALUE === $value->type
+                        && !$value->functionStaticGlobal
                         && JIT\ValueBoxDimWrite::containerCfgIsString($containerOp->type ?? null)
                         && Variable::TYPE_STRING !== $dim->type
                         && Variable::TYPE_OBJECT !== $dim->type
