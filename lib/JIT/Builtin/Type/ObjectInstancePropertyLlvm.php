@@ -87,9 +87,15 @@ final class ObjectInstancePropertyLlvm
             }
         }
         if (!$hasProp) {
-            $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name);
-            if (null !== $runtimeFetch) {
-                return $runtimeFetch;
+            // Classes that allow dynamic properties must define the slot on *this* class.
+            // tryPropertyFetchByRuntimeClass can pick another class that already declared the
+            // same name (e.g. user `C::$x` while writing `stdClass::$x`) and skip defineProperty,
+            // so later property_exists() folds false for the dynamic class (#32688 / #10643).
+            if (!$object->allowsDynamicProperties($classId)) {
+                $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name);
+                if (null !== $runtimeFetch) {
+                    return $runtimeFetch;
+                }
             }
             $object->defineProperty($classId, $name, $object->externalPropertyJitType($class, $name));
             $nameId = $object->propNameIdAfterDefine($name);
