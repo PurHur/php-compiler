@@ -89,9 +89,11 @@ final class TypeDeadOpensslMethodsAbiRuntimeShrinkTest extends TestCase
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void
     {
         $jit = (string) file_get_contents(__DIR__.'/../../ext/openssl/JitOpensslMethods.php');
-        $this->assertStringContainsString('OpensslMethodsCrypto::ensureLinked', $jit);
+        $this->assertStringContainsString('VmOpenssl::cipherMethods', $jit);
+        $this->assertStringContainsString('VmOpenssl::mdMethods', $jit);
         $this->assertStringContainsString('openssl_get_cipher_methods', $jit);
         $this->assertStringContainsString('openssl_get_md_methods', $jit);
+        $this->assertStringNotContainsString('OpensslMethodsCrypto::ensureLinked', $jit);
 
         $helper = (string) file_get_contents(__DIR__.'/../../ext/openssl/OpensslMethodsJitHelper.php');
         $this->assertStringContainsString('OpensslCipherRegistry::CIPHER_METHODS', $helper);
