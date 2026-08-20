@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DomC14NFileRuntime;
 use PHPCompiler\JIT\Builtin\DomC14NRuntime;
 use PHPCompiler\JIT\Builtin\DomCreateElementNSRuntime;
 use PHPCompiler\JIT\Builtin\DomCreateElementRuntime;
@@ -900,6 +901,23 @@ final class JitDomDocumentMethodKernel
                 $context->getTypeFromString('int64'),
             ],
             'PHPCompiler\\ext\\dom\\DomC14NJitHelper::c14nArgv',
+            '/ext/dom/DomC14NJitHelper.php'
+        );
+    }
+
+    public static function ensureC14NFileBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomC14NFileRuntime::ABI_NAME,
+            'dom_node_c14n_file_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('int64'),
+            'PHPCompiler\\ext\\dom\\DomC14NJitHelper::c14nFileArgv',
             '/ext/dom/DomC14NJitHelper.php'
         );
     }

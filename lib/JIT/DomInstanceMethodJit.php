@@ -255,6 +255,9 @@ final class DomInstanceMethodJit
         'domnode::c14n' => true,
         'domelement::c14n' => true,
         'domdocument::c14n' => true,
+        'domnode::c14nfile' => true,
+        'domelement::c14nfile' => true,
+        'domdocument::c14nfile' => true,
         'domxpath::query' => true,
         'domxpath::evaluate' => true,
         'domxpath::registernamespace' => true,
@@ -918,6 +921,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::c14nfile' === $lc || 'domelement::c14nfile' === $lc || 'domdocument::c14nfile' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeC14NFile();
+
+                return;
+            }
             if ('domelement::removechild' === $lc || 'domnode::removechild' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeRemoveChild();
 
@@ -1281,6 +1289,9 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domnode::c14n');
             self::ensureProxy($context, 'domelement::c14n');
             self::ensureProxy($context, 'domdocument::c14n');
+            self::ensureProxy($context, 'domnode::c14nfile');
+            self::ensureProxy($context, 'domelement::c14nfile');
+            self::ensureProxy($context, 'domdocument::c14nfile');
             self::ensureProxy($context, 'domnode::removechild');
             self::ensureProxy($context, 'domelement::removechild');
             self::ensureProxy($context, 'domnode::replacechild');
