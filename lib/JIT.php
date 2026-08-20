@@ -8075,6 +8075,8 @@ class JIT {
                     }
                     if (isset($block->paramByRef[$idx])) {
                         $this->bindJitParamByReference($block, $param->result, $args[$argIdx]);
+                    } elseif ($this->storeJitCalleeValueStructFormal($param->result, $args[$argIdx])) {
+                        // stored — skip assignOperand copy chain
                     } else {
                         $paramArg = $this->prepareNestedJitCalleeParamArgument($args[$argIdx]);
                         $this->assignOperand($param->result, $paramArg, true);
@@ -8209,6 +8211,12 @@ class JIT {
                                 $recvOp,
                                 $this->context->getVariableFromOp($recvOp)
                             );
+                            break;
+                        }
+                        if ($this->storeJitCalleeValueStructFormal(
+                            $recvOp,
+                            $this->prepareNestedJitCalleeParamArgument($args[$recvSlot])
+                        )) {
                             break;
                         }
                         $this->assignOperand(
@@ -8406,10 +8414,21 @@ class JIT {
                         break;
                     }
                     if ($needsNamedStorageAssign) {
-                        if (!$this->context->hasVariableOp($aliasOp)) {
+                        if (
+                            null === $this->byRefFormalParamIndexForAssignDest($block, $aliasOp)
+                            && !$this->context->hasVariableOp($aliasOp)
+                        ) {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $aliasOp);
                         }
-                        $this->assignOperand($aliasOp, $value, true);
+                        $this->emitAssignOperandWithByRefFormalFastPath(
+                            $block,
+                            $aliasOp,
+                            $rhsOperand,
+                            $value,
+                            $args,
+                            $thisParamOffset,
+                            true
+                        );
                         $aliasVar = $this->context->getVariableFromOp($aliasOp);
                         // `$f = function () use ($n) { ... }` — named storage assign must keep
                         // ClosureWithCaptures on `$f` or AOT invoke drops use() snapshots (#24106).
@@ -8417,7 +8436,15 @@ class JIT {
                         $this->recordListUnpackAssignSlot($aliasOp, $aliasVar);
                     } else {
                         if (null !== $aliasOp) {
-                            $this->assignOperand($aliasOp, $value, $forceAssign);
+                            $this->emitAssignOperandWithByRefFormalFastPath(
+                                $block,
+                                $aliasOp,
+                                $rhsOperand,
+                                $value,
+                                $args,
+                                $thisParamOffset,
+                                $forceAssign
+                            );
                         }
                         if (null !== $destOp) {
                             $destUsed = [] !== $destOp->usages;
@@ -8430,9 +8457,13 @@ class JIT {
                                 && $op->arg1 !== $rhsSlot
                                 && !$block->assignTempSlotIsDead((int) $op->arg1);
                             if ($destUsed || $forceAssign || $resultConsumedLater) {
-                                $this->assignOperand(
+                                $this->emitAssignOperandWithByRefFormalFastPath(
+                                    $block,
                                     $destOp,
+                                    $rhsOperand,
                                     $value,
+                                    $args,
+                                    $thisParamOffset,
                                     $destUsed || $forceAssign || $resultConsumedLater
                                 );
                             }
@@ -16297,11 +16328,52 @@ class JIT {
      */
     private function resolveAssignLvalue(Operand $resultOp): JIT\Variable
     {
+        $block = $this->context->jitEnclosingBlock;
+        if (null !== $block && null !== $block->func) {
+            $slot = $block->slotForOperand($resultOp);
+            if (null !== $slot) {
+                foreach ($block->func->params as $paramIdx => $param) {
+                    if (!isset($block->paramByRef[$paramIdx])) {
+                        continue;
+                    }
+                    if ($block->slotForOperand($param->result) !== $slot) {
+                        continue;
+                    }
+                    if (!$this->context->hasVariableOp($param->result)) {
+                        continue;
+                    }
+                    $paramVar = $this->context->getVariableFromOp($param->result);
+                    if (
+                        null !== $paramVar->valueBoxAliasPtr
+                        || $paramVar->borrowedValueEntry
+                    ) {
+                        $this->context->scope->variables[$resultOp] = $paramVar;
+
+                        return $paramVar;
+                    }
+                }
+            }
+        }
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $bound = $this->context->namedVariableBindings[$resolved];
+                if (
+                    null !== $bound->valueBoxAliasPtr
+                    || $bound->borrowedValueEntry
+                    || null !== $bound->foreachByRefPackedArm
+                ) {
+                    $this->context->scope->variables[$resultOp] = $bound;
+
+                    return $bound;
+                }
+            }
+        }
         $result = $this->context->getVariableFromOp($resultOp);
         if (null !== $result->foreachByRefPackedArm || $result->borrowedValueEntry) {
             return $result;
         }
-        $name = JIT\OperandName::resolve($resultOp);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
@@ -16789,6 +16861,9 @@ class JIT {
 
             return;
         }
+        if ($this->rebindAssignLvalueFromByRefFormalOrName($resultOp)) {
+            // operand now aliases the live by-ref formal / named binding
+        }
         if (!$this->context->hasVariableOp($resultOp) && null !== $resolvedName && '' !== $resolvedName) {
             $boundName = $this->context->resolveRefAliasName($resolvedName);
             if (isset($this->context->namedVariableBindings[$boundName])) {
@@ -16969,11 +17044,24 @@ class JIT {
         // Reference aliases to object properties keep objectPropertySlot; guard before
         // valueBoxAliasPtr writes so readonly checks are not skipped (#4273, #3149).
         if (null !== $result->valueBoxAliasPtr && null === $result->objectPropertySlot) {
-            JIT\JitValueBox::assignToPointer(
-                $this->context,
-                $result->valueBoxAliasPtr,
-                $value
-            );
+            if (
+                Variable::TYPE_VALUE === $value->type
+                && Variable::KIND_VARIABLE === $value->kind
+                && '__value__' === $this->context->getStringFromType($value->value->typeOf())
+            ) {
+                JIT\JitValueBox::copyIntoPointer(
+                    $this->context,
+                    $result->valueBoxAliasPtr,
+                    JIT\JitValueBox::pointer($this->context, $value->value)
+                );
+            } else {
+                JIT\JitValueBox::assignToPointer(
+                    $this->context,
+                    $result->valueBoxAliasPtr,
+                    $value
+                );
+            }
+            JIT\JitValueBox::publishAfterWrite($this->context, $result->valueBoxAliasPtr);
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             $this->recordListUnpackAssignSlot($resultOp, $result);
 
@@ -17465,6 +17553,34 @@ class JIT {
             $value->type === $result->type
             && !($branchMergeTarget && Variable::TYPE_VALUE === $result->type)
         ) {
+            if (
+                Variable::TYPE_VALUE === $value->type
+                && Variable::KIND_VALUE === $value->kind
+                && '__value__' === $this->context->getStringFromType($value->value->typeOf())
+                && '__value__' === $this->context->getStringFromType($result->value->typeOf())
+                && null === $result->valueBoxAliasPtr
+                && !$result->borrowedValueEntry
+            ) {
+                if (!$result->includeBinding) {
+                    $result->free();
+                }
+                $this->context->builder->store($value->value, $result->value);
+                $this->maybeCopyObjectPropertyBacking($result, $value, $force);
+                if (null === $result->objectPropertySlot) {
+                    $result->addref();
+                }
+                $this->copyValueBoxJitFlags($result, $value, $force);
+                $result->compileTimeConstantName = $value->compileTimeConstantName;
+                $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+                $this->syncCompileTimeString($result, $value, $force);
+                $this->syncCompileTimeFloat($result, $value, $force);
+                $this->syncCompileTimeBcmathNumber($result, $value, $force);
+                $this->syncCompileTimeDomTagName($result, $value, $force);
+                $this->syncCompileTimeDatePeriod($result, $value, $force);
+                $this->noteDateTimeZoneLocal($resultOp, $value);
+
+                return;
+            }
             if (null !== $result->staticPropertyGlobal && null !== $result->staticPropertyType) {
                 if (
                     !JIT\AsymmetricVisibilityGuard::emitBeforeStaticPropertyStore(
@@ -23792,6 +23908,424 @@ class JIT {
         if (null !== $name && '' !== $name) {
             $this->context->bindVariableByName($name, $paramVar);
         }
+    }
+
+    /**
+     * {@see TYPE_ASSIGN} into a by-ref formal: write through the LLVM {@see __value__*} edge
+     * argument (ZEND_SEND_REF / zend_assign_to_variable), bypassing orphan SSA operands (#e06_byref).
+     *
+     * @param list<Variable> $args
+     */
+    private function emitAssignOperandWithByRefFormalFastPath(
+        Block $block,
+        Operand $destOp,
+        Operand $rhsOperand,
+        Variable $value,
+        array $args,
+        int $thisParamOffset,
+        bool $force
+    ): void {
+        if (
+            !$this->tryEmitByRefFormalValueBoxAssign(
+                $block,
+                $destOp,
+                $rhsOperand,
+                $value,
+                $args,
+                $thisParamOffset
+            )
+        ) {
+            $this->assignOperand($destOp, $value, $force);
+        }
+    }
+
+    /**
+     * {@see TYPE_ASSIGN} into a by-ref formal: write through the LLVM {@see __value__*} edge
+     * argument (ZEND_SEND_REF / zend_assign_to_variable), bypassing orphan SSA operands (#e06_byref).
+     *
+     * @param list<Variable> $args
+     */
+    private function tryEmitByRefFormalValueBoxAssign(
+        Block $block,
+        Operand $destOp,
+        Operand $rhsOperand,
+        Variable $value,
+        array $args,
+        int $thisParamOffset
+    ): bool {
+        if (null === $block->func || [] === $block->paramByRef) {
+            return false;
+        }
+        $refIdx = $this->byRefFormalParamIndexForAssignDest($block, $destOp);
+        if (null === $refIdx) {
+            return false;
+        }
+        $rhsSlot = $block->slotForOperand($rhsOperand);
+        if (null !== $rhsSlot) {
+            foreach ($block->func->params as $param) {
+                if (
+                    $block->slotForOperand($param->result) === $rhsSlot
+                    && $this->context->hasVariableOp($param->result)
+                ) {
+                    $value = $this->context->getVariableFromOp($param->result);
+                    break;
+                }
+            }
+        } elseif ($this->context->hasVariableOp($rhsOperand)) {
+            $value = $this->context->getVariableFromOp($rhsOperand);
+        }
+        $destBinding = $this->resolveByRefFormalAssignDestBinding($block, $destOp, $args, $thisParamOffset, $refIdx);
+        if (null === $destBinding) {
+            return false;
+        }
+        [$destPtr, $destVar] = $destBinding;
+        if ($this->tryEmitByRefFormalAssignFromCalleeFormal($block, $rhsOperand, $destPtr, $args, $thisParamOffset)) {
+            // emitted from ABI formal edge
+        } elseif ($this->tryEmitDirectByRefFormalValueBoxCopy($destPtr, $value)) {
+            // emitted
+        } elseif (
+            Variable::TYPE_VALUE === $value->type
+            && Variable::KIND_VARIABLE === $value->kind
+            && '__value__' === $this->context->getStringFromType($value->value->typeOf())
+        ) {
+            JIT\JitValueBox::copyIntoPointer(
+                $this->context,
+                $destPtr,
+                JIT\JitValueBox::pointer($this->context, $value->value)
+            );
+        } else {
+            JIT\JitValueBox::assignToPointer($this->context, $destPtr, $value);
+        }
+        JIT\JitValueBox::publishAfterWrite($this->context, $destPtr);
+        $this->context->setVariableOp($destOp, $destVar);
+        $destName = JIT\OperandName::resolve($destOp);
+        if (null !== $destName && '' !== $destName) {
+            $this->context->bindVariableByName(
+                $this->context->resolveRefAliasName($destName),
+                $destVar
+            );
+        }
+        JIT\UndefinedVariableHelper::markAssigned($this->context, $destOp, $destVar);
+
+        return true;
+    }
+
+    /**
+     * `$r = $v` when RHS is an untyped formal still on the LLVM {@see __value__} edge (#e06_byref).
+     *
+     * @param list<Variable> $args
+     */
+    private function tryEmitByRefFormalAssignFromCalleeFormal(
+        Block $block,
+        Operand $rhsOperand,
+        \PHPLLVM\Value $destPtr,
+        array $args,
+        int $thisParamOffset
+    ): bool {
+        $rhsSlot = $block->slotForOperand($rhsOperand);
+        if (null === $rhsSlot) {
+            return false;
+        }
+        foreach ($block->func->params as $idx => $param) {
+            if ($block->slotForOperand($param->result) !== $rhsSlot) {
+                continue;
+            }
+            $argIdx = $thisParamOffset + (int) $idx;
+            if (!isset($args[$argIdx])) {
+                return false;
+            }
+            $formal = $args[$argIdx];
+            if (
+                Variable::KIND_VALUE !== $formal->kind
+                || Variable::TYPE_VALUE !== $formal->type
+                || '__value__' !== $this->context->getStringFromType($formal->value->typeOf())
+            ) {
+                return false;
+            }
+            if (!JIT\BasicBlockHelper::unsealAndContinue($this->context)) {
+                JIT\BasicBlockHelper::ensureOpenInsertBlockReplacingVoidReturn($this->context, 'byref_formal_abi_cont');
+            }
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $this->context->builder->store($formal->value, $slot);
+            $srcPtr = JIT\JitValueBox::pointer($this->context, $slot);
+            $long = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                $srcPtr
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $destPtr,
+                $long
+            );
+            JIT\JitValueBox::publishAfterWrite($this->context, $destPtr);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Direct typed write into a by-ref formal edge — avoids copyBetweenPointers dispatch
+     * picking the wrong source box when orphan SSA operands share a scope slot (#e06_byref).
+     */
+    private function tryEmitDirectByRefFormalValueBoxCopy(\PHPLLVM\Value $destPtr, Variable $value): bool
+    {
+        if (Variable::TYPE_NATIVE_LONG === $value->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $destPtr,
+                $this->context->helper->loadValue($value)
+            );
+
+            return true;
+        }
+        $srcPtr = null;
+        if (
+            Variable::TYPE_VALUE === $value->type
+            && Variable::KIND_VALUE === $value->kind
+            && '__value__*' === $this->context->getStringFromType($value->value->typeOf())
+        ) {
+            $srcPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $value->value);
+        } elseif (
+            Variable::TYPE_VALUE === $value->type
+            && Variable::KIND_VARIABLE === $value->kind
+        ) {
+            $llvmTy = $this->context->getStringFromType($value->value->typeOf());
+            if ('__value__*' === $llvmTy) {
+                $srcPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $value->value);
+            } elseif ('__value__' === $llvmTy) {
+                $srcPtr = JIT\JitValueBox::pointer($this->context, $value->value);
+            }
+        }
+        if (null === $srcPtr) {
+            return false;
+        }
+        if (!JIT\BasicBlockHelper::unsealAndContinue($this->context)) {
+            JIT\BasicBlockHelper::ensureOpenInsertBlockReplacingVoidReturn($this->context, 'byref_formal_assign_cont');
+        }
+        $map = $this->context->structFieldMap['__value__'];
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($srcPtr, $map['type'])
+        );
+        $i8 = $this->context->getTypeFromString('int8');
+        $kind = $this->context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isLong = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $longBlock = JIT\BasicBlockHelper::append($this->context, 'byref_formal_assign_long');
+        $slowBlock = JIT\BasicBlockHelper::append($this->context, 'byref_formal_assign_slow');
+        $doneBlock = JIT\BasicBlockHelper::append($this->context, 'byref_formal_assign_done');
+        $this->context->builder->branchIf($isLong, $longBlock, $slowBlock);
+        $this->context->builder->positionAtEnd($longBlock);
+        $long = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readLong'),
+            $srcPtr
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeLong'),
+            $destPtr,
+            $long
+        );
+        $this->context->builder->branch($doneBlock);
+        $this->context->builder->positionAtEnd($slowBlock);
+        JIT\JitValueBox::assignToPointer($this->context, $destPtr, $value);
+        $this->context->builder->branch($doneBlock);
+        $this->context->builder->positionAtEnd($doneBlock);
+
+        return true;
+    }
+
+    /**
+     * @param list<Variable> $args
+     *
+     * @return array{0: \PHPLLVM\Value, 1: Variable}|null
+     */
+    private function resolveByRefFormalAssignDestBinding(
+        Block $block,
+        Operand $destOp,
+        array $args,
+        int $thisParamOffset,
+        int $refIdx
+    ): ?array {
+        $param = $block->func->params[$refIdx] ?? null;
+        if (null !== $param && $this->context->hasVariableOp($param->result)) {
+            $paramVar = $this->context->getVariableFromOp($param->result);
+            if (null !== $paramVar->valueBoxAliasPtr) {
+                return [
+                    JIT\JitValueBox::normalizeValuePtr($this->context, $paramVar->valueBoxAliasPtr),
+                    $paramVar,
+                ];
+            }
+        }
+        $argIdx = $thisParamOffset + $refIdx;
+        if (isset($args[$argIdx])) {
+            $argVar = $args[$argIdx];
+            $destVar = $argVar;
+            if (null !== $param && $this->context->hasVariableOp($param->result)) {
+                $destVar = $this->context->getVariableFromOp($param->result);
+            }
+
+            return [
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $argVar),
+                $destVar,
+            ];
+        }
+        $destName = JIT\OperandName::resolve($destOp);
+        if (null !== $destName && '' !== $destName) {
+            $boundName = $this->context->resolveRefAliasName($destName);
+            if (isset($this->context->namedVariableBindings[$boundName])) {
+                $bound = $this->context->namedVariableBindings[$boundName];
+                if (null !== $bound->valueBoxAliasPtr) {
+                    return [
+                        JIT\JitValueBox::normalizeValuePtr($this->context, $bound->valueBoxAliasPtr),
+                        $bound,
+                    ];
+                }
+            }
+        }
+        $paramName = $block->paramNames[$refIdx] ?? null;
+        if (null !== $paramName && '' !== $paramName) {
+            $boundName = $this->context->resolveRefAliasName($paramName);
+            if (isset($this->context->namedVariableBindings[$boundName])) {
+                $bound = $this->context->namedVariableBindings[$boundName];
+                if (null !== $bound->valueBoxAliasPtr) {
+                    return [
+                        JIT\JitValueBox::normalizeValuePtr($this->context, $bound->valueBoxAliasPtr),
+                        $bound,
+                    ];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function byRefFormalParamIndexForAssignDest(Block $block, Operand $destOp): ?int
+    {
+        if (null === $block->func) {
+            return null;
+        }
+        $destSlot = $block->slotForOperand($destOp);
+        if (null !== $destSlot) {
+            foreach ($block->paramByRef as $paramIdx => $_) {
+                $param = $block->func->params[$paramIdx] ?? null;
+                if (null === $param) {
+                    continue;
+                }
+                if ($block->slotForOperand($param->result) === $destSlot) {
+                    return (int) $paramIdx;
+                }
+            }
+        }
+        $destName = JIT\OperandName::resolve($destOp);
+        if (null === $destName || '' === $destName) {
+            return null;
+        }
+        foreach ($block->paramByRef as $paramIdx => $_) {
+            $paramName = $block->paramNames[$paramIdx] ?? null;
+            if (null === $paramName || $paramName !== $destName) {
+                continue;
+            }
+
+            return (int) $paramIdx;
+        }
+
+        return null;
+    }
+
+    /**
+     * php-cfg may use a distinct SSA operand for `$r = …` vs the param's {@see Param::result};
+     * rebind before assign so {@see Variable::$valueBoxAliasPtr} is not lost (#e06_byref).
+     */
+    private function rebindAssignLvalueFromByRefFormalOrName(Operand $resultOp): bool
+    {
+        if ($this->context->hasVariableOp($resultOp)) {
+            $existing = $this->context->getVariableFromOp($resultOp);
+            if (
+                null !== $existing->valueBoxAliasPtr
+                || $existing->borrowedValueEntry
+                || null !== $existing->foreachByRefPackedArm
+            ) {
+                return false;
+            }
+        }
+        $block = $this->context->jitEnclosingBlock;
+        if (null !== $block && null !== $block->func) {
+            $slot = $block->slotForOperand($resultOp);
+            if (null !== $slot) {
+                foreach ($block->func->params as $paramIdx => $param) {
+                    if (!isset($block->paramByRef[$paramIdx])) {
+                        continue;
+                    }
+                    if ($block->slotForOperand($param->result) !== $slot) {
+                        continue;
+                    }
+                    if (!$this->context->hasVariableOp($param->result)) {
+                        continue;
+                    }
+                    $paramVar = $this->context->getVariableFromOp($param->result);
+                    if (
+                        null === $paramVar->valueBoxAliasPtr
+                        && !$paramVar->borrowedValueEntry
+                    ) {
+                        continue;
+                    }
+                    $this->context->setVariableOp($resultOp, $paramVar);
+
+                    return true;
+                }
+            }
+        }
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null === $name || '' === $name) {
+            return false;
+        }
+        $boundName = $this->context->resolveRefAliasName($name);
+        if (!isset($this->context->namedVariableBindings[$boundName])) {
+            return false;
+        }
+        $bound = $this->context->namedVariableBindings[$boundName];
+        if (
+            null === $bound->valueBoxAliasPtr
+            && !$bound->borrowedValueEntry
+            && null === $bound->foreachByRefPackedArm
+        ) {
+            return false;
+        }
+        $this->context->setVariableOp($resultOp, $bound);
+
+        return true;
+    }
+
+    /**
+     * Recv a by-value {@see __value__} ABI formal via struct store, not copyBetweenPointers (#e06_byref).
+     *
+     * Sealed prologue BBs made the dispatch copy unreachable; `$r = $v` then copied null into
+     * the caller's by-ref slot.
+     */
+    private function storeJitCalleeValueStructFormal(Operand $paramOperand, Variable $formalArg): bool
+    {
+        if (Variable::KIND_VALUE !== $formalArg->kind || Variable::TYPE_VALUE !== $formalArg->type) {
+            return false;
+        }
+        if ('__value__' !== $this->context->getStringFromType($formalArg->value->typeOf())) {
+            return false;
+        }
+        if (!$this->context->hasVariableOp($paramOperand)) {
+            return false;
+        }
+        $dest = $this->context->getVariableFromOp($paramOperand);
+        if ('__value__' !== $this->context->getStringFromType($dest->value->typeOf())) {
+            return false;
+        }
+        $this->context->builder->store($formalArg->value, $dest->value);
+        $dest->addref();
+        JIT\UndefinedVariableHelper::markAssigned($this->context, $paramOperand, $dest);
+
+        return true;
     }
 
     /**
