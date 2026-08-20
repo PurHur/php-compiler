@@ -1670,6 +1670,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/file.stub.php — ?int $length = null (#24846)
             'fwrite' => 2 === $index ? '?int' : null,
             'fgets' => 1 === $index ? '?int' : null,
+            // ext/standard/file.stub.php — ?int $mtime = null, ?int $atime = null (#28558)
+            'touch' => (1 === $index || 2 === $index) ? '?int' : null,
             // ext/standard/file.stub.php — ?int $length = null (#25750)
             'stream_get_contents' => 1 === $index ? '?int' : null,
             // ext/standard/streamsfuncs.stub.php — ?int $length = null (#27739)
