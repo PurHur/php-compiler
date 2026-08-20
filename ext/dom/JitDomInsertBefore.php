@@ -7,19 +7,24 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
+use PHPCompiler\JIT\Call\DomNodeAppendChild;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMNode::insertBefore() (#22686, #26458, #27449, #32801).
+ * LLVM lowering for DOMNode::insertBefore() (#22686, #26458, #27449, #32801, #33031).
  *
  * Thin standalone AOT materializes createElement nodes without DomRegistry
  * ({@see JitDomCreateElement::materializeElementFromLiteral}). The NestedJIT
  * DomRegistry bridge then leaves LLVM childNodes/firstChild/parentNode stale —
  * mirror ParentNode::append / replaceChild slot sync (php-src ext/dom/node.c).
  * Live held childNodes: {@see JitDomInsertBeforeLiveSlots}.
+ *
+ * Null / omitted refChild ≡ append (php-src). Must use {@see DomNodeAppendChild}
+ * (LiveSlots), not historic {@see JitDomAppendChild::invoke} stub (#33031 / re-#26458).
  */
 final class JitDomInsertBefore
 {
@@ -35,38 +40,18 @@ final class JitDomInsertBefore
             return JitDomRequireDomNodeArg::boxNullResult($context);
         }
 
-        // php-src: null refChild ≡ append (ext/dom/node.c). Reuse appendChild AOT path (#26458).
-        if (
-            \count($args) < 3
-            || JITVariable::TYPE_NULL === $args[2]->type
-            || $args[2]->isNullConstant
-        ) {
-            return JitDomAppendChild::invoke($context, $args[0], $args[1]);
+        // php-src: null / omitted refChild ≡ append (ext/dom/node.c).
+        if (\count($args) < 3 || self::isCompileTimeNullRef($args[2])) {
+            return self::appendAsNullRef($context, $args[0], $args[1]);
         }
 
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            self::syncUserScriptInsertBeforeSlots($context, $args[0], $args[1], $args[2]);
-            // LiveSlots refresh held pins (#32801); saveXML still reads INNER_XML (#32940 / peer #32903).
-            self::syncUserScriptInnerXml($context, $args[0], $args[1], $args[2]);
-            DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $args[1]);
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_insert_before_post');
-
-            return self::boxObjectResult($context, self::loadObjectArg($context, $args[1]));
+        // Variable null ($ref = null) is TYPE_VALUE without isNullConstant — branch
+        // before readObject (literal null already handled above) (#33031).
+        if (JITVariable::TYPE_VALUE === $args[2]->type) {
+            return self::invokeWithMaybeNullRef($context, $args[0], $args[1], $args[2]);
         }
 
-        DomNodeTreeMutationRuntime::ensureInsertBeforeLinked($context);
-
-        $parent = self::loadObjectArg($context, $args[0]);
-        $newChild = self::loadObjectArg($context, $args[1]);
-        $refChild = self::loadObjectArg($context, $args[2]);
-        $context->builder->call(
-            $context->lookupFunction(DomNodeTreeMutationRuntime::ABI_INSERT_BEFORE),
-            $parent,
-            $newChild,
-            $refChild
-        );
-
-        return self::boxObjectResult($context, $newChild);
+        return self::invokeWithObjectRef($context, $args[0], $args[1], $args[2]);
     }
 
     public static function syncUserScriptInsertBeforeSlotsPublic(
@@ -92,6 +77,102 @@ final class JitDomInsertBefore
     ): void {
         unset($item0, $item1);
         JitDomInsertBeforeLiveSlots::incrementChildNodesLengthInPlace($context, $parent);
+    }
+
+    /**
+     * Full appendChild path for null-ref insertBefore (#33031).
+     *
+     * Historic {@see JitDomAppendChild::invoke} only wrote parentNode — LiveSlots /
+     * InnerXml stayed stale so the node was dropped from saveXML / childNodes.
+     */
+    private static function appendAsNullRef(
+        Context $context,
+        JITVariable $parentVar,
+        JITVariable $newChildVar
+    ): Value {
+        return (new DomNodeAppendChild())->call($context, $parentVar, $newChildVar);
+    }
+
+    private static function isCompileTimeNullRef(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
+    }
+
+    private static function invokeWithMaybeNullRef(
+        Context $context,
+        JITVariable $parentVar,
+        JITVariable $newChildVar,
+        JITVariable $refChildVar
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_maybe_null');
+        $refPtr = JitValueBox::valuePtrFromVariable($context, $refChildVar);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($refPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NULL, false)
+        );
+
+        $nullBlock = BasicBlockHelper::append($context, 'dom_ib_ref_null');
+        $objBlock = BasicBlockHelper::append($context, 'dom_ib_ref_obj');
+        $doneBlock = BasicBlockHelper::append($context, 'dom_ib_ref_done');
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $nullResult = self::appendAsNullRef($context, $parentVar, $newChildVar);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_ref_null_ret');
+        $nullPred = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        $objResult = self::invokeWithObjectRef($context, $parentVar, $newChildVar, $refChildVar);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_ref_obj_ret');
+        $objPred = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($valuePtrTy);
+        $phi->addIncoming($nullResult, $nullPred);
+        $phi->addIncoming($objResult, $objPred);
+
+        return $phi;
+    }
+
+    private static function invokeWithObjectRef(
+        Context $context,
+        JITVariable $parentVar,
+        JITVariable $newChildVar,
+        JITVariable $refChildVar
+    ): Value {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            self::syncUserScriptInsertBeforeSlots($context, $parentVar, $newChildVar, $refChildVar);
+            // LiveSlots refresh held pins (#32801); saveXML still reads INNER_XML (#32940 / peer #32903).
+            self::syncUserScriptInnerXml($context, $parentVar, $newChildVar, $refChildVar);
+            DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $newChildVar);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_insert_before_post');
+
+            return self::boxObjectResult($context, self::loadObjectArg($context, $newChildVar));
+        }
+
+        DomNodeTreeMutationRuntime::ensureInsertBeforeLinked($context);
+
+        $parent = self::loadObjectArg($context, $parentVar);
+        $newChild = self::loadObjectArg($context, $newChildVar);
+        $refChild = self::loadObjectArg($context, $refChildVar);
+        $context->builder->call(
+            $context->lookupFunction(DomNodeTreeMutationRuntime::ABI_INSERT_BEFORE),
+            $parent,
+            $newChild,
+            $refChild
+        );
+
+        return self::boxObjectResult($context, $newChild);
     }
 
     /**
