@@ -16,10 +16,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for session_encode()/session_decode() via SessionEncodeJitHelper PHP (#6086, #9440, #22076).
+ * JIT/AOT link for session_encode()/session_decode() (#6086, #9440, #22076, #33005).
  *
- * Replaces former ~530-line LLVM wire/apply bodies with thin bridges into {@see VmSessionSerializer} SSOT.
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SessionCreateIdRuntime #21941 / FunctionExistsRuntime #22016).
+ * Encode: LLVM wire walk via {@see \PHPCompiler\ext\standard\JitSessionStorageKernel::emitEncodeWireString}
+ * (same as save_to_disk — NestedJIT encodeWire sees strlen=0 on HT keys, #21900).
+ * Decode: NestedJIT {@see SessionEncodeJitHelper::decodeWire} / {@see VmSessionSerializer}.
  * Thin AOT call-site {@see ensureLinked} must {@see BasicBlockHelper::scopeLoweringToFunction}
  * so BasicBlockHelper::append does not steal into the in-flight user fn (#32994 / peer #27211).
  * php-src: ext/session/session.c — php_session_encode / php_session_decode
@@ -28,13 +29,10 @@ final class SessionEncodeRuntime
 {
     private const HELPER_PATH = '/ext/standard/SessionEncodeJitHelper.php';
 
-    private const ENCODE_WIRE = 'PHPCompiler\\ext\\standard\\SessionEncodeJitHelper::encodeWire';
-
     private const DECODE_WIRE = 'PHPCompiler\\ext\\standard\\SessionEncodeJitHelper::decodeWire';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::ENCODE_WIRE,
         self::DECODE_WIRE,
     ];
 
@@ -117,19 +115,12 @@ final class SessionEncodeRuntime
     {
         $entry = $fn->appendBasicBlock('se_wire_enc_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $encodedRaw = JitNestedHelperCoerce::callHelper(
+        // LLVM wire walk — NestedJIT encodeWire sees strlen=0 on HT keys (#21900 / #33005).
+        // Same path as phpc_session_save_to_disk; empty HT → null (Zend false).
+        $encoded = \PHPCompiler\ext\standard\JitSessionStorageKernel::emitEncodeWireString(
             $context,
-            self::helperFunction($context, self::ENCODE_WIRE),
-            [$fn->getParam(0)]
+            $fn->getParam(0)
         );
-        $encoded = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $encodedRaw);
-        $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $encodedRaw);
-        $failBb = $fn->appendBasicBlock('se_wire_enc_bridge_fail');
-        $okBb = $fn->appendBasicBlock('se_wire_enc_bridge_ok');
-        $context->builder->branchIf($isNull, $failBb, $okBb);
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($context->getTypeFromString('__string__*')->constNull());
-        $context->builder->positionAtEnd($okBb);
         $context->builder->returnValue($encoded);
     }
 
