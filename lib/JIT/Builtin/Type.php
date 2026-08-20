@@ -157,18 +157,11 @@ class Type extends Builtin {
             $fntypeGetHeaders
         );
         $this->context->registerFunction('__compiler_get_headers', $fnGetHeaders);
-        $fntypeFilePutContents = $this->context->context->functionType(
-            $i64,
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*'),
-            $i64
-        );
-        $fnFilePutContents = $this->context->module->addFunction(
-            '__compiler_file_put_contents',
-            $fntypeFilePutContents
-        );
-        $this->context->registerFunction('__compiler_file_put_contents', $fnFilePutContents);
+        // __compiler_file_put_contents always-on shell removed (#33043): StringFilePutContents
+        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
+        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // file_put_contents.1 (#31894 / #32122). User-script file_put_contents() stays
+        // FilePutContentsJitHelper / VmFs::filePutContents.
         $fntypeFwrite = $this->context->context->functionType(
             $i64,
             false,
@@ -1015,6 +1008,7 @@ class Type extends Builtin {
         StringUtf8Runtime::ensureLinked($this->context);
         StringReadfile::ensureLinked($this->context);
         StringFileGetContents::ensureLinked($this->context);
+        StringFilePutContents::ensureLinked($this->context);
         MimeContentTypeRuntime::ensureLinked($this->context);
         MetaTagsRuntime::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);

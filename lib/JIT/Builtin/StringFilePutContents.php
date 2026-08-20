@@ -11,13 +11,16 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_file_put_contents via FilePutContentsJitHelper PHP (#15310, #19966, #30127).
+ * JIT/AOT link for __compiler_file_put_contents via FilePutContentsJitHelper (#15310, #19966, #30127, #33043).
  *
+ * Owns the ABI module-locally: {@see getNamedFunction} first, then {@see addFunction}
+ * if absent. Do not re-add empty always-on shells in {@see Type} — leftover decls mint
+ * file_put_contents.1 (#31894 / #32122).
  * Always {@see JitVmHelperLink} → helper → `@file_put_contents` NestedJIT leaf
  * (libc fopen/fwrite leaf via file_put_contents::call; no kernel Internal).
  * Pre-registerModule NestedJIT resolves builtins via Runtime modules (#15417 / #29833).
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::filePutContents()}.
- * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_stream_ex
+ * php-src: ext/standard/file.c — PHP_FUNCTION(file_put_contents)
  */
 final class StringFilePutContents
 {
@@ -33,6 +36,11 @@ final class StringFilePutContents
     ];
 
     private const BRIDGE_ENTRY = 'fpc_bridge_entry';
+
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
@@ -62,9 +70,14 @@ final class StringFilePutContents
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
+        // Declare ABI module-locally when Type no longer always-on (#33043).
         $fn = null !== $probe
             ? $probe
-            : $context->lookupFunction(self::ABI);
+            : $context->module->addFunction(
+                self::ABI,
+                $context->context->functionType($i64, false, $strPtr, $strPtr, $i64)
+            );
+        $context->registerFunction(self::ABI, $fn);
 
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
         $failBb = $fn->appendBasicBlock('fpc_bridge_fail');
