@@ -7411,7 +7411,7 @@ class Object_ extends Type {
         return $fetched;
     }
 
-    public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name, bool $forWrite = false): Variable
+    public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name, bool $forWrite = false, ?Variable $receiverVar = null): Variable
     {
         $classId = $this->lookup('' !== $class ? $class : 'stdclass');
         $nameLc = strtolower($name);
@@ -7437,7 +7437,7 @@ class Object_ extends Type {
             );
         }
 
-        return ObjectInstancePropertyLlvm::propertyFetchOrdinary($this, $obj, $class, $name, $classId, $forWrite);
+        return ObjectInstancePropertyLlvm::propertyFetchOrdinary($this, $obj, $class, $name, $classId, $forWrite, $receiverVar);
     }
 
     /**

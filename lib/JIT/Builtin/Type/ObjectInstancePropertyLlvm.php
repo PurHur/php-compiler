@@ -22,7 +22,8 @@ final class ObjectInstancePropertyLlvm
         string $class,
         string $name,
         int $classId,
-        bool $forWrite = false
+        bool $forWrite = false,
+        ?Variable $receiverVar = null
     ): Variable {
         $classLc = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
         if (\PHPCompiler\ext\dom\JitDomNodeChildProperty::isDomNodeChildProperty($classLc, strtolower($name))) {
@@ -50,7 +51,7 @@ final class ObjectInstancePropertyLlvm
             return \PHPCompiler\ext\dom\JitDomNamedNodeMap::fetchAttributes($object, $obj, $class);
         }
         if (\PHPCompiler\ext\dom\JitDomDocumentElement::isDomDocumentElement($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomDocumentElement::fetch($object, $obj);
+            return \PHPCompiler\ext\dom\JitDomDocumentElement::fetch($object, $obj, $receiverVar);
         }
         if (\PHPCompiler\ext\dom\JitDomDocumentDoctype::isDomDocumentDoctype($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomDocumentDoctype::fetch($object, $obj, $class);

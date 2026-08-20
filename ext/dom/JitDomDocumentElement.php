@@ -33,7 +33,7 @@ final class JitDomDocumentElement
             && 'documentelement' === $propLc;
     }
 
-    public static function fetch(Object_ $objectType, Value $obj): JITVariable
+    public static function fetch(Object_ $objectType, Value $obj, ?JITVariable $documentVar = null): JITVariable
     {
         $context = $objectType->jitContext();
         if (!JitDomDocumentMethodKernel::shouldUse($context)) {
@@ -63,8 +63,9 @@ final class JitDomDocumentElement
         );
         if (null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
             || null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
+            || (null !== $documentVar && null !== $documentVar->compileTimeDomLoadXml)
         ) {
-            JitDomGetNodePath::annotateDocumentElement($result);
+            JitDomGetNodePath::annotateDocumentElement($result, $documentVar);
         }
 
         return $result;

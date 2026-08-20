@@ -1007,7 +1007,7 @@ final class DomNodeLiveMutationRuntime
         }
         $receiverObj = self::receiverObject($context, $receiver);
         JitDomCreateElement::storeUserScriptInnerXml($context, $receiverObj, $inner);
-        JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner);
+        JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner, $receiver);
 
         return true;
     }
@@ -1103,7 +1103,7 @@ final class DomNodeLiveMutationRuntime
             $oldInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
             $delta = implode('', $pieces);
             $newInner = 'prepend' === $kind ? $delta.$oldInner : $oldInner.$delta;
-            JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($newInner);
+            JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($newInner, $receiver);
         }
     }
 

@@ -139,7 +139,8 @@ final class JitDomInsertBefore
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $xml = $parentVar->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || '' === trim($xml)) {
             return;
         }
@@ -186,7 +187,7 @@ final class JitDomInsertBefore
         }
         $parent = self::loadObjectArg($context, $parentVar);
         JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
-        JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner);
+        JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner, $parentVar);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value

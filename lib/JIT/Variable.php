@@ -136,6 +136,14 @@ final class Variable {
     public ?string $compileTimeDomNodePath = null;
 
     /**
+     * loadXML literal owned by this DOMDocument / documentElement temp (#32978).
+     *
+     * Distinct from {@see JitDomLoadXMLUserScript::lastCompileTimeXml()} so a second
+     * document's loadXML cannot steal C14N / getNodePath folds of an earlier document.
+     */
+    public ?string $compileTimeDomLoadXml = null;
+
+    /**
      * xmlGetLineNo for a loadXML documentElement / child walk (#32489).
      */
     public ?int $compileTimeDomLineNo = null;
