@@ -11,7 +11,10 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** mhash_keygen_s2k() — OpenPGP Salted S2K key derivation (php-src ext/hash/hash.c; #14975). */
+/**
+ * mhash_keygen_s2k() — OpenPGP Salted S2K key derivation
+ * (php-src ext/hash/hash.c; #14975 VM, JIT/AOT #32930).
+ */
 final class mhash_keygen_s2k extends Internal
 {
     public function __construct()
@@ -45,6 +48,12 @@ final class mhash_keygen_s2k extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error($this->getName().'() is not implemented for JIT in this compiler build (issue #14975)');
+        if (4 !== \count($args)) {
+            throw new \ArgumentCountError(
+                \sprintf('mhash_keygen_s2k() expects exactly 4 arguments, %d given', \count($args))
+            );
+        }
+
+        return JitMhash::keygenS2k($context, $args[0], $args[1], $args[2], $args[3]);
     }
 }

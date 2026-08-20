@@ -11,7 +11,9 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** mhash() — legacy binary digest (php-src ext/hash/hash.c; #14975). */
+/**
+ * mhash() — legacy binary digest (php-src ext/hash/hash.c; #14975 VM, JIT/AOT #32930).
+ */
 final class mhash extends Internal
 {
     public function __construct()
@@ -43,6 +45,12 @@ final class mhash extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error($this->getName().'() is not implemented for JIT in this compiler build (issue #14975)');
+        if (2 !== \count($args)) {
+            throw new \ArgumentCountError(
+                \sprintf('mhash() expects exactly 2 arguments, %d given', \count($args))
+            );
+        }
+
+        return JitMhash::mhash($context, $args[0], $args[1]);
     }
 }

@@ -10,7 +10,10 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** mhash_get_block_size() — mhash algorithm block size (php-src ext/hash/hash.c; #14975). */
+/**
+ * mhash_get_block_size() — mhash algorithm block size
+ * (php-src ext/hash/hash.c; #14975 VM, JIT/AOT #32930).
+ */
 final class mhash_get_block_size extends Internal
 {
     public function __construct()
@@ -41,6 +44,12 @@ final class mhash_get_block_size extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error($this->getName().'() is not implemented for JIT in this compiler build (issue #14975)');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                \sprintf('mhash_get_block_size() expects exactly 1 argument, %d given', \count($args))
+            );
+        }
+
+        return JitMhash::getBlockSize($context, $args[0]);
     }
 }
