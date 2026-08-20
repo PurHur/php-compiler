@@ -85,21 +85,27 @@ final class DomNodeChildNodeMutationRuntime
                 // stays stale and item(N) SIGSEGVs (#32817 / peer #32801).
                 self::trySyncSiblingInsertInnerXml($context, $kind, $receiver, $parent, $extraArgs);
                 $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
-                $newChildVar = $extraArgs[0];
-                if ('before' === $kind) {
-                    JitDomChildNodeSiblingInsert::invokeBefore(
-                        $context,
-                        $parentVar,
-                        $newChildVar,
-                        $receiver
-                    );
-                } else {
-                    JitDomChildNodeSiblingInsert::invokeAfter(
-                        $context,
-                        $parentVar,
-                        $newChildVar,
-                        $receiver
-                    );
+                // Multi-arg: LiveSlots each node (peer ParentNode append #32838).
+                // before(...$nodes): each inserts before the original receiver → b,c,a.
+                // after(...$nodes): advance anchor to the last inserted → a,b,c (#32848).
+                $afterAnchor = $receiver;
+                foreach ($extraArgs as $newChildVar) {
+                    if ('before' === $kind) {
+                        JitDomChildNodeSiblingInsert::invokeBefore(
+                            $context,
+                            $parentVar,
+                            $newChildVar,
+                            $receiver
+                        );
+                    } else {
+                        JitDomChildNodeSiblingInsert::invokeAfter(
+                            $context,
+                            $parentVar,
+                            $newChildVar,
+                            $afterAnchor
+                        );
+                        $afterAnchor = $newChildVar;
+                    }
                 }
             } else {
                 // replaceWith: LiveSlots + InnerXml sibling-preserving rewrite (#32822 /
