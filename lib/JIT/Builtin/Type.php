@@ -168,14 +168,11 @@ class Type extends Builtin {
         // decls vs Runtime ABI drift mint fwrite.1 (#31894 / #32122). User-script
         // fwrite() stays JitFwrite / StreamIoJitHelper / JitStreamIoKernel.
         $strPtr = $this->context->getTypeFromString('__string__*');
-        $fntypeFopen = $this->context->context->functionType(
-            $i64,
-            false,
-            $strPtr,
-            $strPtr
-        );
-        $fnFopen = $this->context->module->addFunction('__compiler_fopen', $fntypeFopen);
-        $this->context->registerFunction('__compiler_fopen', $fnFopen);
+        // __compiler_fopen always-on shell removed (#33049): StreamIoRuntime owns the
+        // ABI (getNamedFunction first, then addFunction if absent via declareRuntimeFn;
+        // Type::initialize still StreamIo::ensureLinked). Leftover Type empty decls vs
+        // Runtime ABI drift mint fopen.1 (#31894 / #32122). User-script fopen() stays
+        // JitStreamIoKernel / StreamIoJitHelper / VmFs.
         $fntypeTmpfile = $this->context->context->functionType($i64, false);
         $fnTmpfile = $this->context->module->addFunction('__compiler_tmpfile', $fntypeTmpfile);
         $this->context->registerFunction('__compiler_tmpfile', $fnTmpfile);

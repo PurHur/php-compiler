@@ -42,7 +42,7 @@ final class TypeDeadGetenvAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_fopen'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_tmpfile'", $type);
     }
 
     public function testRuntimeOwnersDeclareAbisModuleLocally(): void

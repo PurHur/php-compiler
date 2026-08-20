@@ -42,7 +42,7 @@ final class TypeDeadQuotPrintAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_fopen'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_tmpfile'", $type);
         $this->assertStringContainsString('StringQuotPrint::ensureLinked', $type);
     }
 
