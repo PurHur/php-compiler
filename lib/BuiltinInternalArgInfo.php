@@ -216,6 +216,9 @@ final class BuiltinInternalArgInfo
             'getrusage' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28519)
             'parse_ini_file', 'parse_ini_string' => 'array|false',
+            // ext/standard/basic_functions.stub.php / image.c — InternalArgInfo return array/int (missing |false) (#27886)
+            'getimagesize', 'getimagesizefromstring' => 'array|false',
+            'exif_imagetype' => 'int|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28343)
             'getopt' => 'array|false',
             // ext/posix/posix.stub.php — InternalArgInfo return array (missing |false) (#28783)
@@ -1509,6 +1512,8 @@ final class BuiltinInternalArgInfo
             'filter_input' => 3 === $index ? 'array|int' : null,
             // ext/standard/file.stub.php — &$would_block untyped; InternalArgInfo int (#23352)
             'flock' => 2 === $index ? '' : null,
+            // ext/standard/image.stub.php / basic_functions.stub.php — &$image_info untyped (InternalArgInfo array) (#27886)
+            'getimagesize', 'getimagesizefromstring' => 1 === $index ? '' : null,
             // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068, #23507)
             'hash', 'hash_file' => 3 === $index ? 'array' : null,
             // ext/standard/string.stub.php — bool $before_needle = false; InternalArgInfo omits 3rd (#25758)
