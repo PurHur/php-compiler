@@ -9,12 +9,11 @@ use PHPUnit\Framework\TestCase;
 /**
  * AOT: function-static string dim assign must not clobber / no-op (#32814).
  *
- * Two layers:
- * 1. FETCH_DIM_W for functionStaticGlobal VALUE boxes uses ValueBoxDimWrite unless CFG
- *    says array (#32806 array retype) — unknown CFG otherwise took ensureHashtablePointer.
- * 2. {@see Variable::fromValueOp} types i8* char pointers as TYPE_STRING so
- *    {@see StringOffsetHelper::isWritableCharOffsetLvalue} accepts them when the dim-fetch
- *    result operand is CFG-unknown (local string dims are CFG-typed string already).
+ * DECLARE retypes string-default function-statics to CFG string so FETCH_DIM_W
+ * takes {@see ValueBoxDimWrite} (same pattern as array defaults → TYPE_ARRAY in #32806).
+ * {@see Variable::fromValueOp} types i8* char pointers as TYPE_STRING so
+ * {@see StringOffsetHelper::isWritableCharOffsetLvalue} accepts them when the dim-fetch
+ * result operand is CFG-unknown.
  *
  * @see php-src Zend/zend_execute.c zend_assign_to_string_offset
  *

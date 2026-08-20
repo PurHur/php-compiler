@@ -191,7 +191,11 @@ final class ObjectStaticPropertyLlvm
             } else {
                 // ZEND_FETCH_STATIC_PROP_R + zend_assign_to_variable copies the zval.
                 // Returning the module box aliases A::$a with $b (#32307, zend_hash.c zend_array_dup).
-                return self::copyBoxedStaticForRead($context, $loaded);
+                $default = $entry['default'] ?? null;
+                $markHashtable = $default instanceof \PHPCompiler\VM\Variable
+                    && \PHPCompiler\VM\Variable::TYPE_ARRAY === $default->type;
+
+                return self::copyBoxedStaticForRead($context, $loaded, $markHashtable);
             }
             $var = new Variable(
                 $context,
@@ -236,7 +240,11 @@ final class ObjectStaticPropertyLlvm
      * pointer. Arrays are zend_array_dup'd so `$b = A::$a; $b[0] = 99` does not mutate
      * `A::$a` (#32307; php-src Zend/zend_hash.c, Zend/zend_execute.c zend_assign_to_variable).
      */
-    private static function copyBoxedStaticForRead(Context $context, Value $srcPtr): Variable
+    private static function copyBoxedStaticForRead(
+        Context $context,
+        Value $srcPtr,
+        bool $markHashtable = false
+    ): Variable
     {
         HashTableDuplicateRuntime::ensureLinked($context);
         $valuePtrTy = $context->getTypeFromString('__value__*');
@@ -299,16 +307,17 @@ final class ObjectStaticPropertyLlvm
 
         $context->builder->positionAtEnd($doneBlock);
 
-        // Match HashTableWriteLlvm::boxedArrayFromHashtable: FETCH_DIM_W must see a
-        // boxed-array local, not a bare TYPE_VALUE slot, or $b[0]=99 SIGSEGVs (#32830).
         $var = new Variable(
             $context,
             Variable::TYPE_VALUE,
             Variable::KIND_VARIABLE,
             $slot
         );
-        $var->valueBoxHashtable = true;
-        $var->valueBoxAliasPtr = JitValueBox::pointer($context, $slot);
+        // So FETCH_DIM_W does not treat script-global VALUE boxes as string offsets (#32830).
+        if ($markHashtable) {
+            $var->valueBoxHashtable = true;
+            $var->valueBoxAliasPtr = JitValueBox::pointer($context, $slot);
+        }
 
         return $var;
     }
