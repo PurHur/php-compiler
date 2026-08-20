@@ -42,6 +42,8 @@ final class SessionStorageRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('SessionStorageJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('dirProbe', $source);
+        $this->assertStringContainsString('#32963', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);

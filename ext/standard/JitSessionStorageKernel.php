@@ -518,6 +518,10 @@ final class JitSessionStorageKernel
 
     /**
      * Resolve PHP_COMPILER_SESSION_DIR (libc getenv) + sess_<id> into a __string__* (#21900).
+     *
+     * Never load through a null getenv result: LLVM evaluates both sides of `and`, so
+     * `and(ne null, eq load(env), 0)` SIGSEGVs when the env is unset (#32963). Peer:
+     * {@see emitEnsureSessionDir} / {@see \PHPCompiler\JIT\Builtin\SysGetTempDirRuntime}.
      */
     private static function emitSessionFilePathString(Context $context, Value $idLen): Value
     {
@@ -543,13 +547,14 @@ final class JitSessionStorageKernel
             $i8p
         );
         $dirNull = $context->builder->icmp(Builder::INT_EQ, $dirEnv, $i8p->constNull());
-        $dirEmpty = $context->builder->and(
-            $context->builder->icmp(Builder::INT_NE, $dirEnv, $i8p->constNull()),
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $context->builder->load($dirEnv),
-                $i8->constInt(0, false)
-            )
+        // Probe is always non-null so the empty-byte load is defined (#32963).
+        // When getenv is null, probe is the default (non-empty) so dirEmpty is false and
+        // dirMissing collapses to dirNull via the or.
+        $dirProbe = $context->builder->select($dirNull, $dirDefault, $dirEnv);
+        $dirEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($dirProbe),
+            $i8->constInt(0, false)
         );
         $dirMissing = $context->builder->or($dirNull, $dirEmpty);
         $dir = $context->builder->select($dirMissing, $dirDefault, $dirEnv);
