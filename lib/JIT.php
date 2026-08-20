@@ -8283,6 +8283,25 @@ class JIT {
                             }
                         }
                     }
+                    // DOMElement::removeAttributeNode() — same CFG-bool → object ASSIGN (#32707).
+                    if ('DOMAttr' === ($value->classUserType ?? '')) {
+                        foreach ([$destOp, $aliasOp] as $tagOp) {
+                            if (!$tagOp instanceof Operand) {
+                                continue;
+                            }
+                            $tagOp->type = new Type(Type::TYPE_OBJECT, [], 'DOMAttr');
+                            if ($this->context->hasVariableOp($tagOp)) {
+                                $ex = $this->context->getVariableFromOp($tagOp);
+                                if (
+                                    Variable::TYPE_VALUE !== $ex->type
+                                    && Variable::TYPE_OBJECT !== $ex->type
+                                ) {
+                                    $ex->free();
+                                    unset($this->context->scope->variables[$tagOp]);
+                                }
+                            }
+                        }
+                    }
                     $value = $this->resolveAssignRhsFromFormalParam($block, $rhsOperand, $value);
                     if (null !== $this->context->ternarySharedReturnSlot && $this->isTernaryBranchMergeAssign($block, $op)) {
                         $this->emitJitReturnFromValue($func, $block, $value);
@@ -12279,6 +12298,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateDomRemoveAttributeNodeResultType(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     $this->propagateDirectoryFactoryResultType(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
@@ -12837,6 +12860,14 @@ class JIT {
                         null !== $nonObjectLabel
                         && $this->context->hasVariableOp($obj)
                         && 'XMLReader' === ($this->context->getVariableFromOp($obj)->classUserType ?? '')
+                    ) {
+                        $nonObjectLabel = null;
+                    }
+                    // DOMElement::removeAttributeNode() — same InternalArgInfo bool lie (#32707).
+                    if (
+                        null !== $nonObjectLabel
+                        && $this->context->hasVariableOp($obj)
+                        && 'DOMAttr' === ($this->context->getVariableFromOp($obj)->classUserType ?? '')
                     ) {
                         $nonObjectLabel = null;
                     }
@@ -14736,6 +14767,30 @@ class JIT {
     }
 
     /**
+     * DOMElement::removeAttributeNode() — InternalArgInfo returns bool until the php-types
+     * patch applies; retag so `$removed->name` is not a non-object property fetch (#32707).
+     */
+    private function propagateDomRemoveAttributeNodeResultType(Operand $result, mixed $toCall): void
+    {
+        if (!($toCall instanceof JIT\Call\DomElementRemoveAttributeNode)) {
+            return;
+        }
+        $result->type = new Type(Type::TYPE_OBJECT, [], 'DOMAttr');
+        if ($this->context->hasVariableOp($result)) {
+            $var = $this->context->getVariableFromOp($result);
+            $var->classUserType = 'DOMAttr';
+            $name = JIT\OperandName::resolve($result);
+            if (null !== $name && '' !== $name) {
+                $resolved = $this->context->resolveRefAliasName($name);
+                if (isset($this->context->namedVariableBindings[$resolved])) {
+                    $this->context->namedVariableBindings[$resolved]->classUserType = 'DOMAttr';
+                }
+                $this->context->bindVariableByName($resolved, $var);
+            }
+        }
+    }
+
+    /**
      * dir() — Internal returns object|false; tag Directory so `$d->read()` is not stolen
      * by the XMLReader::read :object shortcut (#30757 / #27299).
      */
@@ -15006,6 +15061,33 @@ class JIT {
                 $resultVar->classUserType = 'XMLReader';
                 $this->context->setVariableOp($result, $resultVar);
                 $result->type = new Type(Type::TYPE_OBJECT, [], 'XMLReader');
+                $name = JIT\OperandName::resolve($result);
+                if (null !== $name && '' !== $name) {
+                    $resolved = $this->context->resolveRefAliasName($name);
+                    $this->context->bindVariableByName($resolved, $resultVar);
+                }
+
+                return;
+            }
+            // DOMElement::removeAttributeNode() — InternalArgInfo still says bool (PHP 5 era)
+            // until php-types-dom-removeattributenode-return.patch applies. Force VALUE +
+            // DOMAttr so `$removed->name` is not the non-object property path (#32707).
+            if ($this->context->scope->toCall instanceof JIT\Call\DomElementRemoveAttributeNode) {
+                $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
+                if ($this->context->hasVariableOp($result)) {
+                    $this->context->getVariableFromOp($result)->free();
+                }
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer($this->context, $slot, $ptr);
+                $resultVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $resultVar->classUserType = 'DOMAttr';
+                $this->context->setVariableOp($result, $resultVar);
+                $result->type = new Type(Type::TYPE_OBJECT, [], 'DOMAttr');
                 $name = JIT\OperandName::resolve($result);
                 if (null !== $name && '' !== $name) {
                     $resolved = $this->context->resolveRefAliasName($name);
@@ -18092,6 +18174,32 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_NATIVE_BOOL === $result->type && Variable::TYPE_VALUE === $value->type) {
+            // InternalArgInfo may type an object-returning call as bool (XMLReader::XML,
+            // DOMElement::removeAttributeNode). Keep the VALUE box when tagged (#28670, #32707).
+            $objectUserType = $value->classUserType ?? '';
+            if ('XMLReader' === $objectUserType || 'DOMAttr' === $objectUserType) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer(
+                    $this->context,
+                    $slot,
+                    $this->valueBoxPointer($value)
+                );
+                $boxed = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $boxed->classUserType = $objectUserType;
+                $this->context->setVariableOp($resultOp, $boxed);
+                $resolved = JIT\OperandName::resolve($resultOp);
+                if (null !== $resolved && '' !== $resolved) {
+                    $this->context->bindVariableByName($resolved, $boxed);
+                }
+                $resultOp->type = new Type(Type::TYPE_OBJECT, [], $objectUserType);
+
+                return;
+            }
             $boolVal = $this->context->castToBool($this->context->helper->loadValue($value));
             $result->free();
             $this->context->builder->store($boolVal, $result->value);
