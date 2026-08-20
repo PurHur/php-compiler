@@ -55,5 +55,14 @@ final class InstanceOfRuntimeShrinkTest extends TestCase
             InstanceOfJitHelper::RHS_KIND_INVALID,
             InstanceOfJitHelper::valueBoxRhsKind(VmVariable::TYPE_ARRAY)
         );
+        // AOT value boxes store JIT tags with IS_REFCOUNTED (#32766 / #32688).
+        $this->assertSame(
+            InstanceOfJitHelper::RHS_KIND_STRING,
+            InstanceOfJitHelper::valueBoxRhsKind(JitVariable::TYPE_STRING)
+        );
+        $this->assertSame(
+            InstanceOfJitHelper::RHS_KIND_OBJECT,
+            InstanceOfJitHelper::valueBoxRhsKind(JitVariable::TYPE_OBJECT)
+        );
     }
 }
