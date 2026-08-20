@@ -3741,6 +3741,17 @@ class Object_ extends Type {
             $this->defineProperty($id, 'tagName', Variable::TYPE_STRING);
             $this->defineProperty($id, 'attributes', Variable::TYPE_VALUE);
         }
+        if ('domdocument' === $lcname) {
+            // Must be in the allocate() prop layout — late defineProperty from
+            // loadXML/appendChild wrote past the object (#32736). Child-link slots
+            // belong on DOMDocument too: writing DOMNode::firstChild indices into a
+            // DOMDocument instance overwrote documentElement (wrong class_id / SIGSEGV).
+            $this->defineProperty($id, 'documentElement', Variable::TYPE_OBJECT);
+            $this->defineProperty($id, 'firstChild', Variable::TYPE_VALUE);
+            $this->defineProperty($id, 'lastChild', Variable::TYPE_VALUE);
+            $this->defineProperty($id, 'childNodes', Variable::TYPE_VALUE);
+            $this->markHasConstructor($id);
+        }
         if ('dom\\attr' === $lcname) {
             // Living Dom\Attr for thin AOT method_exists / property layout (#27108).
             foreach ([

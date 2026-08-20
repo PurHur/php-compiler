@@ -62,14 +62,14 @@ final class JitDomAppendChildUserScript
 
         $context->builder->positionAtEnd($setRoot);
         $objectType->propertyStore($docElSlot, $childJit, JITVariable::TYPE_OBJECT);
-        self::ensureChildLinkLayout($context);
+        self::ensureDocumentChildLinkLayout($context);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($document, 'DOMNode', VmDom::PROP_FIRST_CHILD),
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_FIRST_CHILD),
             $childJit,
             JITVariable::TYPE_VALUE
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($document, 'DOMNode', VmDom::PROP_LAST_CHILD),
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_LAST_CHILD),
             $childJit,
             JITVariable::TYPE_VALUE
         );
@@ -77,9 +77,9 @@ final class JitDomAppendChildUserScript
         $context->builder->branch($afterDe);
 
         $context->builder->positionAtEnd($linkNext);
-        self::ensureChildLinkLayout($context);
+        self::ensureDocumentChildLinkLayout($context);
         // Prefer lastChild; fall back to documentElement as prior sibling.
-        $lastSlot = $objectType->propertySlotFor($document, 'DOMNode', VmDom::PROP_LAST_CHILD);
+        $lastSlot = $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_LAST_CHILD);
         $lastPtr = $context->builder->load($lastSlot);
         $lastSlotNull = $context->builder->icmp(Builder::INT_EQ, $lastPtr, $voidPtr->constNull());
         $useRoot = BasicBlockHelper::append($context, 'dom_doc_ac_tail_root');
@@ -105,7 +105,7 @@ final class JitDomAppendChildUserScript
             JITVariable::TYPE_VALUE
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($document, 'DOMNode', VmDom::PROP_LAST_CHILD),
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_LAST_CHILD),
             $childJit,
             JITVariable::TYPE_VALUE
         );
@@ -214,6 +214,19 @@ final class JitDomAppendChildUserScript
         }
     }
 
+    /** Child-link slots on DOMDocument itself — do not reuse DOMNode indices (#32736). */
+    private static function ensureDocumentChildLinkLayout(Context $context): void
+    {
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD, VmDom::PROP_CHILD_NODES] as $prop) {
+            if (!$objectType->hasProperty($docClassId, $prop)) {
+                $objectType->defineProperty($docClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+        }
+        self::ensureChildLinkLayout($context);
+    }
+
     private static function writeChildNodesListWithOwner(
         Context $context,
         Value $owner,
@@ -221,7 +234,7 @@ final class JitDomAppendChildUserScript
         ?Value $item0 = null,
         ?Value $item1 = null
     ): void {
-        self::ensureChildLinkLayout($context);
+        self::ensureDocumentChildLinkLayout($context);
         $objectType = $context->type->object;
         $listClassId = $objectType->lookup('DOMNodeList');
         if (!$objectType->hasProperty($listClassId, '__phpcItem0')) {
@@ -267,7 +280,7 @@ final class JitDomAppendChildUserScript
         }
         $listJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $list);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($owner, 'DOMNode', VmDom::PROP_CHILD_NODES),
+            $objectType->propertySlotFor($owner, self::CLASS_DOCUMENT, VmDom::PROP_CHILD_NODES),
             $listJit,
             JITVariable::TYPE_VALUE
         );
