@@ -93,16 +93,13 @@ class Type extends Builtin {
         // already calls StringStripTags::ensureLinked from ext/standard/strip_tags.php.
         // Leftover Type empty decls vs Runtime ABI drift mint strip_tags.1 (#31894 / #32122).
         // User-script strip_tags() stays StripTagsJitHelper / VmString.
+        // __compiler_utf8_strlen / __compiler_utf8_valid always-on shells removed (#33001):
+        // StringUtf8Runtime owns the ABI (getNamedFunction first, then addFunction if
+        // absent via StringUtf8StrlenJit / StringUtf8ValidJit; Type::initialize still
+        // ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // utf8_strlen.1 / utf8_valid.1 (#31894 / #32122). User-script mb_strlen() /
+        // mb_check_encoding() stay JitMbStrlen / JitMbCheckEncoding / Utf8JitHelper.
         $i64 = $this->context->getTypeFromString('int64');
-        $fntypeUtf8Strlen = $this->context->context->functionType(
-            $i64,
-            false,
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnUtf8Strlen = $this->context->module->addFunction('__compiler_utf8_strlen', $fntypeUtf8Strlen);
-        $this->context->registerFunction('__compiler_utf8_strlen', $fnUtf8Strlen);
-        $fnUtf8Valid = $this->context->module->addFunction('__compiler_utf8_valid', $fntypeUtf8Strlen);
-        $this->context->registerFunction('__compiler_utf8_valid', $fnUtf8Valid);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
         $sizeT = $this->context->getTypeFromString('size_t');
@@ -1034,6 +1031,7 @@ class Type extends Builtin {
         StringConvertUu::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
+        StringUtf8Runtime::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
