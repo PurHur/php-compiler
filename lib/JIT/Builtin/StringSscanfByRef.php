@@ -11,8 +11,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_sscanf / __compiler_sscanf_ex via SscanfJitHelper PHP (#12467, #25691).
+ * JIT/AOT link for __compiler_sscanf / __compiler_sscanf_ex via SscanfJitHelper PHP (#12467, #25691, #32935).
  *
+ * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (VmSscanf → SscanfJitHelper)
  * in one NestedJIT scope (peer StringSscanfArray #25653 / StringPack #22842).
  * php-src: ext/standard/sscanf.c — by-reference assignment branch
