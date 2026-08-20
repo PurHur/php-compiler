@@ -234,6 +234,14 @@ final class BasicBlockHelper
     }
 
     /**
+     * Whether $term is a premature {@code ret void} that may be erased before sealing a real br (#32912).
+     */
+    public static function isPrematureVoidReturn(Context $context, $term): bool
+    {
+        return self::isVoidReturnTerminator($context, $term);
+    }
+
+    /**
      * php-llvm {@code isAReturnInst()} TypeErrors (LLVMIsA* is a pointer, {@code fromBool}
      * wants int). Detect {@code ret void} via opcode.
      */
