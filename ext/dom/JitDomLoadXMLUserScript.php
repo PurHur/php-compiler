@@ -186,6 +186,58 @@ final class JitDomLoadXMLUserScript
     }
 
     /**
+     * Append createTextNode character data into a direct child of the document
+     * element so C14N fold matches Zend after nested appendChild (#33000).
+     *
+     * Root-inner concat would produce {@code <a>1</a>x} instead of {@code <a>1x</a>}.
+     * Peer {@see refreshCompileTimeXmlWithRootInner} / attribute mutate (#32981).
+     */
+    public static function refreshCompileTimeXmlAppendTextToChild(
+        int $childIndex,
+        string $rawText,
+        bool $prepend = false
+    ): void {
+        $xml = self::$lastCompileTimeXml;
+        if (null === $xml || '' === trim($xml)) {
+            return;
+        }
+        if (!class_exists(\DOMDocument::class, false) && !class_exists(\DOMDocument::class)) {
+            return;
+        }
+        $doc = new \DOMDocument();
+        if (!@$doc->loadXML($xml)) {
+            return;
+        }
+        $root = $doc->documentElement;
+        if (!$root instanceof \DOMElement) {
+            return;
+        }
+        $target = null;
+        $i = 0;
+        foreach ($root->childNodes as $node) {
+            if ($i === $childIndex) {
+                $target = $node;
+                break;
+            }
+            ++$i;
+        }
+        if (!$target instanceof \DOMNode) {
+            return;
+        }
+        $text = $doc->createTextNode($rawText);
+        if ($prepend && null !== $target->firstChild) {
+            $target->insertBefore($text, $target->firstChild);
+        } else {
+            $target->appendChild($text);
+        }
+        $new = @$doc->saveXML($root);
+        if (!\is_string($new) || '' === $new) {
+            return;
+        }
+        self::commitRefreshedCompileTimeXml($new, $xml);
+    }
+
+    /**
      * Rebuild {@see $lastCompileTimeXml} after a root-inner rewrite so C14N fold
      * sees appendChild/insertBefore/replaceChild/removeChild (#32972 / #32978).
      */
