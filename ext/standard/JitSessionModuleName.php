@@ -24,6 +24,9 @@ final class JitSessionModuleName
             throw new \LogicException('session_module_name() accepts at most one argument');
         }
 
+        // STANDALONE Type::register skips SessionModuleName::implement (#32989).
+        Smod::ensureLinked($context);
+
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
 
