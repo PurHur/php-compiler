@@ -611,7 +611,7 @@ final class DomNodeLiveMutationRuntime
         );
         $listJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $listObj);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($receiverObj, 'DOMNode', VmDom::PROP_CHILD_NODES),
+            $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_CHILD_NODES),
             $listJit,
             Variable::TYPE_VALUE
         );

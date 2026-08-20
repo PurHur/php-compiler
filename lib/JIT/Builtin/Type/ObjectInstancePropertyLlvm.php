@@ -55,11 +55,10 @@ final class ObjectInstancePropertyLlvm
         if (\PHPCompiler\ext\dom\JitDomDocumentDoctype::isDomDocumentDoctype($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomDocumentDoctype::fetch($object, $obj, $class);
         }
-        // Accessing childNodes on a DOM node produces a different DOMNodeList than
-        // XPath::query(); clear stale XPath compile-time state so item() on the
-        // childNodes list does not materialize the XPath result (#32620).
-        if ('childnodes' === strtolower($name) && str_starts_with($classLc, 'dom')) {
-            \PHPCompiler\ext\dom\JitDomXPathQueryUserScript::clearQueryState();
+        // childNodes must use the DOMNode slot LiveSlots/loadXML write — fetching via
+        // DOMElement defineProperty'd a second index past the allocation (#327xx).
+        if (\PHPCompiler\ext\dom\JitDomChildNodesProperty::isDomChildNodesProperty($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomChildNodesProperty::fetch($object, $obj);
         }
 
         return self::propertyFetchDeclaredSlot($object, $obj, $class, $name, $classId, $forWrite);

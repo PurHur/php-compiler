@@ -451,6 +451,9 @@ final class JitDomCreateElement
             VmDom::PROP_LAST_CHILD => JITVariable::TYPE_VALUE,
             VmDom::PROP_NEXT_SIBLING => JITVariable::TYPE_VALUE,
             VmDom::PROP_PREVIOUS_SIBLING => JITVariable::TYPE_VALUE,
+            // Must be in allocate() layout — LiveSlots/loadXML used to write DOMNode::childNodes
+            // indices into DOMElement and OOB / corrupt sibling slots (#24973 peer).
+            VmDom::PROP_CHILD_NODES => JITVariable::TYPE_VALUE,
             // initTextContentSlot / saveXML / getElementById helpers (#25475).
             VmDom::PROP_TEXT_CONTENT => JITVariable::TYPE_STRING,
             'nodeValue' => JITVariable::TYPE_STRING,

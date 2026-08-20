@@ -297,7 +297,7 @@ final class DomNodeChildNodeMutationRuntime
         );
         $listJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $list);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($parent, 'DOMNode', VmDom::PROP_CHILD_NODES),
+            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_CHILD_NODES),
             $listJit,
             Variable::TYPE_VALUE
         );

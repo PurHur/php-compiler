@@ -275,6 +275,11 @@ final class JitDomAppendChildLiveSlots
         if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
             $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
         }
+        // Element parents — childNodes lives on DOMElement layout (#24973).
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_CHILD_NODES)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
+        }
         if (!$objectType->hasProperty($listClassId, 'length')) {
             $objectType->defineProperty($listClassId, 'length', JITVariable::TYPE_NATIVE_LONG);
         }
@@ -341,7 +346,7 @@ final class JitDomAppendChildLiveSlots
     /** Load parent.childNodes object from a TYPE_VALUE slot (null if unset). */
     private static function loadChildNodesListObject(Context $context, Value $owner): Value
     {
-        return self::loadLink($context, $owner, 'DOMNode', VmDom::PROP_CHILD_NODES, 'dom_acls_cn');
+        return self::loadLink($context, $owner, 'DOMElement', VmDom::PROP_CHILD_NODES, 'dom_acls_cn');
     }
 
     private static function writeChildNodesList(
@@ -390,7 +395,7 @@ final class JitDomAppendChildLiveSlots
         }
         $listJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $list);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($owner, 'DOMNode', VmDom::PROP_CHILD_NODES),
+            $objectType->propertySlotFor($owner, 'DOMElement', VmDom::PROP_CHILD_NODES),
             $listJit,
             JITVariable::TYPE_VALUE
         );

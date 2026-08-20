@@ -100,6 +100,10 @@ final class JitDomDocumentElement
         // Include blank text / comments so childNodes->length matches Zend (#27260).
         $children = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
         if ([] === $children) {
+            // Empty elements still need a live NodeList — skipping left
+            // DOMNode::$childNodes unset and ->length SIGSEGVd on AOT.
+            self::storeChildNodesLength($context, $element, 0);
+
             return;
         }
 
@@ -194,9 +198,14 @@ final class JitDomDocumentElement
     ): void {
         $objectType = $context->type->object;
         $nodeClassId = $objectType->lookup('DOMNode');
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
         $listClassId = $objectType->lookup('DOMNodeList');
-        // VALUE — peer LiveSlots / #27216. TYPE_OBJECT leaves NULL-tagged slots as
-        // garbage pointers; after appendChild rewrite, length fetch segfaults (#28672).
+        // VALUE on DOMElement — peer first/last/sibling LiveSlots layout (#27476 / #28672).
+        // Writing DOMNode::childNodes indices into a DOMElement allocation is OOB (#24973).
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_CHILD_NODES)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
+        }
+        // Keep DOMNode declared for Document / Fragment receivers.
         if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
             $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
         }
@@ -258,7 +267,7 @@ final class JitDomDocumentElement
             $list
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($element, 'DOMNode', VmDom::PROP_CHILD_NODES),
+            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_CHILD_NODES),
             $listJit,
             JITVariable::TYPE_VALUE
         );
