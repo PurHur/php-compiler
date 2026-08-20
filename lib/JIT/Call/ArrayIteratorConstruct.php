@@ -32,7 +32,16 @@ final class ArrayIteratorConstruct implements Call
         }
         if (!isset($args[1])) {
             if ('ArrayObject' === $this->className) {
-                self::storeDefaultIteratorClass($context, self::objectReceiver($context, $args[0]));
+                $receiver = self::objectReceiver($context, $args[0]);
+                self::storeFlags($context, $context->helper->loadValue($receiver), $this->className, null);
+                self::storeDefaultIteratorClass($context, $receiver);
+            } elseif (\PHPCompiler\VM\ArrayObjectJitHelper::isArrayAsPropsClass($this->className)) {
+                self::storeFlags(
+                    $context,
+                    $context->helper->loadValue(self::objectReceiver($context, $args[0])),
+                    $this->className,
+                    null
+                );
             }
 
             return self::voidResult($context);
@@ -53,11 +62,47 @@ final class ArrayIteratorConstruct implements Call
         HashTableHelper::spreadInto($context, $copy, $src);
         $objectType->propertyStore($slot, $copy, Variable::TYPE_HASHTABLE);
 
+        self::storeFlags($context, $objPtr, $this->className, $args[2] ?? null);
+
         if ('ArrayObject' === $this->className) {
             self::storeIteratorClass($context, $receiver, $args[3] ?? null);
         }
 
         return self::voidResult($context);
+    }
+
+    /**
+     * Persist SPL_ARRAY_* flags for ARRAY_AS_PROPS property handlers (#33061).
+     */
+    private static function storeFlags(
+        Context $context,
+        Value $objPtr,
+        string $className,
+        ?Variable $flagsArg
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $flagsVal = $i64->constInt(0, false);
+        if (null !== $flagsArg) {
+            if (Variable::TYPE_NATIVE_LONG === $flagsArg->type) {
+                $flagsVal = $context->helper->loadValue($flagsArg);
+            } elseif (null !== $flagsArg->compileTimeLong) {
+                $flagsVal = $i64->constInt((int) $flagsArg->compileTimeLong, false);
+            } elseif (Variable::TYPE_VALUE === $flagsArg->type || \PHPCompiler\JIT\JitValueBox::isValueOperand($flagsArg)) {
+                $flagsVal = $context->builder->call(
+                    $context->lookupFunction('__value__toLong'),
+                    \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $flagsArg)
+                );
+            }
+        }
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor(
+                $objPtr,
+                $className,
+                \PHPCompiler\VM\ArrayObjectJitHelper::PROP_FLAGS
+            ),
+            new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $flagsVal),
+            Variable::TYPE_NATIVE_LONG
+        );
     }
 
     private static function storeDefaultIteratorClass(Context $context, Variable $receiver): void

@@ -3827,6 +3827,7 @@ class Object_ extends Type {
             }
             $this->setClassInterfaces($displayName, $ifaces);
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\ArrayObjectJitHelper::PROP_FLAGS, Variable::TYPE_NATIVE_LONG);
             $constants = [
                 'STD_PROP_LIST' => 1,
                 'ARRAY_AS_PROPS' => 2,
@@ -3857,6 +3858,7 @@ class Object_ extends Type {
                 'Countable',
             ]);
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\ArrayObjectJitHelper::PROP_FLAGS, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\VM\ArrayObjectJitHelper::PROP_ITERATOR_CLASS, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\VM\ArrayObjectJitHelper::PROP_ITERATOR_CLASS_ID, Variable::TYPE_NATIVE_LONG);
             $this->seedExternalClassConstants($id, [

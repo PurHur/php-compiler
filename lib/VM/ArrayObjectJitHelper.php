@@ -22,6 +22,9 @@ final class ArrayObjectJitHelper
 {
     public const PROP_HT = '__spl_ht';
 
+    /** php-src ArrayObject::$flags — SPL_ARRAY_* bitfield (#33061, spl_array.c). */
+    public const PROP_FLAGS = '__flags';
+
     /** php-src ArrayObject iteratorClass string (#27567). */
     public const PROP_ITERATOR_CLASS = '__iterator_class';
 
@@ -29,6 +32,21 @@ final class ArrayObjectJitHelper
     public const PROP_ITERATOR_CLASS_ID = '__iterator_class_id';
 
     public const CLASS_NAME = 'ArrayObject';
+
+    /** SPL_ARRAY_AS_PROPS — backing keys as object properties (ext/spl/spl_array.c). */
+    public const FLAG_ARRAY_AS_PROPS = 2;
+
+    /**
+     * ArrayObject / ArrayIterator / RecursiveArrayIterator — ARRAY_AS_PROPS property handlers.
+     */
+    public static function isArrayAsPropsClass(string $classLc): bool
+    {
+        $lc = strtolower(ltrim($classLc, '\\'));
+
+        return 'arrayobject' === $lc
+            || 'arrayiterator' === $lc
+            || 'recursivearrayiterator' === $lc;
+    }
 
     /**
      * Classes whose `$obj[] =` must append into object `__spl_ht`, not overwrite the
@@ -56,6 +74,74 @@ final class ArrayObjectJitHelper
         return $context->type->object->splBackingHashtable(
             new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj)
         );
+    }
+
+    /**
+     * ARRAY_AS_PROPS property read — `$ao->key` reads `__spl_ht` like `$ao['key']` (#33061).
+     * Returns null when the class/name is not handled here (caller uses declared slots).
+     */
+    public static function tryPropertyFetchRead(
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $obj,
+        string $class,
+        string $name
+    ): ?JITVariable {
+        if (!self::isArrayAsPropsClass($class) || str_starts_with($name, '__')) {
+            return null;
+        }
+        $context = $objectType->jitContext();
+        $classLc = strtolower(ltrim($class, '\\'));
+        $className = match ($classLc) {
+            'arrayobject' => 'ArrayObject',
+            'arrayiterator' => 'ArrayIterator',
+            'recursivearrayiterator' => 'RecursiveArrayIterator',
+            default => $class,
+        };
+
+        $flagsSlot = $objectType->propertyFetch($obj, $className, self::PROP_FLAGS);
+        $flagsVal = JITVariable::TYPE_NATIVE_LONG === $flagsSlot->type
+            ? $context->helper->loadValue($flagsSlot)
+            : $context->builder->call(
+                $context->lookupFunction('__value__toLong'),
+                JitValueBox::valuePtrFromVariable($context, $flagsSlot)
+            );
+        $i64 = $context->getTypeFromString('int64');
+        $hasAsProps = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flagsVal, $i64->constInt(self::FLAG_ARRAY_AS_PROPS, false)),
+            $i64->constInt(0, false)
+        );
+
+        $resultSlot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $resultSlot);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        // Sanitize block names — property names can be arbitrary identifiers.
+        $suffix = substr(sha1($className.'::'.$name), 0, 8);
+        $asPropsBb = $fn->appendBasicBlock('ao_as_props_'.$suffix);
+        $noPropsBb = $fn->appendBasicBlock('ao_no_as_props_'.$suffix);
+        $mergeBb = $fn->appendBasicBlock('ao_as_props_merge_'.$suffix);
+        $context->builder->branchIf($hasAsProps, $asPropsBb, $noPropsBb);
+
+        $context->builder->positionAtEnd($asPropsBb);
+        $receiver = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
+        $keyStr = $context->builder->load($context->constantStringFromString($name));
+        $key = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $keyStr);
+        $box = self::compileOffsetGet($context, $receiver, $key);
+        JitValueBox::copyFromPointer(
+            $context,
+            $destPtr,
+            JitValueBox::pointer($context, $box)
+        );
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($noPropsBb);
+        // Without ARRAY_AS_PROPS do not defineProperty (OOB slot → SIGSEGV). Quiet null (#33061).
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+
+        return new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $resultSlot);
     }
 
     public static function compileCount(Context $context, JITVariable $receiver): Value
