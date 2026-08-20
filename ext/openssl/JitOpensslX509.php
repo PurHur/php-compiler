@@ -30,7 +30,8 @@ use PHPLLVM\Value;
  * openssl_private_decrypt() (#32759 leftover of #6666),
  * openssl_public_decrypt() (#32761 leftover of #6666),
  * openssl_dh_compute_key() (#32771 leftover of #6596), and
- * openssl_spki_verify() (#32776 leftover of #8690).
+ * openssl_spki_verify() (#32776 leftover of #8690);
+ * openssl_spki_export() (#32787 leftover of #6423).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_x509_fingerprint) / X509_digest
@@ -50,6 +51,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_public_decrypt) / EVP_PKEY_verify_recover
  * php-src: ext/openssl/openssl_backend_v3.c — PHP_FUNCTION(openssl_dh_compute_key) / EVP_PKEY_derive
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_verify) / NETSCAPE_SPKI_verify
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_export) / NETSCAPE_SPKI_get_pubkey
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -725,6 +727,36 @@ final class JitOpensslX509
         }
 
         return self::boxedBool($context, VmOpensslSpkiNative::spkiVerify($lit));
+    }
+
+    /**
+     * openssl_spki_export() — bake {@see VmOpensslSpkiNative::spkiExport}.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_spki_export) /
+     * NETSCAPE_SPKI_get_pubkey + PEM_write_bio_PUBKEY
+     * SPKAC argument is the base64 payload (with or without {@code SPKAC=} prefix); VM
+     * {@see VmOpenssl::spkiExport} normalizes via {@see VmOpensslSpkiNative::spkiCleanup}.
+     */
+    public static function spkiExport(Context $context, JITVariable $spkac): Value
+    {
+        $lit = JitStringArg::compileTimeLiteral($spkac);
+        if (null === $lit) {
+            throw new \LogicException(
+                'openssl_spki_export() spkac must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #32787)'
+            );
+        }
+
+        if (!VmOpensslSpkiNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $pem = VmOpensslSpkiNative::spkiExport($lit);
+        if (false === $pem) {
+            return self::boxedFalse($context);
+        }
+
+        return self::boxedString($context, $pem);
     }
 
     /**
