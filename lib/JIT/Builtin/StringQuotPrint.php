@@ -10,10 +10,13 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for quoted_printable_encode/decode via QuotPrintJitHelper PHP (#5225, #9910, #24620, #26899).
+ * JIT/AOT link for quoted_printable_encode/decode via QuotPrintJitHelper PHP (#5225, #9910, #24620, #26899, #32882).
  *
  * User-script AOT uses HelperRuntimeCache prelinked units (#15889). Peer: StringStrRot13 #26868 /
  * StringSoundex #26882 — {@see JitVmHelperLink::ensureBridge} (typed signature re-localize).
+ * Module-local ABI owner (ensureBridge getNamedFunction first): Builtin\Type no longer
+ * always-declares empty shells (#32882 / peer #32876) — leftover Type decls mint
+ * quoted_printable_encode.1 (#31894 / #32122).
  * SSOT: {@see \PHPCompiler\ext\standard\VmString} (VM); helper is NestedJIT-self-contained.
  * php-src: ext/standard/quot_print.c
  */
