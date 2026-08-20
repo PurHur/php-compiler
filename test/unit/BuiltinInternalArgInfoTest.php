@@ -1747,6 +1747,14 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('file_put_contents', 1));
     }
 
+    /** php-src basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28519). */
+    public function testParseIniReflectionReturnUnions(): void
+    {
+        foreach (['parse_ini_file', 'parse_ini_string'] as $f) {
+            $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+    }
+
     /** php-src file.stub.php — InternalArgInfo omits |false for filestat/glob (#26185). */
     public function testFilestatGlobReflectionReturnUnions(): void
     {

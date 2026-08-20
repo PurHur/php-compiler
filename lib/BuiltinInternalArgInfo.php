@@ -214,6 +214,8 @@ final class BuiltinInternalArgInfo
             'sys_getloadavg' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28841)
             'getrusage' => 'array|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28519)
+            'parse_ini_file', 'parse_ini_string' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28343)
             'getopt' => 'array|false',
             // ext/posix/posix.stub.php — InternalArgInfo return array (missing |false) (#28783)
