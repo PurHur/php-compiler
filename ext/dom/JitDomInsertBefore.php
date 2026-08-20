@@ -67,6 +67,24 @@ final class JitDomInsertBefore
         return self::boxObjectResult($context, $newChild);
     }
 
+    public static function syncUserScriptInsertBeforeSlotsPublic(
+        Context $context,
+        JITVariable $parentVar,
+        JITVariable $newChildVar,
+        JITVariable $refChildVar
+    ): void {
+        self::syncUserScriptInsertBeforeSlots($context, $parentVar, $newChildVar, $refChildVar);
+    }
+
+    public static function bumpChildNodesLengthPublic(
+        Context $context,
+        Value $parent,
+        Value $item0,
+        Value $item1
+    ): void {
+        self::bumpChildNodesLength($context, $parent, $item0, $item1);
+    }
+
     /**
      * Update live tree LLVM slots for thin-AOT insertBefore (#27449).
      *
@@ -90,25 +108,12 @@ final class JitDomInsertBefore
         );
         $objectType = $context->type->object;
         $objPtrTy = $context->getTypeFromString('__object__*');
-        $voidPtr = $context->getTypeFromString('void*');
 
+        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
         $nodeClassId = $objectType->lookup('DOMNode');
-        foreach ([
-            VmDom::PROP_FIRST_CHILD,
-            VmDom::PROP_LAST_CHILD,
-            VmDom::PROP_NEXT_SIBLING,
-            VmDom::PROP_PREVIOUS_SIBLING,
-            VmDom::PROP_CHILD_NODES,
-        ] as $prop) {
+        foreach ([VmDom::PROP_CHILD_NODES] as $prop) {
             if (!$objectType->hasProperty($nodeClassId, $prop)) {
                 $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
-            }
-        }
-
-        $elementClassId = $objectType->lookup('DOMElement');
-        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
-            if (!$objectType->hasProperty($elementClassId, $prop)) {
-                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
 
@@ -116,79 +121,41 @@ final class JitDomInsertBefore
         $refJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $refChild);
         $parentJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $parent);
 
-        // Sibling links: new ↔ ref (php-src xmlAddPrevSibling).
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($newChild, 'DOMElement', VmDom::PROP_NEXT_SIBLING),
-            $refJit,
-            JITVariable::TYPE_VALUE
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($refChild, 'DOMElement', VmDom::PROP_PREVIOUS_SIBLING),
-            $newJit,
-            JITVariable::TYPE_VALUE
-        );
+        JitDomParentChildLinkLayout::storeSibling($context, $newChild, VmDom::PROP_NEXT_SIBLING, $refJit);
+        JitDomParentChildLinkLayout::storeSibling($context, $refChild, VmDom::PROP_PREVIOUS_SIBLING, $newJit);
 
-        // firstChild ← newChild when inserting before the current first (issue repro).
-        // DOMElement layout — peer LiveSlots; DOMNode firstChild clobbers tagName (#32361).
-        $firstSlot = $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_FIRST_CHILD);
-        $firstPtr = $context->builder->load($firstSlot);
-        $firstSlotNull = $context->builder->icmp(Builder::INT_EQ, $firstPtr, $voidPtr->constNull());
-        $setFirst = BasicBlockHelper::append($context, 'dom_ib_set_first');
-        $checkFirst = BasicBlockHelper::append($context, 'dom_ib_check_first');
-        $afterFirst = BasicBlockHelper::append($context, 'dom_ib_after_first');
-        $context->builder->branchIf($firstSlotNull, $setFirst, $checkFirst);
-
-        $context->builder->positionAtEnd($checkFirst);
-        $firstObj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $context->builder->pointerCast($firstPtr, $context->getTypeFromString('__value__*'))
-        );
+        // firstChild ← newChild when inserting before the current first (#32611: DOMDocument uses DOMNode).
+        $firstObj = JitDomParentChildLinkLayout::loadFirstChild($context, $parent, 'dom_ib');
         $firstIsRef = $context->builder->icmp(Builder::INT_EQ, $firstObj, $refChild);
         $firstIsNull = $context->builder->icmp(Builder::INT_EQ, $firstObj, $objPtrTy->constNull());
         $shouldSetFirst = $context->builder->or($firstIsRef, $firstIsNull);
+        $setFirst = BasicBlockHelper::append($context, 'dom_ib_set_first');
+        $afterFirst = BasicBlockHelper::append($context, 'dom_ib_after_first');
         $context->builder->branchIf($shouldSetFirst, $setFirst, $afterFirst);
 
         $context->builder->positionAtEnd($setFirst);
-        $objectType->propertyStore($firstSlot, $newJit, JITVariable::TYPE_VALUE);
+        JitDomParentChildLinkLayout::storeFirstChild($context, $parent, $newJit);
         $context->builder->branch($afterFirst);
 
         $context->builder->positionAtEnd($afterFirst);
 
-        // parentNode on newChild (DOMElement allocation layout — #21687 / #27216).
-        $elementClassId = $objectType->lookup('DOMElement');
-        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
-            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
-        }
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($newChild, 'DOMElement', VmDom::PROP_PARENT_NODE),
-            $parentJit,
-            JITVariable::TYPE_VALUE
-        );
+        JitDomParentChildLinkLayout::storeParentNode($context, $newChild, $parentJit);
 
         // firstElementChild when inserting before current first element (#27449).
-        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_FIRST_ELEMENT_CHILD)) {
-            $objectType->defineProperty($elementClassId, VmDom::PROP_FIRST_ELEMENT_CHILD, JITVariable::TYPE_VALUE);
-        }
-        $fecSlot = $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_FIRST_ELEMENT_CHILD);
-        $fecPtr = $context->builder->load($fecSlot);
-        $fecSlotNull = $context->builder->icmp(Builder::INT_EQ, $fecPtr, $voidPtr->constNull());
-        $setFec = BasicBlockHelper::append($context, 'dom_ib_set_fec');
-        $checkFec = BasicBlockHelper::append($context, 'dom_ib_check_fec');
-        $afterFec = BasicBlockHelper::append($context, 'dom_ib_after_fec');
-        $context->builder->branchIf($fecSlotNull, $setFec, $checkFec);
-
-        $context->builder->positionAtEnd($checkFec);
-        $fecObj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $context->builder->pointerCast($fecPtr, $context->getTypeFromString('__value__*'))
-        );
+        $fecObj = JitDomParentChildLinkLayout::loadFirstElementChild($context, $parent, 'dom_ib');
         $fecIsRef = $context->builder->icmp(Builder::INT_EQ, $fecObj, $refChild);
         $fecIsNull = $context->builder->icmp(Builder::INT_EQ, $fecObj, $objPtrTy->constNull());
         $shouldSetFec = $context->builder->or($fecIsRef, $fecIsNull);
+        $setFec = BasicBlockHelper::append($context, 'dom_ib_set_fec');
+        $afterFec = BasicBlockHelper::append($context, 'dom_ib_after_fec');
         $context->builder->branchIf($shouldSetFec, $setFec, $afterFec);
 
         $context->builder->positionAtEnd($setFec);
-        $objectType->propertyStore($fecSlot, $newJit, JITVariable::TYPE_VALUE);
+        $objectType->propertyStore(
+            JitDomParentChildLinkLayout::firstElementChildSlot($context, $parent),
+            $newJit,
+            JITVariable::TYPE_VALUE
+        );
         $context->builder->branch($afterFec);
 
         $context->builder->positionAtEnd($afterFec);
