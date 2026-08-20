@@ -17,7 +17,8 @@ use PHPUnit\Framework\TestCase;
  * #32759 leftover of #6666 openssl_private_decrypt;
  * #32761 leftover of #6666 openssl_public_decrypt;
  * #32771 leftover of #6596 openssl_dh_compute_key;
- * #32776 leftover of #8690 openssl_spki_verify).
+ * #32776 leftover of #8690 openssl_spki_verify;
+ * #32787 leftover of #6423 openssl_spki_export).
  */
 final class OpensslX509RuntimeShrinkTest extends TestCase
 {
@@ -37,6 +38,7 @@ final class OpensslX509RuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmOpensslPkeyNative::publicDecrypt', $source);
         $this->assertStringContainsString('VmOpensslPkeyDeriveNative::dhComputeKey', $source);
         $this->assertStringContainsString('VmOpensslSpkiNative::spkiVerify', $source);
+        $this->assertStringContainsString('VmOpensslSpkiNative::spkiExport', $source);
         $this->assertStringContainsString('__compiler_file_put_contents', $source);
         $this->assertStringContainsString('HashTableHelper::variableFromVmHashTable', $source);
         $this->assertStringContainsString('compile-time string literal', $source);
@@ -57,6 +59,7 @@ final class OpensslX509RuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_public_decrypt.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_dh_compute_key.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_spki_verify.c');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/openssl_spki_export.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/OpensslX509Runtime.php');
     }
 

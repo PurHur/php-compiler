@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_spki_export() — PEM public key from Netscape SPKAC (php-src ext/openssl/openssl.c; #6423).
+ * openssl_spki_export() — PEM public key from Netscape SPKAC (php-src ext/openssl/openssl.c; #6423 VM, JIT/AOT #32787).
  */
 final class openssl_spki_export extends Internal
 {
@@ -45,8 +45,12 @@ final class openssl_spki_export extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_spki_export() is not implemented for JIT in this compiler build (issue #6423)'
-        );
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'openssl_spki_export() expects exactly 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitOpensslX509::spkiExport($context, $args[0]);
     }
 }
