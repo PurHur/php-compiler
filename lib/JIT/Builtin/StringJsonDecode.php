@@ -21,6 +21,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for json_decode runtime helpers via JsonDecodeJitHelper PHP (#9359, #13228, #20829, #24137).
+ * Type always-on shells dropped (#32897).
  *
  * Embed + thin standalone AOT: single {@see __compiler_json_decode} bridge with tag dispatch
  * (Unserialize #20785 / Explode #14750 shape — no thin null stubs).
