@@ -31,7 +31,7 @@ final class JitDomNodeListItem
         DomNodeListItemRuntime::ensureLinked($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_call_cont');
 
-        // Thin-AOT: owner-aware item() (pinned __phpcItemN / firstChild|lastChild) (#27410).
+        // Thin-AOT: owner-aware item() (pinned __phpcItemN / firstChild|second) (#27410 / #32784).
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::invokeOwnerAware($context, $args[0], $args[1]);
         }
@@ -72,7 +72,7 @@ final class JitDomNodeListItem
             }
         }
         $elementClassId = $objectType->lookup('DOMElement');
-        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD, VmDom::PROP_NEXT_SIBLING] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
@@ -106,10 +106,10 @@ final class JitDomNodeListItem
         $use0 = BasicBlockHelper::append($context, 'dom_nli_idx0');
         $check1 = BasicBlockHelper::append($context, 'dom_nli_check1');
         $use1 = BasicBlockHelper::append($context, 'dom_nli_idx1');
-        $ownerHelper = BasicBlockHelper::append($context, 'dom_nli_owner_helper');
+        $ownerWalk = BasicBlockHelper::append($context, 'dom_nli_owner_walk');
         $context->builder->branchIf($is0, $use0, $check1);
         $context->builder->positionAtEnd($check1);
-        $context->builder->branchIf($is1, $use1, $ownerHelper);
+        $context->builder->branchIf($is1, $use1, $ownerWalk);
 
         // index 0: __phpcItem0 else owner.firstChild
         $context->builder->positionAtEnd($use0);
@@ -125,35 +125,37 @@ final class JitDomNodeListItem
             $objPtrTy
         );
 
-        // index 1: __phpcItem1 else owner.lastChild
+        // index 1: __phpcItem1 else firstChild->nextSibling — NOT lastChild (#32784).
         $context->builder->positionAtEnd($use1);
-        $exit1 = self::emitItemResolve(
+        $exit1 = self::emitItemResolveSecond(
             $context,
             $list,
             $owner,
-            '__phpcItem1',
-            VmDom::PROP_LAST_CHILD,
             $merge,
             $voidPtr,
             $valuePtrTy,
             $objPtrTy
         );
 
-        $context->builder->positionAtEnd($ownerHelper);
-        $ownerHelperRaw = $context->builder->call(
-            $context->lookupFunction(DomNodeListItemRuntime::ABI_NAME),
-            $list,
-            $index
+        // index >= 2: walk firstChild→nextSibling (ABI aborts on thin-AOT nodes, #32784).
+        $context->builder->positionAtEnd($ownerWalk);
+        $exitWalk = self::emitItemResolveWalk(
+            $context,
+            $owner,
+            $index,
+            $merge,
+            $voidPtr,
+            $valuePtrTy,
+            $objPtrTy,
+            $i64
         );
-        $ownerHelperVal = JitValueBox::normalizeValuePtr($context, $ownerHelperRaw);
-        $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($merge);
         $phi = $context->builder->phi($valuePtrTy);
         $phi->addIncoming($helperVal, $helperBlock);
         $phi->addIncoming($exit0['value'], $exit0['block']);
         $phi->addIncoming($exit1['value'], $exit1['block']);
-        $phi->addIncoming($ownerHelperVal, $ownerHelper);
+        $phi->addIncoming($exitWalk['value'], $exitWalk['block']);
 
         return $phi;
     }
@@ -232,6 +234,207 @@ final class JitDomNodeListItem
             $resultPtr,
             $childObj
         );
+        $context->builder->branch($exit);
+
+        $context->builder->positionAtEnd($exit);
+        $val = JitValueBox::normalizeValuePtr($context, $resultPtr);
+        $context->builder->branch($merge);
+
+        return ['value' => $val, 'block' => $exit];
+    }
+
+    /**
+     * index 1: __phpcItem1 else firstChild->nextSibling (#32784).
+     *
+     * Prior fallback used lastChild, which only matches index 1 when length==2.
+     *
+     * @return array{value: Value, block: mixed}
+     */
+    private static function emitItemResolveSecond(
+        Context $context,
+        Value $list,
+        Value $owner,
+        $merge,
+        $voidPtr,
+        $valuePtrTy,
+        $objPtrTy
+    ): array {
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NEXT_SIBLING)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_NEXT_SIBLING, JITVariable::TYPE_VALUE);
+        }
+        $resultSlot = JitValueBox::alloc($context);
+        $resultPtr = JitValueBox::pointer($context, $resultSlot);
+        $exit = BasicBlockHelper::append($context, 'dom_nli_item1_done');
+        $writeNull = BasicBlockHelper::append($context, 'dom_nli_item1_null');
+        $readPin = BasicBlockHelper::append($context, 'dom_nli_item1_read');
+        $fallback = BasicBlockHelper::append($context, 'dom_nli_item1_fb');
+        $usePin = BasicBlockHelper::append($context, 'dom_nli_item1_use');
+        $readFirst = BasicBlockHelper::append($context, 'dom_nli_item1_first');
+        $readNext = BasicBlockHelper::append($context, 'dom_nli_item1_next');
+        $storeNext = BasicBlockHelper::append($context, 'dom_nli_item1_store');
+
+        $pinRaw = $context->builder->load(
+            $objectType->propertySlotFor($list, 'DOMNodeList', '__phpcItem1')
+        );
+        $pinSlotNull = $context->builder->icmp(Builder::INT_EQ, $pinRaw, $voidPtr->constNull());
+        $context->builder->branchIf($pinSlotNull, $fallback, $readPin);
+
+        $context->builder->positionAtEnd($readPin);
+        $pinObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($pinRaw, $valuePtrTy)
+        );
+        $pinObjNull = $context->builder->icmp(Builder::INT_EQ, $pinObj, $objPtrTy->constNull());
+        $context->builder->branchIf($pinObjNull, $fallback, $usePin);
+
+        $context->builder->positionAtEnd($usePin);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $resultPtr,
+            $pinObj
+        );
+        $context->builder->branch($exit);
+
+        // Fallback: owner.firstChild->nextSibling (second child, not lastChild).
+        $context->builder->positionAtEnd($fallback);
+        $firstRaw = $context->builder->load(
+            $objectType->propertySlotFor($owner, 'DOMElement', VmDom::PROP_FIRST_CHILD)
+        );
+        $firstSlotNull = $context->builder->icmp(Builder::INT_EQ, $firstRaw, $voidPtr->constNull());
+        $context->builder->branchIf($firstSlotNull, $writeNull, $readFirst);
+
+        $context->builder->positionAtEnd($readFirst);
+        $firstObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($firstRaw, $valuePtrTy)
+        );
+        $firstObjNull = $context->builder->icmp(Builder::INT_EQ, $firstObj, $objPtrTy->constNull());
+        $context->builder->branchIf($firstObjNull, $writeNull, $readNext);
+
+        $context->builder->positionAtEnd($readNext);
+        $nextRaw = $context->builder->load(
+            $objectType->propertySlotFor($firstObj, 'DOMElement', VmDom::PROP_NEXT_SIBLING)
+        );
+        $nextSlotNull = $context->builder->icmp(Builder::INT_EQ, $nextRaw, $voidPtr->constNull());
+        $context->builder->branchIf($nextSlotNull, $writeNull, $storeNext);
+
+        $context->builder->positionAtEnd($storeNext);
+        $nextObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($nextRaw, $valuePtrTy)
+        );
+        $nextObjNull = $context->builder->icmp(Builder::INT_EQ, $nextObj, $objPtrTy->constNull());
+        $doStore = BasicBlockHelper::append($context, 'dom_nli_item1_write_obj');
+        $context->builder->branchIf($nextObjNull, $writeNull, $doStore);
+        $context->builder->positionAtEnd($doStore);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $resultPtr,
+            $nextObj
+        );
+        $context->builder->branch($exit);
+
+        $context->builder->positionAtEnd($writeNull);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $resultPtr);
+        $context->builder->branch($exit);
+
+        $context->builder->positionAtEnd($exit);
+        $val = JitValueBox::normalizeValuePtr($context, $resultPtr);
+        $context->builder->branch($merge);
+
+        return ['value' => $val, 'block' => $exit];
+    }
+
+    /**
+     * Walk owner.firstChild → nextSibling until index (#32784).
+     *
+     * Thin-AOT nodes are not in DomRegistry, so the NestedJIT ABI aborts on
+     * index >= 2 — walk sibling slots in LLVM instead.
+     *
+     * @return array{value: Value, block: mixed}
+     */
+    private static function emitItemResolveWalk(
+        Context $context,
+        Value $owner,
+        Value $index,
+        $merge,
+        $voidPtr,
+        $valuePtrTy,
+        $objPtrTy,
+        $i64
+    ): array {
+        $objectType = $context->type->object;
+        $resultSlot = JitValueBox::alloc($context);
+        $resultPtr = JitValueBox::pointer($context, $resultSlot);
+        $exit = BasicBlockHelper::append($context, 'dom_nli_walk_done');
+        $writeNull = BasicBlockHelper::append($context, 'dom_nli_walk_null');
+        $readFirst = BasicBlockHelper::append($context, 'dom_nli_walk_read_first');
+        $loopHeader = BasicBlockHelper::append($context, 'dom_nli_walk_hdr');
+        $advance = BasicBlockHelper::append($context, 'dom_nli_walk_adv');
+        $found = BasicBlockHelper::append($context, 'dom_nli_walk_found');
+
+        $firstRaw = $context->builder->load(
+            $objectType->propertySlotFor($owner, 'DOMElement', VmDom::PROP_FIRST_CHILD)
+        );
+        $firstSlotNull = $context->builder->icmp(Builder::INT_EQ, $firstRaw, $voidPtr->constNull());
+        $context->builder->branchIf($firstSlotNull, $writeNull, $readFirst);
+
+        $context->builder->positionAtEnd($readFirst);
+        $firstObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($firstRaw, $valuePtrTy)
+        );
+        $firstObjNull = $context->builder->icmp(Builder::INT_EQ, $firstObj, $objPtrTy->constNull());
+        $enter = BasicBlockHelper::append($context, 'dom_nli_walk_enter');
+        $context->builder->branchIf($firstObjNull, $writeNull, $enter);
+        $enterPred = $enter;
+        $context->builder->positionAtEnd($enter);
+        $context->builder->branch($loopHeader);
+
+        $context->builder->positionAtEnd($loopHeader);
+        $curPhi = $context->builder->phi($objPtrTy);
+        $idxPhi = $context->builder->phi($i64);
+        $atIndex = $context->builder->icmp(Builder::INT_EQ, $idxPhi, $index);
+        $context->builder->branchIf($atIndex, $found, $advance);
+
+        $context->builder->positionAtEnd($advance);
+        $nextRaw = $context->builder->load(
+            $objectType->propertySlotFor($curPhi, 'DOMElement', VmDom::PROP_NEXT_SIBLING)
+        );
+        $nextSlotNull = $context->builder->icmp(Builder::INT_EQ, $nextRaw, $voidPtr->constNull());
+        $readNext = BasicBlockHelper::append($context, 'dom_nli_walk_read_next');
+        $context->builder->branchIf($nextSlotNull, $writeNull, $readNext);
+
+        $context->builder->positionAtEnd($readNext);
+        $nextObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($nextRaw, $valuePtrTy)
+        );
+        $nextObjNull = $context->builder->icmp(Builder::INT_EQ, $nextObj, $objPtrTy->constNull());
+        $back = BasicBlockHelper::append($context, 'dom_nli_walk_back');
+        $context->builder->branchIf($nextObjNull, $writeNull, $back);
+        $context->builder->positionAtEnd($back);
+        $nextIdx = $context->builder->add($idxPhi, $i64->constInt(1, false));
+        $context->builder->branch($loopHeader);
+
+        // Complete phis now that predecessors exist
+        $curPhi->addIncoming($firstObj, $enterPred);
+        $curPhi->addIncoming($nextObj, $back);
+        $idxPhi->addIncoming($i64->constInt(0, false), $enterPred);
+        $idxPhi->addIncoming($nextIdx, $back);
+
+        $context->builder->positionAtEnd($found);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $resultPtr,
+            $curPhi
+        );
+        $context->builder->branch($exit);
+
+        $context->builder->positionAtEnd($writeNull);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $resultPtr);
         $context->builder->branch($exit);
 
         $context->builder->positionAtEnd($exit);
