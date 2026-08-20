@@ -383,13 +383,12 @@ class Type extends Builtin {
         $fntypeStreamEnableCrypto = $this->context->context->functionType($i32, false, $i64, $i64, $i64, $i64);
         $fnStreamEnableCrypto = $this->context->module->addFunction('__compiler_stream_enable_crypto', $fntypeStreamEnableCrypto);
         $this->context->registerFunction('__compiler_stream_enable_crypto', $fnStreamEnableCrypto);
-        $fntypeStreamSocketGetName = $this->context->context->functionType($strPtr, false, $i64, $i64);
-        $fnStreamSocketGetName = $this->context->module->addFunction('__compiler_stream_socket_get_name', $fntypeStreamSocketGetName);
-        $this->context->registerFunction('__compiler_stream_socket_get_name', $fnStreamSocketGetName);
-        $double = $this->context->getTypeFromString('double');
-        $fntypeStreamSocketAccept = $this->context->context->functionType($i64, false, $i64, $i64, $double);
-        $fnStreamSocketAccept = $this->context->module->addFunction('__compiler_stream_socket_accept', $fntypeStreamSocketAccept);
-        $this->context->registerFunction('__compiler_stream_socket_accept', $fnStreamSocketAccept);
+        // __compiler_stream_socket_get_name / __compiler_stream_socket_accept always-on
+        // shells removed (#32807): StreamSocketGetNameRuntime / StreamSocketAcceptRuntime
+        // own the ABI (getNamedFunction first; Type::register still ensureLinked). Leftover
+        // Type empty decls vs Runtime ABI drift mints name.1 (#31894 / #32122).
+        // User-script stream_socket_get_name()/stream_socket_accept() stay
+        // StreamSocketGetNameJitHelper / StreamSocketAcceptJitHelper.
         $fntypeFtruncate = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFtruncate = $this->context->module->addFunction('__compiler_ftruncate', $fntypeFtruncate);
         $this->context->registerFunction('__compiler_ftruncate', $fnFtruncate);
