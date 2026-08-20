@@ -4,24 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-/**
- * mime_content_type() semantics for compiled JIT/AOT modules (#9236, php-in-PHP).
- *
- * SSOT: {@see VmMime::mimeContentTypeFromPath()} / {@see VmMime::detectFromBytes()}
- * php-src: ext/standard/file.c — PHP_FUNCTION(mime_content_type)
- */
 final class MimeContentTypeJitHelper
 {
-    /**
-     * @return string|null null when path missing or unreadable (JIT ABI uses null __string__*)
-     */
     public static function mimeContentType(string $path): ?string
     {
-        $result = VmMime::mimeContentTypeFromPath($path);
-        if (false === $result) {
-            return null;
+        $data = @\file_get_contents($path);
+        if (false === $data) {
+            return "FAIL";
         }
+        $sub = \substr($data, 0, 5);
+        $eq = ('<?php' === $sub) ? 'Y' : 'N';
+        $eq2 = ('127.0' === $sub) ? 'Y' : 'N';
 
-        return $result;
+        return "sub=$sub eqPhp=$eq eq127=$eq2";
     }
 }

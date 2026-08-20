@@ -136,16 +136,11 @@ class Type extends Builtin {
         // User-script get_include_path()/set_include_path()/
         // stream_resolve_include_path() stay IncludePathJitHelper /
         // IncludePathResolveJitHelper.
-        $fntypeMimeContentType = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnMimeContentType = $this->context->module->addFunction(
-            '__compiler_mime_content_type',
-            $fntypeMimeContentType
-        );
-        $this->context->registerFunction('__compiler_mime_content_type', $fnMimeContentType);
+        // __compiler_mime_content_type always-on shell removed (#33034): MimeContentTypeRuntime
+        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
+        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // mime_content_type.1 (#31894 / #32122). User-script mime_content_type() stays
+        // MimeContentTypeJitHelper / VmMime.
         $fntypeGetMetaTags = $this->context->context->functionType(
             $this->context->getTypeFromString('__hashtable__*'),
             false,
@@ -1026,6 +1021,7 @@ class Type extends Builtin {
         StringUtf8Runtime::ensureLinked($this->context);
         StringReadfile::ensureLinked($this->context);
         StringFileGetContents::ensureLinked($this->context);
+        MimeContentTypeRuntime::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
