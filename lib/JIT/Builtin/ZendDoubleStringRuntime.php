@@ -206,13 +206,67 @@ final class ZendDoubleStringRuntime
                 '__compiler_zend_serialize_double',
                 $context->context->functionType($strPtr, false, $double)
             );
+        // fcmp NAN/INF (not JitStringCompare) — strcmp helpers append blocks to the
+        // wrong function when ensureSerializeWire runs mid-emit (#32911 / Module.php:180).
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
         $entry = $fn->appendBasicBlock('zend_ser_double_entry');
+        $nanBb = $fn->appendBasicBlock('zend_ser_double_nan');
+        $infBb = $fn->appendBasicBlock('zend_ser_double_inf');
+        $ninfBb = $fn->appendBasicBlock('zend_ser_double_ninf');
+        $okBb = $fn->appendBasicBlock('zend_ser_double_ok');
+        $doneBb = $fn->appendBasicBlock('zend_ser_double_done');
+
+        $context->activeFunction = '__compiler_zend_serialize_double';
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
         $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue(
-            self::snprintfCall($context, $fn->getParam(0), 'd:%.16g;', null)
-        );
+        $dbl = $fn->getParam(0);
+        $isNan = $context->builder->fcmp(Builder::REAL_UNO, $dbl, $dbl);
+        $afterNan = $fn->appendBasicBlock('zend_ser_double_after_nan');
+        $context->builder->branchIf($isNan, $nanBb, $afterNan);
+
+        $context->builder->positionAtEnd($nanBb);
+        $nanStr = $context->builder->load($context->constantStringFromString('d:NAN;'));
+        $nanEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterNan);
+        $posInf = $dbl->typeOf()->constReal(\INF);
+        $isInf = $context->builder->fcmp(Builder::REAL_OEQ, $dbl, $posInf);
+        $afterInf = $fn->appendBasicBlock('zend_ser_double_after_inf');
+        $context->builder->branchIf($isInf, $infBb, $afterInf);
+
+        $context->builder->positionAtEnd($infBb);
+        $infStr = $context->builder->load($context->constantStringFromString('d:INF;'));
+        $infEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterInf);
+        $negInf = $dbl->typeOf()->constReal(-\INF);
+        $isNinf = $context->builder->fcmp(Builder::REAL_OEQ, $dbl, $negInf);
+        $context->builder->branchIf($isNinf, $ninfBb, $okBb);
+
+        $context->builder->positionAtEnd($ninfBb);
+        $ninfStr = $context->builder->load($context->constantStringFromString('d:-INF;'));
+        $ninfEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $okRaw = self::snprintfCall($context, $dbl, 'd:%.16g;', null);
+        $okEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($strPtr);
+        $phi->addIncoming($nanStr, $nanEnd);
+        $phi->addIncoming($infStr, $infEnd);
+        $phi->addIncoming($ninfStr, $ninfEnd);
+        $phi->addIncoming($okRaw, $okEnd);
+        $context->builder->returnValue($phi);
         $context->registerFunction('__compiler_zend_serialize_double', $fn);
 
+        $context->activeFunction = $savedActive;
+        $context->loweringLlvmFunction = $savedLowering;
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
         } else {
