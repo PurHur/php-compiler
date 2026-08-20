@@ -18,16 +18,15 @@ final class Utf8Latin1RuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUtf8Latin1.php');
         $this->assertStringContainsString('Utf8Latin1JitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('#32879', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StringUtf8Latin1Jit::', $source);
-        $this->assertLessThan(150, \substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('coerceBridgeResult', $source);
+        $this->assertLessThan(120, \substr_count($source, "\n") + 1);
     }
 
     public function testUtf8Latin1JitHelperFileDeleted(): void
@@ -38,8 +37,19 @@ final class Utf8Latin1RuntimeShrinkTest extends TestCase
     public function testUtf8Latin1JitHelperDelegatesToVmString(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/Utf8Latin1JitHelper.php');
-        $this->assertStringContainsString('VmString::utf8_encode', $source);
-        $this->assertStringContainsString('VmString::utf8_decode', $source);
+        // Self-contained NestedJIT body (#32879 / peer #20452) — must not call VmString.
+        $this->assertDoesNotMatchRegularExpression(
+            '/VmString::utf8_encode\s*\(/',
+            $source
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/VmString::utf8_decode\s*\(/',
+            $source
+        );
+        $this->assertStringContainsString('byteOrd', $source);
+        $this->assertStringContainsString('byteAt', $source);
+        $this->assertStringContainsString('#32879', $source);
+        $this->assertStringContainsString('#20452', $source);
     }
 
     public function testUtf8Latin1JitHelperSemanticsMatchVmString(): void
