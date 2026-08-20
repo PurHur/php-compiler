@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_csr_export() — export CSR PEM (php-src ext/openssl/xp.c; #6421).
+ * openssl_csr_export() — export CSR PEM (php-src ext/openssl/xp.c; #6421 VM, JIT/AOT #32697).
  */
 final class openssl_csr_export extends Internal
 {
@@ -46,8 +46,13 @@ final class openssl_csr_export extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_csr_export() is not implemented for JIT in this compiler build (issue #6421)'
-        );
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'openssl_csr_export() expects 2 or 3 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::csrExport($context, $args[0], $args[1], $args[2] ?? null);
     }
 }
