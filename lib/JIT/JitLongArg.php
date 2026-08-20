@@ -5,7 +5,14 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 final class JitLongArg {
     public static function lower(Context $context, Variable $arg, string $contextLabel = "argument"): Value {
-        if (null !== $arg->compileTimeLong && !JitValueBox::isValueOperand($arg)) {
+        // Fold only LLVM i64 constants. Loop-carried `$i` is KIND_VALUE with
+        // stale compileTimeLong from `for ($i = 0; …)` (#32831 / #32605).
+        if (
+            null !== $arg->compileTimeLong
+            && null !== $arg->value
+            && \PHPLLVM\Value::KIND_CONSTANT_INT === $arg->value->getKind()
+            && !JitValueBox::isValueOperand($arg)
+        ) {
             return $context->constantFromInteger((int) $arg->compileTimeLong);
         }
         if (Variable::TYPE_NATIVE_LONG === $arg->type) return $context->helper->loadValue($arg);

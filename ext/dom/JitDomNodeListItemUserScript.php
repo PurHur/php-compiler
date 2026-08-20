@@ -25,9 +25,21 @@ final class JitDomNodeListItemUserScript
         if (\count($args) < 2) {
             return null;
         }
-        $index = $args[1]->compileTimeLong;
-        if (null === $index && null !== $args[1]->compileTimeString && is_numeric($args[1]->compileTimeString)) {
-            $index = (int) $args[1]->compileTimeString;
+        // Fold only when the index operand is an LLVM i64 constant. Loop `$i`
+        // keeps stale compileTimeLong=0 as KIND_VALUE (#32831 / peer #32605).
+        $index = null;
+        $arg = $args[1];
+        if (
+            null !== $arg->value
+            && \PHPLLVM\Value::KIND_CONSTANT_INT === $arg->value->getKind()
+        ) {
+            $index = $arg->compileTimeLong;
+            if (null === $index && null !== $arg->compileTimeString && is_numeric($arg->compileTimeString)) {
+                $index = (int) $arg->compileTimeString;
+            }
+            if (null === $index) {
+                $index = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($arg->value->value);
+            }
         }
         if (null === $index || $index < 0) {
             return null;
