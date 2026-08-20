@@ -55,6 +55,8 @@ final class JsonEncodeQuoteStringRuntime
         $strPtr = $context->getTypeFromString('__string__*');
         $ft = $context->context->functionType($strPtr, false, $strPtr);
         $fn = null !== $probe ? $probe : $context->module->addFunction(self::ABI, $ft);
+        // Register before body emit — Type empty shells used to pre-register (#32897 follow-up).
+        $context->registerFunction(self::ABI, $fn);
         $entry = $fn->appendBasicBlock(self::ENTRY);
         $context->builder->positionAtEnd($entry);
 
