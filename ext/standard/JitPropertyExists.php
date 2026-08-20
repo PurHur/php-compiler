@@ -77,7 +77,7 @@ final class JitPropertyExists
             $context->builder->structGep($valuePtr, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
-        // Value-box tags may include IS_REFCOUNTED; compare the low 7 bits (#32688 / #27108).
+        // Value-box tags may include IS_REFCOUNTED; compare the low 7 bits (#27108, #32688).
         $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
@@ -87,12 +87,18 @@ final class JitPropertyExists
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
-            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+            $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false)
         );
+        $isEnum = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_ENUM_CASE & 0x7f, false)
+        );
+        $isObject = $context->builder->or($isObject, $isEnum);
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
-            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+            $i8->constInt(JITVariable::TYPE_STRING & 0x7f, false)
         );
 
         $nullBlock = BasicBlockHelper::append($context, 'prop_exists_null');
@@ -132,13 +138,8 @@ final class JitPropertyExists
         $context->builder->branchIf($isString, $stringBlock, $errBlock);
 
         $context->builder->positionAtEnd($stringBlock);
-        $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
-        if (null !== $classLiteral) {
-            // Runtime helper — autoloads like zend_lookup_class (#26407).
-            $strResult = self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
-        } else {
-            $strResult = $i1->constInt(0, false);
-        }
+        // Runtime class string in a value box — autoload like zend_lookup_class (#26407).
+        $strResult = self::routeThroughPhpHelper($context, $objectOrClass, $propertyArg);
         $context->builder->store($strResult, $resultSlot);
         $context->builder->branch($mergeBlock);
 
@@ -279,9 +280,6 @@ final class JitPropertyExists
     ): Value {
         if (null !== $propLiteral) {
             // ARRAY_AS_PROPS flags are runtime — fold only via PHP helper (#31039).
-            // Dynamic props (stdClass / AllowDynamicProperties) stay on the LLVM table: NestedJIT
-            // ObjectEntry.properties is empty for AOT-native objects (#32688), while defineProperty
-            // during `$o->x = …` updates the compile-time prop table that propertyExistsFromScope reads.
             $isSplArray = self::isSplArrayStorageClassId($context, $classId);
             $splBlock = BasicBlockHelper::append($context, 'prop_exists_spl_array');
             $normBlock = BasicBlockHelper::append($context, 'prop_exists_not_spl_array');
