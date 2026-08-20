@@ -299,12 +299,18 @@ final class ObjectStaticPropertyLlvm
 
         $context->builder->positionAtEnd($doneBlock);
 
-        return new Variable(
+        // Match HashTableWriteLlvm::boxedArrayFromHashtable: FETCH_DIM_W must see a
+        // boxed-array local, not a bare TYPE_VALUE slot, or $b[0]=99 SIGSEGVs (#32830).
+        $var = new Variable(
             $context,
             Variable::TYPE_VALUE,
             Variable::KIND_VARIABLE,
             $slot
         );
+        $var->valueBoxHashtable = true;
+        $var->valueBoxAliasPtr = JitValueBox::pointer($context, $slot);
+
+        return $var;
     }
 
     /**

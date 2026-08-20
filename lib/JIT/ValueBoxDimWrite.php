@@ -89,9 +89,27 @@ final class ValueBoxDimWrite
 
     /**
      * True when CFG types the dim container as array (function-static array defaults, #32806).
+     *
+     * Unions that include array (e.g. mixed from {@code $b = A::$a}) must also count —
+     * otherwise script globals (`functionStaticGlobal`) take {@see fetchStringOffsetWriteLvalue}
+     * and SIGSEGV on HT boxes (#32830 / #32814).
      */
     public static function containerCfgIsArray(?\PHPTypes\Type $type): bool
     {
-        return null !== $type && \PHPTypes\Type::TYPE_ARRAY === $type->type;
+        if (null === $type) {
+            return false;
+        }
+        if (\PHPTypes\Type::TYPE_ARRAY === $type->type) {
+            return true;
+        }
+        if (\PHPTypes\Type::TYPE_UNION === $type->type) {
+            foreach ($type->subTypes ?? [] as $sub) {
+                if (self::containerCfgIsArray($sub)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
