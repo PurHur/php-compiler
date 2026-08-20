@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\ChownJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** chown()/chgrp() JIT: ChownJitHelper via JitVmHelperLink (#9585, #24473, #32466). */
+/** chown()/chgrp() JIT: ChownLibcRuntime libc (#9585, #32466). ChownJitHelper kept for int ABI tests. */
 final class ChownRuntimeShrinkTest extends TestCase
 {
     public function testStringFsDirJitDelegatesChownChgrpToRuntime(): void
@@ -19,20 +19,17 @@ final class ChownRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('resolveIdFromValue', $source);
     }
 
-    public function testChownRuntimeUsesJitHelper(): void
+    public function testChownRuntimeUsesChownLibcRuntime(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ChownRuntime.php');
-        $this->assertStringContainsString('ChownJitHelper::chownArgv', $source);
-        $this->assertStringContainsString('ChownJitHelper::chgrpArgv', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('__value__readLong', $source);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringNotContainsString('parseAndCompile', $source);
-        $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
-        $this->assertStringNotContainsString("lookupFunction('chown')", $source);
-        $this->assertLessThan(210, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('ChownLibcRuntime::emitChown', $source);
+        $this->assertStringContainsString('ChownLibcRuntime::emitChgrp', $source);
+        $this->assertStringNotContainsString('ChownJitHelper::chownArgv', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertLessThan(130, \substr_count($source, "\n") + 1);
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ChownLibcRuntime.php');
+        $this->assertStringContainsString("lookupFunction('chown')", $libc);
+        $this->assertStringContainsString("lookupFunction('fchownat')", $libc);
     }
 
     public function testChownJitHelperMatchesLibcIntUid(): void

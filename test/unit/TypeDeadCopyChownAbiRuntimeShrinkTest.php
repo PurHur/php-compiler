@@ -57,13 +57,13 @@ final class TypeDeadCopyChownAbiRuntimeShrinkTest extends TestCase
         $copy = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CopyRuntime.php');
         $this->assertStringContainsString("'__compiler_copy'", $copy);
         $this->assertStringContainsString("getNamedFunction('__compiler_copy')", $copy);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $copy);
+        $this->assertStringContainsString('CopyLibcRuntime::emit', $copy);
 
         $chown = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ChownRuntime.php');
         $this->assertStringContainsString("'__compiler_chown'", $chown);
         $this->assertStringContainsString("'__compiler_chgrp'", $chown);
         $this->assertStringContainsString("getNamedFunction('__compiler_chown')", $chown);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $chown);
+        $this->assertStringContainsString('ChownLibcRuntime::emitChown', $chown);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void
@@ -73,7 +73,7 @@ final class TypeDeadCopyChownAbiRuntimeShrinkTest extends TestCase
             (string) file_get_contents(__DIR__.'/../../ext/standard/JitCopy.php')
         );
         $this->assertStringContainsString(
-            'CopyJitHelper::copyArgv',
+            'CopyLibcRuntime::emit',
             (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CopyRuntime.php')
         );
         $this->assertStringContainsString(
@@ -85,7 +85,7 @@ final class TypeDeadCopyChownAbiRuntimeShrinkTest extends TestCase
             (string) file_get_contents(__DIR__.'/../../ext/standard/JitChgrp.php')
         );
         $this->assertStringContainsString(
-            'ChownJitHelper::chownArgv',
+            'ChownLibcRuntime::emitChown',
             (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ChownRuntime.php')
         );
     }
