@@ -473,36 +473,11 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_random_bytes', $fnRandomBytes);
         $strPtr = $this->context->getTypeFromString('__string__*');
         $i32 = $this->context->getTypeFromString('int32');
-        $fntypeHash = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $i32);
-        $fnHash = $this->context->module->addFunction('__compiler_hash', $fntypeHash);
-        $this->context->registerFunction('__compiler_hash', $fnHash);
-        $fntypeHashHmac = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i32);
-        $fnHashHmac = $this->context->module->addFunction('__compiler_hash_hmac', $fntypeHashHmac);
-        $this->context->registerFunction('__compiler_hash_hmac', $fnHashHmac);
-        $i64 = $this->context->getTypeFromString('int64');
-        $fntypeHashPbkdf2 = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $strPtr,
-            $strPtr,
-            $strPtr,
-            $i64,
-            $i64,
-            $i32
-        );
-        $fnHashPbkdf2 = $this->context->module->addFunction('__compiler_hash_pbkdf2', $fntypeHashPbkdf2);
-        $this->context->registerFunction('__compiler_hash_pbkdf2', $fnHashPbkdf2);
-        $fntypeHashHkdf = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $strPtr,
-            $strPtr,
-            $i64,
-            $strPtr,
-            $strPtr
-        );
-        $fnHashHkdf = $this->context->module->addFunction('__compiler_hash_hkdf', $fntypeHashHkdf);
-        $this->context->registerFunction('__compiler_hash_hkdf', $fnHashHkdf);
+        // __compiler_hash / __compiler_hash_hmac / __compiler_hash_pbkdf2 /
+        // __compiler_hash_hkdf always-on shells removed (#32876): NestedJIT/AOT
+        // bridge is StringHashCrypto → StringHashCryptoPhp (getNamedFunction first via
+        // JitVmHelperLink::ensureBridge; Type::initialize still ensureLinked). Leftover
+        // Type empty decls vs Runtime ABI drift mint hash.1 (#31894 / #32122).
         // __compiler_hash_equals / __compiler_hash_hmac_algos / __compiler_hash_algos
         // always-on shells removed (#32875): NestedJIT/AOT bridges are StringHashEquals /
         // StringHashHmacAlgos / StringHashAlgos (JitVmHelperLink::ensureBridge;
@@ -1184,6 +1159,7 @@ class Type extends Builtin {
         LibcryptRuntime::ensureLinked($this->context);
         PasswordRandomBytesRuntime::ensureLinked($this->context);
         PasswordCryptoRuntime::ensureLinked($this->context);
+        StringHashCrypto::ensureLinked($this->context);
         OpensslEncryptRuntime::ensureLinked($this->context);
         OpensslSignRuntime::ensureLinked($this->context);
         OpensslDigestRuntime::ensureLinked($this->context);
