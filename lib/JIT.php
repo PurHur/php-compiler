@@ -21993,6 +21993,20 @@ class JIT {
                     return;
                 }
             }
+            // documentElement temps lose TYPE_OBJECT — C14N via RuntimeIndirect echoes "Object" (#32961).
+            if (
+                'c14n' === $methodLcEarly
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
+                if ($this->context->functionIsRegistered('domnode::c14n')) {
+                    $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::c14n');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             // ?-> fetch blocks compile against a null-typed receiver slot; at runtime the
             // branch is only taken when the receiver is a real object (zend_compile.c).
             $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLcEarly);
@@ -22251,6 +22265,13 @@ class JIT {
                 // documentElement temps lose DOMElement userType → :object (#32957 / peer #21687).
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::issamenode');
                 if ($this->context->functionIsRegistered('domnode::issamenode')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
+            } elseif ('c14n' === $methodLc) {
+                // Same untyped documentElement path: without remap, C14N prints "Object" (#32961).
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
+                if ($this->context->functionIsRegistered('domnode::c14n')) {
                     $className = 'DOMNode';
                     $declaringClassLc = 'domnode';
                 }
@@ -22636,6 +22657,12 @@ class JIT {
                 if ('clonenode' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::clonenode');
+                }
+                // C14N on documentElement temps (:object / unknown) — peer cloneNode (#32961).
+                if ('c14n' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::c14n');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::c14n');
                 }
                 // hasChildNodes on documentElement/firstChild temps (:object) — php-src node.c.
                 if ('haschildnodes' === $methodLc) {
@@ -23075,6 +23102,16 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
             if ($this->context->functionIsRegistered('domnode::clonenode')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::clonenode');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        // :object / empty userType would take RuntimeIndirect and echo "Object" (#32961).
+        if ('c14n' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::c14n');
+            if ($this->context->functionIsRegistered('domnode::c14n')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::c14n');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
