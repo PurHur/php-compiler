@@ -12,10 +12,14 @@ $m = 'B';
 var_dump($o instanceof $m);
 $other = new A();
 var_dump($o instanceof $other);
+function cn(): string { return 'A'; }
+$fromFn = cn();
+var_dump($o instanceof $fromFn);
 --EXPECT--
 bool(true)
 bool(true)
 bool(false)
+bool(true)
 bool(true)
 --EXPECT_EXIT--
 0

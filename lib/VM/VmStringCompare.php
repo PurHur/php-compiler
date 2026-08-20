@@ -302,6 +302,58 @@ final class VmStringCompare
     }
 
     /**
+     * Case-insensitive equality of two {@see __string__*} (ASCII), length-guarded (#32766).
+     *
+     * Do not route through {@see __compiler_strcasecmp}: that bridge strlen()s C strings and
+     * mis-reads length-prefixed (non-NUL-terminated) payloads.
+     */
+    public static function asciiCaseInsensitiveIdentical(
+        Context $context,
+        Value $leftStr,
+        Value $rightStr
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'jit_str_ci_identical_entry');
+        $map = $context->structFieldMap['__string__'];
+        $leftLen = $context->builder->load(
+            $context->builder->structGep($leftStr, $map['length'])
+        );
+        $rightLen = $context->builder->load(
+            $context->builder->structGep($rightStr, $map['length'])
+        );
+        $lenEq = $context->builder->icmp(Builder::INT_EQ, $leftLen, $rightLen);
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+
+        $lenOk = BasicBlockHelper::append($context, 'jit_str_ci_len_ok');
+        $lenBad = BasicBlockHelper::append($context, 'jit_str_ci_len_bad');
+        $merge = BasicBlockHelper::append($context, 'jit_str_ci_done');
+        $context->builder->branchIf($lenEq, $lenOk, $lenBad);
+
+        $context->builder->positionAtEnd($lenBad);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($lenOk);
+        $leftChars = $context->builder->pointerCast(
+            $context->builder->structGep($leftStr, $map['value']),
+            $context->getTypeFromString('int8*')
+        );
+        $rightChars = $context->builder->pointerCast(
+            $context->builder->structGep($rightStr, $map['value']),
+            $context->getTypeFromString('int8*')
+        );
+        $strEq = self::emitAsciiCiEqual($context, $leftChars, $rightChars, $leftLen);
+        $eqEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($falseVal, $lenBad);
+        $phi->addIncoming($strEq, $eqEnd);
+
+        return $phi;
+    }
+
+    /**
      * True when $haystack contains $needle as a byte subsequence (#26796 / #24161 class).
      *
      * Empty needle → true (php-src str_contains). Sliding memcmp window — NestedJIT of
