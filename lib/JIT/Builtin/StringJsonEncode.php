@@ -24,7 +24,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_json_encode_* via JsonEncodeNestedJitHelper PHP
- * (#9267, #13239, #20816, #27020).
+ * (#9267, #13239, #20816, #27020). Type always-on shells dropped (#32897).
  *
  * Embed + thin standalone AOT: {@see JsonEncodeNestedJitHelper} via {@see JitVmHelperLink}
  * (Context-free NestedJIT path — avoids `$ctx->runtime->vm` SIGSEGV on thin AOT).

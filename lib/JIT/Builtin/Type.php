@@ -927,63 +927,16 @@ class Type extends Builtin {
         );
         $this->context->registerFunction('phpc_session_decode_wire', $fnSessionDecodeWire);
         SessionStartOptionsRuntime::ensureLinked($this->context);
-        $fntypeJsonEncodeValue = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $valuePtr,
-            $this->context->getTypeFromString('int64')
-        );
-        $fnJsonEncodeValue = $this->context->module->addFunction(
-            '__compiler_json_encode_value',
-            $fntypeJsonEncodeValue
-        );
-        $this->context->registerFunction('__compiler_json_encode_value', $fnJsonEncodeValue);
-        $fntypeJsonEncodeArray = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__hashtable__*'),
-            $this->context->getTypeFromString('int64')
-        );
-        $fnJsonEncodeArray = $this->context->module->addFunction(
-            '__compiler_json_encode_array',
-            $fntypeJsonEncodeArray
-        );
-        $this->context->registerFunction('__compiler_json_encode_array', $fnJsonEncodeArray);
-        $fntypeJsonQuoteString = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $strPtr
-        );
-        $fnJsonQuoteString = $this->context->module->addFunction(
-            '__compiler_json_quote_string',
-            $fntypeJsonQuoteString
-        );
-        $this->context->registerFunction('__compiler_json_quote_string', $fnJsonQuoteString);
-        // Returns __value__* (Unserialize #20785 / #20829) — not void+out-pointer.
-        $fnJsonDecode = $this->context->module->addFunction(
-            '__compiler_json_decode',
-            $this->context->context->functionType($valuePtr, false, $strPtr)
-        );
-        $this->context->registerFunction('__compiler_json_decode', $fnJsonDecode);
-        $fntypeJsonLastError = $this->context->context->functionType($i64, false);
-        $fnJsonLastError = $this->context->module->addFunction('__compiler_json_last_error', $fntypeJsonLastError);
-        $this->context->registerFunction('__compiler_json_last_error', $fnJsonLastError);
-        $fntypeJsonLastErrorMsg = $this->context->context->functionType($strPtr, false);
-        $fnJsonLastErrorMsg = $this->context->module->addFunction(
-            '__compiler_json_last_error_msg',
-            $fntypeJsonLastErrorMsg
-        );
-        $this->context->registerFunction('__compiler_json_last_error_msg', $fnJsonLastErrorMsg);
-        $fnJsonSetLastError = $this->context->module->addFunction(
-            '__compiler_json_set_last_error',
-            $this->context->context->functionType($i64, false, $i64)
-        );
-        $this->context->registerFunction('__compiler_json_set_last_error', $fnJsonSetLastError);
-        $fnJsonValidate = $this->context->module->addFunction(
-            '__compiler_json_validate',
-            $this->context->context->functionType($i64, false, $strPtr, $i64, $i64)
-        );
-        $this->context->registerFunction('__compiler_json_validate', $fnJsonValidate);
+        // __compiler_json_encode_value / __compiler_json_encode_array /
+        // __compiler_json_quote_string / __compiler_json_decode /
+        // __compiler_json_last_error / __compiler_json_last_error_msg /
+        // __compiler_json_set_last_error / __compiler_json_validate always-on shells
+        // removed (#32897): user-script json_encode()/json_decode()/json_last_error*()
+        // /json_validate() stay StringJsonEncode / StringJsonDecode /
+        // JsonEncodeQuoteStringRuntime. NestedJIT/AOT bridges getNamedFunction first
+        // (JitVmHelperLink::ensureBridge / Runtime implement); Type::initialize still
+        // ensureLinked. Leftover Type empty decls vs Runtime ABI drift mint
+        // json_encode.1 (#31894 / #32122).
         $fntypeXmlrpcEncodeValue = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -1158,6 +1111,8 @@ class Type extends Builtin {
         StringHashEquals::ensureLinked($this->context);
         StringHashHmacAlgos::ensureLinked($this->context);
         StringHashAlgos::ensureLinked($this->context);
+        StringJsonEncode::ensureLinked($this->context);
+        StringJsonDecode::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
         StringUtf8Latin1::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
