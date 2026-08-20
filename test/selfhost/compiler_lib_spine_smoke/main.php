@@ -537,6 +537,7 @@ require_once __DIR__.'/../../../ext/dom/JitDomHtmlDocumentSaveHtml.php';
 require_once __DIR__.'/../../../ext/dom/JitDomLoadXMLUserScript.php';
 require_once __DIR__.'/../../../ext/dom/JitDomNodeChildProperty.php';
 require_once __DIR__.'/../../../ext/dom/JitDomNodeIsConnected.php';
+require_once __DIR__.'/../../../ext/dom/JitDomNodeListForeachSnapshot.php';
 require_once __DIR__.'/../../../ext/dom/JitDomNodeListItem.php';
 require_once __DIR__.'/../../../ext/dom/JitDomNodeListItemUserScript.php';
 require_once __DIR__.'/../../../ext/dom/JitDomNodeListLength.php';
