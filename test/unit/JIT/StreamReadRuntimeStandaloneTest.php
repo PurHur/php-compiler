@@ -42,9 +42,12 @@ final class StreamReadRuntimeStandaloneTest extends TestCase
                 $this->assertNotNull($fn, $name);
                 $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
                 $blockName = (string) (iterator_to_array($fn->getBasicBlocks())[0]?->getName() ?? '');
+                $libcPosition = \in_array($name, ['__compiler_ftell', '__compiler_fseek', '__compiler_fgets', '__compiler_stream_get_contents'], true);
                 $this->assertTrue(
-                    str_contains($blockName, 'stream_read_') || str_contains($blockName, 'stream_get_line_'),
-                    $name.' entry block should be NestedJIT bridge, got: '.$blockName
+                    str_contains($blockName, 'stream_read_')
+                    || str_contains($blockName, 'stream_get_line_')
+                    || ($libcPosition && str_contains($blockName, '_entry')),
+                    $name.' entry block should be NestedJIT bridge or thin libc ABI, got: '.$blockName
                 );
             }
         } finally {
