@@ -11351,6 +11351,14 @@ class JIT {
                         $nullsafeVar->compileTimeString = null;
                         $nullsafeVar->compileTimeConstantName = null;
                         $nullsafeVar->compileTimeEnumCase = null;
+                        // Fetch-arm propertySlotPtr (void**) does not dominate the merge block —
+                        // later loads (var_dump / ARG_SEND) must use the coalesce __value__ slot (#32988).
+                        $nullsafeVar->objectPropertySlot = null;
+                        $nullsafeVar->objectPropertyType = null;
+                        $nullsafeVar->objectPropertyReceiver = null;
+                        $nullsafeVar->objectPropertyName = null;
+                        $nullsafeVar->objectPropertyClassName = null;
+                        $nullsafeVar->objectPropertyDnfArms = null;
                     }
                     $nullEntry = $this->jitBranchEntryBlock($op->block1, $func);
                     $fetchEntry = $this->jitBranchEntryBlock($op->block2, $func);
@@ -13771,10 +13779,20 @@ class JIT {
                                 JIT\TypedPropertyUninitGuard::emitBeforeDimWrite($this->context, $fetched);
                             }
                         }
-                        if ($forceBranchMerge) {
+                        if ($forceBranchMerge || $op->nullsafeFetchPropertyRead) {
+                            // Nullsafe merge must not retain fetch-arm objectPropertySlot (#32988).
                             $this->assignOperand($result, $fetched, true);
                         } else {
                             $this->context->scope->variables[$result] = $fetched;
+                        }
+                        if ($op->nullsafeFetchPropertyRead && $this->context->hasVariableOp($result)) {
+                            $bound = $this->context->getVariableFromOp($result);
+                            $bound->objectPropertySlot = null;
+                            $bound->objectPropertyType = null;
+                            $bound->objectPropertyReceiver = null;
+                            $bound->objectPropertyName = null;
+                            $bound->objectPropertyClassName = null;
+                            $bound->objectPropertyDnfArms = null;
                         }
                         $this->applyExternalPropertyResultType($result, $declaringClass, $name->value);
                     } else {
