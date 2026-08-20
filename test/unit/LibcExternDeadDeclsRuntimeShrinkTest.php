@@ -145,6 +145,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureResolveStreamDecl', $source);
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
+        $this->assertStringContainsString('ensureChownFamily', $source);
     }
 
     public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
@@ -446,6 +447,7 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureStdioFile', $source);
         $this->assertStringContainsString('ensurePosixFd', $source);
         $this->assertStringContainsString('ensureStrncmp', $source);
+        $this->assertStringContainsString('ensureChownFamily', $source);
     }
 
     public function testM5TrivialEchoNativeDeclaresStrncmpModuleLocallyAfterLibcExternDrop(): void

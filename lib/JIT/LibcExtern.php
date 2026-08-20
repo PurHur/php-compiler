@@ -243,6 +243,37 @@ final class LibcExtern
      * User-script file I/O stays on PHP helpers (`__compiler_*`); NestedJIT fd leaves
      * call this before lookupFunction('open') etc. Peer: ensureStdioFile (#31764).
      */
+    /**
+     * Module-local chown(2)/fchownat(2) after LibcExtern always-on drop (#28850).
+     *
+     * User-script chown()/chgrp() stay on ChownRuntime / ChownJitHelper; NestedJIT
+     * leaves in JitChown / JitChgrp call this before lookup (#32466). Peer: ensurePosixFd.
+     */
+    public static function ensureChownFamily(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        foreach ([
+            ['chown', $i32, [$i8p, $i32, $i32]],
+            ['fchownat', $i32, [$i32, $i8p, $i32, $i32, $i32]],
+        ] as [$name, $ret, $params]) {
+            try {
+                $context->lookupFunction($name);
+
+                continue;
+            } catch (\LogicException $e) {
+            }
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, false, ...$params)
+                );
+            }
+            $context->registerFunction($name, $fn);
+        }
+    }
+
     public static function ensurePosixFd(Context $context): void
     {
         $i32 = $context->getTypeFromString('int32');

@@ -1021,6 +1021,12 @@ class Context {
             // rename(2) NestedJIT leaf (#29141) — whitelist rename → rename_::call →
             // StringRename::invokeNestedLeaf (module-local rename(2); kernel removed).
             'rename',
+            // chown(2)/chgrp NestedJIT leaf (#32466) — whitelist → chown_/chgrp_::call →
+            // JitChown/JitChgrp::invokeNestedLeaf (module-local chown/fchownat; peer rename).
+            'chown',
+            'lchown',
+            'chgrp',
+            'lchgrp',
             // chdir(2) NestedJIT leaf (#29219) — whitelist chdir → chdir_::call →
             // StringChdir::invokeNestedLeaf (module-local chdir(2); kernel removed).
             'chdir',

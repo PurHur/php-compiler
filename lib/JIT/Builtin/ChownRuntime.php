@@ -145,10 +145,15 @@ final class ChownRuntime
         $context->builder->branchIf($bad, $fail, $body);
 
         $context->builder->positionAtEnd($body);
+        // Helper takes int uid/gid (#32466) — coerce __value__* before NestedJIT call.
+        $idI64 = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $idValue
+        );
         $ok = JitNestedHelperCoerce::callHelper(
             $context,
             self::helperFunction($context, $helperLogical),
-            [$path, $idValue, $fn->getParam(2)]
+            [$path, $idI64, $fn->getParam(2)]
         );
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $ok, $i32)
