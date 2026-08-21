@@ -10,7 +10,7 @@ foreach ($it as $f) {
     }
     echo 'pn=', $f->getPathname(), "\n";
     echo 'p=', $f->getPath(), "\n";
-    echo 's=', (string) $f, "\n";
+    echo 's=', $f->__toString(), "\n";
 }
 --EXPECT--
 pn=test/fixtures/aot/cases/directoryiterator_27289_fixture/a.txt
