@@ -280,9 +280,12 @@ class Type extends Builtin {
         // Leftover Type empty decls vs Runtime ABI drift mint stream_set_read_buffer.1
         // (#31894 / #32122). User-script stream_set_read_buffer() stays JitStreamSetReadBuffer /
         // StreamBufferJitHelper.
-        $fntypeStreamSupports = $this->context->context->functionType($i32, false, $i64, $i64);
-        $fnStreamSupports = $this->context->module->addFunction('__compiler_stream_supports', $fntypeStreamSupports);
-        $this->context->registerFunction('__compiler_stream_supports', $fnStreamSupports);
+        // __compiler_stream_supports always-on shell removed (#33145): StreamIo /
+        // StreamIoRuntime / JitStreamIoKernel owns the ABI (getNamedFunction first, then
+        // addFunction if absent via implementIfMissing/declareRuntimeFn; Type::initialize
+        // still StreamIo::ensureLinked). Leftover Type empty decls vs Runtime ABI drift
+        // mint stream_supports.1 (#31894 / #32122). User-script stream_supports() /
+        // stream_supports_lock() stays JitStreamSupports / StreamIoJitHelper.
         $fntypeStreamIsLocal = $this->context->context->functionType($i32, false, $i64);
         $fnStreamIsLocal = $this->context->module->addFunction('__compiler_stream_is_local', $fntypeStreamIsLocal);
         $this->context->registerFunction('__compiler_stream_is_local', $fnStreamIsLocal);

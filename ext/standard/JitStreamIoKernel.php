@@ -15,13 +15,16 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM stream I/O for standalone / user-script AOT — fopen/fread/fwrite/tmpfile (#5343, #19462, #19530, #26929).
+ * LLVM stream I/O for standalone / user-script AOT — fopen/fread/fwrite/tmpfile (#5343, #19462, #19530, #26929, #33145).
  *
  * Embed JIT uses {@see \PHPCompiler\JIT\Builtin\StreamIoRuntime} + {@see StreamIoJitHelper} PHP.
  * User-script AOT cannot nested-JIT VmFs helpers (ExternalMethod → handle 0, #16075) —
  * this libc + {@see StreamGlobalsJit} handle-table path is the user-script SSOT.
  * Restored after #20943 NestedJIT-only regression blocked fsync/fwrite under thin AOT (#26929).
  * Housed in ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19500 / #19466.
+ *
+ * Do not re-add empty always-on shells in Builtin\Type — leftover decls mint
+ * stream_supports.1 (#31894 / #32122). Type::initialize still StreamIo::ensureLinked.
  *
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
