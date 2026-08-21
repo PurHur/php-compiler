@@ -4153,6 +4153,11 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_PATH, Variable::TYPE_STRING);
             // Live stream handle for fgets/fwrite/eof (#33318).
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_FD, Variable::TYPE_NATIVE_LONG);
+            // Iterator state / EOF latch (#33319).
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_LINE, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_HAS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_AT_EOF, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CUR_LINE, Variable::TYPE_STRING);
             // SplFileInfo path props for inherited isFile/getSize/… (#33313).
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_PATH, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FILENAME, Variable::TYPE_STRING);
