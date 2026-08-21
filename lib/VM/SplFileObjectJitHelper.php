@@ -674,11 +674,12 @@ final class SplFileObjectJitHelper
     }
 
     /**
-     * SplFileObject::fscanf — formatted input from live handle (#33382).
+     * SplFileObject::fscanf — formatted input from live handle (#33382, #33389).
      * php-src: zim_SplFileObject_fscanf → php_stream_get_line + php_sscanf_internal
      *
-     * Thin AOT cannot NestedJIT VmSscanf on libc-fgets strings (#27663). Array mode with a
-     * compile-time whitespace/%d/%s format uses a thin strtol+token scanner (no NestedJIT).
+     * Thin AOT cannot NestedJIT VmSscanf on libc-fgets strings (#27663). Array and by-ref
+     * modes with a compile-time whitespace/%d/%s format use {@see SscanfSimpleArrayApply}.
+     * By-ref EOF returns int -1 (SplFileObject; not procedural false).
      *
      * @param list<JITVariable> $outArgs
      */
@@ -688,18 +689,19 @@ final class SplFileObjectJitHelper
         JITVariable $formatArg,
         JITVariable ...$outArgs
     ): Value {
-        if ([] !== $outArgs) {
-            throw new \LogicException(
-                'SplFileObject::fscanf() thin-AOT by-ref targets are not implemented yet (#33382)'
-            );
-        }
         $fmtLit = $formatArg->compileTimeString ?? null;
         $specs = null !== $fmtLit ? self::parseSimpleScanfSpecs($fmtLit) : null;
         if (null === $specs) {
             throw new \LogicException(
-                'SplFileObject::fscanf() thin-AOT array mode needs compile-time %d/%s format (#33382)'
+                'SplFileObject::fscanf() thin-AOT needs compile-time %d/%s format (#33382/#33389)'
             );
         }
+        if ([] !== $outArgs && \count($outArgs) !== \count($specs)) {
+            throw new \LogicException(
+                'SplFileObject::fscanf() by-ref arity must match conversion specs (#33389)'
+            );
+        }
+        $byRef = [] !== $outArgs;
         self::ensureStreamAbis($context);
         $obj = self::loadObject($context, $receiver);
         $i64 = $context->getTypeFromString('int64');
@@ -723,13 +725,22 @@ final class SplFileObjectJitHelper
 
         $context->builder->positionAtEnd($eofBb);
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(1, false));
-        $falseSlot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            JitValueBox::pointer($context, $falseSlot),
-            $context->getTypeFromString('int32')->constInt(0, false)
-        );
-        $context->builder->store($falseSlot, $slotAlloca);
+        $eofSlot = JitValueBox::alloc($context);
+        if ($byRef) {
+            // php-src SplFileObject::fscanf by-ref at EOF → -1 (not false).
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                JitValueBox::pointer($context, $eofSlot),
+                $i64->constInt(-1, true)
+            );
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeBool'),
+                JitValueBox::pointer($context, $eofSlot),
+                $context->getTypeFromString('int32')->constInt(0, false)
+            );
+        }
+        $context->builder->store($eofSlot, $slotAlloca);
         $context->builder->branch($joinBb);
 
         $context->builder->positionAtEnd($nonEmptyBb);
@@ -743,13 +754,22 @@ final class SplFileObjectJitHelper
         if (null !== $savedBlock) {
             BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         }
-        $ht = SscanfSimpleArrayApply::invoke($context, $line, $specs);
         $okSlot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            JitValueBox::pointer($context, $okSlot),
-            $ht
-        );
+        if ($byRef) {
+            $assigned = SscanfSimpleArrayApply::invokeAssign($context, $line, $specs, $outArgs);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                JitValueBox::pointer($context, $okSlot),
+                $assigned
+            );
+        } else {
+            $ht = SscanfSimpleArrayApply::invoke($context, $line, $specs);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                JitValueBox::pointer($context, $okSlot),
+                $ht
+            );
+        }
         $context->builder->store($okSlot, $slotAlloca);
         $context->builder->branch($joinBb);
 
