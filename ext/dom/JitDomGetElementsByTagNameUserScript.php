@@ -29,6 +29,15 @@ final class JitDomGetElementsByTagNameUserScript
         return self::$lastTagQuery;
     }
 
+    /** Clear so childNodes foreach does not reuse a stale tag snapshot (#33082). */
+    public static function clearTagQuery(): void
+    {
+        self::$lastTagQuery = null;
+        self::$lastNsUri = null;
+        self::$lastNsLocal = null;
+        self::$lastNsFromElement = false;
+    }
+
     public static function shouldUse(Context $context): bool
     {
         return JitDomLoadHTMLUserScript::shouldUse($context);
@@ -55,6 +64,7 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
         self::$lastTagQuery = null;
+        JitDomChildNodesProperty::clearChildNodesFetchHint();
         if (\count($args) < 2) {
             return null;
         }
@@ -128,6 +138,8 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastNsUri = null;
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
+        self::$lastTagQuery = null;
+        JitDomChildNodesProperty::clearChildNodesFetchHint();
         if (\count($args) < 2) {
             return null;
         }

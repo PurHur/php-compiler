@@ -209,6 +209,62 @@ final class JitDomNodeListItemUserScript
     }
 
     /**
+     * Compile-time childNodes[$index] for foreach snapshot (#33082).
+     *
+     * php-src: ext/dom/nodelist.c — child axis includes text/comment siblings.
+     */
+    public static function materializeDirectChildAtCompileTime(
+        Context $context,
+        string $xml,
+        int $index
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_direct_child');
+        $children = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        if (!isset($children[$index])) {
+            return self::boxNull($context);
+        }
+        $node = $children[$index];
+        $obj = match ($node['kind']) {
+            'comment' => JitDomCreateComment::materialize($context, $node['data']),
+            'text' => JitDomCreateTextNode::materialize($context, $node['data']),
+            default => self::materializeDirectElementChild($context, $node),
+        };
+
+        return self::boxObject($context, $obj);
+    }
+
+    /**
+     * @param array{kind: string, data: string, inner?: string, open?: string} $node
+     */
+    private static function materializeDirectElementChild(Context $context, array $node): Value
+    {
+        $tag = $node['data'];
+        $inner = $node['inner'] ?? '';
+        $text = DomParseSimpleXmlJitHelper::textContentFromInnerXmlArgv($inner);
+        $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        if (isset($node['open']) && \is_string($node['open'])) {
+            foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open']) as $attrPair) {
+                $qname = $attrPair['qname'];
+                $value = $attrPair['value'];
+                $pos = strpos($qname, ':');
+                $local = false === $pos ? $qname : substr($qname, $pos + 1);
+                $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals(
+                    $context,
+                    '',
+                    $qname,
+                    $value
+                );
+                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
+                if ($local !== $qname) {
+                    DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
+                }
+            }
+        }
+
+        return $element;
+    }
+
+    /**
      * Materialize //tag NodeList::item($index) from compile-time XML (#27275).
      *
      * Seeds DomUserScriptAttributeCacheLlvm so getAttribute() works on the result.

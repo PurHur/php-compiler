@@ -15,6 +15,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
  * Iterator protocol and runtime item() inside the foreach CFG both break module
  * verification or abort under nested JIT. For user-script getElementsByTagName lists,
  * materialize every item at Iterator_Reset from compile-time XML (peer #27275).
+ * For loadXML-seeded childNodes (no tag), snapshot direct children (#33082).
  *
  * php-src: ext/dom/nodelist.c — InternalIterator; Zend copies non-array Traversables
  * when foreach stability requires a snapshot.
@@ -40,15 +41,21 @@ final class JitDomNodeListForeachSnapshot
         if (!JitDomLoadHTMLUserScript::shouldUse($context)) {
             return false;
         }
-        $tag = JitDomGetElementsByTagNameUserScript::lastTagQuery();
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
-        if (null === $tag || null === $xml) {
-            $xpathTag = JitDomXPathQueryUserScript::lastQueryTag();
-
-            return null !== $xml && null !== $xpathTag && '' !== $xpathTag;
+        if (null === $xml) {
+            return false;
+        }
+        $tag = JitDomGetElementsByTagNameUserScript::lastTagQuery();
+        if (null !== $tag) {
+            return true;
+        }
+        $xpathTag = JitDomXPathQueryUserScript::lastQueryTag();
+        if (null !== $xpathTag && '' !== $xpathTag) {
+            return true;
         }
 
+        // childNodes: no tag — snapshot direct children of compile-time loadXML (#33082).
         return true;
     }
 
@@ -67,23 +74,42 @@ final class JitDomNodeListForeachSnapshot
         if (null === $tag && null !== $xpathTag) {
             $tag = $xpathTag;
         }
-        if (null === $xml || null === $tag) {
-            throw new \LogicException('DOMNodeList foreach snapshot missing compile-time XML/tag (#32707)');
+        if (null === $xml) {
+            throw new \LogicException('DOMNodeList foreach snapshot missing compile-time XML (#32707/#33082)');
         }
 
-        $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
         $sizeT = $context->getTypeFromString('size_t');
         $ht = HashTableHelper::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__grow'),
-            $ht,
-            $sizeT->constInt($count > 0 ? $count : 1, false)
-        );
 
-        for ($i = 0; $i < $count; ++$i) {
-            $itemPtr = JitDomNodeListItemUserScript::materializeItemAtCompileTime($context, $xml, $tag, $i);
-            $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
-            HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $elem);
+        if (null !== $tag) {
+            $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__grow'),
+                $ht,
+                $sizeT->constInt($count > 0 ? $count : 1, false)
+            );
+
+            for ($i = 0; $i < $count; ++$i) {
+                $itemPtr = JitDomNodeListItemUserScript::materializeItemAtCompileTime($context, $xml, $tag, $i);
+                $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
+                HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $elem);
+            }
+        } else {
+            // Direct children of document element (childNodes) — elements/text/comments (#33082).
+            $children = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+            $count = \count($children);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__grow'),
+                $ht,
+                $sizeT->constInt($count > 0 ? $count : 1, false)
+            );
+
+            for ($i = 0; $i < $count; ++$i) {
+                $itemPtr = JitDomNodeListItemUserScript::materializeDirectChildAtCompileTime($context, $xml, $i);
+                $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
+                HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $elem);
+            }
+            JitDomChildNodesProperty::clearChildNodesFetchHint();
         }
 
         $map = $context->structFieldMap['__hashtable__'];

@@ -302,8 +302,12 @@ final class VmIteratorForeach
     public static function compileReset(Context $context, JitVariable $array, ?string $containerUserType = null): void
     {
         $slotKey = $array;
-        // DOMNodeList / DOMNamedNodeMap: compile-time snapshot when available (#32707).
-        if (\PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::isDomNodeListForeach($containerUserType)) {
+        $resolvedType = $containerUserType ?? $array->classUserType;
+        // DOMNodeList / DOMNamedNodeMap: compile-time snapshot when available (#32707 / #33082).
+        if (
+            \PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::isDomNodeListForeach($resolvedType)
+            || \PHPCompiler\ext\dom\JitDomChildNodesProperty::lastFetchWasChildNodes()
+        ) {
             if (\PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::canLower($context, $array)) {
                 \PHPCompiler\ext\dom\JitDomNodeListForeachSnapshot::compileReset($context, $array, $slotKey);
 

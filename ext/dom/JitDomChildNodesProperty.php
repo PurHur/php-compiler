@@ -26,6 +26,9 @@ final class JitDomChildNodesProperty
 
     private const CLASS_NODELIST = 'DOMNodeList';
 
+    /** Set when user script reads ->childNodes (foreach snapshot #33082). */
+    private static bool $lastFetchWasChildNodes = false;
+
     public static function isDomChildNodesProperty(string $classLc, string $propLc): bool
     {
         if ('childnodes' !== strtolower($propLc)) {
@@ -36,6 +39,16 @@ final class JitDomChildNodesProperty
         return str_starts_with($classLc, 'dom');
     }
 
+    public static function lastFetchWasChildNodes(): bool
+    {
+        return self::$lastFetchWasChildNodes;
+    }
+
+    public static function clearChildNodesFetchHint(): void
+    {
+        self::$lastFetchWasChildNodes = false;
+    }
+
     public static function fetch(Object_ $objectType, Value $obj): JITVariable
     {
         $context = $objectType->jitContext();
@@ -44,6 +57,9 @@ final class JitDomChildNodesProperty
         // XPath query()/evaluate() NodeLists share GLOBAL_COUNT; clear so item()
         // on this list does not materialize the XPath snapshot (#32620).
         JitDomXPathQueryUserScript::clearQueryState();
+        // Stale getElementsByTagName tag must not steal childNodes foreach (#33082).
+        JitDomGetElementsByTagNameUserScript::clearTagQuery();
+        self::$lastFetchWasChildNodes = true;
 
         $slotClass = self::slotClass();
         $slotClassId = $objectType->lookup($slotClass);

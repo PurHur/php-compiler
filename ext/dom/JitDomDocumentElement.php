@@ -61,6 +61,8 @@ final class JitDomDocumentElement
             self::PROP_DOCUMENT_ELEMENT,
             $docClassId
         );
+        // So `$doc->documentElement->childNodes` resolves DOMElement layout (#33082).
+        $result->classUserType = self::CLASS_ELEMENT;
         if (null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
             || null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
             || (null !== $documentVar && null !== $documentVar->compileTimeDomLoadXml)

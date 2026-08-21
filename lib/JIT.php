@@ -9624,7 +9624,7 @@ class JIT {
                     JIT\IteratorHelper::compileReset(
                         $this->context,
                         $array,
-                        self::foreachContainerUserType($arrayOp)
+                        self::foreachContainerUserType($arrayOp) ?? $array->classUserType
                     );
                     break;
                 case OpCode::TYPE_ITER_VALID:
@@ -9639,7 +9639,7 @@ class JIT {
                     $valid = JIT\IteratorHelper::compileValid(
                         $this->context,
                         $array,
-                        self::foreachContainerUserType($arrayOp)
+                        self::foreachContainerUserType($arrayOp) ?? $array->classUserType
                     );
                     $this->assignOperandValue($block->getOperand($op->arg1), $valid);
                     break;
@@ -9655,7 +9655,7 @@ class JIT {
                     $key = JIT\IteratorHelper::compileKey(
                         $this->context,
                         $array,
-                        self::foreachContainerUserType($arrayOp)
+                        self::foreachContainerUserType($arrayOp) ?? $array->classUserType
                     );
                     $this->assignOperand($block->getOperand($op->arg1), $key);
                     break;
@@ -9684,7 +9684,7 @@ class JIT {
                         $value = JIT\IteratorHelper::compileValueByRef(
                             $this->context,
                             $array,
-                            self::foreachContainerUserType($arrayOp),
+                            self::foreachContainerUserType($arrayOp) ?? $array->classUserType,
                             $this
                         );
                         $this->context->setVariableOp($destOp, $value);
@@ -9696,7 +9696,7 @@ class JIT {
                     $value = JIT\IteratorHelper::compileValue(
                         $this->context,
                         $array,
-                        self::foreachContainerUserType($arrayOp)
+                        self::foreachContainerUserType($arrayOp) ?? $array->classUserType
                     );
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
