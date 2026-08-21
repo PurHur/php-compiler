@@ -316,9 +316,12 @@ class Type extends Builtin {
         // StreamMeta::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // stream_set_blocking.1 (#31894 / #32122). User-script stream_set_blocking() stays
         // JitStreamSetBlocking / StreamMetaJitHelper.
-        $fntypeStreamEnableCrypto = $this->context->context->functionType($i32, false, $i64, $i64, $i64, $i64);
-        $fnStreamEnableCrypto = $this->context->module->addFunction('__compiler_stream_enable_crypto', $fntypeStreamEnableCrypto);
-        $this->context->registerFunction('__compiler_stream_enable_crypto', $fnStreamEnableCrypto);
+        // __compiler_stream_enable_crypto always-on shell removed (#33159): StreamMeta /
+        // JitStreamMetaKernel / JitStreamMetaThinAot owns the ABI (getNamedFunction first,
+        // then addFunction if absent via implementIfMissing; Type::initialize still
+        // StreamMeta::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // stream_enable_crypto.1 (#31894 / #32122). User-script stream_socket_enable_crypto()
+        // stays JitStreamEnableCrypto / StreamMetaJitHelper.
         // __compiler_stream_socket_get_name / __compiler_stream_socket_accept always-on
         // shells removed (#32807): StreamSocketGetNameRuntime / StreamSocketAcceptRuntime
         // own the ABI (getNamedFunction first; Type::initialize still ensureLinked).
