@@ -145,6 +145,11 @@ final class unserialize extends Internal
         if (null === $literal) {
             return null;
         }
+        // Object/enum/class wires need runtime materialize (ArrayObject bag #33636) —
+        // decodePayload returns ObjectEntry which cannot fold into LLVM scalars.
+        if (\preg_match('/(?:^|[{;])[OCE]:/', $literal)) {
+            return null;
+        }
         $decoded = VmUnserializeFormat::decodePayload($literal, $options);
         if (false === $decoded) {
             return $context->helper->loadValue(
@@ -172,7 +177,8 @@ final class unserialize extends Internal
             return JitJsonDecode::materializeArray($context, $decoded);
         }
 
-        throw new \LogicException('unserialize() result type not supported in this compiler build');
+        // Non-scalar fold result — defer to runtime (do not throw; peer O: path #33636).
+        return null;
     }
 
     /**

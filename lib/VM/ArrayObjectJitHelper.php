@@ -788,6 +788,189 @@ final class ArrayObjectJitHelper
     }
 
     /**
+     * php-src ArrayObject/ArrayIterator::__unserialize bag under thin AOT (#33636).
+     *
+     * Restores integer-keyed bag storage into `__spl_ht` and `__flags`. Does not overwrite
+     * slot 0 with firstIntProp (that corrupted the HT pointer — SIGSEGV on json_encode).
+     *
+     * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925.
+     * NestedJIT helpers stay tiny and split across TUs (large bodies blank under NestedJIT).
+     */
+    public static function compileUnserializeRestore(
+        Context $context,
+        Value $obj,
+        Value $payloadString,
+        string $className = self::CLASS_NAME
+    ): void {
+        \PHPCompiler\JIT\Builtin\StringUnserialize::ensureLinked($context);
+        $internals = [
+            new \PHPCompiler\ext\standard\phpc_native_ht_alloc(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_long(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
+        ];
+        foreach ($internals as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof \PHPCompiler\JIT\Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
+            }
+        }
+        $ht = self::htPtr($context, $obj);
+        $findLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplArrayFindNestedJitHelper::findStorage';
+        $fillLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplArrayFillNestedJitHelper::fillAt';
+        $flagsLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplArrayFlagsNestedJitHelper::parseFlags';
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplArrayFindNestedJitHelper.php',
+            [$findLogical],
+            '#33636'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplArrayFillNestedJitHelper.php',
+            [$fillLogical],
+            '#33636'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplArrayFlagsNestedJitHelper.php',
+            [$flagsLogical],
+            '#33636'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+
+        $findFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $findLogical, '#33636');
+        $fillFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $fillLogical, '#33636');
+        $flagsFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $flagsLogical, '#33636');
+        $i64 = $context->getTypeFromString('int64');
+        $payloadOwned = self::nestedJitOwnedString($context, $payloadString);
+
+        $findOffRaw = $context->builder->call(
+            $findFn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $payloadOwned,
+                $findFn->getParam(0)->typeOf()
+            )
+        );
+        $findOff = \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $findOffRaw, $i64);
+        $parent = BasicBlockHelper::parentFunction($context);
+        $bbFill = $parent->appendBasicBlock('ao_unser_fill');
+        $bbFlags = $parent->appendBasicBlock('ao_unser_flags');
+        $bbDone = $parent->appendBasicBlock('ao_unser_done');
+        $found = $context->builder->icmp(
+            Builder::INT_SGE,
+            $findOff,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($found, $bbFill, $bbFlags);
+
+        $context->builder->positionAtEnd($bbFill);
+        $destI64 = \PHPCompiler\JIT\JitNestedHelperCoerce::ptrToI64($context, $ht);
+        $context->builder->call(
+            $fillFn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $destI64,
+                $fillFn->getParam(0)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $payloadOwned,
+                $fillFn->getParam(1)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $findOff,
+                $fillFn->getParam(2)->typeOf()
+            )
+        );
+        $context->builder->branch($bbFlags);
+
+        $context->builder->positionAtEnd($bbFlags);
+        $flagsRaw = $context->builder->call(
+            $flagsFn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $payloadOwned,
+                $flagsFn->getParam(0)->typeOf()
+            )
+        );
+        $flags = \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $flagsRaw, $i64);
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, $className, self::PROP_FLAGS),
+            new JITVariable($context, JITVariable::TYPE_NATIVE_LONG, JITVariable::KIND_VALUE, $flags),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        if ('ArrayObject' === $className) {
+            self::storeDefaultIteratorClassSlots($context, $obj);
+        }
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /** Default iteratorClass=ArrayIterator after unserialize when bag i:3 is N (#33636). */
+    private static function storeDefaultIteratorClassSlots(Context $context, Value $obj): void
+    {
+        $objectType = $context->type->object;
+        $name = 'ArrayIterator';
+        $classId = $objectType->lookup($name);
+        $nameStr = $context->builder->load($context->constantStringFromString($name));
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_ITERATOR_CLASS),
+            new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $nameStr),
+            JITVariable::TYPE_STRING
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_ITERATOR_CLASS_ID),
+            new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $context->getTypeFromString('int64')->constInt($classId, false)
+            ),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+    }
+
+    /**
+     * Owned `__string__*` copy for NestedJIT PHP string params (#24137 / #33636).
+     */
+    private static function nestedJitOwnedString(Context $context, Value $payload): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $separated = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $payload
+        );
+        $slot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $context->builder->store($separated, $slot);
+        $loaded = $context->builder->load($slot);
+        $map = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $loaded);
+        $src = $context->builder->pointerCast(
+            $context->builder->structGep($loaded, $map['value']),
+            $i8p
+        );
+        $copy = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $src
+        );
+        $context->refcount->disableRefcount($copy);
+
+        return $copy;
+    }
+
+    /**
      * php-src zim_ArrayObject_getFlags / zim_ArrayIterator_getFlags — read `__flags` (#33616).
      * Construct already persists the slot for ARRAY_AS_PROPS (#33061); thin AOT lacked proxies.
      */

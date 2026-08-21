@@ -230,6 +230,26 @@ final class IssetHelperLlvm
 
                 return (new \PHPCompiler\ext\standard\boolval())->call($context, $existsBoxed);
             }
+            // unserialize()/mixed: no userType — try ArrayAccess before HT dim isset (#33636).
+            // Skip under NestedJitCompileScope (string params are TYPE_VALUE).
+            $cfgIsArray = null !== $containerOp
+                && null !== $containerOp->type
+                && Type::TYPE_ARRAY === $containerOp->type->type;
+            if (
+                !$cfgIsArray
+                && !$container->valueBoxHashtable
+                && !\PHPCompiler\JIT\NestedJitCompileScope::isActive()
+            ) {
+                $arrayAccessIsset = ArrayAccessHelper::tryCompileOffsetIsSet(
+                    $context,
+                    $container,
+                    $dim,
+                    $containerOp
+                );
+                if (null !== $arrayAccessIsset) {
+                    return $arrayAccessIsset;
+                }
+            }
             // Value box holding a string — extract __string__* and use string-offset isset.
             // Without this, isset($s[$i]) on an inferred-string VALUE box falls through to
             // hashtable lookup, which always returns false (#32621, peer str_replace #23912).

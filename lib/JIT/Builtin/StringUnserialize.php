@@ -31,6 +31,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Helper NestedJIT-decodes `i:N;` as int; bridge boxes to `__value__*` (#20785).
  * Simple `O:` public-prop objects: {@see UnserializeObjectNestedJitHelper} + call-site
  * LLVM materialize (class table must include user classes — emit from JitUnserialize).
+ * SPL ArrayObject family: bag restore into `__spl_ht` (#33636) — not firstIntProp→slot0.
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -154,12 +155,14 @@ final class StringUnserialize
         );
     }
 
-    /** Register phpc_native_ht_* Internal JIT handlers before NestedJIT (#27030 / #24137). */
+    /** Register phpc_native_ht_* Internal JIT handlers before NestedJIT (#27030 / #24137 / #33636). */
     private static function ensureNativeHtInternalProxies(Context $context): void
     {
         $internals = [
             new \PHPCompiler\ext\standard\phpc_native_ht_alloc(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_long(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
         ];
         foreach ($internals as $internal) {
@@ -305,23 +308,39 @@ final class StringUnserialize
             $objVal = $object->allocate($id);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'unser_obj_after_alloc_'.$id);
             $object->markObjectConstructed($objVal);
-            $voidPtr = $context->getTypeFromString('void*');
-            foreach ($object->instancePropertySets($id) as $propset) {
-                $propName = $propset[1];
-                $box = \PHPCompiler\JIT\JitValueBox::alloc($context);
-                $boxPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $box);
-                $context->builder->call(
-                    $context->lookupFunction('__value__writeLong'),
-                    $boxPtr,
-                    $firstInt
+            if (\PHPCompiler\VM\ArrayObjectJitHelper::isArrayAsPropsClass($className)) {
+                // Bag restore into `__spl_ht` — do not write firstIntProp into slot 0 (#33636).
+                $splName = match (strtolower(ltrim($className, '\\'))) {
+                    'arrayobject' => 'ArrayObject',
+                    'arrayiterator' => 'ArrayIterator',
+                    'recursivearrayiterator' => 'RecursiveArrayIterator',
+                    default => $className,
+                };
+                \PHPCompiler\VM\ArrayObjectJitHelper::compileUnserializeRestore(
+                    $context,
+                    $objVal,
+                    $payloadString,
+                    $splName
                 );
-                $slot = $object->propertySlotFor($objVal, $className, $propName);
-                $context->builder->store(
-                    $context->builder->pointerCast($boxPtr, $voidPtr),
-                    $slot
-                );
-                // firstIntProp covers the first int wire value; enough for #27030 single-prop.
-                break;
+            } else {
+                $voidPtr = $context->getTypeFromString('void*');
+                foreach ($object->instancePropertySets($id) as $propset) {
+                    $propName = $propset[1];
+                    $box = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                    $boxPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $box);
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeLong'),
+                        $boxPtr,
+                        $firstInt
+                    );
+                    $slot = $object->propertySlotFor($objVal, $className, $propName);
+                    $context->builder->store(
+                        $context->builder->pointerCast($boxPtr, $voidPtr),
+                        $slot
+                    );
+                    // firstIntProp covers the first int wire value; enough for #27030 single-prop.
+                    break;
+                }
             }
             BasicBlockHelper::ensureOpenInsertBlock($context, 'unser_obj_after_props_'.$id);
             $context->builder->store($objVal, $objSlot);
