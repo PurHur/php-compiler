@@ -14,6 +14,7 @@ use PHPCompiler\ext\standard\JitFseek;
 use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitFtruncate;
 use PHPCompiler\ext\standard\JitPath;
+use PHPCompiler\ext\standard\JitStrGetcsv;
 use PHPCompiler\ext\standard\StatFieldsJitHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\FputcsvRuntime;
@@ -23,6 +24,7 @@ use PHPCompiler\JIT\Builtin\StatPathRuntime;
 use PHPCompiler\JIT\Builtin\StreamIo;
 use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Builtin\StreamRead;
+use PHPCompiler\JIT\Builtin\StringStrGetcsv;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -66,6 +68,9 @@ use PHPLLVM\Value;
  * DROP_NEW_LINE strips trailing \\r\\n / \\n / \\r on line read (#33390).
  * SKIP_EMPTY omits blank lines on iterator/seek read (#33396); fgets does not skip.
  * Foreach uses Iterator protocol (not packed `__spl_ht` walk) so flags apply (#33396).
+ * READ_CSV: iterator current/next/foreach yield CSV row arrays via JitStrGetcsv (#33397);
+ * fgets()/getCurrentLine() stay line strings (php-src zim_SplFileObject_fgets). No new
+ * object props (layout landmine) — cache raw line in PROP_CUR_LINE and re-parse on current().
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
@@ -85,6 +90,9 @@ final class SplFileObjectJitHelper
 
     /** php-src SplFileObject::SKIP_EMPTY — peer SplFileObjectBuiltin::SKIP_EMPTY. */
     private const FLAG_SKIP_EMPTY = 4;
+
+    /** php-src SplFileObject::READ_CSV — peer SplFileObjectBuiltin::READ_CSV (#33397). */
+    private const FLAG_READ_CSV = 8;
 
     public const PROP_HT = '__spl_ht';
 
@@ -1211,9 +1219,12 @@ final class SplFileObjectJitHelper
     /**
      * SplFileObject::current — lazy-read without bumping key (#33319).
      * php-src: zim_SplFileObject_current
+     * READ_CSV → CSV row array (#33397 / php-src current_zval HashTable).
      */
     public static function compileCurrent(Context $context, JITVariable $receiver): Value
     {
+        // Pin str_getcsv NestedJIT before any main IR (#33334 / #33397).
+        StringStrGetcsv::ensureLinked($context);
         $obj = self::loadObject($context, $receiver);
         $i64 = $context->getTypeFromString('int64');
         $has = self::loadLongProp($context, $obj, self::PROP_HAS);
@@ -1226,18 +1237,40 @@ final class SplFileObjectJitHelper
         $context->builder->branchIf($missing, $needBb, $haveBb);
 
         $context->builder->positionAtEnd($needBb);
-        // Lazy read: lineAdd=0 so key stays 0 on first current(). SKIP_EMPTY (#33396).
-        $tmp = self::emitReadLineToValueBox($context, $receiver, 0, true);
+        // Lazy read: lineAdd=0 so key stays 0 on first current(). SKIP_EMPTY (#33396); READ_CSV (#33397).
+        $tmp = self::emitReadLineToValueBox($context, $receiver, 0, true, true);
         $context->builder->store($tmp, $slotAlloca);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($haveBb);
-        $slot = JitValueBox::alloc($context);
+        $flags = self::loadLongProp($context, $obj, self::PROP_FLAGS);
+        $csvMasked = $context->builder->and($flags, $i64->constInt(self::FLAG_READ_CSV, false));
+        $wantCsv = $context->builder->icmp(Builder::INT_NE, $csvMasked, $i64->constInt(0, false));
+        $haveCsvBb = $fn->appendBasicBlock('splfo_cur_have_csv');
+        $haveStrBb = $fn->appendBasicBlock('splfo_cur_have_str');
+        $context->builder->branchIf($wantCsv, $haveCsvBb, $haveStrBb);
+
+        $context->builder->positionAtEnd($haveCsvBb);
+        // Re-parse cached line (no dedicated CSV cache prop — layout landmine #33397).
         $cur = self::loadStringProp($context, $obj, self::PROP_CUR_LINE);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $cur);
+        $csvSlot = JitStrGetcsv::invoke(
+            $context,
+            $owned,
+            self::loadStringProp($context, $obj, self::PROP_CSV_SEP),
+            self::loadStringProp($context, $obj, self::PROP_CSV_ENC),
+            self::loadStringProp($context, $obj, self::PROP_CSV_ESC)
+        );
+        $context->builder->store($csvSlot, $slotAlloca);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($haveStrBb);
+        $slot = JitValueBox::alloc($context);
+        $curStr = self::loadStringProp($context, $obj, self::PROP_CUR_LINE);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             JitValueBox::pointer($context, $slot),
-            $cur
+            $curStr
         );
         $context->builder->store($slot, $slotAlloca);
         $context->builder->branch($doneBb);
@@ -1253,6 +1286,7 @@ final class SplFileObjectJitHelper
      */
     public static function compileNext(Context $context, JITVariable $receiver): Value
     {
+        StringStrGetcsv::ensureLinked($context);
         $obj = self::loadObject($context, $receiver);
         $i64 = $context->getTypeFromString('int64');
         $has = self::loadLongProp($context, $obj, self::PROP_HAS);
@@ -1263,7 +1297,7 @@ final class SplFileObjectJitHelper
         $context->builder->branchIf($missing, $needBb, $afterBb);
 
         $context->builder->positionAtEnd($needBb);
-        self::emitReadLineToValueBox($context, $receiver, 0, true);
+        self::emitReadLineToValueBox($context, $receiver, 0, true, true);
         $context->builder->branch($afterBb);
 
         $context->builder->positionAtEnd($afterBb);
@@ -1283,15 +1317,20 @@ final class SplFileObjectJitHelper
      * Read one line into PROP_CUR_LINE; bump LINE by $lineAdd; set HAS / AT_EOF.
      * When $applySkipEmpty, omit blank lines (iterator/seek — php-src read_line / #33396).
      * fgets passes false so empty lines are returned (Zend parity).
+     * When $honorReadCsv, READ_CSV yields CSV arrays via JitStrGetcsv (#33397); fgets passes false.
      *
-     * @return Value __value__* box (string or false)
+     * @return Value __value__* box (string, array, or false)
      */
     private static function emitReadLineToValueBox(
         Context $context,
         JITVariable $receiver,
         int $lineAdd,
-        bool $applySkipEmpty = false
+        bool $applySkipEmpty = false,
+        bool $honorReadCsv = false
     ): Value {
+        if ($honorReadCsv) {
+            StringStrGetcsv::ensureLinked($context);
+        }
         self::ensureStreamAbis($context);
         $obj = self::loadObject($context, $receiver);
         $handle = self::loadFd($context, $receiver);
@@ -1319,6 +1358,32 @@ final class SplFileObjectJitHelper
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
         $empty = $context->builder->load($context->constantStringFromString(''));
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
+        if ($honorReadCsv) {
+            // Trailing empty / EOF current with READ_CSV → [null] (Zend / #33397).
+            $flagsEof = self::loadLongProp($context, $obj, self::PROP_FLAGS);
+            $csvEof = $context->builder->and($flagsEof, $i64->constInt(self::FLAG_READ_CSV, false));
+            $wantCsvEof = $context->builder->icmp(Builder::INT_NE, $csvEof, $i64->constInt(0, false));
+            $eofCsvBb = $fn->appendBasicBlock('splfo_rd_eof_csv');
+            $eofStrBb = $fn->appendBasicBlock('splfo_rd_eof_str');
+            $context->builder->branchIf($wantCsvEof, $eofCsvBb, $eofStrBb);
+
+            $context->builder->positionAtEnd($eofCsvBb);
+            $nullRow = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+            $sizeT = $context->getTypeFromString('size_t');
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setNullAt'),
+                $nullRow,
+                $sizeT->constInt(0, false)
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                JitValueBox::pointer($context, $slot),
+                $nullRow
+            );
+            $context->builder->branch($joinBb);
+
+            $context->builder->positionAtEnd($eofStrBb);
+        }
         // Match VM past-end fgets → "" (Zend throws) for thin AOT.
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
@@ -1329,6 +1394,85 @@ final class SplFileObjectJitHelper
 
         $context->builder->positionAtEnd($okBb);
         $flags = self::loadLongProp($context, $obj, self::PROP_FLAGS);
+        if ($honorReadCsv) {
+            $csvMasked = $context->builder->and($flags, $i64->constInt(self::FLAG_READ_CSV, false));
+            $wantCsv = $context->builder->icmp(Builder::INT_NE, $csvMasked, $i64->constInt(0, false));
+            $csvBb = $fn->appendBasicBlock('splfo_rd_csv');
+            $plainBb = $fn->appendBasicBlock('splfo_rd_plain');
+            $context->builder->branchIf($wantCsv, $csvBb, $plainBb);
+
+            $context->builder->positionAtEnd($csvBb);
+            // php-src csv path: no DROP_NEW_LINE before parse; strip CR/LF then parse (#33397).
+            // Empty / terminator-only → [null] in pure LLVM (NestedJIT mid-iterator returned
+            // [] without bridge synthesis — #33397 / peer #27069).
+            $owned = $context->builder->call($context->lookupFunction('__string__separate'), $line);
+            $owned = self::emitRtrimLineTerminators($context, $owned);
+            $lineLen = $context->builder->call($context->lookupFunction('__string__strlen'), $owned);
+            $isBlank = $context->builder->icmp(Builder::INT_EQ, $lineLen, $i64->constInt(0, false));
+            $csvBlankBb = $fn->appendBasicBlock('splfo_rd_csv_blank');
+            $csvParseBb = $fn->appendBasicBlock('splfo_rd_csv_parse');
+            $csvDoneBb = $fn->appendBasicBlock('splfo_rd_csv_done');
+            $htPtrTy = $context->getTypeFromString('__hashtable__*');
+            $sizeT = $context->getTypeFromString('size_t');
+            $htSlot = $context->builder->alloca($htPtrTy);
+            $context->builder->branchIf($isBlank, $csvBlankBb, $csvParseBb);
+
+            $context->builder->positionAtEnd($csvBlankBb);
+            $blankKeepBb = $fn->appendBasicBlock('splfo_rd_csv_blank_keep');
+            if ($applySkipEmpty) {
+                $skipMasked = $context->builder->and($flags, $i64->constInt(self::FLAG_SKIP_EMPTY, false));
+                $wantSkip = $context->builder->icmp(Builder::INT_NE, $skipMasked, $i64->constInt(0, false));
+                $context->builder->branchIf($wantSkip, $loopBb, $blankKeepBb);
+            } else {
+                $context->builder->branch($blankKeepBb);
+            }
+            $context->builder->positionAtEnd($blankKeepBb);
+            $nullRow = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setNullAt'),
+                $nullRow,
+                $sizeT->constInt(0, false)
+            );
+            $context->builder->store($nullRow, $htSlot);
+            $context->builder->branch($csvDoneBb);
+
+            $context->builder->positionAtEnd($csvParseBb);
+            $csvBox = JitStrGetcsv::invoke(
+                $context,
+                $owned,
+                self::loadStringProp($context, $obj, self::PROP_CSV_SEP),
+                self::loadStringProp($context, $obj, self::PROP_CSV_ENC),
+                self::loadStringProp($context, $obj, self::PROP_CSV_ESC)
+            );
+            $htParsed = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $csvBox
+            );
+            $context->builder->store($htParsed, $htSlot);
+            $context->builder->branch($csvDoneBb);
+
+            $context->builder->positionAtEnd($csvDoneBb);
+            self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+            self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(1, false));
+            self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $owned);
+            if ($lineAdd > 0) {
+                $prev = self::loadLongProp($context, $obj, self::PROP_LINE);
+                self::storeLongProp(
+                    $context,
+                    $obj,
+                    self::PROP_LINE,
+                    $context->builder->addNoSignedWrap($prev, $i64->constInt($lineAdd, false))
+                );
+            }
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                JitValueBox::pointer($context, $slot),
+                $context->builder->load($htSlot)
+            );
+            $context->builder->branch($joinBb);
+
+            $context->builder->positionAtEnd($plainBb);
+        }
         $line = self::emitApplyDropNewLine($context, $line, $flags);
         if ($applySkipEmpty) {
             $acceptBb = $fn->appendBasicBlock('splfo_rd_accept');
@@ -1363,6 +1507,46 @@ final class SplFileObjectJitHelper
         $context->builder->positionAtEnd($joinBb);
 
         return $slot;
+    }
+
+    /**
+     * Strip trailing CR/LF from an owned `__string__*` (php_fgetcsv_lookup_trailing_spaces).
+     */
+    private static function emitRtrimLineTerminators(Context $context, Value $line): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $outSlot = $context->builder->alloca($strPtr);
+        $context->builder->store($line, $outSlot);
+
+        $crlf = $context->builder->load($context->constantStringFromString("\r\n"));
+        $isCrlf = JitStringCompare::suffixIdentical($context, $line, $crlf);
+        $crlfBb = $fn->appendBasicBlock('splfo_rtrim_crlf');
+        $checkOneBb = $fn->appendBasicBlock('splfo_rtrim_check_one');
+        $doneBb = $fn->appendBasicBlock('splfo_rtrim_done');
+        $context->builder->branchIf($isCrlf, $crlfBb, $checkOneBb);
+
+        $context->builder->positionAtEnd($crlfBb);
+        self::emitShrinkStringLen($context, $line, 2);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($checkOneBb);
+        $nl = $context->builder->load($context->constantStringFromString("\n"));
+        $isNl = JitStringCompare::suffixIdentical($context, $line, $nl);
+        $cr = $context->builder->load($context->constantStringFromString("\r"));
+        $isCr = JitStringCompare::suffixIdentical($context, $line, $cr);
+        $isOne = $context->builder->or($isNl, $isCr);
+        $oneBb = $fn->appendBasicBlock('splfo_rtrim_one');
+        $context->builder->branchIf($isOne, $oneBb, $doneBb);
+
+        $context->builder->positionAtEnd($oneBb);
+        self::emitShrinkStringLen($context, $line, 1);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $context->builder->load($outSlot);
     }
 
     /**

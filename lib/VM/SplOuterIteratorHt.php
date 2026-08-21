@@ -35,8 +35,9 @@ final class SplOuterIteratorHt
             // Packed fixed slots including null pads — nextFreeElement walk (#28640 / #26793).
             'splfixedarray',
             // SplFileObject: foreach uses Iterator protocol (rewind/valid/current/next) so
-            // setFlags(SKIP_EMPTY|DROP_NEW_LINE|…) apply (#33396 / #33319); HT snapshot remains
-            // for construct-time helpers but is not the foreach walk (#28709 → superseded).
+            // setFlags(SKIP_EMPTY|DROP_NEW_LINE|READ_CSV|…) apply (#33396 / #33397 / #33319);
+            // HT snapshot remains for construct-time helpers but is not the foreach walk
+            // (#28709 → superseded).
         ];
     }
 
