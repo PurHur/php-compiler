@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\JitFlock;
 use PHPCompiler\ext\standard\JitFputcsv;
 use PHPCompiler\ext\standard\JitFread;
 use PHPCompiler\ext\standard\JitFtell;
+use PHPCompiler\ext\standard\JitFtruncate;
 use PHPCompiler\ext\standard\JitPath;
 use PHPCompiler\JIT\Builtin\FputcsvRuntime;
 use PHPCompiler\JIT\Builtin\SplFileObjectSnapshotRuntime;
@@ -36,13 +37,14 @@ use PHPLLVM\Value;
  * getCurrentLine is the php-src fgets alias (#33321).
  * fread/fgetc on `__spl_fd` (#33332).
  * ftell/flock on `__spl_fd` (#33336) via JitFtell / JitFlock.
+ * ftruncate on `__spl_fd` (#33348) via JitFtruncate (peer procedural #33155).
  * fputcsv on `__spl_fd` (#33340) via JitFputcsv (peer procedural #33334 / #27180).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
- * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_fputcsv /
- * zim_SplFileInfo_openFile
+ * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_ftruncate /
+ * zim_SplFileObject_fputcsv / zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -293,6 +295,31 @@ final class SplFileObjectJitHelper
             $operation = JitFlock::lowerOperation($context, $operationArg);
             $ok = JitFlock::invoke($context, $handle, $operation);
         }
+        $i32 = $context->getTypeFromString('int32');
+        $asI32 = $context->builder->zExt($ok, $i32);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            JitValueBox::pointer($context, $slot),
+            $asI32
+        );
+
+        return $slot;
+    }
+
+    /**
+     * SplFileObject::ftruncate — php_stream_truncate_set_size on live handle (#33348).
+     * php-src: zim_SplFileObject_ftruncate
+     */
+    public static function compileFtruncate(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $sizeArg
+    ): Value {
+        self::ensureStreamAbis($context);
+        $handle = self::loadFd($context, $receiver);
+        $size = self::loadLong($context, $sizeArg);
+        $ok = JitFtruncate::invoke($context, $handle, $size);
         $i32 = $context->getTypeFromString('int32');
         $asI32 = $context->builder->zExt($ok, $i32);
         $slot = JitValueBox::alloc($context);
