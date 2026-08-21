@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_cms_sign() — CMS/S/MIME sign (php-src ext/openssl/openssl.c; #6592).
+ * openssl_cms_sign() — CMS/S/MIME sign (php-src ext/openssl/openssl.c; #6592 VM, JIT/AOT #33467).
  */
 final class openssl_cms_sign extends Internal
 {
@@ -60,8 +60,22 @@ final class openssl_cms_sign extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_cms_sign() is not implemented for JIT in this compiler build (issue #6592)'
+        if (\count($args) < 5) {
+            throw new \ArgumentCountError(
+                'openssl_cms_sign() expects at least 5 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitOpensslX509::cmsSign(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3],
+            $args[4],
+            $args[5] ?? null,
+            $args[6] ?? null,
+            $args[7] ?? null
         );
     }
 }
