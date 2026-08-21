@@ -31,8 +31,8 @@ final class TypeDeadErrorLogAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (proc_open still Type always-on).
-        $this->assertStringContainsString("registerFunction('__compiler_proc_open'", $type);
+        // Next leftover sentinel (proc_close still Type always-on).
+        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
         $this->assertStringContainsString('StringErrorLog::ensureLinked', $type);
     }
 

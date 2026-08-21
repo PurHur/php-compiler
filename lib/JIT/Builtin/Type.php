@@ -208,10 +208,12 @@ class Type extends Builtin {
         // + implementBinaryStringBridge; Type::initialize still StreamIo::ensureLinked).
         // Leftover Type empty decls vs Runtime ABI drift mint popen.1 (#31894 / #32122).
         // User-script popen() stays StreamIoJitHelper / JitStreamIoKernel.
+        // __compiler_proc_open always-on shell removed (#33105): ProcessOpenEmbedBridge owns
+        // the ABI (getNamedFunction first, then addFunction if absent via
+        // implementProcOpenBridge; Type::initialize still ProcessOpen::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint proc_open.1 (#31894 / #32122).
+        // User-script proc_open() stays JitProcOpen / ProcessOpenJitHelper.
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypeProcOpen = $this->context->context->functionType($i64, false, $strPtr, $htPtr);
-        $fnProcOpen = $this->context->module->addFunction('__compiler_proc_open', $fntypeProcOpen);
-        $this->context->registerFunction('__compiler_proc_open', $fnProcOpen);
         $fntypeProcClose = $this->context->context->functionType($i32, false, $i64);
         $fnProcClose = $this->context->module->addFunction('__compiler_proc_close', $fntypeProcClose);
         $this->context->registerFunction('__compiler_proc_close', $fnProcClose);
@@ -221,9 +223,12 @@ class Type extends Builtin {
         $fntypeGetResources = $this->context->context->functionType($htPtr, false, $strPtr);
         $fnGetResources = $this->context->module->addFunction('__compiler_get_resources', $fntypeGetResources);
         $this->context->registerFunction('__compiler_get_resources', $fnGetResources);
-        $fntypeFlock = $this->context->context->functionType($i32, false, $i64, $i64);
-        $fnFlock = $this->context->module->addFunction('__compiler_flock', $fntypeFlock);
-        $this->context->registerFunction('__compiler_flock', $fnFlock);
+        // __compiler_flock always-on shell removed (#33104): StreamReadRuntime owns the
+        // ABI (getNamedFunction first, then addFunction if absent via
+        // JitStreamReadBridgeKernel::implementI32Bridge; Type::initialize still
+        // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift
+        // mint flock.1 (#31894 / #32122). User-script flock() stays JitFlock /
+        // StreamReadJitHelper.
         // __compiler_fpassthru always-on shell removed (#33106): StreamReadRuntime owns the
         // ABI (getNamedFunction first, then addFunction if absent via implementI64Bridge;
         // Type::initialize still StreamRead::ensureLinked). Leftover Type empty decls vs
