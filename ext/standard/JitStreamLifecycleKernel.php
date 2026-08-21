@@ -18,14 +18,19 @@ use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed + thin standalone link for stream lifecycle via StreamLifecycleJitHelper PHP (#9442, #20966).
+ * JIT/AOT embed + thin standalone link for stream lifecycle via StreamLifecycleJitHelper PHP (#9442, #20966, #33073).
  *
+ * Owns `__compiler_fclose` / `__compiler_feof` / `__compiler_fflush` / `__compiler_pclose` /
+ * `__compiler_is_resource` ABI module-locally: {@see getNamedFunction} first, then
+ * {@see addFunction} if absent ({@see implementCloseBridge} / {@see implementIfMissing}).
+ * Do not re-add empty always-on shells in {@see \PHPCompiler\JIT\Builtin\Type} — leftover
+ * decls mint fclose.1 (#31894 / #32122).
  * Embed: NestedJIT {@see StreamLifecycleJitHelper} / {@see StreamLibcHandleJitHelper}.
  * Thin user-script AOT: {@see __compiler_is_resource} probes LLVM {@see StreamGlobalsJit}
  * handle table (same slots {@see JitStreamIoKernel} fopen fills) — NestedJIT helpers never
  * see those slots (#27186).
  * SSOT: {@see VmFs}, {@see StreamLifecycleJitHelper}, {@see StreamGlobalsJit}
- * php-src: ext/standard/streamsfuncs.c
+ * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
 final class JitStreamLifecycleKernel
 {

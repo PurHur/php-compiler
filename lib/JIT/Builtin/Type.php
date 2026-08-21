@@ -183,9 +183,11 @@ class Type extends Builtin {
         // + implementNullaryI64Bridge; Type::initialize still StreamIo::ensureLinked).
         // Leftover Type empty decls vs Runtime ABI drift mint tmpfile.1 (#31894 / #32122).
         // User-script tmpfile() stays StreamIoJitHelper / JitStreamIoKernel.
-        $fntypeFclose = $this->context->context->functionType($i32, false, $i64);
-        $fnFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
-        $this->context->registerFunction('__compiler_fclose', $fnFclose);
+        // __compiler_fclose always-on shell removed (#33073): JitStreamLifecycleKernel owns
+        // the ABI (getNamedFunction first, then addFunction if absent via
+        // implementCloseBridge; Type::initialize still StreamLifecycle::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint fclose.1 (#31894 / #32122).
+        // User-script fclose() stays JitFclose / StreamLifecycleJitHelper.
         $fntypePopen = $this->context->context->functionType($i64, false, $strPtr, $strPtr);
         $fnPopen = $this->context->module->addFunction('__compiler_popen', $fntypePopen);
         $this->context->registerFunction('__compiler_popen', $fnPopen);
