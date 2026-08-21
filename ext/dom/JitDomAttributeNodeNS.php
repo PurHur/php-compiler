@@ -247,7 +247,8 @@ final class JitDomAttributeNodeNS
 
     private static function invokeCreateUserScript(Context $context, JITVariable ...$args): Value
     {
-        $nsLit = self::compileTimeStringArg($args[1]);
+        // Prefer isNullConstant over stale compileTimeString (#33534 / peer #33532).
+        $nsLit = self::compileTimeNullableStringArg($args[1]);
         $qLit = self::compileTimeStringArg($args[2]);
         if (null !== $nsLit && null !== $qLit) {
             DomUserScriptAttributeCacheLlvm::rememberCreate($nsLit, $qLit);
@@ -269,7 +270,9 @@ final class JitDomAttributeNodeNS
 
     private static function invokeGetUserScript(Context $context, JITVariable ...$args): Value
     {
-        $nsLit = self::compileTimeStringArg($args[1]);
+        // Prefer isNullConstant over stale compileTimeString — null NS args can carry a
+        // leftover cts stamp, keying the Attr cache as namespace "k" instead of "" (#33534).
+        $nsLit = self::compileTimeNullableStringArg($args[1]);
         $localLit = self::compileTimeStringArg($args[2]);
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null !== $nsLit && null !== $localLit && null !== $xml) {
