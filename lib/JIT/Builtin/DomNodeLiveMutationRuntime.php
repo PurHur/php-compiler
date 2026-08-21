@@ -306,6 +306,11 @@ final class DomNodeLiveMutationRuntime
                     $parentObj
                 );
                 JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
+                // #33404 stopped calling refreshCompileTimeXmlWithRootInner here, so
+                // document-wide saveXML kept replaying the stale loadXML fold and dropped
+                // importNode/appendChild children (#33362 re-break after #33404). Peer
+                // replaceChild (#33424): mark mutated so saveXML dumps pinned slots.
+                JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
 
                 return self::nullValuePtr($context);
             }
