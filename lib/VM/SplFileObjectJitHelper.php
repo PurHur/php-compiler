@@ -60,6 +60,7 @@ use PHPLLVM\Value;
  * setCsvControl/getCsvControl on `__spl_csv_*` (#33371); fgetcsv/fputcsv read props when args omitted.
  * setMaxLineLen/getMaxLineLen on `__spl_max_line_len` (#33377); fgets/fgetcsv use max+1 (#33378).
  * fscanf on `__spl_fd` — fgets + `__compiler_sscanf_array` (#33382).
+ * hasChildren / getChildren — always false / null (#33388).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
@@ -70,7 +71,7 @@ use PHPLLVM\Value;
  * zim_SplFileObject_setFlags / zim_SplFileObject_getFlags /
  * zim_SplFileObject_setCsvControl / zim_SplFileObject_getCsvControl /
  * zim_SplFileObject_setMaxLineLen / zim_SplFileObject_getMaxLineLen /
- * zim_SplFileObject_fscanf /
+ * zim_SplFileObject_fscanf / zim_SplFileObject_hasChildren / zim_SplFileObject_getChildren /
  * zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
@@ -874,6 +875,35 @@ final class SplFileObjectJitHelper
         );
 
         return $slot;
+    }
+
+    /**
+     * SplFileObject::hasChildren — always false (#33388).
+     * php-src: zim_SplFileObject_hasChildren — RETURN_FALSE
+     */
+    public static function compileHasChildren(Context $context, JITVariable $receiver): Value
+    {
+        self::loadObject($context, $receiver);
+        $slot = JitValueBox::alloc($context);
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            JitValueBox::pointer($context, $slot),
+            $i32->constInt(0, false)
+        );
+
+        return $slot;
+    }
+
+    /**
+     * SplFileObject::getChildren — always null (#33388).
+     * php-src: zim_SplFileObject_getChildren
+     */
+    public static function compileGetChildren(Context $context, JITVariable $receiver): Value
+    {
+        self::loadObject($context, $receiver);
+
+        return self::voidResult($context);
     }
 
     /** SplFileObject::rewind — fseek(0) + reset iterator state (#33319). */
