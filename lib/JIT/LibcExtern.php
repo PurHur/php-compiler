@@ -368,6 +368,33 @@ final class LibcExtern
     }
 
     /**
+     * Module-local umask(2) after LibcExtern always-on drop (#33422).
+     *
+     * User-script umask() stays on {@see Builtin\StringUmask} / phpc_umask_*;
+     * {@see Builtin\UmaskLibcRuntime} calls this before lookupFunction('umask').
+     * Peer: ensureRmdir (#33403).
+     */
+    public static function ensureUmask(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $name = 'umask';
+        try {
+            $context->lookupFunction($name);
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $fn = $context->module->getNamedFunction($name);
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                $name,
+                $context->context->functionType($i32, false, $i32)
+            );
+        }
+        $context->registerFunction($name, $fn);
+    }
+
+    /**
      * Module-local printf(3) after LibcExtern always-on drop (#31706).
      *
      * User-script printf() stays on JitPrintf / __compiler_printf (#3681); NestedJIT

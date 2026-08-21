@@ -384,6 +384,11 @@ final class JitSleep
 
     private static function compileTimeObjectGivenLabel(Context $context, JITVariable $arg): string
     {
+        // Only TYPE_OBJECT slots hold __object__* / class_id. Boxed TYPE_VALUE args are
+        // __value__* — structGep(class_id) throws at compile time (#33422 / umask($m)).
+        if (JITVariable::TYPE_OBJECT !== $arg->type) {
+            return 'object';
+        }
         if (JITVariable::KIND_VALUE !== $arg->kind) {
             return 'object';
         }

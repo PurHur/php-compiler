@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for umask() via UmaskJitHelper PHP (#15497).
+ * JIT/AOT link for umask() via libc umask(2) (#15497, #33422).
  *
- * Replaces libc umask(2) LLVM in ext/standard/JitUmask.php.
- * SSOT: {@see \PHPCompiler\ext\standard\UmaskJitHelper}.
+ * NestedJIT {@see \PHPCompiler\ext\standard\UmaskJitHelper} cannot call host \\umask()
+ * under thin AOT (re-enters phpc_umask_*). Bridge bodies are {@see UmaskLibcRuntime} —
+ * peer {@see StringUnlink} #33412 / {@see StringRmdir} #33403.
+ *
  * php-src: ext/standard/filestat.c — PHP_FUNCTION(umask)
  */
 final class StringUmask
@@ -21,18 +23,6 @@ final class StringUmask
     private const ABI_GET = 'phpc_umask_get';
 
     private const ABI_SET = 'phpc_umask_set';
-
-    private const HELPER_PATH = '/ext/standard/UmaskJitHelper.php';
-
-    private const GET_HELPER = 'PHPCompiler\\ext\\standard\\UmaskJitHelper::getArgv';
-
-    private const SET_HELPER = 'PHPCompiler\\ext\\standard\\UmaskJitHelper::setArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::GET_HELPER,
-        self::SET_HELPER,
-    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -59,33 +49,57 @@ final class StringUmask
 
     private static function implementGet(Context $context): void
     {
+        $probe = $context->module->getNamedFunction(self::ABI_GET);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_GET, $probe);
+
+            return;
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_GET,
-            'umask_get_bridge_entry',
-            [],
-            $i64,
-            self::GET_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#15497'
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_GET,
+                $context->context->functionType($i64, false)
+            );
+
+        UmaskLibcRuntime::emitGet($context, $fn);
+        $context->registerFunction(self::ABI_GET, $fn);
+
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementSet(Context $context): void
     {
+        $probe = $context->module->getNamedFunction(self::ABI_SET);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_SET, $probe);
+
+            return;
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_SET,
-            'umask_set_bridge_entry',
-            [$i64],
-            $i64,
-            self::SET_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#15497'
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_SET,
+                $context->context->functionType($i64, false, $i64)
+            );
+
+        UmaskLibcRuntime::emitSet($context, $fn);
+        $context->registerFunction(self::ABI_SET, $fn);
+
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
