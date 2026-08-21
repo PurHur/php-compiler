@@ -32,7 +32,7 @@ final class TypeDeadIsResourceAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (proc_close still Type always-on).
+        // Next leftover sentinel (format_datetime still Type always-on; #33213 unserialize / #33212 phpc_run_command dropped).
         $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
         $this->assertStringContainsString('StreamLifecycle::ensureLinked', $type);
     }

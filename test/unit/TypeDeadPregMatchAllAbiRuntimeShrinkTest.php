@@ -42,8 +42,8 @@ final class TypeDeadPregMatchAllAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (unserialize still Type always-on; #33207 serialize_* dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_unserialize'", $type);
+        // Next leftover sentinel (format_datetime still Type always-on; #33213 unserialize / #33212 phpc_run_command dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_format_datetime'", $type);
         $this->assertStringContainsString('StringPregMatch::ensureLinked', $type);
     }
 

@@ -13,10 +13,17 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
+/**
+ * LLVM lowering for unserialize() via __compiler_unserialize (#9163; ensureLinked #33213).
+ *
+ * ABI owned by {@see StringUnserialize} after Type always-on drop (#33213) —
+ * must ensureLinked before lookup (peer {@see JitSerialize}).
+ */
 final class JitUnserialize
 {
     public static function decodeRuntime(Context $context, JITVariable $payload): Value
     {
+        // #33213 — Type dropped always-on __compiler_unserialize; link before lookup.
         StringUnserialize::ensureLinked($context);
         // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #18840 TypeError).
         $payloadString = JitStringBuiltinArg::lowerTrimFamilyString(

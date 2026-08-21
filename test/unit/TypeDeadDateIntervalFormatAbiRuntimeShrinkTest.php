@@ -31,7 +31,7 @@ final class TypeDeadDateIntervalFormatAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (strftime still Type always-on after #33203 di-fmt drop).
+        // Next leftover sentinel (format_datetime still Type always-on; #33213 unserialize / #33212 phpc_run_command dropped).
         $this->assertStringContainsString("registerFunction('__compiler_strftime'", $type);
         $this->assertStringContainsString('DateIntervalFormatRuntime::ensureLinked', $type);
     }
