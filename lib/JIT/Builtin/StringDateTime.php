@@ -10,9 +10,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_format_datetime via FormatDatetimeJitHelper PHP (#15243, #25433).
+ * JIT/AOT link for __compiler_format_datetime via FormatDatetimeJitHelper PHP (#15243, #25433, #33217).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringStrftime #25365 / StringStrptime #25409).
+ * Declares module-locally (getNamedFunction first) so leftover Type empty decls cannot mint
+ * format_datetime.1 (#31894 / #32122 / #33217).
  * Replaces gmtime/localtime/format-char LLVM monolith; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date), PHP_FUNCTION(gmdate)
  */

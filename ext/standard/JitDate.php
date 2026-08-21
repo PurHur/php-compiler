@@ -277,7 +277,7 @@ final class JitDate
         $format = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], $function, 0, 'format');
         $gmtI8 = $context->getTypeFromString('int8')->constInt($gmt ? 1 : 0, false);
 
-        StringDateTime::ensureLinked($context);
+        StringDateTime::ensureLinked($context); // #33217 — Type always-on format_datetime ABI dropped
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_format_datetime'),
