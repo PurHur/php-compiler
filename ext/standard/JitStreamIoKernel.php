@@ -2172,6 +2172,7 @@ final class JitStreamIoKernel
         );
 
         $context->builder->positionAtEnd($okBb);
+        self::ensureFstatHashtableDecls($context);
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $values = [];
         foreach ($fields as [$name, $index, $offset, $width]) {
@@ -2195,10 +2196,18 @@ final class JitStreamIoKernel
             );
         }
         foreach ($values as [$name, $index, $loaded]) {
+            $keyStr = $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $i64->constInt(\strlen($name), false),
+                $context->builder->pointerCast(
+                    $context->constantFromString($name),
+                    $i8p
+                )
+            );
             $context->builder->call(
                 $context->lookupFunction('__hashtable__setStringKeyLong'),
                 $ht,
-                $context->builder->load($context->constantStringFromString($name)),
+                $keyStr,
                 $loaded
             );
         }
@@ -2206,6 +2215,25 @@ final class JitStreamIoKernel
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($nullHt);
+    }
+
+    /** Module-local hashtable + string decls for filestat HT assemble (#33359). */
+    private static function ensureFstatHashtableDecls(Context $context): void
+    {
+        $void = $context->getTypeFromString('void');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        foreach ([
+            ['__hashtable__alloc', $htPtr, []],
+            ['__hashtable__setLongAt', $void, [$htPtr, $sizeT, $i64]],
+            ['__hashtable__setStringKeyLong', $void, [$htPtr, $strPtr, $i64]],
+            ['__string__init', $strPtr, [$i64, $i8p]],
+        ] as [$name, $ret, $params]) {
+            self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void

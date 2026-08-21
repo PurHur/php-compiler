@@ -99,7 +99,7 @@ final class SplFileObjectFstat33359AotTest extends TestCase
         $kernel = (string) file_get_contents($root.'/ext/standard/JitStreamIoKernel.php');
         $this->assertStringContainsString('implementFstatForce', $kernel);
         $this->assertStringContainsString('fstat_entry', $kernel);
-        $read = (string) file_get_contents($root.'/lib/JIT/Builtin/StreamReadRuntime.php');
-        $this->assertStringContainsString('implementFstatForce', $read);
+        $fstatRt = (string) file_get_contents($root.'/lib/JIT/Builtin/StreamFstatRuntime.php');
+        $this->assertStringContainsString('implementFstatForce', $fstatRt);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\JitStreamIoKernel;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -42,12 +43,17 @@ final class StreamFstatRuntime
 
     public static function implement(Context $context): void
     {
+        // Preserve the caller's insert block — NestedJIT bridge / force delete ABI blocks (#33359).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+
         $probe = $context->module->getNamedFunction('__compiler_fstat');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
             if ($context->isThinStandaloneAotMain()) {
                 JitStreamIoKernel::implementFstatForce($context);
             }
+            self::restoreInsert($context, $savedBlock);
 
             return;
         }
@@ -58,7 +64,16 @@ final class StreamFstatRuntime
         if ($context->isThinStandaloneAotMain()) {
             JitStreamIoKernel::implementFstatForce($context);
         }
-        $context->builder->clearInsertionPosition();
+        self::restoreInsert($context, $savedBlock);
+    }
+
+    private static function restoreInsert(Context $context, mixed $savedBlock): void
+    {
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementFstatBridge(Context $context): void
@@ -101,6 +116,7 @@ final class StreamFstatRuntime
         $context->builder->positionAtEnd($fail);
         $context->builder->returnValue($htPtr->constNull());
         $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
