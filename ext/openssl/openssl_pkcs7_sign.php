@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkcs7_sign() — S/MIME sign (php-src ext/openssl/openssl.c; #6804).
+ * openssl_pkcs7_sign() — S/MIME sign (php-src ext/openssl/openssl.c; #6804 VM, JIT/AOT #33471).
  */
 final class openssl_pkcs7_sign extends Internal
 {
@@ -55,8 +55,21 @@ final class openssl_pkcs7_sign extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_pkcs7_sign() is not implemented for JIT in this compiler build (issue #6804)'
+        if (\count($args) < 5) {
+            throw new \ArgumentCountError(
+                'openssl_pkcs7_sign() expects at least 5 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitOpensslX509::pkcs7Sign(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3],
+            $args[4],
+            $args[5] ?? null,
+            $args[6] ?? null
         );
     }
 }
