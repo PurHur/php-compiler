@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+// #33318 — AOT SplFileObject fgets/fwrite must use a live stream handle (Zend zim_SplFileObject_*).
 $tmp = tempnam(sys_get_temp_dir(), 'splfo');
 if (false === $tmp) {
     exit(1);

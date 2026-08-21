@@ -4151,6 +4151,8 @@ class Object_ extends Type {
             // Slot 0 must be `__spl_ht` for splBackingHashtable (#26783).
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_PATH, Variable::TYPE_STRING);
+            // Live stream handle for fgets/fwrite/eof (#33318).
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_FD, Variable::TYPE_NATIVE_LONG);
             // SplFileInfo path props for inherited isFile/getSize/… (#33313).
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_PATH, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FILENAME, Variable::TYPE_STRING);
@@ -4158,7 +4160,7 @@ class Object_ extends Type {
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
-                'fgets', 'eof', 'getfilename', 'getpathname', 'getpath', '__tostring',
+                'fgets', 'fwrite', 'eof', 'getfilename', 'getpathname', 'getpath', '__tostring',
                 'getsize', 'getrealpath',
                 'getmtime', 'getatime', 'getctime', 'getperms', 'getowner', 'getgroup', 'getinode',
                 'isfile', 'isdir', 'islink', 'getlinktarget', 'isreadable', 'iswritable', 'isexecutable',
