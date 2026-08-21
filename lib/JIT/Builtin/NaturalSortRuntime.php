@@ -7,14 +7,15 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\HashTablePromotePackedToStringKeys;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 /**
- * JIT/AOT link for natsort()/natcasesort() via LLVM packed + string-key natural sorts (#26975).
+ * JIT/AOT link for natsort()/natcasesort() (#26975, #33618).
  *
  * NestedJIT {@see \PHPCompiler\ext\standard\NaturalSortJitHelper} aborts under thin standalone
- * AOT (VmArray / HashTable method stubs — same class as MultisortJitHelper, #26908 / #24010).
- * Emit bubble sorts in {@see Type\HashTable} instead; compare via {@see StringNaturalCompare}.
+ * AOT. Packed lists must preserve keys (php-src php_natsort) — promote packed indices to
+ * decimal strKeys then run {@see __hashtable__sortStringKeyValuesNatural*} (#33618).
  *
  * SSOT (VM): {@see \PHPCompiler\ext\standard\VmArray::natsortCopy()} /
  * {@see \PHPCompiler\ext\standard\VmArray::natcasesortCopy()}
@@ -44,15 +45,11 @@ final class NaturalSortRuntime
     {
         self::ensureLinked($context, $caseInsensitive);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $packed = $caseInsensitive ? self::ABI_PACKED_NATURAL_CASE : self::ABI_PACKED_NATURAL;
+        // Packed setAtIndex cannot express reordered int keys; promote then strKey sort (#33618).
+        HashTablePromotePackedToStringKeys::promote($context, $ht);
         $strKey = $caseInsensitive ? self::ABI_STRKEY_NATURAL_CASE : self::ABI_STRKEY_NATURAL;
-        // Packed lists (numeric 0..n-1) and string-key maps are distinct representations;
-        // each ABI no-ops when its structure is empty / too small (#26975).
-        $context->builder->call($context->lookupFunction($packed), $ht);
         $context->builder->call($context->lookupFunction($strKey), $ht);
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-        }
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
     public static function ensureLinked(Context $context, bool $caseInsensitive = false): void
