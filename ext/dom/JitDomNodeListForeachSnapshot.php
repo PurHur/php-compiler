@@ -14,11 +14,13 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT foreach over DOMNodeList via snapshot → hashtable (#32707, #33082, #33645).
+ * Thin-AOT foreach over DOMNodeList via snapshot → hashtable (#32707, #33082, #33645, #33659).
  *
  * Iterator protocol and runtime item() inside the foreach CFG both break module
  * verification or abort under nested JIT. For user-script getElementsByTagName lists,
- * materialize every item at Iterator_Reset from compile-time XML (peer #27275).
+ * prefer a **live** document-order walk from the pinned documentElement (#33659) —
+ * compile-time loadXML rematerialization (#32707 / #27275) misses createElement nodes
+ * linked via LiveSlots. Fall back to compile-time XML when the root is unset.
  * For {@code $el->childNodes} (no tag query), snapshot **live**
  * {@code owner.firstChild→nextSibling} at Iterator_Reset (#33645) — a compile-time
  * loadXML child list (#33082) ignored after/before/append/prepend. For
@@ -201,19 +203,8 @@ final class JitDomNodeListForeachSnapshot
             }
             $countVal = $sizeT->constInt($count, false);
         } elseif (!$useDirectChildren) {
-            $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
-            $ht = HashTableHelper::alloc($context);
-            $context->builder->call(
-                $context->lookupFunction('__hashtable__grow'),
-                $ht,
-                $sizeT->constInt($count > 0 ? $count : 1, false)
-            );
-            for ($i = 0; $i < $count; ++$i) {
-                $itemPtr = JitDomNodeListItemUserScript::materializeItemAtCompileTime($context, $xml, $tag, $i);
-                $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
-                HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $elem);
-            }
-            $countVal = $sizeT->constInt($count, false);
+            // Live document-order walk when pinned root exists (#33659).
+            [$ht, $countVal] = self::emitLiveTagListSnapshot($context, (string) $tag, $xml);
         } else {
             // Live childNodes: owner.firstChild→nextSibling at Reset (#33645).
             // Compile-time loadXML children (#33082) ignored after/before/append/prepend.
@@ -236,6 +227,64 @@ final class JitDomNodeListForeachSnapshot
         $one = $sizeT->constInt(1, false);
         $invalid = $context->builder->sub($zero, $one);
         $context->builder->store($invalid, $context->foreachIndexSlots[$context->foreachSlotMapKey($slotKey)]);
+    }
+
+    /**
+     * Pack getElementsByTagName matches into a foreach hashtable (#33659).
+     *
+     * Prefers live walk from pinned documentElement; falls back to compile-time
+     * loadXML rematerialization when the root is unset.
+     *
+     * @return array{0: Value, 1: Value} __hashtable__* and size_t element count
+     */
+    private static function emitLiveTagListSnapshot(
+        Context $context,
+        string $tag,
+        string $xml
+    ): array {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nl_foreach_tag');
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+
+        $htSlot = BasicBlockHelper::entryAlloca($context, $htPtrTy);
+        $countSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($htPtrTy->constNull(), $htSlot);
+        $context->builder->store($sizeT->constInt(0, false), $countSlot);
+
+        $pinned = DomUserScriptPinnedRootLlvm::load($context);
+        $noPin = $context->builder->icmp(Builder::INT_EQ, $pinned, $objPtrTy->constNull());
+        $bbFallback = BasicBlockHelper::append($context, 'dom_nl_foreach_tag_fb');
+        $bbLive = BasicBlockHelper::append($context, 'dom_nl_foreach_tag_live');
+        $bbDone = BasicBlockHelper::append($context, 'dom_nl_foreach_tag_done');
+        $context->builder->branchIf($noPin, $bbFallback, $bbLive);
+
+        $context->builder->positionAtEnd($bbFallback);
+        $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+        $fbHt = HashTableHelper::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__grow'),
+            $fbHt,
+            $sizeT->constInt($count > 0 ? $count : 1, false)
+        );
+        for ($i = 0; $i < $count; ++$i) {
+            $itemPtr = JitDomNodeListItemUserScript::materializeItemAtCompileTime($context, $xml, $tag, $i);
+            $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
+            HashTableHelper::setAtIndex($context, $fbHt, $sizeT->constInt($i, false), $elem);
+        }
+        $context->builder->store($fbHt, $htSlot);
+        $context->builder->store($sizeT->constInt($count, false), $countSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbLive);
+        [$liveHt, $liveCount] = JitDomLiveElementsByTagWalk::snapshotToHashtable($context, $pinned, $tag);
+        $context->builder->store($liveHt, $htSlot);
+        $context->builder->store($liveCount, $countSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return [$context->builder->load($htSlot), $context->builder->load($countSlot)];
     }
 
     /**

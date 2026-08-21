@@ -48,9 +48,42 @@ final class JitDomNodeListItemUserScript
         $markup = JitDomLoadXMLUserScript::lastCompileTimeXml()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
 
-        // Dynamic index: compile-time getElementsByTagName / XPath tag list (#33063).
-        // OwnerAware ABI aborts on thin-AOT NodeList without CHILD_NODES_OWNER.
+        // Dynamic index: live walk when pinned root exists (#33659); else compile-time ladder (#33063).
         if (null === $index) {
+            if (null !== $tagQuery) {
+                if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+                    $indexVal = $context->helper->loadValue($arg);
+                } elseif (JITVariable::TYPE_VALUE === $arg->type) {
+                    $indexVal = $context->builder->call(
+                        $context->lookupFunction('__value__readLong'),
+                        JitValueBox::valuePtrFromVariable($context, $arg)
+                    );
+                } else {
+                    $indexVal = null;
+                }
+                if (null !== $indexVal) {
+                    $pinned = DomUserScriptPinnedRootLlvm::load($context);
+                    $live = JitDomLiveElementsByTagWalk::itemAt($context, $pinned, $tagQuery, $indexVal);
+                    if (null !== $markup) {
+                        $compileTime = self::materializeDynamicIndexQueryMatch(
+                            $context,
+                            $markup,
+                            $tagQuery,
+                            $arg
+                        );
+                        $objPtrTy = $context->getTypeFromString('__object__*');
+                        $pinNull = $context->builder->icmp(
+                            Builder::INT_EQ,
+                            $pinned,
+                            $objPtrTy->constNull()
+                        );
+
+                        return $context->builder->select($pinNull, $compileTime, $live);
+                    }
+
+                    return $live;
+                }
+            }
             if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
                 return self::materializeDynamicIndexQueryMatch($context, $xml, $queryTag, $arg);
             }
@@ -86,9 +119,25 @@ final class JitDomNodeListItemUserScript
             }
         }
 
-        // getElementsByTagName live list — any index, including "*" (#26752 / #33063).
+        // getElementsByTagName live list — prefer pinned-root walk (#33659 / #26752 / #33063).
         if (null !== $tagQuery && null !== $markup) {
-            return self::materializeNthQueryMatch($context, $markup, $tagQuery, $index);
+            $pinned = DomUserScriptPinnedRootLlvm::load($context);
+            $i64 = $context->getTypeFromString('int64');
+            $live = JitDomLiveElementsByTagWalk::itemAt(
+                $context,
+                $pinned,
+                $tagQuery,
+                $i64->constInt($index, false)
+            );
+            $compileTime = self::materializeNthQueryMatch($context, $markup, $tagQuery, $index);
+            $objPtrTy = $context->getTypeFromString('__object__*');
+            $pinNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $pinned,
+                $objPtrTy->constNull()
+            );
+
+            return $context->builder->select($pinNull, $compileTime, $live);
         }
         if (0 !== $index) {
             return null;

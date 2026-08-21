@@ -9,18 +9,29 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** User-script AOT: live tag-name counts for DOMNodeList::length (#18478). */
+/**
+ * User-script AOT: live tag-name counts for DOMNodeList::length (#18478, #28605, #33659).
+ *
+ * {@code getElementsByTagName('*')} must bump on any element append (#33659) —
+ * comparing the child local name to {@code *} never matches. Appends before the
+ * first query accumulate in {@see GLOBAL_PENDING} and fold into {@see initCount}.
+ */
 final class DomUserScriptLiveTagListLlvm
 {
     public const GLOBAL_TAG = '__phpc_dom_us_live_tag';
 
     public const GLOBAL_COUNT = '__phpc_dom_us_live_tag_count';
 
+    /** Element appends before any getElementsByTagName query (#33659). */
+    public const GLOBAL_PENDING = '__phpc_dom_us_live_tag_pending';
+
     /**
      * Seed live tag + count from compile-time XML.
      *
      * Re-querying the same tag must keep mutation increments from appendChild
      * (#28605); only retarget when GLOBAL_TAG is unset or a different name.
+     * First query folds {@see GLOBAL_PENDING} so append-then-query sees created
+     * elements (#33659).
      *
      * Pass {@see $force} for XPath snapshots (#28647): each query()/evaluate()
      * NodeList is not live, so same-tag reuse must still rewrite the count.
@@ -38,6 +49,7 @@ final class DomUserScriptLiveTagListLlvm
         $i64 = $context->getTypeFromString('int64');
         $tagGlobal = $context->module->getNamedGlobal(self::GLOBAL_TAG);
         $countGlobal = $context->module->getNamedGlobal(self::GLOBAL_COUNT);
+        $pendingGlobal = $context->module->getNamedGlobal(self::GLOBAL_PENDING);
         $doInit = BasicBlockHelper::append($context, 'dom_us_live_tag_do_init');
         $done = BasicBlockHelper::append($context, 'dom_us_live_tag_init_done');
 
@@ -62,7 +74,11 @@ final class DomUserScriptLiveTagListLlvm
 
         $context->builder->positionAtEnd($doInit);
         $context->builder->store($owned, $tagGlobal);
-        $context->builder->store($i64->constInt($count, false), $countGlobal);
+        $pending = $context->builder->load($pendingGlobal);
+        $base = $i64->constInt($count, false);
+        $total = $context->builder->add($base, $pending);
+        $context->builder->store($total, $countGlobal);
+        $context->builder->store($i64->constInt(0, false), $pendingGlobal);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
@@ -112,9 +128,57 @@ final class DomUserScriptLiveTagListLlvm
         );
     }
 
+    /**
+     * Note an element entering the tree (appendChild / after / before / prepend).
+     *
+     * {@code *} and empty query tags match any element (#33659). Appends before
+     * the first query go to {@see GLOBAL_PENDING}.
+     */
     public static function incrementForChildArg(Context $context, \PHPCompiler\JIT\Variable $childArg): void
     {
         self::ensureGlobals($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_us_live_tag_child_inc');
+        $i64 = $context->getTypeFromString('int64');
+        $one = $i64->constInt(1, false);
+        $tagGlobal = $context->module->getNamedGlobal(self::GLOBAL_TAG);
+        $countGlobal = $context->module->getNamedGlobal(self::GLOBAL_COUNT);
+        $pendingGlobal = $context->module->getNamedGlobal(self::GLOBAL_PENDING);
+        $storedTag = $context->builder->load($tagGlobal);
+        $hasTag = $context->builder->icmp(
+            Builder::INT_NE,
+            $storedTag,
+            $storedTag->typeOf()->constNull()
+        );
+
+        $bbPending = BasicBlockHelper::append($context, 'dom_us_live_tag_child_pending');
+        $bbActive = BasicBlockHelper::append($context, 'dom_us_live_tag_child_active');
+        $bbDone = BasicBlockHelper::append($context, 'dom_us_live_tag_child_done');
+        $context->builder->branchIf($hasTag, $bbActive, $bbPending);
+
+        $context->builder->positionAtEnd($bbPending);
+        $pending = $context->builder->load($pendingGlobal);
+        $context->builder->store($context->builder->add($pending, $one), $pendingGlobal);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbActive);
+        $starLit = $context->builder->load($context->constantStringFromString('*'));
+        $emptyLit = $context->builder->load($context->constantStringFromString(''));
+        $cmpStar = \PHPCompiler\JIT\JitStringCompare::strcmp($context, $storedTag, $starLit);
+        $isStar = $context->builder->icmp(Builder::INT_EQ, $cmpStar, $i64->constInt(0, false));
+        $cmpEmpty = \PHPCompiler\JIT\JitStringCompare::strcmp($context, $storedTag, $emptyLit);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $cmpEmpty, $i64->constInt(0, false));
+        $anyElement = $context->builder->or($isStar, $isEmpty);
+
+        $bbAny = BasicBlockHelper::append($context, 'dom_us_live_tag_child_any');
+        $bbExact = BasicBlockHelper::append($context, 'dom_us_live_tag_child_exact');
+        $context->builder->branchIf($anyElement, $bbAny, $bbExact);
+
+        $context->builder->positionAtEnd($bbAny);
+        $storedCount = $context->builder->load($countGlobal);
+        $context->builder->store($context->builder->add($storedCount, $one), $countGlobal);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbExact);
         $lit = \PHPCompiler\JIT\JitStringBuiltinArg::compileTimeLiteral($childArg)
             ?? $childArg->compileTimeString
             ?? $childArg->compileTimeDomTagName;
@@ -123,10 +187,12 @@ final class DomUserScriptLiveTagListLlvm
                 $context->constantStringFromString(strtolower($lit))
             );
             self::increment($context, $childTag);
-
-            return;
+        } else {
+            self::incrementCount($context);
         }
-        self::incrementCount($context);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     private static function ensureGlobals(Context $context): void
@@ -139,6 +205,10 @@ final class DomUserScriptLiveTagListLlvm
         }
         if (null === $context->module->getNamedGlobal(self::GLOBAL_COUNT)) {
             $g = $context->module->addGlobal($i64, self::GLOBAL_COUNT);
+            $g->setInitializer($i64->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::GLOBAL_PENDING)) {
+            $g = $context->module->addGlobal($i64, self::GLOBAL_PENDING);
             $g->setInitializer($i64->constInt(0, false));
         }
     }
