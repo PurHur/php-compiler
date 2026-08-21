@@ -1498,13 +1498,26 @@ class Context {
                 'SplFileInfo'
             );
         }
-        // SplFileObject — line snapshot `__spl_ht` for foreach (#28709); path via `__pathname` (#33305 / #33308).
+        // SplFileObject — `__spl_ht` + `__pathname` (#33305/#33308); inherited SplFileInfo stats (#33313).
         $this->type->object->lookup('SplFileObject');
         foreach ([
             '__construct', 'getFilename', 'getPathname', 'getPath', '__toString',
         ] as $sfoMethod) {
             $this->functionProxies['splfileobject::'.strtolower($sfoMethod)] = new Call\SplFileObjectMethod(
                 $sfoMethod
+            );
+        }
+        foreach ([
+            'getSize', 'getRealPath',
+            'getMTime', 'getATime', 'getCTime', 'getPerms', 'getOwner', 'getGroup', 'getInode',
+            'isFile', 'isDir',
+            'isLink', 'getLinkTarget', 'isReadable', 'isWritable', 'isExecutable',
+            'getExtension', 'getBasename', 'getType',
+            'getFileInfo', 'getPathInfo', 'openFile',
+        ] as $sfoStatMethod) {
+            $this->functionProxies['splfileobject::'.strtolower($sfoStatMethod)] = new Call\DirectoryIteratorMethod(
+                $sfoStatMethod,
+                'SplFileObject'
             );
         }
         // GlobIterator — glob snapshot + Iterator (#27422).
