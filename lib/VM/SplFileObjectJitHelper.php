@@ -1007,8 +1007,9 @@ final class SplFileObjectJitHelper
     }
 
     /**
-     * SplFileObject::seek — SeekableIterator line seek (#33364).
+     * SplFileObject::seek — SeekableIterator line seek (#33364 / #33453).
      * php-src: zim_SplFileObject_seek — rewind, read_line $line times, bump key (default flags).
+     * Past-EOF key matches Zend via empty-line SUCCESS on first NULL get_line (#24331).
      */
     public static function compileSeek(
         Context $context,
@@ -1088,7 +1089,11 @@ final class SplFileObjectJitHelper
         );
         $context->builder->branch($loopHead);
 
+        // Early EOF — freeLine like VM seek after failed read_line (#25321 / #33453).
         $context->builder->positionAtEnd($earlyDone);
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $emptyEof = $context->builder->load($context->constantStringFromString(''));
+        self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $emptyEof);
         $context->builder->branch($endBb);
 
         $context->builder->positionAtEnd($afterLoop);
@@ -1535,7 +1540,11 @@ final class SplFileObjectJitHelper
     /**
      * Plain (non-READ_CSV) line read into PROP_CUR_LINE.
      *
-     * @return Value __value__* box (string)
+     * php-src 8.2 spl_filesystem_file_read_ex: NULL get_line while !eof is empty-line
+     * SUCCESS (#24331 / #33453). Already-latched AT_EOF is FAILURE for iterator/seek
+     * (current→false) but fgets still returns "" (zim_SplFileObject_fgets).
+     *
+     * @return Value __value__* box (string or false)
      */
     private static function emitPlainReadLineToValueBox(
         Context $context,
@@ -1550,6 +1559,8 @@ final class SplFileObjectJitHelper
         $strPtr = $context->getTypeFromString('__string__*');
         $fn = $context->builder->getInsertBlock()->getParent();
         $loopBb = $fn->appendBasicBlock('splfo_rd_loop');
+        $stickyEofBb = $fn->appendBasicBlock('splfo_rd_sticky_eof');
+        $tryReadBb = $fn->appendBasicBlock('splfo_rd_try');
         $eofBb = $fn->appendBasicBlock('splfo_rd_eof');
         $okBb = $fn->appendBasicBlock('splfo_rd_ok');
         $joinBb = $fn->appendBasicBlock('splfo_rd_join');
@@ -1557,6 +1568,30 @@ final class SplFileObjectJitHelper
         $context->builder->branch($loopBb);
 
         $context->builder->positionAtEnd($loopBb);
+        // Peer SplFileObjectStorage::readPlainLineEx feof-before-read (#33453).
+        $atEof = self::loadLongProp($context, $obj, self::PROP_AT_EOF);
+        $alreadyEof = $context->builder->icmp(Builder::INT_NE, $atEof, $i64->constInt(0, false));
+        $context->builder->branchIf($alreadyEof, $stickyEofBb, $tryReadBb);
+
+        $context->builder->positionAtEnd($stickyEofBb);
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $emptySticky = $context->builder->load($context->constantStringFromString(''));
+        self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $emptySticky);
+        if ($applySkipEmpty) {
+            // Iterator/seek/current — FAILURE → false (php-src read_line at EOF).
+            $i1 = $context->getTypeFromString('int1');
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        } else {
+            // fgets at EOF → "" (zim_SplFileObject_fgets).
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                JitValueBox::pointer($context, $slot),
+                $emptySticky
+            );
+        }
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($tryReadBb);
         $line = $context->builder->call(
             $context->lookupFunction('__compiler_fgets'),
             $handle,
@@ -1565,12 +1600,21 @@ final class SplFileObjectJitHelper
         $isNull = $context->builder->icmp(Builder::INT_EQ, $line, $strPtr->constNull());
         $context->builder->branchIf($isNull, $eofBb, $okBb);
 
+        // NULL get_line while !eof → empty current_line SUCCESS + lineAdd (#24331 / #33453).
         $context->builder->positionAtEnd($eofBb);
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(1, false));
-        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(1, false));
         $empty = $context->builder->load($context->constantStringFromString(''));
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
-        // Match VM past-end fgets → "" (Zend throws) for thin AOT.
+        if ($lineAdd > 0) {
+            $prevEof = self::loadLongProp($context, $obj, self::PROP_LINE);
+            self::storeLongProp(
+                $context,
+                $obj,
+                self::PROP_LINE,
+                $context->builder->addNoSignedWrap($prevEof, $i64->constInt($lineAdd, false))
+            );
+        }
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             JitValueBox::pointer($context, $slot),
