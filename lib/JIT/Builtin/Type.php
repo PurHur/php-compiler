@@ -43,7 +43,7 @@ class Type extends Builtin {
         // still StringDeployPath::ensureLinked on the full load path; JitDeployPath
         // ensureLinked before lookup). Leftover Type empty decls vs Runtime ABI drift
         // mint phpc_deploy_path.1 (#31894 / #32122). User-script phpc_deploy_path() stays
-        // JitDeployPath / DeployPathJitHelper (php-src-shaped deploy root resolve).
+        // JitDeployPath / DeployPathLlvm thin AOT (#33244); VM SSOT DeployPathJitHelper.
         // __compiler_sprintf / __compiler_printf / __compiler_number_format always-on shells
         // removed (#32921): StringFormat owns the ABI (getNamedFunction first, then
         // addFunction if absent; Type::initialize still ensureLinked). Thin AOT already

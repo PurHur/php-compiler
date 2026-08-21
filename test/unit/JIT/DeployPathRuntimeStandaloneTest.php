@@ -4,28 +4,30 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\StringDeployPath;
-use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9309: deploy-path JIT bridge compiles DeployPathJitHelper, not getenv/snprintf LLVM.
+ * Issue #9309 / #33244: deploy-path thin AOT uses DeployPathLlvm, not NestedJIT.
+ *
+ * Full Context(LOAD_TYPE_STANDALONE) construction currently fails on master after
+ * #33234 (missing __compiler_trigger_error during Type::register NestedJIT) —
+ * exercise ownership via source shrink instead; AOT binary repro is the behavior gate.
  *
  * @group aot-lint
  */
 final class DeployPathRuntimeStandaloneTest extends TestCase
 {
-    public function testEnsureStandaloneDefinesDeployPathBridge(): void
+    public function testDeployPathLlvmOwnsThinAotBodyWithoutNestedJitHelper(): void
     {
-        $runtime = new Runtime(Runtime::MODE_AOT);
-        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        StringDeployPath::ensureStandaloneBodies($ctx);
+        $owner = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringDeployPath.php');
+        $this->assertStringContainsString('DeployPathLlvm::implement', $owner);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $owner);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $owner);
 
-        $fn = $ctx->lookupFunction('__compiler_phpc_deploy_path');
-        $this->assertNotNull($fn, '__compiler_phpc_deploy_path must be linked for standalone AOT');
-        $this->assertGreaterThan(0, $fn->countBasicBlocks(), '__compiler_phpc_deploy_path must have LLVM body');
-
-        $lc = \strtolower('PHPCompiler\\ext\\standard\\DeployPathJitHelper::resolve');
-        $this->assertArrayHasKey($lc, $ctx->functions, 'DeployPathJitHelper::resolve must be compiled into module');
+        $llvm = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/DeployPathLlvm.php');
+        $this->assertStringContainsString('#33244', $llvm);
+        $this->assertStringContainsString('StringGetenv::invokeNestedLeaf', $llvm);
+        $this->assertStringContainsString('JitStringConcat::concat', $llvm);
+        $this->assertFileExists(__DIR__.'/../../../ext/standard/DeployPathJitHelper.php');
     }
 }

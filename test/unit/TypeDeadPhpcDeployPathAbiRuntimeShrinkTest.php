@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Drop leftover always-on __compiler_phpc_deploy_path ABI shell from Builtin\Type (#33225).
  *
- * NestedJIT/AOT bridge stays StringDeployPath / JitDeployPath / DeployPathJitHelper.
+ * Thin AOT body is DeployPathLlvm (#33244) — no NestedJIT of DeployPathJitHelper.
  * Runtime owner declares module-locally (getNamedFunction first, then addFunction if absent)
  * so leftover Type empty decls cannot mint phpc_deploy_path.1 (#31894 / #32122).
  */
@@ -40,13 +40,19 @@ final class TypeDeadPhpcDeployPathAbiRuntimeShrinkTest extends TestCase
     {
         $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringDeployPath.php');
         $this->assertStringContainsString('#33225', $owner);
+        $this->assertStringContainsString('#33244', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
-        $this->assertStringContainsString('addFunction', $owner);
-        $this->assertStringContainsString('JitNestedHelperCoerce::callHelper', $owner);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $owner);
+        $this->assertStringContainsString('DeployPathLlvm::implement', $owner);
+        $this->assertStringContainsString('scopeLoweringToFunction', $owner);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $owner);
+        $this->assertStringNotContainsString('JitNestedHelperCoerce::callHelper', $owner);
         $this->assertStringContainsString('__compiler_phpc_deploy_path', $owner);
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/DeployPathLlvm.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/DeployPathJitHelper.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitDeployPath.php');
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DeployPathLlvm.php');
+        $this->assertStringContainsString('#33244', $llvm);
+        $this->assertStringContainsString('StringGetenv::invokeNestedLeaf', $llvm);
         $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitDeployPath.php');
         $this->assertStringContainsString('#33225', $jit);
         $this->assertStringContainsString('StringDeployPath::ensureLinked', $jit);
