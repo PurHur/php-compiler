@@ -31,8 +31,8 @@ final class TypeDeadFdatasyncAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (assert_fail_string still Type always-on; #33234 trigger_error / #33237 assert_fail dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_assert_fail_string'", $type);
+        // Next leftover sentinel (assert_options still Type always-on; #33234 trigger_error / #33241 assert_fail_string dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_assert_options'", $type);
         $this->assertStringContainsString('StreamSync::ensureLinked', $type);
     }
 

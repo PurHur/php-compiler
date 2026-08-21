@@ -615,19 +615,13 @@ class Type extends Builtin {
         // trigger_error.1 (#31894 / #32122). User-script trigger_error()/user_error()
         // stay trigger_error_ / JitBuiltinWarning (php-src Zend/zend_execute_API.c,
         // main/php_errors.c, ext/standard/basic_functions.c).
-        // __compiler_assert_fail always-on shell removed (#33237): AssertFail owns the
-        // ABI (getNamedFunction first, then addFunction if absent; Type::initialize still
-        // AssertFail::ensureLinked on the full load path; JitAssert ensureLinked before
-        // lookup). Leftover Type empty decls vs Runtime ABI drift mint assert_fail.1
-        // (#31894 / #32122). User-script assert() stays JitAssert (php-src
-        // ext/standard/assert.c).
-        $strPtr = $this->context->getTypeFromString('__string__*');
-        $fntypeAssertFailStr = $this->context->context->functionType($void, false, $strPtr);
-        $fnAssertFailStr = $this->context->module->addFunction(
-            '__compiler_assert_fail_string',
-            $fntypeAssertFailStr
-        );
-        $this->context->registerFunction('__compiler_assert_fail_string', $fnAssertFailStr);
+        // __compiler_assert_fail / __compiler_assert_fail_string always-on shells
+        // removed (#33237 / #33241): AssertFail owns both ABIs (getNamedFunction
+        // first, then addFunction if absent; Type::initialize still
+        // AssertFail::ensureLinked on the full load path; JitAssert ensureLinked
+        // before lookup). Leftover Type empty decls vs Runtime ABI drift mint
+        // assert_fail.1 / assert_fail_string.1 (#31894 / #32122). User-script
+        // assert() stays JitAssert (php-src ext/standard/assert.c).
         $valPtr = $this->context->getTypeFromString('__value__*');
         $fntypeAssertOptions = $this->context->context->functionType(
             $void,

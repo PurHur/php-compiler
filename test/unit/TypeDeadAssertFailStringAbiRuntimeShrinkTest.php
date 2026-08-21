@@ -7,46 +7,46 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on __compiler_assert_fail ABI shell from Builtin\Type (#33237).
+ * Drop leftover always-on __compiler_assert_fail_string ABI shell from Builtin\Type (#33241).
  *
  * NestedJIT/AOT bridge stays AssertFail / JitAssert (php-src ext/standard/assert.c).
  * Runtime owner declares module-locally (getNamedFunction first, then addFunction if absent)
- * so leftover Type empty decls cannot mint assert_fail.1 (#31894 / #32122).
+ * so leftover Type empty decls cannot mint assert_fail_string.1 (#31894 / #32122).
  */
-final class TypeDeadAssertFailAbiRuntimeShrinkTest extends TestCase
+final class TypeDeadAssertFailStringAbiRuntimeShrinkTest extends TestCase
 {
-    public function testTypeBuiltinDropsLeftoverAlwaysOnAssertFailAbi(): void
+    public function testTypeBuiltinDropsLeftoverAlwaysOnAssertFailStringAbi(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('#33237', $type);
+        $this->assertStringContainsString('#33241', $type);
         $this->assertDoesNotMatchRegularExpression(
-            '/addFunction\(\s*[\'"]__compiler_assert_fail[\'"]/',
+            '/addFunction\(\s*[\'"]__compiler_assert_fail_string[\'"]/',
             $type,
-            'Builtin\\Type must not always-declare __compiler_assert_fail (#33237)'
+            'Builtin\\Type must not always-declare __compiler_assert_fail_string (#33241)'
         );
         $this->assertStringNotContainsString(
-            "registerFunction('__compiler_assert_fail'",
+            "registerFunction('__compiler_assert_fail_string'",
             $type,
-            'Builtin\\Type must not always-register __compiler_assert_fail (#33237)'
+            'Builtin\\Type must not always-register __compiler_assert_fail_string (#33241)'
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel after #33241 assert_fail_string drop.
+        // Next leftover sentinel (assert_options still Type always-on; #33241 string dropped).
         $this->assertStringContainsString("registerFunction('__compiler_assert_options'", $type);
         $this->assertStringContainsString('AssertFail::ensureLinked', $type);
     }
 
-    public function testRuntimeOwnerDeclaresAssertFailAbiModuleLocally(): void
+    public function testRuntimeOwnerDeclaresAssertFailStringAbiModuleLocally(): void
     {
         $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/AssertFail.php');
-        $this->assertStringContainsString('#33237', $owner);
+        $this->assertStringContainsString('#33241', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
         $this->assertStringContainsString('addFunction', $owner);
-        $this->assertStringContainsString('declareAssertFailAbi', $owner);
-        $this->assertStringContainsString('__compiler_assert_fail', $owner);
+        $this->assertStringContainsString('declareAssertFailStringAbi', $owner);
+        $this->assertStringContainsString('__compiler_assert_fail_string', $owner);
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitAssert.php');
         $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitAssert.php');
-        $this->assertStringContainsString('#33237', $jit);
+        $this->assertStringContainsString('#33241', $jit);
         $this->assertStringContainsString('AssertFail::ensureLinked', $jit);
     }
 
@@ -56,10 +56,10 @@ final class TypeDeadAssertFailAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('AssertFail::ensureLinked($this->context)', $type);
     }
 
-    public function testNoNewRuntimeCForAssertFailAbi(): void
+    public function testNoNewRuntimeCForAssertFailStringAbi(): void
     {
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/assert_fail.c');
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/assert_fail.c');
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/compiler_assert_fail.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/assert_fail_string.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/assert_fail_string.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/compiler_assert_fail_string.c');
     }
 }
