@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: SplFileObject::seek (SeekableIterator line) via live stream (#33364).
+ * AOT: SplFileObject::seek (SeekableIterator line) via live stream (#33364 / #33453).
  *
  * @see php-src ext/spl/spl_directory.c zim_SplFileObject_seek
  *
@@ -30,6 +30,7 @@ final class SplFileObjectSeek33364AotTest extends TestCase
         $this->assertStringContainsString('seek1_cur="b\\n"', $zend);
         $this->assertStringContainsString('seek(4) key=4', $zend);
         $this->assertStringContainsString('seek(10) key=3', $zend);
+        $this->assertStringContainsString('seek10_cur=false', $zend);
 
         if (!LlvmToolchain::hasLibrary($root)) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
@@ -85,6 +86,7 @@ final class SplFileObjectSeek33364AotTest extends TestCase
         $this->assertFileDoesNotExist($root.'/runtime/spl_fileobject_seek.c');
         $helper = (string) file_get_contents($root.'/lib/VM/SplFileObjectJitHelper.php');
         $this->assertStringContainsString('compileSeek', $helper);
+        $this->assertStringContainsString('#33453', $helper);
         $this->assertStringContainsString('#33364', $helper);
         $call = (string) file_get_contents($root.'/lib/JIT/Call/SplFileObjectMethod.php');
         $this->assertStringContainsString("'seek'", $call);
