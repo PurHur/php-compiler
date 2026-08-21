@@ -22,13 +22,15 @@ use PHPLLVM\Value;
  * (#33308 — concat-loop NestedJIT SIGSEGV'd in __ref__delref).
  * Path accessors read `__pathname` (#33305); also init SplFileInfo `__dir_path`/`__filename`
  * for inherited isFile/getSize/… (#33313).
- * Live stream handle `__spl_fd` for fgets/fwrite (#33318) via StreamIo/StreamRead ABIs.
+ * Live stream handle `__spl_fd` for fgets/fwrite/fread/fgetc (#33318 / #33332) via
+ * StreamIo/StreamRead ABIs.
  * Iterator I/O (`current`/`key`/`valid`/`next`/`rewind`) + EOF latch (#33319).
  * getCurrentLine is the php-src fgets alias (#33321).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
- * zim_SplFileObject_getCurrentLine / zim_SplFileInfo_openFile
+ * zim_SplFileObject_fread / zim_SplFileObject_fgetc / zim_SplFileObject_getCurrentLine /
+ * zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -156,6 +158,110 @@ final class SplFileObjectJitHelper
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
 
         return self::emitReadLineToValueBox($context, $receiver, 1);
+    }
+
+    /**
+     * SplFileObject::fread — read up to $length bytes from live handle (#33332).
+     * php-src: zim_SplFileObject_fread
+     */
+    public static function compileFread(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $lengthArg
+    ): Value {
+        self::ensureStreamAbis($context);
+        // NestedJIT StreamIo fread cannot see libc FILE* handles (#33332).
+        \PHPCompiler\ext\standard\JitStreamIoKernel::implementFreadForce($context);
+        $obj = self::loadObject($context, $receiver);
+        $handle = self::loadFd($context, $receiver);
+        $length = self::loadLong($context, $lengthArg);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $strPtr = $context->getTypeFromString('__string__*');
+        // Byte read invalidates cached current_line (php-src frees it).
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $data = $context->builder->call(
+            $context->lookupFunction('__compiler_fread'),
+            $handle,
+            $length
+        );
+        $slot = JitValueBox::alloc($context);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $data, $strPtr->constNull());
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $failBb = $fn->appendBasicBlock('splfo_fread_fail');
+        $okBb = $fn->appendBasicBlock('splfo_fread_ok');
+        $joinBb = $fn->appendBasicBlock('splfo_fread_join');
+        $context->builder->branchIf($isNull, $failBb, $okBb);
+
+        $context->builder->positionAtEnd($failBb);
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(1, false));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            JitValueBox::pointer($context, $slot),
+            $i32->constInt(0, false)
+        );
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($okBb);
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $data
+        );
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($joinBb);
+
+        return $slot;
+    }
+
+    /**
+     * SplFileObject::fgetc — read one byte from live handle (#33332).
+     * php-src: zim_SplFileObject_fgetc
+     */
+    public static function compileFgetc(Context $context, JITVariable $receiver): Value
+    {
+        self::ensureStreamAbis($context);
+        $obj = self::loadObject($context, $receiver);
+        $handle = self::loadFd($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $byte = $context->builder->call(
+            $context->lookupFunction('__compiler_fgetc'),
+            $handle
+        );
+        $slot = JitValueBox::alloc($context);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $byte, $strPtr->constNull());
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $failBb = $fn->appendBasicBlock('splfo_fgetc_fail');
+        $okBb = $fn->appendBasicBlock('splfo_fgetc_ok');
+        $joinBb = $fn->appendBasicBlock('splfo_fgetc_join');
+        $context->builder->branchIf($isNull, $failBb, $okBb);
+
+        $context->builder->positionAtEnd($failBb);
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(1, false));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            JitValueBox::pointer($context, $slot),
+            $i32->constInt(0, false)
+        );
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($okBb);
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $byte
+        );
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($joinBb);
+
+        return $slot;
     }
 
     /**

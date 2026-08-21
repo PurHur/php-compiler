@@ -1003,6 +1003,44 @@ final class JitStreamIoKernel
     }
 
     /**
+     * Idempotent libc fread for thin AOT (#33332). NestedJIT StreamIoJitHelper→VmFs
+     * cannot see JitStreamIoKernel FILE* handles — force after NestedJIT like fgets/fgetc.
+     */
+    public static function implementFreadForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_fread');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('fread_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_fread', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_fread');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_fread');
+        }
+        self::emitFread($context, $fn);
+        $context->registerFunction('__compiler_fread', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /**
      * Idempotent libc fgets for thin AOT (#27663). Do not recreate after NestedJIT.
      */
     public static function implementFgetsForce(Context $context): void
