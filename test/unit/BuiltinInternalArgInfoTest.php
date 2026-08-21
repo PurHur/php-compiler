@@ -60,6 +60,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['stream'], BuiltinParamNames::forFunction('stream_isatty'));
     }
 
+    /** basic_functions.stub.php / dl.c — dl(): bool; InternalArgInfo still int (#28287). */
+    public function testDlReflectionReturnBool(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('dl'));
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('dl'));
+        $this->assertSame(['extension_filename'], BuiltinParamNames::paramNamesForInternalFunction('dl'));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('dl', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('extension_filename', $info['name']);
+        $this->assertSame('string', $info['type']);
+    }
+
     /** ext/pcntl/pcntl.stub.php — pcntl_async_signals(?bool $enable = null): bool (#28843). */
     public function testPcntlAsyncSignalsReflectionReturnBool(): void
     {

@@ -502,6 +502,8 @@ final class BuiltinInternalArgInfo
             'get_resource_id' => 'int',
             // ext/standard/basic_functions.stub.php — absent from InternalArgInfo; Zend : bool (#27774)
             'stream_isatty' => 'bool',
+            // ext/standard/basic_functions.stub.php / dl.c — InternalArgInfo return int; Zend : bool (#28287)
+            'dl' => 'bool',
             // ext/pcntl/pcntl.stub.php — absent from InternalArgInfo; Zend : bool (#28843)
             'pcntl_async_signals' => 'bool',
             // ext/mysqli/mysqli.stub.php — absent from InternalArgInfo; Zend : mysqli_result|bool (#27712)
