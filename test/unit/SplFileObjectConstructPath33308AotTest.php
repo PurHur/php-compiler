@@ -95,7 +95,10 @@ final class SplFileObjectConstructPath33308AotTest extends TestCase
         $root = dirname(__DIR__, 2);
         $this->assertFileDoesNotExist($root.'/runtime/spl_fileobject_path_init.c');
         $helper = (string) file_get_contents($root.'/lib/VM/SplFileObjectJitHelper.php');
-        $this->assertStringContainsString('initSplFileInfoPathProps', $helper);
+        $this->assertStringContainsString('snapshotPath', $helper);
         $this->assertStringContainsString('#33308', $helper);
+        $snap = (string) file_get_contents($root.'/ext/spl/SplFileObjectSnapshotJitHelper.php');
+        $this->assertStringContainsString('explode', $snap);
+        $this->assertStringContainsString('#33308', $snap);
     }
 }
