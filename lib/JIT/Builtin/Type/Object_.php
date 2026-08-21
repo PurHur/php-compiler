@@ -4166,6 +4166,7 @@ class Object_ extends Type {
             foreach ([
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
                 'fgets', 'fwrite', 'eof', 'getcurrentline', 'fread', 'fgetc',
+                'ftell', 'flock',
                 'getfilename', 'getpathname', 'getpath', '__tostring',
                 'getsize', 'getrealpath',
                 'getmtime', 'getatime', 'getctime', 'getperms', 'getowner', 'getgroup', 'getinode',

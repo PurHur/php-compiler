@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\JitFlock;
 use PHPCompiler\ext\standard\JitFread;
+use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitPath;
 use PHPCompiler\JIT\Builtin\SplFileObjectSnapshotRuntime;
 use PHPCompiler\JIT\Builtin\StreamIo;
@@ -28,10 +30,12 @@ use PHPLLVM\Value;
  * Iterator I/O (`current`/`key`/`valid`/`next`/`rewind`) + EOF latch (#33319).
  * getCurrentLine is the php-src fgets alias (#33321).
  * fread/fgetc on `__spl_fd` (#33332).
+ * ftell/flock on `__spl_fd` (#33336) via JitFtell / JitFlock.
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
+ * zim_SplFileObject_ftell / zim_SplFileObject_flock /
  * zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
@@ -240,6 +244,47 @@ final class SplFileObjectJitHelper
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
+
+        return $slot;
+    }
+
+    /**
+     * SplFileObject::ftell — php_stream_tell on live handle (#33336).
+     * php-src: zim_SplFileObject_ftell
+     */
+    public static function compileFtell(Context $context, JITVariable $receiver): Value
+    {
+        self::ensureStreamAbis($context);
+        $handle = self::loadFd($context, $receiver);
+
+        return JitFtell::invoke($context, $handle);
+    }
+
+    /**
+     * SplFileObject::flock — php_stream_lock on live handle (#33336).
+     * php-src: zim_SplFileObject_flock
+     */
+    public static function compileFlock(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $operationArg
+    ): Value {
+        self::ensureStreamAbis($context);
+        $handle = self::loadFd($context, $receiver);
+        if (JitFlock::isCompileTimeNullOperation($operationArg)) {
+            $ok = JitFlock::emitCompileTimeNullOperation($context, $operationArg);
+        } else {
+            $operation = JitFlock::lowerOperation($context, $operationArg);
+            $ok = JitFlock::invoke($context, $handle, $operation);
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $asI32 = $context->builder->zExt($ok, $i32);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            JitValueBox::pointer($context, $slot),
+            $asI32
+        );
 
         return $slot;
     }
