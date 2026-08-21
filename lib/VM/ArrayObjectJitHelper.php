@@ -792,8 +792,8 @@ final class ArrayObjectJitHelper
      *
      * Restores bag storage into `__spl_ht` and `__flags`. Does not overwrite
      * slot 0 with firstIntProp (that corrupted the HT pointer — SIGSEGV on json_encode).
-     * String keys via UnserializeSplArrayFillNestedJitHelper (#33636); packed int keys
-     * via UnserializeSplArrayFillIntKeyNestedJitHelper (#33654).
+     * String keys via UnserializeSplArrayFillNestedJitHelper (#33636 / #33663 string values);
+     * packed int keys via UnserializeSplArrayFillIntKeyNestedJitHelper (#33654).
      *
      * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925.
      * NestedJIT helpers stay tiny and split across TUs (large bodies blank under NestedJIT).

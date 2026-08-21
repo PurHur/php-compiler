@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * NestedJIT: fill `__spl_ht` from bag storage at `i:1;a:` offset (#33636).
+ * NestedJIT: fill `__spl_ht` from bag storage at `i:1;a:` offset (#33636 / #33663).
  *
- * Own TU / single method — string-key + int-value pairs only (issue repro shape).
+ * Own TU / single method — string-key bags; values `i:` or `s:` (php-src spl_array.c).
  * `$pos` must point at the `i` of `i:1;a:`.
+ * Packed int-key bags: {@see UnserializeSplArrayFillIntKeyNestedJitHelper}.
  */
 final class UnserializeSplArrayFillNestedJitHelper
 {
@@ -60,30 +61,56 @@ final class UnserializeSplArrayFillNestedJitHelper
                 return 0;
             }
             $pos = $pos + 2;
-            if ('i' !== $payload[$pos] || $pos + 1 >= $len || ':' !== $payload[$pos + 1]) {
+            if ('i' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+                $num = 0;
+                $vneg = false;
+                if ($pos < $len && '-' === $payload[$pos]) {
+                    $vneg = true;
+                    $pos = $pos + 1;
+                }
+                $sawN = false;
+                while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
+                    $sawN = true;
+                    $num = $num * 10 + (\ord($payload[$pos]) - 48);
+                    $pos = $pos + 1;
+                }
+                if (!$sawN || $pos >= $len || ';' !== $payload[$pos]) {
+                    return 0;
+                }
+                $pos = $pos + 1;
+                if ($vneg) {
+                    $num = 0 - $num;
+                }
+                phpc_native_ht_set_string_key_long($htPtr, $key, $num);
+            } elseif ('s' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+                $slen = 0;
+                $sawS = false;
+                while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
+                    $sawS = true;
+                    $slen = $slen * 10 + (\ord($payload[$pos]) - 48);
+                    $pos = $pos + 1;
+                }
+                if (!$sawS || $pos + 1 >= $len || ':' !== $payload[$pos] || '"' !== $payload[$pos + 1]) {
+                    return 0;
+                }
+                $pos = $pos + 2;
+                $str = '';
+                $si = 0;
+                while ($si < $slen && $pos < $len) {
+                    $str .= $payload[$pos];
+                    $pos = $pos + 1;
+                    $si = $si + 1;
+                }
+                if ($pos + 1 >= $len || '"' !== $payload[$pos] || ';' !== $payload[$pos + 1]) {
+                    return 0;
+                }
+                $pos = $pos + 2;
+                phpc_native_ht_set_string_key($htPtr, $key, $str);
+            } else {
                 return 0;
             }
-            $pos = $pos + 2;
-            $num = 0;
-            $vneg = false;
-            if ($pos < $len && '-' === $payload[$pos]) {
-                $vneg = true;
-                $pos = $pos + 1;
-            }
-            $sawN = false;
-            while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
-                $sawN = true;
-                $num = $num * 10 + (\ord($payload[$pos]) - 48);
-                $pos = $pos + 1;
-            }
-            if (!$sawN || $pos >= $len || ';' !== $payload[$pos]) {
-                return 0;
-            }
-            $pos = $pos + 1;
-            if ($vneg) {
-                $num = 0 - $num;
-            }
-            phpc_native_ht_set_string_key_long($htPtr, $key, $num);
             ++$n;
         }
 
