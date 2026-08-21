@@ -1792,6 +1792,8 @@ class Context {
         // DateTime / DateInterval / DatePeriod ctors — thin user-script AOT (#26772).
         $this->functionProxies['datetime::__construct'] = new Call\DateTimeConstruct();
         $this->functionProxies['datetimeimmutable::__construct'] = new Call\DateTimeImmutableConstruct();
+        // DOMDocument::__construct — seed nodeType for thin AOT (#33607).
+        $this->functionProxies['domdocument::__construct'] = new Call\DomDocumentConstruct();
         $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
         $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();
         $this->functionProxies['dateinterval::format'] = new Call\DateIntervalFormat();

@@ -538,6 +538,7 @@ final class JitDomAttributeNodeNS
         self::storeStringProperty($context, $obj, self::PROP_LOCAL_NAME, $localName, $className);
         self::storeStringProperty($context, $obj, self::PROP_PREFIX, $prefix, $className);
         self::storeNullProperty($context, $obj, self::PROP_OWNER_ELEMENT, $className);
+        JitDomCreateElement::storeNodeType($context, $obj, $className, DomConstants::XML_ATTRIBUTE_NODE);
 
         return $obj;
     }
@@ -605,6 +606,7 @@ final class JitDomAttributeNodeNS
         self::storeStringPropertyValue($context, $obj, self::PROP_LOCAL_NAME, $qualifiedName);
         self::storeStringProperty($context, $obj, self::PROP_PREFIX, '');
         self::storeNullProperty($context, $obj, self::PROP_OWNER_ELEMENT);
+        JitDomCreateElement::storeNodeType($context, $obj, self::CLASS_ATTR, DomConstants::XML_ATTRIBUTE_NODE);
 
         return $obj;
     }
@@ -639,6 +641,9 @@ final class JitDomAttributeNodeNS
         }
         if (!$objectType->hasProperty($classId, self::PROP_OWNER_ELEMENT)) {
             $objectType->defineProperty($classId, self::PROP_OWNER_ELEMENT, JITVariable::TYPE_VALUE);
+        }
+        if (!$objectType->hasProperty($classId, VmDom::PROP_NODE_TYPE)) {
+            $objectType->defineProperty($classId, VmDom::PROP_NODE_TYPE, JITVariable::TYPE_NATIVE_LONG);
         }
     }
 

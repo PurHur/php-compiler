@@ -3759,6 +3759,8 @@ class Object_ extends Type {
             $this->defineProperty($id, 'tagName', Variable::TYPE_STRING);
             $this->defineProperty($id, 'localName', Variable::TYPE_STRING);
             $this->defineProperty($id, 'attributes', Variable::TYPE_VALUE);
+            // Thin AOT nodeType seed (#33607) — must be in allocate() layout.
+            $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
         }
         if ('domdocument' === $lcname) {
             // Must be in the allocate() prop layout — late defineProperty from
@@ -3769,7 +3771,19 @@ class Object_ extends Type {
             $this->defineProperty($id, 'firstChild', Variable::TYPE_VALUE);
             $this->defineProperty($id, 'lastChild', Variable::TYPE_VALUE);
             $this->defineProperty($id, 'childNodes', Variable::TYPE_VALUE);
+            // Thin AOT nodeType seed (#33607).
+            $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
+        }
+        if ('domattr' === $lcname) {
+            foreach ([
+                'nodeName', 'name', 'value', 'nodeValue',
+                'namespaceURI', 'localName', 'prefix',
+            ] as $prop) {
+                $this->defineProperty($id, $prop, Variable::TYPE_STRING);
+            }
+            $this->defineProperty($id, 'ownerElement', Variable::TYPE_VALUE);
+            $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
         }
         if ('dom\\attr' === $lcname) {
             // Living Dom\Attr for thin AOT method_exists / property layout (#27108).
@@ -3780,6 +3794,7 @@ class Object_ extends Type {
                 $this->defineProperty($id, $prop, Variable::TYPE_STRING);
             }
             $this->defineProperty($id, 'ownerElement', Variable::TYPE_VALUE);
+            $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
             $this->defineMethodVisibility($id, 'rename', \PHPCfg\Func::FLAG_PUBLIC);
         }
         if ('dom\\xmldocument' === $lcname) {

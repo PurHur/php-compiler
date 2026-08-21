@@ -77,6 +77,8 @@ final class JitDomCreateTextNode
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
         self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
         self::storeStringLiteral($context, $obj, self::PROP_WHOLE_TEXT, $data);
+        // Stand-in is DOMElement class but nodeType must be TEXT (#33607).
+        JitDomCreateElement::storeNodeType($context, $obj, self::CLASS_STANDIN, DomConstants::XML_TEXT_NODE);
 
         return $obj;
     }
@@ -126,6 +128,7 @@ final class JitDomCreateTextNode
         self::storeStringValue($context, $obj, self::PROP_TEXT_CONTENT, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_DATA, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_WHOLE_TEXT, $dataStr);
+        JitDomCreateElement::storeNodeType($context, $obj, self::CLASS_STANDIN, DomConstants::XML_TEXT_NODE);
 
         return $obj;
     }
