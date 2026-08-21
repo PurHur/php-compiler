@@ -351,7 +351,16 @@ final class DomNodeLiveMutationRuntime
                     ++$prependIdx;
                 }
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
-                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
+                // insertBefore LiveSlots already rebuilds INNER_XML; the old compile-time
+                // tag concat path duplicated the prepended markup in saveXML (#33637).
+                // Peer append (#31684 / #33404): rebuild from live children + mark
+                // loadXML fold stale.
+                JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren(
+                    $context,
+                    $parentObj
+                );
+                JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
+                JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
 
                 return self::nullValuePtr($context);
             }
