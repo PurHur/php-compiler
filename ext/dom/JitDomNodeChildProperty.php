@@ -9,19 +9,30 @@ use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMNode::$firstChild / $lastChild after live mutation (#18951, #28671). */
+/**
+ * LLVM lowering for DOMNode child/sibling edge properties after live mutation
+ * (#18951, #28671, #33273).
+ *
+ * firstChild/lastChild stamps are absolute; nextSibling/previousSibling advance
+ * the receiver's compile-time child index so replaceChild InnerXml splices the
+ * correct sibling (middle via firstChild->nextSibling was replacing index 0).
+ */
 final class JitDomNodeChildProperty
 {
     private const CLASS_NODE = 'DOMNode';
 
-    /** Last firstChild/lastChild compile-time tag — cloneNode receivers often lose Variable metadata. */
+    /** Last firstChild/lastChild/nextSibling/previousSibling compile-time tag. */
     public static ?string $lastFetchedTagName = null;
 
     public static ?int $lastFetchedChildIndex = null;
 
     public static function isDomNodeChildProperty(string $classLc, string $propLc): bool
     {
-        if (!\in_array(strtolower($propLc), ['firstchild', 'lastchild'], true)) {
+        if (!\in_array(
+            strtolower($propLc),
+            ['firstchild', 'lastchild', 'nextsibling', 'previoussibling'],
+            true
+        )) {
             return false;
         }
         $classLc = strtolower($classLc);
@@ -34,8 +45,13 @@ final class JitDomNodeChildProperty
             && \in_array($classLc, ['object', 'stdclass', ''], true);
     }
 
-    public static function fetch(Object_ $objectType, Value $obj, string $propName, string $classLc = 'domnode'): JITVariable
-    {
+    public static function fetch(
+        Object_ $objectType,
+        Value $obj,
+        string $propName,
+        string $classLc = 'domnode',
+        ?JITVariable $receiverVar = null
+    ): JITVariable {
         $slotClass = self::childEdgeClass($classLc);
         $result = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
@@ -44,8 +60,13 @@ final class JitDomNodeChildProperty
             $propName,
             $objectType->lookup($slotClass)
         );
-        self::annotateCompileTimeChild($result, $propName);
-        JitDomGetNodePath::annotateChildFetch($result, $propName);
+        self::annotateCompileTimeChild($result, $propName, $receiverVar);
+        $propLc = strtolower($propName);
+        // GetNodePath's child-fetch annotator only knows first/last (defaults other
+        // props to index 0) — do not let it wipe nextSibling/previousSibling stamps (#33273).
+        if (!\in_array($propLc, ['nextsibling', 'previoussibling'], true)) {
+            JitDomGetNodePath::annotateChildFetch($result, $propName);
+        }
 
         return $result;
     }
@@ -67,10 +88,13 @@ final class JitDomNodeChildProperty
 
     /**
      * Seed child index/tag from loadXML literal so replaceChild can rebuild
-     * PROP_USER_SCRIPT_INNER_XML without collapsing siblings (#28671).
+     * PROP_USER_SCRIPT_INNER_XML without collapsing siblings (#28671 / #33273).
      */
-    private static function annotateCompileTimeChild(JITVariable $result, string $propName): void
-    {
+    private static function annotateCompileTimeChild(
+        JITVariable $result,
+        string $propName,
+        ?JITVariable $receiverVar = null
+    ): void {
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
@@ -81,23 +105,40 @@ final class JitDomNodeChildProperty
         }
         $propLc = strtolower($propName);
         if ('firstchild' === $propLc) {
-            $result->compileTimeDomChildIndex = 0;
-            self::$lastFetchedChildIndex = 0;
-            if ('element' === $nodes[0]['kind']) {
-                $result->compileTimeDomTagName = $nodes[0]['data'];
-                self::$lastFetchedTagName = $nodes[0]['data'];
-            }
+            self::stampChildIndex($result, $nodes, 0);
 
             return;
         }
         if ('lastchild' === $propLc) {
-            $last = \count($nodes) - 1;
-            $result->compileTimeDomChildIndex = $last;
-            self::$lastFetchedChildIndex = $last;
-            if ('element' === $nodes[$last]['kind']) {
-                $result->compileTimeDomTagName = $nodes[$last]['data'];
-                self::$lastFetchedTagName = $nodes[$last]['data'];
+            self::stampChildIndex($result, $nodes, \count($nodes) - 1);
+
+            return;
+        }
+        if ('nextsibling' === $propLc || 'previoussibling' === $propLc) {
+            $base = $receiverVar?->compileTimeDomChildIndex
+                ?? self::$lastFetchedChildIndex
+                ?? null;
+            if (null === $base) {
+                return;
             }
+            $index = 'nextsibling' === $propLc ? $base + 1 : $base - 1;
+            if ($index < 0 || $index >= \count($nodes)) {
+                return;
+            }
+            self::stampChildIndex($result, $nodes, $index);
+        }
+    }
+
+    /**
+     * @param list<array{kind: string, data: string}> $nodes
+     */
+    private static function stampChildIndex(JITVariable $result, array $nodes, int $index): void
+    {
+        $result->compileTimeDomChildIndex = $index;
+        self::$lastFetchedChildIndex = $index;
+        if ('element' === ($nodes[$index]['kind'] ?? '')) {
+            $result->compileTimeDomTagName = $nodes[$index]['data'];
+            self::$lastFetchedTagName = $nodes[$index]['data'];
         }
     }
 }
