@@ -382,12 +382,11 @@ class Type extends Builtin {
         // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // stream_copy_to_stream.1 (#31894 / #32122). User-script stream_copy_to_stream() stays
         // JitStreamCopyToStream / StreamReadJitHelper (libc force peer #33133).
-        $fntypeGetResourceType = $this->context->context->functionType($strPtr, false, $i64);
-        $fnGetResourceType = $this->context->module->addFunction(
-            '__compiler_get_resource_type',
-            $fntypeGetResourceType
-        );
-        $this->context->registerFunction('__compiler_get_resource_type', $fnGetResourceType);
+        // __compiler_get_resource_type always-on shell removed (#33183): StreamResource /
+        // JitStreamResourceKernel owns the ABI (getNamedFunction first, then
+        // implementIfMissing; Type::initialize still StreamResource::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint get_resource_type.1
+        // (#31894 / #32122). User-script get_resource_type() stays JitGetResourceType.
         // __compiler_mkdir always-on shell removed (#32438): user-script mkdir() stays
         // MkdirJitHelper / StringMkdir / VmFsDirNative. NestedJIT/AOT bridge is
         // FsDirRuntime (getNamedFunction first). Leftover Type addFunction vs

@@ -15,11 +15,24 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for get_resource_type() via __compiler_get_resource_type (#3142, #5845, #8743). */
+/**
+ * LLVM lowering for get_resource_type() via __compiler_get_resource_type (#3142, #5845, #8743; ensureLinked #33183).
+ *
+ * ABI owned by {@see StreamResource} / {@see JitStreamResourceKernel} after Type always-on
+ * drop (#33183) — must ensureLinked before lookup (peer {@see JitGetResources} #33130).
+ */
 final class JitGetResourceType
 {
     public static function invoke(Context $context, JITVariable $arg): Value
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StreamResource::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'get_resource_type_restore_cont');
+        }
+
         JitResourceArg::rejectEnumCaseOperand($context, $arg, 'get_resource_type');
         if (JITVariable::TYPE_NULL === $arg->type) {
             JitResourceArg::emitResourceTypeErrorAndAbort($context, 'get_resource_type', 0, 'resource', 'null');
