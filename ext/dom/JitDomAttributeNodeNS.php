@@ -819,25 +819,31 @@ final class JitDomAttributeNodeNS
     }
 
     /**
-     * DOMElement::toggleAttribute() — user-script AOT attribute cache (#19507).
+     * DOMElement::toggleAttribute() — user-script AOT attribute cache (#19507 / #33230).
      * Returns int1: attribute present after call (php-src ext/dom/element.c dom_element_toggle_attribute).
+     *
+     * Pins/unpins {@code element.attributes} like setAttribute/removeAttribute (#33128 / #33143).
      *
      * @param 'omit'|'force_true'|'force_false' $mode
      */
-    public static function emitToggleAttributeInt1(Context $context, string $nameLit, string $mode): Value
-    {
+    public static function emitToggleAttributeInt1(
+        Context $context,
+        Value $element,
+        string $nameLit,
+        string $mode
+    ): Value {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_toggle_attr_emit');
         $i1 = $context->getTypeFromString('int1');
         if ('xmlns' === $nameLit || str_starts_with($nameLit, 'xmlns:')) {
             return $i1->constInt(0, false);
         }
         if ('force_true' === $mode) {
-            self::setAttributeLiteralReuseOrCreate($context, $nameLit, '');
+            self::toggleAddLiteralAttr($context, $element, $nameLit);
 
             return $i1->constInt(1, false);
         }
         if ('force_false' === $mode) {
-            DomUserScriptAttributeCacheLlvm::clearLiteral($context, '', $nameLit);
+            self::toggleRemoveLiteralAttr($context, $element, $nameLit);
 
             return $i1->constInt(0, false);
         }
@@ -856,18 +862,45 @@ final class JitDomAttributeNodeNS
         $context->builder->branchIf($isPresent, $removeBlock, $addBlock);
 
         $context->builder->positionAtEnd($removeBlock);
-        DomUserScriptAttributeCacheLlvm::clearLiteral($context, '', $nameLit);
+        self::toggleRemoveLiteralAttr($context, $element, $nameLit);
         $context->builder->store($i1->constInt(0, false), $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($addBlock);
-        self::setAttributeLiteralReuseOrCreate($context, $nameLit, '');
+        self::toggleAddLiteralAttr($context, $element, $nameLit);
         $context->builder->store($i1->constInt(1, false), $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /** setAttribute('') + live NamedNodeMap pin for toggle add (#33230). */
+    private static function toggleAddLiteralAttr(Context $context, Value $element, string $nameLit): void
+    {
+        $attr = self::setAttributeLiteralReuseOrCreate($context, $nameLit, '');
+        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+        if ('id' === $nameLit) {
+            DomUserScriptElementCacheLlvm::rebindId($context, '');
+            JitDomSetIdAttribute::rememberSetAttributeIdValue('');
+        }
+    }
+
+    /** removeAttribute semantics + live NamedNodeMap unpin for toggle remove (#33230 / #33143). */
+    private static function toggleRemoveLiteralAttr(Context $context, Value $element, string $nameLit): void
+    {
+        if ('id' === $nameLit) {
+            DomUserScriptElementCacheLlvm::clearId($context);
+            $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+            if (null !== $parsed) {
+                $parsed['id'] = '';
+                JitDomLoadHTMLUserScript::rememberCompileTimeParsed($parsed);
+            }
+        }
+        $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit);
+        JitDomNamedNodeMap::removeAttrPin($context, $element, $attr);
+        DomUserScriptAttributeCacheLlvm::clearLiteral($context, '', $nameLit);
     }
 
     private static function compileTimeNullableStringArg(JITVariable $arg): ?string

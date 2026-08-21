@@ -762,7 +762,15 @@ final class DomLivingApiRuntime
                 }
             }
 
-            return \PHPCompiler\ext\dom\JitDomAttributeNodeNS::emitToggleAttributeInt1($context, $nameLit, $mode);
+            // Pass receiver so Attr cache + NamedNodeMap pins stay live (#33230 / peer #33143).
+            $element = self::loadObject($context, $receiver);
+
+            return \PHPCompiler\ext\dom\JitDomAttributeNodeNS::emitToggleAttributeInt1(
+                $context,
+                $element,
+                $nameLit,
+                $mode
+            );
         }
 
         $nameLlvm = JitStringArg::lower($context, $name, 'DOMElement::toggleAttribute() name');
