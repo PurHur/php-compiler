@@ -274,9 +274,12 @@ class Type extends Builtin {
         // Leftover Type empty decls vs Runtime ABI drift mint stream_set_write_buffer.1
         // (#31894 / #32122). User-script stream_set_write_buffer() stays JitStreamSetWriteBuffer /
         // StreamBufferJitHelper.
-        $fntypeStreamSetReadBuffer = $this->context->context->functionType($i64, false, $i64, $i64);
-        $fnStreamSetReadBuffer = $this->context->module->addFunction('__compiler_stream_set_read_buffer', $fntypeStreamSetReadBuffer);
-        $this->context->registerFunction('__compiler_stream_set_read_buffer', $fnStreamSetReadBuffer);
+        // __compiler_stream_set_read_buffer always-on shell removed (#33142): StreamBuffer /
+        // JitStreamBufferKernel owns the ABI (getNamedFunction first, then addFunction if
+        // absent via implementIfMissing; Type::initialize still StreamBuffer::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint stream_set_read_buffer.1
+        // (#31894 / #32122). User-script stream_set_read_buffer() stays JitStreamSetReadBuffer /
+        // StreamBufferJitHelper.
         $fntypeStreamSupports = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnStreamSupports = $this->context->module->addFunction('__compiler_stream_supports', $fntypeStreamSupports);
         $this->context->registerFunction('__compiler_stream_supports', $fnStreamSupports);

@@ -7,13 +7,14 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM bodies for stream buffer controls (#5343 phase 4, #14462, #33127, #33134, #33139).
+ * JIT LLVM bodies for stream buffer controls (#5343 phase 4, #14462, #33127, #33134, #33139, #33142).
  *
  * Owns `__compiler_stream_set_chunk_size` / `__compiler_stream_set_timeout` /
- * `__compiler_stream_set_write_buffer` (and peer buffer ABIs) module-locally via
- * {@see StreamBufferRuntime} / {@see \PHPCompiler\ext\standard\JitStreamBufferKernel}
- * (getNamedFunction first). Do not re-add empty always-on shells in {@see Type} — leftover
- * decls mint stream_set_write_buffer.1 (#31894 / #32122).
+ * `__compiler_stream_set_write_buffer` / `__compiler_stream_set_read_buffer` (and peer
+ * buffer ABIs) module-locally via {@see StreamBufferRuntime} /
+ * {@see \PHPCompiler\ext\standard\JitStreamBufferKernel} (getNamedFunction first). Do not
+ * re-add empty always-on shells in {@see Type} — leftover decls mint
+ * stream_set_read_buffer.1 (#31894 / #32122).
  */
 final class StreamBuffer
 {
