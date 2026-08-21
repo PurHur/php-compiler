@@ -23,6 +23,8 @@ use PHPLLVM\Value;
  * and item(2+) aborted (#32784).
  * DocumentFragment stand-ins expand in place via
  * {@see JitDomAppendChildLiveSlots::expandFragmentChildrenReplace} (#33322).
+ * Cross-parent reparent must unlink the old parent first (php-src
+ * dom_node_replace_child) — peer appendChild #33404 / #33450.
  *
  * Reference: php-src ext/dom/node.c dom_node_replace_child.
  */
@@ -82,6 +84,9 @@ final class JitDomReplaceChildLiveSlots
         $objPtrTy = $context->getTypeFromString('__object__*');
         $newJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $newChild);
         $nullBox = self::nullValueVar($context);
+
+        // php-src: if newChild already has a different parent, remove it first (#33450).
+        JitDomAppendChildLiveSlots::detachFromForeignParentIfNeeded($context, $parent, $newChild);
 
         $prev = self::loadSibling($context, $oldChild, VmDom::PROP_PREVIOUS_SIBLING, 'dom_rc_prev');
         $next = self::loadSibling($context, $oldChild, VmDom::PROP_NEXT_SIBLING, 'dom_rc_next');
@@ -158,8 +163,10 @@ final class JitDomReplaceChildLiveSlots
 
         self::refreshChildNodesListInPlace($context, $parent, $childCount, $newFirst, $item1);
         // saveXML reads PROP_USER_SCRIPT_INNER_XML — rebuild after text/element splice
-        // so replaceChild(createTextNode) matches Zend (#33335).
+        // so replaceChild(createTextNode) matches Zend (#33335). Walk ancestors so
+        // saveXML($root) after nested createElement replace matches Zend (#33450).
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
     }
 
     /**
