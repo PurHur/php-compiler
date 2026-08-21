@@ -17,6 +17,9 @@ use PHPLLVM\Value;
  * allocating an unregistered DOMDocumentType class aborts LLVM codegen in standalone AOT.
  * Slot layout exposes name / publicId / systemId / nodeName for property reads.
  *
+ * {@see TAG_KIND} (`#document-type`) is the appendChild / saveXML discriminator — Zend
+ * {@code nodeName} is the qualified name (#33565 peer of #33556 / #33559).
+ *
  * php-src: ext/dom/domimplementation.stub.php
  *   createDocumentType(string $qualifiedName, string $publicId = "", string $systemId = "")
  */
@@ -24,7 +27,12 @@ final class JitDomCreateDocumentType
 {
     private const CLASS_STANDIN = 'DOMElement';
 
+    /** Internal discriminator; not a Zend DocumentType nodeName. */
+    public const TAG_KIND = '#document-type';
+
     private const PROP_NODE_NAME = 'nodeName';
+
+    private const PROP_TAG_NAME = 'tagName';
 
     private const PROP_NAME = 'name';
 
@@ -86,6 +94,7 @@ final class JitDomCreateDocumentType
         $objectType->markObjectConstructed($obj);
 
         self::storeStringLiteral($context, $obj, self::PROP_NODE_NAME, $qualifiedName);
+        self::storeStringLiteral($context, $obj, self::PROP_TAG_NAME, self::TAG_KIND);
         self::storeStringLiteral($context, $obj, self::PROP_NAME, $qualifiedName);
         self::storeStringLiteral($context, $obj, self::PROP_PUBLIC_ID, $publicId);
         self::storeStringLiteral($context, $obj, self::PROP_SYSTEM_ID, $systemId);
@@ -117,6 +126,7 @@ final class JitDomCreateDocumentType
         $objectType->markObjectConstructed($obj);
 
         self::storeStringValue($context, $obj, self::PROP_NODE_NAME, $nameStr);
+        self::storeStringLiteral($context, $obj, self::PROP_TAG_NAME, self::TAG_KIND);
         self::storeStringValue($context, $obj, self::PROP_NAME, $nameStr);
         self::storeStringValue($context, $obj, self::PROP_PUBLIC_ID, $publicStr);
         self::storeStringValue($context, $obj, self::PROP_SYSTEM_ID, $systemStr);
@@ -133,12 +143,11 @@ final class JitDomCreateDocumentType
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
     ): void {
-        foreach ([
-            self::PROP_NODE_NAME,
-            self::PROP_NAME,
-            self::PROP_PUBLIC_ID,
-            self::PROP_SYSTEM_ID,
-        ] as $prop) {
+        // Same full DOMElement stand-in layout as createElement (#24973 / #33546 / #33556 / #33559):
+        // appendChild reads parentNode / sibling slots; growing the class after
+        // allocate() leaves DocumentType objects undersized and SIGSEGVs (#33565).
+        JitDomCreateElement::ensureDomElementStandInLayout($objectType, $classId);
+        foreach ([self::PROP_NAME, self::PROP_PUBLIC_ID, self::PROP_SYSTEM_ID] as $prop) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
             }
