@@ -7,12 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM bodies for stream_isatty/is_local/supports capability probes (#5343, #33148).
+ * JIT LLVM bodies for stream_isatty/is_local/supports capability probes (#5343, #33148, #33150).
  *
- * Owns `__compiler_stream_is_local` (and peer stream_is_local_uri / stream_isatty) ABI
- * module-locally via {@see StreamCapsRuntime} / {@see \PHPCompiler\ext\standard\JitStreamCapsKernel}
- * (getNamedFunction first). Do not re-add empty always-on shells in {@see Type} — leftover
- * decls mint stream_is_local.1 (#31894 / #32122).
+ * Owns `__compiler_stream_is_local` / `__compiler_stream_is_local_uri` (and peer stream_isatty)
+ * ABI module-locally via {@see StreamCapsRuntime} /
+ * {@see \PHPCompiler\ext\standard\JitStreamCapsKernel} (getNamedFunction first). Do not re-add
+ * empty always-on shells in {@see Type} — leftover decls mint stream_is_local.1 /
+ * stream_is_local_uri.1 (#31894 / #32122).
  */
 final class StreamCaps
 {

@@ -13,15 +13,16 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream capability ABI via StreamCapsJitHelper PHP (#11413, #19772, #23012, #33148).
+ * JIT/AOT link for stream capability ABI via StreamCapsJitHelper PHP (#11413, #19772, #23012, #33148, #33150).
  *
  * Quarantined from lib/JIT/Builtin/StreamCapsRuntime — {@see \PHPCompiler\JIT\Builtin\StreamCapsRuntime}
  * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}
  * (peer StreamSync #23004 / StreamMeta #22994 / StreamBuffer #22979 / StreamMode #22968).
  *
- * Owns `__compiler_stream_is_local` module-locally (getNamedFunction first in
- * {@see implementSingleArgBridge}). Do not re-add empty always-on shells in Type —
- * leftover decls mint stream_is_local.1 (#31894 / #32122).
+ * Owns `__compiler_stream_is_local` / `__compiler_stream_is_local_uri` module-locally
+ * (getNamedFunction first in {@see implementSingleArgBridge} / {@see implementIfMissing}).
+ * Do not re-add empty always-on shells in Type — leftover decls mint stream_is_local.1 /
+ * stream_is_local_uri.1 (#31894 / #32122).
  *
  * SSOT: {@see VmFs}, {@see VmStreamMeta}, {@see StreamCapsJitHelper}
  * php-src: ext/standard/streamsfuncs.c
