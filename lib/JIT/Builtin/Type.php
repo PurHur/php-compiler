@@ -672,9 +672,11 @@ class Type extends Builtin {
         $i32 = $this->context->getTypeFromString('int32');
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
         $i64 = $this->context->getTypeFromString('int64');
-        $fntypePregSplit = $this->context->context->functionType($htPtr, false, $strPtr, $strPtr, $i64, $i64);
-        $fnPregSplit = $this->context->module->addFunction('__compiler_preg_split', $fntypePregSplit);
-        $this->context->registerFunction('__compiler_preg_split', $fnPregSplit);
+        // __compiler_preg_split always-on shell removed (#33199): StringPregMatch /
+        // PregMatchRuntime owns the ABI (getNamedFunction first via implementSplitBridge;
+        // Type::initialize still StringPregMatch::ensureLinked). Leftover Type empty decls
+        // vs Runtime ABI drift mint preg_split.1 (#31894 / #32122). User-script
+        // preg_split() stays JitPregSplit / PregJitHelper (php-src ext/pcre/php_pcre.c).
         $fnPendingReset = $this->context->module->addFunction(
             '__phpc_pending_header_reset',
             $this->context->context->functionType($void, false)

@@ -31,8 +31,8 @@ final class TypeDeadFlockAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (preg_split still Type always-on after #33191 preg_replace drop).
-        $this->assertStringContainsString("registerFunction('__compiler_preg_split'", $type);
+        // Next leftover sentinel (str_getcsv still Type always-on after #33199 preg_split drop).
+        $this->assertStringContainsString("registerFunction('__compiler_str_getcsv'", $type);
         $this->assertStringContainsString('StreamRead::ensureLinked', $type);
     }
 

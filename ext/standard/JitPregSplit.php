@@ -11,7 +11,12 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for preg_split() via __compiler_preg_split (issue #1178). */
+/**
+ * LLVM lowering for preg_split() via __compiler_preg_split (#1178; ensureLinked #33199).
+ *
+ * ABI owned by {@see \PHPCompiler\JIT\Builtin\PregMatchRuntime} after Type always-on drop (#33199) —
+ * must ensureLinked before lookup (peer {@see JitPregMatch} / {@see JitPregLastError}).
+ */
 final class JitPregSplit
 {
     private static int $blockSerial = 0;
@@ -25,6 +30,7 @@ final class JitPregSplit
         Value $limit,
         Value $flags
     ): Value {
+        // #33199 — Type dropped always-on __compiler_preg_split; link before lookup.
         StringPregMatch::ensureLinked($context);
 
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
