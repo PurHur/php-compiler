@@ -56,6 +56,7 @@ use PHPLLVM\Value;
  * fseek on `__spl_fd` (#33347) via JitFseek (clears iterator line cache like rewind).
  * seek (SeekableIterator line) (#33364) — rewind + read-line loop + key bump.
  * setFlags/getFlags on `__spl_flags` (#33368).
+ * setCsvControl/getCsvControl on `__spl_csv_*` (#33371); fgetcsv/fputcsv read props when args omitted.
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
@@ -63,7 +64,9 @@ use PHPLLVM\Value;
  * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_ftruncate /
  * zim_SplFileObject_fflush / zim_SplFileObject_fpassthru / zim_SplFileObject_fputcsv /
  * zim_SplFileObject_fgetcsv / zim_SplFileObject_fseek / zim_SplFileObject_seek /
- * zim_SplFileObject_setFlags / zim_SplFileObject_getFlags / zim_SplFileInfo_openFile
+ * zim_SplFileObject_setFlags / zim_SplFileObject_getFlags /
+ * zim_SplFileObject_setCsvControl / zim_SplFileObject_getCsvControl /
+ * zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -91,6 +94,15 @@ final class SplFileObjectJitHelper
      * track from failed fgets instead (#33319).
      */
     public const PROP_AT_EOF = '__spl_at_eof';
+
+    /** CSV separator — php-src intern->u.file.separator (#33371). */
+    public const PROP_CSV_SEP = '__spl_csv_sep';
+
+    /** CSV enclosure — php-src intern->u.file.enclosure (#33371). */
+    public const PROP_CSV_ENC = '__spl_csv_enc';
+
+    /** CSV escape — php-src intern->u.file.escape (#33371). */
+    public const PROP_CSV_ESC = '__spl_csv_esc';
 
     private const CLASS_NAME = 'SplFileObject';
 
@@ -585,13 +597,15 @@ final class SplFileObjectJitHelper
     ): Value {
         self::ensureStreamAbis($context);
         FputcsvRuntime::ensureLinked($context);
+        $obj = self::loadObject($context, $receiver);
         $handle = self::loadFd($context, $receiver);
         $fields = self::loadFieldsHashtable($context, $fieldsArg);
         $strPtr = $context->getTypeFromString('__string__*');
         $nullStr = $strPtr->constNull();
-        $separator = $nullStr;
-        $enclosure = $nullStr;
-        $escape = $nullStr;
+        // Omitted CSV args → object setCsvControl props (#33371); peer php-src uses intern.
+        $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
+        $enclosure = self::loadStringProp($context, $obj, self::PROP_CSV_ENC);
+        $escape = self::loadStringProp($context, $obj, self::PROP_CSV_ESC);
         $eol = $nullStr;
         if (null !== $separatorArg && !NamedOptionalCallArgs::isOmittedOptional($separatorArg)) {
             $separator = JitStringArg::lower($context, $separatorArg, 'SplFileObject::fputcsv() separator');
@@ -628,11 +642,10 @@ final class SplFileObjectJitHelper
         $handle = self::loadFd($context, $receiver);
         // Thin AOT has no max_line_len prop yet — length < 1 → JitFgetcsv default cap.
         $length = $i64->constInt(-1, true);
-        $strPtr = $context->getTypeFromString('__string__*');
-        $nullStr = $strPtr->constNull();
-        $separator = $nullStr;
-        $enclosure = $nullStr;
-        $escape = $nullStr;
+        // Omitted args → setCsvControl props (#33371); peer php-src intern->u.file.*.
+        $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
+        $enclosure = self::loadStringProp($context, $obj, self::PROP_CSV_ENC);
+        $escape = self::loadStringProp($context, $obj, self::PROP_CSV_ESC);
         if (null !== $separatorArg && !NamedOptionalCallArgs::isOmittedOptional($separatorArg)) {
             $separator = JitStringArg::lower($context, $separatorArg, 'SplFileObject::fgetcsv() separator');
         }
@@ -644,6 +657,63 @@ final class SplFileObjectJitHelper
         }
 
         return JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
+    }
+
+    /**
+     * SplFileObject::setCsvControl — store separator/enclosure/escape (#33371).
+     * php-src: zim_SplFileObject_setCsvControl — optional args keep prior values.
+     */
+    public static function compileSetCsvControl(
+        Context $context,
+        JITVariable $receiver,
+        ?JITVariable $separatorArg = null,
+        ?JITVariable $enclosureArg = null,
+        ?JITVariable $escapeArg = null
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
+        $enclosure = self::loadStringProp($context, $obj, self::PROP_CSV_ENC);
+        $escape = self::loadStringProp($context, $obj, self::PROP_CSV_ESC);
+        if (null !== $separatorArg && !NamedOptionalCallArgs::isOmittedOptional($separatorArg)) {
+            $separator = JitStringArg::lower($context, $separatorArg, 'SplFileObject::setCsvControl() separator');
+        }
+        if (null !== $enclosureArg && !NamedOptionalCallArgs::isOmittedOptional($enclosureArg)) {
+            $enclosure = JitStringArg::lower($context, $enclosureArg, 'SplFileObject::setCsvControl() enclosure');
+        }
+        if (null !== $escapeArg && !NamedOptionalCallArgs::isOmittedOptional($escapeArg)) {
+            $escape = JitStringArg::lower($context, $escapeArg, 'SplFileObject::setCsvControl() escape');
+        }
+        self::storeStringProp($context, $obj, self::PROP_CSV_SEP, $separator);
+        self::storeStringProp($context, $obj, self::PROP_CSV_ENC, $enclosure);
+        self::storeStringProp($context, $obj, self::PROP_CSV_ESC, $escape);
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * SplFileObject::getCsvControl — packed [separator, enclosure, escape] (#33371).
+     * php-src: zim_SplFileObject_getCsvControl — ZEND_PARSE_PARAMETERS_NONE
+     */
+    public static function compileGetCsvControl(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
+        $enclosure = self::loadStringProp($context, $obj, self::PROP_CSV_ENC);
+        $escape = self::loadStringProp($context, $obj, self::PROP_CSV_ESC);
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $i64 = $context->getTypeFromString('int64');
+        $setStringAt = $context->lookupFunction('__hashtable__setStringAt');
+        $context->builder->call($setStringAt, $ht, $i64->constInt(0, false), $separator);
+        $context->builder->call($setStringAt, $ht, $i64->constInt(1, false), $enclosure);
+        $context->builder->call($setStringAt, $ht, $i64->constInt(2, false), $escape);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $slot),
+            $ht
+        );
+
+        return $slot;
     }
 
     /**
@@ -1148,6 +1218,25 @@ final class SplFileObjectJitHelper
         self::storeLongProp($context, $obj, self::PROP_FLAGS, $i64->constInt(0, false));
         $empty = $context->builder->load($context->constantStringFromString(''));
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
+        // php-src defaults: separator=',', enclosure='"', escape='\\' (#33371).
+        self::storeStringProp(
+            $context,
+            $obj,
+            self::PROP_CSV_SEP,
+            $context->builder->load($context->constantStringFromString(','))
+        );
+        self::storeStringProp(
+            $context,
+            $obj,
+            self::PROP_CSV_ENC,
+            $context->builder->load($context->constantStringFromString('"'))
+        );
+        self::storeStringProp(
+            $context,
+            $obj,
+            self::PROP_CSV_ESC,
+            $context->builder->load($context->constantStringFromString('\\'))
+        );
         $objectType->markObjectConstructed($obj);
     }
 
