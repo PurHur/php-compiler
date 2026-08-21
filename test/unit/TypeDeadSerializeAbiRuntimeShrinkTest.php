@@ -43,8 +43,8 @@ final class TypeDeadSerializeAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (unserialize still Type always-on; #33207 serialize_* dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_unserialize'", $type);
+        // Next leftover sentinel (phpc_run_command still Type always-on; #33207 serialize_* / #33214 unserialize dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_phpc_run_command'", $type);
         $this->assertStringContainsString('StringSerialize::ensureLinked', $type);
     }
 

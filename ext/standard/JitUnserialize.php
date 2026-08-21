@@ -13,6 +13,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
+/**
+ * LLVM lowering for unserialize() via __compiler_unserialize (#33214).
+ *
+ * Call-site {@see StringUnserialize::ensureLinked} before lookup — Type no longer
+ * always-declares the ABI (#31894 / #32122).
+ * php-src: ext/standard/var_unserializer.c
+ */
 final class JitUnserialize
 {
     public static function decodeRuntime(Context $context, JITVariable $payload): Value

@@ -20,7 +20,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_unserialize via UnserializeJitHelper PHP (#9163, #20785, #27030).
+ * JIT/AOT link for __compiler_unserialize via UnserializeJitHelper PHP (#9163, #20785, #27030, #33214).
+ *
+ * Owns `__compiler_unserialize` ABI module-locally: {@see getNamedFunction} first, then
+ * bridges / {@see JitVmHelperLink::ensureCompiled}. Do not re-add empty always-on shells in
+ * {@see Type} — leftover decls mint unserialize.1 (#31894 / #32122 / #33214).
  *
  * Embed + thin standalone AOT: {@see UnserializeJitHelper} NestedJIT
  * (Serialize #20773 shape — no thin null/empty stubs).
