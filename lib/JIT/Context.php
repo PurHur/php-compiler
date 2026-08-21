@@ -1975,7 +1975,7 @@ class Context {
             // NestedJIT StreamLifecycle/StreamRead helpers during full standalone init (#20966 / #20982).
             Builtin\StreamLifecycleRuntime::ensureLinked($this);
             Builtin\StreamReadRuntime::ensureLinked($this);
-            # StringTriggerError before AssertFail (#33234 Type always-on drop).
+            // StringTriggerError before AssertFail (#33234 Type always-on drop).
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\AssertFail::ensureStandaloneBodies($this);
             Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
