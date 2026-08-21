@@ -673,11 +673,11 @@ final class SplFileObjectJitHelper
     }
 
     /**
-     * SplFileObject::fscanf — formatted input from live handle (#33382).
+     * SplFileObject::fscanf — formatted input from live handle (#33382 / #33389).
      * php-src: zim_SplFileObject_fscanf → php_stream_get_line + php_sscanf_internal
      *
-     * Thin AOT cannot NestedJIT VmSscanf on libc-fgets strings (#27663). Array mode with a
-     * compile-time whitespace/%d/%s format uses a thin strtol+token scanner (no NestedJIT).
+     * Thin AOT cannot NestedJIT VmSscanf on libc-fgets strings (#27663). Whitespace/%d/%s
+     * formats use {@see SscanfSimpleArrayApply} (array + by-ref assign).
      *
      * @param list<JITVariable> $outArgs
      */
@@ -687,16 +687,11 @@ final class SplFileObjectJitHelper
         JITVariable $formatArg,
         JITVariable ...$outArgs
     ): Value {
-        if ([] !== $outArgs) {
-            throw new \LogicException(
-                'SplFileObject::fscanf() thin-AOT by-ref targets are not implemented yet (#33382)'
-            );
-        }
         $fmtLit = $formatArg->compileTimeString ?? null;
         $specs = null !== $fmtLit ? self::parseSimpleScanfSpecs($fmtLit) : null;
         if (null === $specs) {
             throw new \LogicException(
-                'SplFileObject::fscanf() thin-AOT array mode needs compile-time %d/%s format (#33382)'
+                'SplFileObject::fscanf() thin-AOT needs compile-time %d/%s format (#33382/#33389)'
             );
         }
         self::ensureStreamAbis($context);
@@ -720,15 +715,21 @@ final class SplFileObjectJitHelper
         $joinBb = $fn->appendBasicBlock('splfo_fscanf_join');
         $context->builder->branchIf($isNull, $eofBb, $nonEmptyBb);
 
+        $byRef = [] !== $outArgs;
         $context->builder->positionAtEnd($eofBb);
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(1, false));
-        $falseSlot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            JitValueBox::pointer($context, $falseSlot),
-            $context->getTypeFromString('int32')->constInt(0, false)
-        );
-        $context->builder->store($falseSlot, $slotAlloca);
+        $eofSlot = JitValueBox::alloc($context);
+        if ($byRef) {
+            // SplFileObject by-ref EOF → int -1 (Zend; not procedural false) (#33389).
+            JitValueBox::writeLong($context, $eofSlot, $i64->constInt(-1, true));
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeBool'),
+                JitValueBox::pointer($context, $eofSlot),
+                $context->getTypeFromString('int32')->constInt(0, false)
+            );
+        }
+        $context->builder->store($eofSlot, $slotAlloca);
         $context->builder->branch($joinBb);
 
         $context->builder->positionAtEnd($nonEmptyBb);
@@ -742,14 +743,51 @@ final class SplFileObjectJitHelper
         if (null !== $savedBlock) {
             BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         }
-        $ht = SscanfSimpleArrayApply::invoke($context, $line, $specs);
-        $okSlot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            JitValueBox::pointer($context, $okSlot),
-            $ht
-        );
-        $context->builder->store($okSlot, $slotAlloca);
+        if ($byRef) {
+            $outCount = \count($outArgs);
+            $ptrTy = $context->getTypeFromString('__value__*');
+            $i32 = $context->getTypeFromString('int32');
+            $sizeT = $context->getTypeFromString('size_t');
+            $elemSize = $context->builder->ptrToInt(
+                $context->builder->gep($ptrTy->pointerType(0)->constNull(), $i32->constInt(1, false)),
+                $sizeT
+            );
+            $raw = $context->builder->call(
+                $context->lookupFunction('__mm__malloc'),
+                $context->builder->mul(
+                    $elemSize,
+                    $context->builder->intCast($i64->constInt($outCount, false), $sizeT)
+                )
+            );
+            $outPtrs = $context->builder->pointerCast($raw, $context->getTypeFromString('__value__**'));
+            for ($i = 0; $i < $outCount; ++$i) {
+                $slot = $context->builder->inBoundsGEP($outPtrs, $i64->constInt($i, false));
+                $context->builder->store(
+                    JitValueBox::valuePtrFromVariable($context, $outArgs[$i]),
+                    $slot
+                );
+            }
+            $assigned = SscanfSimpleArrayApply::invokeAssign(
+                $context,
+                $line,
+                $specs,
+                $i64->constInt($outCount, false),
+                $outPtrs
+            );
+            $context->builder->call($context->lookupFunction('__mm__free'), $raw);
+            $okSlot = JitValueBox::alloc($context);
+            JitValueBox::writeLong($context, $okSlot, $assigned);
+            $context->builder->store($okSlot, $slotAlloca);
+        } else {
+            $ht = SscanfSimpleArrayApply::invoke($context, $line, $specs);
+            $okSlot = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                JitValueBox::pointer($context, $okSlot),
+                $ht
+            );
+            $context->builder->store($okSlot, $slotAlloca);
+        }
         $context->builder->branch($joinBb);
 
         $context->builder->positionAtEnd($joinBb);
