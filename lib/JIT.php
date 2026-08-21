@@ -13536,6 +13536,41 @@ class JIT {
                         if (
                             $forWrite
                             && !$this->context->type->object->hasProperty($classId, $name->value)
+                            && \PHPCompiler\VM\ArrayObjectJitHelper::isArrayAsPropsClass($declaringClass)
+                        ) {
+                            // ARRAY_AS_PROPS writes go to `__spl_ht` — not dynamic props (#33068).
+                            // Must run before rejectsDynamicProperties abort (external SPL classes).
+                            $recvVar = $this->context->getVariableFromOp($obj);
+                            if (Variable::TYPE_OBJECT === $recvVar->type) {
+                                $receiver = $this->context->helper->loadValue($recvVar);
+                            } elseif (Variable::TYPE_VALUE === $recvVar->type) {
+                                $receiver = $this->context->builder->call(
+                                    $this->context->lookupFunction('__value__readObject'),
+                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $recvVar)
+                                );
+                            } else {
+                                $receiver = null;
+                            }
+                            $lvalue = null !== $receiver
+                                ? \PHPCompiler\VM\ArrayObjectJitHelper::tryPropertyFetchWrite(
+                                    $this->context->type->object,
+                                    $receiver,
+                                    $declaringClass,
+                                    $name->value
+                                )
+                                : null;
+                            if (null !== $lvalue) {
+                                if ($forceBranchMerge) {
+                                    $this->assignOperand($result, $lvalue, true);
+                                } else {
+                                    $this->context->scope->variables[$result] = $lvalue;
+                                }
+                                break;
+                            }
+                        }
+                        if (
+                            $forWrite
+                            && !$this->context->type->object->hasProperty($classId, $name->value)
                             && $this->context->type->object->isReadonlyClass($classId)
                             && !JIT\MagicMethodDispatch::hasInstanceMethod(
                                 $this->context->type->object,
@@ -17952,6 +17987,11 @@ class JIT {
             )) {
                 return;
             }
+        }
+        if (null !== $result->arrayAsPropsReceiver && null !== $result->arrayAsPropsName) {
+            \PHPCompiler\VM\ArrayObjectJitHelper::compilePropertyAssign($this->context, $result, $value);
+
+            return;
         }
         if (null !== $result->objectPropertySlot) {
             if (null === $result->objectPropertyType) {
