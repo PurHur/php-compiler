@@ -4125,6 +4125,7 @@ class Object_ extends Type {
             foreach ([
                 '__construct', 'getfilename', 'getpathname', 'getpath', 'getbasename',
                 'getextension', '__tostring', 'isfile', 'isdir',
+                'islink', 'isreadable', 'iswritable', 'isexecutable',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
@@ -4199,6 +4200,7 @@ class Object_ extends Type {
             $methods = [
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
                 'isdot', 'getfilename', 'getpathname', 'getpath', 'gettype', '__tostring',
+                'isfile', 'isdir', 'islink', 'isreadable', 'iswritable', 'isexecutable',
             ];
             if ('filesystemiterator' === $lcname) {
                 $methods = array_merge($methods, ['getflags', 'setflags']);
