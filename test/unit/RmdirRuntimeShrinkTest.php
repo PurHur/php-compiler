@@ -21,8 +21,19 @@ final class RmdirRuntimeShrinkTest extends TestCase
     public function testStringRmdirBridgeUsesRmdirJitHelper(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringRmdir.php');
-        $this->assertStringContainsString('RmdirJitHelper', $bridge);
+        // Thin AOT: libc rmdir(2) — NestedJIT helper cannot remove dirs (#33403).
+        $this->assertStringContainsString('RmdirLibcRuntime', $bridge);
         $this->assertStringNotContainsString("lookupFunction('rmdir')", $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        // Insert-block restore so mid-emit ensureLinked does not orphan rmdir calls (#33403).
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $bridge);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $bridge);
+        $this->assertStringContainsString('VmFsDirRmdirLibcThinAbi', (string) file_get_contents(
+            __DIR__.'/../../ext/standard/VmFsDirPure.php'
+        ));
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/RmdirLibcRuntime.php');
+        $this->assertStringContainsString("lookupFunction('rmdir')", $libc);
+        $this->assertStringContainsString('LibcExtern::ensureRmdir', $libc);
     }
 
     public function testRmdirJitHelperDelegatesToVmFs(): void
@@ -40,5 +51,7 @@ final class RmdirRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('RmdirJitHelper.php', $spine);
         $this->assertStringContainsString('StringRmdir.php', $spine);
+        $this->assertStringContainsString('RmdirLibcRuntime.php', $spine);
+        $this->assertStringContainsString('VmFsDirRmdirLibcThinAbi.php', $spine);
     }
 }

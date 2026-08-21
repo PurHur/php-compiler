@@ -340,6 +340,34 @@ final class LibcExtern
     }
 
     /**
+     * Module-local rmdir(2) after LibcExtern always-on drop (#33403).
+     *
+     * User-script rmdir() stays on StringRmdir / RmdirLibcRuntime; NestedJIT leaves and
+     * the AOT bridge call this before lookupFunction('rmdir'). Peer: ensureChownFamily
+     * (#28850). Justified thin ABI: NestedJIT helpers cannot call host \\rmdir (#33403).
+     */
+    public static function ensureRmdir(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $name = 'rmdir';
+        try {
+            $context->lookupFunction($name);
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $fn = $context->module->getNamedFunction($name);
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                $name,
+                $context->context->functionType($i32, false, $i8p)
+            );
+        }
+        $context->registerFunction($name, $fn);
+    }
+
+    /**
      * Module-local printf(3) after LibcExtern always-on drop (#31706).
      *
      * User-script printf() stays on JitPrintf / __compiler_printf (#3681); NestedJIT

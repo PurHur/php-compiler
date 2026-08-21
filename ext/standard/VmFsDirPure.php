@@ -8,12 +8,16 @@ namespace PHPCompiler\ext\standard;
  * mkdir/rmdir/chmod/chown/chgrp without libc FFI (#8991, pairs {@see VmFsDirNative}).
  *
  * Bootstrap path when FFI is disabled: host PHP directory mutators under Zend VM.
+ * AOT NestedJIT path: \\rmdir() re-enters __phpc_jit_rmdir — use
+ * {@see VmFsDirRmdirLibcThinAbi} instead (#33403, peer {@see VmFsTouchLibcThinAbi}).
  *
  * php-src: ext/standard/filestat.c — php_mkdir, php_chmod, php_chown
  */
 final class VmFsDirPure
 {
     private const PATH_MAX = 4096;
+
+    private static bool $rmdirReentrant = false;
 
     public static function available(): bool
     {
@@ -43,7 +47,25 @@ final class VmFsDirPure
             return false;
         }
 
-        return @\rmdir($path);
+        if (self::$rmdirReentrant) {
+            return VmFsDirRmdirLibcThinAbi::rmdir($path);
+        }
+
+        // Prefer libc under NestedJIT AOT — \\rmdir re-enters __phpc_jit_rmdir (#33403).
+        if (VmFsDirRmdirLibcThinAbi::available()) {
+            return VmFsDirRmdirLibcThinAbi::rmdir($path);
+        }
+
+        if (!\function_exists('rmdir')) {
+            return false;
+        }
+
+        self::$rmdirReentrant = true;
+        try {
+            return @\rmdir($path);
+        } finally {
+            self::$rmdirReentrant = false;
+        }
     }
 
     public static function chmod(string $path, int $permissions): bool

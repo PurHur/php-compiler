@@ -4,30 +4,22 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for rmdir() via RmdirJitHelper PHP (#15481).
+ * JIT/AOT link for rmdir() via libc rmdir(2) (#15481, #33403).
  *
- * Replaces libc rmdir(2) LLVM in ext/standard/JitRmdir.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmFs::rmdir()}.
+ * NestedJIT {@see \PHPCompiler\ext\standard\RmdirJitHelper} cannot remove directories under
+ * thin AOT (host \\rmdir re-enters; FFI unavailable in the native binary). Bridge body is
+ * {@see RmdirLibcRuntime} — peer {@see ChownRuntime} / {@see TouchLibcRuntime}.
+ *
  * php-src: ext/standard/filestat.c — php_rmdir
  */
 final class StringRmdir
 {
     private const ABI = '__phpc_jit_rmdir';
-
-    private const HELPER_PATH = '/ext/standard/RmdirJitHelper.php';
-
-    private const INVOKE_HELPER = 'PHPCompiler\\ext\\standard\\RmdirJitHelper::invokeArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::INVOKE_HELPER,
-    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -55,7 +47,10 @@ final class StringRmdir
             return;
         }
 
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#15481');
+        // Restore caller insert block after bridge emit (#33403 / peer #19283) — clearInsertionPosition
+        // left the user-script builder detached ("Instruction referencing instruction not embedded
+        // in a basic block" / Module.php:180).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i1 = $context->getTypeFromString('int1');
@@ -66,15 +61,13 @@ final class StringRmdir
                 $context->context->functionType($i1, false, $strPtr)
             );
 
-        $entry = $fn->appendBasicBlock('rmdir_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_HELPER, '#15481');
-        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$fn->getParam(0)]);
-        $bool = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1);
-        $context->builder->returnValue($bool);
-
+        RmdirLibcRuntime::emit($context, $fn);
         $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
