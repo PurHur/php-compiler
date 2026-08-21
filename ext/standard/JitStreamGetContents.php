@@ -18,7 +18,12 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for stream_get_contents() via __compiler_stream_get_contents (#3142). */
+/**
+ * LLVM lowering for stream_get_contents() via __compiler_stream_get_contents (#3142; ensureLinked #33178).
+ *
+ * ABI owned by {@see StreamReadRuntime} / {@see JitStreamReadBridgeKernel} after Type always-on
+ * drop (#33178) — must ensureLinked before lookup (peer {@see JitStreamGetLine} #33170).
+ */
 final class JitStreamGetContents
 {
     /** php-src ext/standard/file.c — PHP_FUNCTION(stream_get_contents) length range (#24560). */
