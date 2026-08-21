@@ -13,7 +13,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for phpc_run_command() via ProcessRuntime::__compiler_phpc_run_command (#2779). */
+/**
+ * LLVM lowering for phpc_run_command() via ProcessRuntime::__compiler_phpc_run_command (#2779, #33212).
+ *
+ * Call-site {@see ProcessRuntime::ensurePhpcRunCommandLinked} before lookup (Type always-on shell dropped).
+ */
 final class JitPhpcRunCommand
 {
     /** @return Value */

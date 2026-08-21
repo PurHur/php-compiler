@@ -876,14 +876,11 @@ class Type extends Builtin {
         // still ProcessRuntime::ensureLinked). Leftover Type empty decls vs Runtime ABI
         // drift mint shell_exec.1 (#31894 / #32122). User-script stays JitShellExec /
         // JitEscapeshellarg / JitEscapeshellcmd (php-src ext/standard/exec.c).
-        $fntypePhpcRunCommand = $this->context->context->functionType(
-            $this->context->getTypeFromString('__hashtable__*'),
-            false,
-            $strPtr,
-            $this->context->getTypeFromString('__hashtable__*')
-        );
-        $fnPhpcRunCommand = $this->context->module->addFunction('__compiler_phpc_run_command', $fntypePhpcRunCommand);
-        $this->context->registerFunction('__compiler_phpc_run_command', $fnPhpcRunCommand);
+        // __compiler_phpc_run_command always-on shell removed (#33212): ProcessRuntime
+        // owns the ABI (getNamedFunction first via ensurePhpcRunCommandLinked /
+        // implementPhpcRunCommandBridge; JitPhpcRunCommand ensureLinked before lookup).
+        // Leftover Type empty decls vs Runtime ABI drift mint phpc_run_command.1
+        // (#31894 / #32122). User-script stays JitPhpcRunCommand / ProcessPhpcRunCommandJitHelper.
         // __compiler_sys_get_temp_dir always-on shell removed (#32438): user-script
         // sys_get_temp_dir() stays SysGetTempDirJitHelper / SysGetTempDirRuntime
         // (NestedJIT leaf is __compiler_sys_get_temp_dir_leaf). Peer mkdir drop.
