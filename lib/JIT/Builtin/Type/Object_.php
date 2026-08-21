@@ -4163,6 +4163,10 @@ class Object_ extends Type {
             // SplFileInfo path props for inherited isFile/getSize/… (#33313).
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_PATH, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FILENAME, Variable::TYPE_STRING);
+            // CSV delimiter triple after SplFileInfo slots so inherited stats keep indices (#33369).
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CSV_SEP, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CSV_ENC, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CSV_ESC, Variable::TYPE_STRING);
             $this->markHasConstructor($id);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([
@@ -4170,6 +4174,7 @@ class Object_ extends Type {
                 'fgets', 'fwrite', 'eof', 'getcurrentline', 'fread', 'fgetc',
                 'ftell', 'flock', 'fstat', 'ftruncate', 'fflush', 'fpassthru', 'fseek',
                 'fputcsv', 'fgetcsv', 'setflags', 'getflags',
+                'getcsvcontrol', 'setcsvcontrol',
                 'getfilename', 'getpathname', 'getpath', '__tostring',
                 'getsize', 'getrealpath',
                 'getmtime', 'getatime', 'getctime', 'getperms', 'getowner', 'getgroup', 'getinode',
