@@ -79,14 +79,13 @@ final class SplFileObjectMethod implements Call
                 $args[4] ?? null,
                 $args[5] ?? null
             ),
-            // php-src zim_SplFileObject_fgetcsv — optional length/separator/enclosure/escape (#33346).
+            // php-src zim_SplFileObject_fgetcsv — optional separator/enclosure/escape (no length) (#33346).
             'fgetcsv' => SplFileObjectJitHelper::compileFgetcsv(
                 $context,
                 $args[0],
                 $args[1] ?? null,
                 $args[2] ?? null,
-                $args[3] ?? null,
-                $args[4] ?? null
+                $args[3] ?? null
             ),
             'eof' => SplFileObjectJitHelper::compileEof($context, $args[0]),
             'rewind' => SplFileObjectJitHelper::compileRewind($context, $args[0]),

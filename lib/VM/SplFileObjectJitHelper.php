@@ -17,7 +17,6 @@ use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Builtin\StreamRead;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
@@ -403,28 +402,24 @@ final class SplFileObjectJitHelper
 
     /**
      * SplFileObject::fgetcsv — read line + parse CSV on live handle (#33346).
-     * php-src: zim_SplFileObject_fgetcsv → php_fgetcsv
+     * php-src: zim_SplFileObject_fgetcsv → spl_filesystem_file_read_csv (no length arg;
+     * stub is separator/enclosure/escape only — {@see BuiltinParamNames}).
      */
     public static function compileFgetcsv(
         Context $context,
         JITVariable $receiver,
-        ?JITVariable $lengthArg = null,
         ?JITVariable $separatorArg = null,
         ?JITVariable $enclosureArg = null,
         ?JITVariable $escapeArg = null
     ): Value {
         self::ensureStreamAbis($context);
-        $handle = self::loadFd($context, $receiver);
+        $obj = self::loadObject($context, $receiver);
         $i64 = $context->getTypeFromString('int64');
-        // Peer free fgetcsv(): omitted/null length → -1 (unlimited; JitFgetcsv selects 8192 cap).
+        // spl_filesystem_file_free_line — drop cached iterator line before CSV read.
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $handle = self::loadFd($context, $receiver);
+        // No method length arg; unlimited → JitFgetcsv selects 8192 fgets cap (peer free fgetcsv).
         $length = $i64->constInt(-1, true);
-        if (null !== $lengthArg && !NamedOptionalCallArgs::isOmittedOptional($lengthArg)
-            && JITVariable::TYPE_NULL !== $lengthArg->type) {
-            $length = $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $lengthArg, 'SplFileObject::fgetcsv() length'),
-                $i64
-            );
-        }
         $strPtr = $context->getTypeFromString('__string__*');
         $nullStr = $strPtr->constNull();
         $separator = $nullStr;
@@ -440,7 +435,17 @@ final class SplFileObjectJitHelper
             $escape = JitStringArg::lower($context, $escapeArg, 'SplFileObject::fgetcsv() escape');
         }
 
-        return JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
+        $row = JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
+        // php-src always advances current_line_num on fgetcsv (peer fgets lineAdd=1).
+        $prev = self::loadLongProp($context, $obj, self::PROP_LINE);
+        self::storeLongProp(
+            $context,
+            $obj,
+            self::PROP_LINE,
+            $context->builder->addNoSignedWrap($prev, $i64->constInt(1, false))
+        );
+
+        return $row;
     }
 
     /**
