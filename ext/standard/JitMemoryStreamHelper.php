@@ -97,4 +97,14 @@ final class JitMemoryStreamHelper
 
         return self::$position[$handle];
     }
+
+    /** php-src memory stream feof — position at/after end (#33555). */
+    public static function feof(int $handle): bool
+    {
+        if (!isset(self::$open[$handle])) {
+            return true;
+        }
+
+        return self::$position[$handle] >= \strlen(self::$buffer[$handle]);
+    }
 }

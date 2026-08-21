@@ -243,6 +243,10 @@ final class JitStreamIoKernel
                 $name,
                 $context->context->functionType($i32, false, $i64)
             ),
+            '__compiler_feof' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i32, false, $i64)
+            ),
             '__compiler_stream_supports' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i32, false, $i64, $i64)
@@ -310,8 +314,10 @@ final class JitStreamIoKernel
             ['fileno', $i32, [$i8p]],
             ['flock', $i32, [$i32, $i32]],
             ['fgetc', $i32, [$i8p]],
+            ['ungetc', $i32, [$i32, $i8p]],
             ['ftruncate', $i32, [$i32, $i64]],
             ['fflush', $i32, [$i8p]],
+            ['feof', $i32, [$i8p]],
             ['__compiler_stream_filter_apply_write', $strPtr, [$i64, $strPtr]],
             ['__compiler_stream_filter_apply_read', $strPtr, [$i64, $strPtr]],
         ] as [$name, $ret, $params]) {
@@ -1215,6 +1221,54 @@ final class JitStreamIoKernel
         $gotLenI64 = $context->builder->zExt($gotLen, $i64);
         $result = $context->builder->call($context->lookupFunction('__string__init'), $gotLenI64, $buf);
         $context->builder->call($context->lookupFunction('free'), $buf);
+        // php://memory|temp: Zend sets feof after the last successful fgets; libc does not
+        // until a failed read. Peek only for those URIs — regular files keep feof=0 after
+        // the last line (Zend measured; #33555 / #33319).
+        $path = self::loadPtrSlot($context, self::GLOBAL_PATHS, $handle);
+        $pathNull = $context->builder->icmp(Builder::INT_EQ, $path, $nullPtr);
+        $memCheckBb = $fn->appendBasicBlock('fgets_mem_check');
+        $afterPeekBb = $fn->appendBasicBlock('fgets_after_peek');
+        $context->builder->branchIf($pathNull, $afterPeekBb, $memCheckBb);
+
+        $context->builder->positionAtEnd($memCheckBb);
+        $sizeT = $context->getTypeFromString('size_t');
+        $cmpMem = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $path,
+            self::literalCstr($context, 'php://memory'),
+            $sizeT->constInt(12, false)
+        );
+        $isMem = $context->builder->icmp(Builder::INT_EQ, $cmpMem, $i32->constInt(0, false));
+        $tempCheckBb = $fn->appendBasicBlock('fgets_temp_check');
+        $peekBb = $fn->appendBasicBlock('fgets_peek');
+        $context->builder->branchIf($isMem, $peekBb, $tempCheckBb);
+
+        $context->builder->positionAtEnd($tempCheckBb);
+        $cmpTemp = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $path,
+            self::literalCstr($context, 'php://temp'),
+            $sizeT->constInt(10, false)
+        );
+        $isTemp = $context->builder->icmp(Builder::INT_EQ, $cmpTemp, $i32->constInt(0, false));
+        $context->builder->branchIf($isTemp, $peekBb, $afterPeekBb);
+
+        $context->builder->positionAtEnd($peekBb);
+        $peek = $context->builder->call($context->lookupFunction('fgetc'), $fp);
+        $minusOne = $i32->constInt(-1, true);
+        $atEof = $context->builder->icmp(Builder::INT_EQ, $peek, $minusOne);
+        $keepBb = $fn->appendBasicBlock('fgets_peek_keep');
+        $ungetBb = $fn->appendBasicBlock('fgets_peek_unget');
+        $context->builder->branchIf($atEof, $keepBb, $ungetBb);
+
+        $context->builder->positionAtEnd($keepBb);
+        $context->builder->branch($afterPeekBb);
+
+        $context->builder->positionAtEnd($ungetBb);
+        $context->builder->call($context->lookupFunction('ungetc'), $peek, $fp);
+        $context->builder->branch($afterPeekBb);
+
+        $context->builder->positionAtEnd($afterPeekBb);
         $context->builder->returnValue(
             $context->builder->call(
                 $context->lookupFunction('__compiler_stream_filter_apply_read'),
@@ -2222,6 +2276,87 @@ final class JitStreamIoKernel
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($zero);
+    }
+
+    /**
+     * Idempotent libc feof for thin AOT (#33555).
+     *
+     * NestedJIT StreamLifecycleJitHelper::feofArgv cannot see JitStreamIoKernel's FILE*
+     * table (php://temp → tmpfile()) and returns 1 for unrecognized handles — so user
+     * feof() and SplFileObject::eof latch refresh stayed sticky-true. Peer
+     * {@see implementFflushForce}.
+     * ABI: 1 at EOF, 0 otherwise (matches {@see JitFeof} / StreamLifecycleJitHelper).
+     */
+    public static function implementFeofForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_feof');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('feof_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_feof', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_feof');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_feof');
+        }
+        self::emitFeof($context, $fn);
+        $context->registerFunction('__compiler_feof', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** resolve → libc feof; ABI 1 at EOF, 0 otherwise. */
+    private static function emitFeof(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('feof_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $nullPtr = $i8p->constNull();
+        $zero = $i32->constInt(0, false);
+        $one = $i32->constInt(1, false);
+
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('feof_fail');
+        $okBb = $fn->appendBasicBlock('feof_ok');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr),
+            $failBb,
+            $okBb
+        );
+
+        $context->builder->positionAtEnd($okBb);
+        $rc = $context->builder->call($context->lookupFunction('feof'), $fp);
+        // libc feof returns non-zero at EOF; normalize to 0|1 ABI.
+        $context->builder->returnValue(
+            $context->builder->select(
+                $context->builder->icmp(Builder::INT_NE, $rc, $zero),
+                $one,
+                $zero
+            )
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        // Unresolved handle → treat as EOF (closed / invalid), peer NestedJIT fallback.
+        $context->builder->returnValue($one);
     }
 
     private static function registerLinkedRuntime(Context $context): void
