@@ -67,6 +67,10 @@ final class JitTriggerErrorKernel
             return;
         }
 
+        // Declare __compiler_trigger_error before SilenceRuntime NestedJIT — helpers
+        // coerce/warn via lookupFunction(__compiler_trigger_error); empty Type shells
+        // were dropped (#33234), so a missing decl fails NestedJIT (#33253 / #33248 class).
+        self::declareTriggerErrorAbi($context);
         LastErrorRuntime::ensureLinked($context);
         SilenceRuntime::ensureLinked($context);
         ErrorHandlerJitRuntime::ensureLinked($context);
@@ -89,6 +93,28 @@ final class JitTriggerErrorKernel
     {
         self::declareUndefKeyCstrAbi($context);
         self::declareUndefKeyLongAbi($context);
+    }
+
+    /**
+     * Declare __compiler_trigger_error only (getNamedFunction first) — needed before
+     * SilenceRuntime::ensureLinked NestedJIT (#33253). Body via {@see implementTriggerErrorBridge}.
+     */
+    public static function declareTriggerErrorAbi(Context $context): void
+    {
+        $abiName = '__compiler_trigger_error';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i8p, $sizeT, $i32, $i8p, $i32);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
     }
 
     private static function declareUndefKeyCstrAbi(Context $context): void
