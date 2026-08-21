@@ -539,6 +539,12 @@ class Type extends Builtin {
         // StringPregMatch::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // preg_match_all.1 / preg_match_ex.1 (#31894 / #32122). User-script stays
         // JitPregMatchAll / JitPregMatchEx / JitPregMatchAllEx / PregJitHelper.
+        // __compiler_preg_last_error / __compiler_preg_last_error_msg always-on shells
+        // removed (#33192): PregMatchRuntime owns both ABIs (getNamedFunction first via
+        // implementLastErrorBridge / implementLastErrorMsgBridge; Type::initialize still
+        // StringPregMatch::ensureLinked). Leftover Type empty decls vs Runtime ABI drift
+        // mint preg_last_error.1 (#31894 / #32122). User-script stays JitPregLastError /
+        // JitPregLastErrorMsg (php-src ext/pcre/php_pcre.c).
         $fntypePregReplace = $this->context->context->functionType(
             $strPtr,
             false,
@@ -549,15 +555,6 @@ class Type extends Builtin {
         );
         $fnPregReplace = $this->context->module->addFunction('__compiler_preg_replace', $fntypePregReplace);
         $this->context->registerFunction('__compiler_preg_replace', $fnPregReplace);
-        $fntypePregLastError = $this->context->context->functionType($i64, false);
-        $fnPregLastError = $this->context->module->addFunction('__compiler_preg_last_error', $fntypePregLastError);
-        $this->context->registerFunction('__compiler_preg_last_error', $fnPregLastError);
-        $fntypePregLastErrorMsg = $this->context->context->functionType($strPtr, false);
-        $fnPregLastErrorMsg = $this->context->module->addFunction(
-            '__compiler_preg_last_error_msg',
-            $fntypePregLastErrorMsg
-        );
-        $this->context->registerFunction('__compiler_preg_last_error_msg', $fnPregLastErrorMsg);
         $fntypeSuperglobalName = $this->context->context->functionType($i64, false, $strPtr);
         $fnSuperglobalName = $this->context->module->addFunction(
             '__compiler_is_superglobal_name',

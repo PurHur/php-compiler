@@ -8,12 +8,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * preg_* dispatch — embed + standalone AOT via PregMatchRuntime PHP (#5289, #9542, #12982, #33187, #33188).
+ * preg_* dispatch — embed + standalone AOT via PregMatchRuntime PHP (#5289, #9542, #12982, #33187, #33188, #33192).
  *
  * Owns `__compiler_preg_match` / `__compiler_preg_match_all` / `__compiler_preg_match_ex` /
- * `__compiler_preg_match_all_ex` module-locally via {@see PregMatchRuntime} (getNamedFunction first).
- * Do not re-add empty always-on shells in {@see Type} — leftover decls mint preg_match.1 /
- * preg_match_all.1 (#31894 / #32122).
+ * `__compiler_preg_match_all_ex` / `__compiler_preg_last_error` (+ `_msg`) module-locally via
+ * {@see PregMatchRuntime} (getNamedFunction first). Do not re-add empty always-on shells in
+ * {@see Type} — leftover decls mint preg_match.1 / preg_last_error.1 (#31894 / #32122).
  *
  * php-src: ext/pcre/php_pcre.c
  */
