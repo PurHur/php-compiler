@@ -47,8 +47,8 @@ final class TypeDeadStreamSocketAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (strftime still Type always-on; #33213 unserialize / #33215 format_datetime dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_strftime'", $type);
+        // Next leftover sentinel (trigger_error still Type always-on; #33224 strptime / #33222 strftime / #33215 format_datetime dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_trigger_error'", $type);
         $this->assertStringContainsString('StreamSocketGetNameRuntime::ensureLinked', $type);
         $this->assertStringContainsString('StreamSocketAccept::ensureLinked', $type);
     }

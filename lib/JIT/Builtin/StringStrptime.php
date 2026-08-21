@@ -11,11 +11,14 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_strptime via StrptimeJitHelper PHP (#9132, #25409).
+ * JIT/AOT link for __compiler_strptime via StrptimeJitHelper PHP (#9132, #25409, #33224).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringStrftime #25365 / VarFetch #25328).
  * Replaces libc strptime / struct tm LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/date/php_date.c — PHP_FUNCTION(strptime)
+ *
+ * Do not re-add an always-on empty decl in {@see Type} — leftover decls mint strptime.1
+ * (#31894 / #32122 / #33224).
  */
 final class StringStrptime
 {

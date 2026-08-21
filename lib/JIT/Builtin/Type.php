@@ -568,24 +568,18 @@ class Type extends Builtin {
         // Leftover Type empty decls vs Runtime ABI drift mint format_datetime.1
         // (#31894 / #32122). User-script date()/gmdate() stay JitDate /
         // FormatDatetimeJitHelper (php-src ext/date/php_date.c).
-        $fntypeStrftime = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $i64,
-            $this->context->getTypeFromString('int8')
-        );
-        $fnStrftime = $this->context->module->addFunction('__compiler_strftime', $fntypeStrftime);
-        $this->context->registerFunction('__compiler_strftime', $fnStrftime);
-        $fntypeStrptime = $this->context->context->functionType(
-            $void,
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__value__*')
-        );
-        $fnStrptime = $this->context->module->addFunction('__compiler_strptime', $fntypeStrptime);
-        $this->context->registerFunction('__compiler_strptime', $fnStrptime);
+        // __compiler_strftime always-on shell removed (#33222): StringStrftime
+        // owns the ABI (getNamedFunction first via implementStrftimeBridge;
+        // Type::initialize still StringStrftime::ensureLinked on the full load path).
+        // Leftover Type empty decls vs Runtime ABI drift mint strftime.1
+        // (#31894 / #32122). User-script strftime()/gmstrftime() stay JitDate /
+        // StrftimeJitHelper (php-src ext/standard/datetime.c).
+        // __compiler_strptime always-on shell removed (#33224): StringStrptime
+        // owns the ABI (getNamedFunction first via implementStrptimeBridge;
+        // Type::initialize still StringStrptime::ensureLinked on the full load path;
+        // JitStrptime ensureLinked before lookup). Leftover Type empty decls vs
+        // Runtime ABI drift mint strptime.1 (#31894 / #32122). User-script
+        // strptime() stays JitStrptime / StrptimeJitHelper (php-src ext/date/php_date.c).
         // __compiler_date_interval_format always-on shell removed (#33203):
         // DateIntervalFormatRuntime owns the ABI (getNamedFunction first via
         // implementFormatBridge; Type::initialize still DateIntervalFormatRuntime::ensureLinked).
@@ -927,6 +921,8 @@ class Type extends Builtin {
         DateIntervalFormatRuntime::ensureLinked($this->context);
         StringDateTime::ensureLinked($this->context);
         StringDeployPath::ensureLinked($this->context);
+        StringStrftime::ensureLinked($this->context);
+        StringStrptime::ensureLinked($this->context);
         DefaultTimezoneRuntime::ensureLinked($this->context);
         DefaultTimezoneCivilRuntime::ensureLinked($this->context);
         InetRuntime::ensureLinked($this->context);

@@ -13,9 +13,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Assoc parse_url HT via parseUrlComponent + lastString/lastInt (#27078).
+ * Assoc parse_url HT via parseUrlComponent + lastString/lastInt (#27078, #33226).
  *
  * NestedJIT array returns / static string field copies are unsafe under thin AOT.
+ * Emitted under {@see ParseUrlRuntime} {@see BasicBlockHelper::scopeLoweringToFunction} (#27211).
  */
 final class ParseUrlAssocLlvm
 {
