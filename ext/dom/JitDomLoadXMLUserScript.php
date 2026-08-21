@@ -109,6 +109,28 @@ final class JitDomLoadXMLUserScript
     }
 
     /**
+     * Replace the compile-time document root markup after DOMDocument::replaceChild
+     * of documentElement so saveXML does not replay the old loadXML literal (#33379).
+     */
+    public static function refreshCompileTimeXmlReplaceRoot(
+        string $newRootOuterXml,
+        ?JITVariable $document = null
+    ): void {
+        $old = self::$lastCompileTimeXml;
+        self::commitRefreshedCompileTimeXml($newRootOuterXml, $old, null, $document);
+    }
+
+    /**
+     * Drop the loadXML literal so saveXML falls back to pinned documentElement slots (#33379).
+     */
+    public static function clearCompileTimeXmlForDocumentReplace(): void
+    {
+        self::$lastCompileTimeXml = null;
+        self::$treeMutatedSinceLoad = true;
+        self::$lastLoadWasPureUserScript = false;
+    }
+
+    /**
      * Compile-time XML for a specific DOMDocument receiver (stylesheet vs source doc) (#27392).
      */
     public static function compileTimeXmlFor(?JITVariable $document): ?string
