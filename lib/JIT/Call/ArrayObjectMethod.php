@@ -14,7 +14,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * ArrayObject thin-AOT methods (#26823, #33606, ext/spl/spl_array.c).
+ * ArrayObject thin-AOT methods (#26823, #33606, #33613, ext/spl/spl_array.c).
  */
 final class ArrayObjectMethod implements Call
 {
@@ -158,6 +158,29 @@ final class ArrayObjectMethod implements Call
                 static fn () => ArrayObjectJitHelper::compileNatcasesort(
                     $context,
                     $args[0] ?? throw new \LogicException('ArrayObject::natcasesort() called without $this')
+                )
+            ),
+            // php-src zim_ArrayObject_uasort/uksort — exactly 1 callback (#33613 / #30965).
+            'uasort' => $this->compileExact(
+                $context,
+                $args,
+                'ArrayObject::uasort',
+                1,
+                static fn () => ArrayObjectJitHelper::compileUasort(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::uasort() called without $this'),
+                    $args[1]
+                )
+            ),
+            'uksort' => $this->compileExact(
+                $context,
+                $args,
+                'ArrayObject::uksort',
+                1,
+                static fn () => ArrayObjectJitHelper::compileUksort(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::uksort() called without $this'),
+                    $args[1]
                 )
             ),
             default => throw new \LogicException(
