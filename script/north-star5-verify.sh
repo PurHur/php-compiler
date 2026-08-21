@@ -244,6 +244,7 @@ if [[ "${FAST_M5}" -eq 1 ]]; then
 
   if ci_llvm_ready; then
     ci_apply_llvm_memory_env
+    # Retries for gen-0 free(): invalid pointer flake live in the probe script (#33501).
     ns5_run 4f2 "VM driver execute probe (fast)" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-vm-driver-execute-probe
     echo
     echo "=== north-star5-verify step 4f3: spine bundle OK (prelinked blob, no relink) ==="
