@@ -37,6 +37,7 @@ use PHPLLVM\Value;
  * openssl_spki_new() (#32892 leftover of #8690);
  * openssl_pkcs12_export() (#32948 leftover of #6420);
  * openssl_pkcs12_export_to_file() (#32948 leftover of #6420);
+ * openssl_pkcs12_read() (#33444 leftover of #6420);
  * openssl_seal() / openssl_open() (#32979 leftover of #6523).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
@@ -63,6 +64,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_spki_new) / NETSCAPE_SPKI_sign
  * php-src: ext/openssl/pkcs12.c — PHP_FUNCTION(openssl_pkcs12_export) / PKCS12_create
  * php-src: ext/openssl/pkcs12.c — PHP_FUNCTION(openssl_pkcs12_export_to_file)
+ * php-src: ext/openssl/pkcs12.c — PHP_FUNCTION(openssl_pkcs12_read) / PKCS12_parse
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -829,6 +831,62 @@ final class JitOpensslX509
         }
 
         return self::boxedString($context, $spkac);
+    }
+
+    /**
+     * openssl_pkcs12_read() — bake {@see VmOpensslPkcs12Native::parsePkcs12} into &$certificates.
+     *
+     * php-src: ext/openssl/pkcs12.c PHP_FUNCTION(openssl_pkcs12_read) / PKCS12_parse
+     * By-ref $certificates is written via __value__writeHashtable (peer {@see self::seal}).
+     *
+     * PKCS#12 blob and passphrase must be compile-time string literals (thin AOT has no PHP FFI).
+     */
+    public static function pkcs12Read(
+        Context $context,
+        JITVariable $pkcs12,
+        JITVariable $certificates,
+        JITVariable $passphrase
+    ): Value {
+        $blob = JitStringArg::compileTimeLiteral($pkcs12);
+        if (null === $blob) {
+            throw new \LogicException(
+                'openssl_pkcs12_read() pkcs12 must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33444)'
+            );
+        }
+        $pass = JitStringArg::compileTimeLiteral($passphrase);
+        if (null === $pass) {
+            throw new \LogicException(
+                'openssl_pkcs12_read() passphrase must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33444)'
+            );
+        }
+
+        if (!VmOpensslPkcs12Native::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $parsed = VmOpensslPkcs12Native::parsePkcs12($blob, $pass);
+        if (false === $parsed) {
+            return self::boxedFalse($context);
+        }
+
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($parsed as $key => $pem) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->string($pem);
+            $ht->update($key, $var);
+        }
+        $htJit = HashTableHelper::variableFromVmHashTable($context, $ht);
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $certificates);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $outPtr,
+            $context->helper->loadValue($htJit)
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
+
+        return self::boxedBool($context, true);
     }
 
     /**

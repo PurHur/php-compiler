@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkcs12_read() — parse PKCS#12 keystore (php-src ext/openssl/pkcs12.c; #6420).
+ * openssl_pkcs12_read() — parse PKCS#12 keystore (php-src ext/openssl/pkcs12.c; #6420 VM, JIT/AOT #33444).
  */
 final class openssl_pkcs12_read extends Internal
 {
@@ -58,8 +58,12 @@ final class openssl_pkcs12_read extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_pkcs12_read() is not implemented for JIT in this compiler build (issue #6420)'
-        );
+        if (3 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'openssl_pkcs12_read() expects exactly 3 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitOpensslX509::pkcs12Read($context, $args[0], $args[1], $args[2]);
     }
 }

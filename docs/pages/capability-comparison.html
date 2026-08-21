@@ -52,7 +52,7 @@
           This is <em>not</em> a full php-src inventory — only items we measure in
           <a href="https://github.com/PurHur/php-compiler/blob/master/docs/capabilities-syntax.md"><code>capabilities-syntax.md</code></a>
           and <a href="https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md"><code>capabilities.md</code></a>.
-          Generated 2026-08-20 (matrix mtime).
+          Generated 2026-08-21 (matrix mtime).
         </p>
       </header>
 
@@ -64,8 +64,8 @@
         </article>
         <article>
           <div>Stdlib builtins</div>
-          <strong>1087</strong> / 1161 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">37 partial · 37 gaps</p>
+          <strong>1092</strong> / 1161 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">32 partial · 37 gaps</p>
         </article>
         <article>
           <div>Legend</div>
@@ -800,11 +800,11 @@
 <tr data-support="full"><td><code>`openssl_get_md_methods`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_get_privatekey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_get_publickey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`openssl_open`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
+<tr data-support="full"><td><code>`openssl_open`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`openssl_pbkdf2`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`openssl_pkcs12_export`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`openssl_pkcs12_export_to_file`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`openssl_pkcs12_read`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
+<tr data-support="full"><td><code>`openssl_pkcs12_export`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`openssl_pkcs12_export_to_file`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`openssl_pkcs12_read`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_pkcs7_decrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_pkcs7_encrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_pkcs7_read`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
@@ -823,7 +823,7 @@
 <tr data-support="full"><td><code>`openssl_public_decrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`openssl_public_encrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`openssl_random_pseudo_bytes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`openssl_seal`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
+<tr data-support="full"><td><code>`openssl_seal`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`openssl_sign`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`openssl_spki_export`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`openssl_spki_export_challenge`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
