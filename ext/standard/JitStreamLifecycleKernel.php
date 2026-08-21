@@ -220,9 +220,16 @@ final class JitStreamLifecycleKernel
             self::helperFunction($context, $helperLogical),
             [$handleI32]
         );
-        StreamLibcHandleRuntime::emitClearLlvmHandleSlot($context, $handle);
+        $helperI32 = JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i32);
+        // Thin AOT LLVM slots need libc fclose before clear (#33426); embed clear-only.
         $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i32)
+            StreamLibcHandleRuntime::emitCloseBridgeResult(
+                $context,
+                $fn,
+                $handle,
+                $helperI32,
+                '__compiler_pclose' === $abiName
+            )
         );
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();

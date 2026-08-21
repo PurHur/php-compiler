@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -96,6 +97,9 @@ final class JitStreamLibcHandleKernel
      * Thin standalone AOT {@see StreamGlobalsJit::implementThinIsResource} probes these
      * LLVM slots — NestedJIT fclose alone does not clear them (#27186). Must run for
      * LOAD_TYPE_STANDALONE as well as embed.
+     *
+     * Clear-only: FILE* must already be closed (NestedJIT helper path). Thin AOT
+     * LLVM-only slots need {@see emitLibcCloseAndClearLlvmHandleSlot} (#33426).
      */
     public static function emitClearLlvmHandleSlot(Context $context, Value $handle): void
     {
@@ -109,6 +113,201 @@ final class JitStreamLibcHandleKernel
         }
         $slot = $context->builder->gep($global, $zero, $handle);
         $context->builder->store($i8p->constNull(), $context->builder->bitcast($slot, $i8p->pointerType(0)));
+    }
+
+    /**
+     * fclose(3)/pclose(3) the FILE* in the LLVM handle slot, then null it (#33426).
+     *
+     * Thin standalone fopen stores FILE* only in {@see StreamGlobalsJit::GLOBAL_HANDLES};
+     * NestedJIT {@see StreamLifecycleJitHelper::fcloseArgv} never sees those slots and
+     * returns 0 — clear-only then discards the stdio write buffer.
+     *
+     * @return Value i32 — fclose ABI: 1 on libc success / 0 on miss or error;
+     *                     pclose ABI: wait status, or -1 when slot empty
+     */
+    public static function emitLibcCloseAndClearLlvmHandleSlot(
+        Context $context,
+        Value $handle,
+        bool $pclose
+    ): Value {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $zeroI64 = $i64->constInt(0, false);
+        $zeroI32 = $i32->constInt(0, false);
+        $oneI32 = $i32->constInt(1, false);
+        $minusOne = $i32->constInt(-1, true);
+        $nullPtr = $i8p->constNull();
+
+        LibcExtern::ensureStdioFile($context);
+        self::ensurePcloseDecl($context);
+
+        StreamGlobalsJit::ensureGlobals($context);
+        $global = $context->module->getNamedGlobal(StreamGlobalsJit::GLOBAL_HANDLES);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $missBb = $fn->appendBasicBlock($pclose ? 'llvm_pclose_miss' : 'llvm_fclose_miss');
+        $closeBb = $fn->appendBasicBlock($pclose ? 'llvm_pclose_do' : 'llvm_fclose_do');
+        $mergeBb = $fn->appendBasicBlock($pclose ? 'llvm_pclose_merge' : 'llvm_fclose_merge');
+
+        if (null === $global) {
+            $context->builder->branch($missBb);
+            $context->builder->positionAtEnd($missBb);
+            $context->builder->branch($mergeBb);
+            $context->builder->positionAtEnd($closeBb);
+            $context->builder->branch($mergeBb);
+            $context->builder->positionAtEnd($mergeBb);
+            $phi = $context->builder->phi($i32, $pclose ? 'llvm_pclose_r' : 'llvm_fclose_r');
+            $phi->addIncoming($pclose ? $minusOne : $zeroI32, $missBb);
+            $phi->addIncoming($pclose ? $minusOne : $zeroI32, $closeBb);
+
+            return $phi;
+        }
+
+        $slot = $context->builder->gep($global, $zeroI64, $handle);
+        $slotPtr = $context->builder->bitcast($slot, $i8p->pointerType(0));
+        $fp = $context->builder->load($slotPtr);
+        $hasFp = $context->builder->icmp(Builder::INT_NE, $fp, $nullPtr);
+        $context->builder->branchIf($hasFp, $closeBb, $missBb);
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($closeBb);
+        if ($pclose) {
+            $status = self::emitPcloseOrFcloseForSlot($context, $handle, $fp);
+        } else {
+            $rc = $context->builder->call($context->lookupFunction('fclose'), $fp);
+            $status = $context->builder->select(
+                $context->builder->icmp(Builder::INT_EQ, $rc, $zeroI32),
+                $oneI32,
+                $zeroI32
+            );
+        }
+        $context->builder->store($nullPtr, $slotPtr);
+        $popenGlobal = $context->module->getNamedGlobal('phpc_stream_is_popen');
+        if (null !== $popenGlobal) {
+            $popenSlot = $context->builder->gep($popenGlobal, $zeroI64, $handle);
+            $context->builder->store(
+                $i8->constInt(0, false),
+                $context->builder->bitcast($popenSlot, $i8->pointerType(0))
+            );
+        }
+        // Nested pclose/fclose blocks may move the insert point off $closeBb.
+        $closeEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($i32, $pclose ? 'llvm_pclose_r' : 'llvm_fclose_r');
+        $phi->addIncoming($pclose ? $minusOne : $zeroI32, $missBb);
+        $phi->addIncoming($status, $closeEnd);
+
+        return $phi;
+    }
+
+    /** php-src exec.c — popen FILE* uses pclose(3); plain FILE* fclose + status 0. */
+    private static function emitPcloseOrFcloseForSlot(Context $context, Value $handle, Value $fp): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $zeroI64 = $i64->constInt(0, false);
+        $zeroI32 = $i32->constInt(0, false);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $pcloseBb = $fn->appendBasicBlock('llvm_slot_pclose');
+        $fcloseBb = $fn->appendBasicBlock('llvm_slot_fclose');
+        $mergeBb = $fn->appendBasicBlock('llvm_slot_close_merge');
+
+        $isPopen = $i8->constInt(0, false);
+        $popenGlobal = $context->module->getNamedGlobal('phpc_stream_is_popen');
+        if (null !== $popenGlobal) {
+            $popenSlot = $context->builder->gep($popenGlobal, $zeroI64, $handle);
+            $isPopen = $context->builder->load($context->builder->bitcast($popenSlot, $i8->pointerType(0)));
+        }
+        $doPclose = $context->builder->icmp(Builder::INT_NE, $isPopen, $i8->constInt(0, false));
+        $context->builder->branchIf($doPclose, $pcloseBb, $fcloseBb);
+
+        $context->builder->positionAtEnd($pcloseBb);
+        $pcloseStatus = $context->builder->call($context->lookupFunction('pclose'), $fp);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($fcloseBb);
+        $context->builder->call($context->lookupFunction('fclose'), $fp);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($i32, 'llvm_slot_close_status');
+        $phi->addIncoming($pcloseStatus, $pcloseBb);
+        $phi->addIncoming($zeroI32, $fcloseBb);
+
+        return $phi;
+    }
+
+    private static function ensurePcloseDecl(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        try {
+            $context->lookupFunction('pclose');
+
+            return;
+        } catch (\LogicException) {
+        }
+        $fn = $context->module->getNamedFunction('pclose');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'pclose',
+                $context->context->functionType($i32, false, $i8p)
+            );
+        }
+        $context->registerFunction('pclose', $fn);
+    }
+
+    /**
+     * After NestedJIT fclose/pclose: libc-close LLVM slots when the helper missed (#33426).
+     *
+     * @return Value i32 ABI result
+     */
+    public static function emitCloseBridgeResult(
+        Context $context,
+        LlvmFunction $fn,
+        Value $handle,
+        Value $helperI32,
+        bool $pclose
+    ): Value {
+        $i32 = $context->getTypeFromString('int32');
+        if (!$pclose) {
+            $one = $i32->constInt(1, false);
+            $helperOk = $context->builder->icmp(Builder::INT_EQ, $helperI32, $one);
+            $okBb = $fn->appendBasicBlock('stream_fclose_helper_ok');
+            $libcBb = $fn->appendBasicBlock('stream_fclose_libc');
+            $mergeBb = $fn->appendBasicBlock('stream_fclose_merge');
+            $context->builder->branchIf($helperOk, $okBb, $libcBb);
+
+            $context->builder->positionAtEnd($okBb);
+            self::emitClearLlvmHandleSlot($context, $handle);
+            $context->builder->branch($mergeBb);
+
+            $context->builder->positionAtEnd($libcBb);
+            $libcOk = self::emitLibcCloseAndClearLlvmHandleSlot($context, $handle, false);
+            $libcEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($mergeBb);
+
+            $context->builder->positionAtEnd($mergeBb);
+            $phi = $context->builder->phi($i32, 'stream_fclose_result');
+            $phi->addIncoming($one, $okBb);
+            $phi->addIncoming($libcOk, $libcEnd);
+
+            return $phi;
+        }
+
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return self::emitLibcCloseAndClearLlvmHandleSlot($context, $handle, true);
+        }
+
+        self::emitClearLlvmHandleSlot($context, $handle);
+
+        return $helperI32;
     }
 
     private static function implementResolveStream(Context $context): void

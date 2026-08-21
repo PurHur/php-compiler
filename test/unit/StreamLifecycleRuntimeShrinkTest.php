@@ -59,6 +59,8 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('implementStandalone', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('emitCloseBridgeResult', $source);
+        $this->assertStringContainsString('StreamLibcHandleRuntime::emitCloseBridgeResult', $source);
         $this->assertLessThan(320, \substr_count($source, "\n") + 1);
     }
 
