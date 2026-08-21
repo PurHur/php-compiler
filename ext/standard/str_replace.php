@@ -286,14 +286,8 @@ final class str_replace extends Internal
 
     private static function isArrayReplaceArg(JITVariable $arg): bool
     {
-        if (JITVariable::TYPE_HASHTABLE === $arg->type) {
-            return true;
-        }
-        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
-            return true;
-        }
-
-        return false;
+        // Include TYPE_VALUE + compileTimeArray array literals (#33630).
+        return JitStrReplaceSubject::isKnownArray($arg);
     }
 
     /** @throws \TypeError */
