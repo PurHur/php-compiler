@@ -9336,9 +9336,19 @@ class JIT {
                                 break;
                             }
                         }
-                        if (null !== $containerOp->type
-                            && \PHPTypes\Type::TYPE_OBJECT === $containerOp->type->type
-                            && null !== $op->arg3
+                        // Value-boxed ArrayAccess after unserialize() often lacks CFG TYPE_OBJECT
+                        // (#33636). Never broaden under NestedJitCompileScope — NestedJIT string
+                        // params are TYPE_VALUE and `$s[$i]` must stay string-dim.
+                        $cfgIsArray = null !== $containerOp->type
+                            && \PHPTypes\Type::TYPE_ARRAY === $containerOp->type->type;
+                        $cfgIsString = null !== $containerOp->type
+                            && \PHPTypes\Type::TYPE_STRING === $containerOp->type->type;
+                        if (
+                            null !== $op->arg3
+                            && !$value->valueBoxHashtable
+                            && !JIT\NestedJitCompileScope::isActive()
+                            && !$cfgIsArray
+                            && !$cfgIsString
                         ) {
                             $arrayAccess = JIT\ArrayAccessHelper::tryCompileDimFetch(
                                 $this->context,
