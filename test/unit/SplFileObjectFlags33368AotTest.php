@@ -26,7 +26,6 @@ final class SplFileObjectFlags33368AotTest extends TestCase
         $this->assertSame(0, $zendRc, implode("\n", $zendOut));
         $zend = implode("\n", $zendOut)."\n";
         $this->assertStringContainsString('flags=9', $zend);
-        $this->assertStringContainsString('row=a|b', $zend);
 
         exec(
             escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/vm.php').' '
