@@ -7750,6 +7750,7 @@ require_once __DIR__.'/../../../ext/soap/UseSoapErrorHandlerJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Call/NoOpConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/MultipleIteratorZipLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SscanfStrtolApply.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SscanfFgetsThinArray.php';
 require_once __DIR__.'/../../../lib/JIT/JitIncDec.php';
 require_once __DIR__.'/../../../lib/VM/VmIncDec.php';
 require_once __DIR__.'/../../../ext/dom/DomAttrIsIdJitHelper.php';

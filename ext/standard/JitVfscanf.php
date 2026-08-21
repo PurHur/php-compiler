@@ -8,6 +8,8 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Sscanf;
 use PHPCompiler\JIT\Builtin\SscanfStrtolApply;
 use PHPCompiler\JIT\Builtin\StreamReadRuntime;
+use PHPCompiler\JIT\Builtin\SscanfFgetsThinArray;
+use PHPCompiler\JIT\Builtin\StringSscanfArray;
 use PHPCompiler\JIT\Builtin\StringSscanfByRef;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -51,25 +53,53 @@ final class JitVfscanf
         }
 
         $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $args[0], $function.'() stream'),
             $i64
         );
+
+        return self::parseFromHandle(
+            $context,
+            $function,
+            $handle,
+            $args[1],
+            $fmtLit,
+            \array_slice($args, 2)
+        );
+    }
+
+    /**
+     * fscanf/vfscanf from a live stream-handle LLVM value (SplFileObject::__spl_fd, #33382).
+     * Array-return (no by-ref outs) uses fgets + {@see __compiler_sscanf_array}.
+     *
+     * @param list<JITVariable> $outArgs
+     */
+    public static function parseFromHandle(
+        Context $context,
+        string $function,
+        Value $handle,
+        JITVariable $formatArg,
+        ?string $fmtLit,
+        array $outArgs,
+        int $formatArgIndex = 1
+    ): Value {
         $fmt = $context->callerStrictTypes
-            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], $function, 1, 'format')
-            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], $function, 1, 'format');
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $formatArg, $function, $formatArgIndex, 'format')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $formatArg, $function, $formatArgIndex, 'format');
         // declare(strict_types=1): null format rejects via lowerStrictOrCoercible — do not continue (#30236).
         if ($context->callerStrictTypes
-            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))
+            && (JITVariable::TYPE_NULL === $formatArg->type || ($formatArg->isNullConstant ?? false))
         ) {
             return $context->getTypeFromString('__value__*')->constNull();
         }
-        $outCount = $argc - 2;
+
+        $outCount = \count($outArgs);
         if (0 === $outCount) {
-            throw new \LogicException($function.'() without by-ref targets requires compile-time stream/format in this compiler build');
+            return self::parseArrayFromHandle($context, $handle, $fmt, $fmtLit);
         }
 
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
         $useStrtol = null !== $fmtLit
             && SscanfStrtolApply::isStrtolOnlyFormat($fmtLit)
             && $context->isThinStandaloneAotMain();
@@ -107,7 +137,7 @@ final class JitVfscanf
                 $outPtrs,
                 $i64->constInt($i, false)
             );
-            $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[$i + 2]);
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $outArgs[$i]);
             $context->builder->store($valuePtr, $slot);
         }
 
@@ -137,17 +167,19 @@ final class JitVfscanf
         $context->builder->branchIf($empty, $failBb, $scanBb);
 
         $context->builder->positionAtEnd($scanBb);
+        // libc fgets strings need a NestedJIT-safe copy before __compiler_sscanf (#27663 / #33382).
+        $scanLine = $useStrtol ? $line : self::copyStringForNestedJit($context, $line);
         if ($useStrtol) {
             $assigned = $context->builder->call(
                 $context->lookupFunction('phpc_sscanf_strtol_assign'),
-                $line,
+                $scanLine,
                 $i64->constInt($outCount, false),
                 $outPtrs
             );
         } else {
             $assigned = $context->builder->call(
                 $context->lookupFunction('__compiler_sscanf'),
-                $line,
+                $scanLine,
                 $fmt,
                 $i64->constInt($outCount, false),
                 $outPtrs
@@ -161,6 +193,107 @@ final class JitVfscanf
         $context->builder->call($context->lookupFunction('__mm__free'), $raw);
 
         return self::boxAssignedCount($context, $count);
+    }
+
+    /**
+     * Two-arg fscanf array return from a live handle (#33382 / #9284).
+     * EOF (fgets null) → null (Zend SplFileObject::fscanf); otherwise
+     * NestedJIT-safe line copy + {@see __compiler_sscanf_array}.
+     */
+    public static function parseArrayFromHandle(
+        Context $context,
+        Value $handle,
+        Value $fmt,
+        ?string $fmtLit = null
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        Sscanf::ensureLinked($context);
+        $useThin = null !== $fmtLit && SscanfFgetsThinArray::supportsFormat($fmtLit);
+        if (!$useThin) {
+            StringSscanfArray::ensureLinked($context);
+        }
+        if ($context->isThinStandaloneAotMain()) {
+            StreamReadRuntime::forceLibcStreamPositionAbis($context);
+        } else {
+            StreamReadRuntime::ensureVfscanfAbi($context);
+        }
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        }
+
+        $id = (string) \spl_object_id($context);
+        $failBb = BasicBlockHelper::append($context, 'vfscanf_arr_fgets_fail_'.$id);
+        $scanBb = BasicBlockHelper::append($context, 'vfscanf_arr_scan_'.$id);
+        $doneBb = BasicBlockHelper::append($context, 'vfscanf_arr_done_'.$id);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+
+        $line = $context->builder->call(
+            $context->lookupFunction('__compiler_fgets'),
+            $handle,
+            $i64->constInt(-1, true)
+        );
+        $lineNull = $context->builder->icmp(Builder::INT_EQ, $line, $strPtr->constNull());
+        $context->builder->branchIf($lineNull, $failBb, $scanBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $eofSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $eofSlot)
+        );
+        $context->builder->store(JitValueBox::pointer($context, $eofSlot), $resultSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($scanBb);
+        if ($useThin) {
+            $boxed = SscanfFgetsThinArray::scanToArrayBox($context, $line, $fmtLit);
+            $context->builder->store($boxed, $resultSlot);
+        } else {
+            $safeLine = self::copyStringForNestedJit($context, $line);
+            $scanned = $context->builder->call(
+                $context->lookupFunction('__compiler_sscanf_array'),
+                $safeLine,
+                $fmt
+            );
+            $context->builder->store($scanned, $resultSlot);
+        }
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Copy {@see __string__*} bytes into a fresh {@see __string__init} for NestedJIT (#24137 / #27663).
+     */
+    private static function copyStringForNestedJit(Context $context, Value $payload): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $separated = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $payload
+        );
+        $slot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $context->builder->store($separated, $slot);
+        $loaded = $context->builder->load($slot);
+        $map = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $loaded);
+        $src = $context->builder->pointerCast(
+            $context->builder->structGep($loaded, $map['value']),
+            $i8p
+        );
+        $copy = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $src
+        );
+        $context->refcount->disableRefcount($copy);
+
+        return $copy;
     }
 
     private static function boxAssignedCount(Context $context, Value $raw): Value

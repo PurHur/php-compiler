@@ -1501,12 +1501,13 @@ class Context {
         // SplFileObject — `__spl_ht` + `__pathname` + `__spl_fd` (#33305/#33308/#33318) + iterator (#33319);
         // getCurrentLine → fgets (#33321); fread/fgetc (#33332); ftell/flock (#33336); fstat (#33359);
         // ftruncate (#33348); fflush (#33354); fpassthru (#33358); fputcsv (#33340); fgetcsv (#33346);
-        // fseek (#33347); seek (#33364); setFlags/getFlags (#33368); setMaxLineLen/getMaxLineLen (#33377);
-        // setCsvControl/getCsvControl (#33371); inherited SplFileInfo stats (#33313).
+        // fscanf (#33382); fseek (#33347); seek (#33364); setFlags/getFlags (#33368);
+        // setMaxLineLen/getMaxLineLen (#33377); setCsvControl/getCsvControl (#33371);
+        // inherited SplFileInfo stats (#33313).
         $this->type->object->lookup('SplFileObject');
         foreach ([
             '__construct', 'getFilename', 'getPathname', 'getPath', '__toString',
-            'fgets', 'getCurrentLine', 'fread', 'fgetc', 'fwrite', 'fputcsv', 'fgetcsv',
+            'fgets', 'getCurrentLine', 'fread', 'fgetc', 'fwrite', 'fputcsv', 'fgetcsv', 'fscanf',
             'setCsvControl', 'getCsvControl', 'eof',
             'ftell', 'fstat', 'flock', 'ftruncate', 'fflush', 'fpassthru', 'fseek', 'seek',
             'setFlags', 'getFlags', 'setMaxLineLen', 'getMaxLineLen',

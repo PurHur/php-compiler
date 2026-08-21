@@ -14,6 +14,7 @@ use PHPCompiler\ext\standard\JitFseek;
 use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitFtruncate;
 use PHPCompiler\ext\standard\JitPath;
+use PHPCompiler\ext\standard\JitVfscanf;
 use PHPCompiler\ext\standard\StatFieldsJitHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\FputcsvRuntime;
@@ -53,6 +54,7 @@ use PHPLLVM\Value;
  * fpassthru on `__spl_fd` (#33358) via JitFpassthru (peer procedural #1194).
  * fputcsv on `__spl_fd` (#33340) via JitFputcsv (peer procedural #33334 / #27180).
  * fgetcsv on `__spl_fd` (#33346) via JitFgetcsv (peer procedural #33334 / #1192).
+ * fscanf on `__spl_fd` (#33382) via JitVfscanf (peer procedural fscanf / zim_SplFileObject_fscanf).
  * fseek on `__spl_fd` (#33347) via JitFseek (clears iterator line cache like rewind).
  * seek (SeekableIterator line) (#33364) — rewind + read-line loop + key bump.
  * setFlags/getFlags on `__spl_flags` (#33368).
@@ -63,8 +65,8 @@ use PHPLLVM\Value;
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
  * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_ftruncate /
  * zim_SplFileObject_fflush / zim_SplFileObject_fpassthru / zim_SplFileObject_fputcsv /
- * zim_SplFileObject_fgetcsv / zim_SplFileObject_fseek / zim_SplFileObject_seek /
- * zim_SplFileObject_setFlags / zim_SplFileObject_getFlags /
+ * zim_SplFileObject_fgetcsv / zim_SplFileObject_fscanf / zim_SplFileObject_fseek /
+ * zim_SplFileObject_seek / zim_SplFileObject_setFlags / zim_SplFileObject_getFlags /
  * zim_SplFileObject_setCsvControl / zim_SplFileObject_getCsvControl /
  * zim_SplFileInfo_openFile
  */
@@ -660,6 +662,40 @@ final class SplFileObjectJitHelper
         }
 
         return JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
+    }
+
+    /**
+     * SplFileObject::fscanf — formatted read on live handle (#33382).
+     * php-src: zim_SplFileObject_fscanf → php_stream_scanf / peer fscanf()
+     *
+     * @param list<JITVariable> $outArgs by-ref targets (empty → array return)
+     */
+    public static function compileFscanf(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $formatArg,
+        JITVariable ...$outArgs
+    ): Value {
+        self::ensureStreamAbis($context);
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        // spl_filesystem_file_free_line — drop cached iterator line before scanf read.
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $handle = self::loadFd($context, $receiver);
+        $fmtLit = $formatArg->compileTimeString ?? null;
+        if (($formatArg->isNullConstant ?? false) && null === $fmtLit) {
+            $fmtLit = $context->callerStrictTypes ? null : '';
+        }
+
+        return JitVfscanf::parseFromHandle(
+            $context,
+            'SplFileObject::fscanf',
+            $handle,
+            $formatArg,
+            $fmtLit,
+            $outArgs,
+            0
+        );
     }
 
     /**

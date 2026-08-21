@@ -11,7 +11,7 @@ use PHPCompiler\VM\SplFileObjectJitHelper;
 use PHPLLVM\Value;
 
 /**
- * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, #33346, #33347, #33348, #33354, #33358, #33359, #33364, #33368, #33371, #33377, ext/spl/spl_directory.c).
+ * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, #33346, #33347, #33348, #33354, #33358, #33359, #33364, #33368, #33371, #33377, #33382, ext/spl/spl_directory.c).
  */
 final class SplFileObjectMethod implements Call
 {
@@ -126,6 +126,14 @@ final class SplFileObjectMethod implements Call
                 $args[1] ?? null,
                 $args[2] ?? null,
                 $args[3] ?? null
+            ),
+            'fscanf' => SplFileObjectJitHelper::compileFscanf(
+                $context,
+                $args[0],
+                $args[1] ?? throw new \ArgumentCountError(
+                    'SplFileObject::fscanf() expects at least 1 argument, 0 given'
+                ),
+                ...\array_slice($args, 2)
             ),
             'setcsvcontrol' => SplFileObjectJitHelper::compileSetCsvControl(
                 $context,

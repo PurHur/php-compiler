@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -74,13 +74,16 @@ final class StringSscanfArray
         $arrayOutBb = $fn->appendBasicBlock('sscanf_arr_bridge_array');
         $context->builder->positionAtEnd($entry);
 
-        $ht = $context->builder->call(
+        // NestedJIT may return __value__* (boxed HT) or __hashtable__* — coerce like
+        // StringFgetcsvJit (#33382 / #25653). Always re-box into a fresh slot so the
+        // pointer is not a NestedJIT frame temporary.
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::PARSE_ARRAY_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1)
+            [$fn->getParam(0), $fn->getParam(1)]
         );
-        $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
-        $context->builder->branchIf($htNull, $nullOutBb, $arrayOutBb);
+        $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $htRaw);
+        $context->builder->branchIf($isNull, $nullOutBb, $arrayOutBb);
 
         $context->builder->positionAtEnd($nullOutBb);
         $nullSlot = JitValueBox::alloc($context);
@@ -89,6 +92,7 @@ final class StringSscanfArray
         $context->builder->returnValue($nullPtr);
 
         $context->builder->positionAtEnd($arrayOutBb);
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $resultSlot = JitValueBox::alloc($context);
         $resultPtr = JitValueBox::pointer($context, $resultSlot);
         $context->builder->call(
