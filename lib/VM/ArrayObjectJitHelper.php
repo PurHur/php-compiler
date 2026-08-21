@@ -792,7 +792,7 @@ final class ArrayObjectJitHelper
      *
      * Restores bag storage into `__spl_ht` and `__flags`. Does not overwrite
      * slot 0 with firstIntProp (that corrupted the HT pointer — SIGSEGV on json_encode).
-     * String keys via UnserializeSplArrayFillNestedJitHelper (#33636 / #33663 string values);
+     * String keys via UnserializeSplArrayFillNestedJitHelper (#33636 / #33663 / #33670 float/bool/null);
      * packed int keys via UnserializeSplArrayFillIntKeyNestedJitHelper (#33654).
      *
      * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925.
@@ -809,6 +809,9 @@ final class ArrayObjectJitHelper
             new \PHPCompiler\ext\standard\phpc_native_ht_alloc(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_long(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_double(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_bool(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_null(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),

@@ -85,6 +85,48 @@ final class ParseStrNativeOpsJit
         );
     }
 
+    /**
+     * String-key double store — NestedJIT may pass a serialized `d:…` text as string (#33670).
+     */
+    public static function setStringKeyDouble(Context $context, JITVariable $htPtr, JITVariable $key, JITVariable $value): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $doubleVal = self::doubleFromVar($context, $value);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyDouble'),
+            $ht,
+            $keyStr,
+            $doubleVal
+        );
+    }
+
+    /** String-key bool store (#33670). */
+    public static function setStringKeyBool(Context $context, JITVariable $htPtr, JITVariable $key, JITVariable $value): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $boolVal = \PHPCompiler\JIT\JitBoolArg::lower($context, $value, 'phpc_native_ht bool value');
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyBool'),
+            $ht,
+            $keyStr,
+            $boolVal
+        );
+    }
+
+    /** String-key null store (#33670). */
+    public static function setStringKeyNull(Context $context, JITVariable $htPtr, JITVariable $key): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyNull'),
+            $ht,
+            $keyStr
+        );
+    }
+
     public static function setHashtableAt(Context $context, JITVariable $htPtr, JITVariable $index, JITVariable $childPtr): void
     {
         $ht = self::htFromI64($context, $htPtr);
@@ -132,6 +174,42 @@ final class ParseStrNativeOpsJit
             $context->lookupFunction('__hashtable__setNullAt'),
             $ht,
             $idx
+        );
+    }
+
+    private static function doubleFromVar(Context $context, JITVariable $var): Value
+    {
+        $double = $context->getTypeFromString('double');
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $var->type) {
+            $raw = $var->value;
+            $ty = $context->getStringFromType($raw->typeOf());
+            if ('double' === $ty || 'float' === $ty) {
+                return $raw;
+            }
+
+            return $context->builder->load($raw);
+        }
+        if (JITVariable::TYPE_STRING === $var->type) {
+            return JitLongArg::lowerStringToDouble(
+                $context,
+                self::ownedString($context, self::loadStringArg($context, $var))
+            );
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $var->type) {
+            return $context->builder->siToFp(
+                JitLongArg::lower($context, $var, 'phpc_native_ht double from long'),
+                $double
+            );
+        }
+        if (JITVariable::TYPE_VALUE === $var->type) {
+            $raw = $var->value;
+            if (JitNestedHelperCoerce::isValueBox($context, $raw)) {
+                return JitNestedHelperCoerce::extractDoubleFromHelperResult($context, $raw);
+            }
+        }
+
+        throw new \LogicException(
+            'ParseStrNativeOpsJit: expected double/string long for setStringKeyDouble, got type '.$var->type
         );
     }
 
