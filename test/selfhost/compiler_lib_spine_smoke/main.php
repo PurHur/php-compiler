@@ -3425,6 +3425,7 @@ require_once __DIR__.'/../../../ext/standard/UnpackEngine.php';
 require_once __DIR__.'/../../../ext/standard/UnpackJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UnserializeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UnserializeObjectNestedJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/UnserializeSplArrayFillIntKeyNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UnserializeSplArrayFillNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UnserializeSplArrayFindNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UnserializeSplArrayFlagsNestedJitHelper.php';
