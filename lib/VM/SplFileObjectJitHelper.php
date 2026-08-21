@@ -116,8 +116,10 @@ final class SplFileObjectJitHelper
     public const PROP_MAX_LINE_LEN = '__spl_max_line_len';
 
     /**
-     * Local EOF latch — AOT `__compiler_feof` is wrong after fopen (always 1);
-     * track from failed fgets instead (#33319).
+     * Local EOF latch — AOT `__compiler_feof` is untrusted right after fopen
+     * (can read as always-1); clear on construct/rewind/fseek, set on NULL
+     * fgets, and refresh from `__compiler_feof` after a successful get_line
+     * so last-line reads match Zend (#33319 / #33555).
      */
     public const PROP_AT_EOF = '__spl_at_eof';
 
@@ -807,6 +809,8 @@ final class SplFileObjectJitHelper
         $context->builder->branchIf($empty, $eofBb, $scanBb);
 
         $context->builder->positionAtEnd($scanBb);
+        // Successful get_line — refresh EOF latch from stream feof (#33555).
+        self::storeAtEofFromStreamFeof($context, $obj, $handle);
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         SscanfSimpleArrayApply::ensureLinked($context);
         if (null !== $savedBlock) {
@@ -1419,7 +1423,8 @@ final class SplFileObjectJitHelper
         $context->builder->positionAtEnd($acceptBb);
         $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
         $csvBox = self::emitCsvFieldsValueBox($context, $stripped, $separator);
-        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+        // Successful get_line — refresh EOF latch from stream feof (#33555).
+        self::storeAtEofFromStreamFeof($context, $obj, $handle);
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(1, false));
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $stripped);
         if ($lineAdd > 0) {
@@ -1636,7 +1641,9 @@ final class SplFileObjectJitHelper
             $context->builder->branchIf($skip, $loopBb, $acceptBb);
             $context->builder->positionAtEnd($acceptBb);
         }
-        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+        // Successful get_line — refresh EOF latch from stream feof (#33555).
+        // Forcing 0 here left eof() false after the last line while Zend is true.
+        self::storeAtEofFromStreamFeof($context, $obj, $handle);
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(1, false));
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $line);
         if ($lineAdd > 0) {
@@ -1773,6 +1780,26 @@ final class SplFileObjectJitHelper
         StreamIo::ensureLinked($context);
         StreamRead::ensureLinked($context);
         StreamLifecycle::ensureLinked($context);
+    }
+
+    /**
+     * After a successful get_line, set PROP_AT_EOF from `__compiler_feof`.
+     * Do not call right after fopen — feof can be sticky-true (#33319).
+     * php-src: zim_SplFileObject_eof / stream feof after fgets (#33555).
+     */
+    private static function storeAtEofFromStreamFeof(Context $context, Value $obj, Value $handle): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $feofI32 = $context->builder->call(
+            $context->lookupFunction('__compiler_feof'),
+            $handle
+        );
+        self::storeLongProp(
+            $context,
+            $obj,
+            self::PROP_AT_EOF,
+            $context->builder->zExt($feofI32, $i64)
+        );
     }
 
     private static function initConstructedFromPath(

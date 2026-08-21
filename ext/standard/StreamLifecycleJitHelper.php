@@ -65,6 +65,10 @@ final class StreamLifecycleJitHelper
         if (VmFs::isValidHandle($handle)) {
             return VmFs::feof($handle) ? 1 : 0;
         }
+        // php://memory|temp NestedJIT table (#23777) — before libc / unknown fallback.
+        if (JitOpenStreamHandles::isOpen($handle)) {
+            return JitMemoryStreamHelper::feof($handle) ? 1 : 0;
+        }
         if (!StreamLibcHandleJitHelper::isOpen($handle)) {
             return 1;
         }
