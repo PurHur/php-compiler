@@ -11,9 +11,9 @@ use PHPCompiler\VM\DirectoryIteratorJitHelper;
 use PHPLLVM\Value;
 
 /**
- * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289 … #33290).
+ * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289 … #33299).
  *
- * php-src: ext/spl/spl_directory.c — zim_SplFileInfo___construct / getRealPath / getLinkTarget / …
+ * php-src: ext/spl/spl_directory.c — zim_SplFileInfo___construct / getFileInfo / getPathInfo / …
  */
 final class DirectoryIteratorMethod implements Call
 {
@@ -85,6 +85,8 @@ final class DirectoryIteratorMethod implements Call
             'isreadable' => DirectoryIteratorJitHelper::compileIsReadable($context, $args[0], $this->className),
             'iswritable' => DirectoryIteratorJitHelper::compileIsWritable($context, $args[0], $this->className),
             'isexecutable' => DirectoryIteratorJitHelper::compileIsExecutable($context, $args[0], $this->className),
+            'getfileinfo' => DirectoryIteratorJitHelper::compileGetFileInfo($context, $args[0], $this->className),
+            'getpathinfo' => DirectoryIteratorJitHelper::compileGetPathInfo($context, $args[0], $this->className),
             // DirectoryIterator::__toString → filename; SplFileInfo::__toString → pathname (php-src).
             '__tostring' => 'SplFileInfo' === $this->className
                 ? DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className)

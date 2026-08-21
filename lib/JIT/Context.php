@@ -1490,6 +1490,7 @@ class Context {
             'isFile', 'isDir',
             'isLink', 'getLinkTarget', 'isReadable', 'isWritable', 'isExecutable',
             'getPathname', 'getPath', 'getExtension', 'getBasename', 'getType', '__toString',
+            'getFileInfo', 'getPathInfo',
         ] as $sfiMethod) {
             $this->functionProxies['splfileinfo::'.strtolower($sfiMethod)] = new Call\DirectoryIteratorMethod(
                 $sfiMethod,

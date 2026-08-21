@@ -4128,6 +4128,7 @@ class Object_ extends Type {
                 'getperms', 'getowner', 'getgroup', 'getinode',
                 '__tostring', 'isfile', 'isdir',
                 'islink', 'getlinktarget', 'isreadable', 'iswritable', 'isexecutable',
+                'getfileinfo', 'getpathinfo',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }

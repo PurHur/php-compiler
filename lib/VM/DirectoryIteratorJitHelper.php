@@ -24,10 +24,10 @@ use PHPLLVM\Value;
 
 /**
  * Thin-AOT DirectoryIterator / FilesystemIterator / SplFileInfo — snapshot + path props
- * (#27289, #33263, #33274, #33276, #33280, #33289, #33290).
+ * (#27289, #33263, #33274, #33276, #33280, #33289, #33290, #33299).
  *
  * DirectoryIterator construct lists entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}.
- * SplFileInfo construct splits pathname via call-site {@see JitPath} (#33290).
+ * SplFileInfo construct splits pathname via {@see SplFileInfoStorage::splitPathComponents} (#33290/#33299).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
  * isFile/isDir/getPath/getPathname/getSize/getExtension/getType/getLinkTarget join `__dir_path`+`__filename`.
  *
@@ -44,6 +44,8 @@ final class DirectoryIteratorJitHelper
     public const PROP_PATH = '__dir_path';
 
     public const PROP_FLAGS = '__flags';
+
+    private static int $sfiSplitSerial = 0;
 
     public static function compileConstruct(
         Context $context,
@@ -91,7 +93,12 @@ final class DirectoryIteratorJitHelper
     }
 
     /**
-     * SplFileInfo::__construct($filename) — split into `__dir_path` + `__filename` (#33290).
+     * SplFileInfo::__construct($filename) — split into `__dir_path` + `__filename` (#33290 / #33299).
+     *
+     * Mirrors {@see \PHPCompiler\ext\spl\SplFileInfoStorage::splitPathComponents} + filename()
+     * (not php dirname/basename — empty path vs ".", leading-slash single-segment filenames).
+     * Call-site LLVM avoids NestedJIT PathJitHelper null-string ABI under thin AOT (#26905).
+     *
      * php-src: zim_SplFileInfo___construct / spl_filesystem_info_set_filename
      */
     public static function compileSplFileInfoConstruct(
@@ -100,24 +107,256 @@ final class DirectoryIteratorJitHelper
         JITVariable $pathArg
     ): Value {
         $obj = self::loadObject($context, $receiver);
-        $objectType = $context->type->object;
         $pathStr = self::loadString($context, $pathArg);
-        // Call-site LLVM (JitPath) — NestedJIT PathJitHelper / string-index helpers segfault
-        // under thin AOT (#26905 / #33290). SplFileInfoStorage empty-path vs dirname(".") :
-        // when basename length equals pathname length there is no directory component.
-        $namePtr = JitPath::basename($context, $pathStr);
-        $dirPtr = JitPath::dirname($context, $pathStr);
-        $i64 = $context->getTypeFromString('int64');
-        $pathLen = $context->builder->call($context->lookupFunction('__string__strlen'), $pathStr);
-        $nameLen = $context->builder->call($context->lookupFunction('__string__strlen'), $namePtr);
-        $noDir = $context->builder->icmp(Builder::INT_EQ, $pathLen, $nameLen);
-        $empty = $context->builder->load($context->constantStringFromString(''));
-        $dirOut = $context->builder->select($noDir, $empty, $dirPtr);
-        self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_PATH, $dirOut);
-        self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_FILENAME, $namePtr);
-        $objectType->markObjectConstructed($obj);
+        self::initSplFileInfoPathProps($context, $obj, $pathStr);
+        $context->type->object->markObjectConstructed($obj);
 
         return self::voidResult($context);
+    }
+
+    /**
+     * SplFileInfo::getFileInfo — new SplFileInfo(pathname) (#33299).
+     * php-src: zim_SplFileInfo_getFileInfo / spl_filesystem_object_create_type(SPL_FS_INFO)
+     * Default info class only (optional \$class follow-up).
+     */
+    public static function compileGetFileInfo(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+        $info = self::allocateInitializedSplFileInfo($context, $pathname);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $info
+        );
+
+        return $slot;
+    }
+
+    /**
+     * SplFileInfo::getPathInfo — new SplFileInfo(dirname(pathname)) or null (#33299).
+     * php-src: zim_SplFileInfo_getPathInfo
+     */
+    public static function compileGetPathInfo(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $pathname);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+
+        $nullBb = BasicBlockHelper::append($context, 'sfi_pathinfo_null');
+        $okBb = BasicBlockHelper::append($context, 'sfi_pathinfo_ok');
+        $doneBb = BasicBlockHelper::append($context, 'sfi_pathinfo_done');
+        $slot = JitValueBox::alloc($context);
+        $context->builder->branchIf($empty, $nullBb, $okBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $dir = JitPath::dirname($context, $pathname);
+        $info = self::allocateInitializedSplFileInfo($context, $dir);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $info
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $slot;
+    }
+
+    /** Allocate SplFileInfo and init path props from a pathname string. */
+    private static function allocateInitializedSplFileInfo(Context $context, Value $pathname): Value
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('SplFileInfo');
+        $obj = $objectType->allocate($classId);
+        self::initSplFileInfoPathProps($context, $obj, $pathname);
+        $objectType->markObjectConstructed($obj);
+
+        return $obj;
+    }
+
+    private static function initSplFileInfoPathProps(Context $context, Value $obj, Value $pathStr): void
+    {
+        [$dirPtr, $filePtr] = self::emitSplFileInfoPathParts($context, $pathStr);
+        self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_PATH, $dirPtr);
+        self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_FILENAME, $filePtr);
+    }
+
+    /**
+     * @return array{0: Value, 1: Value} [dir, filename] matching SplFileInfoStorage
+     */
+    private static function emitSplFileInfoPathParts(Context $context, Value $pathStr): array
+    {
+        $id = (string) (++self::$sfiSplitSerial);
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $strMap = $context->structFieldMap['__string__'];
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $slash = $i8->constInt(ord('/'), false);
+
+        $origLen = $context->builder->call($context->lookupFunction('__string__strlen'), $pathStr);
+        $bytes = $context->builder->pointerCast(
+            $context->builder->structGep($pathStr, $strMap['value']),
+            $i8p
+        );
+
+        $pathLenSlot = $context->builder->alloca($i64);
+        $context->builder->store($origLen, $pathLenSlot);
+
+        $stripCheck = BasicBlockHelper::append($context, 'sfi_strip_check_'.$id);
+        $stripBody = BasicBlockHelper::append($context, 'sfi_strip_body_'.$id);
+        $stripCont = BasicBlockHelper::append($context, 'sfi_strip_cont_'.$id);
+        $afterStrip = BasicBlockHelper::append($context, 'sfi_after_strip_'.$id);
+        $context->builder->branch($stripCheck);
+
+        $context->builder->positionAtEnd($stripCheck);
+        $pl = $context->builder->load($pathLenSlot);
+        $gt1 = $context->builder->icmp(Builder::INT_SGT, $pl, $one);
+        $stripProbe = BasicBlockHelper::append($context, 'sfi_strip_probe_'.$id);
+        $context->builder->branchIf($gt1, $stripProbe, $afterStrip);
+
+        $context->builder->positionAtEnd($stripProbe);
+        $lastIdx = $context->builder->sub($pl, $one);
+        $lastByte = $context->builder->load($context->builder->gep($bytes, $lastIdx));
+        $lastSlash = $context->builder->icmp(Builder::INT_EQ, $lastByte, $slash);
+        $context->builder->branchIf($lastSlash, $stripBody, $afterStrip);
+
+        $context->builder->positionAtEnd($stripBody);
+        $pl2 = $context->builder->load($pathLenSlot);
+        $context->builder->store($context->builder->sub($pl2, $one), $pathLenSlot);
+        $context->builder->branch($stripCont);
+
+        $context->builder->positionAtEnd($stripCont);
+        $pl3 = $context->builder->load($pathLenSlot);
+        $stillGt1 = $context->builder->icmp(Builder::INT_SGT, $pl3, $one);
+        $idx3 = $context->builder->sub($pl3, $one);
+        $byte3 = $context->builder->load($context->builder->gep($bytes, $idx3));
+        $stillSlash = $context->builder->icmp(Builder::INT_EQ, $byte3, $slash);
+        $keepStrip = $context->builder->and($stillGt1, $stillSlash);
+        $context->builder->branchIf($keepStrip, $stripBody, $afterStrip);
+
+        $context->builder->positionAtEnd($afterStrip);
+        $fileNameSlot = $context->builder->alloca($strPtrTy);
+        $trimmedLen = $context->builder->load($pathLenSlot);
+        $wasTrimmed = $context->builder->icmp(Builder::INT_SLT, $trimmedLen, $origLen);
+        $mkFile = BasicBlockHelper::append($context, 'sfi_mk_file_'.$id);
+        $keepPath = BasicBlockHelper::append($context, 'sfi_keep_path_'.$id);
+        $afterFile = BasicBlockHelper::append($context, 'sfi_after_file_'.$id);
+        $context->builder->branchIf($wasTrimmed, $mkFile, $keepPath);
+
+        $context->builder->positionAtEnd($mkFile);
+        $trimmed = string_trim::jitCopySlice($context, $pathStr, $bytes, $zero, $trimmedLen, 'sfi_trim_'.$id);
+        $context->builder->store($trimmed, $fileNameSlot);
+        $context->builder->branch($afterFile);
+
+        $context->builder->positionAtEnd($keepPath);
+        $context->builder->store($pathStr, $fileNameSlot);
+        $context->builder->branch($afterFile);
+
+        $context->builder->positionAtEnd($afterFile);
+
+        $scanCheck = BasicBlockHelper::append($context, 'sfi_scan_check_'.$id);
+        $scanBody = BasicBlockHelper::append($context, 'sfi_scan_body_'.$id);
+        $afterScan = BasicBlockHelper::append($context, 'sfi_after_scan_'.$id);
+        $context->builder->branch($scanCheck);
+
+        $context->builder->positionAtEnd($scanCheck);
+        $pl4 = $context->builder->load($pathLenSlot);
+        $scanGt1 = $context->builder->icmp(Builder::INT_SGT, $pl4, $one);
+        $scanProbe = BasicBlockHelper::append($context, 'sfi_scan_probe_'.$id);
+        $context->builder->branchIf($scanGt1, $scanProbe, $afterScan);
+
+        $context->builder->positionAtEnd($scanProbe);
+        $idx4 = $context->builder->sub($pl4, $one);
+        $byte4 = $context->builder->load($context->builder->gep($bytes, $idx4));
+        $notSlash = $context->builder->icmp(Builder::INT_NE, $byte4, $slash);
+        $context->builder->branchIf($notSlash, $scanBody, $afterScan);
+
+        $context->builder->positionAtEnd($scanBody);
+        $pl5 = $context->builder->load($pathLenSlot);
+        $context->builder->store($context->builder->sub($pl5, $one), $pathLenSlot);
+        $context->builder->branch($scanCheck);
+
+        $context->builder->positionAtEnd($afterScan);
+        $pl6 = $context->builder->load($pathLenSlot);
+        $gt0 = $context->builder->icmp(Builder::INT_SGT, $pl6, $zero);
+        $decDir = BasicBlockHelper::append($context, 'sfi_dec_dir_'.$id);
+        $afterDirLen = BasicBlockHelper::append($context, 'sfi_after_dirlen_'.$id);
+        $context->builder->branchIf($gt0, $decDir, $afterDirLen);
+
+        $context->builder->positionAtEnd($decDir);
+        $pl7 = $context->builder->load($pathLenSlot);
+        $context->builder->store($context->builder->sub($pl7, $one), $pathLenSlot);
+        $context->builder->branch($afterDirLen);
+
+        $context->builder->positionAtEnd($afterDirLen);
+        $dirLen = $context->builder->load($pathLenSlot);
+        $dirSlot = $context->builder->alloca($strPtrTy);
+        $dirEmpty = $context->builder->icmp(Builder::INT_EQ, $dirLen, $zero);
+        $mkDir = BasicBlockHelper::append($context, 'sfi_mk_dir_'.$id);
+        $emptyDir = BasicBlockHelper::append($context, 'sfi_empty_dir_'.$id);
+        $afterDir = BasicBlockHelper::append($context, 'sfi_after_dir_'.$id);
+        $context->builder->branchIf($dirEmpty, $emptyDir, $mkDir);
+
+        $context->builder->positionAtEnd($emptyDir);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->store($empty, $dirSlot);
+        $context->builder->branch($afterDir);
+
+        $context->builder->positionAtEnd($mkDir);
+        $dirStr = string_trim::jitCopySlice($context, $pathStr, $bytes, $zero, $dirLen, 'sfi_dir_'.$id);
+        $context->builder->store($dirStr, $dirSlot);
+        $context->builder->branch($afterDir);
+
+        $context->builder->positionAtEnd($afterDir);
+        $fileName = $context->builder->load($fileNameSlot);
+        $fileLen = $context->builder->call($context->lookupFunction('__string__strlen'), $fileName);
+        $fileBytes = $context->builder->pointerCast(
+            $context->builder->structGep($fileName, $strMap['value']),
+            $i8p
+        );
+        $dirLen2 = $context->builder->load($pathLenSlot);
+        $hasDir = $context->builder->icmp(Builder::INT_NE, $dirLen2, $zero);
+        $dirShorter = $context->builder->icmp(Builder::INT_SLT, $dirLen2, $fileLen);
+        $takeSuffix = $context->builder->and($hasDir, $dirShorter);
+        $fnSlot = $context->builder->alloca($strPtrTy);
+        $suffixBb = BasicBlockHelper::append($context, 'sfi_fn_suffix_'.$id);
+        $fullBb = BasicBlockHelper::append($context, 'sfi_fn_full_'.$id);
+        $doneBb = BasicBlockHelper::append($context, 'sfi_fn_done_'.$id);
+        $context->builder->branchIf($takeSuffix, $suffixBb, $fullBb);
+
+        $context->builder->positionAtEnd($suffixBb);
+        $start = $context->builder->add($dirLen2, $one);
+        $suffixLen = $context->builder->sub($fileLen, $start);
+        $suffix = string_trim::jitCopySlice($context, $fileName, $fileBytes, $start, $suffixLen, 'sfi_fn_'.$id);
+        $context->builder->store($suffix, $fnSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($fullBb);
+        $context->builder->store($fileName, $fnSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return [
+            $context->builder->load($dirSlot),
+            $context->builder->load($fnSlot),
+        ];
     }
 
     /** True when $namePtr is "." or "..". */
