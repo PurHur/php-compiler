@@ -260,12 +260,7 @@ final class SilenceRuntime
 
     private static function ensureExternal(Context $context, string $name, $ft): void
     {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable $e) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
-        }
+        \PHPCompiler\JIT\LibcExtern::ensureExternalDecl($context, $name, $ft);
     }
 
     private static function registerLinkedRuntime(Context $context): void
