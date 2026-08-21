@@ -134,13 +134,10 @@ final class JitDomCreateTextNode
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
     ): void {
-        foreach ([
-            self::PROP_NODE_NAME,
-            self::PROP_NODE_VALUE,
-            self::PROP_TEXT_CONTENT,
-            self::PROP_DATA,
-            self::PROP_WHOLE_TEXT,
-        ] as $prop) {
+        // Full DOMElement stand-in layout (#33546 / #33556): appendChild reads
+        // parentNode / sibling slots; a short layout leaves text objects undersized.
+        JitDomCreateElement::ensureDomElementStandInLayout($objectType, $classId);
+        foreach ([self::PROP_DATA, self::PROP_WHOLE_TEXT] as $prop) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
             }

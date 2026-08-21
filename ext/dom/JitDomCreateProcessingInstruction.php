@@ -124,14 +124,9 @@ final class JitDomCreateProcessingInstruction
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
     ): void {
-        foreach ([
-            self::PROP_NODE_NAME,
-            self::PROP_TAG_NAME,
-            self::PROP_NODE_VALUE,
-            self::PROP_TEXT_CONTENT,
-            self::PROP_DATA,
-            self::PROP_TARGET,
-        ] as $prop) {
+        // Full DOMElement stand-in layout (#33546 / #33556): appendChild parent/sibling slots.
+        JitDomCreateElement::ensureDomElementStandInLayout($objectType, $classId);
+        foreach ([self::PROP_DATA, self::PROP_TARGET] as $prop) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
             }
