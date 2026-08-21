@@ -13,7 +13,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream buffer/chunk/timeout ABI via StreamBufferJitHelper PHP (#14462, #19788, #22979).
+ * JIT/AOT link for stream buffer/chunk/timeout ABI via StreamBufferJitHelper PHP (#14462, #19788, #22979, #33127).
  *
  * Quarantined from lib/JIT/Builtin/StreamBufferRuntime — {@see \PHPCompiler\JIT\Builtin\StreamBufferRuntime}
  * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}
@@ -24,6 +24,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * {@see JitStreamIoKernel} fopen fills (peer {@see JitStreamMetaThinAot} / #30787 gzwrite).
  * php-src streamsfuncs.c returns EOF (-1) when set_option is NOTIMPL for write buffer on
  * plainfile; read buffer returns 0 (#30788).
+ *
+ * Do not re-add empty always-on shells in Builtin\Type — leftover decls mint
+ * stream_set_chunk_size.1 (#31894 / #32122). Type::initialize still StreamBuffer::ensureLinked.
  *
  * SSOT: {@see StreamBufferJitHelper}
  * php-src: main/streams/streams.c — php_stream_set_chunk_size / set_option buffer+timeout
