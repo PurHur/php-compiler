@@ -1476,7 +1476,7 @@ class Context {
                 'isFile', 'isDir',
                 'isLink', 'getLinkTarget', 'isReadable', 'isWritable', 'isExecutable',
                 'getPathname', 'getPath', 'getExtension', 'getBasename', 'getType', '__toString',
-                'getFileInfo', 'getPathInfo',
+                'getFileInfo', 'getPathInfo', 'openFile',
             ] as $diMethod) {
                 $this->functionProxies[$diLc.'::'.strtolower($diMethod)] = new Call\DirectoryIteratorMethod(
                     $diMethod,
@@ -1491,16 +1491,22 @@ class Context {
             'isFile', 'isDir',
             'isLink', 'getLinkTarget', 'isReadable', 'isWritable', 'isExecutable',
             'getPathname', 'getPath', 'getExtension', 'getBasename', 'getType', '__toString',
-            'getFileInfo', 'getPathInfo',
+            'getFileInfo', 'getPathInfo', 'openFile',
         ] as $sfiMethod) {
             $this->functionProxies['splfileinfo::'.strtolower($sfiMethod)] = new Call\DirectoryIteratorMethod(
                 $sfiMethod,
                 'SplFileInfo'
             );
         }
-        // SplFileObject — line snapshot `__spl_ht` for foreach (#28709).
+        // SplFileObject — line snapshot `__spl_ht` for foreach (#28709); path via `__pathname` (#33305).
         $this->type->object->lookup('SplFileObject');
-        $this->functionProxies['splfileobject::__construct'] = new Call\SplFileObjectMethod('__construct');
+        foreach ([
+            '__construct', 'getFilename', 'getPathname', 'getPath', '__toString',
+        ] as $sfoMethod) {
+            $this->functionProxies['splfileobject::'.strtolower($sfoMethod)] = new Call\SplFileObjectMethod(
+                $sfoMethod
+            );
+        }
         // GlobIterator — glob snapshot + Iterator (#27422).
         $this->type->object->lookup('GlobIterator');
         foreach ([
