@@ -43,6 +43,7 @@ use PHPLLVM\Value;
  * Path accessors read `__pathname` (#33305); also init SplFileInfo `__dir_path`/`__filename`
  * for inherited isFile/getSize/… (#33313).
  * Live stream handle `__spl_fd` for fgets/fwrite (#33318) via StreamIo/StreamRead ABIs.
+ * fwrite/fputcsv fflush so path reads match Zend before destroy (#33400; peer #33133).
  * Iterator I/O (`current`/`key`/`valid`/`next`/`rewind`) + EOF latch (#33319).
  * getCurrentLine is the php-src fgets alias (#33321).
  * fread/fgetc on `__spl_fd` (#33332).
@@ -543,6 +544,8 @@ final class SplFileObjectJitHelper
     /**
      * SplFileObject::fwrite — write to live handle (#33318).
      * php-src: zim_SplFileObject_fwrite
+     *
+     * Thin AOT libc FILE* buffers; fflush so path reads match Zend before destroy (#33400).
      */
     public static function compileFwrite(
         Context $context,
@@ -582,6 +585,9 @@ final class SplFileObjectJitHelper
         $context->builder->branch($joinBb);
 
         $context->builder->positionAtEnd($okBb);
+        // Zend php_stream_write is visible on the path; libc fwrite is not until fflush/fclose.
+        // Call ABI directly — JitFflush::invoke re-enters forceLibcStreamPositionAbis mid-block.
+        $context->builder->call($context->lookupFunction('__compiler_fflush'), $handle);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             JitValueBox::pointer($context, $slot),
@@ -632,7 +638,12 @@ final class SplFileObjectJitHelper
             $eol = JitStringArg::lower($context, $eolArg, 'SplFileObject::fputcsv() eol');
         }
 
-        return JitFputcsv::invoke($context, $handle, $fields, $separator, $enclosure, $escape, $eol);
+        $written = JitFputcsv::invoke($context, $handle, $fields, $separator, $enclosure, $escape, $eol);
+        // Same libc buffering as fwrite — path reads must see the CSV line (#33400).
+        // Direct ABI call (ensureStreamAbis already linked); avoid JitFflush::invoke mid-block.
+        $context->builder->call($context->lookupFunction('__compiler_fflush'), $handle);
+
+        return $written;
     }
 
     /**
