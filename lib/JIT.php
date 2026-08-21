@@ -784,9 +784,14 @@ class JIT {
      * Echo compile-time ?: arm literals from the saved condition (#18784).
      *
      * Avoids merge-block ValueEcho reading a polluted alias temp in standalone AOT.
+     *
+     * Load the condition in the same open BB as {@see branchIf}: after ArrayObject
+     * (and similar) construct the CFG {@see $continueBlock} may already be sealed while
+     * the builder insert has moved on — positioning there then branching caused
+     * "Terminator mid-block" / domination failures (#33094).
      */
     private function emitTernaryLiteralEchoMerge(
-        \PHPLLVM\Value $condition,
+        \PHPLLVM\Value $conditionSlot,
         string $ifLiteral,
         string $elseLiteral,
         \PHPLLVM\BasicBlock $continueBlock
@@ -797,7 +802,20 @@ class JIT {
         $elseBlock = JIT\BasicBlockHelper::append($this->context, 'ternary_echo_lit_else_'.$tag);
         $doneBlock = JIT\BasicBlockHelper::append($this->context, 'ternary_echo_lit_done_'.$tag);
         $builder = $this->context->builder;
-        $builder->positionAtEnd($continueBlock);
+        // Prefer the live insert BB when open: ArrayObject::__construct (etc.) can seal the
+        // CFG-mapped $continueBlock while later opcodes keep emitting on a successor (#33094).
+        $insert = JIT\BasicBlockHelper::tryGetInsertBlock($this->context);
+        if (null !== $insert && null === $insert->getTerminator()) {
+            // already positioned
+        } elseif (null === $continueBlock->getTerminator()) {
+            $builder->positionAtEnd($continueBlock);
+        } else {
+            JIT\BasicBlockHelper::ensureOpenInsertBlock(
+                $this->context,
+                'ternary_echo_lit_from_'.$tag
+            );
+        }
+        $condition = $builder->load($conditionSlot);
         $builder->branchIf($condition, $ifBlock, $elseBlock);
         $builder->positionAtEnd($ifBlock);
         JIT\ValueEchoHelper::echoLiteral($this->context, $ifLiteral);
@@ -815,6 +833,39 @@ class JIT {
         $this->context->ternaryEchoLiteralConditionSlot = null;
         $this->context->ternaryEchoLiteralIf = null;
         $this->context->ternaryEchoLiteralElse = null;
+    }
+
+    /**
+     * Literal affixes when merge ECHO is CONCAT(ternary, lit) or CONCAT(lit, ternary) (#33094 / #32908).
+     *
+     * @return array{0: string, 1: string} prefix, suffix
+     */
+    private function ternaryEchoConcatLiteralAffixes(
+        Block $mergeBlock,
+        ?Block $ifBlock,
+        ?Block $elseBlock
+    ): array {
+        $ternarySlot = $this->mergeTernaryResultSlot($mergeBlock, $ifBlock, $elseBlock);
+        if (null === $ternarySlot) {
+            return ['', ''];
+        }
+        foreach ($mergeBlock->opCodes as $mergeOp) {
+            if (OpCode::TYPE_CONCAT !== $mergeOp->type || null === $mergeOp->arg2 || null === $mergeOp->arg3) {
+                continue;
+            }
+            $leftSlot = (int) $mergeOp->arg2;
+            $rightSlot = (int) $mergeOp->arg3;
+            $leftOp = $mergeBlock->getOperand($leftSlot);
+            $rightOp = $mergeBlock->getOperand($rightSlot);
+            if ($leftSlot === $ternarySlot && $rightOp instanceof Operand\Literal && is_string($rightOp->value)) {
+                return ['', $rightOp->value];
+            }
+            if ($rightSlot === $ternarySlot && $leftOp instanceof Operand\Literal && is_string($leftOp->value)) {
+                return [$leftOp->value, ''];
+            }
+        }
+
+        return ['', ''];
     }
 
     private function mergeEchoSlot(Block $mergeBlock): ?int
@@ -10714,11 +10765,10 @@ class JIT {
                         }
                     }
                     if (null !== $this->context->ternaryEchoLiteralConditionSlot) {
-                        $cond = $this->context->builder->load($this->context->ternaryEchoLiteralConditionSlot);
                         $ifLiteral = $this->context->ternaryEchoLiteralIf ?? '';
                         $elseLiteral = $this->context->ternaryEchoLiteralElse ?? '';
                         $basicBlock = $this->emitTernaryLiteralEchoMerge(
-                            $cond,
+                            $this->context->ternaryEchoLiteralConditionSlot,
                             $ifLiteral,
                             $elseLiteral,
                             $basicBlock
@@ -11518,14 +11568,21 @@ class JIT {
                             $ifLiteral = $this->ternaryEchoBranchLiteralString($op->block1, $mergeBlock);
                             $elseLiteral = $this->ternaryEchoBranchLiteralString($op->block2, $mergeBlock);
                             if (null !== $ifLiteral && null !== $elseLiteral) {
+                                // CONCAT(ternary, "\n") / ("x" . ternary): keep the literal
+                                // side when #18784 replaces ECHO of the concat result (#33094).
+                                [$prefix, $suffix] = $this->ternaryEchoConcatLiteralAffixes(
+                                    $mergeBlock,
+                                    $op->block1,
+                                    $op->block2
+                                );
                                 $condSlot = JIT\BasicBlockHelper::entryAlloca(
                                     $this->context,
                                     $this->context->getTypeFromString('int1')
                                 );
                                 $this->context->builder->store($condition, $condSlot);
                                 $this->context->ternaryEchoLiteralConditionSlot = $condSlot;
-                                $this->context->ternaryEchoLiteralIf = $ifLiteral;
-                                $this->context->ternaryEchoLiteralElse = $elseLiteral;
+                                $this->context->ternaryEchoLiteralIf = $prefix.$ifLiteral.$suffix;
+                                $this->context->ternaryEchoLiteralElse = $prefix.$elseLiteral.$suffix;
                             }
                         }
                     }
