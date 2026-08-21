@@ -298,9 +298,12 @@ class Type extends Builtin {
         // Type::initialize still StreamCaps::ensureLinked). Leftover Type empty decls vs
         // Runtime ABI drift mint stream_is_local_uri.1 (#31894 / #32122). User-script
         // stream_is_local() path/uri helper stays JitStreamIsLocal / StreamCapsJitHelper.
-        $fntypeStreamIsatty = $this->context->context->functionType($i32, false, $i64);
-        $fnStreamIsatty = $this->context->module->addFunction('__compiler_stream_isatty', $fntypeStreamIsatty);
-        $this->context->registerFunction('__compiler_stream_isatty', $fnStreamIsatty);
+        // __compiler_stream_isatty always-on shell removed (#33151): StreamCaps /
+        // StreamCapsRuntime / JitStreamCapsKernel owns the ABI (getNamedFunction first,
+        // then addFunction if absent via implementSingleArgBridge; Type::initialize still
+        // StreamCaps::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // stream_isatty.1 (#31894 / #32122). User-script stream_isatty() stays
+        // JitStreamIsatty / StreamCapsJitHelper.
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
         $fntypeStreamGetMetaData = $this->context->context->functionType($htPtr, false, $i64);
         $fnStreamGetMetaData = $this->context->module->addFunction('__compiler_stream_get_meta_data', $fntypeStreamGetMetaData);
