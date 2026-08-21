@@ -4160,8 +4160,8 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CUR_LINE, Variable::TYPE_STRING);
             // Flags for setFlags/getFlags (#33368).
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_FLAGS, Variable::TYPE_NATIVE_LONG);
-            // max_line_len for setMaxLineLen/getMaxLineLen + fgets cap (#33378).
-            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_MAX_LINE, Variable::TYPE_NATIVE_LONG);
+            // max_line_len for setMaxLineLen/getMaxLineLen + fgets cap (#33377 / #33378).
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_MAX_LINE_LEN, Variable::TYPE_NATIVE_LONG);
             // CSV control trio for setCsvControl/getCsvControl (#33371).
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CSV_SEP, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CSV_ENC, Variable::TYPE_STRING);

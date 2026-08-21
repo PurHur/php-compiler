@@ -56,7 +56,7 @@ use PHPLLVM\Value;
  * fseek on `__spl_fd` (#33347) via JitFseek (clears iterator line cache like rewind).
  * seek (SeekableIterator line) (#33364) — rewind + read-line loop + key bump.
  * setFlags/getFlags on `__spl_flags` (#33368).
- * setMaxLineLen/getMaxLineLen on `__spl_max_line` (#33378); fgets/fgetcsv use max+1 buffer.
+ * setMaxLineLen/getMaxLineLen on `__spl_max_line_len` (#33377 / #33378); fgets/fgetcsv use max+1 buffer.
  * setCsvControl/getCsvControl on `__spl_csv_*` (#33371); fgetcsv/fputcsv read props when args omitted.
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
@@ -91,8 +91,8 @@ final class SplFileObjectJitHelper
     /** SplFileObject flags (READ_CSV / DROP_NEW_LINE / …) — php-src flags (#33368). */
     public const PROP_FLAGS = '__spl_flags';
 
-    /** php-src intern->u.file.max_line_len (#33378 / #19665). */
-    public const PROP_MAX_LINE = '__spl_max_line';
+    /** php-src intern->u.file.max_line_len (#33377 / #33378 / #19665). */
+    public const PROP_MAX_LINE_LEN = '__spl_max_line_len';
     /**
      * Local EOF latch — AOT `__compiler_feof` is wrong after fopen (always 1);
      * track from failed fgets instead (#33319).
@@ -644,7 +644,7 @@ final class SplFileObjectJitHelper
         // spl_filesystem_file_free_line — drop cached iterator line before CSV read.
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
         $handle = self::loadFd($context, $receiver);
-        // php-src: max_line_len > 0 → buffer max+1; else no limit (#33378 / #19665).
+        // php-src: max_line_len > 0 → buffer max+1; else no limit (#33377 / #33378 / #19665).
         $length = self::emitFgetsLengthFromMaxLine($context, $obj, true);
         // Omitted args → setCsvControl props (#33371); peer php-src intern->u.file.*.
         $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
@@ -941,7 +941,7 @@ final class SplFileObjectJitHelper
     }
 
     /**
-     * SplFileObject::setMaxLineLen — store max_line_len (#33378).
+     * SplFileObject::setMaxLineLen — store max_line_len (#33377 / #33378).
      * php-src: zim_SplFileObject_setMaxLineLen — Z_PARAM_LONG, ValueError if < 0
      */
     public static function compileSetMaxLineLen(
@@ -958,19 +958,19 @@ final class SplFileObjectJitHelper
             'splfo_maxlen',
             'SplFileObject::setMaxLineLen(): Argument #1 ($maxLength) must be greater than or equal to 0'
         );
-        self::storeLongProp($context, $obj, self::PROP_MAX_LINE, $max);
+        self::storeLongProp($context, $obj, self::PROP_MAX_LINE_LEN, $max);
 
         return self::voidResult($context);
     }
 
     /**
-     * SplFileObject::getMaxLineLen — read max_line_len (#33378).
+     * SplFileObject::getMaxLineLen — read max_line_len (#33377 / #33378).
      * php-src: zim_SplFileObject_getMaxLineLen — ZEND_PARSE_PARAMETERS_NONE
      */
     public static function compileGetMaxLineLen(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);
-        $max = self::loadLongProp($context, $obj, self::PROP_MAX_LINE);
+        $max = self::loadLongProp($context, $obj, self::PROP_MAX_LINE_LEN);
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
@@ -1062,7 +1062,7 @@ final class SplFileObjectJitHelper
         bool $forFgetcsv = false
     ): Value {
         $i64 = $context->getTypeFromString('int64');
-        $max = self::loadLongProp($context, $obj, self::PROP_MAX_LINE);
+        $max = self::loadLongProp($context, $obj, self::PROP_MAX_LINE_LEN);
         $useMax = $context->builder->icmp(Builder::INT_SGT, $max, $i64->constInt(0, false));
         $maxPlusOne = $context->builder->addNoSignedWrap($max, $i64->constInt(1, false));
         $fallback = $forFgetcsv
@@ -1281,7 +1281,7 @@ final class SplFileObjectJitHelper
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
         self::storeLongProp($context, $obj, self::PROP_FLAGS, $i64->constInt(0, false));
-        self::storeLongProp($context, $obj, self::PROP_MAX_LINE, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_MAX_LINE_LEN, $i64->constInt(0, false));
         $empty = $context->builder->load($context->constantStringFromString(''));
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
         // php-src defaults: separator=',', enclosure='"', escape='\\' (#33371).
