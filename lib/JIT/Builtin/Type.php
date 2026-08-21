@@ -376,19 +376,12 @@ class Type extends Builtin {
             $fntypeStreamGetContents
         );
         $this->context->registerFunction('__compiler_stream_get_contents', $fnStreamGetContents);
-        $fntypeStreamCopyToStream = $this->context->context->functionType(
-            $i64,
-            false,
-            $i64,
-            $i64,
-            $i64,
-            $i64
-        );
-        $fnStreamCopyToStream = $this->context->module->addFunction(
-            '__compiler_stream_copy_to_stream',
-            $fntypeStreamCopyToStream
-        );
-        $this->context->registerFunction('__compiler_stream_copy_to_stream', $fnStreamCopyToStream);
+        // __compiler_stream_copy_to_stream always-on shell removed (#33182): StreamRead /
+        // StreamReadRuntime / JitStreamReadBridgeKernel owns the ABI (getNamedFunction first,
+        // then addFunction if absent via implementI64Bridge; Type::initialize still
+        // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // stream_copy_to_stream.1 (#31894 / #32122). User-script stream_copy_to_stream() stays
+        // JitStreamCopyToStream / StreamReadJitHelper (libc force peer #33133).
         $fntypeGetResourceType = $this->context->context->functionType($strPtr, false, $i64);
         $fnGetResourceType = $this->context->module->addFunction(
             '__compiler_get_resource_type',
