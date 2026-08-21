@@ -717,6 +717,77 @@ final class ArrayObjectJitHelper
     }
 
     /**
+     * php-src ArrayObject/ArrayIterator::__serialize bag under thin AOT (#33625).
+     *
+     * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925.
+     *
+     * @return Value {@see __string__*} full `O:len:"Class":4:{…}` wire
+     */
+    public static function compileSerialize(Context $context, JITVariable $receiver): Value
+    {
+        \PHPCompiler\JIT\Builtin\StringSerialize::ensureLinked($context);
+        $obj = self::loadObject($context, $receiver);
+        $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
+        $classNameStr = \PHPCompiler\JIT\ReflectionBuiltinHelper::getClassName($context, $objVar);
+
+        $flagsSlot = $context->type->object->propertyFetch($obj, self::CLASS_NAME, self::PROP_FLAGS);
+        $flags = JITVariable::TYPE_NATIVE_LONG === $flagsSlot->type
+            ? $context->helper->loadValue($flagsSlot)
+            : $context->builder->call(
+                $context->lookupFunction('__value__toLong'),
+                JitValueBox::valuePtrFromVariable($context, $flagsSlot)
+            );
+
+        $ht = self::htPtr($context, $obj);
+        $logical = 'PHPCompiler\\ext\\standard\\SerializeSplArrayNestedJitHelper::encodeWire';
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/SerializeSplArrayNestedJitHelper.php',
+            [$logical],
+            '#33625'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33625');
+        $strMap = $context->structFieldMap['__string__'];
+        $classLen = $context->builder->load(
+            $context->builder->structGep($classNameStr, $strMap['length'])
+        );
+        $args = [
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $classNameStr,
+                $fn->getParam(0)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $classLen,
+                $fn->getParam(1)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $flags,
+                $fn->getParam(2)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $ht,
+                $fn->getParam(3)->typeOf()
+            ),
+        ];
+        $raw = $context->builder->call($fn, ...$args);
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        return \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr);
+    }
+
+    /** Expose object load for {@see \PHPCompiler\ext\standard\JitSerialize} (#33625). */
+    public static function loadObjectPtr(Context $context, JITVariable $receiver): Value
+    {
+        return self::loadObject($context, $receiver);
+    }
+
+    /**
      * php-src zim_ArrayObject_getFlags / zim_ArrayIterator_getFlags — read `__flags` (#33616).
      * Construct already persists the slot for ARRAY_AS_PROPS (#33061); thin AOT lacked proxies.
      */
