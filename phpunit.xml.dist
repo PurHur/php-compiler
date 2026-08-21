@@ -269,6 +269,7 @@
             <file>./test/compliance/ErrorLogNamed23341JITTest.php</file>
             <file>./test/compliance/IniParseQuantityNamed23405VMTest.php</file>
             <file>./test/compliance/IniParseQuantityNamed23405JITTest.php</file>
+            <file>./test/compliance/RequestParseBodyReflection23878VMTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorNullCallback31508VMTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorNullCallback31508JITTest.php</file>
             <file>./test/compliance/CallbackFilterIteratorStringCallbackMsg31574VMTest.php</file>

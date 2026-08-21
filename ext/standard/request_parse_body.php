@@ -24,6 +24,9 @@ use PHPLLVM\Value;
  * Thin standalone AOT (`isThinStandaloneAotMain`, #20521): {@see JitRequestParseBodyKernel}.
  * Embed / non-thin: NestedJIT {@see RequestParseBodyRuntime}.
  * php-src: ext/standard/http.c
+ *
+ * Reflection stub: ?array $options = null → array (#23878; http.stub.php via
+ * {@see \PHPCompiler\BuiltinInternalArgInfo} / {@see \PHPCompiler\BuiltinParamNames}).
  */
 final class request_parse_body extends Internal
 {

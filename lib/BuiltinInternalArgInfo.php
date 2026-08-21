@@ -231,6 +231,8 @@ final class BuiltinInternalArgInfo
             // ext/posix/posix.stub.php — PHP 8.3+; absent from InternalArgInfo (#27918)
             'posix_sysconf' => 'int',
             'posix_pathconf', 'posix_fpathconf' => 'int|false',
+            // ext/standard/http.stub.php — PHP 8.4+; absent from InternalArgInfo (#23878)
+            'request_parse_body' => 'array',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend array|false (#27776)
             'net_get_interfaces' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28916)
@@ -1681,6 +1683,8 @@ final class BuiltinInternalArgInfo
             'header_register_callback' => 0 === $index ? 'callable' : null,
             // ext/standard/basic_functions.stub.php — ?array $options = null (InternalArgInfo array) (#25381)
             'stream_context_get_default' => 0 === $index ? '?array' : null,
+            // ext/standard/http.stub.php — ?array $options = null; absent from InternalArgInfo (#23878)
+            'request_parse_body' => 0 === $index ? '?array' : null,
             // ext/standard/basic_functions.stub.php — by-ref out params untyped; $raw bool (#28745, #23358)
             'dns_get_record' => match ($index) {
                 2, 3 => '',

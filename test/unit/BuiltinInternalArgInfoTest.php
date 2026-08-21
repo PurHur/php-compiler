@@ -2098,6 +2098,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertFalse($shorthand['isOptional']);
     }
 
+    /** php-src http.stub.php — PHP 8.4+ absent from InternalArgInfo (#23878). */
+    public function testRequestParseBodyReflectionStubTypes(): void
+    {
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('request_parse_body'));
+        $this->assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('request_parse_body', 0));
+        $options = BuiltinInternalArgInfo::paramInfoForFunction('request_parse_body', 0);
+        $this->assertNotNull($options);
+        $this->assertSame('options', $options['name']);
+        $this->assertSame('?array', $options['type']);
+        $this->assertTrue($options['isOptional']);
+    }
+
     /** php-src password.stub.php — absent from InternalArgInfo (#23292). */
     public function testPasswordGetInfoNeedsRehashReflectionStubTypes(): void
     {
