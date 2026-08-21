@@ -6,7 +6,14 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/** JIT/AOT stream read/position/lock helpers via StreamReadRuntime PHP (#5343, #12937). */
+/**
+ * JIT/AOT stream read/position/lock helpers via StreamReadRuntime PHP (#5343, #12937, #33155).
+ *
+ * Owns `__compiler_ftruncate` (and peer flock/fpassthru/fgetc/…) ABI module-locally via
+ * {@see StreamReadRuntime} / {@see \PHPCompiler\ext\standard\JitStreamReadBridgeKernel}
+ * (getNamedFunction first). Do not re-add empty always-on shells in {@see Type} — leftover
+ * decls mint ftruncate.1 (#31894 / #32122).
+ */
 final class StreamRead
 {
     public static function ensureLinked(Context $context): void
