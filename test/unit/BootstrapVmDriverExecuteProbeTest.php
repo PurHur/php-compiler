@@ -39,6 +39,11 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         // Fast gate must not fall into multi-hour Zend spine without FULL_LINK=1 (#10533).
         $this->assertStringContainsString('refusing multi-hour Zend spine fallback', $script);
         $this->assertStringContainsString('bootstrap-refresh-gen0-sidecar.sh', $script);
+        // Transient free(): invalid pointer on prelinked gen-0 — retry like north-star5 4f3 (#33501).
+        $this->assertStringContainsString('bootstrap_vm_driver_execute_probe_run_with_retries', $script);
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_ATTEMPTS', $script);
+        $this->assertStringContainsString('VM driver execute transient failure', $script);
+        $this->assertMatchesRegularExpression('/BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_ATTEMPTS:-5/', $script);
     }
 
     public function testSpineEntryDocumentsVmDriverExecutePath(): void

@@ -58,6 +58,9 @@ final class NorthStar5VerifyScriptTest extends TestCase
         $this->assertStringContainsString('ns5_spine_ratio_label', $body);
         $this->assertStringNotContainsString('718/718', $body);
         $this->assertStringNotContainsString('cfg/llvm parse blockers', $body);
+        // 4f2 retries live in the probe script (same class as 4f3) — #33501.
+        $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe', $body);
+        $this->assertStringContainsString('Retries for gen-0 free(): invalid pointer flake live in the probe script (#33501)', $body);
     }
 
     public function testMakefileDeclaresNorthStar5VerifyTarget(): void
