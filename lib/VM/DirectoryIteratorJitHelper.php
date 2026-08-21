@@ -7,9 +7,9 @@ namespace PHPCompiler\VM;
 use PHPCompiler\ext\standard\JitPath;
 use PHPCompiler\ext\standard\JitStat;
 use PHPCompiler\ext\standard\JitStringConcat;
+use PHPCompiler\ext\standard\string_trim;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StatPathRuntime;
-use PHPCompiler\JIT\Builtin\StringPathinfo;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -257,16 +257,17 @@ final class DirectoryIteratorJitHelper
     }
 
     /**
-     * DirectoryIterator/SplFileInfo::getExtension — pathinfo extension of entry name (#33280).
-     * php-src: zim_DirectoryIterator_getExtension / zim_SplFileInfo_getExtension
+     * DirectoryIterator/SplFileInfo::getExtension — last `.` suffix of entry name (#33280).
+     *
+     * Inline scan (not StringPathinfo NestedJIT): DI snapshot + pathinfo NestedJIT in one
+     * AOT module SIGSEGVs; php-src zim_DirectoryIterator_getExtension uses zend_memrchr on d_name.
      */
     public static function compileGetExtension(Context $context, JITVariable $receiver, string $className): Value
     {
         $obj = self::loadObject($context, $receiver);
         $nameSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_FILENAME);
         $namePtr = self::stringFromProperty($context, $nameSlot);
-        $ext = StringPathinfo::invokeExtension($context, $namePtr);
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'di_getext_after_pathinfo');
+        $ext = self::emitExtensionFromFilename($context, $namePtr);
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
@@ -308,8 +309,10 @@ final class DirectoryIteratorJitHelper
     }
 
     /**
-     * SplFileInfo::getType — pathname then {@see JitStat::pathFiletypeBoxed} (#33280).
-     * php-src: FileInfoFunction(getType, FS_TYPE)
+     * SplFileInfo::getType — synthesize from working path predicates (#33280).
+     *
+     * Avoid {@see JitStat::pathFiletypeBoxed}: standalone `filetype()` AOT SIGSEGVs on master.
+     * php-src: FileInfoFunction(getType, FS_TYPE) — link/dir/file cover the DI fixture.
      */
     public static function compileGetType(Context $context, JITVariable $receiver, string $className): Value
     {
@@ -318,8 +321,118 @@ final class DirectoryIteratorJitHelper
 
         $obj = self::loadObject($context, $receiver);
         $pathname = self::emitJoinedPathname($context, $obj, $className);
+        $isLink = JitStat::pathIsLink($context, $pathname);
+        $isDir = JitStat::pathIsDir($context, $pathname);
+        $isFile = JitStat::pathIsFile($context, $pathname);
 
-        return JitStat::pathFiletypeBoxed($context, $pathname);
+        $linkStr = $context->builder->load($context->constantStringFromString('link'));
+        $dirStr = $context->builder->load($context->constantStringFromString('dir'));
+        $fileStr = $context->builder->load($context->constantStringFromString('file'));
+        $unknownStr = $context->builder->load($context->constantStringFromString('unknown'));
+
+        // Select without PHI across NestedJIT-tainted blocks: alloca + stores.
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $outSlot = $context->builder->alloca($strPtrTy);
+        $linkBb = BasicBlockHelper::append($context, 'di_gettype_link');
+        $checkDir = BasicBlockHelper::append($context, 'di_gettype_check_dir');
+        $dirBb = BasicBlockHelper::append($context, 'di_gettype_dir');
+        $checkFile = BasicBlockHelper::append($context, 'di_gettype_check_file');
+        $fileBb = BasicBlockHelper::append($context, 'di_gettype_file');
+        $unkBb = BasicBlockHelper::append($context, 'di_gettype_unknown');
+        $done = BasicBlockHelper::append($context, 'di_gettype_done');
+        $context->builder->branchIf($isLink, $linkBb, $checkDir);
+
+        $context->builder->positionAtEnd($linkBb);
+        $context->builder->store($linkStr, $outSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($checkDir);
+        $context->builder->branchIf($isDir, $dirBb, $checkFile);
+
+        $context->builder->positionAtEnd($dirBb);
+        $context->builder->store($dirStr, $outSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($checkFile);
+        $context->builder->branchIf($isFile, $fileBb, $unkBb);
+
+        $context->builder->positionAtEnd($fileBb);
+        $context->builder->store($fileStr, $outSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($unkBb);
+        $context->builder->store($unknownStr, $outSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $label = $context->builder->load($outSlot);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $label
+        );
+
+        return $slot;
+    }
+
+    /**
+     * php-src zend_memrchr on basename — return bytes after last `.`, or empty string.
+     */
+    private static function emitExtensionFromFilename(Context $context, Value $namePtr): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $strMap = $context->structFieldMap['__string__'];
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $namePtr);
+        $bytes = $context->builder->pointerCast(
+            $context->builder->structGep($namePtr, $strMap['value']),
+            $i8p
+        );
+        $outSlot = $context->builder->alloca($strPtrTy);
+        $idxSlot = $context->builder->alloca($i64);
+        $context->builder->store($context->builder->sub($len, $one), $idxSlot);
+
+        $loop = BasicBlockHelper::append($context, 'di_ext_scan');
+        $found = BasicBlockHelper::append($context, 'di_ext_found');
+        $none = BasicBlockHelper::append($context, 'di_ext_none');
+        $done = BasicBlockHelper::append($context, 'di_ext_done');
+        $emptyLen = $context->builder->icmp(Builder::INT_SLE, $len, $zero);
+        $context->builder->branchIf($emptyLen, $none, $loop);
+
+        $context->builder->positionAtEnd($loop);
+        $idx = $context->builder->load($idxSlot);
+        $ch = $context->builder->load($context->builder->gep($bytes, $idx));
+        $isDot = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(ord('.'), false));
+        $cont = BasicBlockHelper::append($context, 'di_ext_cont');
+        $context->builder->branchIf($isDot, $found, $cont);
+
+        $context->builder->positionAtEnd($cont);
+        $atStart = $context->builder->icmp(Builder::INT_SLE, $idx, $zero);
+        $dec = $context->builder->sub($idx, $one);
+        $context->builder->store($dec, $idxSlot);
+        $context->builder->branchIf($atStart, $none, $loop);
+
+        $context->builder->positionAtEnd($found);
+        $start = $context->builder->add($idx, $one);
+        $extLen = $context->builder->sub($len, $start);
+        $slice = string_trim::jitCopySlice($context, $namePtr, $bytes, $start, $extLen, 'di_ext');
+        $context->builder->store($slice, $outSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($none);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->store($empty, $outSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($outSlot);
     }
 
     /**
