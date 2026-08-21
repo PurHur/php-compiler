@@ -75,6 +75,16 @@ final class ObjectInstancePropertyLlvm
             if (null !== $asProps) {
                 return $asProps;
             }
+        } else {
+            $asPropsWrite = \PHPCompiler\VM\ArrayObjectJitHelper::tryPropertyFetchWrite(
+                $object,
+                $obj,
+                $class,
+                $name
+            );
+            if (null !== $asPropsWrite) {
+                return $asPropsWrite;
+            }
         }
 
         return self::propertyFetchDeclaredSlot($object, $obj, $class, $name, $classId, $forWrite);

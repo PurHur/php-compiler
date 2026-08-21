@@ -334,17 +334,27 @@ final class JitPropertyExists
             $context->builder->branchIf($isSplArray, $splBlock, $normBlock);
 
             $context->builder->positionAtEnd($splBlock);
-            $splResult = self::routeObjectThroughPhpHelper($context, $objectArg, $propertyArg);
+            // Thin AOT ArrayObject uses `__spl_ht` + `__flags`, not VM ObjectEntry — NestedJIT
+            // PropertyExistsJitHelper always returns false (#33068). Probe HT when ARRAY_AS_PROPS.
+            $objPtr = $context->helper->loadValue($objectArg);
+            $splResult = self::compileSplArrayPropertyExists(
+                $context,
+                $objPtr,
+                $classId,
+                $propLiteral
+            );
+            $splEnd = $context->builder->getInsertBlock();
             $context->builder->branch($mergeBlock);
 
             $context->builder->positionAtEnd($normBlock);
             $normResult = self::forCompleteObjectLiteralProperty($context, $classId, $propLiteral);
+            $normEnd = $context->builder->getInsertBlock();
             $context->builder->branch($mergeBlock);
 
             $context->builder->positionAtEnd($mergeBlock);
             $phi = $context->builder->phi($splResult->typeOf());
-            $phi->addIncoming($splResult, $splBlock);
-            $phi->addIncoming($normResult, $normBlock);
+            $phi->addIncoming($splResult, $splEnd);
+            $phi->addIncoming($normResult, $normEnd);
 
             return $phi;
         }
@@ -423,6 +433,76 @@ final class JitPropertyExists
         }
 
         return $isSpl;
+    }
+
+    /**
+     * Runtime class-id dispatch → ARRAY_AS_PROPS HT probe with the correct layout class (#33068).
+     *
+     * @return Value i1
+     */
+    private static function compileSplArrayPropertyExists(
+        Context $context,
+        Value $objPtr,
+        Value $classId,
+        string $propLiteral
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $object = $context->type->object;
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $mergeBb = $fn->appendBasicBlock('ao_pex_class_merge');
+        $incomings = [];
+        $nextBb = null;
+        $classes = [
+            'ArrayObject' => ArrayObjectBuiltin::CLASS_LC,
+            'ArrayIterator' => ArrayIteratorBuiltin::CLASS_LC,
+            'RecursiveArrayIterator' => RecursiveArrayIteratorBuiltin::CLASS_LC,
+        ];
+        $remaining = [];
+        foreach ($classes as $display => $lc) {
+            $id = $object->classIdByName($lc) ?? $object->classIdForLowerName($lc);
+            if (null !== $id) {
+                $remaining[] = [$display, $id];
+            }
+        }
+        if ([] === $remaining) {
+            return $i1->constInt(0, false);
+        }
+        foreach ($remaining as $idx => [$display, $id]) {
+            $isLast = $idx === count($remaining) - 1;
+            $matchBb = $fn->appendBasicBlock('ao_pex_class_'.$display);
+            if (!$isLast) {
+                $nextBb = $fn->appendBasicBlock('ao_pex_class_next_'.$idx);
+                $match = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $classId,
+                    $context->constantFromInteger($id, 'int64')
+                );
+                $context->builder->branchIf($match, $matchBb, $nextBb);
+            } else {
+                // Last arm — no further compare (already in isSplArray block).
+                $context->builder->branch($matchBb);
+            }
+            $context->builder->positionAtEnd($matchBb);
+            $exists = \PHPCompiler\VM\ArrayObjectJitHelper::compilePropertyExists(
+                $context,
+                $objPtr,
+                $display,
+                $propLiteral
+            );
+            $existsEnd = $context->builder->getInsertBlock();
+            $incomings[] = [$exists, $existsEnd];
+            $context->builder->branch($mergeBb);
+            if (!$isLast && null !== $nextBb) {
+                $context->builder->positionAtEnd($nextBb);
+            }
+        }
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($i1);
+        foreach ($incomings as [$val, $bb]) {
+            $phi->addIncoming($val, $bb);
+        }
+
+        return $phi;
     }
 
     private static function existsForClassIdLiteralProperty(

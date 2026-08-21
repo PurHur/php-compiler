@@ -278,6 +278,15 @@ final class Variable {
 
     public ?string $magicSetName = null;
 
+    /**
+     * ArrayObject/ArrayIterator::ARRAY_AS_PROPS write — assign routes to offsetSet (#33068).
+     */
+    public ?\PHPLLVM\Value $arrayAsPropsReceiver = null;
+
+    public ?string $arrayAsPropsName = null;
+
+    public ?string $arrayAsPropsClassName = null;
+
     /** __get return value; non-object dim-write must error (#4673). Objects may write_dimension (#20005). */
     public ?string $magicGetOverloadedClass = null;
 
