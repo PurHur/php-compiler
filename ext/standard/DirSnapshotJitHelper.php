@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * dir() entry list for JIT/AOT NestedJIT (#30757, #32027, #33009).
+ * dir() entry list for JIT/AOT NestedJIT (#30757, #32027, #33009, #33263).
  *
- * Uses {@see FsGlobJitHelper::scandirArgv} — NestedJIT whitelist → libc scandir vec (peer #29986).
- * Do not call {@see DirHandleJitHelper} / {@see VmDir} (empty listing under thin AOT — #33009).
+ * NestedJIT `\scandir()` directly (same leaf as user-script scandir). Do not call
+ * {@see FsGlobJitHelper::scandirArgv} from this helper (empty listing under NestedJIT
+ * indirection). Do not call {@see DirHandleJitHelper} / {@see VmDir} (#33009).
  *
  * @return list<string>
  */
@@ -19,11 +20,11 @@ final class DirSnapshotJitHelper
      */
     public static function entriesArgv(string $path): array
     {
-        $entries = FsGlobJitHelper::scandirArgv($path, \SCANDIR_SORT_NONE);
-        if (null === $entries) {
+        $entries = \scandir($path, \SCANDIR_SORT_NONE);
+        if (!\is_array($entries)) {
             return [];
         }
 
-        return $entries;
+        return \array_values($entries);
     }
 }

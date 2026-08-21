@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\JitStat;
+use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StatPathRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -15,11 +18,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289).
+ * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263).
  *
  * Construct lists directory entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}
  * (NestedJIT leaf calling DirHandleJitHelper only — StringDir already linked).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
+ * isFile/isDir join `__dir_path`+`__filename` then {@see \PHPCompiler\ext\standard\JitStat}.
  *
  * php-src: ext/spl/spl_directory.c
  */
@@ -195,6 +199,114 @@ final class DirectoryIteratorJitHelper
         );
 
         return $slot;
+    }
+
+    /**
+     * SplFileInfo::isFile — pathname = join(__dir_path, __filename) (#33263).
+     * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isFile
+     */
+    public static function compileIsFile(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compilePathPredicate($context, $receiver, $className, true);
+    }
+
+    /**
+     * SplFileInfo::isDir — pathname = join(__dir_path, __filename) (#33263).
+     * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isDir
+     */
+    public static function compileIsDir(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compilePathPredicate($context, $receiver, $className, false);
+    }
+
+    private static function compilePathPredicate(
+        Context $context,
+        JITVariable $receiver,
+        string $className,
+        bool $wantFile
+    ): Value {
+        StatPathRuntime::ensureLinked($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'di_path_pred_after_stat_link');
+
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+        $pred = $wantFile
+            ? JitStat::pathIsFile($context, $pathname)
+            : JitStat::pathIsDir($context, $pathname);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $pred);
+
+        return $slot;
+    }
+
+    /**
+     * Mirror {@see \PHPCompiler\ext\spl\DirectoryIteratorBuiltin::joinPath} / pathname().
+     */
+    private static function emitJoinedPathname(Context $context, Value $obj, string $className): Value
+    {
+        $dirSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_PATH);
+        $nameSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_FILENAME);
+        $dirPtr = self::stringFromProperty($context, $dirSlot);
+        $namePtr = self::stringFromProperty($context, $nameSlot);
+
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $strMap = $context->structFieldMap['__string__'];
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+
+        // Alloca — JitStringConcat ends in its own blocks; PHI preds would not match (#33263).
+        $outSlot = $context->builder->alloca($strPtrTy);
+
+        $dirLen = $context->builder->call($context->lookupFunction('__string__strlen'), $dirPtr);
+        $dirEmpty = $context->builder->icmp(Builder::INT_EQ, $dirLen, $zero);
+
+        $isDotDir = BasicBlockHelper::append($context, 'di_join_dotdir');
+        $checkSlash = BasicBlockHelper::append($context, 'di_join_slash');
+        $useName = BasicBlockHelper::append($context, 'di_join_name');
+        $joinSlash = BasicBlockHelper::append($context, 'di_join_addslash');
+        $joinBare = BasicBlockHelper::append($context, 'di_join_bare');
+        $done = BasicBlockHelper::append($context, 'di_join_done');
+        $context->builder->branchIf($dirEmpty, $useName, $isDotDir);
+
+        $context->builder->positionAtEnd($isDotDir);
+        $dirBytes = $context->builder->pointerCast(
+            $context->builder->structGep($dirPtr, $strMap['value']),
+            $i8p
+        );
+        $b0 = $context->builder->load($dirBytes);
+        $lenIsOne = $context->builder->icmp(Builder::INT_EQ, $dirLen, $one);
+        $isDot = $context->builder->icmp(Builder::INT_EQ, $b0, $i8->constInt(ord('.'), false));
+        $dirIsDot = $context->builder->and($lenIsOne, $isDot);
+        $context->builder->branchIf($dirIsDot, $useName, $checkSlash);
+
+        $context->builder->positionAtEnd($checkSlash);
+        $lastIdx = $context->builder->sub($dirLen, $one);
+        $lastByte = $context->builder->load($context->builder->gep($dirBytes, $lastIdx));
+        $endsSlash = $context->builder->icmp(Builder::INT_EQ, $lastByte, $i8->constInt(ord('/'), false));
+        $context->builder->branchIf($endsSlash, $joinBare, $joinSlash);
+
+        $context->builder->positionAtEnd($useName);
+        $context->builder->store($namePtr, $outSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($joinBare);
+        $bare = JitStringConcat::concat($context, $dirPtr, $namePtr);
+        $context->builder->store($bare, $outSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($joinSlash);
+        $slash = $context->builder->load($context->constantStringFromString('/'));
+        $withSlash = JitStringConcat::concat($context, $dirPtr, $slash);
+        $joined = JitStringConcat::concat($context, $withSlash, $namePtr);
+        $context->builder->store($joined, $outSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($outSlot);
     }
 
     private static function syncFilenameFromPos(Context $context, Value $obj, string $className): void
