@@ -5,19 +5,24 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
 
 /**
- * Thin-AOT foreach over DOMNodeList via compile-time snapshot → hashtable (#32707, #33082).
+ * Thin-AOT foreach over DOMNodeList via snapshot → hashtable (#32707, #33082, #33645).
  *
  * Iterator protocol and runtime item() inside the foreach CFG both break module
  * verification or abort under nested JIT. For user-script getElementsByTagName lists,
  * materialize every item at Iterator_Reset from compile-time XML (peer #27275).
- * For {@code $el->childNodes} (no tag query), snapshot direct children of loadXML
- * / loadHTML markup (#33082). For {@code $el->attributes} NamedNodeMap, snapshot
- * root open-tag attributes (#33099).
+ * For {@code $el->childNodes} (no tag query), snapshot **live**
+ * {@code owner.firstChild→nextSibling} at Iterator_Reset (#33645) — a compile-time
+ * loadXML child list (#33082) ignored after/before/append/prepend. For
+ * {@code $el->attributes} NamedNodeMap, snapshot root open-tag attributes (#33099).
  *
  * php-src: ext/dom/nodelist.c / namednodemap.c — InternalIterator; Zend copies
  * non-array Traversables when foreach stability requires a snapshot.
@@ -194,6 +199,7 @@ final class JitDomNodeListForeachSnapshot
                 $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
                 HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $elem);
             }
+            $countVal = $sizeT->constInt($count, false);
         } elseif (!$useDirectChildren) {
             $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
             $ht = HashTableHelper::alloc($context);
@@ -207,29 +213,14 @@ final class JitDomNodeListForeachSnapshot
                 $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
                 HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $elem);
             }
+            $countVal = $sizeT->constInt($count, false);
         } else {
-            // Direct children of document element (childNodes) (#33082).
-            $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
-            $count = \count($nodes);
-            $ht = HashTableHelper::alloc($context);
-            $context->builder->call(
-                $context->lookupFunction('__hashtable__grow'),
-                $ht,
-                $sizeT->constInt($count > 0 ? $count : 1, false)
-            );
-            for ($i = 0; $i < $count; ++$i) {
-                $itemPtr = JitDomNodeListItemUserScript::materializeDirectChildAtCompileTime(
-                    $context,
-                    $xml,
-                    $i
-                );
-                $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
-                HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $elem);
-            }
+            // Live childNodes: owner.firstChild→nextSibling at Reset (#33645).
+            // Compile-time loadXML children (#33082) ignored after/before/append/prepend.
+            [$ht, $countVal] = self::emitLiveChildNodesSnapshot($context, $array, $xml);
         }
 
         $map = $context->structFieldMap['__hashtable__'];
-        $countVal = $sizeT->constInt($count, false);
         $context->builder->store($countVal, $context->builder->structGep($ht, $map['numElements']));
         $context->builder->store($countVal, $context->builder->structGep($ht, $map['nextFreeElement']));
 
@@ -245,5 +236,215 @@ final class JitDomNodeListForeachSnapshot
         $one = $sizeT->constInt(1, false);
         $invalid = $context->builder->sub($zero, $one);
         $context->builder->store($invalid, $context->foreachIndexSlots[$context->foreachSlotMapKey($slotKey)]);
+    }
+
+    /**
+     * Pack live childNodes into a foreach hashtable (#33645).
+     *
+     * Prefers {@code DOMNodeList} owner + firstChild→nextSibling (matches item()).
+     * Falls back to compile-time loadXML children when the list has no owner yet
+     * (empty createElement before any child sync).
+     *
+     * @return array{0: Value, 1: Value} __hashtable__* and size_t element count
+     */
+    private static function emitLiveChildNodesSnapshot(
+        Context $context,
+        JITVariable $array,
+        string $xml
+    ): array {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nl_foreach_live');
+        $objectType = $context->type->object;
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidPtr = $context->getTypeFromString('void*');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+
+        $listClassId = $objectType->lookup('DOMNodeList');
+        if (!$objectType->hasProperty($listClassId, 'length')) {
+            $objectType->defineProperty($listClassId, 'length', JITVariable::TYPE_NATIVE_LONG);
+        }
+        if (!$objectType->hasProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER)) {
+            $objectType->defineProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
+        }
+        $elementClassId = $objectType->lookup('DOMElement');
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_NEXT_SIBLING] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+        }
+
+        // Merge fallback / live / empty via entry allocas (avoids ht* phis).
+        $htSlot = BasicBlockHelper::entryAlloca($context, $htPtrTy);
+        $countSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nl_foreach_live_slots');
+        $context->builder->store($htPtrTy->constNull(), $htSlot);
+        $context->builder->store($sizeT->constInt(0, false), $countSlot);
+
+        $list = self::loadNodeListObject($context, $array);
+        $ownerSlot = $objectType->propertySlotFor($list, 'DOMNodeList', VmDom::PROP_CHILD_NODES_OWNER);
+        $ownerPtr = $context->builder->load($ownerSlot);
+        $noOwner = $context->builder->icmp(Builder::INT_EQ, $ownerPtr, $voidPtr->constNull());
+
+        $bbFallback = BasicBlockHelper::append($context, 'dom_nl_foreach_fb_xml');
+        $bbLive = BasicBlockHelper::append($context, 'dom_nl_foreach_live_walk');
+        $bbDone = BasicBlockHelper::append($context, 'dom_nl_foreach_live_done');
+        $context->builder->branchIf($noOwner, $bbFallback, $bbLive);
+
+        // Fallback: original loadXML direct children (#33082) when owner unset.
+        $context->builder->positionAtEnd($bbFallback);
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        $fbCount = \count($nodes);
+        $fbHt = HashTableHelper::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__grow'),
+            $fbHt,
+            $sizeT->constInt($fbCount > 0 ? $fbCount : 1, false)
+        );
+        for ($i = 0; $i < $fbCount; ++$i) {
+            $itemPtr = JitDomNodeListItemUserScript::materializeDirectChildAtCompileTime(
+                $context,
+                $xml,
+                $i
+            );
+            $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
+            HashTableHelper::setAtIndex($context, $fbHt, $sizeT->constInt($i, false), $elem);
+        }
+        $context->builder->store($fbHt, $htSlot);
+        $context->builder->store($sizeT->constInt($fbCount, false), $countSlot);
+        $context->builder->branch($bbDone);
+
+        // Live walk: grow from length; pack firstChild→nextSibling.
+        $context->builder->positionAtEnd($bbLive);
+        $lengthVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $list,
+            'DOMNodeList',
+            'length',
+            $listClassId
+        );
+        $lengthI64 = $context->helper->loadValue($lengthVar);
+        $lengthSz = $context->builder->intCast($lengthI64, $sizeT);
+        $growOne = $sizeT->constInt(1, false);
+        $growNeed = $context->builder->icmp(Builder::INT_UGT, $lengthSz, $growOne);
+        $growN = $context->builder->select($growNeed, $lengthSz, $growOne);
+
+        $liveHt = HashTableHelper::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__grow'),
+            $liveHt,
+            $growN
+        );
+        $context->builder->store($liveHt, $htSlot);
+
+        $owner = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($ownerPtr, $valuePtrTy)
+        );
+        $ownerNull = $context->builder->icmp(Builder::INT_EQ, $owner, $objPtrTy->constNull());
+        $bbEmpty = BasicBlockHelper::append($context, 'dom_nl_foreach_live_empty');
+        $bbReadFirst = BasicBlockHelper::append($context, 'dom_nl_foreach_live_first');
+        $context->builder->branchIf($ownerNull, $bbEmpty, $bbReadFirst);
+
+        $context->builder->positionAtEnd($bbEmpty);
+        $context->builder->store($sizeT->constInt(0, false), $countSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbReadFirst);
+        $firstRaw = $context->builder->load(
+            $objectType->propertySlotFor($owner, 'DOMElement', VmDom::PROP_FIRST_CHILD)
+        );
+        $firstSlotNull = $context->builder->icmp(Builder::INT_EQ, $firstRaw, $voidPtr->constNull());
+        $bbEnter = BasicBlockHelper::append($context, 'dom_nl_foreach_live_enter');
+        $context->builder->branchIf($firstSlotNull, $bbEmpty, $bbEnter);
+
+        $context->builder->positionAtEnd($bbEnter);
+        $firstObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($firstRaw, $valuePtrTy)
+        );
+        $firstObjNull = $context->builder->icmp(Builder::INT_EQ, $firstObj, $objPtrTy->constNull());
+        $bbLoopHdr = BasicBlockHelper::append($context, 'dom_nl_foreach_live_hdr');
+        $context->builder->branchIf($firstObjNull, $bbEmpty, $bbLoopHdr);
+
+        $bbBody = BasicBlockHelper::append($context, 'dom_nl_foreach_live_body');
+        $bbAdvance = BasicBlockHelper::append($context, 'dom_nl_foreach_live_adv');
+        $bbFinish = BasicBlockHelper::append($context, 'dom_nl_foreach_live_finish');
+
+        $context->builder->positionAtEnd($bbLoopHdr);
+        $curPhi = $context->builder->phi($objPtrTy);
+        $idxPhi = $context->builder->phi($sizeT);
+        // Always take body when we entered with a non-null node.
+        $context->builder->branch($bbBody);
+
+        $context->builder->positionAtEnd($bbBody);
+        $boxSlot = JitValueBox::alloc($context);
+        $boxPtr = JitValueBox::pointer($context, $boxSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $boxPtr,
+            $curPhi
+        );
+        $elem = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $boxPtr)
+        );
+        HashTableHelper::setAtIndex($context, $liveHt, $idxPhi, $elem);
+        $context->builder->branch($bbAdvance);
+
+        $context->builder->positionAtEnd($bbAdvance);
+        $nextRaw = $context->builder->load(
+            $objectType->propertySlotFor($curPhi, 'DOMElement', VmDom::PROP_NEXT_SIBLING)
+        );
+        $nextSlotNull = $context->builder->icmp(Builder::INT_EQ, $nextRaw, $voidPtr->constNull());
+        $bbReadNext = BasicBlockHelper::append($context, 'dom_nl_foreach_live_read_next');
+        $context->builder->branchIf($nextSlotNull, $bbFinish, $bbReadNext);
+
+        $context->builder->positionAtEnd($bbReadNext);
+        $nextObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($nextRaw, $valuePtrTy)
+        );
+        $nextObjNull = $context->builder->icmp(Builder::INT_EQ, $nextObj, $objPtrTy->constNull());
+        $bbBack = BasicBlockHelper::append($context, 'dom_nl_foreach_live_back');
+        $context->builder->branchIf($nextObjNull, $bbFinish, $bbBack);
+
+        $context->builder->positionAtEnd($bbBack);
+        $nextIdx = $context->builder->add($idxPhi, $sizeT->constInt(1, false));
+        $context->builder->branch($bbLoopHdr);
+
+        $curPhi->addIncoming($firstObj, $bbEnter);
+        $curPhi->addIncoming($nextObj, $bbBack);
+        $idxPhi->addIncoming($sizeT->constInt(0, false), $bbEnter);
+        $idxPhi->addIncoming($nextIdx, $bbBack);
+
+        $context->builder->positionAtEnd($bbFinish);
+        // Count = last written index + 1.
+        $finalCount = $context->builder->add($idxPhi, $sizeT->constInt(1, false));
+        $context->builder->store($finalCount, $countSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+        $htOut = $context->builder->load($htSlot);
+        $countOut = $context->builder->load($countSlot);
+
+        return [$htOut, $countOut];
+    }
+
+    private static function loadNodeListObject(Context $context, JITVariable $array): Value
+    {
+        if (JITVariable::TYPE_OBJECT === $array->type) {
+            return $context->helper->loadValue($array);
+        }
+        if (JITVariable::TYPE_VALUE === $array->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $array)
+            );
+        }
+
+        throw new \LogicException('DOMNodeList foreach receiver must be an object (#33645)');
     }
 }
