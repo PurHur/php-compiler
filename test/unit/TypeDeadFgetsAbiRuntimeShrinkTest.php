@@ -31,8 +31,8 @@ final class TypeDeadFgetsAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-// Next leftover sentinel (serialize_hashtable still Type always-on; #33196 str_getcsv dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_serialize_hashtable'", $type);
+// Next leftover sentinel (unserialize still Type always-on; #33207 serialize_* dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_unserialize'", $type);
         $this->assertStringContainsString('StreamRead::ensureLinked', $type);
     }
 
