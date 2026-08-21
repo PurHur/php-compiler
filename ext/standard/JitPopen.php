@@ -5,17 +5,23 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
+use PHPCompiler\JIT\Builtin\StreamLifecycleRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for popen() via __compiler_popen (#6211). */
+/** LLVM lowering for popen() via __compiler_popen (#6211 / #33430). */
 final class JitPopen
 {
     /** @return Value boxed stream handle or boolean false */
     public static function invoke(Context $context, Value $commandStr, Value $modeStr): Value
     {
+        // Peer JitFopen/JitTmpfile — Type always-on __compiler_popen dropped (#33100).
+        StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
+        StreamLifecycleRuntime::ensureLinkedForUserScriptLowering($context);
+
         $handle = $context->builder->call(
             $context->lookupFunction('__compiler_popen'),
             $commandStr,

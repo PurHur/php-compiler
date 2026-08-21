@@ -1341,11 +1341,13 @@ final class JitStreamIoKernel
         );
 
         // Seekable remaining: ftell → SEEK_END → restore → min(remaining, maxlength when > 0).
+        // Non-seekable (popen pipes): ftell/SEEK_END fail — fall back to bounded fread (#33430).
         $context->builder->positionAtEnd($sizeBb);
         $pos = $context->builder->call($context->lookupFunction('ftell'), $fp);
         $posBad = $context->builder->icmp(Builder::INT_SLT, $pos, $zeroI64);
         $endSeekBb = $fn->appendBasicBlock('sgc_end_seek');
-        $context->builder->branchIf($posBad, $failBb, $endSeekBb);
+        $pipeBb = $fn->appendBasicBlock('sgc_pipe_read');
+        $context->builder->branchIf($posBad, $pipeBb, $endSeekBb);
 
         $context->builder->positionAtEnd($endSeekBb);
         $endSeekRc = $context->builder->call(
@@ -1356,7 +1358,7 @@ final class JitStreamIoKernel
         );
         $endSeekFail = $context->builder->icmp(Builder::INT_NE, $endSeekRc, $zeroI32);
         $endTellBb = $fn->appendBasicBlock('sgc_end_tell');
-        $context->builder->branchIf($endSeekFail, $failBb, $endTellBb);
+        $context->builder->branchIf($endSeekFail, $pipeBb, $endTellBb);
 
         $context->builder->positionAtEnd($endTellBb);
         $end = $context->builder->call($context->lookupFunction('ftell'), $fp);
@@ -1437,6 +1439,69 @@ final class JitStreamIoKernel
                 $context->lookupFunction('__compiler_stream_filter_apply_read'),
                 $handle,
                 $result
+            )
+        );
+
+        // popen / non-seekable: single fread with maxlength or 64KiB default (#33430).
+        $context->builder->positionAtEnd($pipeBb);
+        $defaultPipe = $i64->constInt(65536, false);
+        $pipeUnlimited = $context->builder->icmp(Builder::INT_SLT, $maxlength, $zeroI64);
+        $pipeLen = $context->builder->select($pipeUnlimited, $defaultPipe, $maxlength);
+        $pipeZero = $context->builder->icmp(Builder::INT_EQ, $pipeLen, $zeroI64);
+        $pipeAllocBb = $fn->appendBasicBlock('sgc_pipe_alloc');
+        $context->builder->branchIf($pipeZero, $emptyBb, $pipeAllocBb);
+
+        $context->builder->positionAtEnd($pipeAllocBb);
+        $pipeReadLen = $context->builder->trunc($pipeLen, $sizeT);
+        $pipeBuf = $context->builder->call($context->lookupFunction('malloc'), $pipeReadLen);
+        $pipeBufNull = $context->builder->icmp(Builder::INT_EQ, $pipeBuf, $nullPtr);
+        $pipeReadBb = $fn->appendBasicBlock('sgc_pipe_do_read');
+        $context->builder->branchIf($pipeBufNull, $failBb, $pipeReadBb);
+
+        $context->builder->positionAtEnd($pipeReadBb);
+        $pipeGot = $context->builder->call(
+            $context->lookupFunction('fread'),
+            $pipeBuf,
+            $sizeT->constInt(1, false),
+            $pipeReadLen,
+            $fp
+        );
+        $pipeGotZero = $context->builder->icmp(Builder::INT_EQ, $pipeGot, $sizeT->constInt(0, false));
+        $pipeErrBb = $fn->appendBasicBlock('sgc_pipe_err');
+        $pipeMakeBb = $fn->appendBasicBlock('sgc_pipe_make');
+        $context->builder->branchIf($pipeGotZero, $pipeErrBb, $pipeMakeBb);
+
+        $context->builder->positionAtEnd($pipeErrBb);
+        $pipeHasErr = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('ferror'), $fp),
+            $zeroI32
+        );
+        $pipeFreeFail = $fn->appendBasicBlock('sgc_pipe_free_fail');
+        $pipeFreeEmpty = $fn->appendBasicBlock('sgc_pipe_free_empty');
+        $context->builder->branchIf($pipeHasErr, $pipeFreeFail, $pipeFreeEmpty);
+
+        $context->builder->positionAtEnd($pipeFreeEmpty);
+        $context->builder->call($context->lookupFunction('free'), $pipeBuf);
+        $context->builder->branch($emptyBb);
+
+        $context->builder->positionAtEnd($pipeFreeFail);
+        $context->builder->call($context->lookupFunction('free'), $pipeBuf);
+        $context->builder->branch($failBb);
+
+        $context->builder->positionAtEnd($pipeMakeBb);
+        $pipeGotI64 = $context->builder->zExt($pipeGot, $i64);
+        $pipeResult = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $pipeGotI64,
+            $pipeBuf
+        );
+        $context->builder->call($context->lookupFunction('free'), $pipeBuf);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $pipeResult
             )
         );
 
