@@ -207,7 +207,7 @@ final class DirectoryIteratorJitHelper
      */
     public static function compileIsFile(Context $context, JITVariable $receiver, string $className): Value
     {
-        return self::compilePathPredicate($context, $receiver, $className, true);
+        return self::compilePathPredicate($context, $receiver, $className, 'file');
     }
 
     /**
@@ -216,23 +216,63 @@ final class DirectoryIteratorJitHelper
      */
     public static function compileIsDir(Context $context, JITVariable $receiver, string $className): Value
     {
-        return self::compilePathPredicate($context, $receiver, $className, false);
+        return self::compilePathPredicate($context, $receiver, $className, 'dir');
     }
 
+    /**
+     * SplFileInfo::isLink — pathname = join(__dir_path, __filename) (#33269).
+     * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isLink
+     */
+    public static function compileIsLink(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compilePathPredicate($context, $receiver, $className, 'link');
+    }
+
+    /**
+     * SplFileInfo::isReadable (#33269). php-src: zim_SplFileInfo_isReadable
+     */
+    public static function compileIsReadable(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compilePathPredicate($context, $receiver, $className, 'readable');
+    }
+
+    /**
+     * SplFileInfo::isWritable (#33269). php-src: zim_SplFileInfo_isWritable
+     */
+    public static function compileIsWritable(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compilePathPredicate($context, $receiver, $className, 'writable');
+    }
+
+    /**
+     * SplFileInfo::isExecutable (#33269). php-src: zim_SplFileInfo_isExecutable
+     */
+    public static function compileIsExecutable(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compilePathPredicate($context, $receiver, $className, 'executable');
+    }
+
+    /** @param 'file'|'dir'|'link'|'readable'|'writable'|'executable' $kind */
     private static function compilePathPredicate(
         Context $context,
         JITVariable $receiver,
         string $className,
-        bool $wantFile
+        string $kind
     ): Value {
         StatPathRuntime::ensureLinked($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'di_path_pred_after_stat_link');
 
         $obj = self::loadObject($context, $receiver);
         $pathname = self::emitJoinedPathname($context, $obj, $className);
-        $pred = $wantFile
-            ? JitStat::pathIsFile($context, $pathname)
-            : JitStat::pathIsDir($context, $pathname);
+        $pred = match ($kind) {
+            'file' => JitStat::pathIsFile($context, $pathname),
+            'dir' => JitStat::pathIsDir($context, $pathname),
+            'link' => JitStat::pathIsLink($context, $pathname),
+            'readable' => JitStat::pathIsReadable($context, $pathname),
+            'writable' => JitStat::pathIsWritable($context, $pathname),
+            'executable' => JitStat::pathIsExecutable($context, $pathname),
+            default => throw new \LogicException('Unknown SplFileInfo path predicate: '.$kind),
+        };
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeBool($context, $slot, $pred);
 
