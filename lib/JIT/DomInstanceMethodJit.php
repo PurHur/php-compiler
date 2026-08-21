@@ -137,6 +137,9 @@ final class DomInstanceMethodJit
         'domelement::getattributenodens' => true,
         'domelement::setattributenodens' => true,
         'domelement::setattributenode' => true,
+        // appendChild() returns DOMNode — setAttributeNode must still hit the user-script proxy (#33604).
+        'domnode::setattributenode' => true,
+        'domnode::setattributenodens' => true,
         'domelement::removeattributenode' => true,
         'dom\\element::removeattributenode' => true,
         'dom\\htmlelement::removeattributenode' => true,
@@ -546,7 +549,7 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domelement::setattributenodens' === $lc) {
+            if ('domelement::setattributenodens' === $lc || 'domnode::setattributenodens' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementSetAttributeNodeNS();
 
                 return;
@@ -561,7 +564,7 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domelement::setattributenode' === $lc) {
+            if ('domelement::setattributenode' === $lc || 'domnode::setattributenode' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementSetAttributeNode();
 
                 return;
@@ -1380,6 +1383,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::getattributenodens');
             self::ensureProxy($context, 'domelement::setattributenodens');
             self::ensureProxy($context, 'domelement::setattributenode');
+            self::ensureProxy($context, 'domnode::setattributenode');
+            self::ensureProxy($context, 'domnode::setattributenodens');
             self::ensureProxy($context, 'domelement::removeattributenode');
             self::ensureProxy($context, 'dom\\element::removeattributenode');
             self::ensureProxy($context, 'dom\\htmlelement::removeattributenode');
