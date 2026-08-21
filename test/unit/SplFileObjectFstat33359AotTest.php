@@ -44,7 +44,8 @@ final class SplFileObjectFstat33359AotTest extends TestCase
         $helper = (string) file_get_contents($root.'/lib/VM/SplFileObjectJitHelper.php');
         $this->assertStringContainsString('compileFstat', $helper);
         $this->assertStringContainsString('#33359', $helper);
-        $this->assertStringContainsString('JitFstat::invoke', $helper);
+        $this->assertStringContainsString('StatPathRuntime', $helper);
+        $this->assertStringContainsString('__hashtable__setStringKeyLong', $helper);
         $call = (string) file_get_contents($root.'/lib/JIT/Call/SplFileObjectMethod.php');
         $this->assertStringContainsString("'fstat'", $call);
         $ctx = (string) file_get_contents($root.'/lib/JIT/Context.php');

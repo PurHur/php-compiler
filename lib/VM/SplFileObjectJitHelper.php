@@ -11,12 +11,14 @@ use PHPCompiler\ext\standard\JitFpassthru;
 use PHPCompiler\ext\standard\JitFputcsv;
 use PHPCompiler\ext\standard\JitFread;
 use PHPCompiler\ext\standard\JitFseek;
-use PHPCompiler\ext\standard\JitFstat;
 use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitFtruncate;
 use PHPCompiler\ext\standard\JitPath;
+use PHPCompiler\ext\standard\StatFieldsJitHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\FputcsvRuntime;
 use PHPCompiler\JIT\Builtin\SplFileObjectSnapshotRuntime;
+use PHPCompiler\JIT\Builtin\StatPathRuntime;
 use PHPCompiler\JIT\Builtin\StreamIo;
 use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Builtin\StreamRead;
@@ -44,6 +46,7 @@ use PHPLLVM\Value;
  * getCurrentLine is the php-src fgets alias (#33321).
  * fread/fgetc on `__spl_fd` (#33332).
  * ftell/flock on `__spl_fd` (#33336) via JitFtell / JitFlock.
+ * fstat via pathname + StatPath long fields (#33359).
  * fstat on `__spl_fd` (#33359) via JitFstat (thin AOT libc fileno force).
  * ftruncate on `__spl_fd` (#33348) via JitFtruncate (peer procedural #33155).
  * fflush on `__spl_fd` (#33354) via JitFflush (peer procedural #1189).
@@ -294,15 +297,98 @@ final class SplFileObjectJitHelper
     }
 
     /**
-     * SplFileObject::fstat — php_stream_stat on live handle (#33359).
-     * php-src: zim_SplFileObject_fstat
+     * SplFileObject::fstat — path-based stat array (#33359).
+     * php-src: zim_SplFileObject_fstat → php_stream_stat.
+     *
+     * Thin AOT `__spl_fd` is a JitStreamIoKernel FILE* id — NestedJIT VmFs::fstat
+     * cannot resolve it. NestedJIT HashTable returns are also not real
+     * `__hashtable__*` under thin AOT (peer getrusage #27551). Materialize via
+     * StatPath long fields + `__hashtable__setLongAt` / `__hashtable__setStringKeyLong`
+     * (peer SplFileInfo::getSize).
      */
     public static function compileFstat(Context $context, JITVariable $receiver): Value
     {
         self::ensureStreamAbis($context);
-        $handle = self::loadFd($context, $receiver);
+        StatPathRuntime::ensureLinked($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'splfo_fstat_after_statpath');
 
-        return JitFstat::invoke($context, $handle);
+        $obj = self::loadObject($context, $receiver);
+        $path = self::loadStringProp($context, $obj, self::PROP_PATH);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $fieldFn = $context->lookupFunction(StatPathRuntime::FN_LONG_FIELD);
+        $size = $context->builder->call(
+            $fieldFn,
+            $path,
+            $zero,
+            $i64->constInt(StatFieldsJitHelper::FIELD_SIZE, false)
+        );
+        $failed = $context->builder->icmp(Builder::INT_SLT, $size, $zero);
+        $failBb = BasicBlockHelper::append($context, 'splfo_fstat_fail');
+        $okBb = BasicBlockHelper::append($context, 'splfo_fstat_ok');
+        $doneBb = BasicBlockHelper::append($context, 'splfo_fstat_done');
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->branchIf($failed, $failBb, $okBb);
+
+        $context->builder->positionAtEnd($failBb);
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $setLongAt = $context->lookupFunction('__hashtable__setLongAt');
+        $setKeyLong = $context->lookupFunction('__hashtable__setStringKeyLong');
+        $fields = [
+            [0, 'dev', StatFieldsJitHelper::FIELD_DEV],
+            [1, 'ino', StatFieldsJitHelper::FIELD_INO],
+            [2, 'mode', StatFieldsJitHelper::FIELD_MODE],
+            [4, 'uid', StatFieldsJitHelper::FIELD_UID],
+            [5, 'gid', StatFieldsJitHelper::FIELD_GID],
+            [7, 'size', StatFieldsJitHelper::FIELD_SIZE],
+            [8, 'atime', StatFieldsJitHelper::FIELD_ATIME],
+            [9, 'mtime', StatFieldsJitHelper::FIELD_MTIME],
+            [10, 'ctime', StatFieldsJitHelper::FIELD_CTIME],
+        ];
+        $values = [];
+        foreach ($fields as [$idx, $name, $fieldId]) {
+            if (StatFieldsJitHelper::FIELD_SIZE === $fieldId) {
+                $values[$idx] = [$name, $size];
+                continue;
+            }
+            $values[$idx] = [
+                $name,
+                $context->builder->call(
+                    $fieldFn,
+                    $path,
+                    $zero,
+                    $i64->constInt($fieldId, false)
+                ),
+            ];
+        }
+        foreach ([3 => 'nlink', 6 => 'rdev', 11 => 'blksize', 12 => 'blocks'] as $idx => $name) {
+            $values[$idx] = [$name, $zero];
+        }
+        ksort($values);
+        foreach ($values as $idx => [$name, $val]) {
+            $context->builder->call($setLongAt, $ht, $i64->constInt($idx, false), $val);
+            $key = $context->builder->load($context->constantStringFromString($name));
+            $context->builder->call($setKeyLong, $ht, $key, $val);
+        }
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $ht
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $ptr;
     }
 
     /**
