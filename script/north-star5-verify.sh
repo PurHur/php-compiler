@@ -245,6 +245,8 @@ if [[ "${FAST_M5}" -eq 1 ]]; then
   if ci_llvm_ready; then
     ci_apply_llvm_memory_env
     ns5_run 4f2 "VM driver execute probe (fast)" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-vm-driver-execute-probe
+    # Retries for gen-0 `free(): invalid pointer` live in
+    # bootstrap-selfhost-vm-driver-execute-probe.sh (#33501; same class as 4f3).
     echo
     echo "=== north-star5-verify step 4f3: spine bundle OK (prelinked blob, no relink) ==="
     if ! ns5_fast_ensure_spine_binary; then

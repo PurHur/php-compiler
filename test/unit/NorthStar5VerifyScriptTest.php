@@ -56,6 +56,10 @@ final class NorthStar5VerifyScriptTest extends TestCase
         $this->assertStringContainsString('FAST_M5', $body);
         $this->assertStringContainsString('ns5_fast_ensure_spine_binary', $body);
         $this->assertStringContainsString('ns5_spine_ratio_label', $body);
+        // 4f2 calls the probe script, which retries gen-0 free(): invalid pointer (#33501);
+        // 4f3 keeps its own spine_fast_max_attempts=5 loop for bundle OK.
+        $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe', $body);
+        $this->assertStringContainsString('spine_fast_max_attempts=5', $body);
         $this->assertStringNotContainsString('718/718', $body);
         $this->assertStringNotContainsString('cfg/llvm parse blockers', $body);
     }
