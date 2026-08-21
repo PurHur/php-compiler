@@ -43,7 +43,7 @@ final class TypeDeadStatMktimeGetrusageAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__phpc_stream_path'", $type);
+        $this->assertStringContainsString("registerFunction('__phpc_session_start_apply'", $type);
     }
 
     public function testRuntimeOwnersDeclareAbisModuleLocally(): void
