@@ -14,7 +14,24 @@ final class ArrayObjectUnserializeFloatBoolBag33670AotTest extends TestCase
 {
     public function testFloatBoolNullBagMatchesZend(): void
     {
-        $this->assertAotMatchesZend(__DIR__.'/../repro/arrayobject_unserialize_float_bool_bag.php');
+        $src = __DIR__.'/../repro/arrayobject_unserialize_float_bool_bag.php';
+        $zend = $this->runPhp($src);
+        $aot = $this->runAot($src);
+        // Guard against __value__readDouble→0.0 on NestedJIT string boxes (#33670 / #32325).
+        $this->assertStringContainsString('1.5', $aot);
+        $this->assertSame($zend, $aot);
+    }
+
+    public function testDoubleFromVarUsesValueBoxStrtod(): void
+    {
+        $src = (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/Builtin/ParseStrNativeOpsJit.php'
+        );
+        $this->assertStringContainsString('valueBoxToDouble', $src);
+        $this->assertStringNotContainsString(
+            'extractDoubleFromHelperResult($context, $raw)',
+            $src
+        );
     }
 
     public function testFillHelperAcceptsFloatBoolNull(): void
@@ -26,13 +43,6 @@ final class ArrayObjectUnserializeFloatBoolBag33670AotTest extends TestCase
         $this->assertStringContainsString('phpc_native_ht_set_string_key_bool(', $fill);
         $this->assertStringContainsString('phpc_native_ht_set_string_key_null(', $fill);
         $this->assertStringContainsString('#33670', $fill);
-    }
-
-    private function assertAotMatchesZend(string $src): void
-    {
-        $zend = $this->runPhp($src);
-        $aot = $this->runAot($src);
-        $this->assertSame($zend, $aot);
     }
 
     private function runPhp(string $src): string
