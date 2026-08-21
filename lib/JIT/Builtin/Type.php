@@ -924,19 +924,12 @@ class Type extends Builtin {
         // user-script tempnam() stays TempnamJitHelper; ftok() stays FtokJitHelper
         // / FtokRuntime::ensureLinked / NestedJIT JitFtokKernel. FsDirRuntime owns
         // the tempnam AOT bridge (getNamedFunction first). Peer mkdir drop.
-        $fntypeHttpBuildQuery = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $this->context->getTypeFromString('__hashtable__*'),
-            $strPtr,
-            $strPtr,
-            $this->context->getTypeFromString('int64')
-        );
-        $fnHttpBuildQuery = $this->context->module->addFunction(
-            '__compiler_http_build_query',
-            $fntypeHttpBuildQuery
-        );
-        $this->context->registerFunction('__compiler_http_build_query', $fnHttpBuildQuery);
+        // __compiler_http_build_query always-on shell removed (#33208): StringHttpBuildQuery
+        // owns the ABI (getNamedFunction first via implementBuildBridge; String_::implement
+        // + JitHttpBuildQuery / http_build_query.php ensureLinked before lookup). Leftover
+        // Type empty decls vs Runtime ABI drift mint http_build_query.1 (#31894 / #32122).
+        // User-script http_build_query() stays JitHttpBuildQuery / HttpBuildQueryJitHelper
+        // (php-src ext/standard/http.c — PHP_FUNCTION(http_build_query)).
         // __compiler_iconv always-on shell removed (#32482): user-script iconv() stays
         // IconvJitHelper / VmIconv. NestedJIT/AOT bridge is IconvRuntime
         // (getNamedFunction first + JitVmHelperLink::ensureCompiled). Leftover Type
