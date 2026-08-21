@@ -47,6 +47,17 @@ final class ArrayObjectMethod implements Call
                     $args[0] ?? throw new \LogicException('ArrayObject::getArrayCopy() called without $this')
                 )
             ),
+            'exchangearray' => $this->compileExact(
+                $context,
+                $args,
+                'ArrayObject::exchangeArray',
+                1,
+                static fn () => ArrayObjectJitHelper::compileExchangeArray(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::exchangeArray() called without $this'),
+                    $args[1]
+                )
+            ),
             'offsetget' => $this->compileExact(
                 $context,
                 $args,
