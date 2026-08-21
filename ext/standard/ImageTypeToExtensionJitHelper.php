@@ -5,32 +5,119 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * image_type_to_extension() for compiled JIT/AOT modules (#14851, php-in-PHP).
+ * image_type_to_extension() for compiled JIT/AOT modules (#14851, #28314, php-in-PHP).
  *
- * SSOT: {@see VmImage::imageTypeToExtension()}
+ * NestedJIT-self-contained (no {@see VmImage} / no static result stash) — peer
+ * {@see ImageTypeToMimeTypeJitHelper} / {@see Hex2binJitHelper} #27008. Returns string|false so the
+ * bridge can map false → __value__ bool without a tag + static pair (AOT statics / class-const
+ * tables were empty under NestedJIT).
+ *
  * php-src: ext/standard/image.c — PHP_FUNCTION(image_type_to_extension)
  */
 final class ImageTypeToExtensionJitHelper
 {
-    public const TAG_FALSE = 0;
-
-    public const TAG_STRING = 1;
-
-    private static ?string $lastString = null;
-
-    public static function lookupArgv(int $imageType, bool $includeDot): int
+    /**
+     * @return string|false
+     */
+    public static function imageTypeToExtensionArgv(int $imageType, bool $includeDot)
     {
-        $ext = VmImage::imageTypeToExtension($imageType, $includeDot);
-        if (false === $ext) {
-            return self::TAG_FALSE;
+        $dotted = self::dottedExtension($imageType);
+        if (false === $dotted) {
+            return false;
         }
-        self::$lastString = $ext;
+        if ($includeDot) {
+            return $dotted;
+        }
 
-        return self::TAG_STRING;
+        // NestedJIT-safe: avoid substr() — drop the leading '.' by offset.
+        return self::withoutDot($dotted);
     }
 
-    public static function lastString(): string
+    /** @return string|false */
+    private static function dottedExtension(int $imageType)
     {
-        return self::$lastString ?? '';
+        switch ($imageType) {
+            case 1:
+                return '.gif';
+            case 2:
+                return '.jpeg';
+            case 3:
+                return '.png';
+            case 4:
+            case 13:
+                return '.swf';
+            case 5:
+                return '.psd';
+            case 6:
+            case 15:
+                return '.bmp';
+            case 7:
+            case 8:
+                return '.tiff';
+            case 9:
+                return '.jpc';
+            case 10:
+                return '.jp2';
+            case 11:
+                return '.jpx';
+            case 12:
+                return '.jb2';
+            case 14:
+                return '.iff';
+            case 16:
+                return '.xbm';
+            case 17:
+                return '.ico';
+            case 18:
+                return '.webp';
+            case 19:
+                return '.avif';
+            case 20:
+                return '.heif';
+            default:
+                return false;
+        }
+    }
+
+    private static function withoutDot(string $dotted): string
+    {
+        switch ($dotted) {
+            case '.gif':
+                return 'gif';
+            case '.jpeg':
+                return 'jpeg';
+            case '.png':
+                return 'png';
+            case '.swf':
+                return 'swf';
+            case '.psd':
+                return 'psd';
+            case '.bmp':
+                return 'bmp';
+            case '.tiff':
+                return 'tiff';
+            case '.jpc':
+                return 'jpc';
+            case '.jp2':
+                return 'jp2';
+            case '.jpx':
+                return 'jpx';
+            case '.jb2':
+                return 'jb2';
+            case '.iff':
+                return 'iff';
+            case '.xbm':
+                return 'xbm';
+            case '.ico':
+                return 'ico';
+            case '.webp':
+                return 'webp';
+            case '.avif':
+                return 'avif';
+            case '.heif':
+                return 'heif';
+            default:
+                return '';
+        }
     }
 }

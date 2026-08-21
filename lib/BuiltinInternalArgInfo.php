@@ -219,6 +219,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/basic_functions.stub.php / image.c — InternalArgInfo return array/int (missing |false) (#27886)
             'getimagesize', 'getimagesizefromstring' => 'array|false',
             'exif_imagetype' => 'int|false',
+            // ext/standard/image.stub.php / image.c — InternalArgInfo return string (missing |false) (#28314)
+            'image_type_to_extension' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#28343)
             'getopt' => 'array|false',
             // ext/posix/posix.stub.php — InternalArgInfo return array (missing |false) (#28783)
