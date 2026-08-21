@@ -221,9 +221,12 @@ class Type extends Builtin {
         $fntypeGetResources = $this->context->context->functionType($htPtr, false, $strPtr);
         $fnGetResources = $this->context->module->addFunction('__compiler_get_resources', $fntypeGetResources);
         $this->context->registerFunction('__compiler_get_resources', $fnGetResources);
-        $fntypeFlock = $this->context->context->functionType($i32, false, $i64, $i64);
-        $fnFlock = $this->context->module->addFunction('__compiler_flock', $fntypeFlock);
-        $this->context->registerFunction('__compiler_flock', $fnFlock);
+        // __compiler_flock always-on shell removed (#33104): StreamReadRuntime owns the
+        // ABI (getNamedFunction first, then addFunction if absent via
+        // JitStreamReadBridgeKernel::implementI32Bridge; Type::initialize still
+        // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift
+        // mint flock.1 (#31894 / #32122). User-script flock() stays JitFlock /
+        // StreamReadJitHelper.
         $fntypeFpassthru = $this->context->context->functionType($i64, false, $i64);
         $fnFpassthru = $this->context->module->addFunction('__compiler_fpassthru', $fntypeFpassthru);
         $this->context->registerFunction('__compiler_fpassthru', $fnFpassthru);
