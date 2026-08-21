@@ -1463,7 +1463,7 @@ class Context {
                 $dirMethod
             );
         }
-        // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289 … #33283, #33289).
+        // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289 … #33290).
         $this->type->object->lookup('SplFileInfo');
         $this->type->object->lookup('DirectoryIterator');
         $this->type->object->lookup('FilesystemIterator');
@@ -1484,6 +1484,7 @@ class Context {
             }
         }
         foreach ([
+            '__construct',
             'getFilename', 'getSize', 'getRealPath',
             'getMTime', 'getATime', 'getCTime', 'getPerms', 'getOwner', 'getGroup', 'getInode',
             'isFile', 'isDir',

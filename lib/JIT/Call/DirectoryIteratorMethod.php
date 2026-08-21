@@ -11,9 +11,9 @@ use PHPCompiler\VM\DirectoryIteratorJitHelper;
 use PHPLLVM\Value;
 
 /**
- * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289 … #33283, #33289).
+ * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289 … #33290).
  *
- * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isFile / getPathname / getSize / getMTime / getLinkTarget / …
+ * php-src: ext/spl/spl_directory.c — zim_SplFileInfo___construct / isFile / getPathname / getSize / …
  */
 final class DirectoryIteratorMethod implements Call
 {
@@ -35,15 +35,23 @@ final class DirectoryIteratorMethod implements Call
         }
 
         return match (strtolower($this->method)) {
-            '__construct' => DirectoryIteratorJitHelper::compileConstruct(
-                $context,
-                $args[0],
-                $args[1] ?? throw new \ArgumentCountError(
-                    $this->className.'::__construct() expects at least 1 argument, 0 given'
+            '__construct' => 'SplFileInfo' === $this->className
+                ? DirectoryIteratorJitHelper::compileSplFileInfoConstruct(
+                    $context,
+                    $args[0],
+                    $args[1] ?? throw new \ArgumentCountError(
+                        'SplFileInfo::__construct() expects exactly 1 argument, 0 given'
+                    )
+                )
+                : DirectoryIteratorJitHelper::compileConstruct(
+                    $context,
+                    $args[0],
+                    $args[1] ?? throw new \ArgumentCountError(
+                        $this->className.'::__construct() expects at least 1 argument, 0 given'
+                    ),
+                    $args[2] ?? null,
+                    $this->className
                 ),
-                $args[2] ?? null,
-                $this->className
-            ),
             'rewind' => DirectoryIteratorJitHelper::compileRewind($context, $args[0], $this->className),
             'valid' => DirectoryIteratorJitHelper::compileValid($context, $args[0], $this->className),
             'current' => DirectoryIteratorJitHelper::compileCurrent($context, $args[0]),
