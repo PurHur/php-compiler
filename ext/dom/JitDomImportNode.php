@@ -15,13 +15,14 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument::importNode() (#19212, #32350, #33097).
+ * LLVM lowering for DOMDocument::importNode() (#19212, #32350, #33097, #33362).
  *
  * php-src ext/dom/document.c PHP_METHOD(DOMDocument, importNode) → xmlDocCopyNode.
  * Thin-standalone AOT cannot return NestedJIT object pointers (property fetch
  * aborts; contrast adoptNode #29853 which reuses the caller-side node). Materialize
  * a user-script DOMElement instead — tag/inner XML from compile-time loadXML
  * (#32350) or loadHTML getElementById (#19212). `$deep` must gate InnerXml (#33097).
+ * Attributes are always copied (xmlDocCopyNode); #33097 only gated children (#33362).
  */
 final class JitDomImportNode
 {
@@ -145,6 +146,7 @@ final class JitDomImportNode
      * the globally last loadXML and is wrong when importing across two documents.
      *
      * `$deep` mirrors php-src xmlDocCopyNode: shallow omits child markup (#33097).
+     * Attribute suffix is always applied (deep does not gate attrs; #33362).
      */
     private static function invokeUserScriptMaterialize(
         Context $context,
@@ -190,6 +192,8 @@ final class JitDomImportNode
             $text = '';
         }
 
+        $attrInfo = self::resolveSourceAttrInfo($sourceNode, $tag);
+
         $element = JitDomCreateElement::materializeForUserScriptDocument(
             $context,
             $documentVar,
@@ -199,11 +203,138 @@ final class JitDomImportNode
         if ($deep && '' !== $inner) {
             JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
         }
+        // xmlDocCopyNode always copies attributes; #33097 only cleared children (#33362).
+        if ('' !== $attrInfo['attrs']) {
+            JitDomCreateElement::storeUserScriptXmlnsAttr($context, $element, $attrInfo['attrs']);
+        }
+        if ([] !== $attrInfo['pairs']) {
+            JitDomCreateElement::storeAttributesPresence($context, $element, $attrInfo['pairs']);
+        }
         if (!$fromXml) {
             self::storeElementInIdMap($context, $documentVar, $id, $element);
         }
 
         return self::boxObjectResult($context, $element);
+    }
+
+    /**
+     * Name→value attrs for compile-time INNER_XML sync after importNode (#33362).
+     *
+     * @return array<string, string>|null
+     */
+    public static function compileTimeAttributesFor(JITVariable $sourceNode, ?string $tag = null): ?array
+    {
+        $tag = $tag ?? ($sourceNode->compileTimeDomTagName ?? '');
+        $info = self::resolveSourceAttrInfo($sourceNode, (string) $tag);
+        if ([] === $info['pairs']) {
+            return $sourceNode->compileTimeDomAttributes;
+        }
+        $out = [];
+        foreach ($info['pairs'] as $pair) {
+            $out[$pair['qname']] = $pair['value'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Open-tag attr suffix + NamedNodeMap pairs for the imported source node (#33362).
+     *
+     * Cross-document importNode runs after the destination loadXML, so
+     * {@see JitDomLoadXMLUserScript::lastCompileTimeXml()} is the *dst* tree —
+     * recover the source child/root markup from remembered literals instead.
+     *
+     * @return array{attrs: string, pairs: list<array{qname: string, value: string}>}
+     */
+    private static function resolveSourceAttrInfo(JITVariable $sourceNode, string $tag): array
+    {
+        $empty = ['attrs' => '', 'pairs' => []];
+        if (null !== $sourceNode->compileTimeDomAttributes && [] !== $sourceNode->compileTimeDomAttributes) {
+            $parts = [];
+            $pairs = [];
+            foreach ($sourceNode->compileTimeDomAttributes as $name => $value) {
+                $name = (string) $name;
+                $value = (string) $value;
+                $parts[] = $name.'="'.htmlspecialchars($value, ENT_QUOTES | ENT_XML1, 'UTF-8').'"';
+                $pairs[] = ['qname' => $name, 'value' => $value];
+            }
+            $attrs = [] === $parts ? '' : ' '.implode(' ', $parts);
+
+            return ['attrs' => $attrs, 'pairs' => $pairs];
+        }
+
+        $markup = self::resolveSourceElementMarkup($sourceNode, $tag);
+        if (null === $markup) {
+            return $empty;
+        }
+        $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($markup);
+        if (null === $parsed) {
+            return $empty;
+        }
+        $attrs = $parsed['attrs'];
+        if ('' === trim($attrs)) {
+            return $empty;
+        }
+        $open = '<'.$parsed['tag'].$attrs.'>';
+
+        return [
+            'attrs' => $attrs,
+            'pairs' => DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open),
+        ];
+    }
+
+    /**
+     * Outer markup of the imported element from compile-time loadXML literals (#33362).
+     */
+    private static function resolveSourceElementMarkup(JITVariable $sourceNode, string $tag): ?string
+    {
+        $index = $sourceNode->compileTimeDomChildIndex;
+        $candidates = [];
+        $bound = $sourceNode->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode);
+        if (null !== $bound) {
+            $candidates[] = $bound;
+        }
+        // Destination loadXML is usually last — prefer every other remembered literal first.
+        $exclude = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $alt = JitDomLoadXMLUserScript::compileTimeXmlExcluding($exclude);
+        if (null !== $alt) {
+            $candidates[] = $alt;
+        }
+        if (null !== $exclude) {
+            $candidates[] = $exclude;
+        }
+        $seen = [];
+        foreach ($candidates as $xml) {
+            if (isset($seen[$xml])) {
+                continue;
+            }
+            $seen[$xml] = true;
+            $stripped = preg_replace('/^\s*<\?xml[^?]*\?>\s*/i', '', trim($xml)) ?? trim($xml);
+            if (null !== $index) {
+                $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks(
+                    DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml)
+                );
+                if (isset($chunks[$index])) {
+                    $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($chunks[$index]);
+                    if (null !== $parsed
+                        && ('' === $tag || strtolower($parsed['tag']) === strtolower($tag))
+                    ) {
+                        return $chunks[$index];
+                    }
+                }
+                continue;
+            }
+            // documentElement / root import — attrs on the root open tag.
+            $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($stripped);
+            if (null !== $parsed
+                && ('' === $tag || strtolower($parsed['tag']) === strtolower($tag))
+            ) {
+                return $stripped;
+            }
+        }
+
+        return null;
     }
 
     /**

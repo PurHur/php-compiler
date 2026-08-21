@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\ext\standard\JitFflush;
 use PHPCompiler\ext\standard\JitFgetcsv;
 use PHPCompiler\ext\standard\JitFlock;
+use PHPCompiler\ext\standard\JitFpassthru;
 use PHPCompiler\ext\standard\JitFputcsv;
 use PHPCompiler\ext\standard\JitFread;
 use PHPCompiler\ext\standard\JitFseek;
@@ -43,6 +44,7 @@ use PHPLLVM\Value;
  * ftell/flock on `__spl_fd` (#33336) via JitFtell / JitFlock.
  * ftruncate on `__spl_fd` (#33348) via JitFtruncate (peer procedural #33155).
  * fflush on `__spl_fd` (#33354) via JitFflush (peer procedural #1189).
+ * fpassthru on `__spl_fd` (#33358) via JitFpassthru (peer procedural #1194).
  * fputcsv on `__spl_fd` (#33340) via JitFputcsv (peer procedural #33334 / #27180).
  * fgetcsv on `__spl_fd` (#33346) via JitFgetcsv (peer procedural #33334 / #1192).
  * fseek on `__spl_fd` (#33347) via JitFseek (clears iterator line cache like rewind).
@@ -51,8 +53,8 @@ use PHPLLVM\Value;
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
  * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_ftruncate /
- * zim_SplFileObject_fflush / zim_SplFileObject_fputcsv / zim_SplFileObject_fgetcsv /
- * zim_SplFileObject_fseek / zim_SplFileInfo_openFile
+ * zim_SplFileObject_fflush / zim_SplFileObject_fpassthru / zim_SplFileObject_fputcsv /
+ * zim_SplFileObject_fgetcsv / zim_SplFileObject_fseek / zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -401,6 +403,22 @@ final class SplFileObjectJitHelper
         );
 
         return $slot;
+    }
+
+    /**
+     * SplFileObject::fpassthru — dump remaining stream to stdout (#33358).
+     * php-src: zim_SplFileObject_fpassthru → php_stream_passthru
+     */
+    public static function compileFpassthru(Context $context, JITVariable $receiver): Value
+    {
+        self::ensureStreamAbis($context);
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        // spl_filesystem_file_free_line — drop cached iterator line before consume.
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $handle = self::loadFd($context, $receiver);
+
+        return JitFpassthru::invoke($context, $handle);
     }
 
     /**

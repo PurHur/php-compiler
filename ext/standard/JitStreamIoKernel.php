@@ -242,6 +242,14 @@ final class JitStreamIoKernel
                 $name,
                 $context->context->functionType($i32, false, $i64)
             ),
+            '__compiler_fstat' => $context->module->addFunction(
+                $name,
+                $context->context->functionType(
+                    $context->getTypeFromString('__hashtable__*'),
+                    false,
+                    $i64
+                )
+            ),
             '__compiler_stream_supports' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i32, false, $i64, $i64)
@@ -306,6 +314,8 @@ final class JitStreamIoKernel
             ['fgetc', $i32, [$i8p]],
             ['ftruncate', $i32, [$i32, $i64]],
             ['fflush', $i32, [$i8p]],
+            // fstat(2) after Type always-on drop — thin AOT SplFileObject::fstat (#33359).
+            ['fstat', $i32, [$i32, $i8p]],
             ['__compiler_stream_filter_apply_write', $strPtr, [$i64, $strPtr]],
             ['__compiler_stream_filter_apply_read', $strPtr, [$i64, $strPtr]],
         ] as [$name, $ret, $params]) {
@@ -2048,6 +2058,154 @@ final class JitStreamIoKernel
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($zero);
+    }
+
+    /**
+     * Idempotent libc fstat for thin AOT (#33359).
+     *
+     * NestedJIT FstatJitHelper→VmFs cannot see JitStreamIoKernel FILE* ids (peer
+     * {@see implementFlockForce} / {@see implementFtruncateForce}). ABI: __hashtable__*
+     * filestat array or null (php-src zim_SplFileObject_fstat / PHP_FUNCTION(fstat)).
+     */
+    public static function implementFstatForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_fstat');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('fstat_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_fstat', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_fstat');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_fstat');
+        }
+        self::emitFstat($context, $fn);
+        $context->registerFunction('__compiler_fstat', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /**
+     * resolve → fileno → fstat(2) → PHP filestat hashtable (VmFs::phpStatArrayToHashTable shape).
+     *
+     * glibc x86_64 struct stat layout — peer {@see JitStatKernel} LONG_FIELD_LAYOUT.
+     */
+    private static function emitFstat(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('fstat_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $nullPtr = $i8p->constNull();
+        $zero = $i32->constInt(0, false);
+        $nullHt = $htPtr->constNull();
+
+        // sizeof(struct stat) on Linux x86_64 glibc
+        $statBufSize = 144;
+        /** @var list<array{0: string, 1: int, 2: int, 3: int}> name, index, offset, width */
+        $fields = [
+            ['dev', 0, 0, 8],
+            ['ino', 1, 8, 8],
+            ['mode', 2, 24, 4],
+            ['nlink', 3, 16, 8],
+            ['uid', 4, 28, 4],
+            ['gid', 5, 32, 4],
+            ['rdev', 6, 40, 8],
+            ['size', 7, 48, 8],
+            ['atime', 8, 72, 8],
+            ['mtime', 9, 88, 8],
+            ['ctime', 10, 104, 8],
+            ['blksize', 11, 56, 8],
+            ['blocks', 12, 64, 8],
+        ];
+
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('fstat_fail');
+        $filenoBb = $fn->appendBasicBlock('fstat_fileno');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr),
+            $failBb,
+            $filenoBb
+        );
+
+        $context->builder->positionAtEnd($filenoBb);
+        $fd = $context->builder->call($context->lookupFunction('fileno'), $fp);
+        $doBb = $fn->appendBasicBlock('fstat_do');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $fd, $zero),
+            $failBb,
+            $doBb
+        );
+
+        $context->builder->positionAtEnd($doBb);
+        $bufType = $i8->arrayType($statBufSize);
+        $buf = $context->builder->alloca($bufType, 1, 'phpc_fstat_buf');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $rc = $context->builder->call($context->lookupFunction('fstat'), $fd, $bufPtr);
+        $okBb = $fn->appendBasicBlock('fstat_ok');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $rc, $zero),
+            $okBb,
+            $failBb
+        );
+
+        $context->builder->positionAtEnd($okBb);
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $values = [];
+        foreach ($fields as [$name, $index, $offset, $width]) {
+            $bytePtr = $context->builder->gep($bufPtr, $i64->constInt($offset, false));
+            if (8 === $width) {
+                $valPtr = $context->builder->pointerCast($bytePtr, $i64->pointerType(0));
+                $loaded = $context->builder->load($valPtr);
+            } else {
+                $valPtr = $context->builder->pointerCast($bytePtr, $i32->pointerType(0));
+                $loaded = $context->builder->zExt($context->builder->load($valPtr), $i64);
+            }
+            $values[] = [$name, $index, $loaded];
+        }
+        // php-src filestat.c — numeric indices 0..12 precede string aliases.
+        foreach ($values as [$name, $index, $loaded]) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setLongAt'),
+                $ht,
+                $sizeT->constInt($index, false),
+                $loaded
+            );
+        }
+        foreach ($values as [$name, $index, $loaded]) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyLong'),
+                $ht,
+                $context->builder->load($context->constantStringFromString($name)),
+                $loaded
+            );
+        }
+        $context->builder->returnValue($ht);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullHt);
     }
 
     private static function registerLinkedRuntime(Context $context): void

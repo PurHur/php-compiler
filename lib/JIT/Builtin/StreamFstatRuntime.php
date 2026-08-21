@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitStreamIoKernel;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -12,6 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __compiler_fstat via FstatJitHelper PHP (#10460, #24586).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathModf #22519).
+ * Thin standalone AOT: {@see JitStreamIoKernel::implementFstatForce} replaces NestedJIT —
+ * VmFs cannot resolve StreamIo FILE* ids (#33359, peer flock #33122).
  * SSOT: {@see \PHPCompiler\ext\standard\VmStreamFstat}, {@see \PHPCompiler\ext\standard\VmFs}
  * php-src: ext/standard/filestat.c — PHP_FUNCTION(fstat)
  */
@@ -41,6 +45,9 @@ final class StreamFstatRuntime
         $probe = $context->module->getNamedFunction('__compiler_fstat');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            if ($context->isThinStandaloneAotMain()) {
+                JitStreamIoKernel::implementFstatForce($context);
+            }
 
             return;
         }
@@ -48,6 +55,9 @@ final class StreamFstatRuntime
         self::ensureJitHelperCompiled($context);
         self::implementFstatBridge($context);
         self::registerLinkedRuntime($context);
+        if ($context->isThinStandaloneAotMain()) {
+            JitStreamIoKernel::implementFstatForce($context);
+        }
         $context->builder->clearInsertionPosition();
     }
 
@@ -69,12 +79,27 @@ final class StreamFstatRuntime
             : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('fstat_bridge_entry');
+        $fail = $fn->appendBasicBlock('fstat_bridge_fail');
+        $body = $fn->appendBasicBlock('fstat_bridge_body');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
+        $context->builder->branch($body);
+
+        $context->builder->positionAtEnd($body);
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::FSTAT_HELPER),
-            $fn->getParam(0)
+            [$fn->getParam(0)]
         );
-        $context->builder->returnValue($result);
+        $htNull = JitNestedHelperCoerce::isHelperResultNull($context, $htRaw);
+        $retBb = $fn->appendBasicBlock('fstat_bridge_ret');
+        $context->builder->branchIf($htNull, $fail, $retBb);
+
+        $context->builder->positionAtEnd($retBb);
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+        $context->builder->returnValue($ht);
+
+        $context->builder->positionAtEnd($fail);
+        $context->builder->returnValue($htPtr->constNull());
         $context->registerFunction($abiName, $fn);
     }
 
