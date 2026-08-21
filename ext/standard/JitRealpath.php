@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * JIT/AOT helper for realpath() via RealpathJitHelper PHP (#15323).
+ * JIT/AOT helper for realpath() via StringRealpath libc realpath(3) (#33432 / #15323).
  *
  * Failure returns an empty string; PHP's empty string compares equal to false with ==.
  */

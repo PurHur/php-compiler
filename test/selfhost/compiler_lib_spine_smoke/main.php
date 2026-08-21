@@ -5892,6 +5892,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringRandomBytes.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringReadfile.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringReadlink.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringRealpath.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/RealpathLibcRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringRename.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringRmdir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/RmdirLibcRuntime.php';
