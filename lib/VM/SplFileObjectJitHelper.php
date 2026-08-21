@@ -14,9 +14,11 @@ use PHPCompiler\ext\standard\JitFseek;
 use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitFtruncate;
 use PHPCompiler\ext\standard\JitPath;
+use PHPCompiler\ext\standard\JitVfscanf;
 use PHPCompiler\ext\standard\StatFieldsJitHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\FputcsvRuntime;
+use PHPCompiler\JIT\Builtin\SscanfStrtolApply;
 use PHPCompiler\JIT\Builtin\SplFileObjectSnapshotRuntime;
 use PHPCompiler\JIT\Builtin\StatPathRuntime;
 use PHPCompiler\JIT\Builtin\StreamIo;
@@ -29,6 +31,7 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -53,6 +56,7 @@ use PHPLLVM\Value;
  * fpassthru on `__spl_fd` (#33358) via JitFpassthru (peer procedural #1194).
  * fputcsv on `__spl_fd` (#33340) via JitFputcsv (peer procedural #33334 / #27180).
  * fgetcsv on `__spl_fd` (#33346) via JitFgetcsv (peer procedural #33334 / #1192).
+ * fscanf on `__spl_fd` (#33382) — fgets + `__compiler_sscanf` pack (no NestedJIT array; #27663).
  * fseek on `__spl_fd` (#33347) via JitFseek (clears iterator line cache like rewind).
  * seek (SeekableIterator line) (#33364) — rewind + read-line loop + key bump.
  * setFlags/getFlags on `__spl_flags` (#33368).
@@ -64,8 +68,8 @@ use PHPLLVM\Value;
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
  * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_ftruncate /
  * zim_SplFileObject_fflush / zim_SplFileObject_fpassthru / zim_SplFileObject_fputcsv /
- * zim_SplFileObject_fgetcsv / zim_SplFileObject_fseek / zim_SplFileObject_seek /
- * zim_SplFileObject_setFlags / zim_SplFileObject_getFlags /
+ * zim_SplFileObject_fgetcsv / zim_SplFileObject_fscanf / zim_SplFileObject_fseek /
+ * zim_SplFileObject_seek / zim_SplFileObject_setFlags / zim_SplFileObject_getFlags /
  * zim_SplFileObject_setCsvControl / zim_SplFileObject_getCsvControl /
  * zim_SplFileObject_setMaxLineLen / zim_SplFileObject_getMaxLineLen /
  * zim_SplFileInfo_openFile
@@ -667,6 +671,334 @@ final class SplFileObjectJitHelper
         }
 
         return JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
+    }
+
+    /**
+     * SplFileObject::fscanf — read line then sscanf (#33382).
+     * php-src: zim_SplFileObject_fscanf → spl_filesystem_file_read + php_sscanf_internal
+     *
+     * Array return: thin-AOT unrolls compile-time `%d`/`%s` (no NestedJIT — #27663 /
+     * `__compiler_sscanf` SIGSEGV with live StreamIo). By-ref: {@see JitVfscanf::parseFromHandle}.
+     *
+     * @param list<JITVariable> $outArgs
+     */
+    public static function compileFscanf(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $formatArg,
+        JITVariable ...$outArgs
+    ): Value {
+        self::ensureStreamAbis($context);
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $handle = self::loadFd($context, $receiver);
+
+        if ([] !== $outArgs) {
+            return JitVfscanf::parseFromHandle(
+                $context,
+                'SplFileObject::fscanf',
+                $handle,
+                $formatArg,
+                ...$outArgs
+            );
+        }
+
+        $fmtLit = $formatArg->compileTimeString ?? null;
+        $specs = null !== $fmtLit ? self::parseDsFormatSpecs($fmtLit) : null;
+        if (null === $specs || [] === $specs) {
+            throw new \LogicException(
+                'SplFileObject::fscanf() array return requires compile-time %d/%s format under thin AOT (#33382)'
+            );
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        LibcExtern::register($context);
+        LibcExtern::ensureStrtolDecl($context);
+        SscanfStrtolApply::ensureLinked($context);
+        self::ensureFscanfArrayWriters($context);
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $slotCount = \count($specs);
+
+        $tempBoxes = [];
+        $tempVars = [];
+        for ($i = 0; $i < $slotCount; ++$i) {
+            $box = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $box)
+            );
+            $tempBoxes[] = $box;
+            $tempVars[] = new JITVariable(
+                $context,
+                JITVariable::TYPE_VALUE,
+                JITVariable::KIND_VALUE,
+                $box
+            );
+        }
+
+        $line = $context->builder->call(
+            $context->lookupFunction('__compiler_fgets'),
+            $handle,
+            self::fgetsBufferLen($context, $obj)
+        );
+        $lineNull = $context->builder->icmp(Builder::INT_EQ, $line, $strPtr->constNull());
+        $eofBb = BasicBlockHelper::append($context, 'splfo_fscanf_eof');
+        $scanBb = BasicBlockHelper::append($context, 'splfo_fscanf_scan');
+        $packBb = BasicBlockHelper::append($context, 'splfo_fscanf_pack');
+        $doneBb = BasicBlockHelper::append($context, 'splfo_fscanf_done');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $valuePtrTy);
+        $context->builder->branchIf($lineNull, $eofBb, $scanBb);
+
+        $context->builder->positionAtEnd($eofBb);
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(1, false));
+        $nullSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $nullSlot)
+        );
+        $context->builder->store(JitValueBox::pointer($context, $nullSlot), $resultSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($scanBb);
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+        $stringMap = $context->structFieldMap['__string__'];
+        $cursorSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $endPtrSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $data = $context->builder->pointerCast(
+            $context->builder->structGep($line, $stringMap['value']),
+            $i8p
+        );
+        $context->builder->store($data, $cursorSlot);
+
+        foreach ($specs as $i => $spec) {
+            self::emitSkipWs($context, $cursorSlot, $i8, $sizeT, 'splfo_fscanf_'.$i);
+            $cur = $context->builder->load($cursorSlot);
+            $ch = $context->builder->load($context->builder->pointerCast($cur, $i8->pointerType(0)));
+            $atEnd = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(0, false));
+            $contBb = BasicBlockHelper::append($context, 'splfo_fscanf_spec_'.$i);
+            $context->builder->branchIf($atEnd, $packBb, $contBb);
+
+            $context->builder->positionAtEnd($contBb);
+            if ('d' === $spec) {
+                $val = $context->builder->call(
+                    $context->lookupFunction('strtol'),
+                    $cur,
+                    $endPtrSlot,
+                    $i32->constInt(10, false)
+                );
+                $endPtr = $context->builder->load($endPtrSlot);
+                $noProgress = $context->builder->icmp(Builder::INT_EQ, $endPtr, $cur);
+                $okBb = BasicBlockHelper::append($context, 'splfo_fscanf_d_ok_'.$i);
+                $context->builder->branchIf($noProgress, $packBb, $okBb);
+                $context->builder->positionAtEnd($okBb);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeLong'),
+                    JitValueBox::pointer($context, $tempBoxes[$i]),
+                    $val
+                );
+                $context->builder->store($endPtr, $cursorSlot);
+            } else {
+                // %s — non-empty run of non-whitespace.
+                $start = $cur;
+                $lenSlot = BasicBlockHelper::entryAlloca($context, $i64);
+                $context->builder->store($i64->constInt(0, false), $lenSlot);
+                $sHead = BasicBlockHelper::append($context, 'splfo_fscanf_s_'.$i);
+                $sAdv = BasicBlockHelper::append($context, 'splfo_fscanf_s_adv_'.$i);
+                $sDone = BasicBlockHelper::append($context, 'splfo_fscanf_s_done_'.$i);
+                $context->builder->branch($sHead);
+
+                $context->builder->positionAtEnd($sHead);
+                $scur = $context->builder->load($cursorSlot);
+                $sch = $context->builder->load($context->builder->pointerCast($scur, $i8->pointerType(0)));
+                $sNul = $context->builder->icmp(Builder::INT_EQ, $sch, $i8->constInt(0, false));
+                $sSpace = $context->builder->or(
+                    $context->builder->icmp(Builder::INT_EQ, $sch, $i8->constInt(0x20, false)),
+                    $context->builder->or(
+                        $context->builder->icmp(Builder::INT_EQ, $sch, $i8->constInt(0x09, false)),
+                        $context->builder->or(
+                            $context->builder->icmp(Builder::INT_EQ, $sch, $i8->constInt(0x0a, false)),
+                            $context->builder->icmp(Builder::INT_EQ, $sch, $i8->constInt(0x0d, false))
+                        )
+                    )
+                );
+                $context->builder->branchIf(
+                    $context->builder->or($sNul, $sSpace),
+                    $sDone,
+                    $sAdv
+                );
+
+                $context->builder->positionAtEnd($sAdv);
+                $context->builder->store(
+                    $context->builder->gep($scur, $sizeT->constInt(1, false)),
+                    $cursorSlot
+                );
+                $context->builder->store(
+                    $context->builder->add($context->builder->load($lenSlot), $i64->constInt(1, false)),
+                    $lenSlot
+                );
+                $context->builder->branch($sHead);
+
+                $context->builder->positionAtEnd($sDone);
+                $slen = $context->builder->load($lenSlot);
+                $empty = $context->builder->icmp(Builder::INT_EQ, $slen, $i64->constInt(0, false));
+                $sOk = BasicBlockHelper::append($context, 'splfo_fscanf_s_ok_'.$i);
+                $context->builder->branchIf($empty, $packBb, $sOk);
+                $context->builder->positionAtEnd($sOk);
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__init'),
+                    $slen,
+                    $start
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($context, $tempBoxes[$i]),
+                    $owned
+                );
+            }
+        }
+        $context->builder->branch($packBb);
+
+        $context->builder->positionAtEnd($packBb);
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        for ($i = 0; $i < $slotCount; ++$i) {
+            HashTableHelper::setAtIndex(
+                $context,
+                $ht,
+                $i64->constInt($i, false),
+                $tempVars[$i]
+            );
+        }
+        $arrSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $arrSlot),
+            $ht
+        );
+        $context->builder->store(JitValueBox::pointer($context, $arrSlot), $resultSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function emitSkipWs(
+        Context $context,
+        Value $cursorSlot,
+        mixed $i8,
+        mixed $sizeT,
+        string $tag
+    ): void {
+        $skipHead = BasicBlockHelper::append($context, $tag.'_ws');
+        $skipAdv = BasicBlockHelper::append($context, $tag.'_ws_adv');
+        $afterWs = BasicBlockHelper::append($context, $tag.'_ws_done');
+        $chkSpace = BasicBlockHelper::append($context, $tag.'_ws_chk');
+        $context->builder->branch($skipHead);
+
+        $context->builder->positionAtEnd($skipHead);
+        $cur = $context->builder->load($cursorSlot);
+        $ch = $context->builder->load($context->builder->pointerCast($cur, $i8->pointerType(0)));
+        $isNul = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(0, false));
+        $isSpace = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(0x20, false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(0x09, false)),
+                $context->builder->or(
+                    $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(0x0a, false)),
+                    $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(0x0d, false))
+                )
+            )
+        );
+        $context->builder->branchIf($isNul, $afterWs, $chkSpace);
+
+        $context->builder->positionAtEnd($chkSpace);
+        $context->builder->branchIf($isSpace, $skipAdv, $afterWs);
+
+        $context->builder->positionAtEnd($skipAdv);
+        $context->builder->store(
+            $context->builder->gep($cur, $sizeT->constInt(1, false)),
+            $cursorSlot
+        );
+        $context->builder->branch($skipHead);
+
+        $context->builder->positionAtEnd($afterWs);
+    }
+
+    /**
+     * @return list<'d'|'s'>|null
+     */
+    private static function parseDsFormatSpecs(string $format): ?array
+    {
+        $len = \strlen($format);
+        $i = 0;
+        $specs = [];
+        while ($i < $len) {
+            $ch = $format[$i];
+            if ('%' === $ch) {
+                if ($i + 1 >= $len) {
+                    return null;
+                }
+                ++$i;
+                if ('%' === $format[$i]) {
+                    ++$i;
+                    continue;
+                }
+                while ($i < $len && \in_array($format[$i], ['l', 'h', 'z', 't'], true)) {
+                    ++$i;
+                }
+                if ($i >= $len || !\in_array($format[$i], ['d', 's'], true)) {
+                    return null;
+                }
+                $specs[] = $format[$i];
+                ++$i;
+                continue;
+            }
+            if (\ctype_space($ch)) {
+                ++$i;
+                continue;
+            }
+
+            return null;
+        }
+
+        return $specs;
+    }
+
+    private static function ensureFscanfArrayWriters(Context $context): void
+    {
+        $void = $context->getTypeFromString('void');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        foreach ([
+            ['__value__writeNull', $void, [$valuePtr]],
+            ['__value__writeLong', $void, [$valuePtr, $i64]],
+            ['__value__writeString', $void, [$valuePtr, $strPtr]],
+            ['__value__writeHashtable', $void, [$valuePtr, $context->getTypeFromString('__hashtable__*')]],
+            ['__string__init', $strPtr, [$i64, $i8p]],
+            ['__hashtable__alloc', $context->getTypeFromString('__hashtable__*'), []],
+        ] as [$name, $ret, $params]) {
+            try {
+                $context->lookupFunction($name);
+            } catch (\Throwable) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, false, ...$params)
+                );
+                $context->registerFunction($name, $fn);
+            }
+        }
     }
 
     /**

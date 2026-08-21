@@ -4175,7 +4175,7 @@ class Object_ extends Type {
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
                 'fgets', 'fwrite', 'eof', 'getcurrentline', 'fread', 'fgetc',
                 'ftell', 'flock', 'fstat', 'ftruncate', 'fflush', 'fpassthru', 'fseek',
-                'fputcsv', 'fgetcsv', 'setflags', 'getflags', 'setmaxlinelen', 'getmaxlinelen',
+                'fputcsv', 'fgetcsv', 'fscanf', 'setflags', 'getflags', 'setmaxlinelen', 'getmaxlinelen',
                 'setcsvcontrol', 'getcsvcontrol',
                 'getfilename', 'getpathname', 'getpath', '__tostring',
                 'getsize', 'getrealpath',

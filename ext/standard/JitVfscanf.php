@@ -50,26 +50,55 @@ final class JitVfscanf
             return self::parseCompileTime($context, (int) $handleLit, $fmtLit, \array_slice($args, 2));
         }
 
+        if ($argc < 3) {
+            throw new \LogicException($function.'() without by-ref targets requires compile-time stream/format in this compiler build');
+        }
+
         $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $args[0], $function.'() stream'),
             $i64
         );
+
+        return self::parseFromHandle($context, $function, $handle, $args[1], ...\array_slice($args, 2));
+    }
+
+    /**
+     * Runtime fscanf/vfscanf with a live stream handle Value (#33382 SplFileObject).
+     *
+     * @param list<JITVariable> $outArgs by-ref assignment targets (non-empty)
+     */
+    public static function parseFromHandle(
+        Context $context,
+        string $function,
+        Value $handle,
+        JITVariable $formatArg,
+        JITVariable ...$outArgs
+    ): Value {
+        $outCount = \count($outArgs);
+        if (0 === $outCount) {
+            throw new \LogicException($function.'() parseFromHandle requires by-ref targets');
+        }
+
+        $fmtLit = $formatArg->compileTimeString ?? null;
+        if (($formatArg->isNullConstant ?? false) && null === $fmtLit) {
+            if ($context->callerStrictTypes) {
+                $fmtLit = null;
+            } else {
+                $fmtLit = '';
+            }
+        }
         $fmt = $context->callerStrictTypes
-            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], $function, 1, 'format')
-            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], $function, 1, 'format');
-        // declare(strict_types=1): null format rejects via lowerStrictOrCoercible — do not continue (#30236).
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $formatArg, $function, 1, 'format')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $formatArg, $function, 1, 'format');
         if ($context->callerStrictTypes
-            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))
+            && (JITVariable::TYPE_NULL === $formatArg->type || ($formatArg->isNullConstant ?? false))
         ) {
             return $context->getTypeFromString('__value__*')->constNull();
         }
-        $outCount = $argc - 2;
-        if (0 === $outCount) {
-            throw new \LogicException($function.'() without by-ref targets requires compile-time stream/format in this compiler build');
-        }
 
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
         $useStrtol = null !== $fmtLit
             && SscanfStrtolApply::isStrtolOnlyFormat($fmtLit)
             && $context->isThinStandaloneAotMain();
@@ -107,7 +136,7 @@ final class JitVfscanf
                 $outPtrs,
                 $i64->constInt($i, false)
             );
-            $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[$i + 2]);
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $outArgs[$i]);
             $context->builder->store($valuePtr, $slot);
         }
 
