@@ -7,7 +7,14 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\ext\standard\JitStreamMetaKernel;
 use PHPCompiler\JIT\Context;
 
-/** JIT LLVM bodies for stream_get_meta_data / stream_set_blocking (#6007, #19678). */
+/**
+ * JIT LLVM bodies for stream_get_meta_data / stream_set_blocking (#6007, #19678, #33154).
+ *
+ * Owns `__compiler_stream_get_meta_data` ABI module-locally via
+ * {@see \PHPCompiler\ext\standard\JitStreamMetaKernel} / {@see \PHPCompiler\ext\standard\JitStreamMetaThinAot}
+ * (getNamedFunction first). Do not re-add empty always-on shells in {@see Type} — leftover
+ * decls mint stream_get_meta_data.1 (#31894 / #32122).
+ */
 final class StreamMeta
 {
     public static function ensureLinked(Context $context): void
