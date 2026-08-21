@@ -12,11 +12,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Thin user-script AOT {@see __compiler_stream_get_meta_data} (#27659).
+ * Thin user-script AOT {@see __compiler_stream_get_meta_data} (#27659, #33154).
  *
  * NestedJIT {@see StreamMetaJitHelper} → {@see VmFs} never sees {@see StreamGlobalsJit}
  * slots that {@see JitStreamIoKernel} fopen fills (peer {@see JitStreamLifecycleKernel} #27186).
  * Build the meta hashtable in LLVM from path + FILE* (php-src streamsfuncs.c keys).
+ * Do not re-add empty always-on shells in Type — leftover decls mint stream_get_meta_data.1
+ * (#31894 / #32122).
  */
 final class JitStreamMetaThinAot
 {

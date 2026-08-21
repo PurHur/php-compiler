@@ -304,10 +304,12 @@ class Type extends Builtin {
         // StreamCaps::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // stream_isatty.1 (#31894 / #32122). User-script stream_isatty() stays
         // JitStreamIsatty / StreamCapsJitHelper.
-        $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypeStreamGetMetaData = $this->context->context->functionType($htPtr, false, $i64);
-        $fnStreamGetMetaData = $this->context->module->addFunction('__compiler_stream_get_meta_data', $fntypeStreamGetMetaData);
-        $this->context->registerFunction('__compiler_stream_get_meta_data', $fnStreamGetMetaData);
+        // __compiler_stream_get_meta_data always-on shell removed (#33154): StreamMeta /
+        // JitStreamMetaKernel / JitStreamMetaThinAot owns the ABI (getNamedFunction first,
+        // then addFunction if absent via implementIfMissing; Type::initialize still
+        // StreamMeta::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // stream_get_meta_data.1 (#31894 / #32122). User-script stream_get_meta_data()
+        // stays JitStreamGetMetaData / StreamMetaJitHelper.
         $fntypeStreamSetBlocking = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnStreamSetBlocking = $this->context->module->addFunction('__compiler_stream_set_blocking', $fntypeStreamSetBlocking);
         $this->context->registerFunction('__compiler_stream_set_blocking', $fnStreamSetBlocking);
