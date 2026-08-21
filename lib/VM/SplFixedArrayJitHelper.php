@@ -338,9 +338,10 @@ final class SplFixedArrayJitHelper
     }
 
     /**
-     * php-src SplFixedArray serialize — integer-keyed elements from `__spl_ht` (#33634).
+     * php-src SplFixedArray serialize — integer-keyed elements from `__spl_ht` (#33634 / #33639).
      *
      * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33625.
+     * Null holes require exportKeyValuePairs to keep TYPE_NULL (#33639).
      *
      * @return Value {@see __string__*} full `O:len:"SplFixedArray":N:{…}` wire
      */
@@ -357,10 +358,10 @@ final class SplFixedArrayJitHelper
             $context,
             '/ext/standard/SerializeSplFixedArrayNestedJitHelper.php',
             [$logical],
-            '#33634'
+            '#33639'
         );
         BasicBlockHelper::restoreInsertBlock($context, $saved);
-        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33634');
+        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33639');
         $strMap = $context->structFieldMap['__string__'];
         $classLen = $context->builder->load(
             $context->builder->structGep($classNameStr, $strMap['length'])

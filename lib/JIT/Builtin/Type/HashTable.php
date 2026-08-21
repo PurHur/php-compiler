@@ -3675,9 +3675,13 @@ class HashTable extends Type
         $map = $this->context->structFieldMap['__hashtable__'];
         $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
         $entry = $this->context->builder->inBoundsGep($values, $index);
-        $this->context->builder->call(
-            $this->context->lookupFunction('__value__writeNull'),
-            $entry
+        // Packed holes are TYPE_UNDEFINED (0xff), not TYPE_NULL — foreach/export skip
+        // UNDEFINED only; NULL is a real element (#27536 / #33639).
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $i8 = $this->context->getTypeFromString('int8');
+        $this->context->builder->store(
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED & 0xff, false),
+            $this->context->builder->structGep($entry, $valueMap['type'])
         );
         $this->decrementNumElements($ht);
         // Trailing packed unset: shrink nextFreeElement past any trailing holes so a later
