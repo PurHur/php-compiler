@@ -302,6 +302,7 @@ final class JitDomAttributeNodeNS
 
     private static function invokeSetUserScript(Context $context, JITVariable ...$args): Value
     {
+        $element = self::loadObjectArg($context, $args[0], 'DOMElement::setAttributeNode() receiver');
         $attr = self::loadObjectArg($context, $args[1], 'DOMElement::setAttributeNodeNS() attr');
         $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace();
         $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
@@ -309,6 +310,8 @@ final class JitDomAttributeNodeNS
             return self::boxNullResult($context);
         }
         $prev = DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr);
+        // Live attributes NamedNodeMap (#33128).
+        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
         $objPtr = $context->getTypeFromString('__object__*');
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
@@ -638,6 +641,7 @@ final class JitDomAttributeNodeNS
             throw new \LogicException('DOMElement::setAttribute() expects receiver, name, and value');
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattr_cont');
+        $element = self::loadObjectArg($context, $args[0], 'DOMElement::setAttribute() receiver');
         $nameLit = self::compileTimeStringArg($args[1]);
         $valueLit = self::compileTimeStringArg($args[2]);
         if (null !== $nameLit && null !== $valueLit) {
@@ -646,6 +650,8 @@ final class JitDomAttributeNodeNS
                 return self::boxBoolResult($context, true);
             }
             $attr = self::setAttributeLiteralReuseOrCreate($context, $nameLit, $valueLit);
+            // Live NamedNodeMap pins/length (#33128).
+            JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
             if ('id' === $nameLit) {
                 DomUserScriptElementCacheLlvm::rebindId($context, $valueLit);
                 JitDomSetIdAttribute::rememberSetAttributeIdValue($valueLit);
@@ -663,6 +669,7 @@ final class JitDomAttributeNodeNS
         $name = self::loadStringArg($context, $args[1]);
         $value = self::loadStringArg($context, $args[2]);
         $attr = self::materializeAttrFromRuntime($context, $context->builder->load($context->constantStringFromString('')), $name, $value);
+        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
         // Runtime name: cannot key the compile-time cache; still materialize Attr for property writes.
         return self::boxObjectResult($context, $attr);
     }
@@ -696,6 +703,8 @@ final class JitDomAttributeNodeNS
         }
         [, $local] = self::splitQualifiedName($qnameLit);
         $attr = self::setAttributeNsLiteralReuseOrCreate($context, $nsLit, $qnameLit, $local, $valueLit);
+        $element = self::loadObjectArg($context, $args[0], 'DOMElement::setAttributeNS() receiver');
+        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
 
         return self::boxObjectResult($context, $attr);
     }

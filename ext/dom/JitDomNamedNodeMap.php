@@ -17,12 +17,14 @@ use PHPLLVM\Value;
 
 /**
  * User-script AOT for DOMNamedNodeMap::$length, ::item(), ::getNamedItem(),
- * ::getNamedItemNS() (php-src namednodemap.c).
+ * ::getNamedItemNS(), and live pin updates after setAttribute* (#33128)
+ * (php-src namednodemap.c).
  *
  * Dummy attributes maps used to be allocated without {@code length} / Attr pins;
  * fetching length then SIGSEGVd (#32546, peer NodeList #28672).
  * {@code getNamedItem()} / {@code getNamedItemNS()} must scan the same pins —
  * NestedJIT DomRegistry lists are absent on thin-AOT maps and abort (#33107 / #33116).
+ * Empty elements must still expose a length-0 map (#33128).
  *
  * php-src: ext/dom/namednodemap.c php_dom_get_namednodemap_length /
  *          PHP_METHOD(DOMNamedNodeMap, item) /
@@ -179,6 +181,172 @@ final class JitDomNamedNodeMap
             $map,
             self::loadStringArg($context, $args[1])
         );
+    }
+
+    /**
+     * Live-append Attr onto element.attributes after setAttribute* (#33128).
+     *
+     * Zend NamedNodeMap is the same object before/after mutation; rewrite of an
+     * already-pinned Attr is a no-op for length/pins.
+     */
+    public static function appendAttrPin(
+        Context $context,
+        Value $element,
+        Value $attr,
+        string $elementClass = 'DOMElement'
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nnm_append_pin');
+        $objectType = $context->type->object;
+        $elemClassId = $objectType->lookup($elementClass);
+        if (!$objectType->hasProperty($elemClassId, VmDom::PROP_ATTRIBUTES)) {
+            $objectType->defineProperty($elemClassId, VmDom::PROP_ATTRIBUTES, JITVariable::TYPE_VALUE);
+        }
+        $mapClassId = $objectType->lookup(self::CLASS_MAP);
+        self::ensureLayout($objectType, $mapClassId);
+
+        $map = self::loadAttributesMapOrAllocate($context, $element, $elementClass);
+        $i64 = $context->getTypeFromString('int64');
+        $voidPtr = $context->getTypeFromString('void*');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $done = $fn->appendBasicBlock('dom_nnm_ap_done');
+
+        // Already pinned?
+        for ($i = 0; $i < self::MAX_PINNED_ATTRS; ++$i) {
+            $try = $fn->appendBasicBlock('dom_nnm_ap_try_'.$i);
+            $next = $fn->appendBasicBlock('dom_nnm_ap_next_'.$i);
+            $context->builder->branch($try);
+            $context->builder->positionAtEnd($try);
+            $pinRaw = $context->builder->load(
+                $objectType->propertySlotFor($map, self::CLASS_MAP, self::pinProp($i))
+            );
+            $slotNull = $context->builder->icmp(Builder::INT_EQ, $pinRaw, $voidPtr->constNull());
+            $read = $fn->appendBasicBlock('dom_nnm_ap_read_'.$i);
+            $context->builder->branchIf($slotNull, $next, $read);
+            $context->builder->positionAtEnd($read);
+            $pinObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $context->builder->pointerCast($pinRaw, $valuePtrTy)
+            );
+            $same = $context->builder->icmp(Builder::INT_EQ, $pinObj, $attr);
+            $context->builder->branchIf($same, $done, $next);
+            $context->builder->positionAtEnd($next);
+        }
+
+        // Append at current length (compile-time unroll against length register).
+        $lengthVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $map,
+            self::CLASS_MAP,
+            VmDom::PROP_LENGTH,
+            $mapClassId
+        );
+        $length = $context->helper->loadValue($lengthVar);
+        for ($i = 0; $i < self::MAX_PINNED_ATTRS; ++$i) {
+            $at = $fn->appendBasicBlock('dom_nnm_ap_at_'.$i);
+            $skip = $fn->appendBasicBlock('dom_nnm_ap_skip_'.$i);
+            $eq = $context->builder->icmp(Builder::INT_EQ, $length, $i64->constInt($i, false));
+            $context->builder->branchIf($eq, $at, $skip);
+            $context->builder->positionAtEnd($at);
+            $pin = new JITVariable(
+                $context,
+                JITVariable::TYPE_OBJECT,
+                JITVariable::KIND_VALUE,
+                $attr
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($map, self::CLASS_MAP, self::pinProp($i)),
+                $pin,
+                JITVariable::TYPE_VALUE
+            );
+            $newLen = new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $i64->constInt($i + 1, false)
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($map, self::CLASS_MAP, VmDom::PROP_LENGTH),
+                $newLen,
+                JITVariable::TYPE_NATIVE_LONG
+            );
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($skip);
+        }
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
+    /** Load element.attributes as DOMNamedNodeMap*; allocate empty map if null (#33128). */
+    private static function loadAttributesMapOrAllocate(
+        Context $context,
+        Value $element,
+        string $elementClass
+    ): Value {
+        $objectType = $context->type->object;
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $voidPtr = $context->getTypeFromString('void*');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $raw = $context->builder->load(
+            $objectType->propertySlotFor($element, $elementClass, VmDom::PROP_ATTRIBUTES)
+        );
+        $slotNull = $context->builder->icmp(Builder::INT_EQ, $raw, $voidPtr->constNull());
+        $bbNull = $fn->appendBasicBlock('dom_nnm_map_null');
+        $bbRead = $fn->appendBasicBlock('dom_nnm_map_read');
+        $bbMerge = $fn->appendBasicBlock('dom_nnm_map_merge');
+        $context->builder->branchIf($slotNull, $bbNull, $bbRead);
+
+        $context->builder->positionAtEnd($bbNull);
+        JitDomCreateElement::storeAttributesPresence($context, $element, [], $elementClass);
+        $fresh = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast(
+                $context->builder->load(
+                    $objectType->propertySlotFor($element, $elementClass, VmDom::PROP_ATTRIBUTES)
+                ),
+                $valuePtrTy
+            )
+        );
+        $nullPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbRead);
+        $loaded = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($raw, $valuePtrTy)
+        );
+        $objNull = $context->builder->icmp(Builder::INT_EQ, $loaded, $objPtrTy->constNull());
+        $bbRealloc = $fn->appendBasicBlock('dom_nnm_map_realloc');
+        $bbKeep = $fn->appendBasicBlock('dom_nnm_map_keep');
+        $context->builder->branchIf($objNull, $bbRealloc, $bbKeep);
+
+        $context->builder->positionAtEnd($bbRealloc);
+        JitDomCreateElement::storeAttributesPresence($context, $element, [], $elementClass);
+        $realloced = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast(
+                $context->builder->load(
+                    $objectType->propertySlotFor($element, $elementClass, VmDom::PROP_ATTRIBUTES)
+                ),
+                $valuePtrTy
+            )
+        );
+        $reallocPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbKeep);
+        $keepPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbMerge);
+        $phi = $context->builder->phi($objPtrTy);
+        $phi->addIncoming($fresh, $nullPred);
+        $phi->addIncoming($realloced, $reallocPred);
+        $phi->addIncoming($loaded, $keepPred);
+
+        return $phi;
     }
 
     /**
