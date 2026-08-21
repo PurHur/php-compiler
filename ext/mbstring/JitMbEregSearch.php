@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding (#30781, #33648).
+ * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding (#30781, #33648, #33655).
  *
  * Same shape as {@see JitMbSearch} / {@see mb_internal_encoding}: literals only;
  * search cursor lives in {@see MbstringState} for the duration of one AOT/JIT
@@ -48,6 +48,48 @@ final class JitMbEregSearch
             $context,
             $slot,
             $i1->constInt($out['matched'] ? 1 : 0, false)
+        );
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * mb_ereg_match() — 2–3 arg literal fold (anchored). php-src php_mbregex.c (#33655).
+     *
+     * @param JITVariable[] $args
+     */
+    public static function tryEregMatchFold(Context $context, array $args): ?Value
+    {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            return null;
+        }
+        $pattern = JitStringArg::compileTimeLiteral($args[0]);
+        $string = JitStringArg::compileTimeLiteral($args[1]);
+        if (null === $pattern || null === $string) {
+            return null;
+        }
+        $options = null;
+        if (3 === $argc) {
+            if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+                $options = null;
+            } else {
+                $options = JitStringArg::compileTimeLiteral($args[2]);
+                if (null === $options) {
+                    return null;
+                }
+            }
+        }
+
+        MbstringAotFoldState::syncRegexEncodingIntoState($context);
+        $matched = VmMbstring::eregMatchAnchored($pattern, $string, $options);
+
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $i1->constInt($matched ? 1 : 0, false)
         );
 
         return JitValueBox::pointer($context, $slot);
