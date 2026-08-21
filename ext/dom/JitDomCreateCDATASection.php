@@ -103,13 +103,11 @@ final class JitDomCreateCDATASection
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
     ): void {
-        foreach ([
-            self::PROP_NODE_NAME,
-            self::PROP_NODE_VALUE,
-            self::PROP_TEXT_CONTENT,
-            self::PROP_DATA,
-            self::PROP_WHOLE_TEXT,
-        ] as $prop) {
+        // Same full DOMElement stand-in layout as createElement (#24973 / #33546 / #33556):
+        // appendChild reads parentNode / sibling slots; growing the class after
+        // allocate() leaves CDATA objects undersized and empties firstChild/documentElement.
+        JitDomCreateElement::ensureDomElementStandInLayout($objectType, $classId);
+        foreach ([self::PROP_DATA, self::PROP_WHOLE_TEXT] as $prop) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
             }
