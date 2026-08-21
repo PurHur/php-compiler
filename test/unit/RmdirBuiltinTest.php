@@ -11,7 +11,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class RmdirBuiltinTest extends TestCase
 {
-    private const CODE = <<<'PHP'
+    /** VM path may call mkdir(); AOT uses a harness-created dir (#33403 / mkdir #33402). */
+    private const CODE_VM = <<<'PHP'
 $base = 'test/compliance/cases/stdlib/rmdir_fixture';
 $dir = $base . '/unit_one';
 if (!is_dir($base)) {
@@ -42,6 +43,30 @@ if (rmdir('/no/such/phpc-rmdir-path')) {
 }
 PHP;
 
+    private const CODE_AOT = <<<'PHP'
+$base = 'test/compliance/cases/stdlib/rmdir_fixture';
+$dir = $base . '/unit_one';
+if (rmdir($dir)) {
+    if (!is_dir($dir)) {
+        echo 'ok', "\n";
+    } else {
+        echo 'bad', "\n";
+    }
+} else {
+    echo 'fail', "\n";
+}
+if (rmdir($dir)) {
+    echo 'bad', "\n";
+} else {
+    echo 'gone', "\n";
+}
+if (rmdir('/no/such/phpc-rmdir-path')) {
+    echo 'badgone', "\n";
+} else {
+    echo 'nogone', "\n";
+}
+PHP;
+
     private const EXPECT = "ok\ngone\nnogone\n";
 
     protected function setUp(): void
@@ -59,7 +84,7 @@ PHP;
 
     public function testVmMatchesPhpSubset(): void
     {
-        $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php'));
+        $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE_VM));
     }
 
     /**
@@ -71,16 +96,19 @@ PHP;
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
-        $this->assertSame(self::EXPECT, $this->runAotBinary());
+        $base = dirname(__DIR__, 2).'/test/compliance/cases/stdlib/rmdir_fixture';
+        $dir = $base.'/unit_one';
+        $this->assertTrue(mkdir($dir, 0755));
+        $this->assertSame(self::EXPECT, $this->runAotBinary(self::CODE_AOT));
     }
 
-    private function runAotBinary(): string
+    private function runAotBinary(string $code): string
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_rmdir_');
         $out = $tmp.'_bin';
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n".self::CODE);
+        file_put_contents($tmp, "<?php\n".$code);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
         $compile = proc_open(
@@ -115,13 +143,13 @@ PHP;
         return (string) $result;
     }
 
-    private function runBin(string $bin): string
+    private function runBin(string $bin, string $code): string
     {
         $repo = dirname(__DIR__, 2);
         $path = $repo.'/'.$bin;
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_rmdir_');
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n".self::CODE);
+        file_put_contents($tmp, "<?php\n".$code);
         $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
