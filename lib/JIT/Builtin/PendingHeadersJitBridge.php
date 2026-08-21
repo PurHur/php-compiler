@@ -18,7 +18,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed + standalone link for pending HTTP headers via PendingHeadersJitHelper PHP (#9545, #20930).
+ * JIT/AOT embed + standalone link for pending HTTP headers via PendingHeadersJitHelper PHP (#9545, #20930, #33255).
+ *
+ * Owns pending-header ABI symbols module-locally (getNamedFunction first). Do not
+ * re-add Type always-on empty decls — leftover mint pending_header_*.1 (#31894 / #32122 / #33255).
  *
  * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\PendingHeadersJitHelper}
  * via {@see JitVmHelperLink::ensureCompiled} (peer FunctionExistsRuntime #22016 / RewriteVarsRuntime #21968).
@@ -79,6 +82,53 @@ final class PendingHeadersJitBridge
         '__phpc_setcookie_add',
         '__phpc_headers_sent',
     ];
+
+    /**
+     * Empty module-local decls only (no NestedJIT) for Type::register (#33255).
+     */
+    public static function declarePendingHeaderAbis(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe) {
+                $context->registerFunction($abiName, $probe);
+                continue;
+            }
+            if ('__phpc_headers_sent' === $abiName) {
+                $ft = $context->context->functionType($i32, false);
+            } elseif ('__phpc_pending_header_list' === $abiName) {
+                $ft = $context->context->functionType($htPtr, false);
+            } elseif ('__phpc_pending_header_add' === $abiName) {
+                $ft = $context->context->functionType($voidTy, false, $strPtr, $i32);
+            } elseif ('__phpc_pending_header_remove' === $abiName) {
+                $ft = $context->context->functionType($voidTy, false, $strPtr);
+            } elseif ('__phpc_setcookie_add' === $abiName) {
+                $ft = $context->context->functionType(
+                    $voidTy,
+                    false,
+                    $strPtr,
+                    $strPtr,
+                    $i64,
+                    $strPtr,
+                    $strPtr,
+                    $i32,
+                    $i32,
+                    $strPtr,
+                    $i32
+                );
+            } else {
+                $ft = $context->context->functionType($voidTy, false);
+            }
+            $fn = $context->module->addFunction($abiName, $ft);
+            $context->registerFunction($abiName, $fn);
+        }
+    }
 
     public static function implement(Context $context): void
     {

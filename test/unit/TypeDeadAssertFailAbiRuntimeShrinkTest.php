@@ -32,7 +32,7 @@ final class TypeDeadAssertFailAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         // Next leftover sentinel after #33241 assert_fail_string drop.
-        $this->assertStringContainsString("registerFunction('__phpc_pending_header_reset'", $type);
+        $this->assertStringContainsString("registerFunction('__phpc_stream_path'", $type);
         $this->assertStringContainsString('AssertFail::ensureLinked', $type);
     }
 

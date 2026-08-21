@@ -7,7 +7,12 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT pending HTTP header dispatch via PendingHeadersJitHelper PHP (#9545, #20930).
+ * JIT/AOT pending HTTP header dispatch via PendingHeadersJitHelper PHP (#9545, #20930, #33255).
+ *
+ * Owns `__phpc_pending_header_*` / `__phpc_header_queue_enable` /
+ * `__phpc_response_headers_flush` / `__phpc_setcookie_add` / `__phpc_headers_sent`
+ * module-locally (getNamedFunction first). Do not re-add always-on empty decls in
+ * {@see Type} — leftover decls mint pending_header_*.1 (#31894 / #32122 / #33255).
  *
  * Embed and thin standalone AOT both NestedJIT via {@see PendingHeadersJitBridge}
  * (IncludePath #20877 shape — no thin stub fork).
@@ -20,7 +25,16 @@ final class PendingHeadersRuntime
         self::implement($context);
     }
 
-    /** Thin AOT: fill Type::register empty pending-header ABI shells for link (#20932). */
+    /**
+     * Module-local empty decls for Type::register (#33255).
+     * Bodies come from {@see ensureLinked} / {@see ensureThinAotLinkStubs}.
+     */
+    public static function declarePendingHeaderAbis(Context $context): void
+    {
+        PendingHeadersJitBridge::declarePendingHeaderAbis($context);
+    }
+
+    /** Thin AOT: fill pending-header ABI shells for link (#20932). */
     public static function ensureThinAotLinkStubs(Context $context): void
     {
         PendingHeadersJitBridge::fillThinAotLinkStubs($context);
