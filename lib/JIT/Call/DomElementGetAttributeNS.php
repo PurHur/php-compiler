@@ -16,6 +16,7 @@ use PHPLLVM\Value;
 
 /**
  * Dom\Element::getAttributeNS() — thin user-script AOT live Attr cache (#27108).
+ * Null namespace prefers isNullConstant over stale compileTimeString (#33532).
  */
 final class DomElementGetAttributeNS implements Call
 {
@@ -31,10 +32,10 @@ final class DomElementGetAttributeNS implements Call
         )) {
             return VmClassMethod::jitArgcDummyReturn($context);
         }
-        $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        if (null === $nsLit && (Variable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant)) {
-            $nsLit = '';
-        }
+        // Prefer isNullConstant over compileTimeString — null args can carry a stale
+        // string stamp (observed cts='k' with nullConst=1), which keyed the lookup as
+        // namespace "k" instead of "" (#33532 / peer SetAttributeNS #33528).
+        $nsLit = self::compileTimeNamespace($args[1]);
         $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
         if (null === $nsLit || null === $localLit
             || !DomUserScriptAttributeCacheLlvm::hasPresentLiteral($nsLit, $localLit)
@@ -46,6 +47,16 @@ final class DomElementGetAttributeNS implements Call
             $context,
             DomUserScriptAttributeCacheLlvm::literalValue($nsLit, $localLit) ?? ''
         );
+    }
+
+    /** Null namespace → '' (php-src getAttributeNS null URI ≡ no namespace). */
+    private static function compileTimeNamespace(Variable $arg): ?string
+    {
+        if (Variable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return '';
+        }
+
+        return JitStringBuiltinArg::compileTimeLiteral($arg) ?? $arg->compileTimeString;
     }
 
     private static function boxConstantString(Context $context, string $lit): Value

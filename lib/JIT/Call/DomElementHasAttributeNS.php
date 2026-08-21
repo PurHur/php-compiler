@@ -32,10 +32,8 @@ final class DomElementHasAttributeNS implements Call
         )) {
             return VmClassMethod::jitArgcDummyReturn($context);
         }
-        $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        if (null === $nsLit && (Variable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
-            $nsLit = '';
-        }
+        // Prefer isNullConstant over compileTimeString (stale cts on null args; #33532).
+        $nsLit = self::compileTimeNamespace($args[1]);
         $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
         $present = null !== $nsLit && null !== $localLit
             && DomUserScriptAttributeCacheLlvm::hasPresentLiteral($nsLit, $localLit);
@@ -49,5 +47,14 @@ final class DomElementHasAttributeNS implements Call
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    private static function compileTimeNamespace(Variable $arg): ?string
+    {
+        if (Variable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return '';
+        }
+
+        return JitStringBuiltinArg::compileTimeLiteral($arg) ?? $arg->compileTimeString;
     }
 }
