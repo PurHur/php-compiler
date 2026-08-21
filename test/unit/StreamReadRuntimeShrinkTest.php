@@ -20,10 +20,12 @@ final class StreamReadRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
-        // Thin AOT still NestedJITs the helper, then forceLibc* replaces FILE*-table ABIs (#27663, #27437).
+        // Thin AOT still NestedJITs the helper, then forceLibc* replaces FILE*-table ABIs (#27663, #27437, #33122, #33133).
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('forceLibcStreamPositionAbis', $source);
         $this->assertStringContainsString('implementStreamGetContentsForce', $source);
+        $this->assertStringContainsString('implementFgetcForce', $source);
+        $this->assertStringContainsString('implementFtruncateForce', $source);
         $this->assertStringNotContainsString('isStandaloneInitPhase', $source);
         $this->assertStringNotContainsString('ensureDeferredStubsForInventoryEmit', $source);
         $this->assertStringNotContainsString('shouldDeferInventoryEmitStubs', $source);
