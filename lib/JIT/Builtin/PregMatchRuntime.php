@@ -23,18 +23,19 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 use llvm\LLVMValueRef_ptr;
 
 /**
- * JIT/AOT embed link for __compiler_preg_* via PregJitHelper PHP (#9542, #21212, #24943, #33187, #33188, #33191, #33192).
+ * JIT/AOT embed link for __compiler_preg_* via PregJitHelper PHP (#9542, #21212, #24943, #33187, #33188, #33191, #33192, #33199).
  *
  * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (peer StringPack
  * #22842 / VariableFunctionCall #24902). Embed uses PregJitHelper + VmPreg*; thin standalone
  * AOT uses PregJitHelperThinAot + PregAotFastPath (#24115) until VmPregEngine NestedJIT
  * lands (#16075).
  * Owns `__compiler_preg_match` / `__compiler_preg_match_all` / `__compiler_preg_match_ex` /
- * `__compiler_preg_match_all_ex` / `__compiler_preg_replace` / `__compiler_preg_last_error` (+ `_msg`)
- * module-locally: {@see getNamedFunction} first, then {@see addFunction} if absent via
- * {@see implementI64PairBridge} / {@see implementMatchExBridge} / {@see implementReplaceBridge} /
- * {@see implementLastErrorBridge}. Do not re-add empty always-on shells in {@see Type} —
- * leftover decls mint preg_match.1 / preg_replace.1 / preg_last_error.1 (#31894 / #32122).
+ * `__compiler_preg_match_all_ex` / `__compiler_preg_replace` / `__compiler_preg_last_error` (+ `_msg`) /
+ * `__compiler_preg_split` module-locally: {@see getNamedFunction} first, then {@see addFunction}
+ * if absent via {@see implementI64PairBridge} / {@see implementMatchExBridge} /
+ * {@see implementReplaceBridge} / {@see implementLastErrorBridge} / {@see implementSplitBridge}.
+ * Do not re-add empty always-on shells in {@see Type} — leftover decls mint preg_match.1 /
+ * preg_replace.1 / preg_last_error.1 / preg_split.1 (#31894 / #32122).
  * preg_replace_callback uses PHP match loop + thin LLVM callback invoke (#13736).
  * php-src: ext/pcre/php_pcre.c
  */
