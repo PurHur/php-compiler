@@ -12755,6 +12755,11 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateUnserializeSplFixedArrayResultType(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall,
+                        $callArgs
+                    );
                     $this->attachBoundClosureInvokeMetadata($block, $op);
                     $this->propagateDomCreateElementCompileTimeTag(
                         $block->getOperand($op->arg1),
@@ -15580,6 +15585,48 @@ class JIT {
                 }
                 $this->context->bindVariableByName($resolved, $var);
             }
+        }
+    }
+
+    /**
+     * Tag literal unserialize(SplFixedArray) so foreach uses splBackingHashtable (#33649).
+     *
+     * Without classUserType, TYPE_VALUE boxes take __value__readHashtable → SEGV.
+     *
+     * @param list<Variable> $callArgs
+     */
+    private function propagateUnserializeSplFixedArrayResultType(
+        Operand $result,
+        mixed $toCall,
+        array $callArgs
+    ): void {
+        if (!($toCall instanceof CoreFunc\Internal)) {
+            return;
+        }
+        if ('unserialize' !== strtolower($toCall->getName())) {
+            return;
+        }
+        $payload = $callArgs[0] ?? null;
+        if (!($payload instanceof Variable)) {
+            return;
+        }
+        $literal = JIT\JitStringArg::compileTimeLiteral($payload);
+        if (null === $literal || !\preg_match('/^O:\d+:"SplFixedArray":/', $literal)) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        $var->classUserType = 'SplFixedArray';
+        $result->type = new Type(Type::TYPE_OBJECT, [], 'SplFixedArray');
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->classUserType = 'SplFixedArray';
+            }
+            $this->context->bindVariableByName($resolved, $var);
         }
     }
 
