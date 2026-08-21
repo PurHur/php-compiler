@@ -14,7 +14,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * ArrayObject thin-AOT methods (#26823, ext/spl/spl_array.c).
+ * ArrayObject thin-AOT methods (#26823, #33606, ext/spl/spl_array.c).
  */
 final class ArrayObjectMethod implements Call
 {
@@ -117,6 +117,49 @@ final class ArrayObjectMethod implements Call
                 $context,
                 $args[0] ?? throw new \LogicException('ArrayObject::getIterator() called without $this')
             ),
+            // php-src zim_ArrayObject_asort/ksort — at most 1 flags arg (#33606 / #19480).
+            'asort' => $this->compileSortOptionalFlags(
+                $context,
+                $args,
+                'ArrayObject::asort',
+                static fn (?Variable $flags) => ArrayObjectJitHelper::compileAsort(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::asort() called without $this'),
+                    $flags,
+                    'ArrayObject::asort'
+                )
+            ),
+            'ksort' => $this->compileSortOptionalFlags(
+                $context,
+                $args,
+                'ArrayObject::ksort',
+                static fn (?Variable $flags) => ArrayObjectJitHelper::compileKsort(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::ksort() called without $this'),
+                    $flags,
+                    'ArrayObject::ksort'
+                )
+            ),
+            'natsort' => $this->compileExact(
+                $context,
+                $args,
+                'ArrayObject::natsort',
+                0,
+                static fn () => ArrayObjectJitHelper::compileNatsort(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::natsort() called without $this')
+                )
+            ),
+            'natcasesort' => $this->compileExact(
+                $context,
+                $args,
+                'ArrayObject::natcasesort',
+                0,
+                static fn () => ArrayObjectJitHelper::compileNatcasesort(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::natcasesort() called without $this')
+                )
+            ),
             default => throw new \LogicException(
                 'ArrayObject JIT lowering is not implemented for '.$this->method.'()'
             ),
@@ -151,5 +194,33 @@ final class ArrayObjectMethod implements Call
         }
 
         return $compile();
+    }
+
+    /**
+     * php-src zim_ArrayObject_asort/ksort — optional $flags (#33606).
+     *
+     * @param callable(?Variable): Value $compile
+     */
+    private function compileSortOptionalFlags(
+        Context $context,
+        array $args,
+        string $function,
+        callable $compile
+    ): Value {
+        $given = max(0, \count($args) - 1);
+        if ($given > 1) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $function.'() expects at most 1 argument, '.$given.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock(
+                $context,
+                'ao_'.strtolower($this->method).'_argc_cont'
+            );
+
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+
+        return $compile(1 === $given ? $args[1] : null);
     }
 }

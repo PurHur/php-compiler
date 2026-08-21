@@ -14,7 +14,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * ArrayIterator / RecursiveArrayIterator thin-AOT methods (#32910, ext/spl/spl_array.c).
+ * ArrayIterator / RecursiveArrayIterator thin-AOT methods (#32910, #33606, ext/spl/spl_array.c).
  *
  * Storage is the same `__spl_ht` layout as ArrayObject (#26783 / #26823) — reuse
  * {@see ArrayObjectJitHelper} IR with ArrayIterator ACE names.
@@ -103,6 +103,48 @@ final class ArrayIteratorMethod implements Call
                     $args[1]
                 )
             ),
+            'asort' => $this->compileSortOptionalFlags(
+                $context,
+                $args,
+                $qualified,
+                static fn (?Variable $flags) => ArrayObjectJitHelper::compileAsort(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this'),
+                    $flags,
+                    $qualified
+                )
+            ),
+            'ksort' => $this->compileSortOptionalFlags(
+                $context,
+                $args,
+                $qualified,
+                static fn (?Variable $flags) => ArrayObjectJitHelper::compileKsort(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this'),
+                    $flags,
+                    $qualified
+                )
+            ),
+            'natsort' => $this->compileExact(
+                $context,
+                $args,
+                $qualified,
+                0,
+                static fn () => ArrayObjectJitHelper::compileNatsort(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this')
+                )
+            ),
+            'natcasesort' => $this->compileExact(
+                $context,
+                $args,
+                $qualified,
+                0,
+                static fn () => ArrayObjectJitHelper::compileNatcasesort(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this')
+                )
+            ),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),
@@ -136,5 +178,33 @@ final class ArrayIteratorMethod implements Call
         }
 
         return $compile();
+    }
+
+    /**
+     * php-src zim_ArrayIterator_asort/ksort — optional $flags (#33606).
+     *
+     * @param callable(?Variable): Value $compile
+     */
+    private function compileSortOptionalFlags(
+        Context $context,
+        array $args,
+        string $function,
+        callable $compile
+    ): Value {
+        $given = max(0, \count($args) - 1);
+        if ($given > 1) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $function.'() expects at most 1 argument, '.$given.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock(
+                $context,
+                'ai_'.strtolower($this->method).'_argc_cont'
+            );
+
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+
+        return $compile(1 === $given ? $args[1] : null);
     }
 }
