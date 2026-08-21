@@ -61,6 +61,8 @@ final class JitDomDocumentElement
             self::PROP_DOCUMENT_ELEMENT,
             $docClassId
         );
+        // So `$doc->documentElement->attributes` / `->childNodes` resolve DOMElement (#33082 / #33099).
+        $result->classUserType = self::CLASS_ELEMENT;
         if (null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
             || null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
             || (null !== $documentVar && null !== $documentVar->compileTimeDomLoadXml)

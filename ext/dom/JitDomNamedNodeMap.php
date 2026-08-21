@@ -74,6 +74,8 @@ final class JitDomNamedNodeMap
             $classId
         );
         $var->classUserType = self::CLASS_MAP;
+        // So foreach($el->attributes) takes the NamedNodeMap snapshot path (#33099).
+        JitDomNodeListForeachSnapshot::markAttributesFetch();
 
         return $var;
     }

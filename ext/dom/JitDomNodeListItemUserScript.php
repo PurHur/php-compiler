@@ -235,6 +235,35 @@ final class JitDomNodeListItemUserScript
     }
 
     /**
+     * Compile-time Nth document-element attribute for attributes foreach (#33099).
+     *
+     * php-src: ext/dom/namednodemap.c — attribute axis order follows xmlNode->properties.
+     */
+    public static function materializeRootAttrAtCompileTime(
+        Context $context,
+        string $xml,
+        int $index
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_root_attr');
+        $attrs = DomParseSimpleXmlJitHelper::rootAttributesArgv($xml);
+        if ($index < 0 || $index >= \count($attrs)) {
+            return self::boxNull($context);
+        }
+        $pair = $attrs[$index];
+        $qname = $pair['qname'];
+        $value = $pair['value'];
+        $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals($context, '', $qname, $value);
+        $pos = strpos($qname, ':');
+        $local = false === $pos ? $qname : substr($qname, $pos + 1);
+        DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
+        if ($local !== $qname) {
+            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
+        }
+
+        return self::boxObject($context, $attr);
+    }
+
+    /**
      * @param array{kind: string, data: string, inner?: string, open?: string} $node
      */
     private static function materializeDirectElementChild(Context $context, array $node): Value
