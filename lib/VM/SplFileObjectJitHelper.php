@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\JitFflush;
 use PHPCompiler\ext\standard\JitFgetcsv;
 use PHPCompiler\ext\standard\JitFlock;
 use PHPCompiler\ext\standard\JitFputcsv;
@@ -40,6 +41,7 @@ use PHPLLVM\Value;
  * fread/fgetc on `__spl_fd` (#33332).
  * ftell/flock on `__spl_fd` (#33336) via JitFtell / JitFlock.
  * ftruncate on `__spl_fd` (#33348) via JitFtruncate (peer procedural #33155).
+ * fflush on `__spl_fd` (#33354) via JitFflush (peer procedural #1189).
  * fputcsv on `__spl_fd` (#33340) via JitFputcsv (peer procedural #33334 / #27180).
  * fgetcsv on `__spl_fd` (#33346) via JitFgetcsv (peer procedural #33334 / #1192).
  * fseek on `__spl_fd` (#33347) via JitFseek (clears iterator line cache like rewind).
@@ -48,8 +50,8 @@ use PHPLLVM\Value;
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
  * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_ftruncate /
- * zim_SplFileObject_fputcsv / zim_SplFileObject_fgetcsv / zim_SplFileObject_fseek /
- * zim_SplFileInfo_openFile
+ * zim_SplFileObject_fflush / zim_SplFileObject_fputcsv / zim_SplFileObject_fgetcsv /
+ * zim_SplFileObject_fseek / zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -354,6 +356,28 @@ final class SplFileObjectJitHelper
         $handle = self::loadFd($context, $receiver);
         $size = self::loadLong($context, $sizeArg);
         $ok = JitFtruncate::invoke($context, $handle, $size);
+        $i32 = $context->getTypeFromString('int32');
+        $asI32 = $context->builder->zExt($ok, $i32);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            JitValueBox::pointer($context, $slot),
+            $asI32
+        );
+
+        return $slot;
+    }
+
+    /**
+     * SplFileObject::fflush — php_stream_flush on live handle (#33354).
+     * php-src: zim_SplFileObject_fflush
+     */
+    public static function compileFflush(Context $context, JITVariable $receiver): Value
+    {
+        self::ensureStreamAbis($context);
+        StreamLifecycle::ensureLinked($context);
+        $handle = self::loadFd($context, $receiver);
+        $ok = JitFflush::invoke($context, $handle);
         $i32 = $context->getTypeFromString('int32');
         $asI32 = $context->builder->zExt($ok, $i32);
         $slot = JitValueBox::alloc($context);
