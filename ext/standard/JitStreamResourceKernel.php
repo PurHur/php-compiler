@@ -14,10 +14,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM get_resource_type()/get_resources() helpers (#5179, #3646, #6821, #19613).
+ * LLVM get_resource_type()/get_resources() helpers (#5179, #3646, #6821, #19613, #33130).
  *
  * Quarantined from lib/JIT/Builtin/StreamResourceJit — {@see \PHPCompiler\JIT\Builtin\StreamResource}
  * stays the thin orchestrator. Handle table stays in C until full #5343 migration.
+ *
+ * Do not re-add empty always-on shells in Builtin\Type — leftover decls mint
+ * get_resources.1 (#31894 / #32122). Type::initialize still StreamResource::ensureLinked.
  *
  * php-src: ext/standard/file.c, ext/standard/basic_functions.c
  */
