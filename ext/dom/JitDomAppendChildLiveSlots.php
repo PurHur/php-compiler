@@ -582,6 +582,10 @@ final class JitDomAppendChildLiveSlots
      * replaceChild(text) saveXML matches Zend (#33335 multi-section).
      * Used after fragment insertBefore/append/replace expand.
      *
+     * Comment / CDATA / PI / entity-ref / fragment must be discriminated **before**
+     * fetching {@code tagName} — createComment/CDATA leave tagName unset and the
+     * element arm SIGSEGVs (#33582, peer saveXML #32315 / #32331).
+     *
      * Hardened for repeated inlining into one {@code main} (#33335): uniquified BB
      * labels, entry allocas, piece merge via alloca (not phi across concat continue
      * hops), and {@see JitStringConcat::concat} without fresh-continue BB pairs.
@@ -622,7 +626,25 @@ final class JitDomAppendChildLiveSlots
         $gt = $context->builder->load($context->constantStringFromString('>'));
         $slashGt = $context->builder->load($context->constantStringFromString('/>'));
         $ltSlash = $context->builder->load($context->constantStringFromString('</'));
+        $commentLit = $context->builder->load($context->constantStringFromString('#comment'));
         $textNameLit = $context->builder->load($context->constantStringFromString('#text'));
+        $cdataLit = $context->builder->load($context->constantStringFromString('#cdata-section'));
+        $fragLit = $context->builder->load($context->constantStringFromString('#document-fragment'));
+        $piKindLit = $context->builder->load(
+            $context->constantStringFromString(JitDomCreateProcessingInstruction::TAG_KIND)
+        );
+        $entityKindLit = $context->builder->load(
+            $context->constantStringFromString(JitDomCreateEntityReference::TAG_KIND)
+        );
+        $commentOpen = $context->builder->load($context->constantStringFromString('<!--'));
+        $commentClose = $context->builder->load($context->constantStringFromString('-->'));
+        $cdataOpen = $context->builder->load($context->constantStringFromString('<![CDATA['));
+        $cdataClose = $context->builder->load($context->constantStringFromString(']]>'));
+        $piOpen = $context->builder->load($context->constantStringFromString('<?'));
+        $piClose = $context->builder->load($context->constantStringFromString('?>'));
+        $piSpace = $context->builder->load($context->constantStringFromString(' '));
+        $erefOpen = $context->builder->load($context->constantStringFromString('&'));
+        $erefClose = $context->builder->load($context->constantStringFromString(';'));
         $context->builder->store($empty, $accAlloca);
 
         $first = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, self::tag('dom_rc_rb_first'));
@@ -646,18 +668,6 @@ final class JitDomAppendChildLiveSlots
             $elementClassId
         );
         $nameStr = $context->helper->loadValue($nameVar);
-        $i64 = $context->getTypeFromString('int64');
-        $isText = $context->builder->icmp(
-            Builder::INT_EQ,
-            JitStringCompare::strcmp($context, $nameStr, $textNameLit),
-            $i64->constInt(0, false)
-        );
-        $bbText = BasicBlockHelper::append($context, self::tag('dom_rc_rb_text'));
-        $bbElem = BasicBlockHelper::append($context, self::tag('dom_rc_rb_elem'));
-        $bbPieceDone = BasicBlockHelper::append($context, self::tag('dom_rc_rb_piece_done'));
-        $context->builder->branchIf($isText, $bbText, $bbElem);
-
-        $context->builder->positionAtEnd($bbText);
         $textVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $cur,
@@ -666,10 +676,98 @@ final class JitDomAppendChildLiveSlots
             $elementClassId
         );
         $textStr = $context->helper->loadValue($textVar);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $bbPieceDone = BasicBlockHelper::append($context, self::tag('dom_rc_rb_piece_done'));
+        $bbComment = BasicBlockHelper::append($context, self::tag('dom_rc_rb_comment'));
+        $bbCheckText = BasicBlockHelper::append($context, self::tag('dom_rc_rb_check_text'));
+        $bbText = BasicBlockHelper::append($context, self::tag('dom_rc_rb_text'));
+        $bbCheckCdata = BasicBlockHelper::append($context, self::tag('dom_rc_rb_check_cdata'));
+        $bbCdata = BasicBlockHelper::append($context, self::tag('dom_rc_rb_cdata'));
+        $bbCheckFrag = BasicBlockHelper::append($context, self::tag('dom_rc_rb_check_frag'));
+        $bbFrag = BasicBlockHelper::append($context, self::tag('dom_rc_rb_frag'));
+        $bbCheckPi = BasicBlockHelper::append($context, self::tag('dom_rc_rb_check_pi'));
+        $bbPi = BasicBlockHelper::append($context, self::tag('dom_rc_rb_pi'));
+        $bbPiEmpty = BasicBlockHelper::append($context, self::tag('dom_rc_rb_pi_empty'));
+        $bbPiData = BasicBlockHelper::append($context, self::tag('dom_rc_rb_pi_data'));
+        $bbCheckEntity = BasicBlockHelper::append($context, self::tag('dom_rc_rb_check_entity'));
+        $bbEntity = BasicBlockHelper::append($context, self::tag('dom_rc_rb_entity'));
+        $bbElem = BasicBlockHelper::append($context, self::tag('dom_rc_rb_elem'));
+
+        // Mirror JitDomSaveXMLUserScript::serializeUserScriptNode — nodeName before tagName (#33582).
+        $isComment = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $commentLit),
+            $zero
+        );
+        $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
+
+        $context->builder->positionAtEnd($bbComment);
+        $context->builder->store(
+            JitStringConcat::concat(
+                $context,
+                JitStringConcat::concat($context, $commentOpen, $textStr, false),
+                $commentClose,
+                false
+            ),
+            $pieceAlloca
+        );
+        $context->builder->branch($bbPieceDone);
+
+        $context->builder->positionAtEnd($bbCheckText);
+        $isText = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $textNameLit),
+            $zero
+        );
+        $context->builder->branchIf($isText, $bbText, $bbCheckCdata);
+
+        $context->builder->positionAtEnd($bbText);
         $context->builder->store($textStr, $pieceAlloca);
         $context->builder->branch($bbPieceDone);
 
-        $context->builder->positionAtEnd($bbElem);
+        $context->builder->positionAtEnd($bbCheckCdata);
+        $isCdata = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $cdataLit),
+            $zero
+        );
+        $context->builder->branchIf($isCdata, $bbCdata, $bbCheckFrag);
+
+        $context->builder->positionAtEnd($bbCdata);
+        $context->builder->store(
+            JitStringConcat::concat(
+                $context,
+                JitStringConcat::concat($context, $cdataOpen, $textStr, false),
+                $cdataClose,
+                false
+            ),
+            $pieceAlloca
+        );
+        $context->builder->branch($bbPieceDone);
+
+        $context->builder->positionAtEnd($bbCheckFrag);
+        $isFrag = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $fragLit),
+            $zero
+        );
+        $context->builder->branchIf($isFrag, $bbFrag, $bbCheckPi);
+
+        $context->builder->positionAtEnd($bbFrag);
+        // Fragment stand-ins never set tagName — emit children INNER_XML only (#32334).
+        $fragInnerVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $cur,
+            'DOMElement',
+            VmDom::PROP_USER_SCRIPT_INNER_XML,
+            $elementClassId
+        );
+        $context->builder->store($context->helper->loadValue($fragInnerVar), $pieceAlloca);
+        $context->builder->branch($bbPieceDone);
+
+        // tagName fetch only after nodeName discriminators (#32315 / #33582).
+        $context->builder->positionAtEnd($bbCheckPi);
         $tagVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $cur,
@@ -678,6 +776,76 @@ final class JitDomAppendChildLiveSlots
             $elementClassId
         );
         $tagStr = $context->helper->loadValue($tagVar);
+        $isPi = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagStr, $piKindLit),
+            $zero
+        );
+        $context->builder->branchIf($isPi, $bbPi, $bbCheckEntity);
+
+        $context->builder->positionAtEnd($bbPi);
+        $dataEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $textStr, $empty),
+            $zero
+        );
+        $context->builder->branchIf($dataEmpty, $bbPiEmpty, $bbPiData);
+
+        $context->builder->positionAtEnd($bbPiEmpty);
+        $context->builder->store(
+            JitStringConcat::concat(
+                $context,
+                JitStringConcat::concat($context, $piOpen, $nameStr, false),
+                $piClose,
+                false
+            ),
+            $pieceAlloca
+        );
+        $context->builder->branch($bbPieceDone);
+
+        $context->builder->positionAtEnd($bbPiData);
+        $context->builder->store(
+            JitStringConcat::concat(
+                $context,
+                JitStringConcat::concat(
+                    $context,
+                    JitStringConcat::concat(
+                        $context,
+                        JitStringConcat::concat($context, $piOpen, $nameStr, false),
+                        $piSpace,
+                        false
+                    ),
+                    $textStr,
+                    false
+                ),
+                $piClose,
+                false
+            ),
+            $pieceAlloca
+        );
+        $context->builder->branch($bbPieceDone);
+
+        $context->builder->positionAtEnd($bbCheckEntity);
+        $isEntity = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagStr, $entityKindLit),
+            $zero
+        );
+        $context->builder->branchIf($isEntity, $bbEntity, $bbElem);
+
+        $context->builder->positionAtEnd($bbEntity);
+        $context->builder->store(
+            JitStringConcat::concat(
+                $context,
+                JitStringConcat::concat($context, $erefOpen, $nameStr, false),
+                $erefClose,
+                false
+            ),
+            $pieceAlloca
+        );
+        $context->builder->branch($bbPieceDone);
+
+        $context->builder->positionAtEnd($bbElem);
         // Open-tag attrs (importNode / loadXML / createElementNS) — without this,
         // rebuild emits bare <tag/> and saveXML drops attributes (#33362).
         $xmlnsVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
@@ -700,7 +868,7 @@ final class JitDomAppendChildLiveSlots
         $innerEmpty = $context->builder->icmp(
             Builder::INT_EQ,
             JitStringCompare::strcmp($context, $innerStr, $empty),
-            $i64->constInt(0, false)
+            $zero
         );
         $bbEmptyEl = BasicBlockHelper::append($context, self::tag('dom_rc_rb_empty_el'));
         $bbFullEl = BasicBlockHelper::append($context, self::tag('dom_rc_rb_full_el'));
