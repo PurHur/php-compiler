@@ -321,13 +321,14 @@ final class JitDomAppendChildUserScript
     }
 
     /**
-     * True when {@code $node} is an Element stand-in (not comment/text/cdata/fragment/PI/entity-ref).
+     * True when {@code $node} is an Element stand-in (not comment/text/cdata/fragment/PI/entity-ref/doctype).
      *
      * createComment/createTextNode use DOMElement allocations with {@code nodeName}
      * {@code #comment}/{@code #text}/… — class_id alone cannot discriminate (#33546).
-     * createProcessingInstruction / createEntityReference keep Zend {@code nodeName}
-     * as the target/entity name and stash {@code #pi}/{@code #entity-ref} on tagName
-     * (#33556 / #32343) — those must not become documentElement either.
+     * createProcessingInstruction / createEntityReference / createDocumentType keep Zend
+     * {@code nodeName} as the target/entity/qualified name and stash
+     * {@code #pi}/{@code #entity-ref}/{@code #document-type} on tagName
+     * (#33556 / #32343 / #33565) — those must not become documentElement either.
      */
     private static function isElementStandIn(Context $context, Value $node): Value
     {
@@ -359,7 +360,7 @@ final class JitDomAppendChildUserScript
             );
             $nonElement = $context->builder->or($nonElement, $match);
         }
-        // PI / entity-ref: Zend nodeName is the target/name; discriminator is tagName.
+        // PI / entity-ref / DocumentType: Zend nodeName is the target/name; discriminator is tagName.
         $tagVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $node,
@@ -371,6 +372,7 @@ final class JitDomAppendChildUserScript
         foreach ([
             JitDomCreateProcessingInstruction::TAG_KIND,
             JitDomCreateEntityReference::TAG_KIND,
+            JitDomCreateDocumentType::TAG_KIND,
         ] as $lit) {
             $litStr = $context->builder->load($context->constantStringFromString($lit));
             $match = $context->builder->icmp(
