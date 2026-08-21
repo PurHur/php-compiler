@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -21,6 +22,7 @@ use PHPLLVM\Value;
  * ({@see JitDomCreateElement::materializeElementFromLiteral}). The NestedJIT
  * DomRegistry bridge then sees unregistered objects and segfaults — mirror the
  * ParentNode::append LLVM slot sync instead (php-src ext/dom/node.c).
+ * Attr as newChild: Hierarchy Request Error — Attr is not content (#33587).
  */
 final class JitDomReplaceChild
 {
@@ -270,6 +272,10 @@ final class JitDomReplaceChild
         $newChild = self::loadObjectArg($context, $newChildVar);
         $oldChild = self::loadObjectArg($context, $oldChildVar);
 
+        // php-src: Attr is not a content child — Hierarchy Request before LiveSlots (#33587).
+        // Peer insertBefore throws Error for Attr+ref; replaceChild uses DOMException.
+        self::rejectAttrAsContentBeforeLiveSlots($context, $newChild);
+
         // Wrong Document / Hierarchy Request before LiveSlots (#30274).
         DomNodeLiveMutationRuntime::assertTreeMutationChildBeforeLiveSlots(
             $context,
@@ -343,6 +349,34 @@ final class JitDomReplaceChild
         }
 
         self::syncUserScriptInnerXml($context, $parentVar, $parent, $newChildVar, $oldChildVar, $xml);
+    }
+
+    /**
+     * Thin-AOT: DOMAttr / Dom\Attr as replaceChild newChild (#33587).
+     *
+     * php-src dom_node_replace_child rejects Attr (not content). Must not walk
+     * Element sibling slots on an Attr allocation (SIGSEGV).
+     */
+    private static function rejectAttrAsContentBeforeLiveSlots(Context $context, Value $newChild): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rc_attr_guard');
+        $bbAttr = BasicBlockHelper::append($context, 'dom_rc_attr_reject');
+        $bbOk = BasicBlockHelper::append($context, 'dom_rc_attr_ok');
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbOk);
+
+        $context->builder->positionAtEnd($bbAttr);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Hierarchy Request Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::HIERARCHY_REQUEST_ERR
+        );
+
+        $context->builder->positionAtEnd($bbOk);
     }
 
     /**

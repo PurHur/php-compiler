@@ -25,6 +25,7 @@ use PHPLLVM\Value;
  * DocumentFragment stand-ins expand children before $refChild (#33312).
  * Cross-parent reparent must unlink the old parent first (php-src
  * dom_node_insert_before) — peer appendChild #33404 / #33450.
+ * Attr newChild: Error before sibling slots (php-src / #33587).
  *
  * Reference: php-src ext/dom/node.c dom_node_insert_before.
  */
@@ -40,9 +41,23 @@ final class JitDomInsertBeforeLiveSlots
         self::ensureLayout($context);
         JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
 
+        // php-src: Attr cannot take Element sibling slots (#33587 / peer appendChild #33570).
+        $bbAttr = BasicBlockHelper::append($context, 'dom_ib_ls_attr');
+        $bbNotAttr = BasicBlockHelper::append($context, 'dom_ib_ls_not_attr');
+        $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
+
+        $context->builder->positionAtEnd($bbAttr);
+        \PHPCompiler\JIT\TryCatchHelper::emitCatchableClassError(
+            $context,
+            'Error',
+            'Cannot add newnode as the previous sibling of refnode'
+        );
+
+        $context->builder->positionAtEnd($bbNotAttr);
         $bbFrag = BasicBlockHelper::append($context, 'dom_ib_frag');
         $bbNormal = BasicBlockHelper::append($context, 'dom_ib_normal');
-        $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
         $isFrag = JitDomAppendChildLiveSlots::isDocumentFragmentNode($context, $newChild);
         $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
 
