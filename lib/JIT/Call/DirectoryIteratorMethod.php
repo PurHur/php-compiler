@@ -11,9 +11,9 @@ use PHPCompiler\VM\DirectoryIteratorJitHelper;
 use PHPLLVM\Value;
 
 /**
- * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289, #33263, #33269).
+ * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289, #33263, #33269, #33274).
  *
- * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isFile / isDir / isLink / isReadable / isWritable / isExecutable
+ * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isFile / getPathname / …
  */
 final class DirectoryIteratorMethod implements Call
 {
@@ -57,6 +57,9 @@ final class DirectoryIteratorMethod implements Call
             'isreadable' => DirectoryIteratorJitHelper::compileIsReadable($context, $args[0], $this->className),
             'iswritable' => DirectoryIteratorJitHelper::compileIsWritable($context, $args[0], $this->className),
             'isexecutable' => DirectoryIteratorJitHelper::compileIsExecutable($context, $args[0], $this->className),
+            'getpathname' => DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className),
+            'getpath' => DirectoryIteratorJitHelper::compileGetPath($context, $args[0], $this->className),
+            '__tostring' => DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),

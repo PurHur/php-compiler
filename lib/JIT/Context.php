@@ -1473,6 +1473,7 @@ class Context {
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next',
                 'isDot', 'getFilename', 'isFile', 'isDir',
                 'isLink', 'isReadable', 'isWritable', 'isExecutable',
+                'getPathname', 'getPath', '__toString',
             ] as $diMethod) {
                 $this->functionProxies[$diLc.'::'.strtolower($diMethod)] = new Call\DirectoryIteratorMethod(
                     $diMethod,
@@ -1483,6 +1484,7 @@ class Context {
         foreach ([
             'getFilename', 'isFile', 'isDir',
             'isLink', 'isReadable', 'isWritable', 'isExecutable',
+            'getPathname', 'getPath', '__toString',
         ] as $sfiMethod) {
             $this->functionProxies['splfileinfo::'.strtolower($sfiMethod)] = new Call\DirectoryIteratorMethod(
                 $sfiMethod,
