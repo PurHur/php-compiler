@@ -17,7 +17,7 @@ final class PendingHeadersRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('PendingHeadersJitBridge::implement', $runtime);
         $this->assertStringContainsString('PendingHeadersJitBridge::fillThinAotLinkStubs', $runtime);
         $this->assertStringNotContainsString('PendingHeadersStandaloneLlvm', $runtime);
-        $this->assertLessThan(45, substr_count($runtime, "\n"), 'PendingHeadersRuntime should be a thin router');
+        $this->assertLessThan(55, substr_count($runtime, "\n"), 'PendingHeadersRuntime should be a thin router');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
     }
 

@@ -34,7 +34,7 @@ final class TypeDeadAssertOptionsAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('abort'", $type);
         // Next leftover sentinel (pending_header_reset still Type always-on; #33249 undef-key dropped).
         $this->assertStringContainsString(
-            "registerFunction('__phpc_pending_header_reset'",
+            "registerFunction('__phpc_stream_path'",
             $type
         );
         $this->assertStringContainsString('AssertOptionsRuntime::ensureLinked', $type);
