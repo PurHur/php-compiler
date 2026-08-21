@@ -18,12 +18,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263).
+ * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263, #33274).
  *
  * Construct lists directory entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}
  * (NestedJIT leaf calling DirHandleJitHelper only — StringDir already linked).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
- * isFile/isDir join `__dir_path`+`__filename` then {@see \PHPCompiler\ext\standard\JitStat}.
+ * isFile/isDir/getPathname join `__dir_path`+`__filename` then {@see \PHPCompiler\ext\standard\JitStat}.
  *
  * php-src: ext/spl/spl_directory.c
  */
@@ -199,6 +199,58 @@ final class DirectoryIteratorJitHelper
         );
 
         return $slot;
+    }
+
+    /**
+     * SplFileInfo::getPathname — join(__dir_path, __filename) (#33274).
+     * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_getPathname
+     */
+    public static function compileGetPathname(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $pathname
+        );
+
+        return $slot;
+    }
+
+    /**
+     * SplFileInfo::getPath — directory component (__dir_path) (#33274).
+     * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_getPath / intern->path
+     */
+    public static function compileGetPath(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $dirSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_PATH);
+        $dirPtr = self::stringFromProperty($context, $dirSlot);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $dirPtr
+        );
+
+        return $slot;
+    }
+
+    /**
+     * DirectoryIterator::__toString → basename; SplFileInfo::__toString → pathname (#33274).
+     * php-src: ext/spl/spl_directory.c — zim_DirectoryIterator___toString / zim_SplFileInfo___toString
+     */
+    public static function compileToString(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $lc = strtolower($className);
+        if ('splfileinfo' === $lc) {
+            return self::compileGetPathname($context, $receiver, $className);
+        }
+
+        // DirectoryIterator / FilesystemIterator: basename only (#19482).
+        return self::compileGetFilename($context, $receiver, $className);
     }
 
     /**
