@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * str_getcsv() NestedJIT helper for thin AOT (#27069, php-in-PHP).
+ * str_getcsv() NestedJIT helper for thin AOT (#27069, #33334, php-in-PHP).
  *
  * Single-function parse (no helper returns of array pairs — NestedJIT failed to
  * advance `$i = $parsed[1]` and hung). Indexed `$fields[$n]=` only; isset lengths.
+ * Outer parse cursor lives in `$pos[0]` — NestedJIT does not loop-carry a scalar
+ * `$i` across the field while (#33334: quoted commas became unquoted splits).
  *
  * Semantics SSOT: {@see VmCsv::parseLine()} / php-src ext/standard/file.c php_fgetcsv.
  */
@@ -85,15 +87,18 @@ final class CsvStrGetcsvJitHelper
 
         $fields = [];
         $n = 0;
-        // $len already counted after terminator strip.
-        $i = 0;
+        // NestedJIT (#33334): scalar `$i` is not loop-carried across the outer while —
+        // cursor must live in an indexed slot (same pattern as `$fields[$n]=`).
+        $pos = [];
+        $pos[0] = 0;
         $guard = 0;
 
-        while ($i <= $len) {
+        while ($pos[0] <= $len) {
             ++$guard;
             if ($guard > $len + 8) {
                 break;
             }
+            $i = $pos[0];
             if ($i >= $len) {
                 $fields[$n] = '';
                 ++$n;
@@ -152,11 +157,13 @@ final class CsvStrGetcsvJitHelper
             }
 
             if ($i >= $len) {
+                $pos[0] = $i;
                 break;
             }
             if ($input[$i] === $delim) {
                 ++$i;
             }
+            $pos[0] = $i;
         }
 
         return $fields;
