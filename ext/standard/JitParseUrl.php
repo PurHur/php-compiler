@@ -20,6 +20,8 @@ use PHPLLVM\Value;
 
 /**
  * LLVM JIT/AOT helpers for parse_url() (routing subset; mirrors VmString::parseUrl).
+ *
+ * Call-site {@see ParseUrlRuntime::ensureLinked} before lookup (Type always-on shell dropped, #33236).
  */
 final class JitParseUrl
 {

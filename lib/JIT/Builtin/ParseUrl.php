@@ -7,7 +7,9 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM body for __phpc_parse_url_* via ParseUrlJitHelper PHP (#9358, #5913).
+ * JIT LLVM body for __phpc_parse_url_* via ParseUrlJitHelper PHP (#9358, #5913, #33236).
+ *
+ * Type always-on shells dropped — {@see ParseUrlRuntime} owns the ABI (getNamedFunction first).
  */
 final class ParseUrl
 {
