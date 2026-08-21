@@ -4124,7 +4124,7 @@ class Object_ extends Type {
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([
                 '__construct', 'getfilename', 'getpathname', 'getpath', 'getbasename',
-                'getextension', '__tostring',
+                'getextension', '__tostring', 'isfile', 'isdir',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
