@@ -858,6 +858,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getcwd'));
     }
 
+    /** php-src ext/standard/image.stub.php — InternalArgInfo return string (missing |false) (#28314). */
+    public function testImageTypeToExtensionReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('image_type_to_extension'));
+    }
+
     /** php-src basic_functions.stub.php — alias/absent return array (#27785). */
     public function testRequiredFilesMangledObjectVarsReflectionReturnArray(): void
     {
