@@ -44,6 +44,7 @@ use PHPLLVM\Value;
  * openssl_cms_read() (#33460 leftover of #6592);
  * openssl_cms_verify() (#33464 leftover of #6592);
  * openssl_cms_sign() (#33467 leftover of #6592);
+ * openssl_pkcs7_verify() (#33466 leftover of #6804);
  * openssl_seal() / openssl_open() (#32979 leftover of #6523).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
@@ -1390,6 +1391,211 @@ final class JitOpensslX509
             $written,
             $i64->constInt(0, false)
         );
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
+    /**
+     * openssl_pkcs7_verify() — bake {@see VmOpensslPkcs7Native::verify}.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkcs7_verify) / PKCS7_verify
+     *
+     * Input path, flags, and optional content/signers paths must be compile-time literals
+     * (thin AOT has no PHP FFI). Verify runs in the compiler process; content and signers
+     * PEMs are emitted via {@see StringFilePutContents} at runtime when those paths are
+     * provided (peer {@see self::cmsVerify} / {@see self::exportToFile}).
+     *
+     * $ca_info / $untrusted / unused trailing path args are type-checked only (VM peer
+     * ignores them in {@see VmOpenssl::pkcs7Verify}).
+     *
+     * Return shape matches php-src: true / false / -1 (error).
+     */
+    public static function pkcs7Verify(
+        Context $context,
+        JITVariable $input,
+        JITVariable $flags,
+        ?JITVariable $signersCertificates = null,
+        ?JITVariable $caInfo = null,
+        ?JITVariable $untrusted = null,
+        ?JITVariable $content = null,
+        ?JITVariable $outputFilename = null
+    ): Value {
+        $inputPath = JitStringArg::compileTimeLiteral($input);
+        if (null === $inputPath) {
+            throw new \LogicException(
+                'openssl_pkcs7_verify() input_filename must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33466)'
+            );
+        }
+
+        $flagsVal = self::compileTimeInt($flags);
+        if (null === $flagsVal) {
+            throw new \LogicException(
+                'openssl_pkcs7_verify() flags must be a compile-time int '
+                .'for JIT/AOT in this compiler build (issue #33466)'
+            );
+        }
+
+        $signersPath = self::compileTimeNullableString(
+            (null !== $signersCertificates && !NamedOptionalCallArgs::isOmittedOptional($signersCertificates))
+                ? $signersCertificates
+                : null
+        );
+        if (null === $signersPath) {
+            throw new \LogicException(
+                'openssl_pkcs7_verify() signers_certificates_filename must be a compile-time string or null '
+                .'for JIT/AOT in this compiler build (issue #33466)'
+            );
+        }
+
+        if (null !== $caInfo && !NamedOptionalCallArgs::isOmittedOptional($caInfo)
+            && !self::compileTimeOptionsOk($caInfo)
+            && null === self::compileTimeStringList($caInfo)
+        ) {
+            throw new \LogicException(
+                'openssl_pkcs7_verify() ca_info must be a compile-time array '
+                .'for JIT/AOT in this compiler build (issue #33466)'
+            );
+        }
+
+        if (null !== $untrusted && !NamedOptionalCallArgs::isOmittedOptional($untrusted)) {
+            $untrustedPath = self::compileTimeNullableString($untrusted);
+            if (null === $untrustedPath) {
+                throw new \LogicException(
+                    'openssl_pkcs7_verify() untrusted_certificates_filename must be a compile-time string or null '
+                    .'for JIT/AOT in this compiler build (issue #33466)'
+                );
+            }
+        }
+
+        $contentPath = self::compileTimeNullableString(
+            (null !== $content && !NamedOptionalCallArgs::isOmittedOptional($content))
+                ? $content
+                : null
+        );
+        if (null === $contentPath) {
+            throw new \LogicException(
+                'openssl_pkcs7_verify() content must be a compile-time string or null '
+                .'for JIT/AOT in this compiler build (issue #33466)'
+            );
+        }
+
+        if (null !== $outputFilename && !NamedOptionalCallArgs::isOmittedOptional($outputFilename)) {
+            if (null === self::compileTimeNullableString($outputFilename)) {
+                throw new \LogicException(
+                    'openssl_pkcs7_verify() output_filename must be a compile-time string or null '
+                    .'for JIT/AOT in this compiler build (issue #33466)'
+                );
+            }
+        }
+
+        if (!VmOpensslPkcs7Native::available()) {
+            return self::boxedLong($context, -1);
+        }
+
+        $bakeContent = null;
+        $bakeSigners = null;
+        $contentBytes = null;
+        $signersBytes = null;
+        try {
+            if (null !== $contentPath[0]) {
+                $bakeContent = tempnam(sys_get_temp_dir(), 'phpc_p7_v_c_');
+                if (false === $bakeContent) {
+                    return self::boxedLong($context, -1);
+                }
+            }
+            if (null !== $signersPath[0]) {
+                $bakeSigners = tempnam(sys_get_temp_dir(), 'phpc_p7_v_s_');
+                if (false === $bakeSigners) {
+                    return self::boxedLong($context, -1);
+                }
+            }
+
+            $result = VmOpensslPkcs7Native::verify(
+                $inputPath,
+                $flagsVal,
+                $bakeSigners,
+                $bakeContent
+            );
+            if (-1 === $result) {
+                return self::boxedLong($context, -1);
+            }
+            if (true !== $result) {
+                return self::boxedBool($context, false);
+            }
+
+            if (null !== $bakeContent && is_file($bakeContent)) {
+                $contentBytes = (string) file_get_contents($bakeContent);
+            }
+            if (null !== $bakeSigners && is_file($bakeSigners)) {
+                $signersBytes = (string) file_get_contents($bakeSigners);
+            }
+        } finally {
+            if (null !== $bakeContent && is_file($bakeContent)) {
+                @unlink($bakeContent);
+            }
+            if (null !== $bakeSigners && is_file($bakeSigners)) {
+                @unlink($bakeSigners);
+            }
+        }
+
+        $writes = [];
+        if (null !== $contentPath[0] && null !== $contentBytes) {
+            $writes[] = [$contentPath[0], $contentBytes];
+        }
+        if (null !== $signersPath[0] && null !== $signersBytes) {
+            $writes[] = [$signersPath[0], $signersBytes];
+        }
+
+        if ([] === $writes) {
+            return self::boxedBool($context, true);
+        }
+
+        StringFilePutContents::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $id = (string) (++self::$blockSerial);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $failBlock = BasicBlockHelper::append($context, 'ossl_pkcs7_verify_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'ossl_pkcs7_verify_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_pkcs7_verify_done_'.$id);
+
+        $failed = null;
+        foreach ($writes as $idx => [$path, $data]) {
+            $pathStr = $context->builder->load($context->constantStringFromString($path));
+            $dataStr = $context->builder->load($context->constantStringFromString($data));
+            $dataOwned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $dataStr
+            );
+            $written = $context->builder->call(
+                $context->lookupFunction('__compiler_file_put_contents'),
+                $pathStr,
+                $dataOwned,
+                $i64->constInt(0, false)
+            );
+            $thisFail = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_SLT,
+                $written,
+                $i64->constInt(0, false)
+            );
+            $failed = null === $failed
+                ? $thisFail
+                : $context->builder->or($failed, $thisFail);
+            unset($idx);
+        }
+
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
