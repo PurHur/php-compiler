@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringPregMatch;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
 
-/** LLVM lowering for preg_last_error() via __compiler_preg_last_error (issue #1181). */
+/** LLVM lowering for preg_last_error() via __compiler_preg_last_error (issue #1181; ensureLinked #33192). */
 final class JitPregLastError
 {
     /** @return Value
      * (native long error code) */
     public static function invoke(Context $context): Value
     {
+        StringPregMatch::ensureLinked($context);
+
         $code = $context->builder->call($context->lookupFunction('__compiler_preg_last_error'));
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);

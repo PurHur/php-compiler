@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
 
-/** LLVM lowering for preg_last_error_msg() via __compiler_preg_last_error_msg (issue #3110). */
+/** LLVM lowering for preg_last_error_msg() via __compiler_preg_last_error_msg (issue #3110; ensureLinked #33192). */
 final class JitPregLastErrorMsg
 {
     /** @return Value (native string pointer boxed as PHP string) */
