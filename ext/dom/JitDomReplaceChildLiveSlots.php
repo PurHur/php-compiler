@@ -157,6 +157,9 @@ final class JitDomReplaceChildLiveSlots
         $item1->addIncoming($loadedSecond, $readPred);
 
         self::refreshChildNodesListInPlace($context, $parent, $childCount, $newFirst, $item1);
+        // saveXML reads PROP_USER_SCRIPT_INNER_XML — rebuild after text/element splice
+        // so replaceChild(createTextNode) matches Zend (#33335).
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
     }
 
     /**

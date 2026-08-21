@@ -17,8 +17,19 @@ final class JitStringConcat
 {
     private static int $seq = 0;
 
-    public static function concat(Context $context, Value $left, Value $right): Value
-    {
+    /**
+     * @param bool $freshContinue When false, leave the insert block on the concat
+     *                            phi block (no continue/after hop). Callers that
+     *                            immediately branch or store the result avoid the
+     *                            extra BB pressure that corrupted multi-section DOM
+     *                            fragment rebuilds in one main (#33335).
+     */
+    public static function concat(
+        Context $context,
+        Value $left,
+        Value $right,
+        bool $freshContinue = true
+    ): Value {
         $tag = 'cc'.(string) ++self::$seq;
         $map = $context->structFieldMap['__string__'];
         $leftLen = $context->builder->load(
@@ -65,7 +76,9 @@ final class JitStringConcat
         $result->addIncoming($emptyStr, $emptyBlock);
         $result->addIncoming($dest, $workBlock);
 
-        BasicBlockHelper::branchToFreshContinue($context, 'concat_continue_'.$tag);
+        if ($freshContinue) {
+            BasicBlockHelper::branchToFreshContinue($context, 'concat_continue_'.$tag);
+        }
 
         return $result;
     }
