@@ -10,6 +10,7 @@
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\LibcExtern;
 
 class Type extends Builtin {
 
@@ -557,12 +558,12 @@ class Type extends Builtin {
         // `__compiler_random_bytes`) and NestedJIT uses /dev/urandom via
         // JitRandomBytesKernel open/read (#29531 / #31817). No NestedJIT getrandom
         // lookups remain. Peer sprintf drop (#32110).
-        $fntypeExit = $this->context->context->functionType($void, false, $i32);
-        $fnExit = $this->context->module->addFunction('exit', $fntypeExit);
-        $this->context->registerFunction('exit', $fnExit);
-        $fntypeAbort = $this->context->context->functionType($void, false);
-        $fnAbort = $this->context->module->addFunction('abort', $fntypeAbort);
-        $this->context->registerFunction('abort', $fnAbort);
+        // exit / abort always-on shells removed (#33267): LibcExtern::ensureExitAbort
+        // owns the ABI (getNamedFunction first). Leftover Type empty decls vs Runtime
+        // ABI drift mint exit.1 / abort.1 (#31894 / #32122). User-script exit()/die()
+        // stay ScriptExit; NestedJIT ErrorRaise / TypeErrorRaise / ReadonlyRaise call
+        // ensureExitAbort before lookup (stdlib.h exit(3)/abort(3)).
+        LibcExtern::ensureExitAbort($this->context);
         // __compiler_format_datetime always-on shell removed (#33215): StringDateTime
         // owns the ABI (getNamedFunction first via implementFormatDatetimeBridge;
         // Type::initialize still StringDateTime::ensureLinked on the full load path).
@@ -629,7 +630,8 @@ class Type extends Builtin {
         // getppid/getgid/getuid/geteuid — JitPosixGet*Kernel::ensureLibc* (#30728–#30803).
         // strerror(3) — SocketErrorRuntime::ensureStrerrorLibc / JitFtok::ensureWarningLibc.
         // getpwuid(3)+geteuid(2) — JitGetCurrentUser::ensureLibcGeteuid/Getpwuid (#32217).
-        // Dead calendar/sleep/getloadavg already dropped (#32173). Keep exit/abort.
+        // Dead calendar/sleep/getloadavg already dropped (#32173).
+        // exit/abort always-on shells removed (#33267): LibcExtern::ensureExitAbort.
         // __compiler_preg_split always-on shell removed (#33199): StringPregMatch /
         // PregMatchRuntime owns the ABI (getNamedFunction first via implementSplitBridge;
         // Type::initialize still StringPregMatch::ensureLinked). Leftover Type empty decls

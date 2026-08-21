@@ -394,6 +394,7 @@ final class ScriptExit
 
         $context->builder->positionAtEnd($enumCaseBlock);
         self::emitBoxedEnumCaseError($context, $boxedPtr);
+        LibcExtern::ensureExitAbort($context);
         $context->builder->call($context->lookupFunction('abort'));
 
         $context->builder->positionAtEnd($afterEnumCase);
@@ -427,6 +428,7 @@ final class ScriptExit
         if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
             self::emitStatusTypeErrorAndAbort($context, 'array');
         } else {
+            LibcExtern::ensureExitAbort($context);
             $context->builder->call(
                 $context->lookupFunction('exit'),
                 $i32->constInt(1, false)
@@ -434,6 +436,7 @@ final class ScriptExit
         }
 
         $context->builder->positionAtEnd($badBlock);
+        LibcExtern::ensureExitAbort($context);
         $context->builder->call(
             $context->lookupFunction('exit'),
             $i32->constInt(1, false)
@@ -488,6 +491,7 @@ final class ScriptExit
             PendingHeaders::emitFlushForStandalone($context);
             ObOutput::emitEndAllForStandalone($context);
         }
+        LibcExtern::ensureExitAbort($context);
         $i32 = $context->getTypeFromString('int32');
         $trunc = $context->builder->trunc($status, $i32);
         $context->builder->call($context->lookupFunction('exit'), $trunc);
@@ -506,6 +510,7 @@ final class ScriptExit
         if (null !== $enumClass) {
             // No ExitStatus builtin (#28500); any compile-time enum status → Error like Zend.
             self::emitEnumStringConversionError($context, $enumClass);
+            LibcExtern::ensureExitAbort($context);
             $context->builder->call($context->lookupFunction('abort'));
 
             return;
@@ -557,6 +562,7 @@ final class ScriptExit
                 $given
             )
         );
+        LibcExtern::ensureExitAbort($context);
         $context->builder->call($context->lookupFunction('abort'));
     }
 

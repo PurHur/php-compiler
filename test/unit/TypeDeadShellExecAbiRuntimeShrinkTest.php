@@ -41,10 +41,17 @@ final class TypeDeadShellExecAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#33201)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after exit/abort drop (#33267).
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]exit[\'"]/',
+            $type,
+            'Builtin\\Type must not always-declare exit (#33267)'
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]abort[\'"]/',
+            $type,
+            'Builtin\\Type must not always-declare abort (#33267)'
+        );
         $this->assertStringContainsString('ProcessRuntime::ensureLinked', $type);
     }
 

@@ -50,8 +50,17 @@ final class TypeDeadIniSilenceAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-declare {$sym} in a table (#32779)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
+        // No further Type always-on leftover after exit/abort drop (#33267).
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]exit[\'"]/',
+            $type,
+            'Builtin\\Type must not always-declare exit (#33267)'
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]abort[\'"]/',
+            $type,
+            'Builtin\\Type must not always-declare abort (#33267)'
+        );
         $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
         $this->assertStringContainsString('IniRuntime::ensureLinked', $type);
     }

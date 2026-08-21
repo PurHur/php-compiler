@@ -988,6 +988,39 @@ final class LibcExtern
     }
 
     /**
+     * Module-local libc exit(3) / abort(3) after Type always-on drop (#33267).
+     *
+     * Canonical void(i32) / void() ABIs. getNamedFunction first so leftover Type empty
+     * decls cannot mint exit.1 / abort.1 (#31894 / #32122). User-script exit()/die() stay
+     * on {@see Builtin\ScriptExit}; NestedJIT ErrorRaise / TypeErrorRaise / ReadonlyRaise
+     * call this before lookup. Peer: ensureMemsetDecl (#31863) / ensureMallocFamily (#32273).
+     */
+    public static function ensureExitAbort(Context $context): void
+    {
+        $void = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
+        foreach ([
+            ['exit', $void, [$i32]],
+            ['abort', $void, []],
+        ] as [$name, $ret, $params]) {
+            try {
+                $context->lookupFunction($name);
+
+                continue;
+            } catch (\LogicException $e) {
+            }
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, false, ...$params)
+                );
+            }
+            $context->registerFunction($name, $fn);
+        }
+    }
+
+    /**
      * Declare an external libc/helper symbol without versioning duplicates (#31894).
      *
      * lookupFunction() may throw while the symbol already exists in the MODULE (LibcExtern

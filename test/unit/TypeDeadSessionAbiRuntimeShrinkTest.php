@@ -54,12 +54,19 @@ final class TypeDeadSessionAbiRuntimeShrinkTest extends TestCase
                 'Builtin\\Type must not always-register '.$abi.' (#33261)'
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
+        // No further Type always-on leftover after exit/abort drop (#33267).
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]exit[\'"]/',
+            $type,
+            'Builtin\\Type must not always-declare exit (#33267)'
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]abort[\'"]/',
+            $type,
+            'Builtin\\Type must not always-declare abort (#33267)'
+        );
         $this->assertStringContainsString('SessionLifecycleRuntime::declareSessionAbis', $type);
         $this->assertStringContainsString('SessionLifecycleRuntime::ensureLinked', $type);
-        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
-        $this->assertStringContainsString("registerFunction('exit'", $type);
     }
 
     public function testRuntimeOwnerDeclaresSessionAbiModuleLocally(): void

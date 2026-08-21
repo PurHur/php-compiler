@@ -41,8 +41,17 @@ final class TypeDeadCopyChownAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32466)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
+        // No further Type always-on leftover after exit/abort drop (#33267).
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]exit[\'"]/',
+            $type,
+            'Builtin\\Type must not always-declare exit (#33267)'
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]abort[\'"]/',
+            $type,
+            'Builtin\\Type must not always-declare abort (#33267)'
+        );
         $this->assertStringContainsString("registerFunction('__compiler_http_build_query'", $type);
         $this->assertStringContainsString('CopyRuntime::ensureLinked', (string) file_get_contents(
             __DIR__.'/../../lib/JIT/Builtin/StringFsDirJit.php'

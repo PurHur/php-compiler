@@ -442,7 +442,6 @@ final class TypeErrorRaise
     {
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
-        $void = $context->context->voidType();
         $sizeT = $context->getTypeFromString('size_t');
 
         if (null === $context->module->getNamedGlobal('stderr')) {
@@ -459,11 +458,8 @@ final class TypeErrorRaise
             'snprintf',
             $context->context->functionType($i32, true, $i8p, $sizeT, $i8p)
         );
-        self::ensureDeclInScope(
-            $context,
-            'exit',
-            $context->context->functionType($void, false, $i32)
-        );
+        // exit/abort via LibcExtern after Type always-on drop (#33267).
+        LibcExtern::ensureExitAbort($context);
     }
 
     public static function ensureDeclInScope(

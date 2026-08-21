@@ -30,10 +30,18 @@ final class TypeDeadAssertOptionsAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_assert_options (#33245)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (pending_header_reset still Type always-on; #33249 undef-key dropped).
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after exit/abort drop (#33267).
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]exit[\'"]/',
+            $type,
+            'Builtin\\Type must not always-declare exit (#33267)'
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/addFunction\(\s*[\'"]abort[\'"]/',
+            $type,
+            'Builtin\\Type must not always-declare abort (#33267)'
+        );
+
         $this->assertStringContainsString('AssertOptionsRuntime::ensureLinked', $type);
     }
 
