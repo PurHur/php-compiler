@@ -31,8 +31,8 @@ final class TypeDeadRandomBytesAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (assert_options still Type always-on; #33234 trigger_error / #33241 assert_fail_string dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_assert_options'", $type);
+        // Next leftover sentinel (undefined_array_key_warning_cstr still Type always-on; #33245 assert_options dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_undefined_array_key_warning_cstr'", $type);
         $this->assertStringContainsString('StringRandomBytes::ensureLinked', $type);
     }
 

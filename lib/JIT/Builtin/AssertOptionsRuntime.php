@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -20,9 +21,12 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * assert_options() JIT/AOT bridge via AssertOptionsJitHelper PHP (#9513, #21528).
+ * assert_options() JIT/AOT bridge via AssertOptionsJitHelper PHP (#9513, #21528, #33245).
  *
- * Embed + thin standalone AOT: always NestedJIT / helper-runtime {@see AssertOptionsJitHelper}
+ * Owns `__compiler_assert_options` module-locally (getNamedFunction first, then
+ * addFunction if absent). Do not re-add an always-on empty decl in {@see Type} —
+ * leftover decls mint assert_options.1 (#31894 / #32122 / #33245).
+ * Embed + thin standalone AOT: NestedJIT / helper-runtime {@see AssertOptionsJitHelper}
  * (ValueEcho #21513 / Unlink #19186 shape — no dishonest STANDALONE false stub).
  * php-src: ext/standard/assert.c — PHP_FUNCTION(assert_options)
  */
@@ -97,6 +101,13 @@ final class AssertOptionsRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            // Thin/standalone: declare empty ABI so later ensureStandaloneBodies
+            // can fill; no Type always-on shell (#33245).
+            self::declareAssertOptionsAbi($context);
+
+            return;
+        }
         self::implement($context);
     }
 
@@ -153,7 +164,7 @@ final class AssertOptionsRuntime
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::ensureLinked($context);
+        self::implement($context);
     }
 
     public static function lookupHelper(Context $context, string $logical): LlvmFunction
@@ -168,14 +179,36 @@ final class AssertOptionsRuntime
         return $fn;
     }
 
+    /**
+     * Module-local ABI: getNamedFunction first, then addFunction if absent (#33245).
+     */
+    private static function declareAssertOptionsAbi(Context $context): Value
+    {
+        $abiName = '__compiler_assert_options';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return $probe;
+        }
+        $void = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $valPtr = $context->getTypeFromString('__value__*');
+        $ft = $context->context->functionType($void, false, $i32, $i64, $valPtr, $valPtr);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+
+        return $fn;
+    }
+
     private static function implement(Context $context): void
     {
+        $probe = self::declareAssertOptionsAbi($context);
         if (NestedJitCompileScope::isActive()) {
             return;
         }
-
-        $probe = $context->module->getNamedFunction('__compiler_assert_options');
-        if (null === $probe || $probe->countBasicBlocks() > 0) {
+        if ($probe->countBasicBlocks() > 0) {
             return;
         }
 
