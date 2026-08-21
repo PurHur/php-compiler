@@ -186,11 +186,13 @@ final class JitDomAppendChildUserScript
     }
 
     /**
-     * True when {@code $node} is an Element stand-in (not comment/text/cdata/fragment).
+     * True when {@code $node} is an Element stand-in (not comment/text/cdata/PI/fragment).
      *
      * createComment/createTextNode use DOMElement allocations with {@code nodeName}
      * {@code #comment}/{@code #text}/… — class_id alone cannot discriminate (#33546).
-     * Avoid reading {@code tagName} here: comment objects may be undersized (#24973 / #32315).
+     * PI/entity-ref keep Zend {@code nodeName} (target/name) and stamp {@code tagName}
+     * {@code #pi}/{@code #entity-ref} for discrimination (#33556). Full stand-in layout
+     * (#33546/#33556) makes {@code tagName} safe to read.
      */
     private static function isElementStandIn(Context $context, Value $node): Value
     {
@@ -198,6 +200,9 @@ final class JitDomAppendChildUserScript
         $elementClassId = $objectType->lookup('DOMElement');
         if (!$objectType->hasProperty($elementClassId, 'nodeName')) {
             $objectType->defineProperty($elementClassId, 'nodeName', JITVariable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($elementClassId, 'tagName')) {
+            $objectType->defineProperty($elementClassId, 'tagName', JITVariable::TYPE_STRING);
         }
         $nameVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
@@ -207,6 +212,14 @@ final class JitDomAppendChildUserScript
             $elementClassId
         );
         $nameStr = $context->helper->loadValue($nameVar);
+        $tagVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            'tagName',
+            $elementClassId
+        );
+        $tagStr = $context->helper->loadValue($tagVar);
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
         $nonElement = $i1->constInt(0, false);
@@ -215,6 +228,18 @@ final class JitDomAppendChildUserScript
             $match = $context->builder->icmp(
                 Builder::INT_EQ,
                 JitStringCompare::strcmp($context, $nameStr, $litStr),
+                $i64->constInt(0, false)
+            );
+            $nonElement = $context->builder->or($nonElement, $match);
+        }
+        foreach ([
+            JitDomCreateProcessingInstruction::TAG_KIND,
+            JitDomCreateEntityReference::TAG_KIND,
+        ] as $lit) {
+            $litStr = $context->builder->load($context->constantStringFromString($lit));
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                JitStringCompare::strcmp($context, $tagStr, $litStr),
                 $i64->constInt(0, false)
             );
             $nonElement = $context->builder->or($nonElement, $match);

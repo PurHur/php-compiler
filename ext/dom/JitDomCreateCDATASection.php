@@ -71,6 +71,7 @@ final class JitDomCreateCDATASection
         $objectType->markObjectConstructed($obj);
 
         self::storeStringLiteral($context, $obj, self::PROP_NODE_NAME, '#cdata-section');
+        self::storeStringLiteral($context, $obj, 'tagName', '#cdata-section');
         self::storeStringLiteral($context, $obj, self::PROP_NODE_VALUE, $data);
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
         self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
@@ -91,6 +92,7 @@ final class JitDomCreateCDATASection
         $objectType->markObjectConstructed($obj);
 
         self::storeStringLiteral($context, $obj, self::PROP_NODE_NAME, '#cdata-section');
+        self::storeStringLiteral($context, $obj, 'tagName', '#cdata-section');
         self::storeStringValue($context, $obj, self::PROP_NODE_VALUE, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_TEXT_CONTENT, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_DATA, $dataStr);

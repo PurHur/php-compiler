@@ -26,6 +26,11 @@ final class DomDocumentAppendTextCdataPi33556AotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/issue_33556_dom_append_pi_then_element_aot.php');
     }
 
+    public function testEntityRefThenElement(): void
+    {
+        $this->assertAotMatchesZend(__DIR__.'/../repro/issue_33556_dom_append_entityref_then_element_aot.php');
+    }
+
     private function assertAotMatchesZend(string $src): void
     {
         $zend = $this->runPhp($src);
