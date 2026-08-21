@@ -25,7 +25,8 @@ final class DomUserScriptAttributeCacheLlvm
      *   valueByKey: array<string, string>,
      *   idBearingByKey: array<string, true>,
      *   lastCreateNamespace: ?string,
-     *   lastCreateLocalName: ?string
+     *   lastCreateLocalName: ?string,
+     *   lastCreateQualifiedName: ?string
      * }>
      */
     private static array $byModule = [];
@@ -33,12 +34,13 @@ final class DomUserScriptAttributeCacheLlvm
     public static function rememberCreate(string $namespace, string $qualifiedName): void
     {
         // rememberCreate is compile-time only; bind to whatever module is current later via store.
+        // Keep both local (Attr cache key) and qName (saveXML open-tag / xmlns:prefix; #33578).
         $pos = strpos($qualifiedName, ':');
         $local = false === $pos ? $qualifiedName : substr($qualifiedName, $pos + 1);
-        self::$pendingCreate = [$namespace, $local];
+        self::$pendingCreate = [$namespace, $local, $qualifiedName];
     }
 
-    /** @var null|array{0: string, 1: string} */
+    /** @var null|array{0: string, 1: string, 2: string} */
     private static ?array $pendingCreate = null;
 
     public static function lastCreateNamespace(): ?string
@@ -49,6 +51,12 @@ final class DomUserScriptAttributeCacheLlvm
     public static function lastCreateLocalName(): ?string
     {
         return self::$pendingCreate[1] ?? null;
+    }
+
+    /** Qualified name from the last createAttribute(NS) (may include prefix; #33578). */
+    public static function lastCreateQualifiedName(): ?string
+    {
+        return self::$pendingCreate[2] ?? self::$pendingCreate[1] ?? null;
     }
 
     /** Compile-time cache presence check for getAttribute / hasAttribute (#19281, #27108). */
@@ -160,6 +168,7 @@ final class DomUserScriptAttributeCacheLlvm
         if (null !== self::$pendingCreate) {
             $state['lastCreateNamespace'] = self::$pendingCreate[0];
             $state['lastCreateLocalName'] = self::$pendingCreate[1];
+            $state['lastCreateQualifiedName'] = self::$pendingCreate[2] ?? self::$pendingCreate[1];
         }
         $global = self::slotGlobal($context, $namespace, $localName);
         $prev = $context->builder->load($global);
@@ -237,7 +246,7 @@ final class DomUserScriptAttributeCacheLlvm
         $context->builder->store($objPtr->constNull(), $global);
     }
 
-    /** @return array{slotByKey: array<string, Value>, presentByKey: array<string, true>, valueByKey: array<string, string>, idBearingByKey: array<string, true>, lastCreateNamespace: ?string, lastCreateLocalName: ?string} */
+    /** @return array{slotByKey: array<string, Value>, presentByKey: array<string, true>, valueByKey: array<string, string>, idBearingByKey: array<string, true>, lastCreateNamespace: ?string, lastCreateLocalName: ?string, lastCreateQualifiedName: ?string} */
     private static function &state(Context $context): array
     {
         $id = spl_object_id($context->module);
@@ -249,6 +258,7 @@ final class DomUserScriptAttributeCacheLlvm
                 'idBearingByKey' => self::$pendingIdBearing,
                 'lastCreateNamespace' => null,
                 'lastCreateLocalName' => null,
+                'lastCreateQualifiedName' => null,
             ];
             self::$pendingIdBearing = [];
             self::$pendingValueByKey = [];

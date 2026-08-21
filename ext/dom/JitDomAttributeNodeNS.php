@@ -350,7 +350,8 @@ final class JitDomAttributeNodeNS
      * php-src: Element::appendChild(Attr) ≡ setAttributeNode (attribute map, not childNodes) (#33570).
      *
      * Pins the Attr, updates the createAttribute cache + open-tag xmlns bag so saveXML
-     * matches Zend (peer {@see DomElementSetAttribute} / #33509).
+     * matches Zend (peer {@see DomElementSetAttribute} / #33509). NS Attrs also emit
+     * xmlns:prefix before the qName (peer setAttributeNS #33526 / #33578).
      */
     public static function installAttrOntoElement(Context $context, Value $element, Value $attr): void
     {
@@ -362,6 +363,7 @@ final class JitDomAttributeNodeNS
         if (null === $local) {
             return;
         }
+        $qname = DomUserScriptAttributeCacheLlvm::lastCreateQualifiedName() ?? $local;
         $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
         DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr, $valueLit);
 
@@ -391,9 +393,15 @@ final class JitDomAttributeNodeNS
         if (null === $id) {
             return;
         }
-        // Non-NS createAttribute uses local name as the open-tag key (peer setAttribute).
-        JitDomCreateElementAttrs::set($id, $local, $valueLit);
+        $bagUpdates = self::openTagAttrUpdates('' === $ns ? null : $ns, $qname, $valueLit);
         $attrs = JitDomCreateElementAttrs::get($id);
+        foreach ($bagUpdates as $name => $val) {
+            unset($attrs[$name]);
+        }
+        $attrs = $bagUpdates + $attrs;
+        foreach ($bagUpdates as $name => $val) {
+            JitDomCreateElementAttrs::set($id, $name, $val);
+        }
         $elementVar = new JITVariable(
             $context,
             JITVariable::TYPE_OBJECT,
@@ -404,7 +412,8 @@ final class JitDomAttributeNodeNS
     }
 
     /**
-     * Compile-time saveXML bag sync after setAttributeNode (peer setAttribute #33509 / #33570).
+     * Compile-time saveXML bag sync after setAttributeNode / setAttributeNodeNS
+     * (peer setAttribute #33509 / #33570 / NS #33578).
      */
     public static function syncSaveXmlAttrSuffixAfterSetAttributeNode(
         Context $context,
@@ -415,19 +424,46 @@ final class JitDomAttributeNodeNS
         if (null === $local) {
             return;
         }
+        $qname = DomUserScriptAttributeCacheLlvm::lastCreateQualifiedName() ?? $local;
         $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
         $id = $elementArg->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
         if (null === $id) {
             return;
         }
-        JitDomCreateElementAttrs::set($id, $local, $valueLit);
+        $bagUpdates = self::openTagAttrUpdates('' === $ns ? null : $ns, $qname, $valueLit);
         $attrs = $elementArg->compileTimeDomAttributes ?? JitDomCreateElementAttrs::get($id);
-        $attrs[$local] = $valueLit;
+        foreach ($bagUpdates as $name => $val) {
+            unset($attrs[$name]);
+        }
+        $attrs = $bagUpdates + $attrs;
+        foreach ($bagUpdates as $name => $val) {
+            JitDomCreateElementAttrs::set($id, $name, $val);
+        }
         $elementArg->compileTimeDomAttributes = $attrs;
         if (null === $elementArg->compileTimeDomElementId) {
             $elementArg->compileTimeDomElementId = $id;
         }
         self::syncSaveXmlAttrSuffix($context, $elementArg, $attrs);
+    }
+
+    /**
+     * Open-tag keys for saveXML: qName=value plus xmlns:prefix when prefixed (php-src xmlSetNsProp).
+     *
+     * @return array<string, string>
+     */
+    public static function openTagAttrUpdates(?string $namespace, string $qname, string $value): array
+    {
+        $updates = [];
+        $colon = strpos($qname, ':');
+        if (false !== $colon && null !== $namespace && '' !== $namespace) {
+            $prefix = substr($qname, 0, $colon);
+            if ('' !== $prefix && 'xmlns' !== $prefix) {
+                $updates['xmlns:'.$prefix] = $namespace;
+            }
+        }
+        $updates[$qname] = $value;
+
+        return $updates;
     }
 
     /**
