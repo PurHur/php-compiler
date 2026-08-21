@@ -213,10 +213,12 @@ class Type extends Builtin {
         // implementProcOpenBridge; Type::initialize still ProcessOpen::ensureLinked).
         // Leftover Type empty decls vs Runtime ABI drift mint proc_open.1 (#31894 / #32122).
         // User-script proc_open() stays JitProcOpen / ProcessOpenJitHelper.
+        // __compiler_proc_close always-on shell removed (#33118): ProcessOpenEmbedBridge owns
+        // the ABI (getNamedFunction first, then addFunction if absent via
+        // implementI32Bridge; Type::initialize still ProcessOpen::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint proc_close.1 (#31894 / #32122).
+        // User-script proc_close() stays JitProcClose / ProcessOpenJitHelper.
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypeProcClose = $this->context->context->functionType($i32, false, $i64);
-        $fnProcClose = $this->context->module->addFunction('__compiler_proc_close', $fntypeProcClose);
-        $this->context->registerFunction('__compiler_proc_close', $fnProcClose);
         $fntypeIsProcessResource = $this->context->context->functionType($i32, false, $i64);
         $fnIsProcessResource = $this->context->module->addFunction('__compiler_is_process_resource', $fntypeIsProcessResource);
         $this->context->registerFunction('__compiler_is_process_resource', $fnIsProcessResource);

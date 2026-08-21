@@ -6,7 +6,14 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/** JIT LLVM bodies for proc_open()/proc_close()/proc_get_status()/proc_terminate() (php-src ext/standard/proc_open.c; #6904, #9408). */
+/**
+ * JIT LLVM bodies for proc_open()/proc_close()/proc_get_status()/proc_terminate()
+ * (php-src ext/standard/proc_open.c; #6904, #9408, #33105, #33118).
+ *
+ * Owns `__compiler_proc_close` (and peer proc_open) ABI module-locally via
+ * {@see ProcessOpenEmbedBridge} (getNamedFunction first). Do not re-add empty
+ * always-on shells in {@see Type} — leftover decls mint proc_close.1 (#31894 / #32122).
+ */
 final class ProcessOpen
 {
     public static function ensureLinked(Context $context): void

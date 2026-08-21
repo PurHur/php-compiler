@@ -10,10 +10,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed link for proc_open/close/status/terminate via ProcessOpenJitHelper PHP (#9408, #12958, #26269, #33105).
+ * JIT/AOT embed link for proc_open/close/status/terminate via ProcessOpenJitHelper PHP (#9408, #12958, #26269, #33105, #33118).
  *
- * Owns `__compiler_proc_open` ABI module-locally (getNamedFunction first in
- * implementProcOpenBridge) so leftover Type empty decls cannot mint proc_open.1
+ * Owns `__compiler_proc_open` / `__compiler_proc_close` ABI module-locally
+ * (getNamedFunction first in implementProcOpenBridge / implementI32Bridge) so
+ * leftover Type empty decls cannot mint proc_open.1 / proc_close.1
  * (#31894 / #32122). Type::initialize still ProcessOpen::ensureLinked.
  *
  * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (ProcessSlotJitHelper →
