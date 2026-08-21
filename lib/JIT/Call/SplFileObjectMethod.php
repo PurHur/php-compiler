@@ -11,7 +11,7 @@ use PHPCompiler\VM\SplFileObjectJitHelper;
 use PHPLLVM\Value;
 
 /**
- * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, ext/spl/spl_directory.c).
+ * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, #33348, ext/spl/spl_directory.c).
  */
 final class SplFileObjectMethod implements Call
 {
@@ -58,6 +58,13 @@ final class SplFileObjectMethod implements Call
                 $args[0],
                 $args[1] ?? throw new \ArgumentCountError(
                     'SplFileObject::flock() expects at least 1 argument, 0 given'
+                )
+            ),
+            'ftruncate' => SplFileObjectJitHelper::compileFtruncate(
+                $context,
+                $args[0],
+                $args[1] ?? throw new \ArgumentCountError(
+                    'SplFileObject::ftruncate() expects exactly 1 argument, 0 given'
                 )
             ),
             'fwrite' => SplFileObjectJitHelper::compileFwrite(
