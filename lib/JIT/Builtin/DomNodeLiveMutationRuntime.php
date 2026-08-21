@@ -298,14 +298,14 @@ final class DomNodeLiveMutationRuntime
                     DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $arg);
                 }
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
-                // Same-parent move (arity-1): rebuild INNER_XML order — concat would duplicate (#31684).
-                if (
-                    1 === $extraArgCount
-                    && self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0])
-                ) {
-                    return self::nullValuePtr($context);
-                }
-                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
+                // Rebuild INNER_XML from live children — compile-time tag concat fails when
+                // `$n = $p->appendChild(createElement(...))` drops compileTimeDomTagName,
+                // and same-parent move concat duplicated markup (#31684 / #33404).
+                JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren(
+                    $context,
+                    $parentObj
+                );
+                JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
 
                 return self::nullValuePtr($context);
             }
