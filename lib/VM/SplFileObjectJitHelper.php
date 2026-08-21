@@ -68,8 +68,9 @@ use PHPLLVM\Value;
  * DROP_NEW_LINE strips trailing \\r\\n / \\n / \\r on line read (#33390).
  * SKIP_EMPTY omits blank lines on iterator/seek read (#33396); fgets does not skip.
  * READ_CSV: iterator current/next/foreach yield CSV field arrays (#33397); fgets stays
- * string-oriented. Cache the current row in `__spl_ht` (no new object props — layout
- * landmine). Parse via JitStrGetcsv after `__string__separate` (peer JitFgetcsv #33334).
+ * string-oriented. Cache the raw line in `__spl_cur_line` and re-parse via JitStrGetcsv
+ * on current() — do **not** overwrite `__spl_ht` (construct line snapshot; clobber was the
+ * residual SIGSEGV after #33440). Parse after `__string__separate` (peer JitFgetcsv #33334).
  * Foreach uses Iterator protocol (not packed `__spl_ht` walk) so flags apply (#33396).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
@@ -1218,7 +1219,7 @@ final class SplFileObjectJitHelper
 
     /**
      * SplFileObject::current — lazy-read without bumping key (#33319).
-     * READ_CSV returns the cached CSV row from `__spl_ht` (#33397).
+     * READ_CSV re-parses `__spl_cur_line` via JitStrGetcsv (#33397) — never `__spl_ht`.
      * php-src: zim_SplFileObject_current
      */
     public static function compileCurrent(Context $context, JITVariable $receiver): Value
@@ -1256,23 +1257,22 @@ final class SplFileObjectJitHelper
         $context->builder->branchIf($isCsv, $haveCsvBb, $haveStrBb);
 
         $context->builder->positionAtEnd($haveCsvBb);
-        $csvSlot = JitValueBox::alloc($context);
-        $ht = self::loadHashtableProp($context, $obj, self::PROP_HT);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            JitValueBox::pointer($context, $csvSlot),
-            $ht
-        );
+        // Re-parse cached line — leave construct `__spl_ht` snapshot intact (#33397 reopen).
+        $cur = self::loadStringProp($context, $obj, self::PROP_CUR_LINE);
+        $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
+        $enclosure = self::loadStringProp($context, $obj, self::PROP_CSV_ENC);
+        $escape = self::loadStringProp($context, $obj, self::PROP_CSV_ESC);
+        $csvSlot = JitStrGetcsv::invoke($context, $cur, $separator, $enclosure, $escape);
         $context->builder->store($csvSlot, $slotAlloca);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($haveStrBb);
         $slot = JitValueBox::alloc($context);
-        $cur = self::loadStringProp($context, $obj, self::PROP_CUR_LINE);
+        $curStr = self::loadStringProp($context, $obj, self::PROP_CUR_LINE);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             JitValueBox::pointer($context, $slot),
-            $cur
+            $curStr
         );
         $context->builder->store($slot, $slotAlloca);
         $context->builder->branch($doneBb);
@@ -1315,7 +1315,7 @@ final class SplFileObjectJitHelper
     }
 
     /**
-     * Read one line into PROP_CUR_LINE (or CSV row into PROP_HT when READ_CSV);
+     * Read one line into PROP_CUR_LINE (CSV parse returned as box; HT snapshot untouched);
      * bump LINE by $lineAdd; set HAS / AT_EOF.
      * When $applySkipEmpty, omit blank lines (iterator/seek — php-src read_line / #33396)
      * and honour READ_CSV (#33397). fgets passes false so empty lines stay strings.
@@ -1364,8 +1364,9 @@ final class SplFileObjectJitHelper
     }
 
     /**
-     * Iterator READ_CSV read_line — fgets + rtrim + JitStrGetcsv; cache row in PROP_HT (#33397).
-     * php-src: spl_filesystem_file_read_csv. Peer compose: JitFgetcsv (#33334).
+     * Iterator READ_CSV read_line — fgets + rtrim + JitStrGetcsv; cache line in CUR_LINE (#33397).
+     * Does not write PROP_HT (construct snapshot). php-src: spl_filesystem_file_read_csv.
+     * Peer compose: JitFgetcsv (#33334).
      *
      * @return Value __value__* box (array row)
      */
@@ -1390,7 +1391,7 @@ final class SplFileObjectJitHelper
         $eofBb = $fn->appendBasicBlock('splfo_csv_rd_eof');
         $okBb = $fn->appendBasicBlock('splfo_csv_rd_ok');
         $joinBb = $fn->appendBasicBlock('splfo_csv_rd_join');
-        $slot = JitValueBox::alloc($context);
+        $slotAlloca = $context->builder->alloca($context->getTypeFromString('__value__*'));
         $context->builder->branch($loopBb);
 
         $context->builder->positionAtEnd($loopBb);
@@ -1413,17 +1414,8 @@ final class SplFileObjectJitHelper
         $enclosure = self::loadStringProp($context, $obj, self::PROP_CSV_ENC);
         $escape = self::loadStringProp($context, $obj, self::PROP_CSV_ESC);
         $eofCsvBox = JitStrGetcsv::invoke($context, $empty, $separator, $enclosure, $escape);
-        $nullHt = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            $eofCsvBox
-        );
-        self::storeHashtableProp($context, $obj, self::PROP_HT, $nullHt);
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            JitValueBox::pointer($context, $slot),
-            $nullHt
-        );
+        $context->builder->store($eofCsvBox, $slotAlloca);
         $context->builder->branch($joinBb);
 
         $context->builder->positionAtEnd($okBb);
@@ -1444,14 +1436,8 @@ final class SplFileObjectJitHelper
         $enclosure = self::loadStringProp($context, $obj, self::PROP_CSV_ENC);
         $escape = self::loadStringProp($context, $obj, self::PROP_CSV_ESC);
         $csvBox = JitStrGetcsv::invoke($context, $stripped, $separator, $enclosure, $escape);
-        // JitStrGetcsv::invoke returns __value__* (pointer to written box).
-        $ht = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            $csvBox
-        );
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(1, false));
-        self::storeHashtableProp($context, $obj, self::PROP_HT, $ht);
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $stripped);
         if ($lineAdd > 0) {
             $prev = self::loadLongProp($context, $obj, self::PROP_LINE);
@@ -1462,16 +1448,12 @@ final class SplFileObjectJitHelper
                 $context->builder->addNoSignedWrap($prev, $i64->constInt($lineAdd, false))
             );
         }
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            JitValueBox::pointer($context, $slot),
-            $ht
-        );
+        $context->builder->store($csvBox, $slotAlloca);
         $context->builder->branch($joinBb);
 
         $context->builder->positionAtEnd($joinBb);
 
-        return $slot;
+        return $context->builder->load($slotAlloca);
     }
 
     /**
@@ -1674,7 +1656,7 @@ final class SplFileObjectJitHelper
         JITVariable $receiver,
         int $lineAdd
     ): void {
-        // Reuse iterator read path (sets HAS + CUR_LINE or PROP_HT for READ_CSV).
+        // Reuse iterator read path (sets HAS + CUR_LINE; READ_CSV returns CSV box).
         self::emitReadLineToValueBox($context, $receiver, $lineAdd, true);
     }
 
@@ -1852,28 +1834,6 @@ final class SplFileObjectJitHelper
             $context->type->object->propertySlotFor($obj, self::CLASS_NAME, $prop),
             new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $str),
             JITVariable::TYPE_STRING
-        );
-    }
-
-    private static function loadHashtableProp(Context $context, Value $obj, string $prop): Value
-    {
-        $slot = $context->type->object->propertyFetch($obj, self::CLASS_NAME, $prop);
-        if (JITVariable::TYPE_HASHTABLE === $slot->type) {
-            return $context->helper->loadValue($slot);
-        }
-
-        return $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            JitValueBox::valuePtrFromVariable($context, $slot)
-        );
-    }
-
-    private static function storeHashtableProp(Context $context, Value $obj, string $prop, Value $ht): void
-    {
-        $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($obj, self::CLASS_NAME, $prop),
-            new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht),
-            JITVariable::TYPE_HASHTABLE
         );
     }
 
