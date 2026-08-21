@@ -545,16 +545,11 @@ class Type extends Builtin {
         // StringPregMatch::ensureLinked). Leftover Type empty decls vs Runtime ABI drift
         // mint preg_last_error.1 (#31894 / #32122). User-script stays JitPregLastError /
         // JitPregLastErrorMsg (php-src ext/pcre/php_pcre.c).
-        $fntypePregReplace = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $strPtr,
-            $strPtr,
-            $strPtr,
-            $i64
-        );
-        $fnPregReplace = $this->context->module->addFunction('__compiler_preg_replace', $fntypePregReplace);
-        $this->context->registerFunction('__compiler_preg_replace', $fnPregReplace);
+        // __compiler_preg_replace always-on shell removed (#33191): StringPregMatch /
+        // PregMatchRuntime owns the ABI (getNamedFunction first via implementReplaceBridge;
+        // Type::initialize still StringPregMatch::ensureLinked). Leftover Type empty decls
+        // vs Runtime ABI drift mint preg_replace.1 (#31894 / #32122). User-script
+        // preg_replace() stays JitPregReplace / PregJitHelper (php-src ext/pcre/php_pcre.c).
         $fntypeSuperglobalName = $this->context->context->functionType($i64, false, $strPtr);
         $fnSuperglobalName = $this->context->module->addFunction(
             '__compiler_is_superglobal_name',
