@@ -26,6 +26,7 @@ use PHPLLVM\Value;
  * DocumentFragment stand-ins expand children before $refChild (#33312).
  * Cross-parent reparent must unlink the old parent first (php-src
  * dom_node_insert_before) — peer appendChild #33404 / #33450.
+ * Attr newChild: Error before sibling slots (php-src / #33587).
  *
  * Reference: php-src ext/dom/node.c dom_node_insert_before.
  */

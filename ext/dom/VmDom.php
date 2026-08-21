@@ -6793,6 +6793,10 @@ final class VmDom
 
             return $oldChild;
         }
+        // php-src: Attr is not content — Hierarchy Request (appendChild installs via attr map) (#33587).
+        if (self::isAttr($newChild)) {
+            DomExceptionConstants::raiseHierarchyRequest();
+        }
         // php-src ext/dom/node.c — WRONG_DOCUMENT_ERR before hierarchy type rejection (#30271).
         self::assertCanReceiveTreeMutationChild($parent, $newChild);
         self::assertAttrMutationChild($parent, $newChild);
