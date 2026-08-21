@@ -12,9 +12,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __phpc_parse_url_* via ParseUrlJitHelper PHP (#9358, #22861, #27078).
+ * JIT/AOT link for __phpc_parse_url_* via ParseUrlJitHelper PHP (#9358, #22861, #27078, #33226).
  *
  * Assoc HT: {@see ParseUrlAssocLlvm} (component + lastString/lastInt).
+ * Thin AOT call-site {@see ensureLinked} must {@see BasicBlockHelper::scopeLoweringToFunction}
+ * so bridge blocks are not appended to user main (#27211 / Module.php:180).
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}. php-src: ext/standard/url.c
  */
 final class ParseUrlRuntime
@@ -89,7 +91,10 @@ final class ParseUrlRuntime
             return;
         }
         $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
+        // Mid-invoke ensureLinked: loweringLlvmFunction is the user fn (#33226 / #27211).
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $name, static function () use ($context, $fn, $emit): void {
+            $emit($context, $fn);
+        });
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
     }
