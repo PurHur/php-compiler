@@ -34,6 +34,8 @@ final class StreamLibcHandleKernelShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringContainsString('StreamLibcHandleJitHelper', $source);
+        $this->assertStringContainsString('emitFcloseAndClearLlvmHandleSlot', $source);
+        $this->assertStringContainsString('#33426', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -41,7 +43,7 @@ final class StreamLibcHandleKernelShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 2)', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(230, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void

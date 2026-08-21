@@ -15,6 +15,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -220,14 +221,24 @@ final class JitStreamLifecycleKernel
             self::helperFunction($context, $helperLogical),
             [$handleI32]
         );
-        StreamLibcHandleRuntime::emitClearLlvmHandleSlot($context, $handle);
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i32)
-        );
+        $helperI32 = JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i32);
+        // Thin AOT fopen stores FILE* only in StreamGlobalsJit — NestedJIT fcloseArgv
+        // misses those slots and used to null them without fclose(3) (#33426 / #30792).
+        if ('__compiler_fclose' === $abiName) {
+            $llvmI32 = StreamLibcHandleRuntime::emitFcloseAndClearLlvmHandleSlot($context, $handle);
+            $zero = $i32->constInt(0, false);
+            $one = $i32->constInt(1, false);
+            $helperOk = $context->builder->icmp(Builder::INT_NE, $helperI32, $zero);
+            $llvmOk = $context->builder->icmp(Builder::INT_NE, $llvmI32, $zero);
+            $ok = $context->builder->or($helperOk, $llvmOk);
+            $context->builder->returnValue($context->builder->select($ok, $one, $zero));
+        } else {
+            StreamLibcHandleRuntime::emitClearLlvmHandleSlot($context, $handle);
+            $context->builder->returnValue($helperI32);
+        }
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
-
     private static function implementIfMissing(Context $context, string $abiName, string $helperLogical): void
     {
         $probe = $context->module->getNamedFunction($abiName);

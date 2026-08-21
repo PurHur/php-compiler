@@ -96,6 +96,9 @@ final class JitStreamLibcHandleKernel
      * Thin standalone AOT {@see StreamGlobalsJit::implementThinIsResource} probes these
      * LLVM slots — NestedJIT fclose alone does not clear them (#27186). Must run for
      * LOAD_TYPE_STANDALONE as well as embed.
+     *
+     * Prefer {@see emitFcloseAndClearLlvmHandleSlot} for `__compiler_fclose`: nulling
+     * without fclose(3) discards unflushed fwrite buffers (#33426).
      */
     public static function emitClearLlvmHandleSlot(Context $context, Value $handle): void
     {
@@ -111,6 +114,81 @@ final class JitStreamLibcHandleKernel
         $context->builder->store($i8p->constNull(), $context->builder->bitcast($slot, $i8p->pointerType(0)));
     }
 
+    /**
+     * fclose(3) the thin-AOT LLVM FILE* slot then null it (#33426 / peer clear #30792).
+     *
+     * NestedJIT {@see StreamLifecycleJitHelper::fcloseArgv} does not see handles that
+     * live only in {@see StreamGlobalsJit::GLOBAL_HANDLES} (fopen via
+     * {@see JitStreamIoKernel}). Returning i32 0|1 so the close bridge can OR with
+     * the helper result.
+     *
+     * @return Value i32 — 1 when a non-null slot was closed with fclose==0; else 0
+     */
+    public static function emitFcloseAndClearLlvmHandleSlot(Context $context, Value $handle): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $zeroI32 = $i32->constInt(0, false);
+        $oneI32 = $i32->constInt(1, false);
+        $zeroI64 = $i64->constInt(0, false);
+
+        StreamGlobalsJit::ensureGlobals($context);
+        self::ensureFcloseDecl($context);
+        $global = $context->module->getNamedGlobal(StreamGlobalsJit::GLOBAL_HANDLES);
+        if (null === $global) {
+            return $zeroI32;
+        }
+
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $missBb = $fn->appendBasicBlock('llvm_fclose_miss');
+        $haveBb = $fn->appendBasicBlock('llvm_fclose_have');
+        $doneBb = $fn->appendBasicBlock('llvm_fclose_done');
+
+        $slot = $context->builder->gep($global, $zeroI64, $handle);
+        $slotPtr = $context->builder->bitcast($slot, $i8p->pointerType(0));
+        $fp = $context->builder->load($slotPtr);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $fp, $i8p->constNull());
+        $context->builder->branchIf($isNull, $missBb, $haveBb);
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($haveBb);
+        $rc = $context->builder->call($context->lookupFunction('fclose'), $fp);
+        $context->builder->store($i8p->constNull(), $slotPtr);
+        $closedOk = $context->builder->icmp(Builder::INT_EQ, $rc, $zeroI32);
+        $haveVal = $context->builder->select($closedOk, $oneI32, $zeroI32);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i32);
+        $phi->addIncoming($zeroI32, $missBb);
+        $phi->addIncoming($haveVal, $haveBb);
+
+        return $phi;
+    }
+
+    private static function ensureFcloseDecl(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $probe = $context->module->getNamedFunction('fclose');
+        if (null !== $probe) {
+            $context->registerFunction('fclose', $probe);
+
+            return;
+        }
+        try {
+            $context->lookupFunction('fclose');
+        } catch (\Throwable) {
+            $decl = $context->module->addFunction(
+                'fclose',
+                $context->context->functionType($i32, false, $i8p)
+            );
+            $context->registerFunction('fclose', $decl);
+        }
+    }
     private static function implementResolveStream(Context $context): void
     {
         $abiName = '__phpc_resolve_stream';
