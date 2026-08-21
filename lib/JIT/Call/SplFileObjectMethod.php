@@ -11,7 +11,7 @@ use PHPCompiler\VM\SplFileObjectJitHelper;
 use PHPLLVM\Value;
 
 /**
- * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, #33346, #33347, #33348, #33354, #33358, #33364, ext/spl/spl_directory.c).
+ * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, #33346, #33347, #33348, #33354, #33358, #33359, #33364, ext/spl/spl_directory.c).
  */
 final class SplFileObjectMethod implements Call
 {
@@ -53,6 +53,7 @@ final class SplFileObjectMethod implements Call
             ),
             'fgetc' => SplFileObjectJitHelper::compileFgetc($context, $args[0]),
             'ftell' => SplFileObjectJitHelper::compileFtell($context, $args[0]),
+            'fstat' => SplFileObjectJitHelper::compileFstat($context, $args[0]),
             'fseek' => SplFileObjectJitHelper::compileFseek(
                 $context,
                 $args[0],
