@@ -44,6 +44,7 @@ final class AssertFail
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        // Context must call StringTriggerError::ensureStandaloneBodies first (#33234).
         AssertIniRuntime::ensureGlobals($context);
         AssertionErrorRaise::registerDeclarations($context);
         self::implementBodies($context);

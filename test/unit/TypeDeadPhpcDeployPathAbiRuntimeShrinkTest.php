@@ -31,8 +31,8 @@ final class TypeDeadPhpcDeployPathAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (trigger_error still Type always-on; #33225 deploy_path dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_trigger_error'", $type);
+        // Next leftover sentinel (assert_options still Type always-on; #33234 trigger_error / #33241 assert_fail_string dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_assert_options'", $type);
         $this->assertStringContainsString('StringDeployPath::ensureLinked', $type);
     }
 
