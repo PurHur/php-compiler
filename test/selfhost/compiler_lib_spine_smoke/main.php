@@ -6080,6 +6080,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomCharacterDataAppendData.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomCharacterDataInsertData.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomCharacterDataDeleteData.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomCharacterDataReplaceData.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentAppendChild.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateAttributeNS.php';
