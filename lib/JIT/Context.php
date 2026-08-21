@@ -1502,14 +1502,14 @@ class Context {
         // getCurrentLine → fgets (#33321); fread/fgetc (#33332); ftell/flock (#33336); fstat (#33359);
         // ftruncate (#33348); fflush (#33354); fpassthru (#33358); fputcsv (#33340); fgetcsv (#33346);
         // fseek (#33347); seek (#33364); setFlags/getFlags (#33368); setCsvControl/getCsvControl (#33371);
-        // inherited SplFileInfo stats (#33313).
+        // setMaxLineLen/getMaxLineLen (#33378); inherited SplFileInfo stats (#33313).
         $this->type->object->lookup('SplFileObject');
         foreach ([
             '__construct', 'getFilename', 'getPathname', 'getPath', '__toString',
             'fgets', 'getCurrentLine', 'fread', 'fgetc', 'fwrite', 'fputcsv', 'fgetcsv',
             'setCsvControl', 'getCsvControl', 'eof',
             'ftell', 'fstat', 'flock', 'ftruncate', 'fflush', 'fpassthru', 'fseek', 'seek',
-            'setFlags', 'getFlags',
+            'setFlags', 'getFlags', 'setMaxLineLen', 'getMaxLineLen',
             'rewind', 'valid', 'current', 'key', 'next',
         ] as $sfoMethod) {
             $this->functionProxies['splfileobject::'.strtolower($sfoMethod)] = new Call\SplFileObjectMethod(

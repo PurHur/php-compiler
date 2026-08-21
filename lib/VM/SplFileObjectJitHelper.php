@@ -57,6 +57,7 @@ use PHPLLVM\Value;
  * seek (SeekableIterator line) (#33364) — rewind + read-line loop + key bump.
  * setFlags/getFlags on `__spl_flags` (#33368).
  * setCsvControl/getCsvControl on `__spl_csv_*` (#33371); fgetcsv/fputcsv read props when args omitted.
+ * setMaxLineLen/getMaxLineLen on `__spl_max_line` (#33378); fgets uses max+1 buffer when set.
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
@@ -103,6 +104,9 @@ final class SplFileObjectJitHelper
 
     /** CSV escape — php-src intern->u.file.escape (#33371). */
     public const PROP_CSV_ESC = '__spl_csv_esc';
+
+    /** Max line length for fgets (0 = unlimited / default buffer) (#33378). */
+    public const PROP_MAX_LINE = '__spl_max_line';
 
     private const CLASS_NAME = 'SplFileObject';
 
@@ -640,8 +644,13 @@ final class SplFileObjectJitHelper
         // spl_filesystem_file_free_line — drop cached iterator line before CSV read.
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
         $handle = self::loadFd($context, $receiver);
-        // Thin AOT has no max_line_len prop yet — length < 1 → JitFgetcsv default cap.
-        $length = $i64->constInt(-1, true);
+        // length < 1 → JitFgetcsv default cap; max_line_len when set (#33378 / #19665).
+        $maxLine = self::loadLongProp($context, $obj, self::PROP_MAX_LINE);
+        $length = $context->builder->select(
+            $context->builder->icmp(Builder::INT_SGT, $maxLine, $i64->constInt(0, false)),
+            $maxLine,
+            $i64->constInt(-1, true)
+        );
         // Omitted args → setCsvControl props (#33371); peer php-src intern->u.file.*.
         $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
         $enclosure = self::loadStringProp($context, $obj, self::PROP_CSV_ENC);
@@ -937,6 +946,47 @@ final class SplFileObjectJitHelper
     }
 
     /**
+     * SplFileObject::setMaxLineLen — store max_line_len (#33378).
+     * php-src: zim_SplFileObject_setMaxLineLen — ValueError if maxLength < 0.
+     */
+    public static function compileSetMaxLineLen(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $maxArg
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $max = JitLongArg::lower($context, $maxArg, 'SplFileObject::setMaxLineLen() maxLength');
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            $context->builder->icmp(Builder::INT_SGE, $max, $i64->constInt(0, false)),
+            'splfo_maxlen',
+            'SplFileObject::setMaxLineLen(): Argument #1 ($maxLength) must be greater than or equal to 0'
+        );
+        self::storeLongProp($context, $obj, self::PROP_MAX_LINE, $max);
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * SplFileObject::getMaxLineLen — read max_line_len (#33378).
+     * php-src: zim_SplFileObject_getMaxLineLen — ZEND_PARSE_PARAMETERS_NONE
+     */
+    public static function compileGetMaxLineLen(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $max = self::loadLongProp($context, $obj, self::PROP_MAX_LINE);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            JitValueBox::pointer($context, $slot),
+            $max
+        );
+
+        return $slot;
+    }
+
+    /**
      * SplFileObject::current — lazy-read without bumping key (#33319).
      * php-src: zim_SplFileObject_current
      */
@@ -1025,7 +1075,7 @@ final class SplFileObjectJitHelper
         $line = $context->builder->call(
             $context->lookupFunction('__compiler_fgets'),
             $handle,
-            $i64->constInt(8192, false)
+            self::fgetsBufferLen($context, $obj)
         );
         $slot = JitValueBox::alloc($context);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $line, $strPtr->constNull());
@@ -1089,7 +1139,7 @@ final class SplFileObjectJitHelper
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_fgets'),
             $handle,
-            $i64->constInt(8192, false)
+            self::fgetsBufferLen($context, $obj)
         );
         $isNull = $context->builder->icmp(Builder::INT_EQ, $raw, $strPtr->constNull());
         $fn = $context->builder->getInsertBlock()->getParent();
@@ -1216,6 +1266,7 @@ final class SplFileObjectJitHelper
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
         self::storeLongProp($context, $obj, self::PROP_FLAGS, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_MAX_LINE, $i64->constInt(0, false));
         $empty = $context->builder->load($context->constantStringFromString(''));
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
         // php-src defaults: separator=',', enclosure='"', escape='\\' (#33371).
@@ -1238,6 +1289,24 @@ final class SplFileObjectJitHelper
             $context->builder->load($context->constantStringFromString('\\'))
         );
         $objectType->markObjectConstructed($obj);
+    }
+
+    /**
+     * php-src max_line_len+1 get_line buffer; 0 → default 8192 (#33378 / #19665).
+     *
+     * @return Value i64
+     */
+    private static function fgetsBufferLen(Context $context, Value $obj): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $max = self::loadLongProp($context, $obj, self::PROP_MAX_LINE);
+        $capped = $context->builder->icmp(Builder::INT_SGT, $max, $i64->constInt(0, false));
+
+        return $context->builder->select(
+            $capped,
+            $context->builder->addNoSignedWrap($max, $i64->constInt(1, false)),
+            $i64->constInt(8192, false)
+        );
     }
 
     private static function loadLongProp(Context $context, Value $obj, string $prop): Value
