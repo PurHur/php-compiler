@@ -11,7 +11,7 @@ use PHPCompiler\VM\SplFileObjectJitHelper;
 use PHPLLVM\Value;
 
 /**
- * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, ext/spl/spl_directory.c).
+ * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, ext/spl/spl_directory.c).
  */
 final class SplFileObjectMethod implements Call
 {
@@ -67,6 +67,17 @@ final class SplFileObjectMethod implements Call
                     'SplFileObject::fwrite() expects at least 1 argument, 0 given'
                 ),
                 $args[2] ?? null
+            ),
+            'fputcsv' => SplFileObjectJitHelper::compileFputcsv(
+                $context,
+                $args[0],
+                $args[1] ?? throw new \ArgumentCountError(
+                    'SplFileObject::fputcsv() expects at least 1 argument, 0 given'
+                ),
+                $args[2] ?? null,
+                $args[3] ?? null,
+                $args[4] ?? null,
+                $args[5] ?? null
             ),
             'eof' => SplFileObjectJitHelper::compileEof($context, $args[0]),
             'rewind' => SplFileObjectJitHelper::compileRewind($context, $args[0]),
