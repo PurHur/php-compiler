@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Builtin\ProcessIdentityJit;
 use PHPCompiler\JIT\Builtin\StringDateTime;
 use PHPCompiler\JIT\Builtin\StringHrtime;
 use PHPCompiler\JIT\Builtin\StringMicrotime;
+use PHPCompiler\JIT\Builtin\StringStrftime;
 use PHPCompiler\JIT\Builtin\StringTime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -426,6 +427,9 @@ final class JitDate
             )
             : self::time($context);
         $gmtI8 = $context->getTypeFromString('int8')->constInt($gmt ? 1 : 0, false);
+
+        // Type always-on strftime drop (#33222) — must ensureLinked before lookup.
+        StringStrftime::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_strftime'),
