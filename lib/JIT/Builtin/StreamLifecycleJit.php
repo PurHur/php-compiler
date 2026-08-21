@@ -7,13 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * Stream lifecycle dispatch — embed and standalone AOT via StreamLifecycleJitHelper PHP (#9442, #12843, #33073, #33080, #33084, #33088).
+ * Stream lifecycle dispatch — embed and standalone AOT via StreamLifecycleJitHelper PHP (#9442, #12843, #33073, #33080, #33084, #33088, #33093).
  *
- * Replaces __compiler_is_resource / __compiler_fclose / __compiler_feof / __compiler_fflush
- * (Type always-on `__compiler_fclose` / `__compiler_feof` / `__compiler_fflush` /
- * `__compiler_is_resource` shells dropped #33073 / #33080 / #33084 / #33088 — kernel
- * owns getNamedFunction-first).
- * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
+ * Replaces __compiler_is_resource / __compiler_fclose / __compiler_feof / __compiler_fflush /
+ * __compiler_pclose (Type always-on `__compiler_fclose` / `__compiler_feof` /
+ * `__compiler_fflush` / `__compiler_is_resource` / `__compiler_pclose` shells dropped
+ * #33073 / #33080 / #33084 / #33088 / #33093 — kernel owns getNamedFunction-first).
+ * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c, ext/standard/exec.c
  */
 final class StreamLifecycleJit
 {

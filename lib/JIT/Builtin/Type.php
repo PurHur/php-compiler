@@ -198,12 +198,14 @@ class Type extends Builtin {
         // then addFunction if absent; Type::initialize still StreamLifecycle::ensureLinked).
         // Leftover Type empty decls vs Runtime ABI drift mint is_resource.1 (#31894 / #32122).
         // User-script is_resource() stays is_resource_ / StreamLifecycleJitHelper.
+        // __compiler_pclose always-on shell removed (#33093): JitStreamLifecycleKernel owns
+        // the ABI (getNamedFunction first, then addFunction if absent via
+        // implementCloseBridge; Type::initialize still StreamLifecycle::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint pclose.1 (#31894 / #32122).
+        // User-script pclose() stays JitPclose / StreamLifecycleJitHelper.
         $fntypePopen = $this->context->context->functionType($i64, false, $strPtr, $strPtr);
         $fnPopen = $this->context->module->addFunction('__compiler_popen', $fntypePopen);
         $this->context->registerFunction('__compiler_popen', $fnPopen);
-        $fntypePclose = $this->context->context->functionType($i32, false, $i64);
-        $fnPclose = $this->context->module->addFunction('__compiler_pclose', $fntypePclose);
-        $this->context->registerFunction('__compiler_pclose', $fnPclose);
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
         $fntypeProcOpen = $this->context->context->functionType($i64, false, $strPtr, $htPtr);
         $fnProcOpen = $this->context->module->addFunction('__compiler_proc_open', $fntypeProcOpen);
