@@ -8,11 +8,12 @@ use PHPCompiler\ext\standard\JitStreamLifecycleKernel;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT embed link for stream lifecycle ABI (#9442, #20966, #33073, #33080, #33084).
+ * JIT/AOT embed link for stream lifecycle ABI (#9442, #20966, #33073, #33080, #33084, #33088).
  *
  * Thin orchestrator — NestedJIT bridges live in {@see JitStreamLifecycleKernel}
  * (no deferred stub fork). Sole owner of `__compiler_fclose` / `__compiler_feof` /
- * `__compiler_fflush` after Type always-on drops.
+ * `__compiler_fflush` after Type always-on drops (#33088 also drops Type
+ * always-on is_resource shell; ABI lives in the kernel).
  */
 final class StreamLifecycleRuntime
 {

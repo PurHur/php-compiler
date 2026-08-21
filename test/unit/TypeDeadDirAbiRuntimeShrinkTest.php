@@ -45,7 +45,7 @@ final class TypeDeadDirAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         $this->assertStringContainsString("registerFunction('__compiler_http_build_query'", $type);
-        $this->assertStringContainsString("addFunction('__compiler_is_resource'", $type);
+        $this->assertStringContainsString("addFunction('__compiler_pclose'", $type);
     }
 
     public function testRuntimeOwnerDeclaresDirAbisModuleLocally(): void
