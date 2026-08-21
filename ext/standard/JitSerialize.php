@@ -128,7 +128,7 @@ final class JitSerialize
 
     private static function encodeObjectOperand(Context $context, JITVariable $arg): Value
     {
-        $splResult = self::tryEncodeSplArrayObject($context, $arg);
+        $splResult = self::tryEncodeSplHtObject($context, $arg);
         if (null !== $splResult) {
             return $splResult;
         }
@@ -147,55 +147,81 @@ final class JitSerialize
     }
 
     /**
-     * ArrayObject / ArrayIterator / RecursiveArrayIterator — Zend __serialize bag from `__spl_ht` (#33625).
+     * SPL classes that store in `__spl_ht` — ArrayObject bag (#33625) / SplFixedArray elements (#33634).
      */
-    private static function tryEncodeSplArrayObject(Context $context, JITVariable $arg): ?Value
+    private static function tryEncodeSplHtObject(Context $context, JITVariable $arg): ?Value
     {
         $objectType = $context->type->object;
-        $classIds = [];
+        $fixedId = $objectType->classIdByName('SplFixedArray')
+            ?? $objectType->classIdForLowerName('splfixedarray');
+        $arrayIds = [];
         foreach (['ArrayObject', 'ArrayIterator', 'RecursiveArrayIterator'] as $name) {
             $id = $objectType->classIdByName($name)
                 ?? $objectType->classIdForLowerName(strtolower($name));
             if (null !== $id) {
-                $classIds[] = $id;
+                $arrayIds[] = $id;
             }
         }
-        if ([] === $classIds) {
+        if (null === $fixedId && [] === $arrayIds) {
             return null;
         }
 
         $obj = ArrayObjectJitHelper::loadObjectPtr($context, $arg);
+        $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
         );
 
         $id = (string) (++self::$blockSerial);
-        $splBlock = BasicBlockHelper::append($context, 'serialize_spl_array_'.$id);
-        $pubBlock = BasicBlockHelper::append($context, 'serialize_pub_props_'.$id);
+        $fixedBlock = BasicBlockHelper::append($context, 'serialize_spl_fixed_'.$id);
+        $arrayBlock = BasicBlockHelper::append($context, 'serialize_spl_array_'.$id);
+        $pubBlock = BasicBlockHelper::append($context, 'serialize_spl_pub_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'serialize_spl_done_'.$id);
+        $notFixed = BasicBlockHelper::append($context, 'serialize_spl_not_fixed_'.$id);
 
-        $isSpl = $context->builder->icmp(
-            Builder::INT_EQ,
-            $classId,
-            $context->constantFromInteger($classIds[0], 'int64')
-        );
-        for ($i = 1, $n = \count($classIds); $i < $n; ++$i) {
-            $isSpl = $context->builder->or(
-                $isSpl,
-                $context->builder->icmp(
-                    Builder::INT_EQ,
-                    $classId,
-                    $context->constantFromInteger($classIds[$i], 'int64')
-                )
+        $i64 = $context->getTypeFromString('int64');
+        if (null !== $fixedId) {
+            $isFixed = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($fixedId, false)
             );
+            $context->builder->branchIf($isFixed, $fixedBlock, $notFixed);
+        } else {
+            $context->builder->branch($notFixed);
         }
-        $context->builder->branchIf($isSpl, $splBlock, $pubBlock);
 
-        $context->builder->positionAtEnd($splBlock);
-        $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
-        $splResult = ArrayObjectJitHelper::compileSerialize($context, $objVar);
-        $splEnd = $context->builder->getInsertBlock();
+        $context->builder->positionAtEnd($notFixed);
+        if ([] !== $arrayIds) {
+            $isArray = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($arrayIds[0], false)
+            );
+            for ($i = 1, $n = \count($arrayIds); $i < $n; ++$i) {
+                $isArray = $context->builder->or(
+                    $isArray,
+                    $context->builder->icmp(
+                        Builder::INT_EQ,
+                        $classId,
+                        $i64->constInt($arrayIds[$i], false)
+                    )
+                );
+            }
+            $context->builder->branchIf($isArray, $arrayBlock, $pubBlock);
+        } else {
+            $context->builder->branch($pubBlock);
+        }
+
+        $context->builder->positionAtEnd($fixedBlock);
+        $fixedResult = \PHPCompiler\VM\SplFixedArrayJitHelper::compileSerialize($context, $objVar);
+        $fixedEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $arrayResult = ArrayObjectJitHelper::compileSerialize($context, $objVar);
+        $arrayEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($pubBlock);
@@ -215,8 +241,9 @@ final class JitSerialize
 
         $context->builder->positionAtEnd($doneBlock);
         $strPtr = $context->getTypeFromString('__string__*');
-        $phi = $context->builder->phi($strPtr, 'serialize_obj_phi_'.$id);
-        $phi->addIncoming($splResult, $splEnd);
+        $phi = $context->builder->phi($strPtr, 'serialize_spl_ht_phi_'.$id);
+        $phi->addIncoming($fixedResult, $fixedEnd);
+        $phi->addIncoming($arrayResult, $arrayEnd);
         $phi->addIncoming($pubResult, $pubEnd);
 
         return $phi;
