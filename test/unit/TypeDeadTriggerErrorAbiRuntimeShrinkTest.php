@@ -60,6 +60,18 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringTriggerError::ensureLinked($this->context)', $type);
     }
 
+    public function testTypeRegisterLinksTriggerErrorBeforeSessionStartOptionsNestedJit(): void
+    {
+        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertStringContainsString('#33248', $type);
+        // Match executable calls only (comments earlier mention the same symbols).
+        $this->assertMatchesRegularExpression(
+            '/StringTriggerError::ensureLinked\(\$this->context\);\s*\n\s*SessionStartOptionsRuntime::ensureLinked\(\$this->context\);/',
+            $type,
+            'Type::register must ensureLinked StringTriggerError immediately before SessionStartOptionsRuntime NestedJIT (#33248)'
+        );
+    }
+
     public function testContextLinksTriggerErrorBeforeAssertFail(): void
     {
         $assert = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/AssertFail.php');
