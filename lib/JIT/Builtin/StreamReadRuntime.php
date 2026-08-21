@@ -15,8 +15,12 @@ use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #20982).
+ * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #20982, #33106).
  *
+ * Owns `__compiler_fpassthru` (and peer flock/ftruncate/fgetc/…) ABI module-locally:
+ * {@see getNamedFunction} first, then {@see addFunction} if absent via
+ * {@see JitStreamReadBridgeKernel}. Do not re-add empty always-on shells in {@see Type}
+ * — leftover decls mint fpassthru.1 (#31894 / #32122).
  * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
  * via {@see JitVmHelperLink} (StreamLifecycle #20966 / StreamIo #20943 shape — no deferred stub fork).
  * LLVM bridges live in {@see JitStreamReadBridgeKernel}.
