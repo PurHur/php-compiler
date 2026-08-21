@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT NestedJIT bridges for __compiler_trigger_error / undefined-array-key (#9293, #19864, #21300, #33234).
+ * JIT/AOT NestedJIT bridges for __compiler_trigger_error / undefined-array-key (#9293, #19864, #21300, #33234, #33249).
  *
  * Quarantined from lib/JIT/Builtin/StringTriggerErrorJit — {@see \PHPCompiler\JIT\Builtin\StringTriggerErrorJit}
  * stays the thin orchestrator. User-handler dispatch stays in {@see ErrorHandlerJitRuntime}.
@@ -24,9 +24,10 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * {@see LastErrorRuntime} and prints via thin libc fprintf (user-script AOT has no
  * honest PHP fwrite(STDERR)). Undefined-array-key NestedJITs {@see TriggerErrorJitHelper}.
  *
- * Do not re-add Type always-on empty decls — leftover mint trigger_error.1 (#31894 / #32122 / #33234).
+ * Do not re-add Type always-on empty decls — leftover mint trigger_error.1 /
+ * undefined_array_key_warning_*.1 (#31894 / #32122 / #33234 / #33249).
  *
- * php-src: Zend/zend_execute_API.c, main/php_errors.c
+ * php-src: Zend/zend_execute_API.c, Zend/zend_execute.c, main/php_errors.c
  */
 final class JitTriggerErrorKernel
 {
@@ -56,6 +57,11 @@ final class JitTriggerErrorKernel
     {
         $probe = $context->module->getNamedFunction('__compiler_trigger_error');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            // trigger_error body present — still ensure undef-key ABIs (#33249 Type drop).
+            self::ensureUndefHelpersCompiled($context);
+            self::ensureValueHelpers($context);
+            self::implementUndefKeyCstrBridge($context);
+            self::implementUndefKeyLongBridge($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -73,6 +79,49 @@ final class JitTriggerErrorKernel
         self::implementTriggerErrorBridge($context);
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Declare undef-key ABIs only (getNamedFunction first) — needed before Type\HashTable::implement
+     * looks them up during Context init (#33249). Bodies via {@see implement}.
+     */
+    public static function declareUndefinedArrayKeyAbis(Context $context): void
+    {
+        self::declareUndefKeyCstrAbi($context);
+        self::declareUndefKeyLongAbi($context);
+    }
+
+    private static function declareUndefKeyCstrAbi(Context $context): void
+    {
+        $abiName = '__compiler_undefined_array_key_warning_cstr';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i8p, $sizeT);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function declareUndefKeyLongAbi(Context $context): void
+    {
+        $abiName = '__compiler_undefined_array_key_warning_long';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i64);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
     }
 
     /** Load libc stderr FILE* (external global), matching StreamGlobalsJit. */
@@ -222,6 +271,7 @@ final class JitTriggerErrorKernel
     private static function implementUndefKeyCstrBridge(Context $context): void
     {
         $abiName = '__compiler_undefined_array_key_warning_cstr';
+        self::declareUndefKeyCstrAbi($context);
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -229,18 +279,12 @@ final class JitTriggerErrorKernel
             return;
         }
 
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $i8p, $sizeT);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
+        $fn = $probe;
         $entry = $fn->appendBasicBlock('undef_key_cstr_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $key = $fn->getParam(0);
         $len = $fn->getParam(1);
+        $i8p = $context->getTypeFromString('int8*');
         $nullKey = $context->builder->icmp(Builder::INT_EQ, $key, $i8p->constNull());
         $retBb = $fn->appendBasicBlock('undef_key_cstr_ret');
         $bodyBb = $fn->appendBasicBlock('undef_key_cstr_body');
@@ -258,6 +302,7 @@ final class JitTriggerErrorKernel
     private static function implementUndefKeyLongBridge(Context $context): void
     {
         $abiName = '__compiler_undefined_array_key_warning_long';
+        self::declareUndefKeyLongAbi($context);
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -265,13 +310,7 @@ final class JitTriggerErrorKernel
             return;
         }
 
-        $i64 = $context->getTypeFromString('int64');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $i64);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
+        $fn = $probe;
         $entry = $fn->appendBasicBlock('undef_key_long_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $context->builder->call(

@@ -590,23 +590,14 @@ class Type extends Builtin {
         // __compiler_idate always-on shell removed (#32250): user-script idate()
         // stays JitIdate IR / IdateJitHelper (#26900). StringIdate::implement()
         // is an intentional no-op.
-        $fntypeUndefKeyStr = $this->context->context->functionType(
-            $void,
-            false,
-            $i8p,
-            $sizeT
-        );
-        $fnUndefKeyStr = $this->context->module->addFunction(
-            '__compiler_undefined_array_key_warning_cstr',
-            $fntypeUndefKeyStr
-        );
-        $this->context->registerFunction('__compiler_undefined_array_key_warning_cstr', $fnUndefKeyStr);
-        $fntypeUndefKeyLong = $this->context->context->functionType($void, false, $i64);
-        $fnUndefKeyLong = $this->context->module->addFunction(
-            '__compiler_undefined_array_key_warning_long',
-            $fntypeUndefKeyLong
-        );
-        $this->context->registerFunction('__compiler_undefined_array_key_warning_long', $fnUndefKeyLong);
+        // __compiler_undefined_array_key_warning_cstr / _long always-on shells removed
+        // (#33249): StringTriggerError / JitTriggerErrorKernel owns the ABIs
+        // (getNamedFunction first via declareUndefinedArrayKeyAbis / implementUndefKey*Bridge;
+        // Type::register declares via owner before HashTable::implement looks them up;
+        // Type::initialize still StringTriggerError::ensureLinked on the full load path).
+        // Leftover Type empty decls vs Runtime ABI drift mint undefined_array_key_warning_*.1
+        // (#31894 / #32122).
+        StringTriggerError::declareUndefinedArrayKeyAbis($this->context);
         // __compiler_trigger_error always-on shell removed (#33234): StringTriggerError
         // / JitTriggerErrorKernel owns the ABI (getNamedFunction first via
         // implementTriggerErrorBridge; Type::initialize still StringTriggerError::ensureLinked

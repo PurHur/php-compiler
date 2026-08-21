@@ -32,8 +32,8 @@ final class TypeDeadIsProcessResourceAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (undefined_array_key_warning_cstr still Type always-on; #33245 assert_options dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_undefined_array_key_warning_cstr'", $type);
+        // Next leftover sentinel (pending_header_reset still Type always-on; #33245 assert_options / #33249 undef-key dropped).
+        $this->assertStringContainsString("registerFunction('__phpc_pending_header_reset'", $type);
         $this->assertStringContainsString('ProcessOpen::ensureLinked', $type);
     }
 
