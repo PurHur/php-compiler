@@ -239,9 +239,11 @@ class Type extends Builtin {
         // implementIfMissing; Type::initialize still StreamLifecycle::ensureLinked).
         // Leftover Type empty decls vs Runtime ABI drift mint feof.1 (#31894 / #32122).
         // User-script feof() stays JitFeof / StreamLifecycleJitHelper.
-        $fntypeFsync = $this->context->context->functionType($i32, false, $i64);
-        $fnFsync = $this->context->module->addFunction('__compiler_fsync', $fntypeFsync);
-        $this->context->registerFunction('__compiler_fsync', $fnFsync);
+        // __compiler_fsync always-on shell removed (#33114): StreamSync / JitStreamSyncKernel
+        // owns the ABI (getNamedFunction first, then addFunction if absent via
+        // implementIfMissing; Type::initialize still StreamSync::ensureLinked). Leftover
+        // Type empty decls vs Runtime ABI drift mint fsync.1 (#31894 / #32122). User-script
+        // fsync() stays StreamSync / JitStreamSyncKernel (libc after stream resolve).
         $fntypeFdatasync = $this->context->context->functionType($i32, false, $i64);
         $fnFdatasync = $this->context->module->addFunction('__compiler_fdatasync', $fntypeFdatasync);
         $this->context->registerFunction('__compiler_fdatasync', $fnFdatasync);
