@@ -162,12 +162,21 @@ final class GetcwdJit
             return;
         } catch (\Throwable $e) {
         }
-        try {
-            $existing = $context->lookupFunction('getcwd');
+        // getNamedFunction first — decl-in-module but not-in-registry must not mint getcwd.1 (#33650 / #31894).
+        $existing = $context->module->getNamedFunction('getcwd');
+        if (null === $existing) {
+            try {
+                $existing = $context->lookupFunction('getcwd');
+            } catch (\Throwable $e) {
+                $existing = null;
+            }
+        }
+        if (null !== $existing) {
+            $context->registerFunction('getcwd', $existing);
             $context->registerFunction(self::COMPILER_GETCWD, $existing);
+            LibcExtern::ensureStrlenDecl($context);
 
             return;
-        } catch (\Throwable $e) {
         }
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');

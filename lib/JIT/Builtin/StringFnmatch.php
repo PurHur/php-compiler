@@ -176,13 +176,20 @@ final class StringFnmatch
             return;
         } catch (\Throwable $e) {
         }
-        // Prefer a direct libc fnmatch symbol when already present (legacy Module decls).
-        try {
-            $existing = $context->lookupFunction('fnmatch');
+        // getNamedFunction first — decl-in-module but not-in-registry must not mint fnmatch.1 (#33650 / #31894).
+        $existing = $context->module->getNamedFunction('fnmatch');
+        if (null === $existing) {
+            try {
+                $existing = $context->lookupFunction('fnmatch');
+            } catch (\Throwable $e) {
+                $existing = null;
+            }
+        }
+        if (null !== $existing) {
+            $context->registerFunction('fnmatch', $existing);
             $context->registerFunction(self::COMPILER_FNMATCH, $existing);
 
             return;
-        } catch (\Throwable $e) {
         }
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');

@@ -126,12 +126,20 @@ final class StringLink
             return;
         } catch (\Throwable $e) {
         }
-        try {
-            $existing = $context->lookupFunction('link');
+        // getNamedFunction first — decl-in-module but not-in-registry must not mint link.1 (#33650 / #31894).
+        $existing = $context->module->getNamedFunction('link');
+        if (null === $existing) {
+            try {
+                $existing = $context->lookupFunction('link');
+            } catch (\Throwable $e) {
+                $existing = null;
+            }
+        }
+        if (null !== $existing) {
+            $context->registerFunction('link', $existing);
             $context->registerFunction(self::COMPILER_LINK, $existing);
 
             return;
-        } catch (\Throwable $e) {
         }
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');

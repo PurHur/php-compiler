@@ -125,13 +125,20 @@ final class StringChroot
             return;
         } catch (\Throwable $e) {
         }
-        // Prefer a direct libc chroot symbol when already present (legacy Module FS externs).
-        try {
-            $existing = $context->lookupFunction('chroot');
+        // getNamedFunction first — decl-in-module but not-in-registry must not mint chroot.1 (#33650 / #31894).
+        $existing = $context->module->getNamedFunction('chroot');
+        if (null === $existing) {
+            try {
+                $existing = $context->lookupFunction('chroot');
+            } catch (\Throwable $e) {
+                $existing = null;
+            }
+        }
+        if (null !== $existing) {
+            $context->registerFunction('chroot', $existing);
             $context->registerFunction(self::COMPILER_CHROOT, $existing);
 
             return;
-        } catch (\Throwable $e) {
         }
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');

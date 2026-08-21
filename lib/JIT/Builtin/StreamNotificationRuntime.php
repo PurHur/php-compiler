@@ -41,6 +41,8 @@ final class StreamNotificationRuntime
 
     public static function implement(Context $context): void
     {
+        // Reuse empty decls — bare addFunction after getNamedFunction mints
+        // __phpc_stream_notification_callback_set.1 (#33650 / peer #31894 / #32122).
         $probe = $context->module->getNamedFunction('__phpc_stream_notification_callback_set');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -53,7 +55,9 @@ final class StreamNotificationRuntime
         $voidTy = $context->getTypeFromString('void');
         $valPtr = $context->getTypeFromString('__value__*');
         $ft = $context->context->functionType($voidTy, false, $valPtr, $valPtr);
-        $fn = $context->module->addFunction('__phpc_stream_notification_callback_set', $ft);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction('__phpc_stream_notification_callback_set', $ft);
         self::implementSet($context, $fn);
 
         self::registerLinkedRuntime($context);
