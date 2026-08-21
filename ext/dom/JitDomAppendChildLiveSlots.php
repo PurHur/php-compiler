@@ -28,6 +28,8 @@ use PHPLLVM\Value;
  * DocumentFragment stand-ins (`nodeName` `#document-fragment`) expand children
  * onto the parent (php-src fragment move); linking the fragment itself left
  * `#document-fragment` in childNodes and SIGSEGV'd on item(N) (#33312).
+ * insertBefore before a middle sibling rebuilds INNER_XML from the live chain
+ * so saveXML order matches childNodes (#33327).
  *
  * Reference: php-src ext/dom/node.c dom_node_append_child.
  * Peer: {@see JitDomInsertBefore}.
@@ -320,7 +322,11 @@ final class JitDomAppendChildLiveSlots
     }
 
     /**
-     * Move fragment children before $refChild (php-src insertFragmentChildrenBefore) (#33312).
+     * Move fragment children before $refChild (php-src insertFragmentChildrenBefore) (#33312 / #33327).
+     *
+     * Prepend/append-only INNER_XML updates were wrong for middle refs (#33327):
+     * live childNodes matched Zend but saveXML still read end-concatenated markup.
+     * Rebuild parent INNER_XML from the live firstChild→nextSibling chain after expand.
      */
     public static function expandFragmentChildrenInsertBefore(
         Context $context,
@@ -331,22 +337,6 @@ final class JitDomAppendChildLiveSlots
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_frag_expand');
         self::ensureLayout($context);
-        if ($syncInnerXml) {
-            // Prepend fragment markup when inserting before the current first child.
-            $firstBefore = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_ib_frag_pfirst');
-            $atStart = $context->builder->icmp(Builder::INT_EQ, $refChild, $firstBefore);
-            $bbPrepend = BasicBlockHelper::append($context, 'dom_ib_frag_prepend_xml');
-            $bbAppendXml = BasicBlockHelper::append($context, 'dom_ib_frag_append_xml');
-            $bbAfterXml = BasicBlockHelper::append($context, 'dom_ib_frag_after_xml');
-            $context->builder->branchIf($atStart, $bbPrepend, $bbAppendXml);
-            $context->builder->positionAtEnd($bbPrepend);
-            self::concatFragmentInnerXmlOntoParent($context, $parent, $fragment, true);
-            $context->builder->branch($bbAfterXml);
-            $context->builder->positionAtEnd($bbAppendXml);
-            self::concatFragmentInnerXmlOntoParent($context, $parent, $fragment, false);
-            $context->builder->branch($bbAfterXml);
-            $context->builder->positionAtEnd($bbAfterXml);
-        }
 
         $objPtrTy = $context->getTypeFromString('__object__*');
         $nullBox = self::nullValueVar($context);
@@ -379,11 +369,15 @@ final class JitDomAppendChildLiveSlots
         $context->builder->branch($bbLoop);
 
         $context->builder->positionAtEnd($bbDone);
+        // saveXML reads PROP_USER_SCRIPT_INNER_XML — sync to live order (#33327).
+        // replaceChild may pass syncInnerXml=false and rebuild once after expand (#33322).
+        if ($syncInnerXml) {
+            self::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
+        }
     }
 
     /**
-     * replaceChild(DocumentFragment): unlink $oldChild then expand fragment (#33322).
-     *
+     * replaceChild(DocumentFragment): unlink $oldChild then expand fragment (#33322).     *
      * php-src: remove old, insert fragment children before old's former next sibling
      * (or append when old was last). Peer {@see VmDom::replaceChild} fragment arm.
      * INNER_XML is rebuilt from children — append/prepend concat is wrong for middle splices.
@@ -419,9 +413,10 @@ final class JitDomAppendChildLiveSlots
     }
 
     /**
-     * Rebuild parent INNER_XML from element children's tagName / INNER_XML (#33322).
+     * Rebuild parent INNER_XML from element children's tagName / INNER_XML (#33322 / #33327).
      *
      * Empty createElement children become {@code <tag/>}; non-empty keep nested markup.
+     * Used after fragment insertBefore (middle/start) and replaceChild expand.
      */
     public static function rebuildUserScriptInnerXmlFromElementChildren(
         Context $context,
