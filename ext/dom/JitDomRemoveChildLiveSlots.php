@@ -20,6 +20,7 @@ use PHPLLVM\Value;
  * the existing childNodes list so held `$list = $parent->childNodes` observes the
  * update (php-src ext/dom/nodelist.c live collection). Replacing the list with a
  * fresh length-0 object left held lists stale and refetch at 0 while siblings remain.
+ * Attr child: Not Found before sibling unlink (#33596 / peer #33587).
  *
  * Reference: php-src ext/dom/node.c dom_node_remove_child.
  */
@@ -30,6 +31,24 @@ final class JitDomRemoveChildLiveSlots
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rm_live_slots');
         self::ensureLayout($context);
 
+        // php-src: Attr is not content — Not Found before sibling slot walks (#33596).
+        $bbAttr = BasicBlockHelper::append($context, 'dom_rm_ls_attr');
+        $bbNotAttr = BasicBlockHelper::append($context, 'dom_rm_ls_not_attr');
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $child);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
+
+        $context->builder->positionAtEnd($bbAttr);
+        \PHPCompiler\JIT\TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Not Found Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::NOT_FOUND_ERR
+        );
+
+        $context->builder->positionAtEnd($bbNotAttr);
         $objPtrTy = $context->getTypeFromString('__object__*');
         $nullBox = self::nullValueVar($context);
 

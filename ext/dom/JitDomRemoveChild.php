@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -20,6 +21,7 @@ use PHPLLVM\Value;
  * replaced the live list with a fresh length-0 object — held `$list` stayed stale
  * and refetch reported 0 while siblings remained (php-src ext/dom/node.c /
  * nodelist.c).
+ * Attr child: Not Found before LiveSlots — Attr is not content (#33596 / peer #33587).
  */
 final class JitDomRemoveChild
 {
@@ -37,6 +39,9 @@ final class JitDomRemoveChild
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $parent = self::loadObjectArg($context, $args[0]);
             $child = self::loadObjectArg($context, $args[1]);
+            // php-src: Attr is not a content child — Not Found before LiveSlots (#33596).
+            // Must not walk Element sibling slots on a DOMAttr allocation (SIGSEGV).
+            self::rejectAttrAsChildBeforeLiveSlots($context, $child);
             JitDomRemoveChildLiveSlots::sync($context, $parent, $child);
             DomUserScriptElementCacheLlvm::invalidateIfElement($context, $child);
             self::syncUserScriptInnerXmlAfterRemove($context, $args[0], $args[1]);
@@ -161,6 +166,35 @@ final class JitDomRemoveChild
         }
 
         throw new \LogicException('DOMNode::removeChild() expects object nodes');
+    }
+
+    /**
+     * Thin-AOT: DOMAttr / Dom\Attr as removeChild child (#33596).
+     *
+     * php-src dom_node_remove_child → NOT_FOUND (Attr is not content). Must not
+     * walk Element sibling slots on an Attr allocation (SIGSEGV). Peer insertBefore/
+     * replaceChild Attr guards (#33587).
+     */
+    private static function rejectAttrAsChildBeforeLiveSlots(Context $context, Value $child): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rm_attr_guard');
+        $bbAttr = BasicBlockHelper::append($context, 'dom_rm_attr_reject');
+        $bbOk = BasicBlockHelper::append($context, 'dom_rm_attr_ok');
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $child);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbOk);
+
+        $context->builder->positionAtEnd($bbAttr);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Not Found Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::NOT_FOUND_ERR
+        );
+
+        $context->builder->positionAtEnd($bbOk);
     }
 
     private static function boxObjectResult(Context $context, Value $object): Value
