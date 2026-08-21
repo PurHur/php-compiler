@@ -529,7 +529,8 @@ final class JitDomAttributeNodeNS
      *
      * saveXML / post-appendChild rebuild read the xmlns/attr slot (#33362); without this,
      * getAttribute works but markup drops attrs. When the element is already attached,
-     * rebuild the parent chain so setattr-after-append matches Zend.
+     * rebuild Element parents via {@see JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward}
+     * (stops at Document / DocumentFragment — Element INNER_XML on those layouts SIGSEGVs; #33540).
      *
      * @param array<string, string> $attrs
      */
@@ -543,24 +544,9 @@ final class JitDomAttributeNodeNS
         $suffix = JitDomCreateElementAttrs::formatSuffix($attrs);
         JitDomCreateElement::storeUserScriptXmlnsAttr($context, $element, $suffix);
 
-        $objPtrTy = $context->getTypeFromString('__object__*');
-        $parent = JitDomParentChildLinkLayout::loadSibling(
-            $context,
-            $element,
-            VmDom::PROP_PARENT_NODE,
-            'dom_setattr_par'
-        );
-        $parentNull = $context->builder->icmp(Builder::INT_EQ, $parent, $objPtrTy->constNull());
-        $bbRebuild = BasicBlockHelper::append($context, 'dom_setattr_rebuild_parent');
-        $bbDone = BasicBlockHelper::append($context, 'dom_setattr_xmlns_done');
-        $context->builder->branchIf($parentNull, $bbDone, $bbRebuild);
-
-        $context->builder->positionAtEnd($bbRebuild);
-        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
-        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
-        $context->builder->branch($bbDone);
-
-        $context->builder->positionAtEnd($bbDone);
+        // Walk from the element so Document/Fragment parents are skipped (do not call
+        // rebuildUserScriptInnerXmlFromElementChildren on a raw parent pointer — #33540).
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $element);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg, string $label): Value
