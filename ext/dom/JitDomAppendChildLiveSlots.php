@@ -31,6 +31,8 @@ use PHPLLVM\Value;
  * DocumentFragment stand-ins (`nodeName` `#document-fragment`) expand children
  * onto the parent (php-src fragment move); linking the fragment itself left
  * `#document-fragment` in childNodes and SIGSEGV'd on item(N) (#33312).
+ * Attr children install via the attribute map (php-src dom_node_append_child),
+ * not firstChild/sibling slots — Element layout walks SIGSEGV on DOMAttr (#33570).
  * insertBefore before a middle sibling rebuilds INNER_XML from the live chain
  * so saveXML order matches childNodes (#33327). Repeated fragment expands in one
  * main use uniquified BB labels + alloca piece merge (#33335). Child open-tag
@@ -54,10 +56,21 @@ final class JitDomAppendChildLiveSlots
         BasicBlockHelper::ensureOpenInsertBlock($context, self::tag('dom_ac_live_slots'));
         self::ensureLayout($context);
 
+        // php-src: Attr under Element → attribute map (not childNodes) (#33570).
+        $bbAttr = BasicBlockHelper::append($context, self::tag('dom_acls_attr'));
+        $bbNotAttr = BasicBlockHelper::append($context, self::tag('dom_acls_not_attr'));
+        $bbSyncEnd = BasicBlockHelper::append($context, self::tag('dom_acls_sync_end'));
+        $isAttr = self::isAttrNode($context, $child);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
+
+        $context->builder->positionAtEnd($bbAttr);
+        self::installAttrAsAttribute($context, $parent, $child);
+        $context->builder->branch($bbSyncEnd);
+
+        $context->builder->positionAtEnd($bbNotAttr);
         // php-src: DocumentFragment children move onto the parent; fragment stays empty (#33312).
         $bbFrag = BasicBlockHelper::append($context, self::tag('dom_acls_frag'));
         $bbNormal = BasicBlockHelper::append($context, self::tag('dom_acls_normal'));
-        $bbSyncEnd = BasicBlockHelper::append($context, self::tag('dom_acls_sync_end'));
         $isFrag = self::isDocumentFragmentNode($context, $child);
         $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
 
@@ -70,6 +83,65 @@ final class JitDomAppendChildLiveSlots
         $context->builder->branch($bbSyncEnd);
 
         $context->builder->positionAtEnd($bbSyncEnd);
+    }
+
+    /**
+     * DOMAttr / Dom\Attr — class_id check (Element slot walks SIGSEGV on Attr; #33570).
+     */
+    public static function isAttrNode(Context $context, Value $node): Value
+    {
+        self::ensureLayout($context);
+        $objectType = $context->type->object;
+        $classicId = $objectType->lookup('DOMAttr');
+        $livingId = $objectType->lookup('Dom\\Attr');
+        $map = $context->structFieldMap['__object__'];
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($node, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $isClassic = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($classicId, false)
+        );
+        $isLiving = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($livingId, false)
+        );
+
+        return $context->builder->or($isClassic, $isLiving);
+    }
+
+    /**
+     * Install Attr via attribute map + saveXML open-tag sync (php-src node.c; #33570).
+     *
+     * Same observable as {@see JitDomAttributeNodeNS::invokeSetAttributeNode} /
+     * {@see DomElementSetAttribute} PROP_USER_SCRIPT_XMLNS_ATTR sync (#33509).
+     */
+    public static function installAttrAsAttribute(Context $context, Value $parent, Value $attr): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, self::tag('dom_acls_attr_install'));
+        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        if (null === $local) {
+            // No createAttribute key — refuse Element child linking (would SIGSEGV).
+            return;
+        }
+        $value = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
+        DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr, $value);
+        JitDomNamedNodeMap::appendAttrPin($context, $parent, $attr);
+
+        $id = JitDomCreateElementAttrs::lastId();
+        if (null !== $id) {
+            JitDomCreateElementAttrs::set($id, $local, $value);
+            $attrs = JitDomCreateElementAttrs::get($id);
+        } else {
+            $attrs = [$local => $value];
+        }
+        $suffix = JitDomCreateElementAttrs::formatSuffix($attrs);
+        JitDomCreateElement::storeUserScriptXmlnsAttr($context, $parent, $suffix);
+        self::rebuildUserScriptInnerXmlUpward($context, $parent);
     }
 
     /**

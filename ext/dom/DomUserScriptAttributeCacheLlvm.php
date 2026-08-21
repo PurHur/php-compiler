@@ -120,6 +120,9 @@ final class DomUserScriptAttributeCacheLlvm
     public static function literalValue(string $namespace, string $localName): ?string
     {
         $key = $namespace."\0".$localName;
+        if (isset(self::$pendingValueByKey[$key])) {
+            return self::$pendingValueByKey[$key];
+        }
         foreach (self::$byModule as $state) {
             if (isset($state['valueByKey'][$key])) {
                 return $state['valueByKey'][$key];
@@ -128,6 +131,37 @@ final class DomUserScriptAttributeCacheLlvm
 
         return null;
     }
+
+    /**
+     * Record Attr::$value for createAttribute keys before setAttributeNode/appendChild (#33570).
+     *
+     * createAttribute only rememberCreate()'s; orphan `$attr->value = …` must seed valueByKey
+     * so saveXML open-tag sync sees the literal (peer setAttribute storeLiteral value arg).
+     */
+    public static function recordLiteralValue(string $namespace, string $localName, string $value): void
+    {
+        $key = $namespace."\0".$localName;
+        self::$pendingValueByKey[$key] = $value;
+        if ([] === self::$byModule) {
+            return;
+        }
+        foreach (self::$byModule as &$state) {
+            $state['valueByKey'][$key] = $value;
+        }
+        unset($state);
+    }
+
+    /** Seed valueByKey for the pending createAttribute name (#33570). */
+    public static function recordPendingCreateValue(string $value): void
+    {
+        if (null === self::$pendingCreate) {
+            return;
+        }
+        self::recordLiteralValue(self::$pendingCreate[0], self::$pendingCreate[1], $value);
+    }
+
+    /** @var array<string, string> */
+    private static array $pendingValueByKey = [];
 
     public static function storeLiteral(
         Context $context,
@@ -148,6 +182,10 @@ final class DomUserScriptAttributeCacheLlvm
         $state['presentByKey'][$key] = true;
         if (null !== $value) {
             $state['valueByKey'][$key] = $value;
+            unset(self::$pendingValueByKey[$key]);
+        } elseif (isset(self::$pendingValueByKey[$key])) {
+            $state['valueByKey'][$key] = self::$pendingValueByKey[$key];
+            unset(self::$pendingValueByKey[$key]);
         }
 
         return $prev;
@@ -225,12 +263,13 @@ final class DomUserScriptAttributeCacheLlvm
             self::$byModule[$id] = [
                 'slotByKey' => [],
                 'presentByKey' => [],
-                'valueByKey' => [],
+                'valueByKey' => self::$pendingValueByKey,
                 'idBearingByKey' => self::$pendingIdBearing,
                 'lastCreateNamespace' => null,
                 'lastCreateLocalName' => null,
             ];
             self::$pendingIdBearing = [];
+            self::$pendingValueByKey = [];
         }
 
         return self::$byModule[$id];

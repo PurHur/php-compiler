@@ -175,6 +175,11 @@ final class JitDomElementTextContent
                     JITVariable::TYPE_STRING
                 );
             }
+            // createAttribute orphans: seed valueByKey for setAttributeNode/appendChild saveXML (#33570).
+            $valueLit = JitStringBuiltinArg::compileTimeLiteral($value) ?? $value->compileTimeString;
+            if (null !== $valueLit) {
+                DomUserScriptAttributeCacheLlvm::recordPendingCreateValue($valueLit);
+            }
 
             return true;
         }
