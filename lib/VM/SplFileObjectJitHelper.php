@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\ext\standard\JitFlock;
 use PHPCompiler\ext\standard\JitFputcsv;
 use PHPCompiler\ext\standard\JitFread;
+use PHPCompiler\ext\standard\JitFseek;
 use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitPath;
 use PHPCompiler\JIT\Builtin\FputcsvRuntime;
@@ -37,12 +38,13 @@ use PHPLLVM\Value;
  * fread/fgetc on `__spl_fd` (#33332).
  * ftell/flock on `__spl_fd` (#33336) via JitFtell / JitFlock.
  * fputcsv on `__spl_fd` (#33340) via JitFputcsv (peer procedural #33334 / #27180).
+ * fseek on `__spl_fd` (#33347) via JitFseek (peer procedural #1191; rewind already seeks).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
  * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_fputcsv /
- * zim_SplFileInfo_openFile
+ * zim_SplFileObject_fseek / zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -274,6 +276,33 @@ final class SplFileObjectJitHelper
         $handle = self::loadFd($context, $receiver);
 
         return JitFtell::invoke($context, $handle);
+    }
+
+    /**
+     * SplFileObject::fseek — php_stream_seek on live handle (#33347).
+     * php-src: zim_SplFileObject_fseek — free_line then seek; returns 0 / -1.
+     */
+    public static function compileFseek(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $offsetArg,
+        ?JITVariable $whenceArg = null
+    ): Value {
+        self::ensureStreamAbis($context);
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        // spl_filesystem_file_free_line — drop cached iterator line (peer fread/fgetc).
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
+        $handle = self::loadFd($context, $receiver);
+        $offset = self::loadLong($context, $offsetArg);
+        $whence = null !== $whenceArg && !NamedOptionalCallArgs::isOmittedOptional($whenceArg)
+            ? self::loadLong($context, $whenceArg)
+            : $i64->constInt(0, false); // SEEK_SET
+
+        return JitFseek::invoke($context, $handle, $offset, $whence);
     }
 
     /**
