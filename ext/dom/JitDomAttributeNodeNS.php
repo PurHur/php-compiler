@@ -310,15 +310,14 @@ final class JitDomAttributeNodeNS
             return self::boxNullResult($context);
         }
         $prev = DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr);
-        // Live attributes NamedNodeMap (#33128).
-        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+        // Live attributes NamedNodeMap (#33128 / #33143): replace pin when
+        // storeLiteral returns a prior Attr (same-name setAttributeNode).
         $objPtr = $context->getTypeFromString('__object__*');
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
             $prev,
             $objPtr->constNull()
         );
-        // Only box the previous attr when non-null (avoid writeObject(null)).
         $tag = (string) (self::$boxSeq++);
         $nullBlock = BasicBlockHelper::append($context, 'dom_setattr_prev_null_'.$tag);
         $objBlock = BasicBlockHelper::append($context, 'dom_setattr_prev_obj_'.$tag);
@@ -327,10 +326,14 @@ final class JitDomAttributeNodeNS
         $context->builder->branchIf($isNull, $nullBlock, $objBlock);
 
         $context->builder->positionAtEnd($nullBlock);
+        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
         $context->builder->store(self::boxNullResult($context), $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($objBlock);
+        // New Attr object replaces prior pin in-place via remove+append (#33143).
+        JitDomNamedNodeMap::removeAttrPin($context, $element, $prev);
+        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
         $context->builder->store(self::boxObjectResult($context, $prev), $resultSlot);
         $context->builder->branch($doneBlock);
 
@@ -730,6 +733,9 @@ final class JitDomAttributeNodeNS
                 'DOMElement::removeAttributeNS() user-script AOT requires compile-time namespace and localName'
             );
         }
+        $element = self::loadObjectArg($context, $args[0], 'DOMElement::removeAttributeNS() receiver');
+        $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, $nsLit, $localLit);
+        JitDomNamedNodeMap::removeAttrPin($context, $element, $attr);
         DomUserScriptAttributeCacheLlvm::clearLiteral($context, $nsLit, $localLit);
 
         return self::boxNullResult($context);
@@ -884,7 +890,10 @@ final class JitDomAttributeNodeNS
     }
 
     /**
-     * DOMElement::removeAttribute() — user-script AOT (#19870).
+     * DOMElement::removeAttribute() — user-script AOT (#19870 / #33143).
+     *
+     * Clears the live Attr cache and unpins {@code element.attributes} so held
+     * NamedNodeMap length/item/getNamedItem match Zend (php-src xmlUnsetProp).
      */
     public static function invokeRemoveAttribute(Context $context, JITVariable ...$args): Value
     {
@@ -892,14 +901,20 @@ final class JitDomAttributeNodeNS
             throw new \LogicException('DOMElement::removeAttribute() expects receiver and name');
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattr_cont');
+        $element = self::loadObjectArg($context, $args[0], 'DOMElement::removeAttribute() receiver');
         $nameLit = self::compileTimeStringArg($args[1]);
-        if (null !== $nameLit && 'id' === $nameLit) {
-            DomUserScriptElementCacheLlvm::clearId($context);
-            $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
-            if (null !== $parsed) {
-                $parsed['id'] = '';
-                JitDomLoadHTMLUserScript::rememberCompileTimeParsed($parsed);
+        if (null !== $nameLit) {
+            if ('id' === $nameLit) {
+                DomUserScriptElementCacheLlvm::clearId($context);
+                $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+                if (null !== $parsed) {
+                    $parsed['id'] = '';
+                    JitDomLoadHTMLUserScript::rememberCompileTimeParsed($parsed);
+                }
             }
+            $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit);
+            JitDomNamedNodeMap::removeAttrPin($context, $element, $attr);
+            DomUserScriptAttributeCacheLlvm::clearLiteral($context, '', $nameLit);
         }
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -950,6 +965,7 @@ final class JitDomAttributeNodeNS
 
     private static function invokeRemoveAttributeNodeUserScript(Context $context, JITVariable ...$args): Value
     {
+        $element = self::loadObjectArg($context, $args[0], 'DOMElement::removeAttributeNode() receiver');
         $attr = self::loadObjectArg($context, $args[1], 'DOMElement::removeAttributeNode() attr');
         $i1 = $context->getTypeFromString('int1');
         $foundSlot = BasicBlockHelper::entryAlloca($context, $i1);
@@ -986,6 +1002,8 @@ final class JitDomAttributeNodeNS
             DomExceptionConstants::NOT_FOUND_ERR
         );
         $context->builder->positionAtEnd($ok);
+        // Live NamedNodeMap pins (#33143).
+        JitDomNamedNodeMap::removeAttrPin($context, $element, $attr);
 
         return self::boxObjectResult($context, $attr);
     }

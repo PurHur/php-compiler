@@ -17,14 +17,16 @@ use PHPLLVM\Value;
 
 /**
  * User-script AOT for DOMNamedNodeMap::$length, ::item(), ::getNamedItem(),
- * ::getNamedItemNS(), and live pin updates after setAttribute* (#33128)
- * (php-src namednodemap.c).
+ * ::getNamedItemNS(), and live pin updates after setAttribute* / removeAttribute*
+ * (#33128 / #33143) (php-src namednodemap.c).
  *
  * Dummy attributes maps used to be allocated without {@code length} / Attr pins;
  * fetching length then SIGSEGVd (#32546, peer NodeList #28672).
  * {@code getNamedItem()} / {@code getNamedItemNS()} must scan the same pins —
  * NestedJIT DomRegistry lists are absent on thin-AOT maps and abort (#33107 / #33116).
  * Empty elements must still expose a length-0 map (#33128).
+ * {@code removeAttribute*} / same-name {@code setAttributeNode} replace must
+ * compact pins so held {@code $el->attributes} matches Zend (#33143).
  *
  * php-src: ext/dom/namednodemap.c php_dom_get_namednodemap_length /
  *          PHP_METHOD(DOMNamedNodeMap, item) /
@@ -274,6 +276,149 @@ final class JitDomNamedNodeMap
             $context->builder->branch($done);
             $context->builder->positionAtEnd($skip);
         }
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Live-remove Attr from element.attributes after removeAttribute* (#33143).
+     *
+     * Compacts pins and decrements length so a held {@code $map = $el->attributes}
+     * stays Zend-identical (php-src xmlUnsetProp / namednodemap.c).
+     * Null {@code $attr} is a no-op.
+     */
+    public static function removeAttrPin(
+        Context $context,
+        Value $element,
+        Value $attr,
+        string $elementClass = 'DOMElement'
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nnm_rm_pin');
+        $objectType = $context->type->object;
+        $elemClassId = $objectType->lookup($elementClass);
+        if (!$objectType->hasProperty($elemClassId, VmDom::PROP_ATTRIBUTES)) {
+            $objectType->defineProperty($elemClassId, VmDom::PROP_ATTRIBUTES, JITVariable::TYPE_VALUE);
+        }
+        $mapClassId = $objectType->lookup(self::CLASS_MAP);
+        self::ensureLayout($objectType, $mapClassId);
+
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $voidPtr = $context->getTypeFromString('void*');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $done = $fn->appendBasicBlock('dom_nnm_rm_done');
+
+        $attrNull = $context->builder->icmp(Builder::INT_EQ, $attr, $objPtrTy->constNull());
+        $haveAttr = $fn->appendBasicBlock('dom_nnm_rm_have');
+        $context->builder->branchIf($attrNull, $done, $haveAttr);
+        $context->builder->positionAtEnd($haveAttr);
+
+        $map = self::loadAttributesMapOrAllocate($context, $element, $elementClass);
+        $lengthVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $map,
+            self::CLASS_MAP,
+            VmDom::PROP_LENGTH,
+            $mapClassId
+        );
+        $length = $context->helper->loadValue($lengthVar);
+        $foundSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt(-1, true), $foundSlot);
+
+        for ($i = 0; $i < self::MAX_PINNED_ATTRS; ++$i) {
+            $try = $fn->appendBasicBlock('dom_nnm_rm_try_'.$i);
+            $next = $fn->appendBasicBlock('dom_nnm_rm_next_'.$i);
+            $context->builder->branch($try);
+            $context->builder->positionAtEnd($try);
+            $inRange = $context->builder->icmp(
+                Builder::INT_SLT,
+                $i64->constInt($i, false),
+                $length
+            );
+            $check = $fn->appendBasicBlock('dom_nnm_rm_check_'.$i);
+            $context->builder->branchIf($inRange, $check, $next);
+            $context->builder->positionAtEnd($check);
+            $pinRaw = $context->builder->load(
+                $objectType->propertySlotFor($map, self::CLASS_MAP, self::pinProp($i))
+            );
+            $slotNull = $context->builder->icmp(Builder::INT_EQ, $pinRaw, $voidPtr->constNull());
+            $read = $fn->appendBasicBlock('dom_nnm_rm_read_'.$i);
+            $context->builder->branchIf($slotNull, $next, $read);
+            $context->builder->positionAtEnd($read);
+            $pinObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $context->builder->pointerCast($pinRaw, $valuePtrTy)
+            );
+            $same = $context->builder->icmp(Builder::INT_EQ, $pinObj, $attr);
+            $hit = $fn->appendBasicBlock('dom_nnm_rm_hit_'.$i);
+            $context->builder->branchIf($same, $hit, $next);
+            $context->builder->positionAtEnd($hit);
+            $context->builder->store($i64->constInt($i, false), $foundSlot);
+            $context->builder->branch($next);
+            $context->builder->positionAtEnd($next);
+        }
+
+        $found = $context->builder->load($foundSlot);
+        $missing = $context->builder->icmp(Builder::INT_EQ, $found, $i64->constInt(-1, true));
+        $compact = $fn->appendBasicBlock('dom_nnm_rm_compact');
+        $context->builder->branchIf($missing, $done, $compact);
+        $context->builder->positionAtEnd($compact);
+
+        // Shift pins[found+1 .. length) down onto found.
+        for ($i = 0; $i < self::MAX_PINNED_ATTRS - 1; ++$i) {
+            $at = $fn->appendBasicBlock('dom_nnm_rm_shift_'.$i);
+            $skip = $fn->appendBasicBlock('dom_nnm_rm_shift_skip_'.$i);
+            $geFound = $context->builder->icmp(
+                Builder::INT_SGE,
+                $i64->constInt($i, false),
+                $found
+            );
+            $ltLenMinus1 = $context->builder->icmp(
+                Builder::INT_SLT,
+                $i64->constInt($i, false),
+                $context->builder->sub($length, $i64->constInt(1, false))
+            );
+            $doShift = $context->builder->and($geFound, $ltLenMinus1);
+            $context->builder->branchIf($doShift, $at, $skip);
+            $context->builder->positionAtEnd($at);
+            $nextRaw = $context->builder->load(
+                $objectType->propertySlotFor($map, self::CLASS_MAP, self::pinProp($i + 1))
+            );
+            $context->builder->store(
+                $nextRaw,
+                $objectType->propertySlotFor($map, self::CLASS_MAP, self::pinProp($i))
+            );
+            $context->builder->branch($skip);
+            $context->builder->positionAtEnd($skip);
+        }
+
+        // Clear former last pin and decrement length.
+        $newLenVal = $context->builder->sub($length, $i64->constInt(1, false));
+        for ($i = 0; $i < self::MAX_PINNED_ATTRS; ++$i) {
+            $clr = $fn->appendBasicBlock('dom_nnm_rm_clr_'.$i);
+            $clrSkip = $fn->appendBasicBlock('dom_nnm_rm_clr_skip_'.$i);
+            $eq = $context->builder->icmp(Builder::INT_EQ, $newLenVal, $i64->constInt($i, false));
+            $context->builder->branchIf($eq, $clr, $clrSkip);
+            $context->builder->positionAtEnd($clr);
+            $context->builder->store(
+                $voidPtr->constNull(),
+                $objectType->propertySlotFor($map, self::CLASS_MAP, self::pinProp($i))
+            );
+            $context->builder->branch($clrSkip);
+            $context->builder->positionAtEnd($clrSkip);
+        }
+        $newLen = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $newLenVal
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($map, self::CLASS_MAP, VmDom::PROP_LENGTH),
+            $newLen,
+            JITVariable::TYPE_NATIVE_LONG
+        );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
     }
