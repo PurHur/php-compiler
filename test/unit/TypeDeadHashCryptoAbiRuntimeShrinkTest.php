@@ -46,8 +46,8 @@ final class TypeDeadHashCryptoAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (unserialize still Type always-on; #33207 serialize_* dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_unserialize'", $type);
+        // Next leftover sentinel (format_datetime still Type always-on; #33213 unserialize / #33212 phpc_run_command dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_format_datetime'", $type);
         $this->assertStringContainsString('StringHashCrypto::ensureLinked', $type);
         // Peer #32875 already dropped these always-on shells
         $this->assertStringContainsString('#32875', $type);

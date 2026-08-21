@@ -864,12 +864,12 @@ class Type extends Builtin {
         // Leftover Type empty decls vs Runtime ABI drift mint serialize_hashtable.1
         // (#31894 / #32122). User-script serialize() stays JitSerialize /
         // SerializeNestedJitHelper (php-src ext/standard/var.c).
-        // Returns __value__* (ArrayPop #12647 / #20785) — not void+out-pointer.
-        $fnUnserialize = $this->context->module->addFunction(
-            '__compiler_unserialize',
-            $this->context->context->functionType($valuePtr, false, $strPtr)
-        );
-        $this->context->registerFunction('__compiler_unserialize', $fnUnserialize);
+        // __compiler_unserialize always-on shell removed (#33213): StringUnserialize
+        // owns the ABI (getNamedFunction first via implementUnserializeBridge;
+        // Type::initialize still StringUnserialize::ensureLinked). Leftover Type empty
+        // decls vs Runtime ABI drift mint unserialize.1 (#31894 / #32122). User-script
+        // unserialize() stays JitUnserialize / UnserializeJitHelper
+        // (php-src ext/standard/var.c / var_unserializer.re).
         // __compiler_shell_exec / __compiler_escapeshellarg / __compiler_escapeshellcmd
         // always-on shells removed (#33201): ProcessRuntime owns the ABI (getNamedFunction
         // first via implementNullableStringBridge / implementStringBridge; Type::initialize
@@ -1026,6 +1026,7 @@ class Type extends Builtin {
         StreamResource::ensureLinked($this->context);
         StringStreamCsv::ensureLinked($this->context);
         StringSerialize::ensureLinked($this->context);
+        StringUnserialize::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);
