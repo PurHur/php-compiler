@@ -15,6 +15,7 @@ use PHPCompiler\JIT\Builtin\SplFileObjectSnapshotRuntime;
 use PHPCompiler\JIT\Builtin\StreamIo;
 use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Builtin\StreamRead;
+use PHPCompiler\JIT\Builtin\StringStrGetcsv;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
@@ -413,6 +414,8 @@ final class SplFileObjectJitHelper
         ?JITVariable $escapeArg = null
     ): Value {
         self::ensureStreamAbis($context);
+        // Pin CSV NestedJIT helpers before emitting into main (#33334 / #33346).
+        StringStrGetcsv::ensureLinked($context);
         $obj = self::loadObject($context, $receiver);
         $i64 = $context->getTypeFromString('int64');
         // spl_filesystem_file_free_line — drop cached iterator line before CSV read.
@@ -436,7 +439,7 @@ final class SplFileObjectJitHelper
         }
 
         $row = JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
-        // php-src always advances current_line_num on fgetcsv (peer fgets lineAdd=1).
+        // php-src advances current_line_num on fgetcsv (peer fgets lineAdd=1).
         $prev = self::loadLongProp($context, $obj, self::PROP_LINE);
         self::storeLongProp(
             $context,

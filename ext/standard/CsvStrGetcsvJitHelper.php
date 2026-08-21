@@ -19,6 +19,7 @@ final class CsvStrGetcsvJitHelper
     public static function stripLineTerminatorsArgv(string $line): string
     {
         $len = \strlen($line);
+        // NestedJIT: do not rebuild with `$out .= $line[$i]` — writeString/delref SIGSEGVs (#33346).
         while ($len > 0) {
             $c = \ord($line[$len - 1]);
             if (10 !== $c && 13 !== $c) {
@@ -29,14 +30,11 @@ final class CsvStrGetcsvJitHelper
         if (0 === $len) {
             return '';
         }
-        $out = '';
-        $i = 0;
-        while ($i < $len) {
-            $out .= $line[$i];
-            ++$i;
+        if ($len === \strlen($line)) {
+            return $line;
         }
 
-        return $out;
+        return \substr($line, 0, $len);
     }
 
     /**
@@ -59,13 +57,10 @@ final class CsvStrGetcsvJitHelper
         if (0 === $len) {
             return [];
         }
-        $trimmed = '';
-        $ti = 0;
-        while ($ti < $len) {
-            $trimmed .= $input[$ti];
-            ++$ti;
+        if ($len !== \strlen($input)) {
+            $input = \substr($input, 0, $len);
+            $len = \strlen($input);
         }
-        $input = $trimmed;
 
         $delimOrd = \strlen($separator) > 0 ? \ord($separator[0]) : 44; // ','
         $encOrd = \strlen($enclosure) > 0 ? \ord($enclosure[0]) : 34; // '"'

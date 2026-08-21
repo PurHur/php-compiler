@@ -26,8 +26,8 @@ final class SplFileObjectFgetcsv33346AotTest extends TestCase
         exec($zendCmd, $zendOut, $zendRc);
         $this->assertSame(0, $zendRc, implode("\n", $zendOut));
         $zend = implode("\n", $zendOut)."\n";
-        $this->assertStringContainsString("'a'", $zend);
-        $this->assertStringContainsString("'b,c'", $zend);
+        $this->assertStringContainsString('a|b', $zend);
+        $this->assertStringNotContainsString('not-array', $zend);
 
         if (!LlvmToolchain::hasLibrary($root)) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
@@ -45,11 +45,16 @@ final class SplFileObjectFgetcsv33346AotTest extends TestCase
         try {
             exec($compile, $compileOut, $compileRc);
             $this->assertSame(0, $compileRc, implode("\n", $compileOut));
-            $runOut = [];
-            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
-            $this->assertSame(0, $runRc, implode("\n", $runOut)."\ncompile:\n".implode("\n", $compileOut));
-            $aot = implode("\n", $runOut)."\n";
-            $this->assertSame($zend, $aot, "AOT must match Zend\nZend:\n$zend\nAOT:\n$aot");
+            $runs = [];
+            for ($i = 0; $i < 5; ++$i) {
+                $runOut = [];
+                exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+                $this->assertSame(0, $runRc, "AOT run $i:\n".implode("\n", $runOut)."\ncompile:\n".implode("\n", $compileOut));
+                $runs[] = implode("\n", $runOut)."\n";
+            }
+            foreach ($runs as $i => $aot) {
+                $this->assertSame($zend, $aot, "AOT run $i must match Zend");
+            }
         } finally {
             chdir($cwd);
             @unlink($bin);
@@ -64,10 +69,14 @@ final class SplFileObjectFgetcsv33346AotTest extends TestCase
         $this->assertStringContainsString('compileFgetcsv', $helper);
         $this->assertStringContainsString('#33346', $helper);
         $this->assertStringContainsString('JitFgetcsv::invoke', $helper);
+        $this->assertStringContainsString('StringStrGetcsv::ensureLinked', $helper);
         $call = (string) file_get_contents($root.'/lib/JIT/Call/SplFileObjectMethod.php');
         $this->assertStringContainsString("'fgetcsv'", $call);
         $ctx = (string) file_get_contents($root.'/lib/JIT/Context.php');
         $this->assertStringContainsString("'fputcsv', 'fgetcsv', 'eof'", $ctx);
         $this->assertStringContainsString('#33346', $ctx);
+        $csv = (string) file_get_contents($root.'/ext/standard/CsvStrGetcsvJitHelper.php');
+        $this->assertStringContainsString('substr($line, 0, $len)', $csv);
+        $this->assertStringContainsString('#33346', $csv);
     }
 }
