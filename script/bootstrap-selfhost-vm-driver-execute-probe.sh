@@ -49,14 +49,42 @@ bootstrap_vm_driver_execute_probe_passes() {
   [[ "${probe_code}" -eq 0 ]] && grep -q 'vm driver ok' <<< "${probe_out}"
 }
 
+# Prelinked gen-0 spine intermittently aborts with free(): invalid pointer (~20%; #33501).
+# Step 4f3 already retries spine bundle OK; match that policy here so 4f2 / release-readiness
+# are not single-shot flake gates. Do not restamp gen-0 fingerprints.
+bootstrap_vm_driver_execute_probe_run_with_retries() {
+  local max_attempts="${BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_ATTEMPTS:-5}"
+  local attempt=1
+  local probe_out=""
+  local probe_code=1
+  while [[ "${attempt}" -le "${max_attempts}" ]]; do
+    set +e
+    probe_out="$(bootstrap_vm_driver_execute_probe_run)"
+    probe_code=$?
+    set -e
+    if bootstrap_vm_driver_execute_probe_passes "${probe_out}" "${probe_code}"; then
+      BOOTSTRAP_VM_DRIVER_PROBE_OUT="${probe_out}"
+      BOOTSTRAP_VM_DRIVER_PROBE_CODE=0
+      return 0
+    fi
+    if [[ -n "${probe_out}" ]]; then
+      printf '%s\n' "${probe_out}" >&2
+    fi
+    if [[ "${attempt}" -lt "${max_attempts}" ]]; then
+      echo "bootstrap-selfhost-vm-driver-execute-probe: retry ${attempt}/${max_attempts} (VM driver execute transient failure)" >&2
+      sleep 1
+    fi
+    attempt=$((attempt + 1))
+  done
+  BOOTSTRAP_VM_DRIVER_PROBE_OUT="${probe_out}"
+  BOOTSTRAP_VM_DRIVER_PROBE_CODE="${probe_code}"
+  return 1
+}
+
 # --- Fast path: native env probe only (no compile/link, no php-env vendor patches) ---
 fast_probe_failed=0
 if [[ -x "${OUT}" ]]; then
-  set +e
-  probe_out="$(bootstrap_vm_driver_execute_probe_run)"
-  probe_code=$?
-  set -e
-  if bootstrap_vm_driver_execute_probe_passes "${probe_out}" "${probe_code}"; then
+  if bootstrap_vm_driver_execute_probe_run_with_retries; then
     echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
     exit 0
   fi
@@ -88,16 +116,12 @@ if [[ "${relink}" == "1" ]]; then
   if [[ "${full_link}" != "1" ]] \
     && bootstrap_copy_prelinked_compiler_lib_spine_blob "${OUT}"; then
     echo "bootstrap-selfhost-vm-driver-execute-probe: seeded ${OUT} from prelinked/bootstrap-gen0 (fast)" >&2
-    set +e
-    probe_out="$(bootstrap_vm_driver_execute_probe_run)"
-    probe_code=$?
-    set -e
-    if bootstrap_vm_driver_execute_probe_passes "${probe_out}" "${probe_code}"; then
+    if bootstrap_vm_driver_execute_probe_run_with_retries; then
       echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
       exit 0
     fi
     echo "bootstrap-selfhost-vm-driver-execute-probe: prelinked seed failed VM probe" >&2
-    printf '%s\n' "${probe_out}" >&2
+    printf '%s\n' "${BOOTSTRAP_VM_DRIVER_PROBE_OUT:-}" >&2
     rm -f "${OUT}"
     # north-star5-verify-fast must stay ~minutes (#10533). Accidental Zend full-spine
     # fallback here is multi-hour and poisons shared bind-mounts — require an explicit
@@ -122,14 +146,12 @@ test -x "${OUT}"
 if [[ -f "${stamp}" ]]; then
   have_sha="$(tr -d '\n' <"${stamp}")"
 fi
-set +e
-probe_out="$(bootstrap_vm_driver_execute_probe_run)"
-probe_code=$?
-set -e
-if bootstrap_vm_driver_execute_probe_passes "${probe_out}" "${probe_code}"; then
+if bootstrap_vm_driver_execute_probe_run_with_retries; then
   echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
   exit 0
 fi
+probe_out="${BOOTSTRAP_VM_DRIVER_PROBE_OUT:-}"
+probe_code="${BOOTSTRAP_VM_DRIVER_PROBE_CODE:-1}"
 if [[ "${want_sha}" != "${have_sha}" ]]; then
   echo "bootstrap-selfhost-vm-driver-execute-probe: sidecar stamp stale after link (want ${want_sha}, have ${have_sha:-<none>})" >&2
 fi
