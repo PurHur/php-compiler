@@ -109,6 +109,46 @@ final class EmptyObjectPropertyLlvm
             if (null !== $hookValue) {
                 return self::compileEmptyFromFetchedValue($context, $hookValue);
             }
+            // ARRAY_AS_PROPS: empty ≡ !isset || falsy(value) — zend spl_array_has_property (#33079).
+            // Do not use empty≡!isset alone: after #33074 isset is true for truthy keys, so that
+            // fallback would still skip the falsy probe for 0/"" and wrongly treat 1 as empty when
+            // the fetch path is never taken for undeclared HT keys.
+            if (
+                \PHPCompiler\VM\ArrayObjectJitHelper::isArrayAsPropsClass($class)
+                && !str_starts_with($propName, '__')
+            ) {
+                $classLc = strtolower(ltrim($class, '\\'));
+                $asPropsClass = match ($classLc) {
+                    'arrayobject' => 'ArrayObject',
+                    'arrayiterator' => 'ArrayIterator',
+                    'recursivearrayiterator' => 'RecursiveArrayIterator',
+                    default => $class,
+                };
+                $classId = $object->lookup($asPropsClass);
+                if (!$object->hasProperty($classId, $propName)) {
+                    $i1 = $context->getTypeFromString('int1');
+                    $isSet = \PHPCompiler\VM\ArrayObjectJitHelper::compilePropertyExists(
+                        $context,
+                        $objPtr,
+                        $asPropsClass,
+                        $propName
+                    );
+                    $fetched = \PHPCompiler\VM\ArrayObjectJitHelper::tryPropertyFetchRead(
+                        $object,
+                        $objPtr,
+                        $class,
+                        $propName
+                    );
+                    $valueEmpty = self::compileEmptyFromFetchedValue($context, $fetched);
+
+                    // empty when !isset OR value empty — avoid extra BBs after offsetGet (#33079).
+                    return $context->builder->select(
+                        $isSet,
+                        $valueEmpty,
+                        $i1->constInt(1, false)
+                    );
+                }
+            }
             $resolved = $object->resolvePropertySlot($class, $propName);
             if (null !== $resolved) {
                 $fetched = $object->propertyFetch($objPtr, $class, $propName);
@@ -118,7 +158,9 @@ final class EmptyObjectPropertyLlvm
         }
 
         // Dynamic / magic: isset probe only when the slot is missing (empty ≡ !isset for absent props).
-        $isset = IssetHelper::compile($context, $container, $dim, $dimOp, $containerOp);
+        // Property empty must pass issetOnProperty=true so string-literal dims are not treated as
+        // ArrayAccess keys (#33079).
+        $isset = IssetHelper::compile($context, $container, $dim, $dimOp, $containerOp, true);
 
         return $context->builder->not($isset);
     }
