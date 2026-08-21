@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -41,19 +42,22 @@ final class JitDomInsertBeforeLiveSlots
         self::ensureLayout($context);
         JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
 
-        // php-src: Attr cannot take Element sibling slots (#33587 / peer appendChild #33570).
-        $bbAttr = BasicBlockHelper::append($context, 'dom_ib_ls_attr');
-        $bbNotAttr = BasicBlockHelper::append($context, 'dom_ib_ls_not_attr');
+        // php-src: Attr is not content — insertBefore must not touch Element sibling slots (#33587).
+        // Zend/libxml: Error "Cannot add newnode as the previous sibling of refnode".
+        // Peer appendChild installs Attr via the attribute map (#33570).
+        $bbAttr = BasicBlockHelper::append($context, 'dom_ib_attr');
+        $bbNotAttr = BasicBlockHelper::append($context, 'dom_ib_not_attr');
         $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
         $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
         $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
 
         $context->builder->positionAtEnd($bbAttr);
-        \PHPCompiler\JIT\TryCatchHelper::emitCatchableClassError(
+        TryCatchHelper::emitCatchableClassError(
             $context,
             'Error',
             'Cannot add newnode as the previous sibling of refnode'
         );
+        // emitCatchableClassError terminates the block (branch to catch dispatch).
 
         $context->builder->positionAtEnd($bbNotAttr);
         $bbFrag = BasicBlockHelper::append($context, 'dom_ib_frag');
@@ -138,6 +142,14 @@ final class JitDomInsertBeforeLiveSlots
         JitDomParentChildLinkLayout::storeSibling($context, $refChild, VmDom::PROP_PREVIOUS_SIBLING, $newJit);
         JitDomParentChildLinkLayout::storeParentNode($context, $newChild, $parentJit);
 
+        // Document parents use documentElement + Document child-edge slots — Element
+        // INNER_XML rebuild / Element childNodes layout SIGSEGVs (#33584).
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, 'dom_ib_parent');
+        $bbDocDone = BasicBlockHelper::append($context, 'dom_ib_doc_done');
+        $bbElFinish = BasicBlockHelper::append($context, 'dom_ib_el_finish');
+        $context->builder->branchIf($isDoc, $bbDocDone, $bbElFinish);
+
+        $context->builder->positionAtEnd($bbElFinish);
         // firstElementChild when inserting before current first element (#27449).
         $fecObj = JitDomParentChildLinkLayout::loadFirstElementChild($context, $parent, 'dom_ib');
         $fecIsRef = $context->builder->icmp(Builder::INT_EQ, $fecObj, $refChild);
@@ -156,6 +168,9 @@ final class JitDomInsertBeforeLiveSlots
         // so createElement trees match Zend after cross-parent insert (#33450).
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
+        $context->builder->branch($bbDocDone);
+
+        $context->builder->positionAtEnd($bbDocDone);
     }
 
     /**

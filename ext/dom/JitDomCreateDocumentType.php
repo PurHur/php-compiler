@@ -98,6 +98,7 @@ final class JitDomCreateDocumentType
         self::storeStringLiteral($context, $obj, self::PROP_NAME, $qualifiedName);
         self::storeStringLiteral($context, $obj, self::PROP_PUBLIC_ID, $publicId);
         self::storeStringLiteral($context, $obj, self::PROP_SYSTEM_ID, $systemId);
+        DomUserScriptDoctypeLlvm::rememberCreate($qualifiedName, $publicId, $systemId);
 
         return $obj;
     }

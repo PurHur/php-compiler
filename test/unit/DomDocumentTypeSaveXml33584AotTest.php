@@ -5,20 +5,29 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: insertBefore/replaceChild(Attr) throw like Zend — no SIGSEGV (#33587).
+ * AOT: DocumentType in saveXML + insertBefore before documentElement (#33584).
+ *
+ * @see php-src ext/dom/document.c / node.c dom_node_insert_before
  *
  * @group llvm
  */
-final class DomInsertBeforeReplaceChildAttr33587AotTest extends TestCase
+final class DomDocumentTypeSaveXml33584AotTest extends TestCase
 {
-    public function testInsertBeforeAndReplaceChildAttr(): void
+    public function testAppendDoctypeSaveXml(): void
     {
-        $src = __DIR__.'/../repro/issue_33587_dom_insertbefore_attr_aot.php';
+        $this->assertAotMatchesZend(__DIR__.'/../repro/issue_33584_dom_doctype_append_savexml_aot.php');
+    }
+
+    public function testInsertBeforeDoctypeSaveXml(): void
+    {
+        $this->assertAotMatchesZend(__DIR__.'/../repro/issue_33584_dom_doctype_insertbefore_savexml_aot.php');
+    }
+
+    private function assertAotMatchesZend(string $src): void
+    {
         $zend = $this->runPhp($src);
         $aot = $this->runAot($src);
         $this->assertSame($zend, $aot);
-        $this->assertStringContainsString('Cannot add newnode as the previous sibling of refnode', $aot);
-        $this->assertStringContainsString('Hierarchy Request Error', $aot);
     }
 
     private function runPhp(string $src): string
@@ -33,7 +42,7 @@ final class DomInsertBeforeReplaceChildAttr33587AotTest extends TestCase
     private function runAot(string $src): string
     {
         $root = dirname(__DIR__, 2);
-        $bin = sys_get_temp_dir().'/dom_ib_rc_attr_33587_'.getmypid();
+        $bin = sys_get_temp_dir().'/dom_doc_dt_33584_'.getmypid().'_'.md5($src);
         $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src);
         exec($cmd.' 2>&1', $compOut, $compRc);

@@ -201,6 +201,9 @@ final class JitDomInsertBefore
             $parent,
             $newChild
         );
+        if (($newChildVar->compileTimeDomTagName ?? null) === JitDomCreateDocumentType::TAG_KIND) {
+            DomUserScriptDoctypeLlvm::markAttached();
+        }
         JitDomInsertBeforeLiveSlots::sync($context, $parent, $newChild, $refChild);
     }
 

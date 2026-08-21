@@ -270,6 +270,12 @@ final class JitDomParentChildLinkLayout
         return $phi;
     }
 
+    /** True when {@code $obj} is a Document-class allocation (#33584). */
+    public static function isDocumentObject(Context $context, Value $obj, string $labelPrefix): Value
+    {
+        return self::isDocument($context, $obj, $labelPrefix);
+    }
+
     private static function isDocument(Context $context, Value $obj, string $labelPrefix): Value
     {
         $objectType = $context->type->object;
