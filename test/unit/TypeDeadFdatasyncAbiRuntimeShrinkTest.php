@@ -31,8 +31,8 @@ final class TypeDeadFdatasyncAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (stream_set_write_buffer still Type always-on; timeout dropped in #33134).
-        $this->assertStringContainsString("registerFunction('__compiler_stream_set_write_buffer'", $type);
+        // Next leftover sentinel (stream_set_read_buffer still Type always-on; write_buffer dropped in #33139).
+        $this->assertStringContainsString("registerFunction('__compiler_stream_set_read_buffer'", $type);
         $this->assertStringContainsString('StreamSync::ensureLinked', $type);
     }
 

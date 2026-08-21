@@ -13,7 +13,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream buffer/chunk/timeout ABI via StreamBufferJitHelper PHP (#14462, #19788, #22979, #33127, #33134).
+ * JIT/AOT link for stream buffer/chunk/timeout ABI via StreamBufferJitHelper PHP (#14462, #19788, #22979, #33127, #33134, #33139).
  *
  * Quarantined from lib/JIT/Builtin/StreamBufferRuntime — {@see \PHPCompiler\JIT\Builtin\StreamBufferRuntime}
  * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}
@@ -26,7 +26,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * plainfile; read buffer returns 0 (#30788).
  *
  * Do not re-add empty always-on shells in Builtin\Type — leftover decls mint
- * stream_set_timeout.1 (#31894 / #32122). Type::initialize still StreamBuffer::ensureLinked.
+ * stream_set_write_buffer.1 (#31894 / #32122). Type::initialize still StreamBuffer::ensureLinked.
  *
  * SSOT: {@see StreamBufferJitHelper}
  * php-src: main/streams/streams.c — php_stream_set_chunk_size / set_option buffer+timeout
