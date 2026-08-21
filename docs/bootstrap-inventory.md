@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7694 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24639 |
+| Source constructs flagged (warnings) | 24652 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1814,11 +1814,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/VmOpensslX509Native.php` | 0 | 1 |
 | `ext/openssl/openssl_cipher_iv_length.php` | 0 | 2 |
 | `ext/openssl/openssl_cipher_key_length.php` | 0 | 2 |
-| `ext/openssl/openssl_cms_decrypt.php` | 0 | 2 |
-| `ext/openssl/openssl_cms_encrypt.php` | 0 | 2 |
-| `ext/openssl/openssl_cms_read.php` | 0 | 4 |
-| `ext/openssl/openssl_cms_sign.php` | 0 | 2 |
-| `ext/openssl/openssl_cms_verify.php` | 0 | 2 |
+| `ext/openssl/openssl_cms_decrypt.php` | 0 | 3 |
+| `ext/openssl/openssl_cms_encrypt.php` | 0 | 3 |
+| `ext/openssl/openssl_cms_read.php` | 0 | 5 |
+| `ext/openssl/openssl_cms_sign.php` | 0 | 3 |
+| `ext/openssl/openssl_cms_verify.php` | 0 | 3 |
 | `ext/openssl/openssl_csr_export.php` | 0 | 3 |
 | `ext/openssl/openssl_csr_export_to_file.php` | 0 | 3 |
 | `ext/openssl/openssl_csr_get_public_key.php` | 0 | 2 |
@@ -1830,7 +1830,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_digest.php` | 0 | 3 |
 | `ext/openssl/openssl_encrypt.php` | 0 | 3 |
 | `ext/openssl/openssl_error_string.php` | 0 | 3 |
-| `ext/openssl/openssl_free_key.php` | 0 | 2 |
+| `ext/openssl/openssl_free_key.php` | 0 | 3 |
 | `ext/openssl/openssl_get_cert_locations.php` | 0 | 3 |
 | `ext/openssl/openssl_get_cipher_methods.php` | 0 | 3 |
 | `ext/openssl/openssl_get_curve_names.php` | 0 | 3 |
@@ -1841,12 +1841,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_pbkdf2.php` | 0 | 3 |
 | `ext/openssl/openssl_pkcs12_export.php` | 0 | 4 |
 | `ext/openssl/openssl_pkcs12_export_to_file.php` | 0 | 3 |
-| `ext/openssl/openssl_pkcs12_read.php` | 0 | 5 |
-| `ext/openssl/openssl_pkcs7_decrypt.php` | 0 | 2 |
-| `ext/openssl/openssl_pkcs7_encrypt.php` | 0 | 2 |
-| `ext/openssl/openssl_pkcs7_read.php` | 0 | 4 |
-| `ext/openssl/openssl_pkcs7_sign.php` | 0 | 2 |
-| `ext/openssl/openssl_pkcs7_verify.php` | 0 | 2 |
+| `ext/openssl/openssl_pkcs12_read.php` | 0 | 6 |
+| `ext/openssl/openssl_pkcs7_decrypt.php` | 0 | 3 |
+| `ext/openssl/openssl_pkcs7_encrypt.php` | 0 | 3 |
+| `ext/openssl/openssl_pkcs7_read.php` | 0 | 5 |
+| `ext/openssl/openssl_pkcs7_sign.php` | 0 | 3 |
+| `ext/openssl/openssl_pkcs7_verify.php` | 0 | 3 |
 | `ext/openssl/openssl_pkey_derive.php` | 0 | 3 |
 | `ext/openssl/openssl_pkey_export.php` | 0 | 5 |
 | `ext/openssl/openssl_pkey_export_to_file.php` | 0 | 5 |
@@ -6188,7 +6188,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrrev.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrrpos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrspn.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringStrstr.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringStrstr.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringStrtok.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrtokJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrtotime.php` | 0 | 1 |
@@ -10367,19 +10367,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 87)
 - new JITVariable (line 197)
 - new JITVariable (line 250)
-- new JITVariable (line 715)
-- new JITVariable (line 741)
-- new JITVariable (line 830)
-- new JITVariable (line 906)
-- new JITVariable (line 912)
-- new JITVariable (line 976)
-- new JITVariable (line 1014)
-- new JITVariable (line 1025)
-- new JITVariable (line 1032)
-- new JITVariable (line 1040)
-- new JITVariable (line 1047)
-- new JITVariable (line 1107)
-- new JITVariable (line 1136)
+- new JITVariable (line 717)
+- new JITVariable (line 743)
+- new JITVariable (line 832)
+- new JITVariable (line 908)
+- new JITVariable (line 914)
+- new JITVariable (line 978)
+- new JITVariable (line 1016)
+- new JITVariable (line 1027)
+- new JITVariable (line 1034)
+- new JITVariable (line 1042)
+- new JITVariable (line 1049)
+- new JITVariable (line 1109)
+- new JITVariable (line 1138)
 - 24 class method(s)
 
 ### `ext/dom/JitDomAppendChildUserScript.php`
@@ -10661,20 +10661,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomInsertBeforeLiveSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 80)
-- new JITVariable (line 81)
 - new JITVariable (line 82)
-- new JITVariable (line 198)
-- new JITVariable (line 204)
-- new JITVariable (line 231)
-- new JITVariable (line 249)
-- new JITVariable (line 316)
-- new JITVariable (line 327)
-- new JITVariable (line 346)
-- new JITVariable (line 368)
+- new JITVariable (line 83)
+- new JITVariable (line 84)
+- new JITVariable (line 207)
+- new JITVariable (line 213)
+- new JITVariable (line 240)
+- new JITVariable (line 258)
+- new JITVariable (line 325)
+- new JITVariable (line 336)
+- new JITVariable (line 355)
 - new JITVariable (line 377)
-- new JITVariable (line 428)
-- new JITVariable (line 457)
+- new JITVariable (line 386)
+- new JITVariable (line 437)
+- new JITVariable (line 466)
 - 9 class method(s)
 
 ### `ext/dom/JitDomInsertData.php`
@@ -10809,7 +10809,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomNormalizeLiveSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 229)
+- new JITVariable (line 251)
 - 8 class method(s)
 
 ### `ext/dom/JitDomParentChildLinkLayout.php`
@@ -10861,19 +10861,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomReplaceChildLiveSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 83)
-- new JITVariable (line 241)
-- new JITVariable (line 253)
-- new JITVariable (line 280)
-- new JITVariable (line 298)
-- new JITVariable (line 386)
-- new JITVariable (line 410)
-- new JITVariable (line 421)
+- new JITVariable (line 85)
+- new JITVariable (line 248)
+- new JITVariable (line 260)
+- new JITVariable (line 287)
+- new JITVariable (line 305)
+- new JITVariable (line 393)
+- new JITVariable (line 417)
 - new JITVariable (line 428)
-- new JITVariable (line 436)
+- new JITVariable (line 435)
 - new JITVariable (line 443)
-- new JITVariable (line 503)
-- new JITVariable (line 532)
+- new JITVariable (line 450)
+- new JITVariable (line 510)
+- new JITVariable (line 539)
 - 16 class method(s)
 
 ### `ext/dom/JitDomReplaceData.php`
@@ -21730,7 +21730,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/JitOpensslX509.php`
 
 **Warnings** (review for bootstrap subset):
-- 35 class method(s)
+- 46 class method(s)
 
 ### `ext/openssl/Module.php`
 
@@ -21969,32 +21969,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- new ArgumentCountError (line 59)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_cms_encrypt.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- new ArgumentCountError (line 69)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_cms_read.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- new HashTable (line 45)
-- new Variable (line 47)
+- new ArgumentCountError (line 32)
+- new HashTable (line 48)
+- new Variable (line 50)
+- new ArgumentCountError (line 62)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_cms_sign.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- new ArgumentCountError (line 64)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_cms_verify.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
+- new ArgumentCountError (line 87)
 - 3 class method(s)
 
 ### `ext/openssl/openssl_csr_export.php`
@@ -22074,7 +22079,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_free_key.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 54)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_get_cert_locations.php`
@@ -22153,38 +22159,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 47)
 - new Variable (line 49)
 - new Variable (line 53)
+- new ArgumentCountError (line 62)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pkcs7_decrypt.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- new ArgumentCountError (line 54)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pkcs7_encrypt.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- new ArgumentCountError (line 64)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pkcs7_read.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- new HashTable (line 45)
-- new Variable (line 47)
+- new ArgumentCountError (line 30)
+- new HashTable (line 46)
+- new Variable (line 48)
+- new ArgumentCountError (line 60)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pkcs7_sign.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- new ArgumentCountError (line 59)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pkcs7_verify.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
+- new ArgumentCountError (line 72)
 - 3 class method(s)
 
 ### `ext/openssl/openssl_pkey_derive.php`
@@ -22215,8 +22227,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_pkey_free.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
-- 3 class method(s)
+- new ArgumentCountError (line 42)
+- 6 class method(s)
 
 ### `ext/openssl/openssl_pkey_get_details.php`
 
@@ -47105,7 +47117,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 2479)
+- new InternalArgInfo (line 2481)
 - 24 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -49389,21 +49401,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomNodeLiveMutationRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 488)
-- new Variable (line 489)
-- new Variable (line 507)
-- new Variable (line 531)
-- new Variable (line 601)
-- new Variable (line 608)
-- new Variable (line 614)
-- new Variable (line 706)
-- new Variable (line 707)
-- new Variable (line 718)
-- new Variable (line 759)
-- new Variable (line 770)
-- new Variable (line 912)
-- new Variable (line 951)
-- new Variable (line 1170)
+- new Variable (line 493)
+- new Variable (line 494)
+- new Variable (line 512)
+- new Variable (line 536)
+- new Variable (line 606)
+- new Variable (line 613)
+- new Variable (line 619)
+- new Variable (line 711)
+- new Variable (line 712)
+- new Variable (line 723)
+- new Variable (line 764)
+- new Variable (line 775)
+- new Variable (line 917)
+- new Variable (line 956)
+- new Variable (line 1175)
 - 45 class method(s)
 
 ### `lib/JIT/Builtin/DomNodeTreeMutationRuntime.php`
@@ -52397,7 +52409,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrstr.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringStrtok.php`
 
@@ -52725,7 +52738,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 164)
 - new Variable (line 186)
 - new Variable (line 265)
-- new Variable (line 408)
+- new Variable (line 407)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php`
@@ -52749,38 +52762,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/Object_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 595)
-- new Variable (line 1022)
-- new Variable (line 1061)
-- new Variable (line 1095)
-- new Variable (line 2132)
-- new Variable (line 2578)
-- new Variable (line 2643)
-- new Variable (line 2664)
-- new Variable (line 2676)
-- new Variable (line 2689)
-- new Variable (line 2899)
-- new VMVariable (line 4618)
-- new VMVariable (line 4638)
-- new VMVariable (line 4648)
-- new VMVariable (line 4668)
-- new VMVariable (line 5870)
-- new ReflectionClassConstant (line 6583)
-- new Variable (line 7006)
-- new Variable (line 7032)
-- new Variable (line 7040)
-- new Variable (line 7063)
-- new Variable (line 7089)
-- new Variable (line 7097)
-- new Variable (line 7171)
-- new Literal (line 7188)
-- new Literal (line 7193)
-- new Literal (line 7198)
-- new Variable (line 7209)
-- new Variable (line 7242)
-- new Variable (line 7265)
-- new Variable (line 7776)
-- 310 class method(s)
+- new Variable (line 602)
+- new Variable (line 1029)
+- new Variable (line 1068)
+- new Variable (line 1102)
+- new Variable (line 2166)
+- new Variable (line 2612)
+- new Variable (line 2677)
+- new Variable (line 2698)
+- new Variable (line 2710)
+- new Variable (line 2723)
+- new Variable (line 2933)
+- new VMVariable (line 4636)
+- new VMVariable (line 4656)
+- new VMVariable (line 4666)
+- new VMVariable (line 4686)
+- new VMVariable (line 5931)
+- new ReflectionClassConstant (line 6644)
+- new Variable (line 7067)
+- new Variable (line 7093)
+- new Variable (line 7101)
+- new Variable (line 7124)
+- new Variable (line 7150)
+- new Variable (line 7158)
+- new Variable (line 7232)
+- new Literal (line 7249)
+- new Literal (line 7254)
+- new Literal (line 7259)
+- new Variable (line 7270)
+- new Variable (line 7303)
+- new Variable (line 7326)
+- new Variable (line 7852)
+- 312 class method(s)
 - 8 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
@@ -61807,12 +61820,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/SplFileObjectJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 1554)
-- new JITVariable (line 1560)
-- new JITVariable (line 1584)
-- new JITVariable (line 1652)
-- new JITVariable (line 1674)
-- 54 class method(s)
+- new JITVariable (line 1794)
+- new JITVariable (line 1800)
+- new JITVariable (line 1824)
+- new JITVariable (line 1892)
+- new JITVariable (line 1914)
+- 58 class method(s)
 
 ### `lib/VM/SplFixedArrayJitHelper.php`
 
