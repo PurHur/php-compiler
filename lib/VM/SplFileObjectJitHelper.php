@@ -5,16 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\JitFlock;
+use PHPCompiler\ext\standard\JitFputcsv;
 use PHPCompiler\ext\standard\JitFread;
 use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitPath;
+use PHPCompiler\JIT\Builtin\FputcsvRuntime;
 use PHPCompiler\JIT\Builtin\SplFileObjectSnapshotRuntime;
 use PHPCompiler\JIT\Builtin\StreamIo;
 use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Builtin\StreamRead;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -31,11 +36,12 @@ use PHPLLVM\Value;
  * getCurrentLine is the php-src fgets alias (#33321).
  * fread/fgetc on `__spl_fd` (#33332).
  * ftell/flock on `__spl_fd` (#33336) via JitFtell / JitFlock.
+ * fputcsv on `__spl_fd` (#33340) via JitFputcsv (peer procedural #33334 / #27180).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
- * zim_SplFileObject_ftell / zim_SplFileObject_flock /
+ * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_fputcsv /
  * zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
@@ -71,10 +77,20 @@ final class SplFileObjectJitHelper
         ?JITVariable $modeArg = null
     ): Value {
         $obj = self::loadObject($context, $receiver);
+        $modeLiteral = 'r';
+        if (null !== $modeArg) {
+            $modeLiteral = $modeArg->compileTimeString ?? null;
+        }
         $mode = null !== $modeArg
             ? self::loadString($context, $modeArg)
             : $context->builder->load($context->constantStringFromString('r'));
-        self::initConstructedFromPath($context, $obj, self::loadString($context, $pathArg), $mode);
+        self::initConstructedFromPath(
+            $context,
+            $obj,
+            self::loadString($context, $pathArg),
+            $mode,
+            $modeLiteral
+        );
 
         return self::voidResult($context);
     }
@@ -344,6 +360,45 @@ final class SplFileObjectJitHelper
     }
 
     /**
+     * SplFileObject::fputcsv — format + write CSV on live handle (#33340).
+     * php-src: zim_SplFileObject_fputcsv → php_fputcsv
+     */
+    public static function compileFputcsv(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $fieldsArg,
+        ?JITVariable $separatorArg = null,
+        ?JITVariable $enclosureArg = null,
+        ?JITVariable $escapeArg = null,
+        ?JITVariable $eolArg = null
+    ): Value {
+        self::ensureStreamAbis($context);
+        FputcsvRuntime::ensureLinked($context);
+        $handle = self::loadFd($context, $receiver);
+        $fields = self::loadFieldsHashtable($context, $fieldsArg);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $separator = $nullStr;
+        $enclosure = $nullStr;
+        $escape = $nullStr;
+        $eol = $nullStr;
+        if (null !== $separatorArg && !NamedOptionalCallArgs::isOmittedOptional($separatorArg)) {
+            $separator = JitStringArg::lower($context, $separatorArg, 'SplFileObject::fputcsv() separator');
+        }
+        if (null !== $enclosureArg && !NamedOptionalCallArgs::isOmittedOptional($enclosureArg)) {
+            $enclosure = JitStringArg::lower($context, $enclosureArg, 'SplFileObject::fputcsv() enclosure');
+        }
+        if (null !== $escapeArg && !NamedOptionalCallArgs::isOmittedOptional($escapeArg)) {
+            $escape = JitStringArg::lower($context, $escapeArg, 'SplFileObject::fputcsv() escape');
+        }
+        if (null !== $eolArg && !NamedOptionalCallArgs::isOmittedOptional($eolArg)) {
+            $eol = JitStringArg::lower($context, $eolArg, 'SplFileObject::fputcsv() eol');
+        }
+
+        return JitFputcsv::invoke($context, $handle, $fields, $separator, $enclosure, $escape, $eol);
+    }
+
+    /**
      * SplFileObject::eof — local latch (AOT __compiler_feof is unreliable) (#33319).
      * php-src: zim_SplFileObject_eof
      */
@@ -598,11 +653,18 @@ final class SplFileObjectJitHelper
         Context $context,
         Value $obj,
         Value $pathStr,
-        ?Value $modeStr = null
+        ?Value $modeStr = null,
+        ?string $modeLiteral = null
     ): void {
         $objectType = $context->type->object;
-        // NestedJIT explode-only line snapshot (#33308); concat-loop helper SIGSEGV'd.
-        $ht = SplFileObjectSnapshotRuntime::snapshotPath($context, $pathStr);
+        // Line snapshot is for foreach over an existing readable file (#33308).
+        // Write modes (w+/a+/…) open a missing path — snapshot SIGSEGVs (#33340).
+        $writeish = null !== $modeLiteral && 1 === preg_match('/^[waxc]/i', $modeLiteral);
+        if ($writeish) {
+            $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        } else {
+            $ht = SplFileObjectSnapshotRuntime::snapshotPath($context, $pathStr);
+        }
         $htVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht);
         $objectType->propertyStore(
             $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_HT),
@@ -687,6 +749,24 @@ final class SplFileObjectJitHelper
             new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $str),
             JITVariable::TYPE_STRING
         );
+    }
+
+    private static function loadFieldsHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_HASHTABLE === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return HashTableHelper::materializeNativeArrayForCall($context, $arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                JitValueBox::pointer($context, $arg->value)
+            );
+        }
+
+        throw new \LogicException('SplFileObject::fputcsv() fields must be an array (#33340)');
     }
 
     private static function loadLong(Context $context, JITVariable $arg): Value

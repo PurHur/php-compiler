@@ -71,21 +71,46 @@ final class SplFileObjectSnapshotRuntime
         }
     }
 
-    /** Read path → line HT (empty file → single ""). */
+    /** Read path → line HT (empty/missing file → single ""). */
     public static function snapshotPath(Context $context, Value $pathStr): Value
     {
         StringFileGetContents::ensureStandaloneBodies($context);
         self::ensureLinked($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'sfo_snap_after_link');
 
+        $strPtr = $context->getTypeFromString('__string__*');
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $pathStr
         );
+        // Write modes (w+/a+/…) open a missing path — file_get_contents is null.
+        // NestedJIT linesFromContentsArgv SIGSEGVs on null (#33340).
+        $isNull = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $contents,
+            $strPtr->constNull()
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $emptyBb = $fn->appendBasicBlock('sfo_snap_empty');
+        $useBb = $fn->appendBasicBlock('sfo_snap_use');
+        $joinBb = $fn->appendBasicBlock('sfo_snap_join');
+        $context->builder->branchIf($isNull, $emptyBb, $useBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $emptyStr = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($useBb);
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($joinBb);
+        $phi = $context->builder->phi($strPtr);
+        $phi->addIncoming($emptyStr, $emptyBb);
+        $phi->addIncoming($contents, $useBb);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI),
-            $contents
+            $phi
         );
     }
 }
