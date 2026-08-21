@@ -5,18 +5,25 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for fpassthru() via __compiler_fpassthru (issue #1194). */
+/**
+ * LLVM lowering for fpassthru() via __compiler_fpassthru (issue #1194; ensureLinked #33113).
+ *
+ * ABI owned by {@see StreamReadRuntime} after Type always-on drop (#33106) — must
+ * ensureLinked before lookup (peer {@see JitFgetc} / {@see JitFlock}).
+ */
 final class JitFpassthru
 {
     /** @return Value
      * (int bytes written, or boolean false on failure) */
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        StreamReadRuntime::ensureLinked($context);
         $bytes = $context->builder->call(
             $context->lookupFunction('__compiler_fpassthru'),
             $handleLong
