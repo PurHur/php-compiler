@@ -7,12 +7,13 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\HashTable;
 
 /**
- * Thin-standalone NestedJIT serialize() for SplFixedArray (#33634).
+ * Thin-standalone NestedJIT serialize() for SplFixedArray (#33634 / #33639).
  *
  * Own TU with a single public method — NestedJIT mis-types extra methods in the same file (#27030).
  * Prefer helper-runtime cache (do not force PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33625.
  *
- * php-src: ext/spl/spl_fixedarray.c — elements as integer-keyed object props.
+ * Relies on HashTableExportKeyValuePairs including TYPE_NULL (skip TYPE_UNDEFINED only) so
+ * SplFixedArray holes emit as i:k;N; (#33639 / php-src spl_fixedarray.c).
  */
 final class SerializeSplFixedArrayNestedJitHelper
 {

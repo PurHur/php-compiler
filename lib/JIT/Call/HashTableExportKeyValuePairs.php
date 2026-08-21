@@ -14,7 +14,10 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** HashTable::exportKeyValuePairs for nested php-in-PHP JIT helpers (#12910). */
+/** HashTable::exportKeyValuePairs for nested php-in-PHP JIT helpers (#12910).
+ *
+ * Packed numeric walk skips TYPE_UNDEFINED holes only — TYPE_NULL is emitted (#33639).
+ */
 final class HashTableExportKeyValuePairs implements Call
 {
     public function call(Context $context, Variable ...$args): Value
@@ -77,11 +80,16 @@ final class HashTableExportKeyValuePairs implements Call
         $valueMap = $context->structFieldMap['__value__'];
         $entry = $context->builder->gep($valuesBase, $idx);
         $typeByte = $context->builder->load($context->builder->structGep($entry, $valueMap['type']));
-        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $kind, $i8->constInt(0, false));
+        // Skip packed TYPE_UNDEFINED holes only — TYPE_NULL is a real element (#27536).
+        // Skipping kind==0 dropped nulls from NestedJIT serialize / SplFixedArray (#33639).
+        $isUndef = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED & 0xff, false)
+        );
         $skipBb = BasicBlockHelper::append($context, 'ht_export_num_skip');
         $addBb = BasicBlockHelper::append($context, 'ht_export_num_add');
-        $context->builder->branchIf($isNull, $skipBb, $addBb);
+        $context->builder->branchIf($isUndef, $skipBb, $addBb);
 
         $context->builder->positionAtEnd($addBb);
         $keyVar = self::longValueBox($context, $context->builder->zExt($idx, $i64));
