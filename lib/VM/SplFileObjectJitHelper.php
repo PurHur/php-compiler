@@ -76,7 +76,7 @@ use PHPLLVM\Value;
  * zim_SplFileObject_setCsvControl / zim_SplFileObject_getCsvControl /
  * zim_SplFileObject_setMaxLineLen / zim_SplFileObject_getMaxLineLen /
  * zim_SplFileObject_fscanf / zim_SplFileObject_hasChildren / zim_SplFileObject_getChildren /
- * zim_SplFileInfo_openFile
+ * zim_SplFileInfo_openFile / zim_SplTempFileObject___construct (#33431)
  */
 final class SplFileObjectJitHelper
 {
@@ -145,6 +145,36 @@ final class SplFileObjectJitHelper
             $mode,
             $modeLiteral
         );
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * SplTempFileObject::__construct — php://temp w+b (#33431).
+     * php-src: zim_SplTempFileObject___construct / peer SplTempFileObjectBuiltin.
+     *
+     * Optional $maxMemory is validated (≥0) then ignored for open — matches current VM
+     * ({@see SplTempFileObjectConstruct}) which opens php://temp without maxmemory URI.
+     */
+    public static function compileTempConstruct(
+        Context $context,
+        JITVariable $receiver,
+        ?JITVariable $maxMemoryArg = null
+    ): Value {
+        if (null !== $maxMemoryArg) {
+            $i64 = $context->getTypeFromString('int64');
+            $max = self::loadLong($context, $maxMemoryArg);
+            TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+                $context,
+                $context->builder->icmp(Builder::INT_SGE, $max, $i64->constInt(0, false)),
+                'spltemp_maxmem',
+                'SplTempFileObject::__construct(): Argument #1 ($maxMemory) must be greater than or equal to 0'
+            );
+        }
+        $obj = self::loadObject($context, $receiver);
+        $path = $context->builder->load($context->constantStringFromString('php://temp'));
+        $mode = $context->builder->load($context->constantStringFromString('w+b'));
+        self::initConstructedFromPath($context, $obj, $path, $mode, 'w+b');
 
         return self::voidResult($context);
     }

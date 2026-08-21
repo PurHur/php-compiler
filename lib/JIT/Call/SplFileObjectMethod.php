@@ -11,12 +11,17 @@ use PHPCompiler\VM\SplFileObjectJitHelper;
 use PHPLLVM\Value;
 
 /**
- * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, #33346, #33347, #33348, #33354, #33358, #33359, #33364, #33368, #33371, #33377, #33378, #33382, #33388, #33390, #33396, ext/spl/spl_directory.c).
+ * SplFileObject / SplTempFileObject thin-AOT methods
+ * (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, #33346, #33347, #33348,
+ * #33354, #33358, #33359, #33364, #33368, #33371, #33377, #33378, #33382, #33388, #33390,
+ * #33396, #33431, ext/spl/spl_directory.c).
  */
 final class SplFileObjectMethod implements Call
 {
-    public function __construct(private readonly string $method)
-    {
+    public function __construct(
+        private readonly string $method,
+        private readonly bool $tempFileObject = false,
+    ) {
     }
 
     public function methodName(): string
@@ -26,19 +31,26 @@ final class SplFileObjectMethod implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
+        $classLabel = $this->tempFileObject ? 'SplTempFileObject' : 'SplFileObject';
         if ([] === $args) {
-            throw new \LogicException('SplFileObject::'.$this->method.'() called without $this');
+            throw new \LogicException($classLabel.'::'.$this->method.'() called without $this');
         }
 
         return match (strtolower($this->method)) {
-            '__construct' => SplFileObjectJitHelper::compileConstruct(
-                $context,
-                $args[0],
-                $args[1] ?? throw new \ArgumentCountError(
-                    'SplFileObject::__construct() expects at least 1 argument, 0 given'
+            '__construct' => $this->tempFileObject
+                ? SplFileObjectJitHelper::compileTempConstruct(
+                    $context,
+                    $args[0],
+                    $args[1] ?? null
+                )
+                : SplFileObjectJitHelper::compileConstruct(
+                    $context,
+                    $args[0],
+                    $args[1] ?? throw new \ArgumentCountError(
+                        'SplFileObject::__construct() expects at least 1 argument, 0 given'
+                    ),
+                    $args[2] ?? null
                 ),
-                $args[2] ?? null
-            ),
             'getfilename' => SplFileObjectJitHelper::compileGetFilename($context, $args[0]),
             'getpathname', '__tostring' => SplFileObjectJitHelper::compileGetPathname($context, $args[0]),
             'getpath' => SplFileObjectJitHelper::compileGetPath($context, $args[0]),
@@ -152,7 +164,7 @@ final class SplFileObjectMethod implements Call
             'key' => SplFileObjectJitHelper::compileKey($context, $args[0]),
             'next' => SplFileObjectJitHelper::compileNext($context, $args[0]),
             default => throw new \LogicException(
-                'SplFileObject JIT lowering is not implemented for '.$this->method.'()'
+                $classLabel.' JIT lowering is not implemented for '.$this->method.'()'
             ),
         };
     }

@@ -4187,6 +4187,28 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('spltempfileobject' === $lcname) {
+            // Thin AOT: subclass of SplFileObject on php://temp (#33431 / #12891).
+            // php-src ext/spl/spl_directory.c — SplTempFileObject.
+            $this->lookup('SplFileObject');
+            $this->setClassParentName($displayName, 'SplFileObject');
+            $this->inheritParentInstanceProperties($id, 'splfileobject');
+            $this->inheritMethodVisibilityFromParent($id, $lcname);
+            $this->ensureZendBuiltinInterfaces();
+            $this->markInterfaceClass('RecursiveIterator');
+            $this->setInterfaceExtends('RecursiveIterator', ['Iterator', 'Traversable']);
+            $this->markInterfaceClass('SeekableIterator');
+            $this->setInterfaceExtends('SeekableIterator', ['Iterator', 'Traversable']);
+            $this->setClassInterfaces($displayName, [
+                'Stringable',
+                'RecursiveIterator',
+                'SeekableIterator',
+                'Traversable',
+                'Iterator',
+            ]);
+            $this->markHasConstructor($id);
+            $this->defineMethodVisibility($id, '__construct', \PHPCfg\Func::FLAG_PUBLIC);
+        }
         if ('directoryiterator' === $lcname || 'filesystemiterator' === $lcname || 'globiterator' === $lcname) {
             // Thin AOT: snapshot `__spl_ht` + Iterator; current() returns $this (#27289 / #27422).
             // php-src ext/spl/spl_directory.c — DirectoryIterator / FilesystemIterator / GlobIterator.
