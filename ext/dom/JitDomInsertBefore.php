@@ -196,7 +196,23 @@ final class JitDomInsertBefore
             $parent,
             $newChild
         );
+        // Document child edges / childNodes live on DOMDocument layout (#32736).
+        // LiveSlots reads DOMElement::childNodes and SIGSEGVs on Document (#33584).
+        $isDoc = JitDomDocumentTypeMarkup::runtimeIsDocumentObject($context, $parent);
+        $bbDoc = BasicBlockHelper::append($context, 'dom_ib_parent_doc');
+        $bbEl = BasicBlockHelper::append($context, 'dom_ib_parent_el');
+        $bbDone = BasicBlockHelper::append($context, 'dom_ib_parent_done');
+        $context->builder->branchIf($isDoc, $bbDoc, $bbEl);
+
+        $context->builder->positionAtEnd($bbDoc);
+        JitDomAppendChildUserScript::insertBeforeOnDocument($context, $parent, $newChild, $refChild);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbEl);
         JitDomInsertBeforeLiveSlots::sync($context, $parent, $newChild, $refChild);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     /**

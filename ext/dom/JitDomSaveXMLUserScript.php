@@ -48,9 +48,9 @@ final class JitDomSaveXMLUserScript
             || null === $xmlLit
             || '' === trim($xmlLit)
         ) {
-            // No loadXML literal / tree mutated: dump documentElement slots.
+            // No loadXML literal / tree mutated: dump doctype + documentElement slots.
             // NestedJIT DomSaveXMLRuntime SIGSEGVs after c:main_before_php (#32361).
-            return self::trySerializeDocumentFromSlots($context);
+            return self::trySerializeDocumentFromSlots($context, $args[0] ?? null);
         }
         // Document-wide constant replay is only valid for pure user-script loads (#26757).
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
@@ -68,12 +68,15 @@ final class JitDomSaveXMLUserScript
     /**
      * Document-wide saveXML() without a loadXML literal — xmlDocDumpMemory of the
      * createElement+appendChild tree (#32361 / php-src ext/dom/document.c).
+     * Prefaces {@code <!DOCTYPE …>} when DocumentType was appended/inserted (#33584).
      */
-    private static function trySerializeDocumentFromSlots(Context $context): Value
-    {
+    private static function trySerializeDocumentFromSlots(
+        Context $context,
+        ?JITVariable $documentVar
+    ): Value {
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
-        foreach (['tagName', 'nodeName', 'textContent', VmDom::PROP_USER_SCRIPT_INNER_XML, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR] as $prop) {
+        foreach (['tagName', 'nodeName', 'textContent', 'name', 'publicId', 'systemId', VmDom::PROP_USER_SCRIPT_INNER_XML, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_STRING);
             }
@@ -99,6 +102,17 @@ final class JitDomSaveXMLUserScript
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDump);
+        $prefix = $decl;
+        if (null !== $documentVar
+            && \in_array($documentVar->type, [JITVariable::TYPE_OBJECT, JITVariable::TYPE_VALUE], true)
+        ) {
+            $prefix = self::prependDoctypeIfPresent(
+                $context,
+                $decl,
+                $nl,
+                self::loadObjectArg($context, $documentVar)
+            );
+        }
         $bodyStr = self::serializeElementMarkup(
             $context,
             $objectType,
@@ -107,9 +121,71 @@ final class JitDomSaveXMLUserScript
             false,
             null
         );
-        $withDecl = JitStringConcat::concat($context, $decl, $bodyStr);
+        $withDecl = JitStringConcat::concat($context, $prefix, $bodyStr);
         $full = JitStringConcat::concat($context, $withDecl, $nl);
         $context->builder->store(self::boxStringValue($context, $full), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Prefix xml decl with {@code <!DOCTYPE …>\n} from {@code $doc->doctype} (#33584).
+     */
+    private static function prependDoctypeIfPresent(
+        Context $context,
+        Value $decl,
+        Value $nl,
+        Value $document
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_savexml_dt_prefix');
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCTYPE)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCTYPE, JITVariable::TYPE_VALUE);
+        }
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+        $bbMissing = BasicBlockHelper::append($context, 'dom_savexml_dt_missing');
+        $bbPresent = BasicBlockHelper::append($context, 'dom_savexml_dt_present');
+        $bbDone = BasicBlockHelper::append($context, 'dom_savexml_dt_done');
+
+        $dtSlot = $objectType->propertySlotFor($document, 'DOMDocument', VmDom::PROP_DOCTYPE);
+        $dtPtr = $context->builder->load($dtSlot);
+        $voidPtr = $context->getTypeFromString('void*');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $slotNull = $context->builder->icmp(Builder::INT_EQ, $dtPtr, $voidPtr->constNull());
+        $context->builder->branchIf($slotNull, $bbMissing, $bbPresent);
+
+        // Slot may be a VALUE box — readObject; null object → no doctype.
+        // Fall through: try readObject path in present arm with null check.
+        $context->builder->positionAtEnd($bbMissing);
+        $context->builder->store($decl, $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbPresent);
+        $dtObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($dtPtr, $context->getTypeFromString('__value__*'))
+        );
+        $dtNull = $context->builder->icmp(Builder::INT_EQ, $dtObj, $objPtrTy->constNull());
+        $bbEmit = BasicBlockHelper::append($context, 'dom_savexml_dt_emit');
+        $bbSkip = BasicBlockHelper::append($context, 'dom_savexml_dt_skip');
+        $context->builder->branchIf($dtNull, $bbSkip, $bbEmit);
+
+        $context->builder->positionAtEnd($bbSkip);
+        $context->builder->store($decl, $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbEmit);
+        $dtMarkup = JitDomDocumentTypeMarkup::serializeStandIn($context, $dtObj);
+        $withDt = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $decl, $dtMarkup),
+            $nl
+        );
+        $context->builder->store($withDt, $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
@@ -244,6 +320,8 @@ final class JitDomSaveXMLUserScript
         $bbPiData = BasicBlockHelper::append($context, 'dom_savexml_pi_data');
         $bbEntityCheck = BasicBlockHelper::append($context, 'dom_savexml_check_entity');
         $bbEntity = BasicBlockHelper::append($context, 'dom_savexml_entity');
+        $bbDoctypeCheck = BasicBlockHelper::append($context, 'dom_savexml_check_doctype');
+        $bbDoctype = BasicBlockHelper::append($context, 'dom_savexml_doctype');
         $bbElement = BasicBlockHelper::append($context, 'dom_savexml_element');
         $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
 
@@ -383,7 +461,7 @@ final class JitDomSaveXMLUserScript
             JitStringCompare::strcmp($context, $tagStr, $entityKindLit),
             $zero
         );
-        $context->builder->branchIf($isEntity, $bbEntity, $bbElement);
+        $context->builder->branchIf($isEntity, $bbEntity, $bbDoctypeCheck);
 
         $context->builder->positionAtEnd($bbEntity);
         // libxml xmlNodeDump XML_ENTITY_REF_NODE: `&` + name + `;` (#32343).
@@ -395,6 +473,23 @@ final class JitDomSaveXMLUserScript
             $erefClose
         );
         $context->builder->store(self::boxStringValue($context, $erefXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDoctypeCheck);
+        $doctypeKindLit = $context->builder->load(
+            $context->constantStringFromString(JitDomCreateDocumentType::TAG_KIND)
+        );
+        $isDoctype = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagStr, $doctypeKindLit),
+            $zero
+        );
+        $context->builder->branchIf($isDoctype, $bbDoctype, $bbElement);
+
+        $context->builder->positionAtEnd($bbDoctype);
+        // libxml xmlNodeDump XML_DOCUMENT_TYPE_NODE (#33584).
+        $dtMarkup = JitDomDocumentTypeMarkup::serializeStandIn($context, $node);
+        $context->builder->store(self::boxStringValue($context, $dtMarkup), $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbElement);

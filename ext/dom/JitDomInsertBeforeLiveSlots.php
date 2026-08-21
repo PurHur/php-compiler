@@ -123,11 +123,16 @@ final class JitDomInsertBeforeLiveSlots
         JitDomParentChildLinkLayout::storeSibling($context, $refChild, VmDom::PROP_PREVIOUS_SIBLING, $newJit);
         JitDomParentChildLinkLayout::storeParentNode($context, $newChild, $parentJit);
 
-        // firstElementChild when inserting before current first element (#27449).
+        // firstElementChild when inserting an Element before the current first element (#27449).
+        // DocumentType / comment / PI must not become firstElementChild (#33584).
+        $isElementChild = JitDomAppendChildUserScript::isElementStandInPublic($context, $newChild);
         $fecObj = JitDomParentChildLinkLayout::loadFirstElementChild($context, $parent, 'dom_ib');
         $fecIsRef = $context->builder->icmp(Builder::INT_EQ, $fecObj, $refChild);
         $fecIsNull = $context->builder->icmp(Builder::INT_EQ, $fecObj, $objPtrTy->constNull());
-        $shouldSetFec = $context->builder->or($fecIsRef, $fecIsNull);
+        $shouldSetFec = $context->builder->and(
+            $isElementChild,
+            $context->builder->or($fecIsRef, $fecIsNull)
+        );
         $setFec = BasicBlockHelper::append($context, 'dom_ib_set_fec');
         $afterFec = BasicBlockHelper::append($context, 'dom_ib_after_fec');
         $context->builder->branchIf($shouldSetFec, $setFec, $afterFec);
@@ -139,8 +144,42 @@ final class JitDomInsertBeforeLiveSlots
         self::incrementChildNodesLengthInPlace($context, $parent);
         // saveXML reads PROP_USER_SCRIPT_INNER_XML — rebuild destination + ancestors
         // so createElement trees match Zend after cross-parent insert (#33450).
+        // Skip Document receivers: document-wide saveXML uses pinned root + doctype (#33584).
+        $skipRebuild = self::runtimeIsDocumentObject($context, $parent);
+        $bbRebuild = BasicBlockHelper::append($context, 'dom_ib_rebuild');
+        $bbRebuildDone = BasicBlockHelper::append($context, 'dom_ib_rebuild_done');
+        $context->builder->branchIf($skipRebuild, $bbRebuildDone, $bbRebuild);
+        $context->builder->positionAtEnd($bbRebuild);
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
+        $context->builder->branch($bbRebuildDone);
+        $context->builder->positionAtEnd($bbRebuildDone);
+    }
+
+    /** Runtime: parent object class_id is a Document (#33584 / peer #33379). */
+    private static function runtimeIsDocumentObject(Context $context, Value $parent): Value
+    {
+        $objectType = $context->type->object;
+        $map = $context->structFieldMap['__object__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $classId = $context->builder->load($context->builder->structGep($parent, $map['class_id']));
+        $isDoc = $i1->constInt(0, false);
+        foreach (['DOMDocument', 'Dom\\Document', 'Dom\\XMLDocument', 'Dom\\HTMLDocument'] as $className) {
+            try {
+                $expected = $objectType->lookup($className);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($expected, false)
+            );
+            $isDoc = $context->builder->or($isDoc, $match);
+        }
+
+        return $isDoc;
     }
 
     /**

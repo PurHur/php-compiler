@@ -314,10 +314,185 @@ final class JitDomAppendChildUserScript
             $docJit,
             JITVariable::TYPE_VALUE
         );
-        // Pin for document-wide saveXML() without loadXML (#32361).
+        // DocumentType → $doc->doctype for saveXML <!DOCTYPE …> (#33584).
+        JitDomDocumentTypeMarkup::storeOnDocumentIfDoctype($context, $document, $child);
+        // Pin documentElement only — doctype/comment must not become the dump root (#32361 / #33584).
+        $bbPin = BasicBlockHelper::append($context, 'dom_doc_ac_pin_de');
+        $bbAfterPin = BasicBlockHelper::append($context, 'dom_doc_ac_after_pin');
+        $context->builder->branchIf($isElement, $bbPin, $bbAfterPin);
+        $context->builder->positionAtEnd($bbPin);
         DomUserScriptPinnedRootLlvm::pin($context, $child);
+        $context->builder->branch($bbAfterPin);
+        $context->builder->positionAtEnd($bbAfterPin);
 
         return self::boxObjectResult($context, $child);
+    }
+
+    /**
+     * Document::insertBefore — DOMDocument child-edge layout (not LiveSlots/#33584).
+     *
+     * LiveSlots reads {@code DOMElement::childNodes} which clobbers Document slots
+     * (#32736). Mirror {@see storeDocumentAppendChild} VALUE-slot linking.
+     */
+    public static function insertBeforeOnDocument(
+        Context $context,
+        Value $document,
+        Value $newChild,
+        Value $refChild
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_doc_ib');
+        self::ensureDocumentChildLinkLayout($context);
+        $objectType = $context->type->object;
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $voidPtr = $context->getTypeFromString('void*');
+        $newJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $newChild);
+        $refJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $refChild);
+        $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $document);
+
+        // prev = ref.previousSibling (DOMElement stand-in layout on children)
+        $elementClassId = $objectType->lookup('DOMElement');
+        foreach ([VmDom::PROP_PREVIOUS_SIBLING, VmDom::PROP_NEXT_SIBLING, VmDom::PROP_PARENT_NODE] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+        }
+        $prevSlot = $objectType->propertySlotFor($refChild, 'DOMElement', VmDom::PROP_PREVIOUS_SIBLING);
+        $prevPtr = $context->builder->load($prevSlot);
+        $prevSlotNull = $context->builder->icmp(Builder::INT_EQ, $prevPtr, $voidPtr->constNull());
+        $bbPrevNull = BasicBlockHelper::append($context, 'dom_doc_ib_prev_null');
+        $bbPrevRead = BasicBlockHelper::append($context, 'dom_doc_ib_prev_read');
+        $bbPrevMerge = BasicBlockHelper::append($context, 'dom_doc_ib_prev_merge');
+        $context->builder->branchIf($prevSlotNull, $bbPrevNull, $bbPrevRead);
+
+        $context->builder->positionAtEnd($bbPrevNull);
+        $nullPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbPrevMerge);
+        $context->builder->positionAtEnd($bbPrevRead);
+        $prevObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($prevPtr, $context->getTypeFromString('__value__*'))
+        );
+        $readPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbPrevMerge);
+        $context->builder->positionAtEnd($bbPrevMerge);
+        $prev = $context->builder->phi($objPtrTy);
+        $prev->addIncoming($objPtrTy->constNull(), $nullPred);
+        $prev->addIncoming($prevObj, $readPred);
+
+        // When prev non-null: prev.next = newChild
+        $prevIsNull = $context->builder->icmp(Builder::INT_EQ, $prev, $objPtrTy->constNull());
+        $bbLinkPrev = BasicBlockHelper::append($context, 'dom_doc_ib_link_prev');
+        $bbAfterPrev = BasicBlockHelper::append($context, 'dom_doc_ib_after_prev');
+        $context->builder->branchIf($prevIsNull, $bbAfterPrev, $bbLinkPrev);
+        $context->builder->positionAtEnd($bbLinkPrev);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($prev, 'DOMElement', VmDom::PROP_NEXT_SIBLING),
+            $newJit,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($bbAfterPrev);
+
+        // When prev null: document.firstChild = newChild
+        $context->builder->positionAtEnd($bbAfterPrev);
+        $bbSetFirst = BasicBlockHelper::append($context, 'dom_doc_ib_set_first');
+        $bbAfterFirst = BasicBlockHelper::append($context, 'dom_doc_ib_after_first');
+        $context->builder->branchIf($prevIsNull, $bbSetFirst, $bbAfterFirst);
+        $context->builder->positionAtEnd($bbSetFirst);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_FIRST_CHILD),
+            $newJit,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($bbAfterFirst);
+
+        $context->builder->positionAtEnd($bbAfterFirst);
+        $bbPrevNullStore = BasicBlockHelper::append($context, 'dom_doc_ib_prev_null_store');
+        $bbPrevObjStore = BasicBlockHelper::append($context, 'dom_doc_ib_prev_obj_store');
+        $bbPrevStoreDone = BasicBlockHelper::append($context, 'dom_doc_ib_prev_store_done');
+        $context->builder->branchIf($prevIsNull, $bbPrevNullStore, $bbPrevObjStore);
+        $context->builder->positionAtEnd($bbPrevNullStore);
+        $nullSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $nullSlot)
+        );
+        $nullVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $nullSlot
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($newChild, 'DOMElement', VmDom::PROP_PREVIOUS_SIBLING),
+            $nullVar,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($bbPrevStoreDone);
+        $context->builder->positionAtEnd($bbPrevObjStore);
+        $prevJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $prev);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($newChild, 'DOMElement', VmDom::PROP_PREVIOUS_SIBLING),
+            $prevJit,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($bbPrevStoreDone);
+
+        $context->builder->positionAtEnd($bbPrevStoreDone);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($newChild, 'DOMElement', VmDom::PROP_NEXT_SIBLING),
+            $refJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($refChild, 'DOMElement', VmDom::PROP_PREVIOUS_SIBLING),
+            $newJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($newChild, 'DOMElement', VmDom::PROP_PARENT_NODE),
+            $docJit,
+            JITVariable::TYPE_VALUE
+        );
+
+        // childNodes: [newChild, refChild] for the common insert-before-first case
+        self::writeChildNodesListWithOwner($context, $document, 2, $newChild, $refChild);
+
+        // DocumentType → $doc->doctype; Element → pin documentElement when unset
+        JitDomDocumentTypeMarkup::storeOnDocumentIfDoctype($context, $document, $newChild);
+        $isElement = self::isElementStandIn($context, $newChild);
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($docClassId, self::PROP_DOCUMENT_ELEMENT)) {
+            $objectType->defineProperty($docClassId, self::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
+        }
+        $docElSlot = $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, self::PROP_DOCUMENT_ELEMENT);
+        $docElPtr = $context->builder->load($docElSlot);
+        $existingRoot = $context->builder->pointerCast($docElPtr, $objPtrTy);
+        $docElMissing = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $docElPtr, $voidPtr->constNull()),
+            $context->builder->icmp(Builder::INT_EQ, $existingRoot, $objPtrTy->constNull())
+        );
+        $bbSetDe = BasicBlockHelper::append($context, 'dom_doc_ib_set_de');
+        $bbAfterDe = BasicBlockHelper::append($context, 'dom_doc_ib_after_de');
+        $context->builder->branchIf(
+            $context->builder->and($isElement, $docElMissing),
+            $bbSetDe,
+            $bbAfterDe
+        );
+        $context->builder->positionAtEnd($bbSetDe);
+        $objectType->propertyStore($docElSlot, $newJit, JITVariable::TYPE_OBJECT);
+        DomUserScriptPinnedRootLlvm::pin($context, $newChild);
+        $context->builder->branch($bbAfterDe);
+        $context->builder->positionAtEnd($bbAfterDe);
+    }
+
+    /**
+     * True when {@code $node} is an Element stand-in (not comment/text/cdata/fragment/PI/entity-ref/doctype).
+     *
+     * Public for insertBefore firstElementChild gating (#33584).
+     */
+    public static function isElementStandInPublic(Context $context, Value $node): Value
+    {
+        return self::isElementStandIn($context, $node);
     }
 
     /**

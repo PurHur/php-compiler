@@ -675,6 +675,8 @@ final class JitDomAppendChildLiveSlots
         $bbPiData = BasicBlockHelper::append($context, self::tag('dom_rc_rb_pi_data'));
         $bbEntityCheck = BasicBlockHelper::append($context, self::tag('dom_rc_rb_check_entity'));
         $bbEntity = BasicBlockHelper::append($context, self::tag('dom_rc_rb_entity'));
+        $bbDoctypeCheck = BasicBlockHelper::append($context, self::tag('dom_rc_rb_check_doctype'));
+        $bbDoctype = BasicBlockHelper::append($context, self::tag('dom_rc_rb_doctype'));
         $bbElem = BasicBlockHelper::append($context, self::tag('dom_rc_rb_elem'));
         $bbPieceDone = BasicBlockHelper::append($context, self::tag('dom_rc_rb_piece_done'));
         $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
@@ -795,7 +797,7 @@ final class JitDomAppendChildLiveSlots
             JitStringCompare::strcmp($context, $tagStrPi, $entityKindLit),
             $zero
         );
-        $context->builder->branchIf($isEntity, $bbEntity, $bbElem);
+        $context->builder->branchIf($isEntity, $bbEntity, $bbDoctypeCheck);
 
         $context->builder->positionAtEnd($bbEntity);
         $erefOpen = $context->builder->load($context->constantStringFromString('&'));
@@ -807,6 +809,24 @@ final class JitDomAppendChildLiveSlots
             false
         );
         $context->builder->store($erefXml, $pieceAlloca);
+        $context->builder->branch($bbPieceDone);
+
+        // DocumentType: nodeName is the qualified name; discriminator is tagName
+        // `#document-type` — must not fetch unset INNER_XML (#33584 / peer #33575).
+        $context->builder->positionAtEnd($bbDoctypeCheck);
+        $doctypeKindLit = $context->builder->load(
+            $context->constantStringFromString(JitDomCreateDocumentType::TAG_KIND)
+        );
+        $isDoctype = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagStrPi, $doctypeKindLit),
+            $zero
+        );
+        $context->builder->branchIf($isDoctype, $bbDoctype, $bbElem);
+
+        $context->builder->positionAtEnd($bbDoctype);
+        $dtMarkup = JitDomDocumentTypeMarkup::serializeStandIn($context, $cur);
+        $context->builder->store($dtMarkup, $pieceAlloca);
         $context->builder->branch($bbPieceDone);
 
         $context->builder->positionAtEnd($bbElem);
