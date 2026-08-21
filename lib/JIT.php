@@ -12760,6 +12760,11 @@ class JIT {
                         $this->context->scope->toCall,
                         $callArgs
                     );
+                    $this->propagateSerializeSplHtBackedPayloadType(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall,
+                        $callArgs
+                    );
                     $this->attachBoundClosureInvokeMetadata($block, $op);
                     $this->propagateDomCreateElementCompileTimeTag(
                         $block->getOperand($op->arg1),
@@ -15594,6 +15599,8 @@ class JIT {
      * Without classUserType, TYPE_VALUE boxes take __value__readHashtable → SEGV.
      * Covers SplFixedArray (#33649), ArrayObject / ArrayIterator / RecursiveArrayIterator (#33654).
      *
+     * Also accepts {@see Variable::$serializedSplClassUserType} from serialize($obj) (#33665).
+     *
      * @param list<Variable> $callArgs
      */
     private function propagateUnserializeSplFixedArrayResultType(
@@ -15611,28 +15618,80 @@ class JIT {
         if (!($payload instanceof Variable)) {
             return;
         }
-        $literal = JIT\JitStringArg::compileTimeLiteral($payload);
-        if (null === $literal
-            || !\preg_match(
-                '/^O:\d+:"(SplFixedArray|ArrayObject|ArrayIterator|RecursiveArrayIterator)":/',
-                $literal,
-                $m
-            )
-        ) {
+        $class = $payload->serializedSplClassUserType ?? null;
+        if (null === $class || '' === $class) {
+            $literal = JIT\JitStringArg::compileTimeLiteral($payload);
+            if (null === $literal
+                || !\preg_match(
+                    '/^O:\d+:"(SplFixedArray|ArrayObject|ArrayIterator|RecursiveArrayIterator)":/',
+                    $literal,
+                    $m
+                )
+            ) {
+                return;
+            }
+            $class = $m[1];
+        } elseif (!\PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($class)) {
             return;
         }
-        $class = $m[1];
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
         $var = $this->context->getVariableFromOp($result);
         $var->classUserType = $class;
-        $result->type = new Type(Type::TYPE_OBJECT, [], $class);
+        // Keep VALUE storage for roundtrip payloads; CFG TYPE_OBJECT empties ArrayObject HT (#33654).
+        if (null === $payload->serializedSplClassUserType) {
+            $result->type = new Type(Type::TYPE_OBJECT, [], $class);
+        }
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
                 $this->context->namedVariableBindings[$resolved]->classUserType = $class;
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
+    }
+
+    /**
+     * Stamp serialize($htBackedSpl) so unserialize can restore classUserType (#33665).
+     *
+     * @param list<Variable> $callArgs
+     */
+    private function propagateSerializeSplHtBackedPayloadType(
+        Operand $result,
+        mixed $toCall,
+        array $callArgs
+    ): void {
+        if (!($toCall instanceof CoreFunc\Internal)) {
+            return;
+        }
+        if ('serialize' !== strtolower($toCall->getName())) {
+            return;
+        }
+        $arg = $callArgs[0] ?? null;
+        if (!($arg instanceof Variable)) {
+            return;
+        }
+        $class = $arg->classUserType ?? null;
+        if (null === $class || '' === $class) {
+            return;
+        }
+        if (!\PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($class)
+            && 0 !== strcasecmp($class, 'SplObjectStorage')
+        ) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        $var->serializedSplClassUserType = $class;
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->serializedSplClassUserType = $class;
             }
             $this->context->bindVariableByName($resolved, $var);
         }
@@ -19668,6 +19727,9 @@ class JIT {
         }
         if ($force || null !== $src->classUserType) {
             $dest->classUserType = $src->classUserType;
+        }
+        if ($force || null !== $src->serializedSplClassUserType) {
+            $dest->serializedSplClassUserType = $src->serializedSplClassUserType;
         }
     }
 

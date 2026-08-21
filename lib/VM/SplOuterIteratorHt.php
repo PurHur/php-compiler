@@ -13,31 +13,33 @@ final class SplOuterIteratorHt
 {
     public const PROP_HT = '__spl_ht';
 
+    /** @return list<string> Canonical class names for {@see isHtBacked} + runtime class_id checks (#33665). */
+    public static function classNames(): array
+    {
+        return [
+            'LimitIterator',
+            'AppendIterator',
+            'RegexIterator',
+            'CallbackFilterIterator',
+            'CachingIterator',
+            'ArrayIterator',
+            'RecursiveArrayIterator',
+            'RecursiveIteratorIterator',
+            'ArrayObject',
+            'ParentIterator',
+            'MultipleIterator',
+            'RecursiveTreeIterator',
+            'SplDoublyLinkedList',
+            'SplQueue',
+            'SplFixedArray',
+            'SplStack',
+        ];
+    }
+
     /** @return list<string> */
     public static function classNamesLc(): array
     {
-        return [
-            'limititerator',
-            'appenditerator',
-            'regexiterator',
-            'callbackfilteriterator',
-            'cachingiterator',
-            'arrayiterator',
-            'recursivearrayiterator',
-            'recursiveiteratoriterator',
-            'arrayobject',
-            'parentiterator',
-            'multipleiterator',
-            'recursivetreeiterator',
-            // FIFO packed `__spl_ht` deque — not SplStack (LIFO foreach) (#27311 / #26790).
-            'spldoublylinkedlist',
-            'splqueue',
-            // Packed fixed slots including null pads — nextFreeElement walk (#28640 / #26793).
-            'splfixedarray',
-            // SplFileObject: foreach uses Iterator protocol (rewind/valid/current/next) so
-            // setFlags(SKIP_EMPTY|DROP_NEW_LINE|…) apply (#33396 / #33319); HT snapshot remains
-            // for construct-time helpers but is not the foreach walk (#28709 → superseded).
-        ];
+        return array_map(static fn (string $n): string => strtolower($n), self::classNames());
     }
 
     /**

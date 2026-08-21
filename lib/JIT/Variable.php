@@ -313,6 +313,11 @@ final class Variable {
     /** Compile-time class for `new Foo` results — survives VALUE-box assign (#26825). */
     public ?string $classUserType = null;
 
+    /**
+     * When this string is `serialize($htBackedSpl)`, the class name for unserialize tagging (#33665).
+     */
+    public ?string $serializedSplClassUserType = null;
+
     /** MCJIT/AOT foreach over a {@see Generator} object (#3074, #3115). */
     public bool $isJitGenerator = false;
 
