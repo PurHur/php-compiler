@@ -126,8 +126,28 @@ final class DomUserScriptAttributeCacheLlvm
             }
         }
 
-        return null;
+        return self::$pendingValueByKey[$key] ?? null;
     }
+
+    /**
+     * Record Attr::$value literal for createAttribute keys before setAttributeNode / appendChild (#33570).
+     */
+    public static function setLiteralValue(string $namespace, string $localName, string $value): void
+    {
+        $key = $namespace."\0".$localName;
+        if ([] === self::$byModule) {
+            self::$pendingValueByKey[$key] = $value;
+
+            return;
+        }
+        foreach (self::$byModule as &$state) {
+            $state['valueByKey'][$key] = $value;
+        }
+        unset($state);
+    }
+
+    /** @var array<string, string> */
+    private static array $pendingValueByKey = [];
 
     public static function storeLiteral(
         Context $context,
@@ -225,12 +245,13 @@ final class DomUserScriptAttributeCacheLlvm
             self::$byModule[$id] = [
                 'slotByKey' => [],
                 'presentByKey' => [],
-                'valueByKey' => [],
+                'valueByKey' => self::$pendingValueByKey,
                 'idBearingByKey' => self::$pendingIdBearing,
                 'lastCreateNamespace' => null,
                 'lastCreateLocalName' => null,
             ];
             self::$pendingIdBearing = [];
+            self::$pendingValueByKey = [];
         }
 
         return self::$byModule[$id];

@@ -312,7 +312,8 @@ final class JitDomAttributeNodeNS
         if (null === $ns || null === $local) {
             return self::boxNullResult($context);
         }
-        $prev = DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr);
+        $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
+        $prev = DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr, $valueLit);
         // Live attributes NamedNodeMap (#33128 / #33143): replace pin when
         // storeLiteral returns a prior Attr (same-name setAttributeNode).
         $objPtr = $context->getTypeFromString('__object__*');
@@ -343,6 +344,90 @@ final class JitDomAttributeNodeNS
         $context->builder->positionAtEnd($doneBlock);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * php-src: Element::appendChild(Attr) ≡ setAttributeNode (attribute map, not childNodes) (#33570).
+     *
+     * Pins the Attr, updates the createAttribute cache + open-tag xmlns bag so saveXML
+     * matches Zend (peer {@see DomElementSetAttribute} / #33509).
+     */
+    public static function installAttrOntoElement(Context $context, Value $element, Value $attr): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_install_attr');
+        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+
+        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        if (null === $local) {
+            return;
+        }
+        $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
+        DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr, $valueLit);
+
+        // ownerElement — php-src sets after attribute map install.
+        if (!$context->type->object->hasProperty(
+            $context->type->object->lookup(self::CLASS_ATTR),
+            self::PROP_OWNER_ELEMENT
+        )) {
+            self::ensureAttrPropertyLayout(
+                $context->type->object,
+                $context->type->object->lookup(self::CLASS_ATTR)
+            );
+        }
+        $ownerJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $element
+        );
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($attr, self::CLASS_ATTR, self::PROP_OWNER_ELEMENT),
+            $ownerJit,
+            JITVariable::TYPE_VALUE
+        );
+
+        $id = JitDomCreateElementAttrs::lastId();
+        if (null === $id) {
+            return;
+        }
+        // Non-NS createAttribute uses local name as the open-tag key (peer setAttribute).
+        JitDomCreateElementAttrs::set($id, $local, $valueLit);
+        $attrs = JitDomCreateElementAttrs::get($id);
+        $elementVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $element
+        );
+        self::syncSaveXmlAttrSuffix($context, $elementVar, $attrs);
+    }
+
+    /**
+     * Compile-time saveXML bag sync after setAttributeNode (peer setAttribute #33509 / #33570).
+     */
+    public static function syncSaveXmlAttrSuffixAfterSetAttributeNode(
+        Context $context,
+        JITVariable $elementArg
+    ): void {
+        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        if (null === $local) {
+            return;
+        }
+        $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
+        $id = $elementArg->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+        if (null === $id) {
+            return;
+        }
+        JitDomCreateElementAttrs::set($id, $local, $valueLit);
+        $attrs = $elementArg->compileTimeDomAttributes ?? JitDomCreateElementAttrs::get($id);
+        $attrs[$local] = $valueLit;
+        $elementArg->compileTimeDomAttributes = $attrs;
+        if (null === $elementArg->compileTimeDomElementId) {
+            $elementArg->compileTimeDomElementId = $id;
+        }
+        self::syncSaveXmlAttrSuffix($context, $elementArg, $attrs);
     }
 
     public static function materializeAttrFromLiterals(
