@@ -12755,6 +12755,11 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateUnserializeSplHtResultType(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall,
+                        $callArgs
+                    );
                     $this->attachBoundClosureInvokeMetadata($block, $op);
                     $this->propagateDomCreateElementCompileTimeTag(
                         $block->getOperand($op->arg1),
@@ -15580,6 +15585,77 @@ class JIT {
                 }
                 $this->context->bindVariableByName($resolved, $var);
             }
+        }
+    }
+
+    /**
+     * Literal `unserialize(O:…Spl/ArrayObject…)` — result is a VALUE object box without CFG
+     * userType. Tag classUserType so foreach uses splBackingHashtable instead of
+     * __value__readHashtable (#33654 / #33649; peer XMLReader/Directory factory tags).
+     *
+     * @param array<int|string, mixed> $callArgs
+     */
+    private function propagateUnserializeSplHtResultType(
+        Operand $result,
+        mixed $toCall,
+        array $callArgs
+    ): void {
+        if (!($toCall instanceof CoreFunc\Internal)) {
+            return;
+        }
+        if ('unserialize' !== strtolower($toCall->getName())) {
+            return;
+        }
+        if (!isset($callArgs[0]) || !($callArgs[0] instanceof Variable)) {
+            return;
+        }
+        $literal = JIT\JitStringArg::compileTimeLiteral($callArgs[0]);
+        if (null === $literal || '' === $literal) {
+            return;
+        }
+        // php-src ext/standard/var_unserializer.c — O:<len>:"ClassName":
+        if (1 !== preg_match('/^O:\d+:"([^"]+)":/', $literal, $m)) {
+            return;
+        }
+        $className = $m[1];
+        if (!\PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($className)) {
+            return;
+        }
+        $lc = strtolower(ltrim($className, '\\'));
+        $canonical = match ($lc) {
+            'arrayobject' => 'ArrayObject',
+            'arrayiterator' => 'ArrayIterator',
+            'recursivearrayiterator' => 'RecursiveArrayIterator',
+            'splfixedarray' => 'SplFixedArray',
+            'splstack' => 'SplStack',
+            'splqueue' => 'SplQueue',
+            'spldoublylinkedlist' => 'SplDoublyLinkedList',
+            'limititerator' => 'LimitIterator',
+            'appenditerator' => 'AppendIterator',
+            'regexiterator' => 'RegexIterator',
+            'callbackfilteriterator' => 'CallbackFilterIterator',
+            'cachingiterator' => 'CachingIterator',
+            'recursiveiteratoriterator' => 'RecursiveIteratorIterator',
+            'parentiterator' => 'ParentIterator',
+            'multipleiterator' => 'MultipleIterator',
+            'recursivetreeiterator' => 'RecursiveTreeIterator',
+            default => $className,
+        };
+        // Keep CFG operand as mixed/VALUE storage — retagging TYPE_OBJECT here makes
+        // TYPE_ASSIGN drop the unserialize VALUE box (count/dim empty; #33654).
+        // foreachContainerUserType reads classUserType on the JIT binding.
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        $var->classUserType = $canonical;
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->classUserType = $canonical;
+            }
+            $this->context->bindVariableByName($resolved, $var);
         }
     }
 
