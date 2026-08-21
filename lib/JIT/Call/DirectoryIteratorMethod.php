@@ -87,8 +87,8 @@ final class DirectoryIteratorMethod implements Call
             'isexecutable' => DirectoryIteratorJitHelper::compileIsExecutable($context, $args[0], $this->className),
             'getfileinfo' => DirectoryIteratorJitHelper::compileGetFileInfo($context, $args[0], $this->className),
             'getpathinfo' => DirectoryIteratorJitHelper::compileGetPathInfo($context, $args[0], $this->className),
-            // DirectoryIterator::__toString → filename; SplFileInfo::__toString → pathname (php-src).
-            '__tostring' => 'SplFileInfo' === $this->className
+            // DirectoryIterator::__toString → filename; SplFileInfo/SplFileObject → pathname (php-src).
+            '__tostring' => ('SplFileInfo' === $this->className || 'SplFileObject' === $this->className)
                 ? DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className)
                 : DirectoryIteratorJitHelper::compileGetFilename($context, $args[0], $this->className),
             default => throw new \LogicException(

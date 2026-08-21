@@ -1498,9 +1498,15 @@ class Context {
                 'SplFileInfo'
             );
         }
-        // SplFileObject — line snapshot `__spl_ht` for foreach (#28709).
+        // SplFileObject — line snapshot `__spl_ht` for foreach (#28709); path props (#33308).
         $this->type->object->lookup('SplFileObject');
         $this->functionProxies['splfileobject::__construct'] = new Call\SplFileObjectMethod('__construct');
+        foreach (['getFilename', 'getPathname', 'getPath', '__toString'] as $sfoPathMethod) {
+            $this->functionProxies['splfileobject::'.strtolower($sfoPathMethod)] = new Call\DirectoryIteratorMethod(
+                $sfoPathMethod,
+                'SplFileObject'
+            );
+        }
         // GlobIterator — glob snapshot + Iterator (#27422).
         $this->type->object->lookup('GlobIterator');
         foreach ([

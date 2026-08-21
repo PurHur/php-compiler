@@ -13,10 +13,11 @@ use PHPLLVM\Value;
 /**
  * Thin-AOT SplFileObject — snapshot lines into `__spl_ht` for foreach (#28709).
  *
- * Construct reads via libc file_get_contents then fgets-shaped line split.
+ * Construct reads via libc file_get_contents then NestedJIT explode line split.
+ * Also initialises SplFileInfo `__dir_path` / `__filename` (#33308).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
- * php-src: ext/spl/spl_directory.c — SplFileObject iterator
+ * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject___construct
  */
 final class SplFileObjectJitHelper
 {
@@ -46,6 +47,14 @@ final class SplFileObjectJitHelper
             $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_PATH),
             $pathVar,
             JITVariable::TYPE_STRING
+        );
+        // Parent SplFileInfo path props — getFilename/getPathname (#33308).
+        DirectoryIteratorJitHelper::initSplFileInfoPathProps(
+            $context,
+            $obj,
+            $pathStr,
+            self::CLASS_NAME,
+            false
         );
         $objectType->markObjectConstructed($obj);
 

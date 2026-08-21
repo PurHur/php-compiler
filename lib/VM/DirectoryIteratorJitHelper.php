@@ -198,18 +198,27 @@ final class DirectoryIteratorJitHelper
     }
 
     /**
-     * Split pathname into `__dir_path` + `__filename` (#33290 / #33304).
+     * Split pathname into `__dir_path` + `__filename` (#33290 / #33304 / #33308).
      *
      * Mirrors {@see \PHPCompiler\ext\spl\SplFileInfoStorage::splitPathComponents} + filename()
      * (not php dirname/basename — empty path vs ".", leading-slash single-segment filenames).
      * Call-site LLVM avoids NestedJIT PathJitHelper null-string ABI under thin AOT (#26905).
+     *
+     * @param string $className Declaring class for property slots (SplFileInfo or SplFileObject).
      */
-    private static function initSplFileInfoPathProps(Context $context, Value $obj, Value $pathStr): void
-    {
+    public static function initSplFileInfoPathProps(
+        Context $context,
+        Value $obj,
+        Value $pathStr,
+        string $className = 'SplFileInfo',
+        bool $markConstructed = true
+    ): void {
         [$dirPtr, $filePtr] = self::emitSplFileInfoPathParts($context, $pathStr);
-        self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_PATH, $dirPtr);
-        self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_FILENAME, $filePtr);
-        $context->type->object->markObjectConstructed($obj);
+        self::storeStringProperty($context, $obj, $className, self::PROP_PATH, $dirPtr);
+        self::storeStringProperty($context, $obj, $className, self::PROP_FILENAME, $filePtr);
+        if ($markConstructed) {
+            $context->type->object->markObjectConstructed($obj);
+        }
     }
 
     /**
