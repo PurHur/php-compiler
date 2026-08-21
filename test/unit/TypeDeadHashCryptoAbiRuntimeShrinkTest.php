@@ -46,8 +46,8 @@ final class TypeDeadHashCryptoAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (assert_fail still Type always-on; #33234 trigger_error dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_assert_fail'", $type);
+        // Next leftover sentinel (assert_fail_string still Type always-on; #33234 trigger_error / #33237 assert_fail dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_assert_fail_string'", $type);
         $this->assertStringContainsString('StringHashCrypto::ensureLinked', $type);
         // Peer #32875 already dropped these always-on shells
         $this->assertStringContainsString('#32875', $type);

@@ -545,12 +545,13 @@ class Type extends Builtin {
         // Type::initialize still StringPregMatch::ensureLinked). Leftover Type empty decls
         // vs Runtime ABI drift mint preg_replace.1 (#31894 / #32122). User-script
         // preg_replace() stays JitPregReplace / PregJitHelper (php-src ext/pcre/php_pcre.c).
-        $fntypeSuperglobalName = $this->context->context->functionType($i64, false, $strPtr);
-        $fnSuperglobalName = $this->context->module->addFunction(
-            '__compiler_is_superglobal_name',
-            $fntypeSuperglobalName
-        );
-        $this->context->registerFunction('__compiler_is_superglobal_name', $fnSuperglobalName);
+        // __compiler_is_superglobal_name always-on shell removed (#33235): StringSuperglobalName /
+        // SuperglobalNameRuntime owns the ABI (getNamedFunction first, then addFunction if
+        // absent; Type::initialize still StringSuperglobalName::ensureLinked on the full load
+        // path; JitSuperglobalName / JIT.php ensureLinked before lookup). Leftover Type empty
+        // decls vs Runtime ABI drift mint is_superglobal_name.1 (#31894 / #32122). User-script
+        // stays compiler_is_superglobal_name / JitSuperglobalName / SuperglobalNameJitHelper
+        // (php-src Zend/zend_compile.c — zend_is_auto_global_str).
         // getrandom(3) always-on decl removed (#32139): user-script random_bytes()
         // remains PHP helpers (`RandomBytesJitHelper` / `StringRandomBytes` /
         // `__compiler_random_bytes`) and NestedJIT uses /dev/urandom via
@@ -614,9 +615,12 @@ class Type extends Builtin {
         // trigger_error.1 (#31894 / #32122). User-script trigger_error()/user_error()
         // stay trigger_error_ / JitBuiltinWarning (php-src Zend/zend_execute_API.c,
         // main/php_errors.c, ext/standard/basic_functions.c).
-        $fntypeAssertFail = $this->context->context->functionType($void, false, $i8p, $sizeT);
-        $fnAssertFail = $this->context->module->addFunction('__compiler_assert_fail', $fntypeAssertFail);
-        $this->context->registerFunction('__compiler_assert_fail', $fnAssertFail);
+        // __compiler_assert_fail always-on shell removed (#33237): AssertFail owns the
+        // ABI (getNamedFunction first, then addFunction if absent; Type::initialize still
+        // AssertFail::ensureLinked on the full load path; JitAssert ensureLinked before
+        // lookup). Leftover Type empty decls vs Runtime ABI drift mint assert_fail.1
+        // (#31894 / #32122). User-script assert() stays JitAssert (php-src
+        // ext/standard/assert.c).
         $strPtr = $this->context->getTypeFromString('__string__*');
         $fntypeAssertFailStr = $this->context->context->functionType($void, false, $strPtr);
         $fnAssertFailStr = $this->context->module->addFunction(
@@ -707,17 +711,12 @@ class Type extends Builtin {
         // (php-src ext/standard/file.c — PHP_FUNCTION(str_getcsv)).
         $valuePtr = $this->context->getTypeFromString('__value__*');
         $i64 = $this->context->getTypeFromString('int64');
-        $i1 = $this->context->getTypeFromString('int1');
-        $fnParseUrl = $this->context->module->addFunction(
-            '__phpc_parse_url_component',
-            $this->context->context->functionType($void, false, $strPtr, $i64, $valuePtr)
-        );
-        $this->context->registerFunction('__phpc_parse_url_component', $fnParseUrl);
-        $fnParseUrlAssoc = $this->context->module->addFunction(
-            '__phpc_parse_url_assoc',
-            $this->context->context->functionType($void, false, $strPtr, $valuePtr)
-        );
-        $this->context->registerFunction('__phpc_parse_url_assoc', $fnParseUrlAssoc);
+        // __phpc_parse_url_component / __phpc_parse_url_assoc always-on shells removed (#33236):
+        // ParseUrlRuntime owns the ABI (getNamedFunction first via implementIfMissing +
+        // scopeLoweringToFunction #33226; Type::initialize still ParseUrlRuntime::ensureLinked;
+        // JitParseUrl ensureLinked before lookup). Leftover Type empty decls vs Runtime ABI
+        // drift mint parse_url_component.1 (#31894 / #32122). User-script parse_url() stays
+        // JitParseUrl / ParseUrlJitHelper (php-src ext/standard/url.c).
         // __compiler_getdate always-on shell removed (#32250): user-script getdate()
         // stays JitGetdate IR / GetdateJitHelper (#26900). StringGetdate::implement()
         // is an intentional no-op.
@@ -926,6 +925,7 @@ class Type extends Builtin {
         DateIntervalFormatRuntime::ensureLinked($this->context);
         StringDateTime::ensureLinked($this->context);
         StringDeployPath::ensureLinked($this->context);
+        StringSuperglobalName::ensureLinked($this->context);
         StringStrftime::ensureLinked($this->context);
         StringStrptime::ensureLinked($this->context);
         DefaultTimezoneRuntime::ensureLinked($this->context);
@@ -996,6 +996,7 @@ class Type extends Builtin {
         MetaTagsRuntime::ensureLinked($this->context);
         StringErrorLog::ensureLinked($this->context);
         GetHeadersRuntime::ensureLinked($this->context);
+        ParseUrlRuntime::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);

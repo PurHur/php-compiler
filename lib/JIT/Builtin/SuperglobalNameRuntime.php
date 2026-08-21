@@ -10,7 +10,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_is_superglobal_name via SuperglobalNameJitHelper PHP (#9271, #25091).
+ * JIT/AOT link for __compiler_is_superglobal_name via SuperglobalNameJitHelper PHP (#9271, #25091, #33235).
+ *
+ * Owns `__compiler_is_superglobal_name` ABI module-locally: {@see getNamedFunction} first, then
+ * {@see implementBridge}. Do not re-add empty always-on shells in {@see Type} — leftover decls
+ * mint is_superglobal_name.1 (#31894 / #32122 / #33235).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer TimezoneOffset #25042).
  * Replaces memcmp LLVM loop; SSOT {@see \PHPCompiler\ext\standard\SuperglobalNames}.

@@ -31,8 +31,8 @@ final class TypeDeadPregMatchAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (assert_fail still Type always-on; #33234 trigger_error dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_assert_fail'", $type);
+        // Next leftover sentinel (assert_fail_string still Type always-on; #33234 trigger_error / #33237 assert_fail dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_assert_fail_string'", $type);
         $this->assertStringContainsString('StringPregMatch::ensureLinked', $type);
     }
 
