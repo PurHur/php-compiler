@@ -11,11 +11,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_fgetcsv via fgets + CsvStrGetcsvJitHelper (#6750, #9444, #13440, #27180, #33189).
+ * JIT/AOT link for __compiler_fgetcsv via fgets + CsvStrGetcsvJitHelper (#6750, #9444, #13440, #27180, #33189, #33196).
  *
  * Owns `__compiler_fgetcsv` ABI module-locally: {@see getNamedFunction} first, then
  * {@see addFunction} if absent via {@see implementFgetcsvBridge}. Do not re-add empty
  * always-on shells in {@see Type} — leftover decls mint fgetcsv.1 (#31894 / #32122 / #33189).
+ * Mid-invoke ensureLinked pins {@see Context::$loweringLlvmFunction} to this bridge (#33196 / #27211).
  *
  * Thin AOT must not NestedJIT CsvJitHelper fgetcsvArgv
  * (VmFs::fgetcsv / builtinHandlerFrame missing under NestedJIT). Read one line via
@@ -87,81 +88,91 @@ final class StringFgetcsvJit
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('fgetcsv_bridge_entry');
-        $bodyBb = $fn->appendBasicBlock('fgetcsv_bridge_body');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->branch($bodyBb);
+        // Mid-invoke ensureLinked: loweringLlvmFunction is the user fn (#33196 / peer #27211).
+        $savedLowering = $context->loweringLlvmFunction;
+        $savedActive = $context->activeFunction;
+        $context->activeFunction = $abiName;
+        $context->loweringLlvmFunction = $fn instanceof \PHPLLVM\Value\Function_ ? $fn : null;
+        try {
+            $entry = $fn->appendBasicBlock('fgetcsv_bridge_entry');
+            $bodyBb = $fn->appendBasicBlock('fgetcsv_bridge_body');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->branch($bodyBb);
 
-        $context->builder->positionAtEnd($bodyBb);
-        $handle = $fn->getParam(0);
-        $length = $fn->getParam(1);
-        $separator = $fn->getParam(2);
-        $enclosure = $fn->getParam(3);
-        $escape = $fn->getParam(4);
+            $context->builder->positionAtEnd($bodyBb);
+            $handle = $fn->getParam(0);
+            $length = $fn->getParam(1);
+            $separator = $fn->getParam(2);
+            $enclosure = $fn->getParam(3);
+            $escape = $fn->getParam(4);
 
-        // php-src: length <= 0 means no limit; fgets ABI uses length as max (incl. NUL).
-        // Use a large positive cap when length < 1 (peer VmFs::fgetcsv null length).
-        $zero = $i64->constInt(0, false);
-        $defaultCap = $i64->constInt(8192, false);
-        $useDefault = $context->builder->icmp(Builder::INT_SLT, $length, $i64->constInt(1, false));
-        $fgetsLen = $context->builder->select($useDefault, $defaultCap, $length);
+            // php-src: length <= 0 means no limit; fgets ABI uses length as max (incl. NUL).
+            // Use a large positive cap when length < 1 (peer VmFs::fgetcsv null length).
+            $zero = $i64->constInt(0, false);
+            $defaultCap = $i64->constInt(8192, false);
+            $useDefault = $context->builder->icmp(Builder::INT_SLT, $length, $i64->constInt(1, false));
+            $fgetsLen = $context->builder->select($useDefault, $defaultCap, $length);
 
-        $lineRaw = $context->builder->call(
-            $context->lookupFunction('__compiler_fgets'),
-            $handle,
-            $fgetsLen
-        );
-        $lineIsNull = $context->builder->icmp(Builder::INT_EQ, $lineRaw, $strPtr->constNull());
-        $eofBb = $fn->appendBasicBlock('fgetcsv_bridge_eof');
-        $parseBb = $fn->appendBasicBlock('fgetcsv_bridge_parse');
-        $context->builder->branchIf($lineIsNull, $eofBb, $parseBb);
+            $lineRaw = $context->builder->call(
+                $context->lookupFunction('__compiler_fgets'),
+                $handle,
+                $fgetsLen
+            );
+            $lineIsNull = $context->builder->icmp(Builder::INT_EQ, $lineRaw, $strPtr->constNull());
+            $eofBb = $fn->appendBasicBlock('fgetcsv_bridge_eof');
+            $parseBb = $fn->appendBasicBlock('fgetcsv_bridge_parse');
+            $context->builder->branchIf($lineIsNull, $eofBb, $parseBb);
 
-        $context->builder->positionAtEnd($eofBb);
-        $context->builder->returnValue($htPtr->constNull());
+            $context->builder->positionAtEnd($eofBb);
+            $context->builder->returnValue($htPtr->constNull());
 
-        $context->builder->positionAtEnd($parseBb);
-        $lineSep = $context->builder->call($context->lookupFunction('__string__separate'), $lineRaw);
-        $strippedRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::stripHelperFunction($context),
-            [$lineSep]
-        );
-        $stripped = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strippedRaw);
-        $strippedSep = $context->builder->call($context->lookupFunction('__string__separate'), $stripped);
-        $sepSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $separator, ',');
-        $encSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $enclosure, '"');
-        $escSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $escape, '\\');
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::parseHelperFunction($context),
-            [$strippedSep, $sepSep, $encSep, $escSep]
-        );
-        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
-        // Line-terminator-only / empty helper [] → synthesize [null] (#27069 / #10623).
-        $sizeT = $context->getTypeFromString('size_t');
-        $htIsNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
-        $num = $context->builder->select(
-            $htIsNull,
-            $sizeT->constInt(0, false),
-            $context->builder->call($context->lookupFunction('__hashtable__getNumElements'), $ht)
-        );
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $sizeT->constInt(0, false));
-        $emptyBb = $fn->appendBasicBlock('fgetcsv_bridge_empty_null_row');
-        $retBb = $fn->appendBasicBlock('fgetcsv_bridge_ret');
-        $context->builder->branchIf($isEmpty, $emptyBb, $retBb);
+            $context->builder->positionAtEnd($parseBb);
+            $lineSep = $context->builder->call($context->lookupFunction('__string__separate'), $lineRaw);
+            $strippedRaw = JitNestedHelperCoerce::callHelper(
+                $context,
+                self::stripHelperFunction($context),
+                [$lineSep]
+            );
+            $stripped = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strippedRaw);
+            $strippedSep = $context->builder->call($context->lookupFunction('__string__separate'), $stripped);
+            $sepSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $separator, ',');
+            $encSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $enclosure, '"');
+            $escSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $escape, '\\');
+            $htRaw = JitNestedHelperCoerce::callHelper(
+                $context,
+                self::parseHelperFunction($context),
+                [$strippedSep, $sepSep, $encSep, $escSep]
+            );
+            $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+            // Line-terminator-only / empty helper [] → synthesize [null] (#27069 / #10623).
+            $sizeT = $context->getTypeFromString('size_t');
+            $htIsNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
+            $num = $context->builder->select(
+                $htIsNull,
+                $sizeT->constInt(0, false),
+                $context->builder->call($context->lookupFunction('__hashtable__getNumElements'), $ht)
+            );
+            $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $sizeT->constInt(0, false));
+            $emptyBb = $fn->appendBasicBlock('fgetcsv_bridge_empty_null_row');
+            $retBb = $fn->appendBasicBlock('fgetcsv_bridge_ret');
+            $context->builder->branchIf($isEmpty, $emptyBb, $retBb);
 
-        $context->builder->positionAtEnd($emptyBb);
-        $nullRow = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setNullAt'),
-            $nullRow,
-            $sizeT->constInt(0, false)
-        );
-        $context->builder->returnValue($nullRow);
+            $context->builder->positionAtEnd($emptyBb);
+            $nullRow = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setNullAt'),
+                $nullRow,
+                $sizeT->constInt(0, false)
+            );
+            $context->builder->returnValue($nullRow);
 
-        $context->builder->positionAtEnd($retBb);
-        $context->builder->returnValue($ht);
-        $context->registerFunction($abiName, $fn);
+            $context->builder->positionAtEnd($retBb);
+            $context->builder->returnValue($ht);
+            $context->registerFunction($abiName, $fn);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+        }
     }
 
     private static function parseHelperFunction(Context $context): LlvmFunction

@@ -13,12 +13,15 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_str_getcsv via CsvStrGetcsvJitHelper PHP (#9444, #13358, #26135, #27069).
+ * JIT/AOT link for __compiler_str_getcsv via CsvStrGetcsvJitHelper PHP (#9444, #13358, #26135, #27069, #33196).
  *
  * Helper compile: NestedJIT {@see CsvStrGetcsvJitHelper} only (no VmFs / fgetcsvArgv).
  * Bridge: default CSV chars via {@see Context::constantStringFromString} (not raw cstr →
  * `__string__separate`), and NestedJIT HashTable returns via {@see JitNestedHelperCoerce}.
- * php-src: ext/standard/string.c — PHP_FUNCTION(str_getcsv)
+ * Owns `__compiler_str_getcsv` module-locally (getNamedFunction first via
+ * {@see implementStrGetcsvBridge}). Do not re-add empty always-on shells in {@see Type} —
+ * leftover decls mint str_getcsv.1 (#31894 / #32122).
+ * php-src: ext/standard/file.c — PHP_FUNCTION(str_getcsv)
  */
 final class StringStrGetcsv
 {
@@ -100,87 +103,97 @@ final class StringStrGetcsv
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('str_getcsv_bridge_entry');
-        $nullBb = $fn->appendBasicBlock('str_getcsv_bridge_null');
-        $bodyBb = $fn->appendBasicBlock('str_getcsv_bridge_body');
-        $context->builder->positionAtEnd($entry);
+        // Mid-invoke ensureLinked: loweringLlvmFunction is the user fn (#33196 / peer #27211).
+        $savedLowering = $context->loweringLlvmFunction;
+        $savedActive = $context->activeFunction;
+        $context->activeFunction = $abiName;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
+        try {
+            $entry = $fn->appendBasicBlock('str_getcsv_bridge_entry');
+            $nullBb = $fn->appendBasicBlock('str_getcsv_bridge_null');
+            $bodyBb = $fn->appendBasicBlock('str_getcsv_bridge_body');
+            $context->builder->positionAtEnd($entry);
 
-        $input = $fn->getParam(0);
-        $separator = $fn->getParam(1);
-        $enclosure = $fn->getParam(2);
-        $escape = $fn->getParam(3);
+            $input = $fn->getParam(0);
+            $separator = $fn->getParam(1);
+            $enclosure = $fn->getParam(2);
+            $escape = $fn->getParam(3);
 
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $input, $strPtr->constNull()),
-            $nullBb,
-            $bodyBb
-        );
+            $context->builder->branchIf(
+                $context->builder->icmp(Builder::INT_EQ, $input, $strPtr->constNull()),
+                $nullBb,
+                $bodyBb
+            );
 
-        $context->builder->positionAtEnd($nullBb);
-        $context->builder->returnValue($htPtr->constNull());
+            $context->builder->positionAtEnd($nullBb);
+            $context->builder->returnValue($htPtr->constNull());
 
-        $context->builder->positionAtEnd($bodyBb);
-        $inputSep = $context->builder->call($context->lookupFunction('__string__separate'), $input);
-        // Empty / whitespace-free zero-length input → [null] without NestedJIT (return [null]
-        // aborts; empty-array helper + setNullAt left count() aborting — #27069).
-        $map = $context->structFieldMap['__string__'];
-        $inLen = $context->builder->load($context->builder->structGep($inputSep, $map['length']));
-        $sizeT = $context->getTypeFromString('size_t');
-        $isZeroLen = $context->builder->icmp(Builder::INT_EQ, $inLen, $sizeT->constInt(0, false));
-        $zeroLenBb = $fn->appendBasicBlock('str_getcsv_bridge_zero_len');
-        $parseBb = $fn->appendBasicBlock('str_getcsv_bridge_parse');
-        $context->builder->branchIf($isZeroLen, $zeroLenBb, $parseBb);
+            $context->builder->positionAtEnd($bodyBb);
+            $inputSep = $context->builder->call($context->lookupFunction('__string__separate'), $input);
+            // Empty / whitespace-free zero-length input → [null] without NestedJIT (return [null]
+            // aborts; empty-array helper + setNullAt left count() aborting — #27069).
+            $map = $context->structFieldMap['__string__'];
+            $inLen = $context->builder->load($context->builder->structGep($inputSep, $map['length']));
+            $sizeT = $context->getTypeFromString('size_t');
+            $isZeroLen = $context->builder->icmp(Builder::INT_EQ, $inLen, $sizeT->constInt(0, false));
+            $zeroLenBb = $fn->appendBasicBlock('str_getcsv_bridge_zero_len');
+            $parseBb = $fn->appendBasicBlock('str_getcsv_bridge_parse');
+            $context->builder->branchIf($isZeroLen, $zeroLenBb, $parseBb);
 
-        $context->builder->positionAtEnd($zeroLenBb);
-        $context->builder->returnValue(self::allocNullRowHashtable($context));
+            $context->builder->positionAtEnd($zeroLenBb);
+            $context->builder->returnValue(self::allocNullRowHashtable($context));
 
-        $context->builder->positionAtEnd($parseBb);
-        // php-src / fgetcsv bridge — strip trailing CR/LF before NestedJIT parse (#28994).
-        // Helper also strips (VmCsv parity for host/JIT); double-strip is a no-op.
-        $strippedRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::STRIP_LINE_HELPER),
-            [$inputSep]
-        );
-        $stripped = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strippedRaw);
-        $strippedSep = $context->builder->call($context->lookupFunction('__string__separate'), $stripped);
-        $stripLen = $context->builder->load($context->builder->structGep($strippedSep, $map['length']));
-        $stripZero = $context->builder->icmp(Builder::INT_EQ, $stripLen, $sizeT->constInt(0, false));
-        $stripZeroBb = $fn->appendBasicBlock('str_getcsv_bridge_strip_zero');
-        $stripParseBb = $fn->appendBasicBlock('str_getcsv_bridge_strip_parse');
-        $context->builder->branchIf($stripZero, $stripZeroBb, $stripParseBb);
+            $context->builder->positionAtEnd($parseBb);
+            // php-src / fgetcsv bridge — strip trailing CR/LF before NestedJIT parse (#28994).
+            // Helper also strips (VmCsv parity for host/JIT); double-strip is a no-op.
+            $strippedRaw = JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, self::STRIP_LINE_HELPER),
+                [$inputSep]
+            );
+            $stripped = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strippedRaw);
+            $strippedSep = $context->builder->call($context->lookupFunction('__string__separate'), $stripped);
+            $stripLen = $context->builder->load($context->builder->structGep($strippedSep, $map['length']));
+            $stripZero = $context->builder->icmp(Builder::INT_EQ, $stripLen, $sizeT->constInt(0, false));
+            $stripZeroBb = $fn->appendBasicBlock('str_getcsv_bridge_strip_zero');
+            $stripParseBb = $fn->appendBasicBlock('str_getcsv_bridge_strip_parse');
+            $context->builder->branchIf($stripZero, $stripZeroBb, $stripParseBb);
 
-        $context->builder->positionAtEnd($stripZeroBb);
-        $context->builder->returnValue(self::allocNullRowHashtable($context));
+            $context->builder->positionAtEnd($stripZeroBb);
+            $context->builder->returnValue(self::allocNullRowHashtable($context));
 
-        $context->builder->positionAtEnd($stripParseBb);
-        $sepSep = self::coerceOptionalCsvString($context, $separator, ',');
-        $encSep = self::coerceOptionalCsvString($context, $enclosure, '"');
-        $escSep = self::coerceOptionalCsvString($context, $escape, '\\');
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::STR_GETCSV_HELPER),
-            [$strippedSep, $sepSep, $encSep, $escSep]
-        );
-        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
-        // Line-terminator-only rows: helper returns [] → synthesize [null] (#27069 / #10623).
-        $htIsNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
-        $num = $context->builder->select(
-            $htIsNull,
-            $sizeT->constInt(0, false),
-            $context->builder->call($context->lookupFunction('__hashtable__getNumElements'), $ht)
-        );
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $sizeT->constInt(0, false));
-        $emptyBb = $fn->appendBasicBlock('str_getcsv_bridge_empty_null_row');
-        $retBb = $fn->appendBasicBlock('str_getcsv_bridge_ret');
-        $context->builder->branchIf($isEmpty, $emptyBb, $retBb);
+            $context->builder->positionAtEnd($stripParseBb);
+            $sepSep = self::coerceOptionalCsvString($context, $separator, ',');
+            $encSep = self::coerceOptionalCsvString($context, $enclosure, '"');
+            $escSep = self::coerceOptionalCsvString($context, $escape, '\\');
+            $htRaw = JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, self::STR_GETCSV_HELPER),
+                [$strippedSep, $sepSep, $encSep, $escSep]
+            );
+            $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+            // Line-terminator-only rows: helper returns [] → synthesize [null] (#27069 / #10623).
+            $htIsNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
+            $num = $context->builder->select(
+                $htIsNull,
+                $sizeT->constInt(0, false),
+                $context->builder->call($context->lookupFunction('__hashtable__getNumElements'), $ht)
+            );
+            $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $sizeT->constInt(0, false));
+            $emptyBb = $fn->appendBasicBlock('str_getcsv_bridge_empty_null_row');
+            $retBb = $fn->appendBasicBlock('str_getcsv_bridge_ret');
+            $context->builder->branchIf($isEmpty, $emptyBb, $retBb);
 
-        $context->builder->positionAtEnd($emptyBb);
-        $context->builder->returnValue(self::allocNullRowHashtable($context));
+            $context->builder->positionAtEnd($emptyBb);
+            $context->builder->returnValue(self::allocNullRowHashtable($context));
 
-        $context->builder->positionAtEnd($retBb);
-        $context->builder->returnValue($ht);
-        $context->registerFunction($abiName, $fn);
+            $context->builder->positionAtEnd($retBb);
+            $context->builder->returnValue($ht);
+            $context->registerFunction($abiName, $fn);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+        }
     }
 
     /** php-src empty / CRLF-only CSV row → one NULL field (#4922 / #10623). */

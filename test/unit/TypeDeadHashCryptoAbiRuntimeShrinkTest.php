@@ -46,8 +46,8 @@ final class TypeDeadHashCryptoAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (proc_close dropped in #33118; random_bytes in #33160).
-        $this->assertStringContainsString("registerFunction('__compiler_str_getcsv'", $type);
+        // Next leftover sentinel (serialize_hashtable still Type always-on; #33196 str_getcsv dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_serialize_hashtable'", $type);
         $this->assertStringContainsString('StringHashCrypto::ensureLinked', $type);
         // Peer #32875 already dropped these always-on shells
         $this->assertStringContainsString('#32875', $type);
