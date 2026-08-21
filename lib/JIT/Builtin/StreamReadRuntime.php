@@ -173,6 +173,8 @@ final class StreamReadRuntime
         \PHPCompiler\ext\standard\JitStreamIoKernel::implementFgetcForce($context);
         \PHPCompiler\ext\standard\JitStreamIoKernel::implementFtruncateForce($context);
         \PHPCompiler\ext\standard\JitStreamIoKernel::implementFflushForce($context);
+        // feof NestedJIT cannot see libc FILE* (php://temp tmpfile) — sticky 1 (#33555).
+        \PHPCompiler\ext\standard\JitStreamIoKernel::implementFeofForce($context);
         // fstat NestedJIT VmFs cannot see libc FILE* table; return-type mismatch under thin AOT.
         StreamFstatRuntime::forceLibcFstat($context);
     }
