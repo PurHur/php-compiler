@@ -175,6 +175,12 @@ final class JitDomElementTextContent
                     JITVariable::TYPE_STRING
                 );
             }
+            // createAttribute + $attr->value = 'lit' → valueByKey for setAttributeNode /
+            // appendChild(Attr) saveXML open-tag sync (#33570 / peer #33509).
+            $valueLit = JitStringBuiltinArg::compileTimeLiteral($value) ?? $value->compileTimeString;
+            if (null !== $valueLit) {
+                DomUserScriptAttributeCacheLlvm::rememberLiteralValue($valueLit);
+            }
 
             return true;
         }

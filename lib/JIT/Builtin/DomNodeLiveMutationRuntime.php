@@ -9,6 +9,7 @@ use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\dom\DomExceptionConstants;
 use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
 use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
+use PHPCompiler\ext\dom\JitDomAttributeNodeNS;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
@@ -289,6 +290,19 @@ final class DomNodeLiveMutationRuntime
                 $parentObj = self::receiverObject($context, $receiver);
                 foreach ($extraArgs as $arg) {
                     $childObj = self::mutationArgObject($context, $arg);
+                    // Attr → attribute map (php-src dom_node_append_child); skip hierarchy
+                    // assert / tag-list bump used for element children (#33570).
+                    $bbAttr = BasicBlockHelper::append($context, 'dom_mut_ac_attr');
+                    $bbChild = BasicBlockHelper::append($context, 'dom_mut_ac_child');
+                    $bbNext = BasicBlockHelper::append($context, 'dom_mut_ac_next');
+                    $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $childObj);
+                    $context->builder->branchIf($isAttr, $bbAttr, $bbChild);
+
+                    $context->builder->positionAtEnd($bbAttr);
+                    JitDomAttributeNodeNS::installAttrOnElement($context, $parentObj, $childObj);
+                    $context->builder->branch($bbNext);
+
+                    $context->builder->positionAtEnd($bbChild);
                     self::assertTreeMutationChildBeforeLiveSlots($context, $parentObj, $childObj);
                     JitDomAppendChildLiveSlots::sync(
                         $context,
@@ -296,6 +310,9 @@ final class DomNodeLiveMutationRuntime
                         $childObj
                     );
                     DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $arg);
+                    $context->builder->branch($bbNext);
+
+                    $context->builder->positionAtEnd($bbNext);
                 }
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
                 // Rebuild INNER_XML from live children — compile-time tag concat fails when

@@ -345,6 +345,60 @@ final class JitDomAttributeNodeNS
         return $context->builder->load($resultSlot);
     }
 
+    /**
+     * php-src dom_node_append_child: Attr installs via the attribute map, not child links (#33570).
+     *
+     * Same observable as setAttributeNode — pin NamedNodeMap + PROP_USER_SCRIPT_XMLNS_ATTR.
+     * Linking Attr as an Element child walks wrong slots and SIGSEGVs.
+     */
+    public static function installAttrOnElement(
+        Context $context,
+        Value $element,
+        Value $attr
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_attr_install');
+        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        if (null === $local) {
+            // No createAttribute key — still pin to avoid element-child SIGSEGV.
+            JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+
+            return;
+        }
+        $value = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local)
+            ?? DomUserScriptAttributeCacheLlvm::pendingLiteralValue()
+            ?? '';
+        $prev = DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr, $value);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $prev,
+            $objPtr->constNull()
+        );
+        $tag = (string) (self::$boxSeq++);
+        $nullBlock = BasicBlockHelper::append($context, 'dom_ac_attr_prev_null_'.$tag);
+        $objBlock = BasicBlockHelper::append($context, 'dom_ac_attr_prev_obj_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'dom_ac_attr_prev_done_'.$tag);
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        JitDomNamedNodeMap::removeAttrPin($context, $element, $prev);
+        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        $attrs = DomUserScriptAttributeCacheLlvm::presentNonNsAttrsForSaveXml();
+        $attrs[$local] = $value;
+        $suffix = JitDomCreateElementAttrs::formatSuffix($attrs);
+        JitDomCreateElement::storeUserScriptXmlnsAttr($context, $element, $suffix);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $element);
+    }
+
     public static function materializeAttrFromLiterals(
         Context $context,
         string $namespace,

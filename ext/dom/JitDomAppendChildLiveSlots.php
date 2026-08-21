@@ -31,6 +31,8 @@ use PHPLLVM\Value;
  * DocumentFragment stand-ins (`nodeName` `#document-fragment`) expand children
  * onto the parent (php-src fragment move); linking the fragment itself left
  * `#document-fragment` in childNodes and SIGSEGV'd on item(N) (#33312).
+ * Attr children install via the attribute map (php-src dom_node_append_child),
+ * not Element first/last/sibling slots (#33570).
  * insertBefore before a middle sibling rebuilds INNER_XML from the live chain
  * so saveXML order matches childNodes (#33327). Repeated fragment expands in one
  * main use uniquified BB labels + alloca piece merge (#33335). Child open-tag
@@ -54,10 +56,21 @@ final class JitDomAppendChildLiveSlots
         BasicBlockHelper::ensureOpenInsertBlock($context, self::tag('dom_ac_live_slots'));
         self::ensureLayout($context);
 
+        // php-src: Attr → attribute map (not child sibling links) (#33570).
+        $bbAttr = BasicBlockHelper::append($context, self::tag('dom_acls_attr'));
+        $bbNotAttr = BasicBlockHelper::append($context, self::tag('dom_acls_not_attr'));
+        $bbSyncEnd = BasicBlockHelper::append($context, self::tag('dom_acls_sync_end'));
+        $isAttr = self::isAttrNode($context, $child);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
+
+        $context->builder->positionAtEnd($bbAttr);
+        JitDomAttributeNodeNS::installAttrOnElement($context, $parent, $child);
+        $context->builder->branch($bbSyncEnd);
+
+        $context->builder->positionAtEnd($bbNotAttr);
         // php-src: DocumentFragment children move onto the parent; fragment stays empty (#33312).
         $bbFrag = BasicBlockHelper::append($context, self::tag('dom_acls_frag'));
         $bbNormal = BasicBlockHelper::append($context, self::tag('dom_acls_normal'));
-        $bbSyncEnd = BasicBlockHelper::append($context, self::tag('dom_acls_sync_end'));
         $isFrag = self::isDocumentFragmentNode($context, $child);
         $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
 
@@ -70,6 +83,42 @@ final class JitDomAppendChildLiveSlots
         $context->builder->branch($bbSyncEnd);
 
         $context->builder->positionAtEnd($bbSyncEnd);
+    }
+
+    /**
+     * DOMAttr / Dom\Attr — must not use Element child-edge layout (#33570).
+     *
+     * Peer: {@see JitDomSaveXMLUserScript} Attr dump gate.
+     */
+    public static function isAttrNode(Context $context, Value $node): Value
+    {
+        $objectType = $context->type->object;
+        $classicId = $objectType->lookup('DOMAttr');
+        $livingId = $objectType->lookup('Dom\\Attr');
+        foreach ([$classicId, $livingId] as $classId) {
+            foreach (['nodeName', 'name', 'value'] as $prop) {
+                if (!$objectType->hasProperty($classId, $prop)) {
+                    $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
+                }
+            }
+        }
+        $map = $context->structFieldMap['__object__'];
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($node, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $isClassic = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($classicId, false)
+        );
+        $isLiving = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($livingId, false)
+        );
+
+        return $context->builder->or($isClassic, $isLiving);
     }
 
     /**

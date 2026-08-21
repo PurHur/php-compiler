@@ -41,6 +41,9 @@ final class DomUserScriptAttributeCacheLlvm
     /** @var null|array{0: string, 1: string} */
     private static ?array $pendingCreate = null;
 
+    /** Attr::$value literal write before setAttributeNode / appendChild(Attr) (#33570). */
+    private static ?string $pendingValue = null;
+
     public static function lastCreateNamespace(): ?string
     {
         return self::$pendingCreate[0] ?? null;
@@ -49,6 +52,53 @@ final class DomUserScriptAttributeCacheLlvm
     public static function lastCreateLocalName(): ?string
     {
         return self::$pendingCreate[1] ?? null;
+    }
+
+    /**
+     * Record Attr::$value / nodeValue literal for the pending createAttribute key (#33570).
+     *
+     * php-src: attr.c stores the value on the Attr; saveXML / setAttributeNode open-tag
+     * sync need the same string at compile time for PROP_USER_SCRIPT_XMLNS_ATTR.
+     */
+    public static function rememberLiteralValue(string $value): void
+    {
+        self::$pendingValue = $value;
+        if (null === self::$pendingCreate) {
+            return;
+        }
+        $key = self::$pendingCreate[0]."\0".self::$pendingCreate[1];
+        foreach (self::$byModule as &$state) {
+            $state['valueByKey'][$key] = $value;
+        }
+        unset($state);
+    }
+
+    public static function pendingLiteralValue(): ?string
+    {
+        return self::$pendingValue;
+    }
+
+    /**
+     * Non-NS Attr name=>value pairs present in the module cache (saveXML open-tag) (#33570).
+     *
+     * @return array<string, string>
+     */
+    public static function presentNonNsAttrsForSaveXml(): array
+    {
+        $attrs = [];
+        foreach (self::$byModule as $state) {
+            foreach ($state['presentByKey'] as $key => $_) {
+                $parts = explode("\0", $key, 2);
+                $ns = $parts[0];
+                $local = $parts[1] ?? '';
+                if ('' !== $ns || '' === $local) {
+                    continue;
+                }
+                $attrs[$local] = $state['valueByKey'][$key] ?? self::$pendingValue ?? '';
+            }
+        }
+
+        return $attrs;
     }
 
     /** Compile-time cache presence check for getAttribute / hasAttribute (#19281, #27108). */
@@ -146,6 +196,13 @@ final class DomUserScriptAttributeCacheLlvm
         $context->builder->store($attr, $global);
         $key = $namespace."\0".$localName;
         $state['presentByKey'][$key] = true;
+        if (null === $value && null !== self::$pendingValue
+            && null !== self::$pendingCreate
+            && self::$pendingCreate[0] === $namespace
+            && self::$pendingCreate[1] === $localName
+        ) {
+            $value = self::$pendingValue;
+        }
         if (null !== $value) {
             $state['valueByKey'][$key] = $value;
         }
