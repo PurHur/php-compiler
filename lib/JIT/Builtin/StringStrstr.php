@@ -10,14 +10,19 @@ use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\VM\VmStringCompare;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_;
 
 /**
- * JIT/AOT lowering for strstr()/stristr() (#14778, #27185).
+ * JIT/AOT lowering for strstr()/stristr() (#14778, #27185, #23332).
  *
  * Search via {@see VmStringCompare::findOffset} (memcmp IR) + haystack slice —
  * NestedJIT {@see \PHPCompiler\ext\standard\StrstrJitHelper} mis-materializes
  * nullable {@see __string__*} under thin AOT (silent false). Fresh scan ABI avoids
  * stale helper-runtime `phpc_strstr` NestedJIT bridges (peer {@see StringStrpbrk} / #27055).
+ *
+ * Thin AOT call-site {@see ensureLinked} must {@see BasicBlockHelper::scopeLoweringToFunction}
+ * so {@see VmStringCompare::findOffset} blocks are not appended to user main (#27211 /
+ * Module.php:180 — cross-function args / basic blocks).
  *
  * SSOT: {@see \PHPCompiler\ext\standard\VmString} (compile-time fold + VM).
  * php-src: ext/standard/string.c — PHP_FUNCTION(strstr), PHP_FUNCTION(stristr)
@@ -137,6 +142,26 @@ final class StringStrstr
             return;
         }
 
+        // Mid-invoke ensureLinked: loweringLlvmFunction is the user fn (#27211 / #23332).
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abi, static function () use (
+            $context,
+            $fn,
+            $abi,
+            $entryName,
+            $caseInsensitive
+        ): void {
+            self::emitBodyIntoFunction($context, $fn, $abi, $entryName, $caseInsensitive);
+        });
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitBodyIntoFunction(
+        Context $context,
+        Function_ $fn,
+        string $abi,
+        string $entryName,
+        bool $caseInsensitive
+    ): void {
         $haystack = $fn->getParam(0);
         $needle = $fn->getParam(1);
         $beforeNeedle = $fn->getParam(2);
