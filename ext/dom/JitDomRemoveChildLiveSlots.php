@@ -21,6 +21,7 @@ use PHPLLVM\Value;
  * update (php-src ext/dom/nodelist.c live collection). Replacing the list with a
  * fresh length-0 object left held lists stale and refetch at 0 while siblings remain.
  * Attr child: Not Found before sibling unlink (#33596 / peer #33587).
+ * Non-child (parentNode !== parent): Not Found before unlink (#33599).
  *
  * Reference: php-src ext/dom/node.c dom_node_remove_child.
  */
@@ -49,6 +50,8 @@ final class JitDomRemoveChildLiveSlots
         );
 
         $context->builder->positionAtEnd($bbNotAttr);
+        // php-src / VmDom::assertChildOfParent — Not Found when child.parent != parent (#33599).
+        self::rejectIfNotChildOfParent($context, $parent, $child);
         $objPtrTy = $context->getTypeFromString('__object__*');
         $nullBox = self::nullValueVar($context);
 
@@ -121,6 +124,36 @@ final class JitDomRemoveChildLiveSlots
         $newSecond->addIncoming($objPtrTy->constNull(), $nullPred);
         $newSecond->addIncoming($loadedSecond, $readPred);
         self::decrementChildNodesLengthInPlace($context, $parent, $newFirst, $newSecond);
+    }
+
+    /**
+     * php-src dom_node_remove_child / VmDom::assertChildOfParent (#33599).
+     *
+     * Thin-AOT previously unlinked any object pointer and returned it — silent
+     * wrong output when the node was never a child or belonged to another parent.
+     */
+    private static function rejectIfNotChildOfParent(Context $context, Value $parent, Value $child): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rm_parent_guard');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $curParent = self::loadSibling($context, $child, VmDom::PROP_PARENT_NODE, 'dom_rm_chk_parent');
+        $isChild = $context->builder->icmp(Builder::INT_EQ, $curParent, $parent);
+        $bbBad = BasicBlockHelper::append($context, 'dom_rm_not_child');
+        $bbOk = BasicBlockHelper::append($context, 'dom_rm_is_child');
+        $context->builder->branchIf($isChild, $bbOk, $bbBad);
+
+        $context->builder->positionAtEnd($bbBad);
+        \PHPCompiler\JIT\TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Not Found Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::NOT_FOUND_ERR
+        );
+
+        $context->builder->positionAtEnd($bbOk);
     }
 
     /**
