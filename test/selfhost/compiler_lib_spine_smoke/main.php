@@ -491,6 +491,7 @@ require_once __DIR__.'/../../../ext/dom/JitDomChildNodeSiblingInsert.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateComment.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateCDATASection.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateDocumentFragment.php';
+require_once __DIR__.'/../../../ext/dom/JitDomDocumentFragmentExpand.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateDocumentType.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateElement.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateElementNS.php';

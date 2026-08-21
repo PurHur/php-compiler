@@ -24,6 +24,9 @@ use PHPLLVM\Value;
  * Middle-child moves that only checked first/last took the fresh-append path and
  * SIGSEGV'd when walking childNodes (#32929).
  *
+ * DocumentFragment stand-ins (nodeName {@code #document-fragment}) expand via
+ * {@see JitDomDocumentFragmentExpand} before membership checks (#33312).
+ *
  * Reference: php-src ext/dom/node.c dom_node_append_child.
  * Peer: {@see JitDomInsertBefore}.
  */
@@ -39,6 +42,20 @@ final class JitDomAppendChildLiveSlots
         $childJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $child);
         $nullBox = self::nullValueVar($context);
 
+        $bbDone = BasicBlockHelper::append($context, 'dom_acls_done');
+        $bbNotFrag = BasicBlockHelper::append($context, 'dom_acls_not_frag');
+        // php-src: appendChild(DocumentFragment) steals children; stand-in must not
+        // become a childNodes entry (#33312 / VmDom::insertFragmentChildrenBefore).
+        JitDomDocumentFragmentExpand::branchAppendIfFragment(
+            $context,
+            $parent,
+            $child,
+            $bbNotFrag,
+            $bbDone
+        );
+
+        $context->builder->positionAtEnd($bbNotFrag);
+
         // Detect same-parent membership without parentNode (#27476 / #32929):
         // first/last identity OR already linked via prev/next (middle children).
         $curFirst0 = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_acls_chk_first');
@@ -52,7 +69,6 @@ final class JitDomAppendChildLiveSlots
         $isLinked = $context->builder->or($hasPrev, $hasNext);
         $isMember = $context->builder->or($context->builder->or($isFirstChild, $isLastChild), $isLinked);
 
-        $bbDone = BasicBlockHelper::append($context, 'dom_acls_done');
         $bbAlreadyLast = BasicBlockHelper::append($context, 'dom_acls_already_last');
         $bbNotLast = BasicBlockHelper::append($context, 'dom_acls_not_last');
         // php-src: appendChild of already-last child is a no-op (still returns child).
