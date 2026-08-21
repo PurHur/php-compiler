@@ -29,6 +29,15 @@ final class JitDomGetElementsByTagNameUserScript
         return self::$lastTagQuery;
     }
 
+    /** Clear tag query so childNodes foreach does not reuse a stale tag (#33082). */
+    public static function clearTagQueryState(): void
+    {
+        self::$lastTagQuery = null;
+        self::$lastNsUri = null;
+        self::$lastNsLocal = null;
+        self::$lastNsFromElement = false;
+    }
+
     public static function shouldUse(Context $context): bool
     {
         return JitDomLoadHTMLUserScript::shouldUse($context);
@@ -55,6 +64,7 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
         self::$lastTagQuery = null;
+        JitDomNodeListForeachSnapshot::clearChildNodesFetch();
         if (\count($args) < 2) {
             return null;
         }

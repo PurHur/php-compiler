@@ -9624,7 +9624,7 @@ class JIT {
                     JIT\IteratorHelper::compileReset(
                         $this->context,
                         $array,
-                        self::foreachContainerUserType($arrayOp)
+                        self::foreachContainerUserType($arrayOp, $array)
                     );
                     break;
                 case OpCode::TYPE_ITER_VALID:
@@ -9639,7 +9639,7 @@ class JIT {
                     $valid = JIT\IteratorHelper::compileValid(
                         $this->context,
                         $array,
-                        self::foreachContainerUserType($arrayOp)
+                        self::foreachContainerUserType($arrayOp, $array)
                     );
                     $this->assignOperandValue($block->getOperand($op->arg1), $valid);
                     break;
@@ -9655,7 +9655,7 @@ class JIT {
                     $key = JIT\IteratorHelper::compileKey(
                         $this->context,
                         $array,
-                        self::foreachContainerUserType($arrayOp)
+                        self::foreachContainerUserType($arrayOp, $array)
                     );
                     $this->assignOperand($block->getOperand($op->arg1), $key);
                     break;
@@ -9684,7 +9684,7 @@ class JIT {
                         $value = JIT\IteratorHelper::compileValueByRef(
                             $this->context,
                             $array,
-                            self::foreachContainerUserType($arrayOp),
+                            self::foreachContainerUserType($arrayOp, $array),
                             $this
                         );
                         $this->context->setVariableOp($destOp, $value);
@@ -9696,7 +9696,7 @@ class JIT {
                     $value = JIT\IteratorHelper::compileValue(
                         $this->context,
                         $array,
-                        self::foreachContainerUserType($arrayOp)
+                        self::foreachContainerUserType($arrayOp, $array)
                     );
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
@@ -26222,8 +26222,10 @@ class JIT {
         );
     }
 
-    private static function foreachContainerUserType(Operand $arrayOp): ?string
-    {
+    private static function foreachContainerUserType(
+        Operand $arrayOp,
+        ?JIT\Variable $arrayVar = null
+    ): ?string {
         $userType = $arrayOp->type->userType ?? null;
         if (null !== $userType && '' !== $userType) {
             return $userType;
@@ -26233,6 +26235,11 @@ class JIT {
             if (null !== $decl && 0 === strcasecmp($decl, 'SplObjectStorage')) {
                 return 'SplObjectStorage';
             }
+        }
+        // Property fetches (childNodes) tag DOMNodeList on the JIT binding, not CFG userType (#33082).
+        $tagged = $arrayVar->classUserType ?? null;
+        if (null !== $tagged && '' !== $tagged) {
+            return $tagged;
         }
 
         return null;

@@ -44,6 +44,8 @@ final class JitDomChildNodesProperty
         // XPath query()/evaluate() NodeLists share GLOBAL_COUNT; clear so item()
         // on this list does not materialize the XPath snapshot (#32620).
         JitDomXPathQueryUserScript::clearQueryState();
+        // Stamp for thin-AOT foreach snapshot (#33082) — CFG userType is often unset.
+        JitDomNodeListForeachSnapshot::markChildNodesFetch();
 
         $slotClass = self::slotClass();
         $slotClassId = $objectType->lookup($slotClass);

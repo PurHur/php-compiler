@@ -10,19 +10,45 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 /**
- * Thin-AOT foreach over DOMNodeList via compile-time snapshot → hashtable (#32707).
+ * Thin-AOT foreach over DOMNodeList via compile-time snapshot → hashtable (#32707, #33082).
  *
  * Iterator protocol and runtime item() inside the foreach CFG both break module
  * verification or abort under nested JIT. For user-script getElementsByTagName lists,
  * materialize every item at Iterator_Reset from compile-time XML (peer #27275).
+ * For {@code $el->childNodes} (no tag query), snapshot direct children of loadXML
+ * / loadHTML markup (#33082) — otherwise Iterator protocol SIGSEGVs.
  *
  * php-src: ext/dom/nodelist.c — InternalIterator; Zend copies non-array Traversables
  * when foreach stability requires a snapshot.
  */
 final class JitDomNodeListForeachSnapshot
 {
+    /** Set when thin-AOT last fetched DOMNode::$childNodes (#33082). */
+    private static bool $lastChildNodesFetch = false;
+
+    public static function markChildNodesFetch(): void
+    {
+        self::$lastChildNodesFetch = true;
+        // Child list is not a tag query — clear so canLower prefers direct children.
+        JitDomGetElementsByTagNameUserScript::clearTagQueryState();
+        JitDomXPathQueryUserScript::clearQueryState();
+    }
+
+    public static function clearChildNodesFetch(): void
+    {
+        self::$lastChildNodesFetch = false;
+    }
+
+    public static function lastWasChildNodesFetch(): bool
+    {
+        return self::$lastChildNodesFetch;
+    }
+
     public static function isDomNodeListForeach(?string $containerUserType): bool
     {
+        if (self::$lastChildNodesFetch) {
+            return true;
+        }
         if (null === $containerUserType || '' === $containerUserType) {
             return false;
         }
@@ -35,28 +61,53 @@ final class JitDomNodeListForeachSnapshot
             || 'dom\\dtdnamednodemap' === $lc;
     }
 
-    public static function canLower(Context $context, JITVariable $array): bool
+    /** True for DOMNodeList / HTMLCollection — not NamedNodeMap (attrs need a different bake). */
+    public static function isChildNodesStyleList(?string $containerUserType): bool
     {
+        if (self::$lastChildNodesFetch) {
+            return true;
+        }
+        if (null === $containerUserType || '' === $containerUserType) {
+            return false;
+        }
+        $lc = strtolower(ltrim($containerUserType, '\\'));
+
+        return 'domnodelist' === $lc
+            || 'dom\\nodelist' === $lc
+            || 'dom\\htmlcollection' === $lc;
+    }
+
+    public static function canLower(
+        Context $context,
+        JITVariable $array,
+        ?string $containerUserType = null
+    ): bool {
         if (!JitDomLoadHTMLUserScript::shouldUse($context)) {
             return false;
         }
         $tag = JitDomGetElementsByTagNameUserScript::lastTagQuery();
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
-        if (null === $tag || null === $xml) {
-            $xpathTag = JitDomXPathQueryUserScript::lastQueryTag();
-
-            return null !== $xml && null !== $xpathTag && '' !== $xpathTag;
+        if (null !== $tag && null !== $xml) {
+            return true;
         }
-
-        return true;
+        $xpathTag = JitDomXPathQueryUserScript::lastQueryTag();
+        if (null !== $xml && null !== $xpathTag && '' !== $xpathTag) {
+            return true;
+        }
+        // childNodes / HTMLCollection with compile-time document markup (#33082).
+        return null !== $xml && self::isChildNodesStyleList($containerUserType);
     }
 
-    public static function compileReset(Context $context, JITVariable $array, JITVariable $slotKey): void
-    {
-        if (!self::canLower($context, $array)) {
+    public static function compileReset(
+        Context $context,
+        JITVariable $array,
+        JITVariable $slotKey,
+        ?string $containerUserType = null
+    ): void {
+        if (!self::canLower($context, $array, $containerUserType)) {
             throw new \LogicException(
-                'DOMNodeList foreach in thin AOT requires compile-time getElementsByTagName/loadXML (#32707)'
+                'DOMNodeList foreach in thin AOT requires compile-time getElementsByTagName/loadXML (#32707/#33082)'
             );
         }
 
@@ -67,23 +118,46 @@ final class JitDomNodeListForeachSnapshot
         if (null === $tag && null !== $xpathTag) {
             $tag = $xpathTag;
         }
-        if (null === $xml || null === $tag) {
-            throw new \LogicException('DOMNodeList foreach snapshot missing compile-time XML/tag (#32707)');
+        if (null === $xml) {
+            throw new \LogicException('DOMNodeList foreach snapshot missing compile-time XML (#32707/#33082)');
         }
 
-        $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
         $sizeT = $context->getTypeFromString('size_t');
-        $ht = HashTableHelper::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__grow'),
-            $ht,
-            $sizeT->constInt($count > 0 ? $count : 1, false)
-        );
-
-        for ($i = 0; $i < $count; ++$i) {
-            $itemPtr = JitDomNodeListItemUserScript::materializeItemAtCompileTime($context, $xml, $tag, $i);
-            $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
-            HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $elem);
+        $useDirectChildren = self::$lastChildNodesFetch
+            || null === $tag
+            || '' === $tag;
+        if (!$useDirectChildren) {
+            $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+            $ht = HashTableHelper::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__grow'),
+                $ht,
+                $sizeT->constInt($count > 0 ? $count : 1, false)
+            );
+            for ($i = 0; $i < $count; ++$i) {
+                $itemPtr = JitDomNodeListItemUserScript::materializeItemAtCompileTime($context, $xml, $tag, $i);
+                $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
+                HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $elem);
+            }
+        } else {
+            // Direct children of document element (childNodes) (#33082).
+            $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+            $count = \count($nodes);
+            $ht = HashTableHelper::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__grow'),
+                $ht,
+                $sizeT->constInt($count > 0 ? $count : 1, false)
+            );
+            for ($i = 0; $i < $count; ++$i) {
+                $itemPtr = JitDomNodeListItemUserScript::materializeDirectChildAtCompileTime(
+                    $context,
+                    $xml,
+                    $i
+                );
+                $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
+                HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $elem);
+            }
         }
 
         $map = $context->structFieldMap['__hashtable__'];
@@ -93,6 +167,7 @@ final class JitDomNodeListForeachSnapshot
 
         $htVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht);
         $context->foreachDomNodeListSlots[$context->foreachSlotMapKey($slotKey)] = $htVar;
+        self::clearChildNodesFetch();
 
         if (!isset($context->foreachIndexSlots[$context->foreachSlotMapKey($slotKey)])) {
             $context->foreachIndexSlots[$context->foreachSlotMapKey($slotKey)] = BasicBlockHelper::entryAlloca($context, $sizeT);
