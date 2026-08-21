@@ -7,27 +7,28 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on __compiler_fflush ABI shell from Builtin\Type (#33084).
+ * Drop leftover always-on __compiler_is_resource ABI shell from Builtin\Type (#33088).
  *
  * NestedJIT/AOT bridge stays StreamLifecycleRuntime + JitStreamLifecycleKernel /
- * StreamLifecycleJitHelper. Runtime owner declares module-locally (getNamedFunction
- * first) so leftover Type empty decls cannot mint fflush.1 (#31894 / #32122).
+ * StreamGlobalsJit::implementThinIsResource / StreamLifecycleJitHelper. Runtime owner
+ * declares module-locally (getNamedFunction first) so leftover Type empty decls cannot
+ * mint is_resource.1 (#31894 / #32122).
  */
-final class TypeDeadFflushAbiRuntimeShrinkTest extends TestCase
+final class TypeDeadIsResourceAbiRuntimeShrinkTest extends TestCase
 {
-    public function testTypeBuiltinDropsLeftoverAlwaysOnFflushAbi(): void
+    public function testTypeBuiltinDropsLeftoverAlwaysOnIsResourceAbi(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('#33084', $type);
+        $this->assertStringContainsString('#33088', $type);
         $this->assertDoesNotMatchRegularExpression(
-            '/addFunction\(\s*[\'"]__compiler_fflush[\'"]/',
+            '/addFunction\(\s*[\'"]__compiler_is_resource[\'"]/',
             $type,
-            'Builtin\\Type must not always-declare __compiler_fflush (#33084)'
+            'Builtin\\Type must not always-declare __compiler_is_resource (#33088)'
         );
         $this->assertStringNotContainsString(
-            "registerFunction('__compiler_fflush'",
+            "registerFunction('__compiler_is_resource'",
             $type,
-            'Builtin\\Type must not always-register __compiler_fflush (#33084)'
+            'Builtin\\Type must not always-register __compiler_is_resource (#33088)'
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
@@ -36,15 +37,16 @@ final class TypeDeadFflushAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamLifecycle::ensureLinked', $type);
     }
 
-    public function testRuntimeOwnerDeclaresFflushAbiModuleLocally(): void
+    public function testRuntimeOwnerDeclaresIsResourceAbiModuleLocally(): void
     {
         $owner = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamLifecycleKernel.php');
-        $this->assertStringContainsString('#33084', $owner);
+        $this->assertStringContainsString('#33088', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
         $this->assertStringContainsString('addFunction', $owner);
-        $this->assertStringContainsString('__compiler_fflush', $owner);
+        $this->assertStringContainsString('__compiler_is_resource', $owner);
+        $this->assertStringContainsString('StreamGlobalsJit::implementThinIsResource', $owner);
         $this->assertFileExists(__DIR__.'/../../ext/standard/StreamLifecycleJitHelper.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitFflush.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/is_resource_.php');
     }
 
     public function testTypeInitializeStillEnsureLinksStreamLifecycle(): void
@@ -53,9 +55,9 @@ final class TypeDeadFflushAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamLifecycle::ensureLinked($this->context)', $type);
     }
 
-    public function testNoNewRuntimeCForFflushAbi(): void
+    public function testNoNewRuntimeCForIsResourceAbi(): void
     {
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/fflush.c');
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/fflush.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/is_resource.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/is_resource.c');
     }
 }

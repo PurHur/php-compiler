@@ -193,15 +193,17 @@ class Type extends Builtin {
         // implementIfMissing; Type::initialize still StreamLifecycle::ensureLinked).
         // Leftover Type empty decls vs Runtime ABI drift mint fflush.1 (#31894 / #32122).
         // User-script fflush() stays JitFflush / StreamLifecycleJitHelper.
+        // __compiler_is_resource always-on shell removed (#33088): JitStreamLifecycleKernel /
+        // StreamGlobalsJit::implementThinIsResource own the ABI (getNamedFunction first,
+        // then addFunction if absent; Type::initialize still StreamLifecycle::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint is_resource.1 (#31894 / #32122).
+        // User-script is_resource() stays is_resource_ / StreamLifecycleJitHelper.
         $fntypePopen = $this->context->context->functionType($i64, false, $strPtr, $strPtr);
         $fnPopen = $this->context->module->addFunction('__compiler_popen', $fntypePopen);
         $this->context->registerFunction('__compiler_popen', $fnPopen);
         $fntypePclose = $this->context->context->functionType($i32, false, $i64);
         $fnPclose = $this->context->module->addFunction('__compiler_pclose', $fntypePclose);
         $this->context->registerFunction('__compiler_pclose', $fnPclose);
-        $fntypeIsResource = $this->context->context->functionType($i32, false, $i64);
-        $fnIsResource = $this->context->module->addFunction('__compiler_is_resource', $fntypeIsResource);
-        $this->context->registerFunction('__compiler_is_resource', $fnIsResource);
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
         $fntypeProcOpen = $this->context->context->functionType($i64, false, $strPtr, $htPtr);
         $fnProcOpen = $this->context->module->addFunction('__compiler_proc_open', $fntypeProcOpen);
