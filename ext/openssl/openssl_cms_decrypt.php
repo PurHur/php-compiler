@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_cms_decrypt() — CMS/S/MIME decrypt (php-src ext/openssl/openssl.c; #6592).
+ * openssl_cms_decrypt() — CMS/S/MIME decrypt (php-src ext/openssl/openssl.c; #6592 VM, JIT/AOT #33479).
  */
 final class openssl_cms_decrypt extends Internal
 {
@@ -55,8 +55,19 @@ final class openssl_cms_decrypt extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_cms_decrypt() is not implemented for JIT in this compiler build (issue #6592)'
+        if (\count($args) < 3) {
+            throw new \ArgumentCountError(
+                'openssl_cms_decrypt() expects at least 3 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitOpensslX509::cmsDecrypt(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3] ?? null,
+            $args[4] ?? null
         );
     }
 }
