@@ -19,6 +19,7 @@ final class DomElementRemoveAttribute implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattr_invoke_cont');
+        $id = null;
         // Keep createElement attr bag + loadXML C14N fold in sync (#32981).
         if (\count($args) >= 2) {
             $name = $args[1]->compileTimeString;
@@ -43,6 +44,22 @@ final class DomElementRemoveAttribute implements Call
             }
         }
 
-        return JitDomAttributeNodeNS::invokeRemoveAttribute($context, ...$args);
+        $result = JitDomAttributeNodeNS::invokeRemoveAttribute($context, ...$args);
+
+        // Drop attr from saveXML open-tag suffix (#33509).
+        if (\count($args) >= 2) {
+            $name = $args[1]->compileTimeString;
+            if (null !== $name && 'xmlns' !== $name) {
+                $attrs = $args[0]->compileTimeDomAttributes;
+                if (null === $attrs && null !== $id) {
+                    $attrs = JitDomCreateElementAttrs::get($id);
+                }
+                if (null !== $attrs) {
+                    JitDomAttributeNodeNS::syncSaveXmlAttrSuffix($context, $args[0], $attrs);
+                }
+            }
+        }
+
+        return $result;
     }
 }
