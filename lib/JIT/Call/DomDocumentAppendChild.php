@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\ext\dom\JitDomAppendChild;
 use PHPCompiler\ext\dom\JitDomAppendChildUserScript;
 use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -22,9 +21,9 @@ final class DomDocumentAppendChild implements Call
         if (\count($args) >= 2 && JitDomRequireDomNodeArg::guardOrAbort($context, $args[1], 'DOMNode::appendChild', 1, 'node')) {
             return JitDomRequireDomNodeArg::boxNullResult($context);
         }
-        JitDomAppendChild::invoke($context, $args[0], $args[1]);
-
-        return JitDomAppendChildUserScript::invokeDocumentAppend(
+        // DocumentFragment: move children onto the document (php-src fragment expand).
+        // LiveSlots expand targets Element parents; Document uses UserScript (#33564).
+        return JitDomAppendChildUserScript::invokeDocumentAppendMaybeFragment(
             $context,
             $args[0],
             $args[1]
