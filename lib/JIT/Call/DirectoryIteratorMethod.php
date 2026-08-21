@@ -59,7 +59,10 @@ final class DirectoryIteratorMethod implements Call
             'isexecutable' => DirectoryIteratorJitHelper::compileIsExecutable($context, $args[0], $this->className),
             'getpathname' => DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className),
             'getpath' => DirectoryIteratorJitHelper::compileGetPath($context, $args[0], $this->className),
-            '__tostring' => DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className),
+            // DirectoryIterator::__toString → filename; SplFileInfo::__toString → pathname (php-src).
+            '__tostring' => 'SplFileInfo' === $this->className
+                ? DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className)
+                : DirectoryIteratorJitHelper::compileGetFilename($context, $args[0], $this->className),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),

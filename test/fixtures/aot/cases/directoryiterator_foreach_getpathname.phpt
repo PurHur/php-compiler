@@ -15,4 +15,4 @@ foreach ($it as $f) {
 --EXPECT--
 pn=test/fixtures/aot/cases/directoryiterator_27289_fixture/a.txt
 p=test/fixtures/aot/cases/directoryiterator_27289_fixture
-s=test/fixtures/aot/cases/directoryiterator_27289_fixture/a.txt
+s=a.txt
