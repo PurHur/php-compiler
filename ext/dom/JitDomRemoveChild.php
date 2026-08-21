@@ -22,6 +22,7 @@ use PHPLLVM\Value;
  * and refetch reported 0 while siblings remained (php-src ext/dom/node.c /
  * nodelist.c).
  * Attr child: Not Found before LiveSlots — Attr is not content (#33596 / peer #33587).
+ * Non-child: Not Found when parentNode !== parent (#33599 / VmDom::assertChildOfParent).
  */
 final class JitDomRemoveChild
 {
