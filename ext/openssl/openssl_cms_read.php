@@ -14,7 +14,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_cms_read() — extract cert PEMs from CMS PEM content (php-src ext/openssl/openssl.c; #6592).
+ * openssl_cms_read() — extract cert PEMs from CMS PEM content
+ * (php-src ext/openssl/openssl.c; #6592 VM, JIT/AOT #33460).
+ *
+ * php-src names the first parameter `$cms_data` (PEM *content*, not a path).
  */
 final class openssl_cms_read extends Internal
 {
@@ -34,7 +37,7 @@ final class openssl_cms_read extends Internal
             return;
         }
 
-        $cms = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'openssl_cms_read', 0, 'input_filename');
+        $cms = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'openssl_cms_read', 0, 'cms_data');
         $certs = VmOpenssl::cmsRead($cms, $frame);
         if (false === $certs) {
             $frame->returnVar->bool(false);
@@ -48,15 +51,19 @@ final class openssl_cms_read extends Internal
             $var->string($pem);
             $ht->append($var);
         }
-        // ZEND_SEND_REF writeback — same as preg_match() / openssl_pkcs12_read() (#6592).
+        // ZEND_SEND_REF writeback — same as openssl_pkcs7_read() / openssl_pkcs12_read() (#6592).
         $frame->calledArgs[1]->resolveIndirect()->array($ht);
         $frame->returnVar->bool(true);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_cms_read() is not implemented for JIT in this compiler build (issue #6592)'
-        );
+        if (2 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'openssl_cms_read() expects exactly 2 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitOpensslX509::cmsRead($context, $args[0], $args[1]);
     }
 }

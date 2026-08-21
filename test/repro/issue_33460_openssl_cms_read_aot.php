@@ -1,0 +1,37 @@
+<?php
+
+declare(strict_types=1);
+
+// #33460 leftover of #6592 — compile-time CMS/PKCS#7 PEM (test/fixtures/openssl/cert.p7b)
+$data = '-----BEGIN PKCS7-----
+MIIDnQYJKoZIhvcNAQcCoIIDjjCCA4oCAQExADALBgkqhkiG9w0BBwGgggNwMIID
+bDCCAtWgAwIBAgIJAK7FVsxyN1CiMA0GCSqGSIb3DQEBBQUAMIGBMQswCQYDVQQG
+EwJCUjEaMBgGA1UECBMRUmlvIEdyYW5kZSBkbyBTdWwxFTATBgNVBAcTDFBvcnRv
+IEFsZWdyZTEeMBwGA1UEAxMVSGVucmlxdWUgZG8gTi4gQW5nZWxvMR8wHQYJKoZI
+hvcNAQkBFhBobmFuZ2Vsb0BwaHAubmV0MB4XDTA4MDYzMDEwMjg0M1oXDTA4MDcz
+MDEwMjg0M1owgYExCzAJBgNVBAYTAkJSMRowGAYDVQQIExFSaW8gR3JhbmRlIGRv
+IFN1bDEVMBMGA1UEBxMMUG9ydG8gQWxlZ3JlMR4wHAYDVQQDExVIZW5yaXF1ZSBk
+byBOLiBBbmdlbG8xHzAdBgkqhkiG9w0BCQEWEGhuYW5nZWxvQHBocC5uZXQwgZ8w
+DQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAMteno+QK1ulX4/WDAVBYfoTPRTze4SZ
+Lwgael4jwWTytj+8c5nNllrFELD6WjJzfjaoIMhCF4w4I2bkWR6/PTqrvnv+iiiI
+tHfKvJgYqIobUhkiKmWa2wL3mgqvNRIqTrTC4jWZuCkxQ/ksqL9O/F6zk+aRS1d+
+KbPaqCR5Rw+lAgMBAAGjgekwgeYwHQYDVR0OBBYEFNt+QHK9XDWF7CkpgRLoYmhq
+tz99MIG2BgNVHSMEga4wgauAFNt+QHK9XDWF7CkpgRLoYmhqtz99oYGHpIGEMIGB
+MQswCQYDVQQGEwJCUjEaMBgGA1UECBMRUmlvIEdyYW5kZSBkbyBTdWwxFTATBgNV
+BAcTDFBvcnRvIEFsZWdyZTEeMBwGA1UEAxMVSGVucmlxdWUgZG8gTi4gQW5nZWxv
+MR8wHQYJKoZIhvcNAQkBFhBobmFuZ2Vsb0BwaHAubmV0ggkArsVWzHI3UKIwDAYD
+VR0TBAUwAwEB/zANBgkqhkiG9w0BAQUFAAOBgQCP1GUnStC0TBqngr3Kx+zSUW8K
+utKO0ORc5R8aV/x9LlaJrzPyQJgiPpu5hXogLSKRIHxQS3X2+Y0VvIpW72LWPVKP
+hYlNtO3oKnfoJGKin0eEhXRZMjfEW/kznY+ZZmNifV2r8s+KhNAqI4PbClvn4vh8
+xF/9+eVEj+hM+0OflKEAMQA=
+-----END PKCS7-----
+';
+
+$certs = [];
+var_export(openssl_cms_read($data, $certs));
+echo "|";
+echo (isset($certs[0]) && str_starts_with($certs[0], "-----BEGIN CERTIFICATE-----")) ? "cert-ok" : "cert-bad";
+echo "|";
+$bad = [];
+var_export(openssl_cms_read("not-a-cms", $bad));
+echo "\n";
