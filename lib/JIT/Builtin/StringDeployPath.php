@@ -6,13 +6,18 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_phpc_deploy_path via DeployPathJitHelper PHP (#585, #9309, #27037).
+ * JIT/AOT link for __compiler_phpc_deploy_path via DeployPathJitHelper PHP (#585, #9309, #27037, #33225).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringFilterSanitize #27033 / StringFilterUrl #26766).
+ *
+ * Do not re-add an always-on empty decl in {@see Type} — leftover decls mint phpc_deploy_path.1
+ * (#31894 / #32122 / #33225). Thin standalone AOT still cannot NestedJIT this helper without a
+ * startup SEGV (peer #33217 strftime); declare-only there so link fails honestly.
  */
 final class StringDeployPath
 {
@@ -44,30 +49,71 @@ final class StringDeployPath
             return;
         }
 
-        $fn = null !== $probe
-            ? $probe
-            : $context->lookupFunction('__compiler_phpc_deploy_path');
+        // Thin user-script AOT: NestedJIT DeployPathJitHelper SEGV at startup
+        // (`main_before_php`, peer #33217). Keep declare-only so link fails with
+        // undefined reference — same honest failure as the pre-#33225 empty Type decl.
+        if ($context->isThinStandaloneAotMain()) {
+            self::declareAbiOnly($context);
+
+            return;
+        }
 
         // Restore caller insert block after bridge emit (#20988 / peer StringFilterSanitize #27033) —
         // clearInsertionPosition left the user-script builder detached
         // ("Current basic block has no parent function").
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
-
-        $entry = $fn->appendBasicBlock('deploy_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context),
-            $fn->getParam(0),
-            $fn->getParam(1)
-        );
-        $context->builder->returnValue($result);
-        $context->registerFunction('__compiler_phpc_deploy_path', $fn);
+        self::implementDeployPathBridge($context);
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function declareAbiOnly(Context $context): void
+    {
+        $abiName = '__compiler_phpc_deploy_path';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $strPtr);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementDeployPathBridge(Context $context): void
+    {
+        $abiName = '__compiler_phpc_deploy_path';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $strPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('deploy_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        // NestedJIT string may be __value__*; ABI is __string__* (#26853 / peer StringFilterSanitize).
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context),
+            [$fn->getParam(0), $fn->getParam(1)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
+        );
+        $context->registerFunction($abiName, $fn);
     }
 
     private static function helperFunction(Context $context): LlvmFunction

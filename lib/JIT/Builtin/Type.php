@@ -38,17 +38,12 @@ class Type extends Builtin {
         // GetenvLookupJitHelper / PutenvJitHelper / JitEnv. Leftover Type
         // addFunction vs Runtime ABI drift mints getenv.1 (#31894 / #32122);
         // empty Type decls were also mistaken for completed bodies (#26756).
-        $fntypeDeployPath = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnDeployPath = $this->context->module->addFunction(
-            '__compiler_phpc_deploy_path',
-            $fntypeDeployPath
-        );
-        $this->context->registerFunction('__compiler_phpc_deploy_path', $fnDeployPath);
+        // __compiler_phpc_deploy_path always-on shell removed (#33225): StringDeployPath
+        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
+        // still StringDeployPath::ensureLinked on the full load path; JitDeployPath
+        // ensureLinked before lookup). Leftover Type empty decls vs Runtime ABI drift
+        // mint phpc_deploy_path.1 (#31894 / #32122). User-script phpc_deploy_path() stays
+        // JitDeployPath / DeployPathJitHelper (php-src-shaped deploy root resolve).
         // __compiler_sprintf / __compiler_printf / __compiler_number_format always-on shells
         // removed (#32921): StringFormat owns the ABI (getNamedFunction first, then
         // addFunction if absent; Type::initialize still ensureLinked). Thin AOT already
@@ -931,6 +926,7 @@ class Type extends Builtin {
         CheckdateRuntime::ensureLinked($this->context);
         DateIntervalFormatRuntime::ensureLinked($this->context);
         StringDateTime::ensureLinked($this->context);
+        StringDeployPath::ensureLinked($this->context);
         DefaultTimezoneRuntime::ensureLinked($this->context);
         DefaultTimezoneCivilRuntime::ensureLinked($this->context);
         InetRuntime::ensureLinked($this->context);
