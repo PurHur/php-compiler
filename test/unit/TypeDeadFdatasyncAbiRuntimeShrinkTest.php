@@ -31,8 +31,8 @@ final class TypeDeadFdatasyncAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (preg_match_all still Type always-on; preg_match dropped in #33187).
-        $this->assertStringContainsString("registerFunction('__compiler_preg_match_all'", $type);
+        // Next leftover sentinel (preg_replace still Type always-on; preg_match_all dropped in #33188).
+        $this->assertStringContainsString("registerFunction('__compiler_preg_replace'", $type);
         $this->assertStringContainsString('StreamSync::ensureLinked', $type);
     }
 

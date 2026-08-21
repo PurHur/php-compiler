@@ -7,11 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT MCJIT body for __compiler_preg_* — embed PHP helper vs standalone LLVM (#5289, #9542, #33187).
+ * JIT MCJIT body for __compiler_preg_* — embed PHP helper vs standalone LLVM (#5289, #9542, #33187, #33188).
  *
  * Delegates to {@see StringPregMatchJit} → {@see PregMatchRuntime} PHP bridge (#13736).
- * Owns `__compiler_preg_match` module-locally (getNamedFunction first). Do not re-add empty
- * always-on shells in {@see Type} — leftover decls mint preg_match.1 (#31894 / #32122).
+ * Owns `__compiler_preg_match` / `__compiler_preg_match_all` / `__compiler_preg_match_ex` /
+ * `__compiler_preg_match_all_ex` module-locally (getNamedFunction first). Do not re-add empty
+ * always-on shells in {@see Type} — leftover decls mint preg_match.1 / preg_match_all.1
+ * (#31894 / #32122).
  *
  * Phase A / M2 spine: bundled in compiler_lib_spine_smoke (not ratio-deferred).
  */
