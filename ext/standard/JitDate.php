@@ -277,6 +277,7 @@ final class JitDate
         $format = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], $function, 0, 'format');
         $gmtI8 = $context->getTypeFromString('int8')->constInt($gmt ? 1 : 0, false);
 
+        // Type always-on format_datetime drop (#33215) — must ensureLinked before lookup.
         StringDateTime::ensureLinked($context);
 
         return $context->builder->call(
