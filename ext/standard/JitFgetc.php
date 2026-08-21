@@ -11,7 +11,12 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for fgetc() via __compiler_fgetc (issue #1195). */
+/**
+ * LLVM lowering for fgetc() via __compiler_fgetc (issue #1195; ensureLinked #33166).
+ *
+ * ABI owned by {@see StreamReadRuntime} / {@see JitStreamReadBridgeKernel} after Type always-on
+ * drop (#33166) — must ensureLinked before lookup (peer {@see JitFtruncate} #33155).
+ */
 final class JitFgetc
 {
     /** @return Value
