@@ -31,8 +31,8 @@ final class TypeDeadStreamSetWriteBufferAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (stream_supports still Type always-on; read_buffer dropped in #33142).
-        $this->assertStringContainsString("registerFunction('__compiler_stream_supports'", $type);
+        // Next leftover sentinel (stream_is_local still Type always-on; stream_supports dropped in #33145).
+        $this->assertStringContainsString("registerFunction('__compiler_stream_is_local'", $type);
         $this->assertStringContainsString('StreamBuffer::ensureLinked', $type);
     }
 
