@@ -531,6 +531,10 @@ final class JitDomAttributeNodeNS
      * getAttribute works but markup drops attrs. When the element is already attached,
      * rebuild the parent chain so setattr-after-append matches Zend.
      *
+     * Walk upward from the element only (#33540): {@see rebuildUserScriptInnerXmlUpward}
+     * skips Document/Fragment parents. Calling {@see rebuildUserScriptInnerXmlFromElementChildren}
+     * on a raw parent pointer SIGSEGVs when that parent is a Document (Element INNER_XML layout).
+     *
      * @param array<string, string> $attrs
      */
     public static function syncSaveXmlAttrSuffix(
@@ -556,8 +560,7 @@ final class JitDomAttributeNodeNS
         $context->builder->branchIf($parentNull, $bbDone, $bbRebuild);
 
         $context->builder->positionAtEnd($bbRebuild);
-        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
-        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $element);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
