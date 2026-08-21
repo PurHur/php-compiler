@@ -7,14 +7,19 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: SplFileObject::READ_CSV without NestedJIT segfault (#33397 / reopen after #33448).
+ * AOT: SplFileObject::READ_CSV without NestedJIT segfault (#33397 / after #33448/#33451).
+ *
+ * Locks pure-LLVM iterator parse (JitExplode + null row) and CUR_LINE cache
+ * (never CSV row in construct `__spl_ht`).
+ *
+ * @see php-src ext/spl/spl_directory.c spl_filesystem_file_read_csv / SPL_FILE_OBJECT_READ_CSV
  *
  * @group llvm
  * @group aot
  */
 final class SplFileObjectReadCsv33397AotTest extends TestCase
 {
-    public function testAotMatchesZendWithoutSegfault(): void
+    public function testZendAndVmMatch(): void
     {
         $root = dirname(__DIR__, 2);
         $repro = $root.'/test/repro/splfileobject_read_csv_aot.php';
@@ -23,8 +28,29 @@ final class SplFileObjectReadCsv33397AotTest extends TestCase
         exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($repro).' 2>&1', $zendOut, $zendRc);
         $this->assertSame(0, $zendRc, implode("\n", $zendOut));
         $zend = implode("\n", $zendOut)."\n";
+        $this->assertStringContainsString('0:["1","2"]', $zend);
+        $this->assertStringContainsString('cur:["1","2"]', $zend);
+        $this->assertStringContainsString('fgets:"1,2\n"', $zend);
         $this->assertStringContainsString('[NULL]', $zend);
-        $this->assertStringContainsString('"1","2"', $zend);
+
+        exec(
+            escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/vm.php').' '
+            .escapeshellarg($repro).' 2>&1',
+            $vmOut,
+            $vmRc
+        );
+        $this->assertSame(0, $vmRc, implode("\n", $vmOut));
+        $this->assertSame($zend, implode("\n", $vmOut)."\n");
+    }
+
+    public function testAotMatchesZendWithoutSegfault(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $repro = $root.'/test/repro/splfileobject_read_csv_aot.php';
+
+        exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($repro).' 2>&1', $zendOut, $zendRc);
+        $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+        $zend = implode("\n", $zendOut)."\n";
 
         if (!LlvmToolchain::hasLibrary($root)) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
@@ -40,12 +66,14 @@ final class SplFileObjectReadCsv33397AotTest extends TestCase
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($repro).' 2>&1';
         $cwd = getcwd();
         chdir($root);
+        $script = '';
+        $zendFile = '';
         try {
             exec($compile, $compileOut, $compileRc);
             $this->assertSame(0, $compileRc, implode("\n", $compileOut));
             $this->assertFileExists($bin);
-            // Drive repeats via bash (peer AOT tests: PHP exec() of the same binary is
-            // intermittently SIGSEGV on this host; bash loop matches docker-exec stress).
+            // Bash loop: PHP exec() of the same AOT binary is intermittently SIGSEGV on
+            // this host; docker-exec bash stress matches (#33397).
             $script = sys_get_temp_dir().'/phpc_run_'.$id.'.sh';
             $zendFile = sys_get_temp_dir().'/phpc_zend_'.$id.'.txt';
             file_put_contents($zendFile, $zend);
@@ -63,27 +91,36 @@ final class SplFileObjectReadCsv33397AotTest extends TestCase
         } finally {
             chdir($cwd);
             @unlink($bin);
-            @unlink($script ?? '');
-            @unlink($zendFile ?? '');
+            @unlink($script);
+            @unlink($zendFile);
             foreach (glob($cache.'/*') ?: [] as $f) {
                 @unlink($f);
             }
             @rmdir($cache);
-            @unlink($root.'/tmp_from_phpunit_33397.bin');
         }
     }
 
     public function testIteratorUsesExplodeNotNestedJitStrGetcsv(): void
     {
         $root = dirname(__DIR__, 2);
+        $this->assertFileDoesNotExist($root.'/runtime/spl_fileobject_read_csv.c');
         $helper = (string) file_get_contents($root.'/lib/VM/SplFileObjectJitHelper.php');
         $this->assertStringContainsString('FLAG_READ_CSV', $helper);
+        $this->assertStringContainsString('#33397', $helper);
+        $this->assertStringContainsString('emitReadCsvLineToValueBox', $helper);
         $this->assertStringContainsString('emitCsvFieldsValueBox', $helper);
         $this->assertStringContainsString('JitExplode::explode', $helper);
         $this->assertStringNotContainsString('JitStrGetcsv::invoke', $helper);
+        $this->assertStringContainsString('Does not write PROP_HT', $helper);
+        $this->assertDoesNotMatchRegularExpression(
+            '/emitReadCsvLineToValueBox[\s\S]*?storeHashtableProp\(\$context, \$obj, self::PROP_HT/',
+            $helper
+        );
         $this->assertStringNotContainsString(
             'storeHashtableProp($context, $obj, self::PROP_HT',
             $helper
         );
+        $outer = (string) file_get_contents($root.'/lib/VM/SplOuterIteratorHt.php');
+        $this->assertStringNotContainsString("'splfileobject'", $outer);
     }
 }
