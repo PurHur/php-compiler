@@ -567,15 +567,12 @@ class Type extends Builtin {
         $fntypeAbort = $this->context->context->functionType($void, false);
         $fnAbort = $this->context->module->addFunction('abort', $fntypeAbort);
         $this->context->registerFunction('abort', $fnAbort);
-        $fntypeFormatDt = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $i64,
-            $this->context->getTypeFromString('int8')
-        );
-        $fnFormatDt = $this->context->module->addFunction('__compiler_format_datetime', $fntypeFormatDt);
-        $this->context->registerFunction('__compiler_format_datetime', $fnFormatDt);
+        // __compiler_format_datetime always-on shell removed (#33215): StringDateTime
+        // owns the ABI (getNamedFunction first via implementFormatDatetimeBridge;
+        // Type::initialize still StringDateTime::ensureLinked on the full load path).
+        // Leftover Type empty decls vs Runtime ABI drift mint format_datetime.1
+        // (#31894 / #32122). User-script date()/gmdate() stay JitDate /
+        // FormatDatetimeJitHelper (php-src ext/date/php_date.c).
         $fntypeStrftime = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -933,6 +930,7 @@ class Type extends Builtin {
         CheckdnsrrRuntime::ensureLinked($this->context);
         CheckdateRuntime::ensureLinked($this->context);
         DateIntervalFormatRuntime::ensureLinked($this->context);
+        StringDateTime::ensureLinked($this->context);
         DefaultTimezoneRuntime::ensureLinked($this->context);
         DefaultTimezoneCivilRuntime::ensureLinked($this->context);
         InetRuntime::ensureLinked($this->context);

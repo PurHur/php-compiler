@@ -10,11 +10,14 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_format_datetime via FormatDatetimeJitHelper PHP (#15243, #25433).
+ * JIT/AOT link for __compiler_format_datetime via FormatDatetimeJitHelper PHP (#15243, #25433, #33215).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringStrftime #25365 / StringStrptime #25409).
  * Replaces gmtime/localtime/format-char LLVM monolith; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date), PHP_FUNCTION(gmdate)
+ *
+ * Do not re-add an always-on empty decl in {@see Type} — leftover decls mint format_datetime.1
+ * (#31894 / #32122 / #33215).
  */
 final class StringDateTime
 {
