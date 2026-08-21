@@ -7,13 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT stream read/position/lock helpers via StreamReadRuntime PHP (#5343, #12937, #33155, #33164).
+ * JIT/AOT stream read/position/lock helpers via StreamReadRuntime PHP (#5343, #12937, #33155, #33164, #33166).
  *
- * Owns `__compiler_ftell` / `__compiler_ftruncate` (and peer flock/fpassthru/fgetc/…) ABI
- * module-locally via {@see StreamReadRuntime} /
+ * Owns `__compiler_fgetc` / `__compiler_ftell` / `__compiler_ftruncate` (and peer flock/fpassthru/…)
+ * ABI module-locally via {@see StreamReadRuntime} /
  * {@see \PHPCompiler\ext\standard\JitStreamReadBridgeKernel} (getNamedFunction first). Do not
- * re-add empty always-on shells in {@see Type} — leftover decls mint ftell.1 / ftruncate.1
- * (#31894 / #32122).
+ * re-add empty always-on shells in {@see Type} — leftover decls mint fgetc.1 / ftell.1 /
+ * ftruncate.1 (#31894 / #32122).
  */
 final class StreamRead
 {
