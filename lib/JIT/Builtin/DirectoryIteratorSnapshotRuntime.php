@@ -50,6 +50,10 @@ final class DirectoryIteratorSnapshotRuntime
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
+        // NestedJIT scandir / FsGlob may warn via trigger_error; Type always-on shell
+        // was dropped (#33234) — link before bridge so O=0 / cold NestedJIT cannot miss it
+        // (#33262 fallout / DirectoryIterator AOT empty listing).
+        StringTriggerError::ensureLinked($context);
         // FsGlob leaf for NestedJIT scandir inside DirectoryIteratorSnapshotJitHelper (#33009).
         StringFsGlob::ensureLinked($context);
         $htPtr = $context->getTypeFromString('__hashtable__*');

@@ -1471,7 +1471,7 @@ class Context {
             $diLc = strtolower($diClass);
             foreach ([
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next',
-                'isDot', 'getFilename',
+                'isDot', 'getFilename', 'isFile', 'isDir',
             ] as $diMethod) {
                 $this->functionProxies[$diLc.'::'.strtolower($diMethod)] = new Call\DirectoryIteratorMethod(
                     $diMethod,

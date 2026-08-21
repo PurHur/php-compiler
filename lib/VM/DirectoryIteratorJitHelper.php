@@ -20,6 +20,7 @@ use PHPLLVM\Value;
  * Construct lists directory entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}
  * (NestedJIT leaf calling DirHandleJitHelper only — StringDir already linked).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
+ * isFile/isDir join `__dir_path`+`__filename` then {@see \PHPCompiler\ext\standard\JitStat} (#33263).
  *
  * php-src: ext/spl/spl_directory.c
  */
@@ -195,6 +196,74 @@ final class DirectoryIteratorJitHelper
         );
 
         return $slot;
+    }
+
+    /**
+     * SplFileInfo::isFile() — pathname via join(__dir_path, __filename) (#33263).
+     * php-src: ext/spl/spl_directory.c zim_SplFileInfo_isFile
+     */
+    public static function compileIsFile(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compilePathPredicate($context, $receiver, $className, 'isFile');
+    }
+
+    /**
+     * SplFileInfo::isDir() — peer of isFile (#33263).
+     * php-src: ext/spl/spl_directory.c zim_SplFileInfo_isDir
+     */
+    public static function compileIsDir(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compilePathPredicate($context, $receiver, $className, 'isDir');
+    }
+
+    private static function compilePathPredicate(
+        Context $context,
+        JITVariable $receiver,
+        string $className,
+        string $kind
+    ): Value {
+        \PHPCompiler\JIT\Builtin\StringTriggerError::ensureLinked($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'di_stat_after_trigger_link');
+        $pathPtr = self::emitPathname($context, $receiver, $className);
+        $pred = 'isFile' === $kind
+            ? \PHPCompiler\ext\standard\JitStat::pathIsFile($context, $pathPtr)
+            : \PHPCompiler\ext\standard\JitStat::pathIsDir($context, $pathPtr);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $pred);
+
+        return $slot;
+    }
+
+    /** Join __dir_path + '/' + __filename (php-src SplFileInfo pathname). */
+    private static function emitPathname(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $nameSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_FILENAME);
+        $namePtr = self::stringFromProperty($context, $nameSlot);
+        $dirSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_PATH);
+        $dirPtr = self::stringFromProperty($context, $dirSlot);
+        $slash = $context->builder->load($context->constantStringFromString('/'));
+        $withSlash = self::concatStr($context, $dirPtr, $slash);
+
+        return self::concatStr($context, $withSlash, $namePtr);
+    }
+
+    private static function concatStr(Context $context, Value $left, Value $right): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $leftSize = $context->builder->load($context->builder->structGep($left, $map['length']));
+        $rightSize = $context->builder->load($context->builder->structGep($right, $map['length']));
+        $size = $context->builder->add($leftSize, $rightSize);
+        $result = $context->builder->call($context->lookupFunction('__string__alloc'), $size);
+        $context->intrinsic->builder = $context->builder;
+        $dest = $context->builder->structGep($result, $map['value']);
+        $leftChar = $context->builder->structGep($left, $map['value']);
+        $context->intrinsic->memcpy($dest, $leftChar, $leftSize, false);
+        $dest2 = $context->builder->gep($dest, $leftSize);
+        $rightChar = $context->builder->structGep($right, $map['value']);
+        $context->intrinsic->memcpy($dest2, $rightChar, $rightSize, false);
+
+        return $result;
     }
 
     private static function syncFilenameFromPos(Context $context, Value $obj, string $className): void

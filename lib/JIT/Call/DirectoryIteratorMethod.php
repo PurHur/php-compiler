@@ -51,6 +51,8 @@ final class DirectoryIteratorMethod implements Call
             'next' => DirectoryIteratorJitHelper::compileNext($context, $args[0], $this->className),
             'isdot' => DirectoryIteratorJitHelper::compileIsDot($context, $args[0], $this->className),
             'getfilename' => DirectoryIteratorJitHelper::compileGetFilename($context, $args[0], $this->className),
+            'isfile' => DirectoryIteratorJitHelper::compileIsFile($context, $args[0], $this->className),
+            'isdir' => DirectoryIteratorJitHelper::compileIsDir($context, $args[0], $this->className),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),
