@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -37,55 +39,73 @@ final class JitDomAppendChildUserScript
         // #27410: zero old parent's live childNodes length before reparent.
         self::zeroOldParentChildNodesLength($context, $child);
 
-        // documentElement: keep existing root; only first append installs it (#27410).
+        // Child-list linking is independent of documentElement (#33546).
+        // Comments/PIs/text must not become documentElement — only Element stand-ins
+        // do (php-src dom_document_append_child). Previously setRoot always wrote
+        // documentElement=child, so comment-then-element left a comment root and
+        // tagName reads SIGSEGVd.
+        //
         // loadXML/loadHTML pin documentElement as TYPE_OBJECT (raw __object__*), not a
         // VALUE box — __value__readObject on that pointer segfaults (#29487 / re-#19212).
         $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
         if (!$objectType->hasProperty($docClassId, self::PROP_DOCUMENT_ELEMENT)) {
             $objectType->defineProperty($docClassId, self::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
         }
+        self::ensureDocumentChildLinkLayout($context);
         $docElSlot = $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, self::PROP_DOCUMENT_ELEMENT);
         $docElPtr = $context->builder->load($docElSlot);
         $voidPtr = $context->getTypeFromString('void*');
         $objPtrTy = $context->getTypeFromString('__object__*');
-        $slotNull = $context->builder->icmp(Builder::INT_EQ, $docElPtr, $voidPtr->constNull());
-        $checkVal = BasicBlockHelper::append($context, 'dom_doc_ac_de_check');
-        $setRoot = BasicBlockHelper::append($context, 'dom_doc_ac_set_de');
-        $linkNext = BasicBlockHelper::append($context, 'dom_doc_ac_link_next');
-        $afterDe = BasicBlockHelper::append($context, 'dom_doc_ac_after_de');
-        $context->builder->branchIf($slotNull, $setRoot, $checkVal);
-
-        $context->builder->positionAtEnd($checkVal);
         $existingRoot = $context->builder->pointerCast($docElPtr, $objPtrTy);
-        $rootNull = $context->builder->icmp(Builder::INT_EQ, $existingRoot, $objPtrTy->constNull());
-        $context->builder->branchIf($rootNull, $setRoot, $linkNext);
-
-        $context->builder->positionAtEnd($setRoot);
-        $objectType->propertyStore($docElSlot, $childJit, JITVariable::TYPE_OBJECT);
-        self::ensureDocumentChildLinkLayout($context);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_FIRST_CHILD),
-            $childJit,
-            JITVariable::TYPE_VALUE
+        $docElMissing = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $docElPtr, $voidPtr->constNull()),
+            $context->builder->icmp(Builder::INT_EQ, $existingRoot, $objPtrTy->constNull())
         );
+
+        $firstSlot = $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_FIRST_CHILD);
+        $firstPtr = $context->builder->load($firstSlot);
+        $firstSlotNull = $context->builder->icmp(Builder::INT_EQ, $firstPtr, $voidPtr->constNull());
+        $bbReadFirst = BasicBlockHelper::append($context, 'dom_doc_ac_read_first');
+        $bbEmpty = BasicBlockHelper::append($context, 'dom_doc_ac_link_empty');
+        $bbAppend = BasicBlockHelper::append($context, 'dom_doc_ac_link_append');
+        $bbAfterLink = BasicBlockHelper::append($context, 'dom_doc_ac_after_link');
+        $context->builder->branchIf($firstSlotNull, $bbEmpty, $bbReadFirst);
+
+        $context->builder->positionAtEnd($bbReadFirst);
+        $firstObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($firstPtr, $context->getTypeFromString('__value__*'))
+        );
+        $firstNull = $context->builder->icmp(Builder::INT_EQ, $firstObj, $objPtrTy->constNull());
+        // No firstChild but loadXML may still have documentElement — treat as non-empty.
+        $context->builder->branchIf(
+            $context->builder->and($firstNull, $docElMissing),
+            $bbEmpty,
+            $bbAppend
+        );
+
+        $context->builder->positionAtEnd($bbEmpty);
+        $objectType->propertyStore($firstSlot, $childJit, JITVariable::TYPE_VALUE);
         $objectType->propertyStore(
             $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_LAST_CHILD),
             $childJit,
             JITVariable::TYPE_VALUE
         );
         self::writeChildNodesListWithOwner($context, $document, 1, $child, null);
-        $context->builder->branch($afterDe);
+        $context->builder->branch($bbAfterLink);
 
-        $context->builder->positionAtEnd($linkNext);
-        self::ensureDocumentChildLinkLayout($context);
-        // Prefer lastChild; fall back to documentElement as prior sibling.
+        $context->builder->positionAtEnd($bbAppend);
+        // Prefer lastChild; fall back to firstChild, then documentElement as prior sibling.
         $lastSlot = $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_LAST_CHILD);
         $lastPtr = $context->builder->load($lastSlot);
         $lastSlotNull = $context->builder->icmp(Builder::INT_EQ, $lastPtr, $voidPtr->constNull());
+        $useFirst = BasicBlockHelper::append($context, 'dom_doc_ac_tail_first');
         $useRoot = BasicBlockHelper::append($context, 'dom_doc_ac_tail_root');
         $useLast = BasicBlockHelper::append($context, 'dom_doc_ac_tail_last');
         $haveTail = BasicBlockHelper::append($context, 'dom_doc_ac_have_tail');
-        $context->builder->branchIf($lastSlotNull, $useRoot, $useLast);
+        $context->builder->branchIf($lastSlotNull, $useFirst, $useLast);
+        $context->builder->positionAtEnd($useFirst);
+        $context->builder->branchIf($firstNull, $useRoot, $haveTail);
         $context->builder->positionAtEnd($useRoot);
         $context->builder->branch($haveTail);
         $context->builder->positionAtEnd($useLast);
@@ -94,9 +114,10 @@ final class JitDomAppendChildUserScript
             $context->builder->pointerCast($lastPtr, $context->getTypeFromString('__value__*'))
         );
         $lastObjNull = $context->builder->icmp(Builder::INT_EQ, $lastObj, $objPtrTy->constNull());
-        $context->builder->branchIf($lastObjNull, $useRoot, $haveTail);
+        $context->builder->branchIf($lastObjNull, $useFirst, $haveTail);
         $context->builder->positionAtEnd($haveTail);
         $tailPhi = $context->builder->phi($objPtrTy);
+        $tailPhi->addIncoming($firstObj, $useFirst);
         $tailPhi->addIncoming($existingRoot, $useRoot);
         $tailPhi->addIncoming($lastObj, $useLast);
         $objectType->propertyStore(
@@ -109,10 +130,43 @@ final class JitDomAppendChildUserScript
             $childJit,
             JITVariable::TYPE_VALUE
         );
-        self::writeChildNodesListWithOwner($context, $document, 2, $existingRoot, $child);
-        $context->builder->branch($afterDe);
+        // item0: prefer live firstChild so comment-then-element lists stay ordered (#33546).
+        $headFromFirst = BasicBlockHelper::append($context, 'dom_doc_ac_head_first');
+        $headFromDe = BasicBlockHelper::append($context, 'dom_doc_ac_head_de');
+        $headDone = BasicBlockHelper::append($context, 'dom_doc_ac_head_done');
+        $firstPtr2 = $context->builder->load($firstSlot);
+        $firstSlotNull2 = $context->builder->icmp(Builder::INT_EQ, $firstPtr2, $voidPtr->constNull());
+        $context->builder->branchIf($firstSlotNull2, $headFromDe, $headFromFirst);
+        $context->builder->positionAtEnd($headFromFirst);
+        $firstObj2 = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($firstPtr2, $context->getTypeFromString('__value__*'))
+        );
+        $firstNull2 = $context->builder->icmp(Builder::INT_EQ, $firstObj2, $objPtrTy->constNull());
+        $context->builder->branchIf($firstNull2, $headFromDe, $headDone);
+        $context->builder->positionAtEnd($headFromDe);
+        $context->builder->branch($headDone);
+        $context->builder->positionAtEnd($headDone);
+        $headPhi = $context->builder->phi($objPtrTy);
+        $headPhi->addIncoming($firstObj2, $headFromFirst);
+        $headPhi->addIncoming($existingRoot, $headFromDe);
+        self::writeChildNodesListWithOwner($context, $document, 2, $headPhi, $child);
+        $context->builder->branch($bbAfterLink);
 
-        $context->builder->positionAtEnd($afterDe);
+        $context->builder->positionAtEnd($bbAfterLink);
+        // Install documentElement only for Element stand-ins when unset (#33546).
+        $isElement = self::isElementStandIn($context, $child);
+        $bbSetDe = BasicBlockHelper::append($context, 'dom_doc_ac_set_de');
+        $bbAfterDe = BasicBlockHelper::append($context, 'dom_doc_ac_after_de');
+        $context->builder->branchIf(
+            $context->builder->and($isElement, $docElMissing),
+            $bbSetDe,
+            $bbAfterDe
+        );
+        $context->builder->positionAtEnd($bbSetDe);
+        $objectType->propertyStore($docElSlot, $childJit, JITVariable::TYPE_OBJECT);
+        $context->builder->branch($bbAfterDe);
+        $context->builder->positionAtEnd($bbAfterDe);
 
         // #21687: parentNode on child via DOMElement layout (allocation class).
         $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $document);
@@ -129,6 +183,44 @@ final class JitDomAppendChildUserScript
         DomUserScriptPinnedRootLlvm::pin($context, $child);
 
         return self::boxObjectResult($context, $child);
+    }
+
+    /**
+     * True when {@code $node} is an Element stand-in (not comment/text/cdata/fragment).
+     *
+     * createComment/createTextNode use DOMElement allocations with {@code nodeName}
+     * {@code #comment}/{@code #text}/… — class_id alone cannot discriminate (#33546).
+     * Avoid reading {@code tagName} here: comment objects may be undersized (#24973 / #32315).
+     */
+    private static function isElementStandIn(Context $context, Value $node): Value
+    {
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, 'nodeName')) {
+            $objectType->defineProperty($elementClassId, 'nodeName', JITVariable::TYPE_STRING);
+        }
+        $nameVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            'nodeName',
+            $elementClassId
+        );
+        $nameStr = $context->helper->loadValue($nameVar);
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $nonElement = $i1->constInt(0, false);
+        foreach (['#comment', '#text', '#cdata-section', '#document-fragment'] as $lit) {
+            $litStr = $context->builder->load($context->constantStringFromString($lit));
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                JitStringCompare::strcmp($context, $nameStr, $litStr),
+                $i64->constInt(0, false)
+            );
+            $nonElement = $context->builder->or($nonElement, $match);
+        }
+
+        return $context->builder->not($nonElement);
     }
 
     /** Replace old parent's childNodes with length 0 when child.parentNode is set (#27410). */
