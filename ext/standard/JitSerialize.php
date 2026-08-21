@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ArrayObjectJitHelper;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -127,6 +128,10 @@ final class JitSerialize
 
     private static function encodeObjectOperand(Context $context, JITVariable $arg): Value
     {
+        $splResult = self::tryEncodeSplArrayObject($context, $arg);
+        if (null !== $splResult) {
+            return $splResult;
+        }
         $className = ReflectionBuiltinHelper::getClassName($context, $arg);
         $varsBoxed = JitGetObjectVars::invoke($context, $arg, false);
         $ht = $context->builder->call(
@@ -139,6 +144,82 @@ final class JitSerialize
             $className,
             $ht
         );
+    }
+
+    /**
+     * ArrayObject / ArrayIterator / RecursiveArrayIterator — Zend __serialize bag from `__spl_ht` (#33625).
+     */
+    private static function tryEncodeSplArrayObject(Context $context, JITVariable $arg): ?Value
+    {
+        $objectType = $context->type->object;
+        $classIds = [];
+        foreach (['ArrayObject', 'ArrayIterator', 'RecursiveArrayIterator'] as $name) {
+            $id = $objectType->classIdByName($name)
+                ?? $objectType->classIdForLowerName(strtolower($name));
+            if (null !== $id) {
+                $classIds[] = $id;
+            }
+        }
+        if ([] === $classIds) {
+            return null;
+        }
+
+        $obj = ArrayObjectJitHelper::loadObjectPtr($context, $arg);
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+
+        $id = (string) (++self::$blockSerial);
+        $splBlock = BasicBlockHelper::append($context, 'serialize_spl_array_'.$id);
+        $pubBlock = BasicBlockHelper::append($context, 'serialize_pub_props_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'serialize_spl_done_'.$id);
+
+        $isSpl = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $context->constantFromInteger($classIds[0], 'int64')
+        );
+        for ($i = 1, $n = \count($classIds); $i < $n; ++$i) {
+            $isSpl = $context->builder->or(
+                $isSpl,
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $classId,
+                    $context->constantFromInteger($classIds[$i], 'int64')
+                )
+            );
+        }
+        $context->builder->branchIf($isSpl, $splBlock, $pubBlock);
+
+        $context->builder->positionAtEnd($splBlock);
+        $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
+        $splResult = ArrayObjectJitHelper::compileSerialize($context, $objVar);
+        $splEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($pubBlock);
+        $className = ReflectionBuiltinHelper::getClassName($context, $arg);
+        $varsBoxed = JitGetObjectVars::invoke($context, $arg, false);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::normalizeValuePtr($context, $varsBoxed)
+        );
+        $pubResult = $context->builder->call(
+            $context->lookupFunction('__compiler_serialize_object'),
+            $className,
+            $ht
+        );
+        $pubEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $phi = $context->builder->phi($strPtr, 'serialize_obj_phi_'.$id);
+        $phi->addIncoming($splResult, $splEnd);
+        $phi->addIncoming($pubResult, $pubEnd);
+
+        return $phi;
     }
 
     private static function encodeBoxedObject(Context $context, Value $valuePtr): Value
