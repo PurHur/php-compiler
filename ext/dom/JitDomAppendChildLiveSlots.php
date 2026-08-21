@@ -30,7 +30,8 @@ use PHPLLVM\Value;
  * `#document-fragment` in childNodes and SIGSEGV'd on item(N) (#33312).
  * insertBefore before a middle sibling rebuilds INNER_XML from the live chain
  * so saveXML order matches childNodes (#33327). Repeated fragment expands in one
- * main use uniquified BB labels + alloca piece merge (#33335).
+ * main use uniquified BB labels + alloca piece merge (#33335). Child open-tag
+ * attrs come from PROP_USER_SCRIPT_XMLNS_ATTR so importNode attrs survive (#33362).
  *
  * Reference: php-src ext/dom/node.c dom_node_append_child.
  * Peer: {@see JitDomInsertBefore}.
@@ -459,6 +460,9 @@ final class JitDomAppendChildLiveSlots
                 $objectType->defineProperty($elementClassId, $textProp, JITVariable::TYPE_STRING);
             }
         }
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR, JITVariable::TYPE_STRING);
+        }
         $objPtrTy = $context->getTypeFromString('__object__*');
         $strTy = $context->getTypeFromString('__string__*');
         $accAlloca = BasicBlockHelper::entryAlloca($context, $strTy);
@@ -525,6 +529,17 @@ final class JitDomAppendChildLiveSlots
             $elementClassId
         );
         $tagStr = $context->helper->loadValue($tagVar);
+        // Open-tag attrs (importNode / loadXML / createElementNS) — without this,
+        // rebuild emits bare <tag/> and saveXML drops attributes (#33362).
+        $xmlnsVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $cur,
+            'DOMElement',
+            VmDom::PROP_USER_SCRIPT_XMLNS_ATTR,
+            $elementClassId
+        );
+        $xmlnsStr = $context->helper->loadValue($xmlnsVar);
+        $openName = JitStringConcat::concat($context, $tagStr, $xmlnsStr, false);
         $innerVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $cur,
@@ -547,7 +562,7 @@ final class JitDomAppendChildLiveSlots
         $context->builder->positionAtEnd($bbEmptyEl);
         $emptyPiece = JitStringConcat::concat(
             $context,
-            JitStringConcat::concat($context, $lt, $tagStr, false),
+            JitStringConcat::concat($context, $lt, $openName, false),
             $slashGt,
             false
         );
@@ -557,7 +572,7 @@ final class JitDomAppendChildLiveSlots
         $context->builder->positionAtEnd($bbFullEl);
         $open = JitStringConcat::concat(
             $context,
-            JitStringConcat::concat($context, $lt, $tagStr, false),
+            JitStringConcat::concat($context, $lt, $openName, false),
             $gt,
             false
         );

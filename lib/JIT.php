@@ -15176,6 +15176,7 @@ class JIT {
      *
      * `$deep` must gate InnerXml: shallow importNode must not re-stamp source children
      * onto the result (php-src xmlDocCopyNode deep=0; #33097).
+     * Attributes are always copied (#33362).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -15213,6 +15214,13 @@ class JIT {
         $resultVar->compileTimeDomLoadXml = null;
         if (null !== $src->compileTimeDomNodePath) {
             $resultVar->compileTimeDomNodePath = $src->compileTimeDomNodePath;
+        }
+        // Stamp attrs for appendChild INNER_XML sync (compileTimeChildElementMarkup; #33362).
+        $attrs = \PHPCompiler\ext\dom\JitDomImportNode::compileTimeAttributesFor($src, $tag);
+        if (null !== $attrs && [] !== $attrs) {
+            $resultVar->compileTimeDomAttributes = $attrs;
+        } elseif (null !== $src->compileTimeDomAttributes) {
+            $resultVar->compileTimeDomAttributes = $src->compileTimeDomAttributes;
         }
     }
 
