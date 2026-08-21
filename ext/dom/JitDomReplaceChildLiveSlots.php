@@ -21,6 +21,8 @@ use PHPLLVM\Value;
  * path always allocated a fresh list (and collapsed unknown counts to 1/2),
  * leaving held lists with stale `__phpcItem*` — item(1) fell back to lastChild
  * and item(2+) aborted (#32784).
+ * DocumentFragment stand-ins expand in place via
+ * {@see JitDomAppendChildLiveSlots::expandFragmentChildrenReplace} (#33322).
  *
  * Reference: php-src ext/dom/node.c dom_node_replace_child.
  */
@@ -38,6 +40,43 @@ final class JitDomReplaceChildLiveSlots
         ?int $childCount = null
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rc_live_slots');
+        self::ensureLayout($context);
+
+        $bbFrag = BasicBlockHelper::append($context, 'dom_rc_frag');
+        $bbNormal = BasicBlockHelper::append($context, 'dom_rc_normal');
+        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_end');
+        $isFrag = JitDomAppendChildLiveSlots::isDocumentFragmentNode($context, $newChild);
+        $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
+
+        $context->builder->positionAtEnd($bbFrag);
+        JitDomAppendChildLiveSlots::expandFragmentChildrenReplace(
+            $context,
+            $parent,
+            $newChild,
+            $oldChild
+        );
+        $context->builder->branch($bbEnd);
+
+        $context->builder->positionAtEnd($bbNormal);
+        self::syncNonFragment($context, $parent, $newChild, $oldChild, $childCount);
+        $context->builder->branch($bbEnd);
+
+        $context->builder->positionAtEnd($bbEnd);
+    }
+
+    /**
+     * Element/text replaceChild (non-fragment) (#28671 / #33322).
+     *
+     * @param int|null $childCount
+     */
+    public static function syncNonFragment(
+        Context $context,
+        Value $parent,
+        Value $newChild,
+        Value $oldChild,
+        ?int $childCount = null
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rc_nonfrag');
         self::ensureLayout($context);
 
         $objPtrTy = $context->getTypeFromString('__object__*');
