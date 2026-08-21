@@ -48,6 +48,9 @@ final class TypeDeadGetResourcesAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#33130', $orchestrator);
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitGetResources.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamResourceKernel.php');
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitGetResources.php');
+        $this->assertStringContainsString('StreamResource::ensureLinked', $jit);
+        $this->assertStringContainsString('#33130', $jit);
     }
 
     public function testTypeInitializeStillEnsureLinksStreamResource(): void

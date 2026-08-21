@@ -4,17 +4,27 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamResource;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for get_resources() via __compiler_get_resources (#3646). */
+/** LLVM lowering for get_resources() via __compiler_get_resources (#3646, #33130). */
 final class JitGetResources
 {
     public static function invoke(Context $context, ?JITVariable $typeArg): Value
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StreamResource::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'get_resources_restore_cont');
+        }
+
         $strPtrTy = $context->getTypeFromString('__string__*');
         $typePtr = $strPtrTy->constNull();
         if (null !== $typeArg && JITVariable::TYPE_NULL !== $typeArg->type) {
