@@ -8,21 +8,27 @@ use PHPCompiler\ext\standard\SymlinkJitHelper;
 use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
-/** symlink() JIT routes through SymlinkJitHelper PHP not libc symlinkat LLVM (#15544). */
+/** symlink() JIT/AOT routes through thin libc symlink(2) (#33416 / peer unlink #33412). */
 final class SymlinkRuntimeShrinkTest extends TestCase
 {
-    public function testJitSymlinkUsesPhpBridgeNotLibc(): void
+    public function testJitSymlinkUsesStringSymlinkBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSymlink.php');
         $this->assertStringContainsString('StringSymlink::invoke', $source);
         $this->assertStringNotContainsString("lookupFunction('symlinkat')", $source);
     }
 
-    public function testStringSymlinkBridgeUsesSymlinkJitHelper(): void
+    public function testStringSymlinkBridgeUsesLibcRuntime(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSymlink.php');
-        $this->assertStringContainsString('SymlinkJitHelper', $bridge);
-        $this->assertStringNotContainsString("lookupFunction('symlinkat')", $bridge);
+        $this->assertStringContainsString('SymlinkLibcRuntime::emit', $bridge);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $bridge);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SymlinkLibcRuntime.php');
+        $this->assertStringContainsString('symlink(2)', $libc);
+        $this->assertStringContainsString('#33416', $libc);
     }
 
     public function testSymlinkJitHelperDelegatesToVmFs(): void
@@ -59,10 +65,11 @@ final class SymlinkRuntimeShrinkTest extends TestCase
         rmdir($base);
     }
 
-    public function testSpineBundleIncludesSymlinkJitHelper(): void
+    public function testSpineBundleIncludesSymlinkLibcRuntime(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('SymlinkJitHelper.php', $spine);
         $this->assertStringContainsString('StringSymlink.php', $spine);
+        $this->assertStringContainsString('SymlinkLibcRuntime.php', $spine);
     }
 }

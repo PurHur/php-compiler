@@ -8,7 +8,9 @@ namespace PHPCompiler\ext\standard;
  * symlink() for compiled JIT/AOT modules (php-in-PHP).
  *
  * SSOT: {@see VmFs::symlink()}
- * php-src: ext/standard/filestat.c — php_symlink
+ * Thin AOT user-script path uses libc symlink(2) via {@see \PHPCompiler\JIT\Builtin\StringSymlink}
+ * (#33416) — this helper remains for VM / NestedJIT consumers of VmFs.
+ * php-src: ext/standard/link.c — php_symlink
  */
 final class SymlinkJitHelper
 {
