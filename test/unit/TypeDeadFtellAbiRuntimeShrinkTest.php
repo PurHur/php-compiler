@@ -7,52 +7,52 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on __compiler_ftruncate ABI shell from Builtin\Type (#33155).
+ * Drop leftover always-on __compiler_ftell ABI shell from Builtin\Type (#33164).
  *
  * NestedJIT/AOT bridge stays StreamRead / StreamReadRuntime / JitStreamReadBridgeKernel.
  * Runtime owner declares module-locally (getNamedFunction first) so leftover Type
- * empty decls cannot mint ftruncate.1 (#31894 / #32122).
+ * empty decls cannot mint ftell.1 (#31894 / #32122).
  */
-final class TypeDeadFtruncateAbiRuntimeShrinkTest extends TestCase
+final class TypeDeadFtellAbiRuntimeShrinkTest extends TestCase
 {
-    public function testTypeBuiltinDropsLeftoverAlwaysOnFtruncateAbi(): void
+    public function testTypeBuiltinDropsLeftoverAlwaysOnFtellAbi(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('#33155', $type);
+        $this->assertStringContainsString('#33164', $type);
         $this->assertDoesNotMatchRegularExpression(
-            '/addFunction\(\s*[\'"]__compiler_ftruncate[\'"]/',
+            '/addFunction\(\s*[\'"]__compiler_ftell[\'"]/',
             $type,
-            'Builtin\\Type must not always-declare __compiler_ftruncate (#33155)'
+            'Builtin\\Type must not always-declare __compiler_ftell (#33164)'
         );
         $this->assertStringNotContainsString(
-            "registerFunction('__compiler_ftruncate'",
+            "registerFunction('__compiler_ftell'",
             $type,
-            'Builtin\\Type must not always-register __compiler_ftruncate (#33155)'
+            'Builtin\\Type must not always-register __compiler_ftell (#33164)'
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (fgetc still Type always-on; ftell dropped in #33164).
+        // Next leftover sentinel (fgetc still Type always-on).
         $this->assertStringContainsString("registerFunction('__compiler_fgetc'", $type);
         $this->assertStringContainsString('StreamRead::ensureLinked', $type);
     }
 
-    public function testRuntimeOwnerDeclaresFtruncateAbiModuleLocally(): void
+    public function testRuntimeOwnerDeclaresFtellAbiModuleLocally(): void
     {
         $owner = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamReadBridgeKernel.php');
-        $this->assertStringContainsString('#33155', $owner);
+        $this->assertStringContainsString('#33164', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
         $this->assertStringContainsString('addFunction', $owner);
-        $this->assertStringContainsString('implementI32Bridge', $owner);
+        $this->assertStringContainsString('implementI64Bridge', $owner);
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamReadRuntime.php');
-        $this->assertStringContainsString('#33155', $runtime);
+        $this->assertStringContainsString('#33164', $runtime);
         $this->assertStringContainsString('getNamedFunction', $runtime);
-        $this->assertStringContainsString('__compiler_ftruncate', $runtime);
+        $this->assertStringContainsString('__compiler_ftell', $runtime);
         $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamRead.php');
-        $this->assertStringContainsString('#33155', $orchestrator);
-        $this->assertFileExists(__DIR__.'/../../ext/standard/StreamReadJitHelper.php');
+        $this->assertStringContainsString('#33164', $orchestrator);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/StreamIoJitHelper.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamReadBridgeKernel.php');
-        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitFtruncate.php');
-        $this->assertStringContainsString('#33155', $jit);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitFtell.php');
+        $this->assertStringContainsString('#33164', $jit);
         $this->assertStringContainsString('StreamReadRuntime::ensureLinked', $jit);
     }
 
@@ -62,9 +62,9 @@ final class TypeDeadFtruncateAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamRead::ensureLinked($this->context)', $type);
     }
 
-    public function testNoNewRuntimeCForFtruncateAbi(): void
+    public function testNoNewRuntimeCForFtellAbi(): void
     {
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/ftruncate.c');
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/ftruncate.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/ftell.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/ftell.c');
     }
 }

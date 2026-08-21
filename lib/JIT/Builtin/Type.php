@@ -331,9 +331,12 @@ class Type extends Builtin {
         // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // ftruncate.1 (#31894 / #32122). User-script ftruncate() stays JitFtruncate /
         // StreamReadJitHelper (libc force peer #33133).
-        $fntypeFtell = $this->context->context->functionType($i64, false, $i64);
-        $fnFtell = $this->context->module->addFunction('__compiler_ftell', $fntypeFtell);
-        $this->context->registerFunction('__compiler_ftell', $fnFtell);
+        // __compiler_ftell always-on shell removed (#33164): StreamRead /
+        // StreamReadRuntime / JitStreamReadBridgeKernel owns the ABI (getNamedFunction first,
+        // then addFunction if absent via implementI64Bridge; Type::initialize still
+        // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // ftell.1 (#31894 / #32122). User-script ftell() stays JitFtell /
+        // StreamIoJitHelper (php://memory #25299).
         $fntypeFgetc = $this->context->context->functionType($strPtr, false, $i64);
         $fnFgetc = $this->context->module->addFunction('__compiler_fgetc', $fntypeFgetc);
         $this->context->registerFunction('__compiler_fgetc', $fnFgetc);
