@@ -30,12 +30,17 @@ final class JitDomElementTextContent
 
     private const PROP_NODE_VALUE = 'nodeValue';
 
-    public static function fetch(Object_ $objectType, Value $obj): JITVariable
+    public static function fetch(Object_ $objectType, Value $obj, ?JITVariable $receiverVar = null): JITVariable
     {
-        return self::fetchNamed($objectType, $obj, self::PROP_TEXT_CONTENT);
+        return self::fetchNamed($objectType, $obj, self::PROP_TEXT_CONTENT, $receiverVar);
     }
 
-    public static function fetchNamed(Object_ $objectType, Value $obj, string $propName): JITVariable
+    public static function fetchNamed(
+        Object_ $objectType,
+        Value $obj,
+        string $propName,
+        ?JITVariable $receiverVar = null
+    ): JITVariable
     {
         $context = $objectType->jitContext();
         $propLc = strtolower($propName);
@@ -60,6 +65,15 @@ final class JitDomElementTextContent
             $var->objectPropertyName = $slotProp;
             $var->objectPropertyClassName = self::CLASS_ELEMENT;
             $var->objectPropertyType = JITVariable::TYPE_STRING;
+            // Carry firstChild/item index from the element Variable so a later
+            // textContent write can splice the parent INNER_XML even if
+            // lastFetched* was overwritten by nextSibling (#33293).
+            if (null !== $receiverVar?->compileTimeDomChildIndex) {
+                $var->compileTimeDomChildIndex = $receiverVar->compileTimeDomChildIndex;
+            }
+            if (null !== $receiverVar?->compileTimeDomTagName) {
+                $var->compileTimeDomTagName = $receiverVar->compileTimeDomTagName;
+            }
 
             return $var;
         }
@@ -170,11 +184,18 @@ final class JitDomElementTextContent
         }
 
         $str = self::loadStringValue($context, $value);
+        $textLit = JitStringBuiltinArg::compileTimeLiteral($value) ?? $value->compileTimeString;
 
         if (JitDomDocumentMethodKernel::shouldUse($context)
             && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
         ) {
             self::emitUserScriptDetachAndReplace($context, $receiver, $str);
+            // Child saveXML($node) already uses cleared INNER_XML + textContent (#23251).
+            // Parent / document saveXML still read the parent's seeded INNER_XML — splice
+            // the child's new outer markup in (peer replaceChild #28671; #33293 / re-#23892).
+            if (null !== $textLit) {
+                self::syncParentInnerXmlAfterTextContentWrite($context, $receiver, $textLit, $lvalue);
+            }
             if (null !== $lvalue->objectPropertySlot) {
                 $context->type->object->propertyStore(
                     $lvalue->objectPropertySlot,
@@ -323,6 +344,104 @@ final class JitDomElementTextContent
         JitDomDocumentElement::storeChildNodesLength($context, $receiver, 1);
         // Prefer empty inner markup so saveXML falls back to textContent (#26757 / #23251).
         JitDomCreateElement::storeUserScriptInnerXml($context, $receiver, '');
+    }
+
+    /**
+     * After a child textContent write, refresh the parent's PROP_USER_SCRIPT_INNER_XML
+     * so saveXML($parent) / saveXML() match Zend (#33293 / re-#23892).
+     *
+     * documentElement textContent writes leave lastFetchedChildIndex null
+     * ({@see JitDomGetNodePath}) — skip; the receiver's own INNER_XML was cleared above.
+     */
+    private static function syncParentInnerXmlAfterTextContentWrite(
+        Context $context,
+        Value $receiver,
+        string $textLit,
+        JITVariable $lvalue
+    ): void {
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
+        }
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        // Prefer the element Variable's stamped index (survives nextSibling) over
+        // lastFetched* statics — documentElement writes leave index null (#33293).
+        $index = $lvalue->compileTimeDomChildIndex
+            ?? null;
+        $tag = $lvalue->compileTimeDomTagName
+            ?? null;
+        if (null === $index) {
+            // No child-index on the receiver: this is documentElement (or unknown).
+            // emitUserScriptDetachAndReplace already cleared its own INNER_XML.
+            return;
+        }
+        if (null === $tag || '' === $tag) {
+            if ($index < 0 || $index >= \count($nodes)
+                || 'element' !== ($nodes[$index]['kind'] ?? '')
+            ) {
+                return;
+            }
+            $tag = $nodes[$index]['data'];
+        }
+        if ($index < 0 || $index >= \count($nodes)) {
+            return;
+        }
+        $attrs = '';
+        if (isset($nodes[$index]['open']) && \is_string($nodes[$index]['open'])) {
+            $attrs = DomParseSimpleXmlJitHelper::attrSuffixFromOpenTagArgv($nodes[$index]['open']);
+        }
+        $escaped = htmlspecialchars($textLit, ENT_QUOTES | ENT_XML1, 'UTF-8');
+        $replacement = '' === $escaped
+            ? '<'.$tag.$attrs.'/>'
+            : '<'.$tag.$attrs.'>'.$escaped.'</'.$tag.'>';
+        $newInner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, $replacement);
+        if (null === $newInner) {
+            return;
+        }
+
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        }
+        // parentNode lives on DOMElement slots (peer JitDomParentNodeProperty / #23251) —
+        // loading via DOMNode aliases the wrong field and leaves the real parent stale.
+        $slotPtr = $context->builder->load(
+            $objectType->propertySlotFor($receiver, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE)
+        );
+        $voidPtr = $context->getTypeFromString('void*');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $isNullSlot = $context->builder->icmp(Builder::INT_EQ, $slotPtr, $voidPtr->constNull());
+        $nullBlock = BasicBlockHelper::append($context, 'dom_tc_parent_slot_null');
+        $readBlock = BasicBlockHelper::append($context, 'dom_tc_parent_slot_read');
+        $merge = BasicBlockHelper::append($context, 'dom_tc_parent_slot_merge');
+        $context->builder->branchIf($isNullSlot, $nullBlock, $readBlock);
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($readBlock);
+        $valuePtr = $context->builder->pointerCast(
+            $slotPtr,
+            $context->getTypeFromString('__value__*')
+        );
+        $parentFromSlot = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $parentObj = $context->builder->phi($objPtrTy);
+        $parentObj->addIncoming($objPtrTy->constNull(), $nullBlock);
+        $parentObj->addIncoming($parentFromSlot, $readBlock);
+
+        $parentNull = $context->builder->icmp(Builder::INT_EQ, $parentObj, $objPtrTy->constNull());
+        $doStore = BasicBlockHelper::append($context, 'dom_tc_parent_inner_store');
+        $afterStore = BasicBlockHelper::append($context, 'dom_tc_parent_inner_done');
+        $context->builder->branchIf($parentNull, $afterStore, $doStore);
+        $context->builder->positionAtEnd($doStore);
+        JitDomCreateElement::storeUserScriptInnerXml($context, $parentObj, $newInner);
+        JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($newInner, null);
+        $context->builder->branch($afterStore);
+        $context->builder->positionAtEnd($afterStore);
     }
 
     /** Load __object__* from a DOMNode firstChild/lastChild TYPE_VALUE slot (or null). */
