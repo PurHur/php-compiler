@@ -1029,11 +1029,21 @@ final class DomNodeLiveMutationRuntime
         $tag = $arg->compileTimeDomTagName ?? null;
         if (null !== $tag && '' !== $tag) {
             $inner = $arg->compileTimeDomInnerXml ?? '';
+            $attrSuffix = '';
+            if (null !== $arg->compileTimeDomAttributes && [] !== $arg->compileTimeDomAttributes) {
+                $parts = [];
+                foreach ($arg->compileTimeDomAttributes as $name => $value) {
+                    $parts[] = $name.'="'.htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8').'"';
+                }
+                if ([] !== $parts) {
+                    $attrSuffix = ' '.implode(' ', $parts);
+                }
+            }
             if ('' === $inner) {
-                return '<'.$tag.'/>';
+                return '<'.$tag.$attrSuffix.'/>';
             }
 
-            return '<'.$tag.'>'.$inner.'</'.$tag.'>';
+            return '<'.$tag.$attrSuffix.'>'.$inner.'</'.$tag.'>';
         }
         $text = self::compileTimeChildTextData($arg);
         if (null === $text) {
