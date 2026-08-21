@@ -609,9 +609,12 @@ class Type extends Builtin {
         $fntypeTriggerError = $this->context->context->functionType($void, false, $i8p, $sizeT, $i32, $i8p, $i32);
         $fnTriggerError = $this->context->module->addFunction('__compiler_trigger_error', $fntypeTriggerError);
         $this->context->registerFunction('__compiler_trigger_error', $fnTriggerError);
-        $fntypeAssertFail = $this->context->context->functionType($void, false, $i8p, $sizeT);
-        $fnAssertFail = $this->context->module->addFunction('__compiler_assert_fail', $fntypeAssertFail);
-        $this->context->registerFunction('__compiler_assert_fail', $fnAssertFail);
+        // __compiler_assert_fail always-on shell removed (#33237): AssertFail owns the
+        // ABI (getNamedFunction first, then addFunction if absent; Type::initialize still
+        // AssertFail::ensureLinked on the full load path; JitAssert ensureLinked before
+        // lookup). Leftover Type empty decls vs Runtime ABI drift mint assert_fail.1
+        // (#31894 / #32122). User-script assert() stays JitAssert (php-src
+        // ext/standard/assert.c).
         $strPtr = $this->context->getTypeFromString('__string__*');
         $fntypeAssertFailStr = $this->context->context->functionType($void, false, $strPtr);
         $fnAssertFailStr = $this->context->module->addFunction(

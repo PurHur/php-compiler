@@ -12,9 +12,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM implementation of assert() failure bridge (issue #6550, #3157).
+ * LLVM implementation of assert() failure bridge (issue #6550, #3157, #33237).
  *
- * Replaces __compiler_assert_fail* in lib/AOT/runtime/superglobals_refresh.c.
+ * Owns `__compiler_assert_fail` module-locally (getNamedFunction first, then
+ * addFunction if absent). Do not re-add an always-on empty decl in {@see Type} —
+ * leftover decls mint assert_fail.1 (#31894 / #32122 / #33237).
+ * `__compiler_assert_fail_string` still Type-declared until a follow-up shrink.
  * php-src: ext/standard/assert.c
  */
 final class AssertFail
@@ -31,6 +34,10 @@ final class AssertFail
         AssertionErrorRaise::registerDeclarations($context);
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             self::implementBodies($context);
+        } else {
+            // Thin/standalone: declare empty ABI so later ensureStandaloneBodies
+            // can fill; no Type always-on shell (#33237).
+            self::declareAssertFailAbi($context);
         }
     }
 
@@ -41,12 +48,31 @@ final class AssertFail
         self::implementBodies($context);
     }
 
+    /**
+     * Module-local ABI: getNamedFunction first, then addFunction if absent (#33237).
+     */
+    private static function declareAssertFailAbi(Context $context): Value
+    {
+        $abiName = '__compiler_assert_fail';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return $probe;
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $void = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($void, false, $i8p, $sizeT);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+
+        return $fn;
+    }
+
     private static function implementBodies(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_assert_fail');
-        if (null === $probe) {
-            return;
-        }
+        $probe = self::declareAssertFailAbi($context);
         if ($probe->countBasicBlocks() > 0) {
             return;
         }

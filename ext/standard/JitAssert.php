@@ -17,7 +17,12 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for assert() via AssertFail runtime (issues #3157, #6550). */
+/**
+ * LLVM lowering for assert() via AssertFail runtime (issues #3157, #6550, #33237).
+ *
+ * Always {@see AssertFail::ensureLinked} before `__compiler_assert_fail` lookup —
+ * Type no longer always-declares that ABI (#33237).
+ */
 final class JitAssert
 {
     /** @return Value int64 1 on pass, 0 on fail (php-cfg infers assert() as int) */
