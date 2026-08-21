@@ -1471,7 +1471,7 @@ class Context {
             $diLc = strtolower($diClass);
             foreach ([
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next',
-                'isDot', 'getFilename', 'getSize',
+                'isDot', 'getFilename', 'getSize', 'getRealPath',
                 'getMTime', 'getATime', 'getCTime', 'getPerms', 'getOwner', 'getGroup', 'getInode',
                 'isFile', 'isDir',
                 'isLink', 'isReadable', 'isWritable', 'isExecutable',
@@ -1484,7 +1484,7 @@ class Context {
             }
         }
         foreach ([
-            'getFilename', 'getSize',
+            'getFilename', 'getSize', 'getRealPath',
             'getMTime', 'getATime', 'getCTime', 'getPerms', 'getOwner', 'getGroup', 'getInode',
             'isFile', 'isDir',
             'isLink', 'isReadable', 'isWritable', 'isExecutable',
