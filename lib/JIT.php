@@ -15589,9 +15589,10 @@ class JIT {
     }
 
     /**
-     * Tag literal unserialize(SplFixedArray) so foreach uses splBackingHashtable (#33649).
+     * Tag literal unserialize(SPL HT-backed) so foreach uses splBackingHashtable (#33649, #33654).
      *
      * Without classUserType, TYPE_VALUE boxes take __value__readHashtable → SEGV.
+     * Covers SplFixedArray (#33649), ArrayObject / ArrayIterator / RecursiveArrayIterator (#33654).
      *
      * @param list<Variable> $callArgs
      */
@@ -15611,20 +15612,27 @@ class JIT {
             return;
         }
         $literal = JIT\JitStringArg::compileTimeLiteral($payload);
-        if (null === $literal || !\preg_match('/^O:\d+:"SplFixedArray":/', $literal)) {
+        if (null === $literal
+            || !\preg_match(
+                '/^O:\d+:"(SplFixedArray|ArrayObject|ArrayIterator|RecursiveArrayIterator)":/',
+                $literal,
+                $m
+            )
+        ) {
             return;
         }
+        $class = $m[1];
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
         $var = $this->context->getVariableFromOp($result);
-        $var->classUserType = 'SplFixedArray';
-        $result->type = new Type(Type::TYPE_OBJECT, [], 'SplFixedArray');
+        $var->classUserType = $class;
+        $result->type = new Type(Type::TYPE_OBJECT, [], $class);
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
-                $this->context->namedVariableBindings[$resolved]->classUserType = 'SplFixedArray';
+                $this->context->namedVariableBindings[$resolved]->classUserType = $class;
             }
             $this->context->bindVariableByName($resolved, $var);
         }
