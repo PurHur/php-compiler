@@ -1536,6 +1536,34 @@ class Context {
                 'SplFileObject'
             );
         }
+        // SplTempFileObject — extends SplFileObject; php://temp construct (#33431).
+        $this->type->object->lookup('SplTempFileObject');
+        foreach ([
+            '__construct', 'getFilename', 'getPathname', 'getPath', '__toString',
+            'fgets', 'getCurrentLine', 'fread', 'fgetc', 'fwrite', 'fputcsv', 'fgetcsv', 'fscanf',
+            'setCsvControl', 'getCsvControl', 'eof', 'hasChildren', 'getChildren',
+            'ftell', 'fstat', 'flock', 'ftruncate', 'fflush', 'fpassthru', 'fseek', 'seek',
+            'setFlags', 'getFlags', 'setMaxLineLen', 'getMaxLineLen',
+            'rewind', 'valid', 'current', 'key', 'next',
+        ] as $stfoMethod) {
+            $this->functionProxies['spltempfileobject::'.strtolower($stfoMethod)] = new Call\SplFileObjectMethod(
+                $stfoMethod,
+                true
+            );
+        }
+        foreach ([
+            'getSize', 'getRealPath',
+            'getMTime', 'getATime', 'getCTime', 'getPerms', 'getOwner', 'getGroup', 'getInode',
+            'isFile', 'isDir',
+            'isLink', 'getLinkTarget', 'isReadable', 'isWritable', 'isExecutable',
+            'getExtension', 'getBasename', 'getType',
+            'getFileInfo', 'getPathInfo', 'openFile',
+        ] as $stfoStatMethod) {
+            $this->functionProxies['spltempfileobject::'.strtolower($stfoStatMethod)] = new Call\DirectoryIteratorMethod(
+                $stfoStatMethod,
+                'SplFileObject'
+            );
+        }
         // GlobIterator — glob snapshot + Iterator (#27422).
         $this->type->object->lookup('GlobIterator');
         foreach ([
