@@ -411,6 +411,8 @@ final class SplFixedArrayJitHelper
             new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_double_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_bool_at(),
         ];
         foreach ($internals as $internal) {
             $lc = strtolower($internal->getName());
@@ -421,6 +423,8 @@ final class SplFixedArrayJitHelper
         }
         $ht = self::htPtr($context, $obj);
         $logical = 'PHPCompiler\\ext\\standard\\UnserializeSplFixedArrayNestedJitHelper::restoreInto';
+        $dblLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplFixedArrayDoubleNestedJitHelper::restoreInto';
+        $boolLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplFixedArrayBoolNestedJitHelper::restoreInto';
         $saved = BasicBlockHelper::tryGetInsertBlock($context);
         \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
             $context,
@@ -429,22 +433,42 @@ final class SplFixedArrayJitHelper
             '#33640'
         );
         BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplFixedArrayDoubleNestedJitHelper.php',
+            [$dblLogical],
+            '#33673'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplFixedArrayBoolNestedJitHelper.php',
+            [$boolLogical],
+            '#33673'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
         $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33640');
+        $dblFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $dblLogical, '#33673');
+        $boolFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $boolLogical, '#33673');
         $payloadOwned = self::nestedJitOwnedString($context, $payloadString);
         $destI64 = \PHPCompiler\JIT\JitNestedHelperCoerce::ptrToI64($context, $ht);
-        $context->builder->call(
-            $fn,
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $destI64,
-                $fn->getParam(0)->typeOf()
-            ),
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $payloadOwned,
-                $fn->getParam(1)->typeOf()
-            )
-        );
+        foreach ([$fn, $dblFn, $boolFn] as $peerFn) {
+            $context->builder->call(
+                $peerFn,
+                \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                    $context,
+                    $destI64,
+                    $peerFn->getParam(0)->typeOf()
+                ),
+                \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                    $context,
+                    $payloadOwned,
+                    $peerFn->getParam(1)->typeOf()
+                )
+            );
+        }
     }
 
     /** Owned `__string__*` copy for NestedJIT PHP string params (#24137 / #33640). */

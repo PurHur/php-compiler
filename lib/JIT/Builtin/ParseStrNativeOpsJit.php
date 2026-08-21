@@ -178,6 +178,42 @@ final class ParseStrNativeOpsJit
         );
     }
 
+    /** Packed double write — NestedJIT may pass `d:…` text as string (#33673). */
+    public static function setDoubleAt(Context $context, JITVariable $htPtr, JITVariable $index, JITVariable $value): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $sizeT = $context->getTypeFromString('size_t');
+        $idx = $context->builder->zext(
+            JitLongArg::lower($context, $index, 'phpc_native_ht index'),
+            $sizeT
+        );
+        $dbl = self::doubleFromVar($context, $value);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setDoubleAt'),
+            $ht,
+            $idx,
+            $dbl
+        );
+    }
+
+    /** Packed bool write (#33673). */
+    public static function setBoolAt(Context $context, JITVariable $htPtr, JITVariable $index, JITVariable $value): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $sizeT = $context->getTypeFromString('size_t');
+        $idx = $context->builder->zext(
+            JitLongArg::lower($context, $index, 'phpc_native_ht index'),
+            $sizeT
+        );
+        $boolVal = \PHPCompiler\JIT\JitBoolArg::lower($context, $value, 'phpc_native_ht bool value');
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setBoolAt'),
+            $ht,
+            $idx,
+            $boolVal
+        );
+    }
+
     private static function doubleFromVar(Context $context, JITVariable $var): Value
     {
         $double = $context->getTypeFromString('double');

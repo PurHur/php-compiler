@@ -5,18 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * NestedJIT: restore SplFixedArray integer-keyed wire into `__spl_ht` (#33640).
+ * NestedJIT: write SplFixedArray `d:` slots (#33673).
  *
- * Own TU / single method — NestedJIT blanks large bodies; do not use strpos().
- * Wire shape: `O:len:"SplFixedArray":N:{i:0;…i:k;N;…}` (php-src spl_fixedarray.c).
+ * Own TU — peer of {@see UnserializeSplFixedArrayNestedJitHelper} which skips `d:`.
  */
-final class UnserializeSplFixedArrayNestedJitHelper
+final class UnserializeSplFixedArrayDoubleNestedJitHelper
 {
-    /**
-     * Fill caller-owned HT from full O: payload. Returns 1 on success.
-     *
-     * @param mixed $payload
-     */
     public static function restoreInto(int $htPtr, string $payload): int
     {
         if ($htPtr <= 0) {
@@ -82,54 +76,54 @@ final class UnserializeSplFixedArrayNestedJitHelper
             if ($ineg) {
                 $idx = 0 - $idx;
             }
-            if ($idx < 0) {
+            if ($idx < 0 || $pos >= $len) {
                 return 0;
             }
-            if ($pos >= $len) {
-                return 0;
-            }
-            if ('N' === $payload[$pos] && $pos + 1 < $len && ';' === $payload[$pos + 1]) {
-                phpc_native_ht_set_null_at($htPtr, $idx);
+            if ('d' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
                 $pos = $pos + 2;
-            } elseif ('i' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
-                $pos = $pos + 2;
-                $num = 0;
-                $vneg = false;
-                if ($pos < $len && '-' === $payload[$pos]) {
-                    $vneg = true;
+                $dstr = '';
+                if ($pos < $len && ('-' === $payload[$pos] || '+' === $payload[$pos])) {
+                    $dstr .= $payload[$pos];
                     $pos = $pos + 1;
                 }
-                $sawN = false;
-                while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
-                    $sawN = true;
-                    $num = $num * 10 + (\ord($payload[$pos]) - 48);
+                $sawD = false;
+                while ($pos < $len && (($payload[$pos] >= '0' && $payload[$pos] <= '9') || '.' === $payload[$pos])) {
+                    $sawD = true;
+                    $dstr .= $payload[$pos];
                     $pos = $pos + 1;
                 }
-                if (!$sawN || $pos >= $len || ';' !== $payload[$pos]) {
+                if (!$sawD || $pos >= $len || ';' !== $payload[$pos]) {
                     return 0;
                 }
                 $pos = $pos + 1;
-                if ($vneg) {
-                    $num = 0 - $num;
+                phpc_native_ht_set_double_at($htPtr, $idx, $dstr);
+            } elseif ('N' === $payload[$pos] && $pos + 1 < $len && ';' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+            } elseif ('i' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+                if ($pos < $len && '-' === $payload[$pos]) {
+                    $pos = $pos + 1;
                 }
-                phpc_native_ht_set_long_at($htPtr, $idx, $num);
+                while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
+                    $pos = $pos + 1;
+                }
+                if ($pos >= $len || ';' !== $payload[$pos]) {
+                    return 0;
+                }
+                $pos = $pos + 1;
             } elseif ('s' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
                 $pos = $pos + 2;
                 $slen = 0;
-                $sawS = false;
                 while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
-                    $sawS = true;
                     $slen = $slen * 10 + (\ord($payload[$pos]) - 48);
                     $pos = $pos + 1;
                 }
-                if (!$sawS || $pos + 1 >= $len || ':' !== $payload[$pos] || '"' !== $payload[$pos + 1]) {
+                if ($pos + 1 >= $len || ':' !== $payload[$pos] || '"' !== $payload[$pos + 1]) {
                     return 0;
                 }
                 $pos = $pos + 2;
-                $str = '';
                 $si = 0;
                 while ($si < $slen && $pos < $len) {
-                    $str .= $payload[$pos];
                     $pos = $pos + 1;
                     $si = $si + 1;
                 }
@@ -137,26 +131,9 @@ final class UnserializeSplFixedArrayNestedJitHelper
                     return 0;
                 }
                 $pos = $pos + 2;
-                phpc_native_ht_set_string_at($htPtr, $idx, $str);
-            } elseif ('d' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
-                // Peer TU writes floats (#33673) — keep this TU NestedJIT-small.
-                $pos = $pos + 2;
-                while ($pos < $len && ';' !== $payload[$pos]) {
-                    $pos = $pos + 1;
-                }
-                if ($pos >= $len || ';' !== $payload[$pos]) {
-                    return 0;
-                }
-                $pos = $pos + 1;
             } elseif ('b' === $payload[$pos] && $pos + 3 < $len && ':' === $payload[$pos + 1]
                 && ('0' === $payload[$pos + 2] || '1' === $payload[$pos + 2])
                 && ';' === $payload[$pos + 3]) {
-                // Peer TU writes real bools (#33673); long placeholder keeps count.
-                $bval = 0;
-                if ('1' === $payload[$pos + 2]) {
-                    $bval = 1;
-                }
-                phpc_native_ht_set_long_at($htPtr, $idx, $bval);
                 $pos = $pos + 4;
             } else {
                 return 0;
