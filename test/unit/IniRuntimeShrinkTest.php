@@ -47,13 +47,19 @@ final class IniRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('branchIfKey', $source);
         $this->assertStringNotContainsString("lookupFunction('strcasecmp')", $source);
-        // Thin EG(exception_ignore_args) path for AOT NestedJIT SEGV (#27549) — not a false stub.
+        // Thin EG(exception_ignore_args) + PG(precision)/serialize_precision/memory_limit
+        // LLVM SSOT for AOT NestedJIT BSS toxicity (#27549 / #33059) — not false stubs.
         $this->assertStringContainsString('phpc_ini_exception_ignore_args', $source);
         $this->assertStringContainsString('emitThinSetExceptionIgnoreArgs', $source);
         $this->assertStringContainsString('emitParseBoolIni', $source);
+        $this->assertStringContainsString('IniRuntimeThinStorage', $source);
+        $this->assertStringContainsString('G_PRECISION', $source);
+        $thin = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/IniRuntimeThinStorage.php');
+        $this->assertStringContainsString('phpc_ini_precision', $thin);
         $lineCount = \substr_count($source, "\n") + 1;
-        $this->assertLessThanOrEqual(650, $lineCount);
-        $this->assertGreaterThan(400, 1034 - $lineCount);
+        $this->assertLessThanOrEqual(780, $lineCount);
+        // Historical peak was 1034 lines before #21200 NestedJIT-only shrink.
+        $this->assertLessThan(1034, $lineCount);
     }
 
     public function testIniJitHelperMemoryLimitRoundTrip(): void
@@ -69,7 +75,8 @@ final class IniRuntimeShrinkTest extends TestCase
 
     public function testIniJitHelperUnknownKeyReturnsNull(): void
     {
-        $this->assertNull(IniJitHelper::iniGet('bogus_ini_key'));
+        // NestedJIT maps false via INI_FALSE_SENTINEL (#33059); host PHP sees the same sentinel.
+        $this->assertSame(IniJitHelper::INI_FALSE_SENTINEL, IniJitHelper::iniGet('bogus_ini_key'));
     }
 
     public function testIniJitHelperDefaultCharsetRoundTrip(): void

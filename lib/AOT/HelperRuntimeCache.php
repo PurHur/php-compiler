@@ -182,6 +182,15 @@ final class HelperRuntimeCache
         // #30858 / re-#27011 — prelinked QuotemetaJitHelper unit.o SIGSEGVs under thin AOT;
         // NestedJIT VmQuotemeta (strlen/substr) into the user module (peer #30859).
         'phpcompiler\\ext\\standard\\quotemetajithelper::quotemetaargv' => true,
+        // #33059 — prelinked IniJitHelper unit.o returns "0" for every ini_get under thin
+        // AOT (NestedJIT class-const isset + split statics). Force NestedJIT into the user
+        // module; precision/serialize_precision/memory_limit use LLVM SSOT thin paths.
+        'phpcompiler\\ext\\standard\\inijithelper::iniget' => true,
+        'phpcompiler\\ext\\standard\\inijithelper::iniset' => true,
+        'phpcompiler\\ext\\standard\\inijithelper::inicfgget' => true,
+        'phpcompiler\\ext\\standard\\inijithelper::inirestore' => true,
+        'phpcompiler\\ext\\standard\\inijithelper::getprecisionint' => true,
+        'phpcompiler\\ext\\standard\\inijithelper::getserializeprecisionint' => true,
         // #30813 — prelinked Nl2brJitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
         // VmNl2br (strlen/substr) into the user module (peer #30812 / #30859).
         'phpcompiler\\ext\\standard\\nl2brjithelper::nl2brargv' => true,

@@ -15,6 +15,12 @@ use PHPCompiler\VM\SapiOutput;
  */
 final class IniJitHelper
 {
+    /**
+     * NestedJIT cannot return typed null for ?string under thin AOT (TypeError abort).
+     * Bridge maps this sentinel to Zend false (#33059).
+     */
+    public const INI_FALSE_SENTINEL = '__phpc_ini_false__';
+
     /** @var list<string> */
     private const SUPPORTED_KEYS = [
         'error_reporting',
@@ -230,7 +236,10 @@ final class IniJitHelper
         return self::$registerArgcArgv;
     }
 
+
+
     public static function getUserAgent(): string
+
     {
         return self::$userAgent;
     }
@@ -298,30 +307,35 @@ final class IniJitHelper
     }
 
     /** @return string|null null when ini_get() is false */
-    public static function iniGet(string $option): ?string
+    public static function iniGet(string $option)
     {
         $key = strtolower($option);
         if ('max_memory_limit' === $key) {
-            return \PHPCompiler\CompilerVersion::supportsMaxMemoryLimit() ? self::$maxMemoryLimit : null;
+            return \PHPCompiler\CompilerVersion::supportsMaxMemoryLimit() ? self::$maxMemoryLimit : self::INI_FALSE_SENTINEL;
         }
-        if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
-            return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
+        // NestedJIT isset()/in_array()/nullable returns are BSS-toxic under thin AOT (#33059).
+        if (self::isReadonlyBoolKey($key)) {
+            return VmIni::formatBoolIniGet(self::readonlyBoolDefault($key));
         }
-        if (isset(self::READONLY_STRING_DEFAULTS[$key])) {
-            return self::READONLY_STRING_DEFAULTS[$key];
+        if (self::isReadonlyStringKey($key)) {
+            return self::readonlyStringDefault($key);
         }
-        if (in_array($key, self::ASSERT_INI_KEYS, true)) {
+        if (self::isAssertIniKey($key)) {
             return self::assertIniGet($key);
         }
-        if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
+        if (self::isEmptyStringIniKey($key)) {
             return '';
         }
-        $mirrored = VmIniIntrospection::mirroredHostIniGet($key);
-        if (null !== $mirrored) {
-            return $mirrored;
+        if (self::isMirroredHostIniKey($key)) {
+            $mirrored = VmIniIntrospection::mirroredHostIniGet($key);
+            if (\is_string($mirrored)) {
+                return $mirrored;
+            }
+
+            return self::INI_FALSE_SENTINEL;
         }
-        if (!in_array($key, self::SUPPORTED_KEYS, true)) {
-            return null;
+        if (!self::isSupportedKey($key)) {
+            return self::INI_FALSE_SENTINEL;
         }
 
         if ('error_reporting' === $key) {
@@ -397,24 +411,24 @@ final class IniJitHelper
             return VmIni::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
         }
 
-        return null;
+        return self::INI_FALSE_SENTINEL;
     }
 
     /** @return string|null null when ini_set() is false */
-    public static function iniSet(string $option, string $newValue): ?string
+    public static function iniSet(string $option, string $newValue)
     {
         $key = strtolower($option);
         if ('max_memory_limit' === $key) {
-            return null;
+            return self::INI_FALSE_SENTINEL;
         }
         if (self::rejectSessionIniAfterHeadersSent($key)) {
-            return null;
+            return self::INI_FALSE_SENTINEL;
         }
-        if (in_array($key, self::ASSERT_INI_KEYS, true)) {
+        if (self::isAssertIniKey($key)) {
             return self::assertIniSet($key, $newValue);
         }
-        if (!in_array($key, self::SUPPORTED_KEYS, true)) {
-            return null;
+        if (!self::isSupportedKey($key)) {
+            return self::INI_FALSE_SENTINEL;
         }
 
         if ('error_reporting' === $key) {
@@ -499,27 +513,27 @@ final class IniJitHelper
             return self::setMaxExecutionTime($newValue);
         }
         if ('register_argc_argv' === $key) {
-            return null;
+            return self::INI_FALSE_SENTINEL;
         }
 
-        return null;
+        return self::INI_FALSE_SENTINEL;
     }
 
     /** @return string|null null when get_cfg_var() is false */
-    public static function iniCfgGet(string $option): ?string
+    public static function iniCfgGet(string $option)
     {
         $key = strtolower($option);
         if ('max_memory_limit' === $key) {
-            return \PHPCompiler\CompilerVersion::supportsMaxMemoryLimit() ? self::CFG_MAX_MEMORY_LIMIT : null;
+            return \PHPCompiler\CompilerVersion::supportsMaxMemoryLimit() ? self::CFG_MAX_MEMORY_LIMIT : self::INI_FALSE_SENTINEL;
         }
-        if (in_array($key, self::CFG_EMPTY_STRING_KEYS, true)) {
+        if (self::isCfgEmptyStringKey($key)) {
             return '';
         }
-        if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
-            return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
+        if (self::isReadonlyBoolKey($key)) {
+            return VmIni::formatBoolIniGet(self::readonlyBoolDefault($key));
         }
-        if (isset(self::READONLY_STRING_DEFAULTS[$key])) {
-            return self::READONLY_STRING_DEFAULTS[$key];
+        if (self::isReadonlyStringKey($key)) {
+            return self::readonlyStringDefault($key);
         }
         if ('engine' === $key) {
             return '1';
@@ -527,13 +541,13 @@ final class IniJitHelper
         if ('zend.exception_ignore_args' === $key) {
             return '1';
         }
-        if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
+        if (self::isAssertIniKey($key)) {
             $value = VmAssertState::iniGet($option);
 
-            return false === $value ? null : $value;
+            return false === $value ? self::INI_FALSE_SENTINEL : $value;
         }
-        if (!in_array($key, self::SUPPORTED_KEYS, true)) {
-            return null;
+        if (!self::isSupportedKey($key)) {
+            return self::INI_FALSE_SENTINEL;
         }
 
         if ('error_reporting' === $key) {
@@ -596,13 +610,13 @@ final class IniJitHelper
             return VmIni::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
         }
 
-        return null;
+        return self::INI_FALSE_SENTINEL;
     }
 
     public static function iniRestore(string $option): void
     {
         $key = strtolower($option);
-        if (!in_array($key, self::SUPPORTED_KEYS, true)) {
+        if (!self::isSupportedKey($key)) {
             return;
         }
 
@@ -735,7 +749,7 @@ final class IniJitHelper
     {
         $parsed = (int) trim($newValue);
         if ($parsed <= 0) {
-            return null;
+            return self::INI_FALSE_SENTINEL;
         }
         $old = self::unserializeMaxDepthAsIniString();
         self::$unserializeMaxDepth = $parsed;
@@ -756,7 +770,7 @@ final class IniJitHelper
     {
         $parsed = self::parseSessionGcMaxlifetimeIni($newValue);
         if ($parsed <= 0) {
-            return null;
+            return self::INI_FALSE_SENTINEL;
         }
         $old = self::sessionGcMaxlifetimeAsIniString();
         self::$sessionGcMaxlifetime = $parsed;
@@ -794,7 +808,7 @@ final class IniJitHelper
     {
         $old = VmDate::defaultTimezoneGet();
         if (!VmDate::tryDefaultTimezoneSet($newValue)) {
-            return null;
+            return self::INI_FALSE_SENTINEL;
         }
 
         return $old;
@@ -804,7 +818,7 @@ final class IniJitHelper
     {
         $parsed = (int) $newValue;
         if ($parsed < 0) {
-            return null;
+            return self::INI_FALSE_SENTINEL;
         }
         $old = (string) self::$pcreBacktrackLimit;
         self::$pcreBacktrackLimit = $parsed;
@@ -824,7 +838,7 @@ final class IniJitHelper
     {
         $parsed = (int) $newValue;
         if ($parsed < 0) {
-            return null;
+            return self::INI_FALSE_SENTINEL;
         }
         $old = (string) self::$pcreRecursionLimit;
         self::$pcreRecursionLimit = $parsed;
@@ -836,7 +850,7 @@ final class IniJitHelper
     {
         $parsed = (int) trim($newValue);
         if ($parsed < 0 || $parsed > self::EXCEPTION_STRING_PARAM_MAX_LEN_CEILING) {
-            return null;
+            return self::INI_FALSE_SENTINEL;
         }
         $old = (string) self::$exceptionStringParamMaxLen;
         self::$exceptionStringParamMaxLen = $parsed;
@@ -864,7 +878,7 @@ final class IniJitHelper
     }
 
     /** @return string|null */
-    private static function assertIniGet(string $key): ?string
+    private static function assertIniGet(string $key)
     {
         if ('zend.assertions' === $key) {
             return AssertOptionsJitHelper::iniGetZendAssertions();
@@ -886,11 +900,11 @@ final class IniJitHelper
             return AssertOptionsJitHelper::iniGetException();
         }
 
-        return null;
+        return self::INI_FALSE_SENTINEL;
     }
 
     /** @return string|null */
-    private static function assertIniSet(string $key, string $newValue): ?string
+    private static function assertIniSet(string $key, string $newValue)
     {
         if ('zend.assertions' === $key) {
             $result = AssertOptionsJitHelper::iniSetZendAssertionsFromString($newValue);
@@ -918,7 +932,7 @@ final class IniJitHelper
             return AssertOptionsJitHelper::iniSetExceptionFromString($newValue);
         }
 
-        return null;
+        return self::INI_FALSE_SENTINEL;
     }
 
     /** php-src ext/session/session.c — session ini cannot change after headers sent (#11548). */
@@ -928,6 +942,144 @@ final class IniJitHelper
             return false;
         }
 
-        return in_array($key, ['session.save_path', 'session.gc_maxlifetime', 'session.use_strict_mode'], true);
+        return 'session.save_path' === $key
+            || 'session.gc_maxlifetime' === $key
+            || 'session.use_strict_mode' === $key;
+    }
+
+    private static function isReadonlyBoolKey(string $key): bool
+    {
+        return 'enable_dl' === $key
+            || 'short_open_tag' === $key
+            || 'zend.enable_gc' === $key
+            || 'session.use_cookies' === $key
+            || 'session.use_only_cookies' === $key
+            || 'allow_url_fopen' === $key
+            || 'allow_url_include' === $key;
+    }
+
+    private static function isReadonlyStringKey(string $key): bool
+    {
+        return 'session.save_handler' === $key
+            || 'user_ini.filename' === $key
+            || 'realpath_cache_size' === $key
+            || 'realpath_cache_ttl' === $key
+            || 'post_max_size' === $key
+            || 'upload_max_filesize' === $key
+            || 'default_socket_timeout' === $key
+            || 'auto_detect_line_endings' === $key
+            || 'default_mimetype' === $key
+            || 'variables_order' === $key
+            || 'request_order' === $key
+            || 'arg_separator.output' === $key;
+    }
+
+    /** Caller must check {@see isReadonlyBoolKey} first. */
+    private static function readonlyBoolDefault(string $key): bool
+    {
+        return match ($key) {
+            'enable_dl', 'short_open_tag', 'allow_url_include' => false,
+            default => true,
+        };
+    }
+
+    /** Caller must check {@see isReadonlyStringKey} first. */
+    private static function readonlyStringDefault(string $key): string
+    {
+        return match ($key) {
+            'session.save_handler' => 'files',
+            'user_ini.filename' => '.user.ini',
+            'realpath_cache_size' => '4096K',
+            'realpath_cache_ttl' => '120',
+            'post_max_size' => '8M',
+            'upload_max_filesize' => '2M',
+            'default_socket_timeout' => '60',
+            'auto_detect_line_endings' => '0',
+            'default_mimetype' => 'text/html',
+            'variables_order' => 'GPCS',
+            'request_order' => 'GP',
+            'arg_separator.output' => '&',
+            default => '',
+        };
+    }
+
+    private static function isAssertIniKey(string $key): bool
+    {
+        return 'zend.assertions' === $key
+            || 'assert.active' === $key
+            || 'assert.bail' === $key
+            || 'assert.callback' === $key
+            || 'assert.exception' === $key;
+    }
+
+    private static function isEmptyStringIniKey(string $key): bool
+    {
+        return 'auto_prepend_file' === $key
+            || 'auto_append_file' === $key
+            || 'browscap' === $key
+            || 'error_log' === $key
+            || 'doc_root' === $key
+            || 'user_dir' === $key
+            || 'disable_functions' === $key
+            || 'disable_classes' === $key
+            || 'mail.add_x_header' === $key
+            || 'error_append_string' === $key
+            || 'error_prepend_string' === $key
+            || 'upload_tmp_dir' === $key
+            || 'sys_temp_dir' === $key;
+    }
+
+    private static function isCfgEmptyStringKey(string $key): bool
+    {
+        return 'auto_prepend_file' === $key
+            || 'auto_append_file' === $key
+            || 'doc_root' === $key
+            || 'user_dir' === $key
+            || 'disable_functions' === $key
+            || 'disable_classes' === $key
+            || 'mail.add_x_header' === $key;
+    }
+
+    private static function isMirroredHostIniKey(string $key): bool
+    {
+        return 'extension_dir' === $key
+            || 'sendmail_path' === $key
+            || 'mail.force_extra_parameters' === $key;
+    }
+
+    private static function isSupportedKey(string $key): bool
+    {
+        return 'error_reporting' === $key
+            || 'display_errors' === $key
+            || 'memory_limit' === $key
+            || 'precision' === $key
+            || 'serialize_precision' === $key
+            || 'unserialize_max_depth' === $key
+            || 'unserialize_callback_func' === $key
+            || 'session.gc_maxlifetime' === $key
+            || 'session.save_path' === $key
+            || 'session.use_strict_mode' === $key
+            || 'include_path' === $key
+            || 'open_basedir' === $key
+            || 'short_open_tag' === $key
+            || 'register_argc_argv' === $key
+            || 'zend.enable_gc' === $key
+            || 'max_execution_time' === $key
+            || 'default_charset' === $key
+            || 'date.timezone' === $key
+            || 'cfg_file_path' === $key
+            || 'user_agent' === $key
+            || 'url_rewriter.tags' === $key
+            || 'url_rewriter.hosts' === $key
+            || 'pcre.backtrack_limit' === $key
+            || 'pcre.jit' === $key
+            || 'pcre.recursion_limit' === $key
+            || 'zend.exception_string_param_max_len' === $key
+            || 'zend.exception_ignore_args' === $key
+            || 'zend.assertions' === $key
+            || 'assert.active' === $key
+            || 'assert.bail' === $key
+            || 'assert.callback' === $key
+            || 'assert.exception' === $key;
     }
 }

@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
@@ -33,9 +34,9 @@ final class IniRuntime
 
     private const G_MEMORY_LIMIT = 'phpc_ini_memory_limit';
 
-    private const G_SERIALIZE_PRECISION = 'phpc_ini_serialize_precision';
+    private const G_SERIALIZE_PRECISION = IniRuntimeThinStorage::G_SERIALIZE_PRECISION;
 
-    private const G_PRECISION = 'phpc_ini_precision';
+    private const G_PRECISION = IniRuntimeThinStorage::G_PRECISION;
 
     /** php-src EG(exception_ignore_args) — thin i8 global for AOT (#27549 / #21998). */
     private const G_EXCEPTION_IGNORE_ARGS = 'phpc_ini_exception_ignore_args';
@@ -206,18 +207,66 @@ final class IniRuntime
     private static function implementIniGetBridge(Context $context, LlvmFunction $fn): void
     {
         StringCaseCompare::ensureStrcasecmpLinked($context);
+        IniRuntimeThinStorage::ensureGlobals($context);
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::GET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
         $out = $fn->getParam(1);
-        $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
-        $thinBb = BasicBlockHelper::append($context, 'ini_get_ignore_args_thin');
-        $nestedBb = BasicBlockHelper::append($context, 'ini_get_nested');
         $doneBb = BasicBlockHelper::append($context, 'ini_get_done');
-        $context->builder->branchIf($isIgnore, $thinBb, $nestedBb);
 
-        $context->builder->positionAtEnd($thinBb);
+        $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
+        $thinIgnoreBb = BasicBlockHelper::append($context, 'ini_get_ignore_args_thin');
+        $afterIgnoreBb = BasicBlockHelper::append($context, 'ini_get_after_ignore');
+        $context->builder->branchIf($isIgnore, $thinIgnoreBb, $afterIgnoreBb);
+
+        $context->builder->positionAtEnd($thinIgnoreBb);
         self::emitThinGetExceptionIgnoreArgs($context, $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterIgnoreBb);
+        $isPrec = IniRuntimeThinStorage::emitOptionIsPrecision($context, $option);
+        $thinPrecBb = BasicBlockHelper::append($context, 'ini_get_precision_thin');
+        $afterPrecBb = BasicBlockHelper::append($context, 'ini_get_after_precision');
+        $context->builder->branchIf($isPrec, $thinPrecBb, $afterPrecBb);
+
+        $context->builder->positionAtEnd($thinPrecBb);
+        IniRuntimeThinStorage::emitThinGetPrecision($context, $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterPrecBb);
+        $isSer = IniRuntimeThinStorage::emitOptionIsSerializePrecision($context, $option);
+        $thinSerBb = BasicBlockHelper::append($context, 'ini_get_ser_prec_thin');
+        $afterSerBb = BasicBlockHelper::append($context, 'ini_get_after_ser_prec');
+        $context->builder->branchIf($isSer, $thinSerBb, $afterSerBb);
+
+        $context->builder->positionAtEnd($thinSerBb);
+        IniRuntimeThinStorage::emitThinGetSerializePrecision($context, $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterSerBb);
+        $isMem = IniRuntimeThinStorage::emitOptionIsMemoryLimit($context, $option);
+        $thinMemBb = BasicBlockHelper::append($context, 'ini_get_memory_thin');
+        $afterMemBb = BasicBlockHelper::append($context, 'ini_get_after_memory');
+        $context->builder->branchIf($isMem, $thinMemBb, $afterMemBb);
+
+        $context->builder->positionAtEnd($thinMemBb);
+        IniRuntimeThinStorage::emitThinGetMemoryLimit($context, $out);
+        $context->builder->branch($doneBb);
+
+        // Unknown keys → Zend false without NestedJIT (nullable/?string returns abort) (#33059).
+        $context->builder->positionAtEnd($afterMemBb);
+        $isKnown = IniRuntimeThinStorage::emitOptionIsKnownNestedKey($context, $option);
+        $nestedBb = BasicBlockHelper::append($context, 'ini_get_nested');
+        $unknownBb = BasicBlockHelper::append($context, 'ini_get_unknown_false');
+        $context->builder->branchIf($isKnown, $nestedBb, $unknownBb);
+
+        $context->builder->positionAtEnd($unknownBb);
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $out,
+            $i32->constInt(0, false)
+        );
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($nestedBb);
@@ -249,19 +298,51 @@ final class IniRuntime
     private static function implementIniSetBridge(Context $context, LlvmFunction $fn): void
     {
         StringCaseCompare::ensureStrcasecmpLinked($context);
+        IniRuntimeThinStorage::ensureGlobals($context);
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::SET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
         $value = $fn->getParam(1);
         $out = $fn->getParam(2);
-        $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
-        $thinBb = BasicBlockHelper::append($context, 'ini_set_ignore_args_thin');
-        $nestedBb = BasicBlockHelper::append($context, 'ini_set_nested');
         $doneBb = BasicBlockHelper::append($context, 'ini_set_done');
-        $context->builder->branchIf($isIgnore, $thinBb, $nestedBb);
 
-        $context->builder->positionAtEnd($thinBb);
+        $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
+        $thinIgnoreBb = BasicBlockHelper::append($context, 'ini_set_ignore_args_thin');
+        $afterIgnoreBb = BasicBlockHelper::append($context, 'ini_set_after_ignore');
+        $context->builder->branchIf($isIgnore, $thinIgnoreBb, $afterIgnoreBb);
+
+        $context->builder->positionAtEnd($thinIgnoreBb);
         self::emitThinSetExceptionIgnoreArgs($context, $value, $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterIgnoreBb);
+        $isPrec = IniRuntimeThinStorage::emitOptionIsPrecision($context, $option);
+        $thinPrecBb = BasicBlockHelper::append($context, 'ini_set_precision_thin');
+        $afterPrecBb = BasicBlockHelper::append($context, 'ini_set_after_precision');
+        $context->builder->branchIf($isPrec, $thinPrecBb, $afterPrecBb);
+
+        $context->builder->positionAtEnd($thinPrecBb);
+        IniRuntimeThinStorage::emitThinSetPrecision($context, $value, $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterPrecBb);
+        $isSer = IniRuntimeThinStorage::emitOptionIsSerializePrecision($context, $option);
+        $thinSerBb = BasicBlockHelper::append($context, 'ini_set_ser_prec_thin');
+        $afterSerBb = BasicBlockHelper::append($context, 'ini_set_after_ser_prec');
+        $context->builder->branchIf($isSer, $thinSerBb, $afterSerBb);
+
+        $context->builder->positionAtEnd($thinSerBb);
+        IniRuntimeThinStorage::emitThinSetSerializePrecision($context, $value, $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterSerBb);
+        $isMem = IniRuntimeThinStorage::emitOptionIsMemoryLimit($context, $option);
+        $thinMemBb = BasicBlockHelper::append($context, 'ini_set_memory_thin');
+        $nestedBb = BasicBlockHelper::append($context, 'ini_set_nested');
+        $context->builder->branchIf($isMem, $thinMemBb, $nestedBb);
+
+        $context->builder->positionAtEnd($thinMemBb);
+        IniRuntimeThinStorage::emitThinSetMemoryLimit($context, $value, $out);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($nestedBb);
@@ -271,8 +352,7 @@ final class IniRuntime
             [$option, $value]
         );
         self::writeHelperStringOrFalseToValue($context, $out, $result);
-        self::syncSerializePrecisionGlobal($context);
-        self::syncPrecisionGlobal($context);
+        // Do not sync precision globals from NestedJIT — statics are split/BSS-zero (#33059).
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
@@ -282,16 +362,18 @@ final class IniRuntime
     private static function implementIniRestoreBridge(Context $context, LlvmFunction $fn): void
     {
         StringCaseCompare::ensureStrcasecmpLinked($context);
+        IniRuntimeThinStorage::ensureGlobals($context);
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::RESTORE_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
-        $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
-        $thinBb = BasicBlockHelper::append($context, 'ini_restore_ignore_args_thin');
-        $nestedBb = BasicBlockHelper::append($context, 'ini_restore_nested');
         $doneBb = BasicBlockHelper::append($context, 'ini_restore_done');
-        $context->builder->branchIf($isIgnore, $thinBb, $nestedBb);
 
-        $context->builder->positionAtEnd($thinBb);
+        $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
+        $thinIgnoreBb = BasicBlockHelper::append($context, 'ini_restore_ignore_args_thin');
+        $afterIgnoreBb = BasicBlockHelper::append($context, 'ini_restore_after_ignore');
+        $context->builder->branchIf($isIgnore, $thinIgnoreBb, $afterIgnoreBb);
+
+        $context->builder->positionAtEnd($thinIgnoreBb);
         // php-src compiled default Off (`"0"`) — Zend/zend.c (#28061).
         $i8 = $context->getTypeFromString('int8');
         $context->builder->store(
@@ -300,13 +382,41 @@ final class IniRuntime
         );
         $context->builder->branch($doneBb);
 
+        $context->builder->positionAtEnd($afterIgnoreBb);
+        $isPrec = IniRuntimeThinStorage::emitOptionIsPrecision($context, $option);
+        $thinPrecBb = BasicBlockHelper::append($context, 'ini_restore_precision_thin');
+        $afterPrecBb = BasicBlockHelper::append($context, 'ini_restore_after_precision');
+        $context->builder->branchIf($isPrec, $thinPrecBb, $afterPrecBb);
+
+        $context->builder->positionAtEnd($thinPrecBb);
+        IniRuntimeThinStorage::emitThinRestorePrecision($context);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterPrecBb);
+        $isSer = IniRuntimeThinStorage::emitOptionIsSerializePrecision($context, $option);
+        $thinSerBb = BasicBlockHelper::append($context, 'ini_restore_ser_prec_thin');
+        $afterSerBb = BasicBlockHelper::append($context, 'ini_restore_after_ser_prec');
+        $context->builder->branchIf($isSer, $thinSerBb, $afterSerBb);
+
+        $context->builder->positionAtEnd($thinSerBb);
+        IniRuntimeThinStorage::emitThinRestoreSerializePrecision($context);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($afterSerBb);
+        $isMem = IniRuntimeThinStorage::emitOptionIsMemoryLimit($context, $option);
+        $thinMemBb = BasicBlockHelper::append($context, 'ini_restore_memory_thin');
+        $nestedBb = BasicBlockHelper::append($context, 'ini_restore_nested');
+        $context->builder->branchIf($isMem, $thinMemBb, $nestedBb);
+
+        $context->builder->positionAtEnd($thinMemBb);
+        IniRuntimeThinStorage::emitThinRestoreMemoryLimit($context);
+        $context->builder->branch($doneBb);
+
         $context->builder->positionAtEnd($nestedBb);
         $context->builder->call(
             self::helperFunction($context, self::INI_RESTORE_HELPER),
             $option
         );
-        self::syncSerializePrecisionGlobal($context);
-        self::syncPrecisionGlobal($context);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
@@ -330,6 +440,7 @@ final class IniRuntime
 
     private static function emitOptionIsExceptionIgnoreArgs(Context $context, Value $optionStr): Value
     {
+        \PHPCompiler\JIT\LibcExtern::ensureStrcmpDecl($context);
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $strMap = $context->structFieldMap['__string__'];
@@ -337,13 +448,10 @@ final class IniRuntime
             $context->builder->structGep($optionStr, $strMap['value']),
             $i8p
         );
-        $want = $context->builder->load($context->constantStringFromString(self::EXCEPTION_IGNORE_ARGS_KEY));
-        $wantCstr = $context->builder->pointerCast(
-            $context->builder->structGep($want, $strMap['value']),
-            $i8p
-        );
+        // libc strcmp — NestedJIT __compiler_strcasecmp always-eq → every key → "0" (#33059).
+        $wantCstr = $context->pointerFromStringConstant(self::EXCEPTION_IGNORE_ARGS_KEY);
         $cmp = $context->builder->call(
-            $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
+            $context->lookupFunction('strcmp'),
             $optCstr,
             $wantCstr
         );
@@ -444,10 +552,11 @@ final class IniRuntime
         $i32 = $context->getTypeFromString('int32');
         $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
         $falseBb = BasicBlockHelper::append($context, 'ini_result_false');
+        $checkSentinelBb = BasicBlockHelper::append($context, 'ini_result_check_sentinel');
         $okBb = BasicBlockHelper::append($context, 'ini_result_string');
         $doneBb = BasicBlockHelper::append($context, 'ini_result_done');
 
-        $context->builder->branchIf($isNull, $falseBb, $okBb);
+        $context->builder->branchIf($isNull, $falseBb, $checkSentinelBb);
 
         $context->builder->positionAtEnd($falseBb);
         $context->builder->call(
@@ -457,40 +566,32 @@ final class IniRuntime
         );
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($okBb);
+        // NestedJIT cannot return typed null — IniJitHelper uses INI_FALSE_SENTINEL (#33059).
+        $context->builder->positionAtEnd($checkSentinelBb);
         $str = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+        LibcExtern::ensureStrcmpDecl($context);
+        $i8p = $context->getTypeFromString('int8*');
+        $strMap = $context->structFieldMap['__string__'];
+        $hay = $context->builder->pointerCast(
+            $context->builder->structGep($str, $strMap['value']),
+            $i8p
+        );
+        $needle = $context->pointerFromStringConstant(
+            \PHPCompiler\ext\standard\IniJitHelper::INI_FALSE_SENTINEL
+        );
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strcmp'),
+            $hay,
+            $needle
+        );
+        $isSentinel = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+        $context->builder->branchIf($isSentinel, $falseBb, $okBb);
+
+        $context->builder->positionAtEnd($okBb);
         $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
-    }
-
-    private static function syncSerializePrecisionGlobal(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $prec = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::SERIALIZE_PRECISION_INT_HELPER),
-            []
-        );
-        $context->builder->store(
-            $context->builder->trunc($prec, $i32),
-            self::globalPtr($context, self::G_SERIALIZE_PRECISION, $i32)
-        );
-    }
-
-    private static function syncPrecisionGlobal(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $prec = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::PRECISION_INT_HELPER),
-            []
-        );
-        $context->builder->store(
-            $context->builder->trunc($prec, $i32),
-            self::globalPtr($context, self::G_PRECISION, $i32)
-        );
     }
 
     /** Load PG(precision) for float→string lowering (#21963). */
@@ -518,20 +619,12 @@ final class IniRuntime
 
     private static function ensureGlobals(Context $context): void
     {
-        $i32 = $context->getTypeFromString('int32');
+        IniRuntimeThinStorage::ensureGlobals($context);
         $i8p = $context->getTypeFromString('int8*');
 
         if (null === $context->module->getNamedGlobal(self::G_MEMORY_LIMIT)) {
             $g = $context->module->addGlobal($i8p, self::G_MEMORY_LIMIT);
             $g->setInitializer($i8p->constNull());
-        }
-        if (null === $context->module->getNamedGlobal(self::G_SERIALIZE_PRECISION)) {
-            $g = $context->module->addGlobal($i32, self::G_SERIALIZE_PRECISION);
-            $g->setInitializer($i32->constInt(-1, true));
-        }
-        if (null === $context->module->getNamedGlobal(self::G_PRECISION)) {
-            $g = $context->module->addGlobal($i32, self::G_PRECISION);
-            $g->setInitializer($i32->constInt(14, true));
         }
         $i8 = $context->getTypeFromString('int8');
         if (null === $context->module->getNamedGlobal(self::G_EXCEPTION_IGNORE_ARGS)) {

@@ -99,6 +99,10 @@ final class JitNestedHelperCoerce
         if (self::isValueBox($context, $raw)) {
             return self::isValueBoxNullOrFalse($context, self::valueBoxPtrFromHelperResult($context, $raw));
         }
+        $haveStr = $context->getStringFromType($raw->typeOf());
+        if ('int64' === $haveStr || 'long long' === $haveStr) {
+            return self::i64IsZero($context, $raw);
+        }
 
         return self::isNullPtr($context, $raw, $raw->typeOf());
     }
