@@ -16,6 +16,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -248,6 +249,84 @@ final class DirectoryIteratorJitHelper
     public static function compileGetSize(Context $context, JITVariable $receiver, string $className): Value
     {
         return self::compilePathLongStat($context, $receiver, $className, 'size');
+    }
+
+    /**
+     * SplFileInfo::getRealPath — libc realpath(3) on joined pathname (#33287).
+     * php-src: zim_SplFileInfo_getRealPath
+     *
+     * Avoid StringRealpath/NestedJIT PHP realpath() — absolute paths with `..`
+     * currently fail/segfault in RealpathJitHelper under thin AOT.
+     */
+    public static function compileGetRealPath(Context $context, JITVariable $receiver, string $className): Value
+    {
+        self::ensureLibcRealpath($context);
+        LibcExtern::ensureStrlenDecl($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'di_getrealpath_after_libc');
+
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $strMap = $context->structFieldMap['__string__'];
+
+        $pathCstr = $context->builder->pointerCast(
+            $context->builder->structGep($pathname, $strMap['value']),
+            $i8p
+        );
+        $buf = $context->builder->alloca($i8->arrayType(4096));
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $real = $context->builder->call($context->lookupFunction('realpath'), $pathCstr, $bufPtr);
+        $ok = $context->builder->icmp(Builder::INT_NE, $real, $i8p->constNull());
+
+        $failBb = BasicBlockHelper::append($context, 'di_getrealpath_fail');
+        $okBb = BasicBlockHelper::append($context, 'di_getrealpath_ok');
+        $doneBb = BasicBlockHelper::append($context, 'di_getrealpath_done');
+        $slot = JitValueBox::alloc($context);
+        $context->builder->branchIf($ok, $okBb, $failBb);
+
+        $context->builder->positionAtEnd($failBb);
+        JitValueBox::writeBool($context, $slot, $context->context->int1Type()->constInt(0, false));
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufPtr);
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($len, $i64),
+            $context->builder->pointerCast($bufPtr, $charPtr)
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $str
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $slot;
+    }
+
+    /** Module-local realpath(3) after LibcExtern always-on drop (#31534). */
+    private static function ensureLibcRealpath(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        try {
+            $context->lookupFunction('realpath');
+        } catch (\Throwable) {
+            $fn = $context->module->getNamedFunction('realpath');
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    'realpath',
+                    $context->context->functionType($i8p, false, $i8p, $i8p)
+                );
+            }
+            $context->registerFunction('realpath', $fn);
+        }
     }
 
     /**

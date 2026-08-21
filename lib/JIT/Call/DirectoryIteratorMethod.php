@@ -54,6 +54,7 @@ final class DirectoryIteratorMethod implements Call
             'getpathname' => DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className),
             'getpath' => DirectoryIteratorJitHelper::compileGetPath($context, $args[0], $this->className),
             'getsize' => DirectoryIteratorJitHelper::compileGetSize($context, $args[0], $this->className),
+            'getrealpath' => DirectoryIteratorJitHelper::compileGetRealPath($context, $args[0], $this->className),
             'getmtime' => DirectoryIteratorJitHelper::compileGetMTime($context, $args[0], $this->className),
             'getatime' => DirectoryIteratorJitHelper::compileGetATime($context, $args[0], $this->className),
             'getctime' => DirectoryIteratorJitHelper::compileGetCTime($context, $args[0], $this->className),

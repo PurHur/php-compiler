@@ -4124,7 +4124,7 @@ class Object_ extends Type {
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([
                 '__construct', 'getfilename', 'getpathname', 'getpath', 'getbasename',
-                'getextension', 'getsize', 'gettype', 'getmtime', 'getatime', 'getctime',
+                'getextension', 'getsize', 'gettype', 'getrealpath', 'getmtime', 'getatime', 'getctime',
                 'getperms', 'getowner', 'getgroup', 'getinode',
                 '__tostring', 'isfile', 'isdir',
                 'islink', 'isreadable', 'iswritable', 'isexecutable',
@@ -4202,7 +4202,7 @@ class Object_ extends Type {
             $methods = [
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
                 'isdot', 'getfilename', 'getpathname', 'getpath', 'getsize',
-                'getextension', 'getbasename', 'gettype',
+                'getextension', 'getbasename', 'gettype', 'getrealpath',
                 'getmtime', 'getatime', 'getctime', 'getperms', 'getowner', 'getgroup', 'getinode',
                 '__tostring',
                 'isfile', 'isdir', 'islink', 'isreadable', 'iswritable', 'isexecutable',
