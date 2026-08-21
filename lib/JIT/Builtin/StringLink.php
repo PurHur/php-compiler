@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for link() via LinkJitHelper PHP.
+ * JIT/AOT link for link() via LinkJitHelper PHP (#15544, #33406).
  *
+ * User-script AOT: {@see LinkJitHelper} via {@see JitVmHelperLink}
+ * (Rename #29141 shape — helper SSOT is {@see \PHPCompiler\ext\standard\VmFs::hardLink()}).
+ * NestedJIT leaf: module-local link(2) decl (avoids re-entering the helper
+ * bridge while NestedJIT compiles LinkJitHelper / `@link`).
  * Replaces libc linkat(2) LLVM in ext/standard/JitLink.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmFs::hardLink()}.
  * php-src: ext/standard/link.c — php_link
  */
 final class StringLink
@@ -29,6 +33,11 @@ final class StringLink
         self::INVOKE_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'link_bridge_entry';
+
+    /** Module-local link(2) — NestedJIT leaf (#33406 / peer rename #29141). */
+    private const COMPILER_LINK = '__compiler_link';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -41,40 +50,94 @@ final class StringLink
 
     public static function invoke(Context $context, Value $target, Value $link): Value
     {
+        // Nested helper compile: libc leaf without re-entering LinkJitHelper (#33406).
+        if (NestedJitCompileScope::isActive()) {
+            return self::invokeNestedLeaf($context, $target, $link);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call($context->lookupFunction(self::ABI), $target, $link);
     }
 
+    /** @return Value i1 — true when link(2) returns 0 */
+    public static function invokeNestedLeaf(Context $context, Value $targetStr, Value $linkStr): Value
+    {
+        return self::invokeCompilerLink($context, $targetStr, $linkStr);
+    }
+
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
         }
 
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, 'link-jit-php');
-
         $strPtr = $context->getTypeFromString('__string__*');
+        // ABI stays i1 for link() callers; helper returns int 0/1 so NestedJIT
+        // uses readLong (bool boxes have no readLong arm — always 0; #20603 / #29141).
         $i1 = $context->getTypeFromString('int1');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($i1, false, $strPtr, $strPtr)
-            );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            [$strPtr, $strPtr],
+            $i1,
+            self::INVOKE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#33406'
+        );
+    }
 
-        $entry = $fn->appendBasicBlock('link_bridge_entry');
-        $context->builder->positionAtEnd($entry);
+    /** @return Value i1 — true when link(2) returns 0 */
+    private static function invokeCompilerLink(Context $context, Value $targetStr, Value $linkStr): Value
+    {
+        self::ensureCompilerLinkDecl($context);
+        $map = $context->structFieldMap['__string__'];
+        $targetPtr = $context->builder->structGep($targetStr, $map['value']);
+        $linkPtr = $context->builder->structGep($linkStr, $map['value']);
+        $i32 = $context->getTypeFromString('int32');
+        $ret = $context->builder->call(
+            $context->lookupFunction(self::COMPILER_LINK),
+            $targetPtr,
+            $linkPtr
+        );
+        $zero = $i32->constInt(0, false);
 
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_HELPER, 'link-jit-php');
-        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$fn->getParam(0), $fn->getParam(1)]);
-        $bool = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1);
-        $context->builder->returnValue($bool);
+        return $context->builder->icmp(Builder::INT_EQ, $ret, $zero);
+    }
 
-        $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
+    /**
+     * Declare link(2) under a compiler-owned alias (peer {@see StringRename} #29090).
+     * The linker resolves the body from libc via the {@code link} symbol name.
+     */
+    private static function ensureCompilerLinkDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction(self::COMPILER_LINK);
+
+            return;
+        } catch (\Throwable $e) {
+        }
+        try {
+            $existing = $context->lookupFunction('link');
+            $context->registerFunction(self::COMPILER_LINK, $existing);
+
+            return;
+        } catch (\Throwable $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $ft = $context->context->functionType($i32, false, $i8p, $i8p);
+        $fn = $context->module->addFunction('link', $ft);
+        $context->registerFunction('link', $fn);
+        $context->registerFunction(self::COMPILER_LINK, $fn);
     }
 }
