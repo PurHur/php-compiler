@@ -24,10 +24,11 @@ use PHPLLVM\Value;
 
 /**
  * Thin-AOT DirectoryIterator / FilesystemIterator / SplFileInfo — snapshot + path props
- * (#27289, #33263, #33274, #33276, #33280, #33289, #33290).
+ * (#27289, #33263, #33274, #33276, #33280, #33289, #33290, #33300).
  *
  * DirectoryIterator construct lists entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}.
  * SplFileInfo construct splits pathname via call-site {@see JitPath} (#33290).
+ * getFileInfo/getPathInfo allocate a fresh SplFileInfo from pathname / dirname (#33300).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
  * isFile/isDir/getPath/getPathname/getSize/getExtension/getType/getLinkTarget join `__dir_path`+`__filename`.
  *
@@ -100,14 +101,98 @@ final class DirectoryIteratorJitHelper
         JITVariable $pathArg
     ): Value {
         $obj = self::loadObject($context, $receiver);
-        $objectType = $context->type->object;
-        $pathStr = self::loadString($context, $pathArg);
-        // Call-site LLVM (JitPath) — NestedJIT PathJitHelper / string-index helpers segfault
-        // under thin AOT (#26905 / #33290). SplFileInfoStorage empty-path vs dirname(".") :
-        // when basename length equals pathname length there is no directory component.
+        self::initSplFileInfoFromPathString($context, $obj, self::loadString($context, $pathArg));
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * SplFileInfo::getFileInfo — fresh SplFileInfo for the same pathname (#33300).
+     * php-src: zim_SplFileInfo_getFileInfo / spl_filesystem_object_create_type(SPL_FS_INFO)
+     *
+     * Default info class only; optional `$class` / setInfoClass are follow-ups.
+     */
+    public static function compileGetFileInfo(
+        Context $context,
+        JITVariable $receiver,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+
+        return self::emitNewSplFileInfoFromPath($context, $pathname);
+    }
+
+    /**
+     * SplFileInfo::getPathInfo — SplFileInfo for dirname(pathname); null if empty (#33300).
+     * php-src: zim_SplFileInfo_getPathInfo
+     */
+    public static function compileGetPathInfo(
+        Context $context,
+        JITVariable $receiver,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+        $i64 = $context->getTypeFromString('int64');
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $pathname);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(0, false));
+
+        $nullBb = BasicBlockHelper::append($context, 'sfi_pathinfo_null');
+        $mkBb = BasicBlockHelper::append($context, 'sfi_pathinfo_mk');
+        $done = BasicBlockHelper::append($context, 'sfi_pathinfo_done');
+        $retSlot = $context->builder->alloca($context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($empty, $nullBb, $mkBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $nullSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $nullSlot)
+        );
+        $context->builder->store($nullSlot, $retSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($mkBb);
+        $dir = JitPath::dirname($context, $pathname);
+        $mkSlot = self::emitNewSplFileInfoFromPath($context, $dir);
+        $context->builder->store($mkSlot, $retSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($retSlot);
+    }
+
+    /**
+     * Allocate SplFileInfo and init path props from a `__string__*` pathname (#33300).
+     */
+    private static function emitNewSplFileInfoFromPath(Context $context, Value $pathStr): Value
+    {
+        $classId = $context->type->object->lookup('SplFileInfo');
+        $newObj = $context->type->object->allocate($classId);
+        self::initSplFileInfoFromPathString($context, $newObj, $pathStr);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $newObj
+        );
+
+        return $slot;
+    }
+
+    /**
+     * Shared SplFileInfo path split used by __construct / getFileInfo / getPathInfo (#33290 / #33300).
+     * Call-site {@see JitPath} — NestedJIT PathJitHelper segfaults under thin AOT (#26905).
+     */
+    private static function initSplFileInfoFromPathString(
+        Context $context,
+        Value $obj,
+        Value $pathStr
+    ): void {
         $namePtr = JitPath::basename($context, $pathStr);
         $dirPtr = JitPath::dirname($context, $pathStr);
-        $i64 = $context->getTypeFromString('int64');
         $pathLen = $context->builder->call($context->lookupFunction('__string__strlen'), $pathStr);
         $nameLen = $context->builder->call($context->lookupFunction('__string__strlen'), $namePtr);
         $noDir = $context->builder->icmp(Builder::INT_EQ, $pathLen, $nameLen);
@@ -115,9 +200,7 @@ final class DirectoryIteratorJitHelper
         $dirOut = $context->builder->select($noDir, $empty, $dirPtr);
         self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_PATH, $dirOut);
         self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_FILENAME, $namePtr);
-        $objectType->markObjectConstructed($obj);
-
-        return self::voidResult($context);
+        $context->type->object->markObjectConstructed($obj);
     }
 
     /** True when $namePtr is "." or "..". */

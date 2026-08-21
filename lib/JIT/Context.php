@@ -1475,7 +1475,8 @@ class Context {
                 'getMTime', 'getATime', 'getCTime', 'getPerms', 'getOwner', 'getGroup', 'getInode',
                 'isFile', 'isDir',
                 'isLink', 'getLinkTarget', 'isReadable', 'isWritable', 'isExecutable',
-                'getPathname', 'getPath', 'getExtension', 'getBasename', 'getType', '__toString',
+                'getPathname', 'getPath', 'getFileInfo', 'getPathInfo',
+                'getExtension', 'getBasename', 'getType', '__toString',
             ] as $diMethod) {
                 $this->functionProxies[$diLc.'::'.strtolower($diMethod)] = new Call\DirectoryIteratorMethod(
                     $diMethod,
@@ -1489,7 +1490,8 @@ class Context {
             'getMTime', 'getATime', 'getCTime', 'getPerms', 'getOwner', 'getGroup', 'getInode',
             'isFile', 'isDir',
             'isLink', 'getLinkTarget', 'isReadable', 'isWritable', 'isExecutable',
-            'getPathname', 'getPath', 'getExtension', 'getBasename', 'getType', '__toString',
+            'getPathname', 'getPath', 'getFileInfo', 'getPathInfo',
+            'getExtension', 'getBasename', 'getType', '__toString',
         ] as $sfiMethod) {
             $this->functionProxies['splfileinfo::'.strtolower($sfiMethod)] = new Call\DirectoryIteratorMethod(
                 $sfiMethod,
