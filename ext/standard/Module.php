@@ -669,6 +669,7 @@ class Module extends ModuleAbstract
             new phpc_native_ht_set_string_key_ht(),
             new phpc_native_ht_set_string_at(),
             new phpc_native_ht_set_long_at(),
+            new phpc_native_ht_set_null_at(),
             new phpc_native_ht_set_hashtable_at(),
             new phpc_native_ht_set_string_key_long(),
             new phpc_ob_write_stdout_kernel(),

@@ -32,6 +32,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Simple `O:` public-prop objects: {@see UnserializeObjectNestedJitHelper} + call-site
  * LLVM materialize (class table must include user classes — emit from JitUnserialize).
  * SPL ArrayObject family: bag restore into `__spl_ht` (#33636) — not firstIntProp→slot0.
+ * SplFixedArray: integer-keyed elements into `__spl_ht` (#33640) — same slot-0 trap.
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -164,6 +165,7 @@ final class StringUnserialize
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_long(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
         ];
         foreach ($internals as $internal) {
             $lc = strtolower($internal->getName());
@@ -308,9 +310,10 @@ final class StringUnserialize
             $objVal = $object->allocate($id);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'unser_obj_after_alloc_'.$id);
             $object->markObjectConstructed($objVal);
+            $classLc = strtolower(ltrim($className, '\\'));
             if (\PHPCompiler\VM\ArrayObjectJitHelper::isArrayAsPropsClass($className)) {
                 // Bag restore into `__spl_ht` — do not write firstIntProp into slot 0 (#33636).
-                $splName = match (strtolower(ltrim($className, '\\'))) {
+                $splName = match ($classLc) {
                     'arrayobject' => 'ArrayObject',
                     'arrayiterator' => 'ArrayIterator',
                     'recursivearrayiterator' => 'RecursiveArrayIterator',
@@ -321,6 +324,13 @@ final class StringUnserialize
                     $objVal,
                     $payloadString,
                     $splName
+                );
+            } elseif ('splfixedarray' === $classLc) {
+                // Integer-keyed elements into `__spl_ht` — not firstIntProp→slot0 (#33640).
+                \PHPCompiler\VM\SplFixedArrayJitHelper::compileUnserializeRestore(
+                    $context,
+                    $objVal,
+                    $payloadString
                 );
             } else {
                 $voidPtr = $context->getTypeFromString('void*');

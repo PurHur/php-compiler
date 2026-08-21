@@ -119,6 +119,22 @@ final class ParseStrNativeOpsJit
         );
     }
 
+    /** Packed null hole for SplFixedArray unserialize (#33640 / php-src spl_fixedarray.c). */
+    public static function setNullAt(Context $context, JITVariable $htPtr, JITVariable $index): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $sizeT = $context->getTypeFromString('size_t');
+        $idx = $context->builder->zext(
+            JitLongArg::lower($context, $index, 'phpc_native_ht index'),
+            $sizeT
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setNullAt'),
+            $ht,
+            $idx
+        );
+    }
+
     private static function htFromI64(Context $context, JITVariable $ptr): Value
     {
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
