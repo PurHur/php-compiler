@@ -45,7 +45,7 @@ final class TypeDeadCompilerAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         // __compiler_number_format always-on shell removed (#32921); ownership in StringFormat.
-        $this->assertStringContainsString("registerFunction('__compiler_popen'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_proc_open'", $type);
     }
 
     public function testNoNestedJitLookupOfDroppedCompilerAbisRemains(): void
