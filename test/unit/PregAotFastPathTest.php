@@ -77,6 +77,33 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(0, PregAotFastPath::lastCapHasName(1));
     }
 
+    /** Issue #33611 — literal prefix + capturing groups under thin AOT. */
+    public function testLiteralPrefixCaptureGroups(): void
+    {
+        $this->assertSame(8, PregAotFastPath::patternKind('/a(b)/'));
+        $this->assertSame(8, PregAotFastPath::patternKind('#a(b)#'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/a(b)/', 'ab', 0));
+        $this->assertSame(2, PregAotFastPath::lastCapCount());
+        $this->assertSame('ab', PregAotFastPath::lastCap(0));
+        $this->assertSame('b', PregAotFastPath::lastCap(1));
+        $this->assertSame(0, PregAotFastPath::matchCount('/a(b)/', 'ax', 0));
+
+        $this->assertSame(8, PregAotFastPath::patternKind('/a(b)(c)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/a(b)(c)/', 'zabc', 0));
+        $this->assertSame(3, PregAotFastPath::lastCapCount());
+        $this->assertSame('abc', PregAotFastPath::lastCap(0));
+        $this->assertSame('b', PregAotFastPath::lastCap(1));
+        $this->assertSame('c', PregAotFastPath::lastCap(2));
+
+        // Existing consecutive-groups shape still works.
+        $this->assertSame(8, PregAotFastPath::patternKind('/(a)(b)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/(a)(b)/', 'ab', 0));
+        $this->assertSame(3, PregAotFastPath::lastCapCount());
+        $this->assertSame('ab', PregAotFastPath::lastCap(0));
+        $this->assertSame('a', PregAotFastPath::lastCap(1));
+        $this->assertSame('b', PregAotFastPath::lastCap(2));
+    }
+
     public function testSpacePlusReplace(): void
     {
         $this->assertSame(4, PregAotFastPath::patternKind('/\s+/'));

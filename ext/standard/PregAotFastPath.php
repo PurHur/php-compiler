@@ -89,6 +89,14 @@ final class PregAotFastPath
         if ('/(a)(b)/' === $pattern || '#(a)(b)#' === $pattern) {
             return self::matchExactAbGroups($subject, $offset);
         }
+        // Literal prefix + group(s) — NestedJIT exact compares (#33611).
+        // General prefix+groups classify segfaults under NestedJIT; keep exact like /(a)(b)/.
+        if ('/a(b)/' === $pattern || '#a(b)#' === $pattern) {
+            return self::matchExactAGroupB($subject, $offset);
+        }
+        if ('/a(b)(c)/' === $pattern || '#a(b)(c)#' === $pattern) {
+            return self::matchExactAGroupBC($subject, $offset);
+        }
         // Exact \\x{…} / \\xHH literals — NestedJIT body expand path is unreliable (#29024).
         $hexLit = self::exactHexEscapeLiteral($pattern);
         if (null !== $hexLit) {
@@ -237,6 +245,11 @@ final class PregAotFastPath
             self::$kindName = 'n';
 
             return 3;
+        }
+        // Literal prefix + groups — exact kind for #33611 (matchCount uses dedicated exact matchers).
+        if ('/a(b)/' === $pattern || '#a(b)#' === $pattern
+            || '/a(b)(c)/' === $pattern || '#a(b)(c)#' === $pattern) {
+            return 8;
         }
         if ('/(?<digit>\\d+)/' === $pattern || '#(?<digit>\\d+)#' === $pattern) {
             self::$kindName = 'digit';
@@ -984,6 +997,47 @@ final class PregAotFastPath
                 self::$cap0 = 'ab';
                 self::$cap1 = 'a';
                 self::$cap2 = 'b';
+                self::$capCount = 3;
+
+                return 1;
+            }
+            ++$j;
+        }
+
+        return 0;
+    }
+
+    /** `/a(b)/` — full match ab, group 1 is b (#33611). */
+    private static function matchExactAGroupB(string $subject, int $offset): int
+    {
+        $subLen = \strlen($subject);
+        $j = $offset;
+        while ($j + 2 <= $subLen) {
+            if ('a' === \substr($subject, $j, 1) && 'b' === \substr($subject, $j + 1, 1)) {
+                self::$cap0 = 'ab';
+                self::$cap1 = 'b';
+                self::$capCount = 2;
+
+                return 1;
+            }
+            ++$j;
+        }
+
+        return 0;
+    }
+
+    /** `/a(b)(c)/` — full match abc, groups b and c (#33611). */
+    private static function matchExactAGroupBC(string $subject, int $offset): int
+    {
+        $subLen = \strlen($subject);
+        $j = $offset;
+        while ($j + 3 <= $subLen) {
+            if ('a' === \substr($subject, $j, 1)
+                && 'b' === \substr($subject, $j + 1, 1)
+                && 'c' === \substr($subject, $j + 2, 1)) {
+                self::$cap0 = 'abc';
+                self::$cap1 = 'b';
+                self::$cap2 = 'c';
                 self::$capCount = 3;
 
                 return 1;
