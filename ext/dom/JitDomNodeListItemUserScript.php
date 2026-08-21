@@ -25,7 +25,7 @@ final class JitDomNodeListItemUserScript
         if (\count($args) < 2) {
             return null;
         }
-        // Fold only when the index operand is an LLVM i64 constant. Loop `$i`
+        // Fold when the index operand is an LLVM i64 constant. Loop `$i`
         // keeps stale compileTimeLong=0 as KIND_VALUE (#32831 / peer #32605).
         $index = null;
         $arg = $args[1];
@@ -41,12 +41,28 @@ final class JitDomNodeListItemUserScript
                 $index = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($arg->value->value);
             }
         }
-        if (null === $index || $index < 0) {
-            return null;
-        }
 
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         $queryTag = JitDomXPathQueryUserScript::lastQueryTag();
+        $tagQuery = JitDomGetElementsByTagNameUserScript::lastTagQuery();
+        $markup = JitDomLoadXMLUserScript::lastCompileTimeXml()
+            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+
+        // Dynamic index: compile-time getElementsByTagName / XPath tag list (#33063).
+        // OwnerAware ABI aborts on thin-AOT NodeList without CHILD_NODES_OWNER.
+        if (null === $index) {
+            if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
+                return self::materializeDynamicIndexQueryMatch($context, $xml, $queryTag, $arg);
+            }
+            if (null !== $tagQuery && null !== $markup) {
+                return self::materializeDynamicIndexQueryMatch($context, $markup, $tagQuery, $arg);
+            }
+
+            return null;
+        }
+        if ($index < 0) {
+            return null;
+        }
 
         // XPath //tag (and predicate) lists: materialize Nth match with attrs (#27275).
         if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
@@ -70,15 +86,12 @@ final class JitDomNodeListItemUserScript
             }
         }
 
-        // getElementsByTagName live list: return pinned root firstChild (#26752).
-        if (0 !== $index) {
-            return null;
-        }
-        $tagQuery = JitDomGetElementsByTagNameUserScript::lastTagQuery();
-        $markup = JitDomLoadXMLUserScript::lastCompileTimeXml()
-            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+        // getElementsByTagName live list — any index, including "*" (#26752 / #33063).
         if (null !== $tagQuery && null !== $markup) {
             return self::materializeNthQueryMatch($context, $markup, $tagQuery, $index);
+        }
+        if (0 !== $index) {
+            return null;
         }
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
@@ -102,6 +115,45 @@ final class JitDomNodeListItemUserScript
         );
 
         return self::boxObject($context, $firstObj);
+    }
+
+    /**
+     * Runtime item($i) over a compile-time tag list via select ladder (#33063).
+     *
+     * Avoids DomNodeListItemRuntime ABI (aborts on thin-AOT nodes without an owner).
+     */
+    private static function materializeDynamicIndexQueryMatch(
+        Context $context,
+        string $xml,
+        string $tag,
+        JITVariable $indexArg
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_dyn_idx');
+        $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+        $i64 = $context->getTypeFromString('int64');
+        // Same index lowering as JitDomNodeListItem::loadIntArg.
+        if (JITVariable::TYPE_NATIVE_LONG === $indexArg->type) {
+            $indexVal = $context->helper->loadValue($indexArg);
+        } elseif (JITVariable::TYPE_VALUE === $indexArg->type) {
+            $indexVal = $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                JitValueBox::valuePtrFromVariable($context, $indexArg)
+            );
+        } else {
+            throw new \LogicException('DOMNodeList::item() dynamic index must be an integer (#33063)');
+        }
+        $out = self::boxNull($context);
+        for ($i = 0; $i < $count; ++$i) {
+            $cand = self::materializeNthQueryMatch($context, $xml, $tag, $i);
+            $isI = $context->builder->icmp(
+                Builder::INT_EQ,
+                $indexVal,
+                $i64->constInt($i, false)
+            );
+            $out = $context->builder->select($isI, $cand, $out);
+        }
+
+        return $out;
     }
 
     /**
@@ -185,7 +237,12 @@ final class JitDomNodeListItemUserScript
                 }
             }
         }
-        $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        // getElementsByTagName("*"): open-tag carries the real element name (#33063).
+        $elementName = $tag;
+        if ('*' === $tag) {
+            $elementName = DomParseSimpleXmlJitHelper::tagNameFromOpenTagArgv($openTag) ?? 'div';
+        }
+        $element = JitDomCreateElement::materializeElementWithTextContent($context, $elementName, $text);
         foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($openTag) as $attrPair) {
             $qname = $attrPair['qname'];
             $value = $attrPair['value'];

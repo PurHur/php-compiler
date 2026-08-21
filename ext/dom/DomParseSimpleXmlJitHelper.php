@@ -17,6 +17,11 @@ final class DomParseSimpleXmlJitHelper
         if ('' === $tag) {
             return 0;
         }
+        // DOMDocument::getElementsByTagName("*") — every element open-tag (#33063).
+        // Peer countDescendantTagArgv already routed "*" here via countElementOpenTagsArgv.
+        if ('*' === $tag) {
+            return self::countElementOpenTagsArgv($xml);
+        }
         $needle = '<'.$tag;
         $count = 0;
         $offset = 0;
@@ -271,6 +276,9 @@ final class DomParseSimpleXmlJitHelper
             return null;
         }
         $tag = strtolower($tag);
+        if ('*' === $tag) {
+            return self::nthElementOpenTagArgv($xml, $position);
+        }
         $needle = '<'.$tag;
         $seen = 0;
         $offset = 0;
@@ -296,6 +304,49 @@ final class DomParseSimpleXmlJitHelper
         }
 
         return null;
+    }
+
+    /**
+     * Nth (1-based) element open-tag for getElementsByTagName("*") (#33063).
+     *
+     * Skips closers, comments, and PIs — same rules as {@see countElementOpenTagsArgv}.
+     */
+    public static function nthElementOpenTagArgv(string $xml, int $position): ?string
+    {
+        if ($position < 1) {
+            return null;
+        }
+        $seen = 0;
+        $offset = 0;
+        $len = \strlen($xml);
+        while ($offset < $len && false !== ($pos = strpos($xml, '<', $offset))) {
+            $next = $xml[$pos + 1] ?? '';
+            if ('/' === $next || '!' === $next || '?' === $next || '' === $next) {
+                $offset = $pos + 1;
+                continue;
+            }
+            $gt = strpos($xml, '>', $pos);
+            if (false === $gt) {
+                break;
+            }
+            ++$seen;
+            if ($seen === $position) {
+                return substr($xml, $pos, $gt - $pos + 1);
+            }
+            $offset = $pos + 1;
+        }
+
+        return null;
+    }
+
+    /** Local/QName from an open-tag string ({@code <a/>}, {@code <h:foo bar="x">}). */
+    public static function tagNameFromOpenTagArgv(string $openTag): ?string
+    {
+        if (1 !== preg_match('/^<\/?([A-Za-z_][\w:.-]*)/', $openTag, $m)) {
+            return null;
+        }
+
+        return $m[1];
     }
 
     /**
@@ -431,6 +482,18 @@ final class DomParseSimpleXmlJitHelper
             return null;
         }
         $tag = strtolower($tag);
+        if ('*' === $tag) {
+            $openTag = self::nthElementOpenTagArgv($xml, $position);
+            if (null === $openTag) {
+                return null;
+            }
+            $name = self::tagNameFromOpenTagArgv($openTag);
+            if (null === $name) {
+                return null;
+            }
+            // Re-resolve by concrete name at the same document-order index among all tags.
+            return self::nthWildcardElementTextArgv($xml, $position, $name, $openTag);
+        }
         $needle = '<'.$tag;
         $seen = 0;
         $offset = 0;
@@ -465,6 +528,29 @@ final class DomParseSimpleXmlJitHelper
         }
 
         return null;
+    }
+
+    /** Inner markup of the Nth element open-tag for "*" lists (#33063). */
+    private static function nthWildcardElementTextArgv(
+        string $xml,
+        int $position,
+        string $name,
+        string $openTag
+    ): ?string {
+        $pos = strpos($xml, $openTag);
+        if (false === $pos) {
+            return null;
+        }
+        $gt = $pos + \strlen($openTag) - 1;
+        if ($gt > $pos && '/' === $xml[$gt - 1]) {
+            return '';
+        }
+        $close = stripos($xml, '</'.$name.'>', $gt + 1);
+        if (false === $close) {
+            return '';
+        }
+
+        return substr($xml, $gt + 1, $close - $gt - 1);
     }
 
     public static function rootTagArgv(string $xml): string
