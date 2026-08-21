@@ -13,7 +13,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT ABI bridges for __compiler_fsync / __compiler_fdatasync via libc (#9815, #19660, #26929, #33114).
+ * JIT/AOT ABI bridges for __compiler_fsync / __compiler_fdatasync via libc (#9815, #19660, #26929, #33114, #33123).
  *
  * Thin AOT NestedJIT of StreamSyncJitHelper segfaults after c:main_before_php (peer
  * getdate HashTable / getmypid stub class before LLVM rewrite — #26900 / #26944). Emit
@@ -21,8 +21,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * {@see VmFs::fsync()} / {@see VmPhpFdStream::syncFileno()}. Helper PHP remains the
  * algorithm note ({@see StreamSyncJitHelper}) but is not NestedJIT-linked.
  *
- * Do not re-add empty always-on shells in Builtin\Type — leftover decls mint fsync.1
- * (#31894 / #32122). Type::initialize still StreamSync::ensureLinked.
+ * Do not re-add empty always-on shells in Builtin\Type — leftover decls mint fsync.1 /
+ * fdatasync.1 (#31894 / #32122). Type::initialize still StreamSync::ensureLinked.
  *
  * Quarantined from lib/JIT/Builtin — {@see \PHPCompiler\JIT\Builtin\StreamSync}
  * stays the thin orchestrator. Call-site {@see ensureLinked} restores the caller

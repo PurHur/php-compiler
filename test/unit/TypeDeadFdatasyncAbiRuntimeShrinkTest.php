@@ -7,44 +7,45 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on __compiler_fsync ABI shell from Builtin\Type (#33114).
+ * Drop leftover always-on __compiler_fdatasync ABI shell from Builtin\Type (#33123).
  *
  * NestedJIT/AOT bridge stays StreamSync / JitStreamSyncKernel (implementIfMissing).
  * Runtime owner declares module-locally (getNamedFunction first) so leftover Type
- * empty decls cannot mint fsync.1 (#31894 / #32122).
+ * empty decls cannot mint fdatasync.1 (#31894 / #32122).
  */
-final class TypeDeadFsyncAbiRuntimeShrinkTest extends TestCase
+final class TypeDeadFdatasyncAbiRuntimeShrinkTest extends TestCase
 {
-    public function testTypeBuiltinDropsLeftoverAlwaysOnFsyncAbi(): void
+    public function testTypeBuiltinDropsLeftoverAlwaysOnFdatasyncAbi(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('#33114', $type);
+        $this->assertStringContainsString('#33123', $type);
         $this->assertDoesNotMatchRegularExpression(
-            '/addFunction\(\s*[\'"]__compiler_fsync[\'"]/',
+            '/addFunction\(\s*[\'"]__compiler_fdatasync[\'"]/',
             $type,
-            'Builtin\\Type must not always-declare __compiler_fsync (#33114)'
+            'Builtin\\Type must not always-declare __compiler_fdatasync (#33123)'
         );
         $this->assertStringNotContainsString(
-            "registerFunction('__compiler_fsync'",
+            "registerFunction('__compiler_fdatasync'",
             $type,
-            'Builtin\\Type must not always-register __compiler_fsync (#33114)'
+            'Builtin\\Type must not always-register __compiler_fdatasync (#33123)'
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (stream_set_chunk_size still Type always-on; fdatasync dropped in #33123).
+        // Next leftover sentinel (stream_set_chunk_size still Type always-on).
         $this->assertStringContainsString("registerFunction('__compiler_stream_set_chunk_size'", $type);
         $this->assertStringContainsString('StreamSync::ensureLinked', $type);
     }
 
-    public function testRuntimeOwnerDeclaresFsyncAbiModuleLocally(): void
+    public function testRuntimeOwnerDeclaresFdatasyncAbiModuleLocally(): void
     {
         $owner = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamSyncKernel.php');
+        $this->assertStringContainsString('#33123', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
         $this->assertStringContainsString('addFunction', $owner);
-        $this->assertStringContainsString('__compiler_fsync', $owner);
+        $this->assertStringContainsString('__compiler_fdatasync', $owner);
         $this->assertStringContainsString('implementIfMissing', $owner);
         $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamSync.php');
-        $this->assertStringContainsString('#33114', $orchestrator);
+        $this->assertStringContainsString('#33123', $orchestrator);
         $this->assertFileExists(__DIR__.'/../../ext/standard/StreamSyncJitHelper.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamSyncKernel.php');
     }
@@ -55,9 +56,9 @@ final class TypeDeadFsyncAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamSync::ensureLinked($this->context)', $type);
     }
 
-    public function testNoNewRuntimeCForFsyncAbi(): void
+    public function testNoNewRuntimeCForFdatasyncAbi(): void
     {
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/fsync.c');
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/fsync.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/fdatasync.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/fdatasync.c');
     }
 }
