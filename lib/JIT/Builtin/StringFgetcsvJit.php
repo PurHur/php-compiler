@@ -57,6 +57,8 @@ final class StringFgetcsvJit
         } catch (\Throwable) {
         }
 
+        // Compile NestedJIT CSV helpers + stream ABIs *before* emitting the bridge body.
+        // Lazily ensureCompiledBundle(force) mid-bridge corrupts __compiler_fgetcsv IR (#33334).
         StringStrGetcsv::ensureLinked($context);
         StreamReadRuntime::ensureLinked($context);
         self::ensureStripHelperCompiled($context);
@@ -177,21 +179,28 @@ final class StringFgetcsvJit
 
     private static function parseHelperFunction(Context $context): LlvmFunction
     {
-        StringStrGetcsv::ensureLinked($context);
-        self::ensureStripHelperCompiled($context);
-
+        // Lookup only — never NestedJIT here (see implement() pre-link).
         return JitVmHelperLink::lookupCompiled($context, self::FGETCSV_PARSE_HELPER, '#27180');
     }
 
     private static function stripHelperFunction(Context $context): LlvmFunction
     {
-        self::ensureStripHelperCompiled($context);
-
         return JitVmHelperLink::lookupCompiled($context, self::STRIP_LINE_HELPER, '#27180');
     }
 
     private static function ensureStripHelperCompiled(Context $context): void
     {
+        // Skip if both helpers already NestedJITed (StringStrGetcsv::ensureLinked).
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
         // StringStrGetcsv NestedJITs strGetcsvArgv only; also compile stripLineTerminatorsArgv.
         JitVmHelperLink::ensureCompiledBundle(
             $context,

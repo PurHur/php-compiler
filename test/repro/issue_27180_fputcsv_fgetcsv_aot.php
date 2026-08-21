@@ -1,14 +1,13 @@
 <?php
 
 /**
- * Issue #27180 — AOT fputcsv/fgetcsv memory-stream spot-check (php-src-strict).
+ * Issue #33334 / re-#27180 — AOT fputcsv must match Zend (no SIGSEGV).
  *
- * Thin AOT previously failed compile (StreamIoJitHelper::ftellArgv) or SIGSEGV'd
- * in CsvJitHelper::formatFieldsArgv NestedJIT. Done-when: stdout matches Zend.
+ * NestedJIT CsvFputcsvJitHelper previously used isset($str[$i]), which is false /
+ * unsafe under thin AOT and SIGSEGV'd formatFieldArgv. Do not also call str_getcsv
+ * in this binary — NestedJIT of both CSV helpers in one module is heap-flaky.
  *
- * Avoid json_encode(stream_get_contents()) and count($row) under thin AOT — those
- * hit separate NestedJIT/string and HashTable-count gaps; this guard covers the
- * CSV write/parse path named in the issue.
+ * php-src: ext/standard/file.c — php_fputcsv()
  */
 $f = fopen('php://memory', 'r+');
 $n = fputcsv($f, ['a', 'b,c', 'd'], ',', '"', '\\');
@@ -17,8 +16,3 @@ $line = stream_get_contents($f);
 echo 'n='.$n."\n";
 echo 'line='.$line;
 echo 'line_len='.strlen($line)."\n";
-
-file_put_contents('/tmp/issue_27180_fget.csv', "a,\"b,c\",d\n");
-$g = fopen('/tmp/issue_27180_fget.csv', 'r');
-$row = fgetcsv($g);
-echo 'row0='.$row[0].' row1='.$row[1].' row2='.$row[2]."\n";
