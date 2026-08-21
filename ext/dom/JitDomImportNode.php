@@ -15,13 +15,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument::importNode() (#19212, #32350).
+ * LLVM lowering for DOMDocument::importNode() (#19212, #32350, #33097).
  *
  * php-src ext/dom/document.c PHP_METHOD(DOMDocument, importNode) → xmlDocCopyNode.
  * Thin-standalone AOT cannot return NestedJIT object pointers (property fetch
  * aborts; contrast adoptNode #29853 which reuses the caller-side node). Materialize
  * a user-script DOMElement instead — tag/inner XML from compile-time loadXML
- * (#32350) or loadHTML getElementById (#19212).
+ * (#32350) or loadHTML getElementById (#19212). `$deep` must gate InnerXml (#33097).
  */
 final class JitDomImportNode
 {
@@ -40,7 +40,10 @@ final class JitDomImportNode
         }
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            return self::invokeUserScriptMaterialize($context, $args[0], $args[1]);
+            // php-src default $deep=false — user-script path must not always copy InnerXml (#33097).
+            $deep = self::compileTimeDeep($args[2] ?? null);
+
+            return self::invokeUserScriptMaterialize($context, $args[0], $args[1], $deep);
         }
 
         DomImportNodeRuntime::ensureLinked($context);
@@ -140,11 +143,14 @@ final class JitDomImportNode
      *
      * Prefer the *source node* compile-time tag/inner (#32987) — lastCompileTimeXml is
      * the globally last loadXML and is wrong when importing across two documents.
+     *
+     * `$deep` mirrors php-src xmlDocCopyNode: shallow omits child markup (#33097).
      */
     private static function invokeUserScriptMaterialize(
         Context $context,
         JITVariable $documentVar,
-        JITVariable $sourceNode
+        JITVariable $sourceNode,
+        bool $deep
     ): Value {
         $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
@@ -178,13 +184,19 @@ final class JitDomImportNode
             $id = $html['id'] ?? $id;
         }
 
+        // Shallow importNode: element only — no child InnerXml / text nodes (#33097).
+        if (!$deep) {
+            $inner = '';
+            $text = '';
+        }
+
         $element = JitDomCreateElement::materializeForUserScriptDocument(
             $context,
             $documentVar,
             $tag,
             $text
         );
-        if ('' !== $inner) {
+        if ($deep && '' !== $inner) {
             JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
         }
         if (!$fromXml) {
@@ -192,6 +204,25 @@ final class JitDomImportNode
         }
 
         return self::boxObjectResult($context, $element);
+    }
+
+    /**
+     * Compile-time $deep for user-script importNode (php-src default false).
+     * Same shape as {@see JitDomCloneNode::compileTimeDeep} (#33097).
+     */
+    private static function compileTimeDeep(?JITVariable $arg): bool
+    {
+        if (null === $arg) {
+            return false;
+        }
+        if (null !== $arg->compileTimeLong) {
+            return 0 !== $arg->compileTimeLong;
+        }
+        if (null !== $arg->compileTimeString) {
+            return '1' === $arg->compileTimeString || 'true' === strtolower($arg->compileTimeString);
+        }
+
+        return false;
     }
 
     /**
