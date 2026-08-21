@@ -50,6 +50,9 @@ final class VmStatPure
     /**
      * fstat(2) on an open fd via /proc/self/fd/N (Linux) or host lstat fallback.
      *
+     * Must {@see stat} (follow the fd symlink), not {@see lstat} — lstat returns
+     * symlink metadata (wrong size). Peer libc fstat(2) in StreamFstatRuntime (#33359).
+     *
      * @return array<int|string, int>|false
      */
     public static function fstatFd(int $fd)
@@ -58,7 +61,7 @@ final class VmStatPure
             return false;
         }
         if ('Linux' === \PHP_OS_FAMILY && self::procFdStatAvailable()) {
-            return self::lstat('/proc/self/fd/'.$fd);
+            return self::stat('/proc/self/fd/'.$fd);
         }
 
         return false;
