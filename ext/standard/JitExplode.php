@@ -542,6 +542,11 @@ final class JitExplode
 
     /**
      * Once-per-module LLVM helper: byte offset of $needle in $haystack at/after $offset, or -1.
+     *
+     * Must {@see BasicBlockHelper::scopeLoweringToFunction} — mid-call from SplFileObject
+     * iterator/current READ_CSV arm, {@see Context::$loweringLlvmFunction} is the user method;
+     * without the scope, {@see VmStringCompare::findOffset} appends {@code jit_find_*} blocks
+     * there and Module verify fails (cross-function args / void ret i64) — #33521 / #27211.
      */
     private static function ensureFindDelimFunction(Context $context): void
     {
@@ -566,19 +571,26 @@ final class JitExplode
         $fn = null !== $existing
             ? $existing
             : $context->module->addFunction($name, $ft);
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-        // memcmp(3) via LibcExtern::ensureMemcmpDecl after always-on drop (#31954).
-        LibcExtern::ensureMemcmpDecl($context);
-        $found = VmStringCompare::findOffset(
-            $context,
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2),
-            false
-        );
-        $context->builder->returnValue($found);
         $context->registerFunction($name, $fn);
+
+        // Peer StringStrstr::emitBody — findOffset uses BasicBlockHelper::append → parentFunction().
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $name, static function () use (
+            $context,
+            $fn
+        ): void {
+            $entry = $fn->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($entry);
+            // memcmp(3) via LibcExtern::ensureMemcmpDecl after always-on drop (#31954).
+            LibcExtern::ensureMemcmpDecl($context);
+            $found = VmStringCompare::findOffset(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2),
+                false
+            );
+            $context->builder->returnValue($found);
+        });
 
         if (null !== $saved) {
             $context->builder->positionAtEnd($saved);
