@@ -32,8 +32,8 @@ final class TypeDeadFpassthruAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (stream_is_local_uri still Type always-on; stream_is_local dropped in #33148).
-        $this->assertStringContainsString("registerFunction('__compiler_stream_is_local_uri'", $type);
+        // Next leftover sentinel (stream_isatty still Type always-on; stream_is_local_uri dropped in #33150).
+        $this->assertStringContainsString("registerFunction('__compiler_stream_isatty'", $type);
         $this->assertStringContainsString('StreamRead::ensureLinked', $type);
     }
 
