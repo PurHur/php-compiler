@@ -1498,7 +1498,7 @@ class Context {
                 'SplFileInfo'
             );
         }
-        // SplFileObject — line snapshot `__spl_ht` for foreach (#28709); path via `__pathname` (#33305).
+        // SplFileObject — line snapshot `__spl_ht` for foreach (#28709); path via `__pathname` (#33305 / #33308).
         $this->type->object->lookup('SplFileObject');
         foreach ([
             '__construct', 'getFilename', 'getPathname', 'getPath', '__toString',

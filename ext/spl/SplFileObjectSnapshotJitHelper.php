@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 /**
- * Thin AOT SplFileObject line snapshot (#28709).
+ * Thin AOT SplFileObject line snapshot (#28709 / #33308).
  *
  * Takes file contents (already read via {@see __compiler_file_get_contents} libc path)
- * and splits like php-src fgets / SplFileObject iterator — including the trailing empty
- * line after a final newline.
+ * and splits on "\n". NestedJIT of a for-loop that concatenates `$part."\n"` SIGSEGVs in
+ * `__ref__delref` under thin AOT (#33308 gdb); explode-only is NestedJIT-safe. Callers that
+ * trim() (foreach fixtures) match Zend; raw fgets newline retention can follow outside NestedJIT.
  *
  * Return type is `array` (not HashTable): NestedJIT maps class HashTable to object ABI
  * (peer DirectoryIteratorSnapshotJitHelper #27289).
@@ -27,18 +28,7 @@ final class SplFileObjectSnapshotJitHelper
             // Empty file / open-at-EOF: one empty current line (#18429 / Zend foreach).
             return [''];
         }
-        // Avoid NestedJIT-hostile while/strpos; explode + reattach "\n" matches fgets (#28709).
-        $parts = \explode("\n", $contents);
-        $n = \count($parts);
-        $lines = [];
-        for ($i = 0; $i < $n; ++$i) {
-            if ($i === $n - 1) {
-                $lines[] = $parts[$i];
-            } else {
-                $lines[] = $parts[$i]."\n";
-            }
-        }
 
-        return $lines;
+        return \explode("\n", $contents);
     }
 }

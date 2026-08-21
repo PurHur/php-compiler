@@ -5,18 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\JitPath;
+use PHPCompiler\JIT\Builtin\SplFileObjectSnapshotRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT SplFileObject — snapshot lines into `__spl_ht` for foreach (#28709, #33305).
+ * Thin-AOT SplFileObject — snapshot lines into `__spl_ht` for foreach (#28709, #33305, #33308).
  *
- * Construct / openFile read via libc file_get_contents then fgets-shaped line split.
- * Path accessors read `__pathname` (not SplFileInfo `__dir_path`/`__filename`) (#33305).
+ * Construct / openFile read via libc file_get_contents then NestedJIT explode line split
+ * (#33308 — concat-loop NestedJIT SIGSEGV'd in __ref__delref).
+ * Path accessors read `__pathname` (#33305).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileInfo_openFile
@@ -130,9 +131,8 @@ final class SplFileObjectJitHelper
     private static function initConstructedFromPath(Context $context, Value $obj, Value $pathStr): void
     {
         $objectType = $context->type->object;
-        // Prefer empty HT over NestedJIT line snapshot — snapshotPath SIGSEGV under thin AOT
-        // on this tree (#33305); foreach remains a follow-up (also red on master).
-        $ht = HashTableHelper::alloc($context);
+        // NestedJIT explode-only line snapshot (#33308); concat-loop helper SIGSEGV'd.
+        $ht = SplFileObjectSnapshotRuntime::snapshotPath($context, $pathStr);
         $htVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht);
         $objectType->propertyStore(
             $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_HT),
