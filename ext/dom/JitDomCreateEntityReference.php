@@ -93,15 +93,10 @@ final class JitDomCreateEntityReference
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
     ): void {
-        foreach ([
-            self::PROP_NODE_NAME,
-            self::PROP_TAG_NAME,
-            self::PROP_TEXT_CONTENT,
-        ] as $prop) {
-            if (!$objectType->hasProperty($classId, $prop)) {
-                $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
-            }
-        }
+        // Same full DOMElement stand-in layout as createElement (#24973 / #33546 / #33556 / #33559):
+        // appendChild reads parentNode / sibling slots; growing the class after
+        // allocate() leaves entity-ref objects undersized and SIGSEGVs.
+        JitDomCreateElement::ensureDomElementStandInLayout($objectType, $classId);
     }
 
     private static function storeStringLiteral(Context $context, Value $obj, string $prop, string $lit): void
