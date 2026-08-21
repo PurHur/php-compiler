@@ -13,7 +13,12 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream buffer/chunk/timeout ABI via StreamBufferJitHelper PHP (#14462, #19788, #22979).
+ * JIT/AOT link for stream buffer/chunk/timeout ABI via StreamBufferJitHelper PHP (#14462, #19788, #22979, #33127).
+ *
+ * Owns `__compiler_stream_set_chunk_size` (and peer timeout/write/read buffer) ABI
+ * module-locally (getNamedFunction first). Do not re-add empty always-on shells in
+ * Builtin\Type — leftover decls mint stream_set_chunk_size.1 (#31894 / #32122).
+ * Type::initialize still StreamBuffer::ensureLinked.
  *
  * Quarantined from lib/JIT/Builtin/StreamBufferRuntime — {@see \PHPCompiler\JIT\Builtin\StreamBufferRuntime}
  * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}

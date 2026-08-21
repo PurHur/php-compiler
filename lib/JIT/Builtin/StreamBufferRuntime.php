@@ -8,9 +8,11 @@ use PHPCompiler\ext\standard\JitStreamBufferKernel;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT link for stream buffer/chunk/timeout ABI (#14462, #19788).
+ * JIT/AOT link for stream buffer/chunk/timeout ABI (#14462, #19788, #33127).
  *
  * Thin orchestrator — NestedJIT bridges live in {@see JitStreamBufferKernel}.
+ * Kernel declares buffer ABI module-locally (getNamedFunction first). Do not
+ * re-add empty always-on shells in {@see Type} (#31894 / #32122).
  */
 final class StreamBufferRuntime
 {
