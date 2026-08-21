@@ -24,9 +24,11 @@ use PHPLLVM\Value;
  * for inherited isFile/getSize/… (#33313).
  * Live stream handle `__spl_fd` for fgets/fwrite (#33318) via StreamIo/StreamRead ABIs.
  * Iterator I/O (`current`/`key`/`valid`/`next`/`rewind`) + EOF latch (#33319).
+ * getCurrentLine is the php-src fgets alias (#33321).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
- * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileInfo_openFile
+ * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
+ * zim_SplFileObject_getCurrentLine / zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {

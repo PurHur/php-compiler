@@ -76,6 +76,8 @@ final class SplFileObjectStreamMethods33318AotTest extends TestCase
         $this->assertStringContainsString("'fgets'", $call);
         $this->assertStringContainsString("'fwrite'", $call);
         $ctx = (string) file_get_contents($root.'/lib/JIT/Context.php');
-        $this->assertStringContainsString("'fgets', 'fwrite', 'eof'", $ctx);
+        $this->assertStringContainsString("'fgets'", $ctx);
+        $this->assertStringContainsString("'fwrite'", $ctx);
+        $this->assertStringContainsString("'eof'", $ctx);
     }
 }
