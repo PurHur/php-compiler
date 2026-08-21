@@ -46,6 +46,8 @@ final class JitDomRemoveChild
             JitDomRemoveChildLiveSlots::sync($context, $parent, $child);
             DomUserScriptElementCacheLlvm::invalidateIfElement($context, $child);
             self::syncUserScriptInnerXmlAfterRemove($context, $args[0], $args[1]);
+            // #33659 bumped live tag pending/count on append; remove must undo (#33679).
+            DomUserScriptLiveTagListLlvm::decrementForChildArg($context, $args[1]);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_remove_child_post');
 
             return self::boxObjectResult($context, $child);

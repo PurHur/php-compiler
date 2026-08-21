@@ -155,8 +155,17 @@ final class JitDomInsertBefore
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             self::syncUserScriptInsertBeforeSlots($context, $parentVar, $newChildVar, $refChildVar);
             // LiveSlots refresh held pins (#32801); saveXML still reads INNER_XML (#32940 / peer #32903).
-            self::syncUserScriptInnerXml($context, $parentVar, $newChildVar, $refChildVar);
-            DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $newChildVar);
+            // When InnerXml refresh rewrites compile-time XML to include the new child,
+            // countTagArgv already sees it — do not also bump PENDING (#33679).
+            $xmlRefreshed = self::syncUserScriptInnerXml(
+                $context,
+                $parentVar,
+                $newChildVar,
+                $refChildVar
+            );
+            if (!$xmlRefreshed) {
+                DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $newChildVar);
+            }
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_insert_before_post');
 
             return self::boxObjectResult($context, self::loadObjectArg($context, $newChildVar));
@@ -239,23 +248,26 @@ final class JitDomInsertBefore
      * Only called from {@see invoke} (not ChildNode::before, which owns its own
      * InnerXml path via DomNodeChildNodeMutationRuntime).
      */
+    /**
+     * @return bool true when compile-time XML was rewritten to include the new child
+     */
     private static function syncUserScriptInnerXml(
         Context $context,
         JITVariable $parentVar,
         JITVariable $newChildVar,
         JITVariable $refChildVar
-    ): void {
+    ): bool {
         $newTag = $newChildVar->compileTimeDomTagName ?? null;
         if (null === $newTag || '' === $newTag) {
-            return;
+            return false;
         }
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
-            return;
+            return false;
         }
         $xml = $parentVar->compileTimeDomLoadXml
             ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || '' === trim($xml)) {
-            return;
+            return false;
         }
         $newInner = $newChildVar->compileTimeDomInnerXml ?? '';
         $markup = '' === $newInner
@@ -265,7 +277,8 @@ final class JitDomInsertBefore
         // Already applied this insert into the fold source (invoke can re-enter) (#32972).
         $open = '<'.$newTag;
         if (str_starts_with(ltrim($parentInner), $open)) {
-            return;
+            // Fold already contains the child — countTagArgv sees it (#33679).
+            return true;
         }
         $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
         $index = $refChildVar->compileTimeDomChildIndex
@@ -287,7 +300,7 @@ final class JitDomInsertBefore
             }
         }
         if (null === $index) {
-            return;
+            return false;
         }
         $inner = DomParseSimpleXmlJitHelper::innerXmlInsertMarkupAt(
             $parentInner,
@@ -296,11 +309,13 @@ final class JitDomInsertBefore
             false
         );
         if (null === $inner) {
-            return;
+            return false;
         }
         $parent = self::loadObjectArg($context, $parentVar);
         JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
         JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner, $parentVar);
+
+        return true;
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value
