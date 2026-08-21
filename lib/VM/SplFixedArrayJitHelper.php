@@ -395,6 +395,86 @@ final class SplFixedArrayJitHelper
         return self::loadObject($context, $receiver);
     }
 
+    /**
+     * php-src SplFixedArray::__unserialize — integer-keyed elements into `__spl_ht` (#33640).
+     *
+     * Do not write firstIntProp into slot 0 (that replaces the HT pointer — SIGSEGV on offsetGet).
+     * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33636.
+     */
+    public static function compileUnserializeRestore(
+        Context $context,
+        Value $obj,
+        Value $payloadString
+    ): void {
+        \PHPCompiler\JIT\Builtin\StringUnserialize::ensureLinked($context);
+        $internals = [
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
+        ];
+        foreach ($internals as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof \PHPCompiler\JIT\Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
+            }
+        }
+        $ht = self::htPtr($context, $obj);
+        $logical = 'PHPCompiler\\ext\\standard\\UnserializeSplFixedArrayNestedJitHelper::restoreInto';
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplFixedArrayNestedJitHelper.php',
+            [$logical],
+            '#33640'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33640');
+        $payloadOwned = self::nestedJitOwnedString($context, $payloadString);
+        $destI64 = \PHPCompiler\JIT\JitNestedHelperCoerce::ptrToI64($context, $ht);
+        $context->builder->call(
+            $fn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $destI64,
+                $fn->getParam(0)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $payloadOwned,
+                $fn->getParam(1)->typeOf()
+            )
+        );
+    }
+
+    /** Owned `__string__*` copy for NestedJIT PHP string params (#24137 / #33640). */
+    private static function nestedJitOwnedString(Context $context, Value $payload): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $separated = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $payload
+        );
+        $slot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $context->builder->store($separated, $slot);
+        $loaded = $context->builder->load($slot);
+        $map = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $loaded);
+        $src = $context->builder->pointerCast(
+            $context->builder->structGep($loaded, $map['value']),
+            $i8p
+        );
+        $copy = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $src
+        );
+        $context->refcount->disableRefcount($copy);
+
+        return $copy;
+    }
+
     private static function htPtr(Context $context, Value $obj): Value
     {
         return $context->helper->loadValue(
