@@ -1505,7 +1505,7 @@ class Context {
         foreach ([
             '__construct', 'getFilename', 'getPathname', 'getPath', '__toString',
             'fgets', 'getCurrentLine', 'fread', 'fgetc', 'fwrite', 'fputcsv', 'fgetcsv', 'eof',
-            'ftell', 'flock', 'ftruncate', 'fflush', 'fseek',
+            'ftell', 'fstat', 'flock', 'ftruncate', 'fflush', 'fseek',
             'rewind', 'valid', 'current', 'key', 'next',
         ] as $sfoMethod) {
             $this->functionProxies['splfileobject::'.strtolower($sfoMethod)] = new Call\SplFileObjectMethod(

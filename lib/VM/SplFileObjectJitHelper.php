@@ -10,6 +10,7 @@ use PHPCompiler\ext\standard\JitFlock;
 use PHPCompiler\ext\standard\JitFputcsv;
 use PHPCompiler\ext\standard\JitFread;
 use PHPCompiler\ext\standard\JitFseek;
+use PHPCompiler\ext\standard\JitFstat;
 use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitFtruncate;
 use PHPCompiler\ext\standard\JitPath;
@@ -283,6 +284,18 @@ final class SplFileObjectJitHelper
         $handle = self::loadFd($context, $receiver);
 
         return JitFtell::invoke($context, $handle);
+    }
+
+    /**
+     * SplFileObject::fstat — php_stream_stat on live handle (#33359).
+     * php-src: zim_SplFileObject_fstat
+     */
+    public static function compileFstat(Context $context, JITVariable $receiver): Value
+    {
+        self::ensureStreamAbis($context);
+        $handle = self::loadFd($context, $receiver);
+
+        return JitFstat::invoke($context, $handle);
     }
 
     /**
