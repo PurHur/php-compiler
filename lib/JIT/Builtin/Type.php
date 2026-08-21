@@ -364,18 +364,12 @@ class Type extends Builtin {
         // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // fseek.1 (#31894 / #32122). User-script fseek() stays JitFseek /
         // StreamReadJitHelper (libc force peer #33133).
-        $fntypeStreamGetContents = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $i64,
-            $i64,
-            $i64
-        );
-        $fnStreamGetContents = $this->context->module->addFunction(
-            '__compiler_stream_get_contents',
-            $fntypeStreamGetContents
-        );
-        $this->context->registerFunction('__compiler_stream_get_contents', $fnStreamGetContents);
+        // __compiler_stream_get_contents always-on shell removed (#33178): StreamRead /
+        // StreamReadRuntime / JitStreamReadBridgeKernel owns the ABI (getNamedFunction first,
+        // then addFunction if absent via implementNullableStringBridge; Type::initialize still
+        // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // stream_get_contents.1 (#31894 / #32122). User-script stream_get_contents() stays
+        // JitStreamGetContents / StreamReadJitHelper (libc force peer #33133).
         // __compiler_stream_copy_to_stream always-on shell removed (#33182): StreamRead /
         // StreamReadRuntime / JitStreamReadBridgeKernel owns the ABI (getNamedFunction first,
         // then addFunction if absent via implementI64Bridge; Type::initialize still

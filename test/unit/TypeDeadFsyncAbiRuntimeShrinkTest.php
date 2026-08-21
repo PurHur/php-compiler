@@ -31,8 +31,8 @@ final class TypeDeadFsyncAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (stream_get_contents still Type always-on; fseek dropped in #33176).
-        $this->assertStringContainsString("registerFunction('__compiler_stream_get_contents'", $type);
+        // Next leftover sentinel (get_resource_type still Type always-on; stream_get_contents dropped in #33178).
+        $this->assertStringContainsString("registerFunction('__compiler_get_resource_type'", $type);
         $this->assertStringContainsString('StreamSync::ensureLinked', $type);
     }
 
