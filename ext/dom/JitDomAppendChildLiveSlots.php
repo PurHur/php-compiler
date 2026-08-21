@@ -21,10 +21,13 @@ use PHPLLVM\Value;
  * Parent firstChild/lastChild use DOMElement (createElement layout). DOMNode
  * first/last on an Element allocation aliases tagName/nodeName (#32361 / #24973).
  * Sibling/parentNode on children use DOMElement (DOMNode sibling aliases parentNode).
- * Move detection uses first/last identity **or** non-null prev/next siblings —
- * parentNode slots are unreliable after lastChild stores on thin AOT (#27476).
+ * Move detection uses first/last of the destination **or** sibling links while
+ * parentNode still equals the destination (#27476 / #32929 / #33404).
  * Middle-child moves that only checked first/last took the fresh-append path and
  * SIGSEGV'd when walking childNodes (#32929).
+ * Cross-parent reparent must unlink the old parent first (php-src
+ * dom_node_append_child) — fresh-append alone left ghost firstChild/childNodes
+ * and empty destination INNER_XML when the arg lost compileTimeDomTagName (#33404).
  * DocumentFragment stand-ins (`nodeName` `#document-fragment`) expand children
  * onto the parent (php-src fragment move); linking the fragment itself left
  * `#document-fragment` in childNodes and SIGSEGV'd on item(N) (#33312).
@@ -84,8 +87,12 @@ final class JitDomAppendChildLiveSlots
         $childJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $child);
         $nullBox = self::nullValueVar($context);
 
-        // Detect same-parent membership without parentNode (#27476 / #32929):
-        // first/last identity OR already linked via prev/next (middle children).
+        // php-src: if child already has a different parent, remove it first (#33404).
+        self::detachFromForeignParentIfNeeded($context, $parent, $child);
+
+        // Same-parent membership: first/last of *this* parent, or sibling-linked
+        // while parentNode still equals the destination (#27476 / #32929 / #33404).
+        // Bare hasPrev/hasNext alone mis-classified cross-parent children before detach.
         $curFirst0 = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_acls_chk_first');
         $curLast0 = self::loadChildEdge($context, $parent, VmDom::PROP_LAST_CHILD, 'dom_acls_chk_last');
         $isFirstChild = $context->builder->icmp(Builder::INT_EQ, $curFirst0, $child);
@@ -95,7 +102,10 @@ final class JitDomAppendChildLiveSlots
         $hasPrev = $context->builder->icmp(Builder::INT_NE, $chkPrev, $objPtrTy->constNull());
         $hasNext = $context->builder->icmp(Builder::INT_NE, $chkNext, $objPtrTy->constNull());
         $isLinked = $context->builder->or($hasPrev, $hasNext);
-        $isMember = $context->builder->or($context->builder->or($isFirstChild, $isLastChild), $isLinked);
+        $curParent = self::loadSibling($context, $child, VmDom::PROP_PARENT_NODE, 'dom_acls_chk_parent');
+        $parentMatches = $context->builder->icmp(Builder::INT_EQ, $curParent, $parent);
+        $linkedHere = $context->builder->and($isLinked, $parentMatches);
+        $isMember = $context->builder->or($context->builder->or($isFirstChild, $isLastChild), $linkedHere);
 
         $bbDone = BasicBlockHelper::append($context, 'dom_acls_done');
         $bbAlreadyLast = BasicBlockHelper::append($context, 'dom_acls_already_last');
@@ -248,6 +258,102 @@ final class JitDomAppendChildLiveSlots
         self::incrementChildNodesLengthInPlace($context, $parent, $curFirst, $pin1);
         self::storeParentNode($context, $child, $parent);
         $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /**
+     * php-src dom_node_append_child: remove from a foreign parent before append (#33404).
+     *
+     * Rebuilds INNER_XML on the old parent and its element ancestors so saveXML
+     * on grandparents matches Zend after the move.
+     */
+    private static function detachFromForeignParentIfNeeded(
+        Context $context,
+        Value $newParent,
+        Value $child
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, self::tag('dom_acls_detach_check'));
+        self::ensureLayout($context);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $oldParent = self::loadSibling($context, $child, VmDom::PROP_PARENT_NODE, self::tag('dom_acls_old_par'));
+        $oldNull = $context->builder->icmp(Builder::INT_EQ, $oldParent, $objPtrTy->constNull());
+        $sameParent = $context->builder->icmp(Builder::INT_EQ, $oldParent, $newParent);
+        $skip = $context->builder->or($oldNull, $sameParent);
+        $bbDetach = BasicBlockHelper::append($context, self::tag('dom_acls_detach'));
+        $bbDone = BasicBlockHelper::append($context, self::tag('dom_acls_detach_done'));
+        $context->builder->branchIf($skip, $bbDone, $bbDetach);
+
+        $context->builder->positionAtEnd($bbDetach);
+        JitDomRemoveChildLiveSlots::sync($context, $oldParent, $child);
+        self::rebuildUserScriptInnerXmlFromElementChildren($context, $oldParent);
+        self::rebuildUserScriptInnerXmlUpward($context, $oldParent);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /**
+     * Rebuild INNER_XML on each element ancestor (parentNode chain) (#33404).
+     *
+     * Nested createElement trees store self-closing tags in the grandparent
+     * INNER_XML; after a child gains/loses content, walk up so saveXML($root)
+     * matches Zend. Stop at Document / DocumentFragment — Element INNER_XML
+     * rebuild on those layouts SIGSEGVs.
+     */
+    public static function rebuildUserScriptInnerXmlUpward(Context $context, Value $node): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, self::tag('dom_acls_upward'));
+        self::ensureLayout($context);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $map = $context->structFieldMap['__object__'];
+        $curAlloca = BasicBlockHelper::entryAlloca($context, $objPtrTy);
+        $context->builder->store($node, $curAlloca);
+        $bbLoop = BasicBlockHelper::append($context, self::tag('dom_acls_up_loop'));
+        $bbBody = BasicBlockHelper::append($context, self::tag('dom_acls_up_body'));
+        $bbDone = BasicBlockHelper::append($context, self::tag('dom_acls_up_done'));
+        $context->builder->branch($bbLoop);
+
+        $context->builder->positionAtEnd($bbLoop);
+        $cur = $context->builder->load($curAlloca);
+        $parent = self::loadSibling($context, $cur, VmDom::PROP_PARENT_NODE, self::tag('dom_acls_up_par'));
+        $parentNull = $context->builder->icmp(Builder::INT_EQ, $parent, $objPtrTy->constNull());
+        $context->builder->branchIf($parentNull, $bbDone, $bbBody);
+
+        $context->builder->positionAtEnd($bbBody);
+        $classId = $context->builder->load($context->builder->structGep($parent, $map['class_id']));
+        $stop = $i1->constInt(0, false);
+        foreach (
+            [
+                'DOMDocument',
+                'Dom\\Document',
+                'Dom\\XMLDocument',
+                'Dom\\HTMLDocument',
+                'DOMDocumentFragment',
+                'Dom\\DocumentFragment',
+            ] as $className
+        ) {
+            try {
+                $expected = $context->type->object->lookup($className);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($expected, false)
+            );
+            $stop = $context->builder->or($stop, $match);
+        }
+        $bbRebuild = BasicBlockHelper::append($context, self::tag('dom_acls_up_rebuild'));
+        $context->builder->branchIf($stop, $bbDone, $bbRebuild);
+
+        $context->builder->positionAtEnd($bbRebuild);
+        self::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
+        $context->builder->store($parent, $curAlloca);
+        $context->builder->branch($bbLoop);
 
         $context->builder->positionAtEnd($bbDone);
     }
