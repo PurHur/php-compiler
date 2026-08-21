@@ -545,12 +545,13 @@ class Type extends Builtin {
         // Type::initialize still StringPregMatch::ensureLinked). Leftover Type empty decls
         // vs Runtime ABI drift mint preg_replace.1 (#31894 / #32122). User-script
         // preg_replace() stays JitPregReplace / PregJitHelper (php-src ext/pcre/php_pcre.c).
-        $fntypeSuperglobalName = $this->context->context->functionType($i64, false, $strPtr);
-        $fnSuperglobalName = $this->context->module->addFunction(
-            '__compiler_is_superglobal_name',
-            $fntypeSuperglobalName
-        );
-        $this->context->registerFunction('__compiler_is_superglobal_name', $fnSuperglobalName);
+        // __compiler_is_superglobal_name always-on shell removed (#33235): StringSuperglobalName /
+        // SuperglobalNameRuntime owns the ABI (getNamedFunction first, then addFunction if
+        // absent; Type::initialize still StringSuperglobalName::ensureLinked on the full load
+        // path; JitSuperglobalName / JIT.php ensureLinked before lookup). Leftover Type empty
+        // decls vs Runtime ABI drift mint is_superglobal_name.1 (#31894 / #32122). User-script
+        // stays compiler_is_superglobal_name / JitSuperglobalName / SuperglobalNameJitHelper
+        // (php-src Zend/zend_compile.c — zend_is_auto_global_str).
         // getrandom(3) always-on decl removed (#32139): user-script random_bytes()
         // remains PHP helpers (`RandomBytesJitHelper` / `StringRandomBytes` /
         // `__compiler_random_bytes`) and NestedJIT uses /dev/urandom via
@@ -921,6 +922,7 @@ class Type extends Builtin {
         DateIntervalFormatRuntime::ensureLinked($this->context);
         StringDateTime::ensureLinked($this->context);
         StringDeployPath::ensureLinked($this->context);
+        StringSuperglobalName::ensureLinked($this->context);
         StringStrftime::ensureLinked($this->context);
         StringStrptime::ensureLinked($this->context);
         DefaultTimezoneRuntime::ensureLinked($this->context);
