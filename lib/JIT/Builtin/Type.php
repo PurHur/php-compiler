@@ -815,6 +815,12 @@ class Type extends Builtin {
             )
         );
         $this->context->registerFunction('phpc_session_decode_wire', $fnSessionDecodeWire);
+        // Thin AOT (HELPER_RUNTIME_O=0): SessionStartOptionsRuntime NestedJIT lowers
+        // scalar coerce warnings via JitScalarEnumCoerce → lookupFunction(
+        // __compiler_trigger_error). Link StringTriggerError first so register() does
+        // not race an empty module (#33248 / #33234). Do not restore Type always-on
+        // empty addFunction/registerFunction for the ABI (#31894 / #32122).
+        StringTriggerError::ensureLinked($this->context);
         SessionStartOptionsRuntime::ensureLinked($this->context);
         // __compiler_json_encode_value / __compiler_json_encode_array /
         // __compiler_json_quote_string / __compiler_json_decode /
