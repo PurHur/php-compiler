@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * NestedJIT: fill `__spl_ht` from bag storage at `i:1;a:` offset (#33636 / #33663).
+ * NestedJIT: fill `__spl_ht` from bag storage at `i:1;a:` offset (#33636 / #33663 / #33670).
  *
- * Own TU / single method — string-key bags with int / string / null values.
+ * Own TU / single method — string-key bags with int / string / float / bool / null values.
  * `$pos` must point at the `i` of `i:1;a:`.
  * Packed int-key bags stay in {@see UnserializeSplArrayFillIntKeyNestedJitHelper}.
  */
@@ -62,7 +62,7 @@ final class UnserializeSplArrayFillNestedJitHelper
             }
             $pos = $pos + 2;
             if ('N' === $payload[$pos] && $pos + 1 < $len && ';' === $payload[$pos + 1]) {
-                // php-src stores null; NestedJIT has no string-key null setter — skip slot.
+                phpc_native_ht_set_string_key_null($htPtr, $key);
                 $pos = $pos + 2;
             } elseif ('i' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
                 $pos = $pos + 2;
@@ -111,6 +111,27 @@ final class UnserializeSplArrayFillNestedJitHelper
                 }
                 $pos = $pos + 2;
                 phpc_native_ht_set_string_key($htPtr, $key, $str);
+            } elseif ('b' === $payload[$pos] && $pos + 3 < $len && ':' === $payload[$pos + 1]
+                && ('0' === $payload[$pos + 2] || '1' === $payload[$pos + 2])
+                && ';' === $payload[$pos + 3]) {
+                $bval = 0;
+                if ('1' === $payload[$pos + 2]) {
+                    $bval = 1;
+                }
+                phpc_native_ht_set_string_key_bool($htPtr, $key, $bval);
+                $pos = $pos + 4;
+            } elseif ('d' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+                $fstr = '';
+                while ($pos < $len && ';' !== $payload[$pos]) {
+                    $fstr .= $payload[$pos];
+                    $pos = $pos + 1;
+                }
+                if ($pos >= $len || ';' !== $payload[$pos] || '' === $fstr) {
+                    return 0;
+                }
+                $pos = $pos + 1;
+                phpc_native_ht_set_string_key_double_str($htPtr, $key, $fstr);
             } else {
                 return 0;
             }

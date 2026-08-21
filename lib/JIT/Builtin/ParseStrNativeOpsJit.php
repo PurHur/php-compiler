@@ -135,6 +135,64 @@ final class ParseStrNativeOpsJit
         );
     }
 
+    /** String-key bool (NestedJIT passes 0/1 long) — ArrayObject bag `b:` (#33670). */
+    public static function setStringKeyBool(Context $context, JITVariable $htPtr, JITVariable $key, JITVariable $value): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $longVal = JitLongArg::lower($context, $value, 'phpc_native_ht bool value');
+        $i1 = $context->getTypeFromString('int1');
+        $asBool = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $longVal,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        // icmp already yields i1; keep a named cast path if the builder returns i8 elsewhere.
+        if ($asBool->typeOf() !== $i1) {
+            $asBool = $context->builder->trunc($asBool, $i1);
+        }
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyBool'),
+            $ht,
+            $keyStr,
+            $asBool
+        );
+    }
+
+    /** String-key null — ArrayObject bag `N;` (#33670). */
+    public static function setStringKeyNull(Context $context, JITVariable $htPtr, JITVariable $key): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyNull'),
+            $ht,
+            $keyStr
+        );
+    }
+
+    /**
+     * String-key float from serialize `d:` digit text via strtod (#33670).
+     * NestedJIT-safe — no float local in the fill helper.
+     */
+    public static function setStringKeyDoubleFromString(
+        Context $context,
+        JITVariable $htPtr,
+        JITVariable $key,
+        JITVariable $digitStr
+    ): void {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $digits = self::ownedString($context, self::loadStringArg($context, $digitStr));
+        $dbl = JitLongArg::lowerStringToDouble($context, $digits);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyDouble'),
+            $ht,
+            $keyStr,
+            $dbl
+        );
+    }
+
     private static function htFromI64(Context $context, JITVariable $ptr): Value
     {
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
