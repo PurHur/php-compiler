@@ -14,7 +14,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * ArrayObject thin-AOT methods (#26823, #33606, #33613, ext/spl/spl_array.c).
+ * ArrayObject thin-AOT methods (#26823, #33606, #33613, #33616, ext/spl/spl_array.c).
  */
 final class ArrayObjectMethod implements Call
 {
@@ -181,6 +181,31 @@ final class ArrayObjectMethod implements Call
                     $context,
                     $args[0] ?? throw new \LogicException('ArrayObject::uksort() called without $this'),
                     $args[1]
+                )
+            ),
+            // php-src zim_ArrayObject_getFlags/setFlags — thin AOT was a silent no-op (#33616).
+            'getflags' => $this->compileExact(
+                $context,
+                $args,
+                'ArrayObject::getFlags',
+                0,
+                static fn () => ArrayObjectJitHelper::compileGetFlags(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::getFlags() called without $this'),
+                    'ArrayObject'
+                )
+            ),
+            'setflags' => $this->compileExact(
+                $context,
+                $args,
+                'ArrayObject::setFlags',
+                1,
+                static fn () => ArrayObjectJitHelper::compileSetFlags(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::setFlags() called without $this'),
+                    $args[1],
+                    'ArrayObject',
+                    'ArrayObject::setFlags'
                 )
             ),
             default => throw new \LogicException(

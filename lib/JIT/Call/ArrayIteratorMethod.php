@@ -14,7 +14,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * ArrayIterator / RecursiveArrayIterator thin-AOT methods (#32910, #33606, #33613, ext/spl/spl_array.c).
+ * ArrayIterator / RecursiveArrayIterator thin-AOT methods (#32910, #33606, #33613, #33616, ext/spl/spl_array.c).
  *
  * Storage is the same `__spl_ht` layout as ArrayObject (#26783 / #26823) — reuse
  * {@see ArrayObjectJitHelper} IR with ArrayIterator ACE names.
@@ -166,6 +166,31 @@ final class ArrayIteratorMethod implements Call
                     $context,
                     $args[0] ?? throw new \LogicException($qualified.'() called without $this'),
                     $args[1]
+                )
+            ),
+            // php-src zim_ArrayIterator_getFlags/setFlags — thin AOT was a silent no-op (#33616).
+            'getflags' => $this->compileExact(
+                $context,
+                $args,
+                $qualified,
+                0,
+                fn () => ArrayObjectJitHelper::compileGetFlags(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this'),
+                    $this->className
+                )
+            ),
+            'setflags' => $this->compileExact(
+                $context,
+                $args,
+                $qualified,
+                1,
+                fn () => ArrayObjectJitHelper::compileSetFlags(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this'),
+                    $args[1],
+                    $this->className,
+                    $qualified
                 )
             ),
             default => throw new \LogicException(

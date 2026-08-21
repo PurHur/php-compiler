@@ -1378,6 +1378,9 @@ class Context {
             // php-src spl_array_object_uasort/uksort — thin AOT was a silent no-op (#33613).
             'uasort',
             'uksort',
+            // php-src zim_ArrayIterator_getFlags/setFlags — thin AOT was a silent no-op (#33616).
+            'getFlags',
+            'setFlags',
         ] as $aiMethod) {
             $this->functionProxies['arrayiterator::'.strtolower($aiMethod)] = new Call\ArrayIteratorMethod(
                 $aiMethod,
@@ -1410,6 +1413,9 @@ class Context {
             // php-src spl_array_object_uasort/uksort — thin AOT was a silent no-op (#33613).
             'uasort',
             'uksort',
+            // php-src zim_ArrayObject_getFlags/setFlags — thin AOT was a silent no-op (#33616).
+            'getFlags',
+            'setFlags',
         ] as $aoMethod) {
             $this->functionProxies['arrayobject::'.strtolower($aoMethod)] = new Call\ArrayObjectMethod($aoMethod);
         }
