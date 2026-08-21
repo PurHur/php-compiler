@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -40,9 +41,26 @@ final class JitDomInsertBeforeLiveSlots
         self::ensureLayout($context);
         JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
 
+        // php-src: Attr is not content — insertBefore must not touch Element sibling slots (#33587).
+        // Zend/libxml: Error "Cannot add newnode as the previous sibling of refnode".
+        // Peer appendChild installs Attr via the attribute map (#33570).
+        $bbAttr = BasicBlockHelper::append($context, 'dom_ib_attr');
+        $bbNotAttr = BasicBlockHelper::append($context, 'dom_ib_not_attr');
+        $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
+
+        $context->builder->positionAtEnd($bbAttr);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'Error',
+            'Cannot add newnode as the previous sibling of refnode'
+        );
+        // emitCatchableClassError terminates the block (branch to catch dispatch).
+
+        $context->builder->positionAtEnd($bbNotAttr);
         $bbFrag = BasicBlockHelper::append($context, 'dom_ib_frag');
         $bbNormal = BasicBlockHelper::append($context, 'dom_ib_normal');
-        $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
         $isFrag = JitDomAppendChildLiveSlots::isDocumentFragmentNode($context, $newChild);
         $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
 
