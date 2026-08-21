@@ -31,8 +31,8 @@ final class TypeDeadStreamSupportsAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (stream_enable_crypto still Type always-on; stream_set_blocking dropped in #33157).
-        $this->assertStringContainsString("registerFunction('__compiler_stream_enable_crypto'", $type);
+        // Next leftover sentinel (ftell still Type always-on; stream_enable_crypto dropped in #33159).
+        $this->assertStringContainsString("registerFunction('__compiler_ftell'", $type);
         $this->assertStringContainsString('StreamIo::ensureLinked', $type);
     }
 
