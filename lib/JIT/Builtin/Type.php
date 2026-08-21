@@ -703,17 +703,12 @@ class Type extends Builtin {
         // (php-src ext/standard/file.c — PHP_FUNCTION(str_getcsv)).
         $valuePtr = $this->context->getTypeFromString('__value__*');
         $i64 = $this->context->getTypeFromString('int64');
-        $i1 = $this->context->getTypeFromString('int1');
-        $fnParseUrl = $this->context->module->addFunction(
-            '__phpc_parse_url_component',
-            $this->context->context->functionType($void, false, $strPtr, $i64, $valuePtr)
-        );
-        $this->context->registerFunction('__phpc_parse_url_component', $fnParseUrl);
-        $fnParseUrlAssoc = $this->context->module->addFunction(
-            '__phpc_parse_url_assoc',
-            $this->context->context->functionType($void, false, $strPtr, $valuePtr)
-        );
-        $this->context->registerFunction('__phpc_parse_url_assoc', $fnParseUrlAssoc);
+        // __phpc_parse_url_component / __phpc_parse_url_assoc always-on shells removed (#33236):
+        // ParseUrlRuntime owns the ABI (getNamedFunction first via implementIfMissing +
+        // scopeLoweringToFunction #33226; Type::initialize still ParseUrlRuntime::ensureLinked;
+        // JitParseUrl ensureLinked before lookup). Leftover Type empty decls vs Runtime ABI
+        // drift mint parse_url_component.1 (#31894 / #32122). User-script parse_url() stays
+        // JitParseUrl / ParseUrlJitHelper (php-src ext/standard/url.c).
         // __compiler_getdate always-on shell removed (#32250): user-script getdate()
         // stays JitGetdate IR / GetdateJitHelper (#26900). StringGetdate::implement()
         // is an intentional no-op.
@@ -993,6 +988,7 @@ class Type extends Builtin {
         MetaTagsRuntime::ensureLinked($this->context);
         StringErrorLog::ensureLinked($this->context);
         GetHeadersRuntime::ensureLinked($this->context);
+        ParseUrlRuntime::ensureLinked($this->context);
         StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);

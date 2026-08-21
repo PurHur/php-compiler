@@ -12,12 +12,13 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __phpc_parse_url_* via ParseUrlJitHelper PHP (#9358, #22861, #27078, #33226).
+ * JIT/AOT link for __phpc_parse_url_* via ParseUrlJitHelper PHP (#9358, #22861, #27078, #33226, #33236).
  *
  * Assoc HT: {@see ParseUrlAssocLlvm} (component + lastString/lastInt).
  * Thin AOT call-site {@see ensureLinked} must {@see BasicBlockHelper::scopeLoweringToFunction}
  * so bridge blocks are not appended to user main (#27211 / Module.php:180).
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}. php-src: ext/standard/url.c
+ * Do not re-add always-on empty decls in {@see Type} — leftover decls mint parse_url_component.1
+ * (#31894 / #32122 / #33236). SSOT: {@see \PHPCompiler\ext\standard\VmString}. php-src: ext/standard/url.c
  */
 final class ParseUrlRuntime
 {
@@ -101,6 +102,13 @@ final class ParseUrlRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        // getNamedFunction first — leftover Type empty decls + blind addFunction mint .1 (#31894 / #33236).
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            $context->registerFunction($name, $probe);
+
+            return $probe;
+        }
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
