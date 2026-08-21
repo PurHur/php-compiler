@@ -209,6 +209,69 @@ final class JitDomNodeListItemUserScript
     }
 
     /**
+     * Compile-time Nth direct child of document element for childNodes foreach (#33082).
+     *
+     * Peer {@see materializeItemAtCompileTime} / loadXML {@see JitDomDocumentElement}
+     * child seeding — comment / text / element with INNER_XML + attrs.
+     */
+    public static function materializeDirectChildAtCompileTime(
+        Context $context,
+        string $xml,
+        int $index
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_direct_child');
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        if ($index < 0 || $index >= \count($nodes)) {
+            return self::boxNull($context);
+        }
+        $node = $nodes[$index];
+        $object = match ($node['kind']) {
+            'comment' => JitDomCreateComment::materialize($context, $node['data']),
+            'text' => JitDomCreateTextNode::materialize($context, $node['data']),
+            default => self::materializeDirectElementChild($context, $node),
+        };
+
+        return self::boxObject($context, $object);
+    }
+
+    /**
+     * @param array{kind: string, data: string, inner?: string, open?: string} $node
+     */
+    private static function materializeDirectElementChild(Context $context, array $node): Value
+    {
+        $tag = $node['data'];
+        $inner = $node['inner'] ?? '';
+        $text = DomParseSimpleXmlJitHelper::textContentFromInnerXmlArgv($inner);
+        $child = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        JitDomCreateElement::storeUserScriptInnerXml($context, $child, $inner);
+        if (isset($node['open']) && \is_string($node['open'])) {
+            JitDomCreateElement::storeUserScriptXmlnsAttr(
+                $context,
+                $child,
+                DomParseSimpleXmlJitHelper::attrSuffixFromOpenTagArgv($node['open'])
+            );
+            foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open']) as $attrPair) {
+                $qname = $attrPair['qname'];
+                $value = $attrPair['value'];
+                $pos = strpos($qname, ':');
+                $local = false === $pos ? $qname : substr($qname, $pos + 1);
+                $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals(
+                    $context,
+                    '',
+                    $qname,
+                    $value
+                );
+                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
+                if ($local !== $qname) {
+                    DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
+                }
+            }
+        }
+
+        return $child;
+    }
+
+    /**
      * Materialize //tag NodeList::item($index) from compile-time XML (#27275).
      *
      * Seeds DomUserScriptAttributeCacheLlvm so getAttribute() works on the result.
