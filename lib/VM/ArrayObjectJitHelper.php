@@ -14,6 +14,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\HashTableWriteLlvm;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\ext\standard\StdlibConstants;
@@ -711,6 +712,55 @@ final class ArrayObjectJitHelper
     {
         $ht = self::htPtr($context, self::loadObject($context, $receiver));
         HashTableWriteLlvm::unsetValueBoxKey($context, $ht, self::asValueBoxKey($context, $key));
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * php-src zim_ArrayObject_getFlags / zim_ArrayIterator_getFlags — read `__flags` (#33616).
+     * Construct already persists the slot for ARRAY_AS_PROPS (#33061); thin AOT lacked proxies.
+     */
+    public static function compileGetFlags(
+        Context $context,
+        JITVariable $receiver,
+        string $className = self::CLASS_NAME
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $flagsSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_FLAGS);
+        $flags = JITVariable::TYPE_NATIVE_LONG === $flagsSlot->type
+            ? $context->helper->loadValue($flagsSlot)
+            : $context->builder->call(
+                $context->lookupFunction('__value__toLong'),
+                JitValueBox::valuePtrFromVariable($context, $flagsSlot)
+            );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            JitValueBox::pointer($context, $slot),
+            $flags
+        );
+
+        return $slot;
+    }
+
+    /**
+     * php-src zim_ArrayObject_setFlags / zim_ArrayIterator_setFlags — store `__flags` (#33616).
+     * ZEND_PARSE_PARAMETERS_START(1, 1) Z_PARAM_LONG — soft-null coerce via JitLongArg (#31696).
+     */
+    public static function compileSetFlags(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $flagsArg,
+        string $className = self::CLASS_NAME,
+        string $function = 'ArrayObject::setFlags'
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $flags = JitLongArg::lower($context, $flagsArg, $function.'() flags');
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, $className, self::PROP_FLAGS),
+            new JITVariable($context, JITVariable::TYPE_NATIVE_LONG, JITVariable::KIND_VALUE, $flags),
+            JITVariable::TYPE_NATIVE_LONG
+        );
 
         return self::voidResult($context);
     }
