@@ -31,8 +31,8 @@ final class TypeDeadStreamSetChunkSizeAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (fseek still Type always-on; stream_get_line dropped in #33170).
-        $this->assertStringContainsString("registerFunction('__compiler_fseek'", $type);
+        // Next leftover sentinel after fseek drop (#33177); stream_get_contents still Type always-on.
+        $this->assertStringContainsString("registerFunction('__compiler_stream_get_contents'", $type);
         $this->assertStringContainsString('StreamBuffer::ensureLinked', $type);
     }
 

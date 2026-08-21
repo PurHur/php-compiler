@@ -9,16 +9,16 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 
 /**
- * LLVM ABI bridges for stream read runtime via NestedJIT StreamReadJitHelper (#18672, #20982, #33155, #33164, #33166, #33168, #33170).
+ * LLVM ABI bridges for stream read runtime via NestedJIT StreamReadJitHelper (#18672, #20982, #33155, #33164, #33166, #33168, #33170, #33177).
  *
  * Moved out of lib/JIT/Builtin/ — {@see StreamReadRuntime} stays the thin PHP-helper
  * orchestrator (no deferred stub fork — peer StreamLifecycle #20966).
  *
- * Owns `__compiler_ftruncate` / `__compiler_ftell` / `__compiler_fgetc` / `__compiler_fgets` /
- * `__compiler_stream_get_line` module-locally (getNamedFunction first in {@see implementI32Bridge} /
- * {@see implementI64Bridge} / {@see implementNullableStringBridge} /
+ * Owns `__compiler_ftruncate` / `__compiler_ftell` / `__compiler_fseek` / `__compiler_fgetc` /
+ * `__compiler_fgets` / `__compiler_stream_get_line` module-locally (getNamedFunction first in
+ * {@see implementI32Bridge} / {@see implementI64Bridge} / {@see implementNullableStringBridge} /
  * {@see implementStreamGetLineBridge}). Do not re-add empty always-on shells in Type — leftover
- * decls mint ftruncate.1 / ftell.1 / fgetc.1 / fgets.1 / stream_get_line.1 (#31894 / #32122).
+ * decls mint ftruncate.1 / ftell.1 / fseek.1 / fgetc.1 / fgets.1 / stream_get_line.1 (#31894 / #32122).
  *
  * SSOT semantics: {@see StreamReadJitHelper}
  * php-src: ext/standard/file.c, ext/standard/flock_compat.c

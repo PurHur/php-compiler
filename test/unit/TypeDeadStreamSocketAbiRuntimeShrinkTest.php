@@ -47,8 +47,8 @@ final class TypeDeadStreamSocketAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover after ftell drop (#33164); enable_crypto already gone (#33159).
-        $this->assertStringContainsString("registerFunction('__compiler_fseek'", $type);
+        // Next leftover sentinel after fseek drop (#33177); stream_get_contents still Type always-on.
+        $this->assertStringContainsString("registerFunction('__compiler_stream_get_contents'", $type);
         $this->assertStringContainsString('StreamSocketGetNameRuntime::ensureLinked', $type);
         $this->assertStringContainsString('StreamSocketAccept::ensureLinked', $type);
     }
