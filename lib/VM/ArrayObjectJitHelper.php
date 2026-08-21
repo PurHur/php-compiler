@@ -330,6 +330,57 @@ final class ArrayObjectJitHelper
         return $slot;
     }
 
+    /**
+     * php-src spl_array_object_exchange_array — replace `__spl_ht`, return previous (#33083).
+     *
+     * Thin AOT: array|ArrayObject/ArrayIterator input → owned packed copy into the
+     * receiver slot (php-src just_array / Z_PARAM_ARRAY_OR_OBJECT). Shared USE_OTHER
+     * iterator retarget is VM-only ({@see SplArrayStorage::exchangeArray}).
+     */
+    public static function compileExchangeArray(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $input
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $objectType = $context->type->object;
+        $oldHt = self::htPtr($context, $obj);
+        $oldCopy = new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
+            HashTableHelper::alloc($context)
+        );
+        HashTableHelper::spreadInto(
+            $context,
+            $oldCopy,
+            new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $oldHt)
+        );
+
+        $src = HashTableHelper::coerceToPackedHashtable($context, $input);
+        $fresh = new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
+            HashTableHelper::alloc($context)
+        );
+        HashTableHelper::spreadInto($context, $fresh, $src);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_HT),
+            $fresh,
+            JITVariable::TYPE_HASHTABLE
+        );
+
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $slot),
+            $context->helper->loadValue($oldCopy)
+        );
+
+        return $slot;
+    }
+
     public static function compileOffsetGet(Context $context, JITVariable $receiver, JITVariable $key): Value
     {
         $ht = self::htPtr($context, self::loadObject($context, $receiver));
