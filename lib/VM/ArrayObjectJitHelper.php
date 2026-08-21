@@ -790,8 +790,10 @@ final class ArrayObjectJitHelper
     /**
      * php-src ArrayObject/ArrayIterator::__unserialize bag under thin AOT (#33636).
      *
-     * Restores integer-keyed bag storage into `__spl_ht` and `__flags`. Does not overwrite
+     * Restores bag storage into `__spl_ht` and `__flags`. Does not overwrite
      * slot 0 with firstIntProp (that corrupted the HT pointer — SIGSEGV on json_encode).
+     * String keys via UnserializeSplArrayFillNestedJitHelper (#33636); packed int keys
+     * via UnserializeSplArrayFillIntKeyNestedJitHelper (#33654).
      *
      * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925.
      * NestedJIT helpers stay tiny and split across TUs (large bodies blank under NestedJIT).
@@ -809,6 +811,7 @@ final class ArrayObjectJitHelper
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_long(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
         ];
         foreach ($internals as $internal) {
             $lc = strtolower($internal->getName());
@@ -820,6 +823,7 @@ final class ArrayObjectJitHelper
         $ht = self::htPtr($context, $obj);
         $findLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplArrayFindNestedJitHelper::findStorage';
         $fillLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplArrayFillNestedJitHelper::fillAt';
+        $fillIntLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplArrayFillIntKeyNestedJitHelper::fillAt';
         $flagsLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplArrayFlagsNestedJitHelper::parseFlags';
         $saved = BasicBlockHelper::tryGetInsertBlock($context);
         \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
@@ -840,6 +844,14 @@ final class ArrayObjectJitHelper
         $saved = BasicBlockHelper::tryGetInsertBlock($context);
         \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
             $context,
+            '/ext/standard/UnserializeSplArrayFillIntKeyNestedJitHelper.php',
+            [$fillIntLogical],
+            '#33654'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
             '/ext/standard/UnserializeSplArrayFlagsNestedJitHelper.php',
             [$flagsLogical],
             '#33636'
@@ -848,6 +860,7 @@ final class ArrayObjectJitHelper
 
         $findFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $findLogical, '#33636');
         $fillFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $fillLogical, '#33636');
+        $fillIntFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $fillIntLogical, '#33654');
         $flagsFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $flagsLogical, '#33636');
         $i64 = $context->getTypeFromString('int64');
         $payloadOwned = self::nestedJitOwnedString($context, $payloadString);
@@ -874,6 +887,7 @@ final class ArrayObjectJitHelper
 
         $context->builder->positionAtEnd($bbFill);
         $destI64 = \PHPCompiler\JIT\JitNestedHelperCoerce::ptrToI64($context, $ht);
+        // String-key bags (#33636); packed int-key bags (#33654) — each no-ops on the other shape.
         $context->builder->call(
             $fillFn,
             \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
@@ -890,6 +904,24 @@ final class ArrayObjectJitHelper
                 $context,
                 $findOff,
                 $fillFn->getParam(2)->typeOf()
+            )
+        );
+        $context->builder->call(
+            $fillIntFn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $destI64,
+                $fillIntFn->getParam(0)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $payloadOwned,
+                $fillIntFn->getParam(1)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $findOff,
+                $fillIntFn->getParam(2)->typeOf()
             )
         );
         $context->builder->branch($bbFlags);
