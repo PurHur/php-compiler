@@ -291,11 +291,6 @@ final class PregExpandRuntime
 
     private static function ensureExternal(Context $context, string $name, $fnType): void
     {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $fnType);
-            $context->registerFunction($name, $fn);
-        }
+        \PHPCompiler\JIT\LibcExtern::ensureExternalDecl($context, $name, $fnType);
     }
 }

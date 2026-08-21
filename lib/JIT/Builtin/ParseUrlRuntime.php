@@ -243,17 +243,8 @@ final class ParseUrlRuntime
 
     private static function ensureExternal(Context $context, string $name, $ft): void
     {
-        try {
-            $context->lookupFunction($name);
-
-            return;
-        } catch (\Throwable) {
-        }
-        $fn = $context->module->getNamedFunction($name);
-        if (null === $fn) {
-            $fn = $context->module->addFunction($name, $ft);
-        }
-        $context->registerFunction($name, $fn);
+        // getNamedFunction first — peer #31894 / #33550 (do not mint name.1).
+        \PHPCompiler\JIT\LibcExtern::ensureExternalDecl($context, $name, $ft);
     }
 
     private static function registerLinkedRuntime(Context $context): void
