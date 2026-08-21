@@ -1788,6 +1788,9 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — numeric_prefix='', arg_separator=null, encoding_type=PHP_QUERY_RFC1738 (#24971)
             case 'http_build_query':
                 return ['data', 'numeric_prefix=', 'arg_separator=', 'encoding_type='];
+            // php-src ext/standard/http.stub.php — PHP 8.4+; absent from InternalArgInfo (#23878)
+            case 'request_parse_body':
+                return ['options='];
             case 'json_encode':
                 return ['value', 'flags', 'depth'];
             // php-src ext/json/json.stub.php — InternalArgInfo omits flags= (#24812)
