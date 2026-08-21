@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -15,19 +16,28 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT for DOMNamedNodeMap::$length and ::item() (php-src namednodemap.c).
+ * User-script AOT for DOMNamedNodeMap::$length, ::item(), ::getNamedItem()
+ * (php-src namednodemap.c).
  *
  * Dummy attributes maps used to be allocated without {@code length} / Attr pins;
  * fetching length then SIGSEGVd (#32546, peer NodeList #28672).
+ * {@code getNamedItem()} must scan the same pins — NestedJIT DomRegistry lists
+ * are absent on thin-AOT maps and abort (#33107).
  *
  * php-src: ext/dom/namednodemap.c php_dom_get_namednodemap_length /
- *          PHP_METHOD(DOMNamedNodeMap, item)
+ *          PHP_METHOD(DOMNamedNodeMap, item) /
+ *          PHP_METHOD(DOMNamedNodeMap, getNamedItem)
  */
 final class JitDomNamedNodeMap
 {
     public const MAX_PINNED_ATTRS = 16;
 
     private const CLASS_MAP = 'DOMNamedNodeMap';
+
+    private const CLASS_ATTR = 'DOMAttr';
+
+    /** Attr string props matched by getNamedItem (php-src xmlHasProp / nodeName). */
+    private const ATTR_NAME_PROPS = ['name', 'localName', 'nodeName'];
 
     public static function pinProp(int $index): string
     {
@@ -137,6 +147,144 @@ final class JitDomNamedNodeMap
         return self::emitRuntimeItem($context, $map, self::loadIntArg($context, $args[1]));
     }
 
+    /**
+     * DOMNamedNodeMap::getNamedItem() — pin scan by Attr local/node name (#33107).
+     *
+     * php-src namednodemap.c: Attr maps match local name ({@see xmlHasProp});
+     * Entity/Notation maps match declaration nodeName.
+     */
+    public static function invokeGetNamedItem(Context $context, JITVariable ...$args): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nnm_getnameditem_cont');
+        if (!VmClassMethod::requireExactJitUserArgCount(
+            $context,
+            $args,
+            'DOMNamedNodeMap::getNamedItem',
+            1
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+
+        $map = self::loadObject($context, $args[0]);
+        $objectType = $context->type->object;
+        self::ensureLayout($objectType, $objectType->lookup(self::CLASS_MAP));
+        self::ensureAttrNameLayout($objectType);
+
+        return self::emitRuntimeGetNamedItem(
+            $context,
+            $map,
+            self::loadStringArg($context, $args[1])
+        );
+    }
+
+    private static function emitRuntimeGetNamedItem(Context $context, Value $map, Value $nameStr): Value
+    {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $done = $fn->appendBasicBlock('dom_nnm_gni_done');
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+        $voidPtr = $context->getTypeFromString('void*');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $objectType = $context->type->object;
+
+        for ($i = 0; $i < self::MAX_PINNED_ATTRS; ++$i) {
+            $tryPin = $fn->appendBasicBlock('dom_nnm_gni_try_'.$i);
+            $next = $fn->appendBasicBlock('dom_nnm_gni_next_'.$i);
+            $context->builder->branch($tryPin);
+            $context->builder->positionAtEnd($tryPin);
+
+            $pinRaw = $context->builder->load(
+                $objectType->propertySlotFor($map, self::CLASS_MAP, self::pinProp($i))
+            );
+            $slotNull = $context->builder->icmp(Builder::INT_EQ, $pinRaw, $voidPtr->constNull());
+            $readPin = $fn->appendBasicBlock('dom_nnm_gni_read_'.$i);
+            $context->builder->branchIf($slotNull, $next, $readPin);
+
+            $context->builder->positionAtEnd($readPin);
+            $pinObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $context->builder->pointerCast($pinRaw, $valuePtrTy)
+            );
+            $objNull = $context->builder->icmp(Builder::INT_EQ, $pinObj, $objPtrTy->constNull());
+            $matchProps = $fn->appendBasicBlock('dom_nnm_gni_props_'.$i);
+            $context->builder->branchIf($objNull, $next, $matchProps);
+
+            $context->builder->positionAtEnd($matchProps);
+            $matched = self::emitAttrNameMatches($context, $pinObj, $nameStr);
+            $hit = $fn->appendBasicBlock('dom_nnm_gni_hit_'.$i);
+            $context->builder->branchIf($matched, $hit, $next);
+
+            $context->builder->positionAtEnd($hit);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeObject'),
+                $ptr,
+                $pinObj
+            );
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($next);
+        }
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /** True when Attr name / localName / nodeName equals the sought string. */
+    private static function emitAttrNameMatches(Context $context, Value $attrObj, Value $nameStr): Value
+    {
+        $objectType = $context->type->object;
+        $attrClassId = $objectType->lookup(self::CLASS_ATTR);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $any = $fn->appendBasicBlock('dom_nnm_gni_any');
+        $no = $fn->appendBasicBlock('dom_nnm_gni_no');
+        $phiBlock = $fn->appendBasicBlock('dom_nnm_gni_match_phi');
+        $i1 = $context->getTypeFromString('bool');
+
+        foreach (self::ATTR_NAME_PROPS as $prop) {
+            $propVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $attrObj,
+                self::CLASS_ATTR,
+                $prop,
+                $attrClassId
+            );
+            $propStr = $context->helper->loadValue($propVar);
+            $cmp = JitStringCompare::strcmp($context, $propStr, $nameStr);
+            $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+            $cont = $fn->appendBasicBlock('dom_nnm_gni_prop_cont_'.$prop);
+            $context->builder->branchIf($eq, $any, $cont);
+            $context->builder->positionAtEnd($cont);
+        }
+        $context->builder->branch($no);
+
+        $context->builder->positionAtEnd($any);
+        $context->builder->branch($phiBlock);
+        $context->builder->positionAtEnd($no);
+        $context->builder->branch($phiBlock);
+        $context->builder->positionAtEnd($phiBlock);
+        $phi = $context->builder->phi($i1);
+        // Incoming order must match branch predecessors (any then no).
+        $phi->addIncoming($i1->constInt(1, false), $any);
+        $phi->addIncoming($i1->constInt(0, false), $no);
+
+        return $phi;
+    }
+
+    private static function ensureAttrNameLayout(Object_ $objectType): void
+    {
+        $attrClassId = $objectType->lookup(self::CLASS_ATTR);
+        foreach (self::ATTR_NAME_PROPS as $prop) {
+            if (!$objectType->hasProperty($attrClassId, $prop)) {
+                $objectType->defineProperty($attrClassId, $prop, JITVariable::TYPE_STRING);
+            }
+        }
+    }
+
     private static function emitRuntimeItem(Context $context, Value $map, Value $index): Value
     {
         $fn = $context->builder->getInsertBlock()->getParent();
@@ -241,5 +389,23 @@ final class JitDomNamedNodeMap
         }
 
         throw new \LogicException('DOMNamedNodeMap::item() index must be an integer');
+    }
+
+    private static function loadStringArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+
+        throw new \LogicException('DOMNamedNodeMap::getNamedItem() name must be a string');
     }
 }

@@ -1050,16 +1050,22 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            // Pin-scan getNamedItem — NestedJIT DomRegistry aborts on thin-AOT maps (#33107).
+            if ('domnamednodemap::getnameditem' === $lc
+                || 'dom\\namednodemap::getnameditem' === $lc
+                || 'dom\\dtdnamednodemap::getnameditem' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNamedNodeMapGetNamedItem();
+
+                return;
+            }
             if ('domnodelist::getiterator' === $lc
-                || 'domnamednodemap::getnameditem' === $lc
                 || 'domnamednodemap::getnameditemns' === $lc
                 || 'domnamednodemap::getiterator' === $lc
                 || 'dom\\nodelist::getiterator' === $lc
                 || 'dom\\htmlcollection::getiterator' === $lc
-                || 'dom\\namednodemap::getnameditem' === $lc
                 || 'dom\\namednodemap::getnameditemns' === $lc
                 || 'dom\\namednodemap::getiterator' === $lc
-                || 'dom\\dtdnamednodemap::getnameditem' === $lc
                 || 'dom\\dtdnamednodemap::getnameditemns' === $lc
                 || 'dom\\dtdnamednodemap::getiterator' === $lc
                 || 'domtokenlist::getiterator' === $lc
