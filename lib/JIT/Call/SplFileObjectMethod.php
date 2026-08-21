@@ -11,7 +11,7 @@ use PHPCompiler\VM\SplFileObjectJitHelper;
 use PHPLLVM\Value;
 
 /**
- * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, ext/spl/spl_directory.c).
+ * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, ext/spl/spl_directory.c).
  */
 final class SplFileObjectMethod implements Call
 {
@@ -44,6 +44,14 @@ final class SplFileObjectMethod implements Call
             'getpath' => SplFileObjectJitHelper::compileGetPath($context, $args[0]),
             // getCurrentLine is an fgets alias in php-src (zim_SplFileObject_getCurrentLine).
             'fgets', 'getcurrentline' => SplFileObjectJitHelper::compileFgets($context, $args[0]),
+            'fread' => SplFileObjectJitHelper::compileFread(
+                $context,
+                $args[0],
+                $args[1] ?? throw new \ArgumentCountError(
+                    'SplFileObject::fread() expects exactly 1 argument, 0 given'
+                )
+            ),
+            'fgetc' => SplFileObjectJitHelper::compileFgetc($context, $args[0]),
             'fwrite' => SplFileObjectJitHelper::compileFwrite(
                 $context,
                 $args[0],
