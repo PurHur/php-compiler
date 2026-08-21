@@ -126,13 +126,20 @@ final class StringRename
             return;
         } catch (\Throwable $e) {
         }
-        // Prefer a direct libc rename symbol when already present (Module FS externs).
-        try {
-            $existing = $context->lookupFunction('rename');
+        // getNamedFunction first — decl-in-module but not-in-registry must not mint rename.1 (#33650 / #31894).
+        $existing = $context->module->getNamedFunction('rename');
+        if (null === $existing) {
+            try {
+                $existing = $context->lookupFunction('rename');
+            } catch (\Throwable $e) {
+                $existing = null;
+            }
+        }
+        if (null !== $existing) {
+            $context->registerFunction('rename', $existing);
             $context->registerFunction(self::COMPILER_RENAME, $existing);
 
             return;
-        } catch (\Throwable $e) {
         }
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');

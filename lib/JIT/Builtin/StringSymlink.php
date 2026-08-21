@@ -126,12 +126,20 @@ final class StringSymlink
             return;
         } catch (\Throwable $e) {
         }
-        try {
-            $existing = $context->lookupFunction('symlink');
+        // getNamedFunction first — decl-in-module but not-in-registry must not mint symlink.1 (#33650 / #31894).
+        $existing = $context->module->getNamedFunction('symlink');
+        if (null === $existing) {
+            try {
+                $existing = $context->lookupFunction('symlink');
+            } catch (\Throwable $e) {
+                $existing = null;
+            }
+        }
+        if (null !== $existing) {
+            $context->registerFunction('symlink', $existing);
             $context->registerFunction(self::COMPILER_SYMLINK, $existing);
 
             return;
-        } catch (\Throwable $e) {
         }
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');

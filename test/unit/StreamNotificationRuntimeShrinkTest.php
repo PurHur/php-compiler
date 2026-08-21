@@ -27,7 +27,11 @@ final class StreamNotificationRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('addGlobal($valPtr', $source);
         $this->assertStringNotContainsString('GLOBAL_CALLBACK', $source);
-        $this->assertLessThan(130, \substr_count($source, "\n") + 1);
+        // Empty probe must be reused — bare addFunction after getNamedFunction mints .1 (#33650).
+        $this->assertStringContainsString('null !== $probe', $source);
+        $this->assertStringContainsString('? $probe', $source);
+        $this->assertStringContainsString('getNamedFunction(\'__phpc_stream_notification_callback_set\')', $source);
+        $this->assertLessThan(140, \substr_count($source, "\n") + 1);
     }
 
     public function testStreamNotificationJitHelperDelegatesStorage(): void
