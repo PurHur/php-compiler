@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for strptime() via StringStrptime (__compiler_strptime, #3694). */
+/** LLVM lowering for strptime() via StringStrptime (__compiler_strptime, #3694, #33224). */
 final class JitStrptime
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -25,6 +25,7 @@ final class JitStrptime
         // php-src: ext/date/php_date.c — PHP_FUNCTION(strptime) deprecated since 8.1 (#22771).
         VmEngineBuiltinDeprecation::emitJitFunction($context, 'strptime');
 
+        // Type always-on strptime drop (#33224) — must ensureLinked before lookup.
         StringStrptime::ensureLinked($context);
 
         $date = JitStringBuiltinArg::lower($context, $args[0], 'strptime', 1, 'date');
