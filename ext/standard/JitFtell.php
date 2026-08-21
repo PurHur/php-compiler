@@ -11,7 +11,12 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for ftell() via __compiler_ftell (issue #1190). */
+/**
+ * LLVM lowering for ftell() via __compiler_ftell (issue #1190; ensureLinked #33164).
+ *
+ * ABI owned by {@see StreamReadRuntime} / {@see JitStreamReadBridgeKernel} after Type always-on
+ * drop (#33164) — must ensureLinked before lookup (peer {@see JitFtruncate} / {@see JitFgetc} #33113).
+ */
 final class JitFtell
 {
     /** @return Value */

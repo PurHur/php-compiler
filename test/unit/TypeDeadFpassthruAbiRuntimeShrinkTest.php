@@ -32,8 +32,8 @@ final class TypeDeadFpassthruAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (ftell still Type always-on; stream_enable_crypto dropped in #33159).
-        $this->assertStringContainsString("registerFunction('__compiler_ftell'", $type);
+        // Next leftover sentinel (fgetc still Type always-on; ftell dropped in #33164).
+        $this->assertStringContainsString("registerFunction('__compiler_fgetc'", $type);
         $this->assertStringContainsString('StreamRead::ensureLinked', $type);
     }
 
