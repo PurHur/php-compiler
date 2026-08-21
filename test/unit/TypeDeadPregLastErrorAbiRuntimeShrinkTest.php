@@ -41,8 +41,8 @@ final class TypeDeadPregLastErrorAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (stream_path still Type always-on; #33255 pending-header dropped).
-        $this->assertStringContainsString("registerFunction('__phpc_stream_path'", $type);
+        // Next leftover sentinel (session_start_apply still Type always-on; #33258 stream_path dropped).
+        $this->assertStringContainsString("registerFunction('__phpc_session_start_apply'", $type);
         $this->assertStringContainsString('StringPregMatch::ensureLinked', $type);
     }
 

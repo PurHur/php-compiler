@@ -10,11 +10,15 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __phpc_stream_path via StreamPathJitHelper PHP (#9480, #25139).
+ * JIT/AOT link for __phpc_stream_path via StreamPathJitHelper PHP (#9480, #25139, #33258).
+ *
+ * Owns `__phpc_stream_path` module-locally (`getNamedFunction` first via
+ * {@see declareStreamPathAbi} / {@see implement}). Do not re-add empty always-on
+ * shells in {@see Type} — leftover decls mint stream_path.1 (#31894 / #32122 / #33258).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SessionNameReject #25092).
  * Replaces LLVM phpc_stream_paths[] table lookup; SSOT {@see \PHPCompiler\ext\standard\VmFs}.
- * php-src: ext/standard/streams.c — php_stream path metadata
+ * php-src: ext/standard/streamsfuncs.c — php_stream path metadata
  */
 final class StreamPathRuntime
 {
@@ -41,6 +45,26 @@ final class StreamPathRuntime
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
+    }
+
+    /**
+     * Module-local empty decl for Type::register (#33258).
+     * Body comes from {@see ensureLinked} / {@see implement}.
+     */
+    public static function declareStreamPathAbi(Context $context): void
+    {
+        $abiName = '__phpc_stream_path';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $i64);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
     }
 
     public static function implement(Context $context): void
