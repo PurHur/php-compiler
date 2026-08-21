@@ -96,23 +96,134 @@ final class JitJsonEncode
 
     /**
      * Public props via get_object_vars + FORCE_OBJECT so empty objects encode as {} (#28638).
+     * ArrayObject/ArrayIterator store in `__spl_ht` — get_object_vars is empty under thin AOT (#33619).
      * php-src: ext/json/json_encoder.c — php_json_encode_object / zend_get_properties_for
+     * php-src: ext/spl/spl_array.c — spl_array_get_properties returns the array HT
      */
     private static function encodeObjectPublicProps(Context $context, JITVariable $arg, Value $flags): Value
     {
+        $force = $context->getTypeFromString('int64')->constInt(VmJsonFlags::FORCE_OBJECT, false);
+        $flagsObj = $context->builder->or($flags, $force);
+        $splEncoded = self::tryEncodeSplArrayObjectStorage($context, $arg, $flagsObj);
+        if (null !== $splEncoded) {
+            return $splEncoded;
+        }
+
         $boxed = JitGetObjectVars::invoke($context, $arg, false);
         $ht = $context->builder->call(
             $context->lookupFunction('__value__readHashtable'),
             $boxed
         );
         // Skip unconditional overlay — see encode() (#31101). FORCE_OBJECT still applied.
-        $force = $context->getTypeFromString('int64')->constInt(VmJsonFlags::FORCE_OBJECT, false);
-        $flagsObj = $context->builder->or($flags, $force);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
             $ht,
             $flagsObj
+        );
+    }
+
+    /**
+     * Encode ArrayObject family via `__spl_ht` (php-src spl_array_get_properties; #33619).
+     *
+     * Returns null when the operand is not a resolved object pointer we can class-id dispatch.
+     */
+    private static function tryEncodeSplArrayObjectStorage(
+        Context $context,
+        JITVariable $arg,
+        Value $flagsObj
+    ): ?Value {
+        $objVar = self::resolveObjectReceiver($context, $arg);
+        if (null === $objVar) {
+            return null;
+        }
+
+        $objectType = $context->type->object;
+        $aoId = $objectType->lookup('ArrayObject');
+        $aiId = $objectType->lookup('ArrayIterator');
+        $raiId = $objectType->lookup('RecursiveArrayIterator');
+        $objPtr = $context->helper->loadValue($objVar);
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $objMap['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $isAo = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i64->constInt($aoId, false)
+        );
+        $isAi = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i64->constInt($aiId, false)
+        );
+        $isRai = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i64->constInt($raiId, false)
+        );
+        $isSpl = $context->builder->or($context->builder->or($isAo, $isAi), $isRai);
+
+        $id = (string) (++self::$blockSerial);
+        $splBlock = BasicBlockHelper::append($context, 'json_encode_spl_array_'.$id);
+        $plainBlock = BasicBlockHelper::append($context, 'json_encode_spl_plain_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'json_encode_spl_done_'.$id);
+        $context->builder->branchIf($isSpl, $splBlock, $plainBlock);
+
+        $context->builder->positionAtEnd($splBlock);
+        $htVar = $objectType->splBackingHashtable($objVar);
+        $splResult = $context->builder->call(
+            $context->lookupFunction('__compiler_json_encode_array'),
+            $context->helper->loadValue($htVar),
+            $flagsObj
+        );
+        $splEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($plainBlock);
+        $boxed = JitGetObjectVars::invoke($context, $arg, false);
+        $plainHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $boxed
+        );
+        $plainResult = $context->builder->call(
+            $context->lookupFunction('__compiler_json_encode_array'),
+            $plainHt,
+            $flagsObj
+        );
+        $plainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $phi = $context->builder->phi($strPtr, 'json_encode_spl_phi_'.$id);
+        $phi->addIncoming($splResult, $splEnd);
+        $phi->addIncoming($plainResult, $plainEnd);
+
+        return $phi;
+    }
+
+    /** @return JITVariable|null TYPE_OBJECT receiver for class_id / `__spl_ht` */
+    private static function resolveObjectReceiver(Context $context, JITVariable $arg): ?JITVariable
+    {
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            return $arg;
+        }
+        if (JITVariable::TYPE_VALUE !== $arg->type) {
+            return null;
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::normalizeValuePtr($context, $valuePtr)
+        );
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $objPtr
         );
     }
 
