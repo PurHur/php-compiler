@@ -302,6 +302,29 @@ final class StringUnserialize
             );
             $context->builder->branchIf($isMatch, $case, $next);
             $context->builder->positionAtEnd($case);
+            $lc = strtolower($className);
+            if (
+                'arrayobject' === $lc
+                || 'arrayiterator' === $lc
+                || 'recursivearrayiterator' === $lc
+            ) {
+                // Integer-keyed Zend bag → `__spl_ht` (#33636); firstIntProp corrupts slot 0.
+                $display = match ($lc) {
+                    'arrayobject' => 'ArrayObject',
+                    'arrayiterator' => 'ArrayIterator',
+                    default => 'RecursiveArrayIterator',
+                };
+                $splBoxed = \PHPCompiler\VM\ArrayObjectJitHelper::compileUnserializeFromWire(
+                    $context,
+                    $payloadString,
+                    $id,
+                    $display
+                );
+                $context->builder->store($splBoxed, $resultSlot);
+                $context->builder->branch($bbDone);
+                $check = $next;
+                continue;
+            }
             $objVal = $object->allocate($id);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'unser_obj_after_alloc_'.$id);
             $object->markObjectConstructed($objVal);
