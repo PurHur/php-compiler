@@ -13,15 +13,17 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT ABI bridges for stream meta via StreamMetaJitHelper PHP (#6007, #13846, #19678, #22994, #33154).
+ * JIT/AOT ABI bridges for stream meta via StreamMetaJitHelper PHP (#6007, #13846, #19678, #22994, #33154, #33157).
  *
  * Quarantined from lib/JIT/Builtin/StreamMetaJit — {@see \PHPCompiler\JIT\Builtin\StreamMeta}
  * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}
  * (peer StreamBuffer #22979 / StreamMode #22968).
  *
- * Owns `__compiler_stream_get_meta_data` module-locally (getNamedFunction first in
+ * Owns `__compiler_stream_get_meta_data` / `__compiler_stream_set_blocking` /
+ * `__compiler_stream_enable_crypto` module-locally (getNamedFunction first in
  * {@see implementIfMissing} / {@see JitStreamMetaThinAot}). Do not re-add empty always-on
- * shells in Type — leftover decls mint stream_get_meta_data.1 (#31894 / #32122).
+ * shells in Type — leftover decls mint stream_get_meta_data.1 / stream_set_blocking.1
+ * (#31894 / #32122). Type::initialize still StreamMeta::ensureLinked.
  *
  * Replaces ~424-line feof/fcntl/strncmp LLVM; SSOT {@see StreamMetaJitHelper}
  * php-src: ext/standard/streamsfuncs.c — stream_get_meta_data / stream_set_blocking
