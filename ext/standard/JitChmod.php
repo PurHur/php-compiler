@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * JIT/AOT helper for chmod() via ChmodJitHelper PHP (#15458).
+ * JIT/AOT helper for chmod() via StringChmod / ChmodLibcRuntime (#15458 / #33418).
  */
 
 namespace PHPCompiler\ext\standard;

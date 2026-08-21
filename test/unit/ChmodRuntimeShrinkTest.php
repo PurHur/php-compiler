@@ -8,10 +8,10 @@ use PHPCompiler\ext\standard\ChmodJitHelper;
 use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
-/** chmod() JIT routes through ChmodJitHelper PHP not libc chmod LLVM (#15458). */
+/** chmod() JIT/AOT routes through thin libc chmod(2) (#33418 / peer unlink #33412). */
 final class ChmodRuntimeShrinkTest extends TestCase
 {
-    public function testJitChmodUsesPhpBridgeNotLibc(): void
+    public function testJitChmodUsesStringChmodBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitChmod.php');
         $this->assertStringContainsString('StringChmod::invoke', $source);
@@ -19,11 +19,17 @@ final class ChmodRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('__compiler_trigger_error', $source);
     }
 
-    public function testStringChmodBridgeUsesChmodJitHelper(): void
+    public function testStringChmodBridgeUsesLibcRuntime(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringChmod.php');
-        $this->assertStringContainsString('ChmodJitHelper', $bridge);
-        $this->assertStringNotContainsString("lookupFunction('chmod')", $bridge);
+        $this->assertStringContainsString('ChmodLibcRuntime::emit', $bridge);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $bridge);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ChmodLibcRuntime.php');
+        $this->assertStringContainsString('chmod(2)', $libc);
+        $this->assertStringContainsString('#33418', $libc);
     }
 
     public function testChmodJitHelperDelegatesToVmFs(): void
@@ -36,11 +42,12 @@ final class ChmodRuntimeShrinkTest extends TestCase
         unlink($file);
     }
 
-    public function testSpineBundleIncludesChmodJitHelper(): void
+    public function testSpineBundleIncludesChmodLibcRuntime(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('ChmodJitHelper.php', $spine);
         $this->assertStringContainsString('StringChmod.php', $spine);
+        $this->assertStringContainsString('ChmodLibcRuntime.php', $spine);
     }
 
     public function testNestedConsumersDeclareChmodModuleLocally(): void

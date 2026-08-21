@@ -5765,6 +5765,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringCaseCompare.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringChdir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringChroot.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFnmatch.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ChmodLibcRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringChmod.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringChunkSplit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringClassExists.php';

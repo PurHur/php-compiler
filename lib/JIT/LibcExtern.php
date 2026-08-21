@@ -105,7 +105,7 @@ final class LibcExtern
             // mkstemp dropped (#31655): JitTempnamKernel::ensureLibc declares mkstemp(3)
             // module-locally (sole NestedJIT lookupFunction consumer); user-script tempnam()
             // stays on TempnamJitHelper / StringTempnam / VmFsTempnam* (not libc).
-            // chmod dropped (#31374): ChmodJitHelper / StringChmod own user-script chmod();
+            // chmod dropped (#31374): ChmodLibcRuntime / StringChmod own user-script chmod() (#33418);
             // NestedJIT JitTempnamKernel + M5TrivialEchoNative declare chmod(2) module-locally.
             // mkdir dropped (#31374): MkdirJitHelper / StringMkdir own user-script mkdir();
             // NestedJIT JitSessionStorageKernel declares mkdir(2) module-locally.
