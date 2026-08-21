@@ -570,8 +570,8 @@ final class DirectoryIteratorJitHelper
      * SplFileInfo::getRealPath — libc realpath(3) on joined pathname (#33287).
      * php-src: zim_SplFileInfo_getRealPath
      *
-     * Avoid StringRealpath/NestedJIT PHP realpath() — absolute paths with `..`
-     * currently fail/segfault in RealpathJitHelper under thin AOT.
+     * Module-local realpath(3) (peer StringRealpath #33432) — NestedJIT
+     * RealpathJitHelper returned empty under thin AOT before the libc bridge.
      */
     public static function compileGetRealPath(Context $context, JITVariable $receiver, string $className): Value
     {

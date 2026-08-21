@@ -6,29 +6,19 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
-use PHPLLVM\Builder;
+use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for __phpc_jit_realpath via RealpathJitHelper PHP (#15323).
+ * JIT/AOT link for __phpc_jit_realpath via thin libc realpath(3) (#33432 / peer #33287).
  *
- * Replaces libc realpath(3)/strlen LLVM in ext/standard/JitRealpath.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString::realpath()}.
+ * NestedJIT {@see \PHPCompiler\ext\standard\RealpathJitHelper} returns empty under thin AOT
+ * (DirectoryIterator already used module-local realpath(3) in #33287). Platform realpath(3)
+ * is the justified thin path — peer SysGetTempDirRuntime (#29433) / StringUnlink (#33412).
  * php-src: ext/standard/basic_functions.c — php_realpath
  */
 final class StringRealpath
 {
     private const ABI = '__phpc_jit_realpath';
-
-    private const HELPER_PATH = '/ext/standard/RealpathJitHelper.php';
-
-    private const RESOLVE_HELPER = 'PHPCompiler\\ext\\standard\\RealpathJitHelper::resolveArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::RESOLVE_HELPER,
-    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -40,19 +30,9 @@ final class StringRealpath
         self::ensureLinked($context);
     }
 
-    public static function invoke(Context $context, \PHPLLVM\Value $path): \PHPLLVM\Value
+    public static function invoke(Context $context, Value $path): Value
     {
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
         self::ensureLinked($context);
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'realpath_invoke_cont');
-        }
 
         return $context->builder->call($context->lookupFunction(self::ABI), $path);
     }
@@ -66,7 +46,9 @@ final class StringRealpath
             return;
         }
 
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#15323');
+        // Restore caller insert block after bridge emit (#33432 / peer StringChmod #33418) —
+        // clearInsertionPosition alone orphans mid-emit realpath() callsites (Module.php:180).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $fn = null !== $probe
@@ -76,34 +58,13 @@ final class StringRealpath
                 $context->context->functionType($strPtr, false, $strPtr)
             );
 
-        $entry = $fn->appendBasicBlock('realpath_bridge_entry');
-        $failBb = $fn->appendBasicBlock('realpath_bridge_fail');
-        $okBb = $fn->appendBasicBlock('realpath_bridge_ok');
-        $context->builder->positionAtEnd($entry);
-
-        $path = $fn->getParam(0);
-        $isNullPath = $context->builder->icmp(Builder::INT_EQ, $path, $strPtr->constNull());
-        $context->builder->branchIf($isNullPath, $failBb, $okBb);
-
-        $context->builder->positionAtEnd($okBb);
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::RESOLVE_HELPER, '#15323');
-        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$path]);
-        $isNullResult = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
-        $failResultBb = $fn->appendBasicBlock('realpath_bridge_result_fail');
-        $okResultBb = $fn->appendBasicBlock('realpath_bridge_result_ok');
-        $context->builder->branchIf($isNullResult, $failResultBb, $okResultBb);
-
-        $context->builder->positionAtEnd($failResultBb);
-        $context->builder->branch($failBb);
-
-        $context->builder->positionAtEnd($okResultBb);
-        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
-        $context->builder->returnValue($result);
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($context->builder->load($context->constantStringFromString('')));
+        RealpathLibcRuntime::emit($context, $fn);
 
         $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

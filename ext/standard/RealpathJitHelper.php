@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * realpath() for compiled JIT/AOT modules (#15323, php-in-PHP).
+ * Pure-PHP realpath normalize for Zend/unit parity (#15323).
+ *
+ * User-script JIT/AOT `realpath()` uses libc via {@see \PHPCompiler\JIT\Builtin\StringRealpath}
+ * (#33432) — this helper returned empty under thin NestedJIT (#33287).
  *
  * php-src: ext/standard/basic_functions.c — php_realpath
- *
- * NestedJIT must not call the PHP `realpath()` builtin — that re-enters
- * {@see \PHPCompiler\JIT\Builtin\StringRealpath} and returns empty (#33287).
  *
  * Keep the leaf minimal: no `str_replace` (missing NestedJIT link) and no
  * per-byte `$path[$i]` loops (thin-AOT segfault). Use `explode('/')` only.
