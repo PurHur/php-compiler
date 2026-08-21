@@ -231,11 +231,24 @@ final class DirectoryIteratorJitHelper
         bool $markConstructed = true
     ): void {
         [$dirPtr, $filePtr] = self::emitSplFileInfoPathParts($context, $pathStr);
-        self::storeStringProperty($context, $obj, $className, self::PROP_PATH, $dirPtr);
-        self::storeStringProperty($context, $obj, $className, self::PROP_FILENAME, $filePtr);
+        self::storeSplFileInfoPathParts($context, $obj, $className, $dirPtr, $filePtr);
         if ($markConstructed) {
             $context->type->object->markObjectConstructed($obj);
         }
+    }
+
+    /**
+     * Write SplFileInfo `__dir_path` / `__filename` (SplTempFileObject empty-path override #33568).
+     */
+    public static function storeSplFileInfoPathParts(
+        Context $context,
+        Value $obj,
+        string $className,
+        Value $dirPtr,
+        Value $filePtr
+    ): void {
+        self::storeStringProperty($context, $obj, $className, self::PROP_PATH, $dirPtr);
+        self::storeStringProperty($context, $obj, $className, self::PROP_FILENAME, $filePtr);
     }
 
     /**

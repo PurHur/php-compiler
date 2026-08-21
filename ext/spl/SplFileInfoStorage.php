@@ -45,6 +45,16 @@ final class SplFileInfoStorage
     }
 
     /**
+     * Override stored directory component (SplTempFileObject forces "" after open).
+     * php-src: zim_SplTempFileObject___construct — intern->path = ZSTR_EMPTY_ALLOC (#33568).
+     */
+    public static function setPath(ObjectEntry $object, string $path): void
+    {
+        self::state($object);
+        self::$store[$object->id]['path'] = $path;
+    }
+
+    /**
      * SplFileInfo::getFilename() / private fileName debug bag — not php basename().
      * php-src: when path is non-empty and shorter than file_name, skip path + '/'.
      */

@@ -14,7 +14,6 @@ use PHPCompiler\ext\standard\JitFread;
 use PHPCompiler\ext\standard\JitFseek;
 use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitFtruncate;
-use PHPCompiler\ext\standard\JitPath;
 use PHPCompiler\ext\standard\StatFieldsJitHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\FputcsvRuntime;
@@ -87,6 +86,9 @@ final class SplFileObjectJitHelper
 {
     /** php-src SplFileObject::DROP_NEW_LINE — peer SplFileObjectBuiltin::DROP_NEW_LINE. */
     private const FLAG_DROP_NEW_LINE = 1;
+
+    /** php-src SplFileObject::READ_AHEAD — peer SplFileObjectBuiltin::READ_AHEAD (#33568). */
+    private const FLAG_READ_AHEAD = 2;
 
     /** php-src SplFileObject::SKIP_EMPTY — peer SplFileObjectBuiltin::SKIP_EMPTY. */
     private const FLAG_SKIP_EMPTY = 4;
@@ -185,6 +187,15 @@ final class SplFileObjectJitHelper
         $path = $context->builder->load($context->constantStringFromString('php://temp'));
         $mode = $context->builder->load($context->constantStringFromString('w+b'));
         self::initConstructedFromPath($context, $obj, $path, $mode, 'w+b');
+        // php-src zim_SplTempFileObject___construct — path = ZSTR_EMPTY_ALLOC (#33568).
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        DirectoryIteratorJitHelper::storeSplFileInfoPathParts(
+            $context,
+            $obj,
+            self::CLASS_NAME,
+            $empty,
+            $path
+        );
 
         return self::voidResult($context);
     }
@@ -207,19 +218,10 @@ final class SplFileObjectJitHelper
         return $slot;
     }
 
-    /** SplFileObject::getFilename — basename(__pathname) (#33305). */
+    /** SplFileObject::getFilename — SplFileInfo `__filename` (not php basename) (#33305 / #33568). */
     public static function compileGetFilename(Context $context, JITVariable $receiver): Value
     {
-        $pathname = self::loadPathname($context, $receiver);
-        $name = JitPath::basename($context, $pathname);
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            JitValueBox::pointer($context, $slot),
-            $name
-        );
-
-        return $slot;
+        return DirectoryIteratorJitHelper::compileGetFilename($context, $receiver, self::CLASS_NAME);
     }
 
     /** SplFileObject::getPathname / __toString (#33305). */
@@ -236,30 +238,10 @@ final class SplFileObjectJitHelper
         return $slot;
     }
 
-    /** SplFileObject::getPath — dirname(__pathname) (#33305). */
+    /** SplFileObject::getPath — SplFileInfo `__dir_path` (#33305 / #33568). */
     public static function compileGetPath(Context $context, JITVariable $receiver): Value
     {
-        $pathname = self::loadPathname($context, $receiver);
-        $dir = JitPath::dirname($context, $pathname);
-        // Match SplFileInfo empty-dir when basename length equals pathname length.
-        $pathLen = $context->builder->call($context->lookupFunction('__string__strlen'), $pathname);
-        $name = JitPath::basename($context, $pathname);
-        $nameLen = $context->builder->call($context->lookupFunction('__string__strlen'), $name);
-        $noDir = $context->builder->icmp(
-            Builder::INT_EQ,
-            $pathLen,
-            $nameLen
-        );
-        $empty = $context->builder->load($context->constantStringFromString(''));
-        $dirOut = $context->builder->select($noDir, $empty, $dir);
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            JitValueBox::pointer($context, $slot),
-            $dirOut
-        );
-
-        return $slot;
+        return DirectoryIteratorJitHelper::compileGetPath($context, $receiver, self::CLASS_NAME);
     }
 
     /**
@@ -1282,26 +1264,30 @@ final class SplFileObjectJitHelper
     }
 
     /**
-     * SplFileObject::next — drop current and bump key (#33319).
-     * php-src: zim_SplFileObject_next
+     * SplFileObject::next — drop current and bump key (#33319 / #33568).
+     * php-src: zim_SplFileObject_next — free_line; read_line only under READ_AHEAD.
      */
     public static function compileNext(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);
         $i64 = $context->getTypeFromString('int64');
-        $has = self::loadLongProp($context, $obj, self::PROP_HAS);
-        $missing = $context->builder->icmp(Builder::INT_EQ, $has, $i64->constInt(0, false));
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $needBb = $fn->appendBasicBlock('splfo_next_need');
-        $afterBb = $fn->appendBasicBlock('splfo_next_after');
-        $context->builder->branchIf($missing, $needBb, $afterBb);
-
-        $context->builder->positionAtEnd($needBb);
-        self::emitReadLineToValueBox($context, $receiver, 0, true);
-        $context->builder->branch($afterBb);
-
-        $context->builder->positionAtEnd($afterBb);
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
+
+        $flags = self::loadLongProp($context, $obj, self::PROP_FLAGS);
+        $aheadMasked = $context->builder->and($flags, $i64->constInt(self::FLAG_READ_AHEAD, false));
+        $isAhead = $context->builder->icmp(Builder::INT_NE, $aheadMasked, $i64->constInt(0, false));
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $aheadBb = $fn->appendBasicBlock('splfo_next_ahead');
+        $bumpBb = $fn->appendBasicBlock('splfo_next_bump');
+        $context->builder->branchIf($isAhead, $aheadBb, $bumpBb);
+
+        $context->builder->positionAtEnd($aheadBb);
+        self::emitReadLineToValueBox($context, $receiver, 0, true);
+        $context->builder->branch($bumpBb);
+
+        $context->builder->positionAtEnd($bumpBb);
         $line = self::loadLongProp($context, $obj, self::PROP_LINE);
         self::storeLongProp(
             $context,

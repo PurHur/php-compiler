@@ -78,11 +78,8 @@ final class SplFileObjectStorage
     public static function next(ObjectEntry $object): void
     {
         $state = &self::$state[$object->id];
-        if (null === $state['currentLine'] && null === $state['currentCsv']) {
-            if (!self::readLineForIterator($object, true)) {
-                return;
-            }
-        }
+        // php-src zim_SplFileObject_next — free_line only; read_line solely under READ_AHEAD (#33568).
+        // Eager-reading when current is null advanced the stream and made valid()/eof diverge from Zend.
         self::freeLine($state);
         if (self::hasFlag($state, self::FLAG_READ_AHEAD)) {
             self::readLineForIterator($object, true);
