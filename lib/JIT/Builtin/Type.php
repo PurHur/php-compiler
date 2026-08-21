@@ -352,9 +352,12 @@ class Type extends Builtin {
         // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // fgets.1 (#31894 / #32122). User-script fgets() stays JitFgets /
         // StreamReadJitHelper (libc force peer #33133).
-        $fntypeStreamGetLine = $this->context->context->functionType($strPtr, false, $i64, $i64, $strPtr);
-        $fnStreamGetLine = $this->context->module->addFunction('__compiler_stream_get_line', $fntypeStreamGetLine);
-        $this->context->registerFunction('__compiler_stream_get_line', $fnStreamGetLine);
+        // __compiler_stream_get_line always-on shell removed (#33170): StreamRead /
+        // StreamReadRuntime / JitStreamReadBridgeKernel owns the ABI (getNamedFunction first,
+        // then addFunction if absent via implementStreamGetLineBridge; Type::initialize still
+        // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // stream_get_line.1 (#31894 / #32122). User-script stream_get_line() stays
+        // JitStreamGetLine / StreamReadJitHelper (libc force peer #33133).
         $fntypeFseek = $this->context->context->functionType($i64, false, $i64, $i64, $i64);
         $fnFseek = $this->context->module->addFunction('__compiler_fseek', $fntypeFseek);
         $this->context->registerFunction('__compiler_fseek', $fnFseek);

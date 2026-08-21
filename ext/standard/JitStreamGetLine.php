@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for stream_get_line() via __compiler_stream_get_line (issue #3738). */
+/**
+ * LLVM lowering for stream_get_line() via __compiler_stream_get_line (issue #3738; ensureLinked #33170).
+ *
+ * ABI owned by {@see StreamReadRuntime} / {@see JitStreamReadBridgeKernel} after Type always-on
+ * drop (#33170) — must ensureLinked before lookup (peer {@see JitFgetc} #33166).
+ */
 final class JitStreamGetLine
 {
     /** @return Value
@@ -21,6 +27,7 @@ final class JitStreamGetLine
         Value $maxLengthLong,
         Value $endingStr,
     ): Value {
+        StreamReadRuntime::ensureLinked($context);
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_stream_get_line'),
             $handleLong,

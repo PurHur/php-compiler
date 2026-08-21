@@ -31,8 +31,8 @@ final class TypeDeadFgetsAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel after fgets drop (#33168); fgetc already gone (#33166).
-        $this->assertStringContainsString("registerFunction('__compiler_stream_get_line'", $type);
+        // Next leftover sentinel after fgets drop (#33168); stream_get_line dropped in #33170 → fseek.
+        $this->assertStringContainsString("registerFunction('__compiler_fseek'", $type);
         $this->assertStringContainsString('StreamRead::ensureLinked', $type);
     }
 
