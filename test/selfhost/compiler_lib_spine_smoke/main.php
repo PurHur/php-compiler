@@ -5776,6 +5776,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringConvertUu.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringCountChars.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringCslashes.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringDateTime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DeployPathLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringDeployPath.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringDir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringDirFactory.php';

@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for phpc_deploy_path() via DeployPathJitHelper / {@see StringDeployPath} (#9309, #33225).
+ * LLVM lowering for phpc_deploy_path() via {@see StringDeployPath} / DeployPathLlvm (#9309, #33225, #33244).
  *
  * Call-site {@see StringDeployPath::ensureLinked} before lookup (Type always-on shell dropped).
  */
