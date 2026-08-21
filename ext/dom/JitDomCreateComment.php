@@ -70,6 +70,8 @@ final class JitDomCreateComment
         self::storeStringLiteral($context, $obj, self::PROP_NODE_VALUE, $data);
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
         self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
+        // Stand-in is DOMElement class but nodeType must be COMMENT (#33607).
+        JitDomCreateElement::storeNodeType($context, $obj, self::CLASS_STANDIN, DomConstants::XML_COMMENT_NODE);
 
         return $obj;
     }
@@ -89,6 +91,7 @@ final class JitDomCreateComment
         self::storeStringValue($context, $obj, self::PROP_NODE_VALUE, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_TEXT_CONTENT, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_DATA, $dataStr);
+        JitDomCreateElement::storeNodeType($context, $obj, self::CLASS_STANDIN, DomConstants::XML_COMMENT_NODE);
 
         return $obj;
     }

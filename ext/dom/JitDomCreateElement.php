@@ -216,6 +216,8 @@ final class JitDomCreateElement
         // Non-NS elements: localName === tagName (php-src dom_node_local_name_read; #33014).
         // Must be in allocate() layout — late defineProperty aliases INNER_XML (#33014).
         self::storeStringProperty($context, $obj, $className, VmDom::PROP_LOCAL_NAME, $nameStr);
+        // Seed nodeType — unset NATIVE_LONG / missing slot SIGSEGVs (#33607 / peer #25475).
+        self::storeNodeType($context, $obj, $className, DomConstants::XML_ELEMENT_NODE);
         // Zend always exposes a live empty DOMNamedNodeMap — null SIGSEGVs on length (#33128).
         self::storeAttributesPresence($context, $obj, [], $className);
         // Always seed textContent/nodeValue — defineProperty alone leaves a null
@@ -448,6 +450,7 @@ final class JitDomCreateElement
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_NODE_NAME, $nameStr);
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_TAG_NAME, $nameStr);
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, VmDom::PROP_LOCAL_NAME, $nameStr);
+        self::storeNodeType($context, $obj, self::CLASS_ELEMENT, DomConstants::XML_ELEMENT_NODE);
         self::storeAttributesPresence($context, $obj, [], self::CLASS_ELEMENT);
 
         return $obj;
@@ -474,6 +477,8 @@ final class JitDomCreateElement
         foreach ([
             self::PROP_NODE_NAME => JITVariable::TYPE_STRING,
             self::PROP_TAG_NAME => JITVariable::TYPE_STRING,
+            // php-src node.c node_type_read — must be in allocate() layout (#33607).
+            VmDom::PROP_NODE_TYPE => JITVariable::TYPE_NATIVE_LONG,
             self::PROP_ATTRIBUTES => JITVariable::TYPE_VALUE,
             // #21687: contains()/getRootNode without DomRegistry.
             VmDom::PROP_PARENT_NODE => JITVariable::TYPE_VALUE,
@@ -558,6 +563,36 @@ final class JitDomCreateElement
             $context->type->object->propertySlotFor($obj, $className, $prop),
             $propVar,
             JITVariable::TYPE_NULL
+        );
+    }
+
+    /**
+     * Seed DOMNode::$nodeType (php-src ext/dom/node.c; #33607 / peer textContent #25475).
+     *
+     * Public for Text/Comment stand-ins and Attr/Document materialize paths that share
+     * the thin-AOT slot layout.
+     */
+    public static function storeNodeType(
+        Context $context,
+        Value $obj,
+        string $className,
+        int $nodeType
+    ): void {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup($className);
+        if (!$objectType->hasProperty($classId, VmDom::PROP_NODE_TYPE)) {
+            $objectType->defineProperty($classId, VmDom::PROP_NODE_TYPE, JITVariable::TYPE_NATIVE_LONG);
+        }
+        $typeVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt($nodeType, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, $className, VmDom::PROP_NODE_TYPE),
+            $typeVar,
+            JITVariable::TYPE_NATIVE_LONG
         );
     }
 
