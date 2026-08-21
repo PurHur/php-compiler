@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for ftruncate() via __compiler_ftruncate (issue #3256). */
+/**
+ * LLVM lowering for ftruncate() via __compiler_ftruncate (issue #3256; ensureLinked #33155).
+ *
+ * ABI owned by {@see StreamReadRuntime} / {@see JitStreamReadBridgeKernel} after Type always-on
+ * drop (#33155) — must ensureLinked before lookup (peer {@see JitFlock} / {@see JitFgetc} #33113).
+ */
 final class JitFtruncate
 {
     private const SIZE_ERROR = 'ftruncate(): Argument #2 ($size) must be greater than or equal to 0';
@@ -19,6 +25,7 @@ final class JitFtruncate
     public static function invoke(Context $context, Value $handleLong, Value $sizeLong): Value
     {
         self::emitRuntimeSizeGuard($context, $sizeLong);
+        StreamReadRuntime::ensureLinked($context);
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_ftruncate'),
             $handleLong,

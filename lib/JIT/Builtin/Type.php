@@ -322,9 +322,12 @@ class Type extends Builtin {
         // Leftover Type empty decls vs Runtime ABI drift mints stream_socket_get_name.1
         // (#31894 / #32122). User-script stream_socket_get_name()/stream_socket_accept()
         // stay JitStreamSocketGetName / JitStreamSocketAccept.
-        $fntypeFtruncate = $this->context->context->functionType($i32, false, $i64, $i64);
-        $fnFtruncate = $this->context->module->addFunction('__compiler_ftruncate', $fntypeFtruncate);
-        $this->context->registerFunction('__compiler_ftruncate', $fnFtruncate);
+        // __compiler_ftruncate always-on shell removed (#33155): StreamRead /
+        // StreamReadRuntime / JitStreamReadBridgeKernel owns the ABI (getNamedFunction first,
+        // then addFunction if absent via implementI32Bridge; Type::initialize still
+        // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // ftruncate.1 (#31894 / #32122). User-script ftruncate() stays JitFtruncate /
+        // StreamReadJitHelper (libc force peer #33133).
         $fntypeFtell = $this->context->context->functionType($i64, false, $i64);
         $fnFtell = $this->context->module->addFunction('__compiler_ftell', $fntypeFtell);
         $this->context->registerFunction('__compiler_ftell', $fnFtell);

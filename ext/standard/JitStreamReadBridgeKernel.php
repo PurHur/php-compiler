@@ -9,10 +9,15 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 
 /**
- * LLVM ABI bridges for stream read runtime via NestedJIT StreamReadJitHelper (#18672, #20982).
+ * LLVM ABI bridges for stream read runtime via NestedJIT StreamReadJitHelper (#18672, #20982, #33155).
  *
  * Moved out of lib/JIT/Builtin/ — {@see StreamReadRuntime} stays the thin PHP-helper
  * orchestrator (no deferred stub fork — peer StreamLifecycle #20966).
+ *
+ * Owns `__compiler_ftruncate` module-locally (getNamedFunction first in
+ * {@see implementI32Bridge}). Do not re-add empty always-on shells in Type —
+ * leftover decls mint ftruncate.1 (#31894 / #32122).
+ *
  * SSOT semantics: {@see StreamReadJitHelper}
  * php-src: ext/standard/file.c, ext/standard/flock_compat.c
  */
