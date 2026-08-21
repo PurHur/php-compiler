@@ -10,15 +10,18 @@ use PHPLLVM\Type;
 use PHPLLVM\Value;
 
 /**
- * Pure LLVM uksort()/uasort() for thin standalone AOT (#27217).
+ * Pure LLVM uksort()/uasort() for thin standalone AOT (#27217, #33626).
  *
  * NestedJIT of {@see \PHPCompiler\ext\standard\UsortJitHelper} keyed sorts aborts under thin AOT.
  * Emit call-site bubble-sort over {@see HashTableExportKeyValuePairs} + writeback via
  * {@see HashTableMutateNestedLlvm::reorderKeyedPairs}. Cap passes at n².
  *
+ * Before writeback, integer pair keys are stringified (peer {@see ValueSortKeyedLlvm} / #33620):
+ * packed `values[index]` cannot express non-ascending key order after uasort (#33626).
+ *
  * Comparison (spaceship-equivalent for issue repro arrows):
  * - string → {@see JitStringCompare::strcmp} (thin AOT Closure string spaceship returns 0)
- * - otherwise → int64 icmp spaceship (avoids NestedClosureInvoke hangs under thin AOT)
+ * - otherwise → int64 icmp spaceship (avoids NestedJIT closure-invoke hangs under thin AOT)
  *
  * php-src: ext/standard/array.c — php_array_uksort / php_array_uasort / php_usort
  */
@@ -134,10 +137,85 @@ final class UsortKeyedLlvm
         $context->builder->branch($passHead);
 
         $context->builder->positionAtEnd($writeback);
+        // Stringify int keys so reorderKeyedPairs uses strKeys insertion order
+        // (same trick as ValueSortKeyedLlvm / KeySortRuntime::krsortPackedListByKey — #33626).
+        self::stringifyIntegerPairKeys($context, $pairs);
         HashTableMutateNestedLlvm::reorderKeyedPairs($context, $ht, $pairs);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Replace integer pair keys with their decimal string form so
+     * {@see HashTableMutateNestedLlvm::reorderKeyedPairs} uses setAtStringKey.
+     */
+    private static function stringifyIntegerPairKeys(Context $context, Value $pairsHt): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8 = $context->getTypeFromString('int8');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->builder->load($context->builder->structGep($pairsHt, $map['nextFreeElement']));
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'usort_strkey_head');
+        $body = BasicBlockHelper::append($context, 'usort_strkey_body');
+        $done = BasicBlockHelper::append($context, 'usort_strkey_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $pairBox = HashTableReadLlvm::readIndexedToValueBox($context, $pairsHt, $idx);
+        $pairHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::valuePtrFromVariable($context, $pairBox)
+        );
+        $keyVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $zero);
+        $keyPtr = JitValueBox::valuePtrFromVariable($context, $keyVar);
+        $kind = $context->builder->and(
+            $context->builder->load($context->builder->structGep($keyPtr, $valueMap['type'])),
+            $i8->constInt(0x7f, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG & 0x7f, false)
+        );
+        $asStr = BasicBlockHelper::append($context, 'usort_strkey_as_str');
+        $advance = BasicBlockHelper::append($context, 'usort_strkey_advance');
+        $context->builder->branchIf($isLong, $asStr, $advance);
+
+        $context->builder->positionAtEnd($asStr);
+        $longKey = $context->builder->call($context->lookupFunction('__value__readLong'), $keyPtr);
+        $keyStr = JitNativeString::formatIndexKey($context, $longKey);
+        $strBox = self::stringPtrValueBox($context, $keyStr);
+        HashTableHelper::setAtIndex($context, $pairHt, $zero, $strBox);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function stringPtrValueBox(Context $context, Value $strPtr): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $strPtr
+        );
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }
 
     /** @return Value int64 */
