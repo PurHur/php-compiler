@@ -310,6 +310,9 @@ final class JitDomAttributeNodeNS
         $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace();
         $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
         if (null === $ns || null === $local) {
+            // Still install pin + ownerElement when create-cache keys are missing (#33598).
+            self::installAttrOntoElement($context, $element, $attr);
+
             return self::boxNullResult($context);
         }
         $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
@@ -338,10 +341,14 @@ final class JitDomAttributeNodeNS
         // New Attr object replaces prior pin in-place via remove+append (#33143).
         JitDomNamedNodeMap::removeAttrPin($context, $element, $prev);
         JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+        // Replaced Attr is detached — clear ownerElement (php-src / #33598).
+        self::storeOwnerElement($context, $prev, null);
         $context->builder->store(self::boxObjectResult($context, $prev), $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
+        // setAttributeNode must wire ownerElement — same as appendChild(Attr) (#33570 / #33598).
+        self::storeOwnerElement($context, $attr, $element);
 
         return $context->builder->load($resultSlot);
     }
@@ -357,6 +364,9 @@ final class JitDomAttributeNodeNS
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_install_attr');
         JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+        // ownerElement must be set even when createAttribute cache keys are missing (#33598).
+        // php-src wires owner on attribute-map install regardless of compile-time name tracking.
+        self::storeOwnerElement($context, $attr, $element);
 
         $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
         $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
@@ -366,28 +376,6 @@ final class JitDomAttributeNodeNS
         $qname = DomUserScriptAttributeCacheLlvm::lastCreateQualifiedName() ?? $local;
         $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
         DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr, $valueLit);
-
-        // ownerElement — php-src sets after attribute map install.
-        if (!$context->type->object->hasProperty(
-            $context->type->object->lookup(self::CLASS_ATTR),
-            self::PROP_OWNER_ELEMENT
-        )) {
-            self::ensureAttrPropertyLayout(
-                $context->type->object,
-                $context->type->object->lookup(self::CLASS_ATTR)
-            );
-        }
-        $ownerJit = new JITVariable(
-            $context,
-            JITVariable::TYPE_OBJECT,
-            JITVariable::KIND_VALUE,
-            $element
-        );
-        $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($attr, self::CLASS_ATTR, self::PROP_OWNER_ELEMENT),
-            $ownerJit,
-            JITVariable::TYPE_VALUE
-        );
 
         $id = JitDomCreateElementAttrs::lastId();
         if (null === $id) {
@@ -607,6 +595,41 @@ final class JitDomAttributeNodeNS
         }
 
         return [substr($qualifiedName, 0, $pos), substr($qualifiedName, $pos + 1)];
+    }
+
+    /**
+     * Wire or clear Attr::$ownerElement after attribute-map install/detach (#33570 / #33598).
+     *
+     * @param Value|null $element Element object pointer, or null to detach
+     */
+    private static function storeOwnerElement(Context $context, Value $attr, ?Value $element): void
+    {
+        if (!$context->type->object->hasProperty(
+            $context->type->object->lookup(self::CLASS_ATTR),
+            self::PROP_OWNER_ELEMENT
+        )) {
+            self::ensureAttrPropertyLayout(
+                $context->type->object,
+                $context->type->object->lookup(self::CLASS_ATTR)
+            );
+        }
+        if (null === $element) {
+            self::storeNullProperty($context, $attr, self::PROP_OWNER_ELEMENT);
+
+            return;
+        }
+        // ownerElement is a TYPE_VALUE slot (boxed object) — match installAttrOntoElement (#33570).
+        $ownerJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $element
+        );
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($attr, self::CLASS_ATTR, self::PROP_OWNER_ELEMENT),
+            $ownerJit,
+            JITVariable::TYPE_VALUE
+        );
     }
 
     private static function ensureAttrPropertyLayout(
