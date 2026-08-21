@@ -9,7 +9,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
 
-/** LLVM lowering for fseek() via __compiler_fseek (issue #1191). */
+/**
+ * LLVM lowering for fseek() via __compiler_fseek (issue #1191; ensureLinked #33176).
+ *
+ * ABI owned by {@see StreamReadRuntime} / {@see JitStreamReadBridgeKernel} after Type always-on
+ * drop (#33176) — must ensureLinked before lookup (peer {@see JitFtell} / {@see JitStreamGetLine} #33170).
+ */
 final class JitFseek
 {
     /** @return Value
