@@ -18,18 +18,22 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for ini_get/ini_set/ini_restore via IniJitHelper PHP (#9249, #21200, #32779).
+ * JIT/AOT link for ini_get/ini_set/ini_restore via IniJitHelper PHP (#9249, #21200, #32779, #33059).
  *
  * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\IniJitHelper}
  * via {@see JitVmHelperLink} (IncludePath #20877 / RandomBytes #21186 shape — no thin
  * false/nop stub fork). Semantics match {@see \PHPCompiler\ext\standard\VmIni}.
  * Owns `__compiler_ini_*` ABI module-locally (getNamedFunction first) after Type
  * always-on shells dropped (#32779 / #32122 name.1 class).
+ * Thin AOT: helper uses {@see string}|false (not ?string) + {@see ensureCompiledModuleDefaults}
+ * because NestedJIT BSS-zeros PHP static defaults and nullable-string ABI collapsed to "0" (#33059).
  * php-src: ext/standard/ini.c, main/php_ini.c
  */
 final class IniRuntime
 {
     private const HELPER_PATH = '/ext/standard/IniJitHelper.php';
+
+    private const LEAF_GET_PATH = '/ext/standard/IniGetLeafJitHelper.php';
 
     private const G_MEMORY_LIMIT = 'phpc_ini_memory_limit';
 
@@ -42,17 +46,19 @@ final class IniRuntime
 
     private const EXCEPTION_IGNORE_ARGS_KEY = 'zend.exception_ignore_args';
 
-    private const INI_GET_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::iniGet';
+    private const INI_GET_HELPER = 'PHPCompiler\\ext\\standard\\IniGetLeafJitHelper::iniGet';
 
-    private const INI_SET_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::iniSet';
+    private const INI_SET_HELPER = 'PHPCompiler\\ext\\standard\\IniGetLeafJitHelper::iniSet';
 
     private const INI_CFG_GET_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::iniCfgGet';
 
-    private const INI_RESTORE_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::iniRestore';
+    private const INI_RESTORE_HELPER = 'PHPCompiler\\ext\\standard\\IniGetLeafJitHelper::iniRestore';
 
-    private const SERIALIZE_PRECISION_INT_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::getSerializePrecisionInt';
+    private const SERIALIZE_PRECISION_INT_HELPER = 'PHPCompiler\\ext\\standard\\IniGetLeafJitHelper::getSerializePrecisionInt';
 
-    private const PRECISION_INT_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::getPrecisionInt';
+    private const PRECISION_INT_HELPER = 'PHPCompiler\\ext\\standard\\IniGetLeafJitHelper::getPrecisionInt';
+
+    private const ENSURE_DEFAULTS_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::ensureCompiledModuleDefaults';
 
     private const GET_BRIDGE_ENTRY = 'ini_get_bridge_entry';
 
@@ -70,6 +76,22 @@ final class IniRuntime
         self::INI_RESTORE_HELPER,
         self::SERIALIZE_PRECISION_INT_HELPER,
         self::PRECISION_INT_HELPER,
+        self::ENSURE_DEFAULTS_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const HELPER_BUNDLE_PATHS = [
+        '/ext/standard/OutputRewriteVarsJitHelper.php',
+        self::HELPER_PATH,
+        self::LEAF_GET_PATH,
+    ];
+
+    /** @var list<string> */
+    private const HELPER_BUNDLE_METHODS = [
+        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getTags',
+        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::setTags',
+        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getHosts',
+        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::setHosts',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -102,19 +124,8 @@ final class IniRuntime
             // url_rewriter.* tags/hosts on OutputRewriteVarsJitHelper (#27566).
             JitVmHelperLink::ensureCompiledBundle(
                 $context,
-                [
-                    '/ext/standard/OutputRewriteVarsJitHelper.php',
-                    self::HELPER_PATH,
-                ],
-                array_merge(
-                    [
-                        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getTags',
-                        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::setTags',
-                        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getHosts',
-                        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::setHosts',
-                    ],
-                    self::COMPILED_HELPERS
-                ),
+                self::HELPER_BUNDLE_PATHS,
+                array_merge(self::HELPER_BUNDLE_METHODS, self::COMPILED_HELPERS),
                 '#21200'
             );
             self::registerLinkedRuntime($context);
@@ -127,19 +138,8 @@ final class IniRuntime
         self::ensureGlobals($context);
         JitVmHelperLink::ensureCompiledBundle(
             $context,
-            [
-                '/ext/standard/OutputRewriteVarsJitHelper.php',
-                self::HELPER_PATH,
-            ],
-            array_merge(
-                [
-                    'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getTags',
-                    'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::setTags',
-                    'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getHosts',
-                    'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::setHosts',
-                ],
-                self::COMPILED_HELPERS
-            ),
+            self::HELPER_BUNDLE_PATHS,
+            array_merge(self::HELPER_BUNDLE_METHODS, self::COMPILED_HELPERS),
             '#21200'
         );
         self::ensureValueWriters($context);
@@ -205,31 +205,17 @@ final class IniRuntime
 
     private static function implementIniGetBridge(Context $context, LlvmFunction $fn): void
     {
-        StringCaseCompare::ensureStrcasecmpLinked($context);
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::GET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
         $out = $fn->getParam(1);
-        $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
-        $thinBb = BasicBlockHelper::append($context, 'ini_get_ignore_args_thin');
-        $nestedBb = BasicBlockHelper::append($context, 'ini_get_nested');
-        $doneBb = BasicBlockHelper::append($context, 'ini_get_done');
-        $context->builder->branchIf($isIgnore, $thinBb, $nestedBb);
-
-        $context->builder->positionAtEnd($thinBb);
-        self::emitThinGetExceptionIgnoreArgs($context, $out);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($nestedBb);
+        // Leaf only — LLVM strcasecmp thin dispatch always matched exception_ignore_args (#33059).
         $result = JitNestedHelperCoerce::callHelper(
             $context,
             self::helperFunction($context, self::INI_GET_HELPER),
             [$option]
         );
         self::writeHelperStringOrFalseToValue($context, $out, $result);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
     }
 
@@ -248,23 +234,11 @@ final class IniRuntime
 
     private static function implementIniSetBridge(Context $context, LlvmFunction $fn): void
     {
-        StringCaseCompare::ensureStrcasecmpLinked($context);
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::SET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
         $value = $fn->getParam(1);
         $out = $fn->getParam(2);
-        $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
-        $thinBb = BasicBlockHelper::append($context, 'ini_set_ignore_args_thin');
-        $nestedBb = BasicBlockHelper::append($context, 'ini_set_nested');
-        $doneBb = BasicBlockHelper::append($context, 'ini_set_done');
-        $context->builder->branchIf($isIgnore, $thinBb, $nestedBb);
-
-        $context->builder->positionAtEnd($thinBb);
-        self::emitThinSetExceptionIgnoreArgs($context, $value, $out);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($nestedBb);
         $result = JitNestedHelperCoerce::callHelper(
             $context,
             self::helperFunction($context, self::INI_SET_HELPER),
@@ -273,43 +247,20 @@ final class IniRuntime
         self::writeHelperStringOrFalseToValue($context, $out, $result);
         self::syncSerializePrecisionGlobal($context);
         self::syncPrecisionGlobal($context);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
     }
 
     private static function implementIniRestoreBridge(Context $context, LlvmFunction $fn): void
     {
-        StringCaseCompare::ensureStrcasecmpLinked($context);
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::RESTORE_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
-        $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
-        $thinBb = BasicBlockHelper::append($context, 'ini_restore_ignore_args_thin');
-        $nestedBb = BasicBlockHelper::append($context, 'ini_restore_nested');
-        $doneBb = BasicBlockHelper::append($context, 'ini_restore_done');
-        $context->builder->branchIf($isIgnore, $thinBb, $nestedBb);
-
-        $context->builder->positionAtEnd($thinBb);
-        // php-src compiled default Off (`"0"`) — Zend/zend.c (#28061).
-        $i8 = $context->getTypeFromString('int8');
-        $context->builder->store(
-            $i8->constInt(0, false),
-            self::globalPtr($context, self::G_EXCEPTION_IGNORE_ARGS, $i8)
-        );
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($nestedBb);
         $context->builder->call(
             self::helperFunction($context, self::INI_RESTORE_HELPER),
             $option
         );
         self::syncSerializePrecisionGlobal($context);
         self::syncPrecisionGlobal($context);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
     }
 
@@ -328,117 +279,7 @@ final class IniRuntime
         );
     }
 
-    private static function emitOptionIsExceptionIgnoreArgs(Context $context, Value $optionStr): Value
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $strMap = $context->structFieldMap['__string__'];
-        $optCstr = $context->builder->pointerCast(
-            $context->builder->structGep($optionStr, $strMap['value']),
-            $i8p
-        );
-        $want = $context->builder->load($context->constantStringFromString(self::EXCEPTION_IGNORE_ARGS_KEY));
-        $wantCstr = $context->builder->pointerCast(
-            $context->builder->structGep($want, $strMap['value']),
-            $i8p
-        );
-        $cmp = $context->builder->call(
-            $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
-            $optCstr,
-            $wantCstr
-        );
-
-        return $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-    }
-
-    private static function emitThinGetExceptionIgnoreArgs(Context $context, Value $out): void
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $on = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->load(self::globalPtr($context, self::G_EXCEPTION_IGNORE_ARGS, $i8)),
-            $i8->constInt(0, false)
-        );
-        $onBb = BasicBlockHelper::append($context, 'ini_get_ignore_on');
-        $offBb = BasicBlockHelper::append($context, 'ini_get_ignore_off');
-        $doneBb = BasicBlockHelper::append($context, 'ini_get_ignore_done');
-        $context->builder->branchIf($on, $onBb, $offBb);
-
-        $context->builder->positionAtEnd($onBb);
-        $one = $context->builder->load($context->constantStringFromString('1'));
-        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $one);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($offBb);
-        $zero = $context->builder->load($context->constantStringFromString('0'));
-        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $zero);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
-    }
-
-    private static function emitThinSetExceptionIgnoreArgs(Context $context, Value $valueStr, Value $out): void
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $gPtr = self::globalPtr($context, self::G_EXCEPTION_IGNORE_ARGS, $i8);
-        $oldOn = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->load($gPtr),
-            $i8->constInt(0, false)
-        );
-        $oldOnBb = BasicBlockHelper::append($context, 'ini_set_ignore_old_on');
-        $oldOffBb = BasicBlockHelper::append($context, 'ini_set_ignore_old_off');
-        $parseBb = BasicBlockHelper::append($context, 'ini_set_ignore_parse');
-        $context->builder->branchIf($oldOn, $oldOnBb, $oldOffBb);
-
-        $context->builder->positionAtEnd($oldOnBb);
-        $oldOne = $context->builder->load($context->constantStringFromString('1'));
-        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $oldOne);
-        $context->builder->branch($parseBb);
-
-        $context->builder->positionAtEnd($oldOffBb);
-        $oldZero = $context->builder->load($context->constantStringFromString('0'));
-        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $oldZero);
-        $context->builder->branch($parseBb);
-
-        $context->builder->positionAtEnd($parseBb);
-        $newOn = self::emitParseBoolIni($context, $valueStr);
-        $context->builder->store(
-            $context->builder->select($newOn, $i8->constInt(1, false), $i8->constInt(0, false)),
-            $gPtr
-        );
-    }
-
     /** VmIni::parseBoolIni — thin strcmp table (empty/0/off/false → false). */
-    private static function emitParseBoolIni(Context $context, Value $valueStr): Value
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $i1 = $context->getTypeFromString('int1');
-        $strMap = $context->structFieldMap['__string__'];
-        $cstr = $context->builder->pointerCast(
-            $context->builder->structGep($valueStr, $strMap['value']),
-            $i8p
-        );
-        $falsy = false;
-        foreach (['', '0', 'off', 'false'] as $lit) {
-            $want = $context->builder->load($context->constantStringFromString($lit));
-            $wantCstr = $context->builder->pointerCast(
-                $context->builder->structGep($want, $strMap['value']),
-                $i8p
-            );
-            $cmp = $context->builder->call(
-                $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
-                $cstr,
-                $wantCstr
-            );
-            $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $falsy = false === $falsy ? $eq : $context->builder->or($falsy, $eq);
-        }
-
-        return $context->builder->xor($falsy, $i1->constInt(1, false));
-    }
-
     private static function writeHelperStringOrFalseToValue(Context $context, Value $out, Value $raw): void
     {
         $i32 = $context->getTypeFromString('int32');

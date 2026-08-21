@@ -186,9 +186,55 @@ final class IniJitHelper
 
     private static bool $registerArgcArgv = true;
 
+    /**
+     * NestedJIT under thin AOT does not apply PHP static property defaults (BSS-zero) (#33059).
+     * First ini_get/ini_set/ini_restore seeds from CFG_* so precision etc. match Zend.
+     */
+    private static bool $compiledModuleDefaultsSeeded = false;
+
     public static function syncRegisterArgcArgv(bool $enabled): void
     {
         self::$registerArgcArgv = $enabled;
+    }
+
+    /**
+     * Seed compiled-module static storage — NestedJIT does not emit PHP static defaults (#33059).
+     *
+     * php-src: main/php_ini.c / ext/standard compiled PG() defaults; VM uses {@see VmIni}.
+     */
+    public static function ensureCompiledModuleDefaults(): void
+    {
+        if (self::$compiledModuleDefaultsSeeded) {
+            return;
+        }
+        self::$compiledModuleDefaultsSeeded = true;
+        ErrorSilenceJitHelper::iniRestoreErrorReporting();
+        self::$displayErrorsLocalValue = null;
+        self::$displayErrors = VmIni::parseBoolIni(self::CFG_DISPLAY_ERRORS);
+        ErrorSilenceJitHelper::setDisplayErrors(self::$displayErrors);
+        self::$memoryLimit = VmIni::clampMemoryLimitToMax(self::CFG_MEMORY_LIMIT, null, true);
+        VmIni::syncMemoryLimitFromJit(self::$memoryLimit);
+        self::$maxMemoryLimit = self::CFG_MAX_MEMORY_LIMIT;
+        self::$precision = VmIni::parsePrecision(self::CFG_PRECISION);
+        self::$serializePrecision = self::parseSerializePrecisionIni(self::CFG_SERIALIZE_PRECISION);
+        self::$unserializeMaxDepth = (int) self::CFG_UNSERIALIZE_MAX_DEPTH;
+        self::$unserializeCallbackFunc = '';
+        self::$sessionGcMaxlifetime = 1440;
+        self::$sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+        VmSession::setUseStrictMode(false);
+        VmOpenBasedir::restore();
+        self::$userAgent = '';
+        self::$defaultCharset = self::CFG_DEFAULT_CHARSET;
+        self::$pcreBacktrackLimit = (int) self::CFG_PCRE_BACKTRACK_LIMIT;
+        self::$pcreJit = true;
+        self::$pcreRecursionLimit = (int) self::CFG_PCRE_RECURSION_LIMIT;
+        self::$exceptionStringParamMaxLen = self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
+        VmIni::syncExceptionStringParamMaxLen(self::$exceptionStringParamMaxLen);
+        self::$exceptionIgnoreArgs = self::CFG_EXCEPTION_IGNORE_ARGS;
+        VmIni::syncExceptionIgnoreArgs(self::$exceptionIgnoreArgs);
+        self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+        ExecutionLimitsJitHelper::applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
+        self::$registerArgcArgv = true;
     }
 
     /** Keep NestedJIT/AOT aligned with VmIni max_memory_limit (#23232). */
@@ -237,12 +283,16 @@ final class IniJitHelper
 
     public static function getSerializePrecisionInt(): int
     {
+        self::ensureCompiledModuleDefaults();
+
         return self::$serializePrecision;
     }
 
     /** php-src PG(precision) — int for NestedJIT float→string (#21963). */
     public static function getPrecisionInt(): int
     {
+        self::ensureCompiledModuleDefaults();
+
         return self::$precision;
     }
 
@@ -297,12 +347,19 @@ final class IniJitHelper
         return \sprintf('%d', self::$unserializeMaxDepth);
     }
 
-    /** @return string|null null when ini_get() is false */
+    /**
+     * @return string|null null when ini_get() is false
+     *
+     * NestedJIT thin AOT: keep {@see ?string} (null not false) so ABI is {@see __string__*}
+     * not value-box — peer GetenvLookupJitHelper #20644. Seed statics via
+     * {@see ensureCompiledModuleDefaults} (#33059 BSS-zero defaults).
+     */
     public static function iniGet(string $option): ?string
     {
+        self::ensureCompiledModuleDefaults();
         $key = strtolower($option);
         if ('max_memory_limit' === $key) {
-            return \PHPCompiler\CompilerVersion::supportsMaxMemoryLimit() ? self::$maxMemoryLimit : null;
+            return \PHPCompiler\CompilerVersion::supportsMaxMemoryLimit() ? self::$maxMemoryLimit : false;
         }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
             return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
@@ -403,6 +460,7 @@ final class IniJitHelper
     /** @return string|null null when ini_set() is false */
     public static function iniSet(string $option, string $newValue): ?string
     {
+        self::ensureCompiledModuleDefaults();
         $key = strtolower($option);
         if ('max_memory_limit' === $key) {
             return null;
@@ -508,6 +566,7 @@ final class IniJitHelper
     /** @return string|null null when get_cfg_var() is false */
     public static function iniCfgGet(string $option): ?string
     {
+        self::ensureCompiledModuleDefaults();
         $key = strtolower($option);
         if ('max_memory_limit' === $key) {
             return \PHPCompiler\CompilerVersion::supportsMaxMemoryLimit() ? self::CFG_MAX_MEMORY_LIMIT : null;
@@ -601,6 +660,7 @@ final class IniJitHelper
 
     public static function iniRestore(string $option): void
     {
+        self::ensureCompiledModuleDefaults();
         $key = strtolower($option);
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return;
