@@ -3330,7 +3330,9 @@ class HashTable extends Type
     }
 
     /**
-     * Bubble-sort packed list values with strnatcmp / strnatcasecmp (#26975).
+     * Legacy packed natural sort — value swap only (sort() shape). Kept for helper-runtime
+     * ABI registration; call path uses {@see \PHPCompiler\JIT\NaturalSortKeyedLlvm} so keys
+     * are preserved (#33618 / php-src php_natsort). Do not invoke from NaturalSortRuntime.
      *
      * NestedJIT {@see \PHPCompiler\ext\standard\NaturalSortJitHelper} aborts under thin
      * standalone AOT. Mirror {@see implementSortPacked} but compare via the StringNaturalCompare
