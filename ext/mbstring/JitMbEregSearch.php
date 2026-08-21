@@ -6,11 +6,12 @@ namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Compile-time fold for mb_ereg_search_* / mb_regex_encoding (#30781).
+ * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding (#30781, #33648).
  *
  * Same shape as {@see JitMbSearch} / {@see mb_internal_encoding}: literals only;
  * search cursor lives in {@see MbstringState} for the duration of one AOT/JIT
@@ -18,6 +19,40 @@ use PHPLLVM\Value;
  */
 final class JitMbEregSearch
 {
+    /**
+     * mb_ereg() / mb_eregi() — 2-arg literal fold (no &$regs). php-src php_mbregex.c (#33648).
+     *
+     * @param JITVariable[] $args
+     */
+    public static function tryEregFold(
+        Context $context,
+        array $args,
+        bool $caseInsensitive
+    ): ?Value {
+        if (2 !== \count($args)) {
+            return null;
+        }
+        $pattern = JitStringArg::compileTimeLiteral($args[0]);
+        $string = JitStringArg::compileTimeLiteral($args[1]);
+        if (null === $pattern || null === $string) {
+            return null;
+        }
+
+        MbstringAotFoldState::syncRegexEncodingIntoState($context);
+        $out = VmMbstring::eregMatch($pattern, $string, $caseInsensitive);
+
+        // Boxed bool — same convention as mb_ord foldFalse / ExceptionBridge catchables (#33648).
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $i1->constInt($out['matched'] ? 1 : 0, false)
+        );
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
     /**
      * @param JITVariable[] $args
      */

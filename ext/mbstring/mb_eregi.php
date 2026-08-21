@@ -7,14 +7,20 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_eregi() — case-insensitive multibyte regex match (php-src ext/mbstring/php_mbregex.c; #4635).
+ * mb_eregi() — case-insensitive multibyte regex match (php-src ext/mbstring/php_mbregex.c; #4635, #33648).
+ *
+ * JIT/AOT leftover #33648: catchable argc/TypeError paths (peer mb_ereg); 2-arg compile-time
+ * literal fold via {@see JitMbEregSearch::tryEregFold}. &$regs happy-path remains follow-up.
  */
 final class mb_eregi extends Internal
 {
@@ -57,6 +63,50 @@ final class mb_eregi extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                sprintf('mb_eregi() expects at least 2 arguments, %d given', $argc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_eregi_argc_cont');
+
+            return self::foldFalse($context);
+        }
+
+        // Compile-time null string args under caller strict_types → TypeError (#33648).
+        foreach ([[0, 'pattern'], [1, 'string']] as [$idx, $name]) {
+            $isNull = JITVariable::TYPE_NULL === $args[$idx]->type || $args[$idx]->isNullConstant;
+            if ($isNull && $context->callerStrictTypes) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    sprintf(
+                        'mb_eregi(): Argument #%d ($%s) must be of type string, null given',
+                        $idx + 1,
+                        $name
+                    )
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_eregi_te_cont');
+
+                return self::foldFalse($context);
+            }
+        }
+
+        $folded = JitMbEregSearch::tryEregFold($context, $args, true);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         throw new \LogicException('mb_eregi() is not lowered for JIT/AOT in this compiler build');
+    }
+
+    private static function foldFalse(Context $context): Value
+    {
+        // Boxed __value__ — matches mb_ord / ExceptionBridge catchable paths (#33648).
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+        return JitValueBox::pointer($context, $slot);
     }
 }
