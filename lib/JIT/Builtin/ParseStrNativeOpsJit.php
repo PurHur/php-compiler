@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -201,15 +202,14 @@ final class ParseStrNativeOpsJit
                 $double
             );
         }
-        if (JITVariable::TYPE_VALUE === $var->type) {
-            $raw = $var->value;
-            if (JitNestedHelperCoerce::isValueBox($context, $raw)) {
-                return JitNestedHelperCoerce::extractDoubleFromHelperResult($context, $raw);
-            }
+        // NestedJIT often boxes the `d:` lexeme as __value__ TYPE_STRING.
+        // __value__readDouble returns 0.0 for string boxes — must strtod (#33670 / #32325).
+        if (JITVariable::TYPE_VALUE === $var->type || JitValueBox::isValueOperand($var)) {
+            return \PHPCompiler\JIT\JitValueNumeric::valueBoxToDouble($context, $var);
         }
 
         throw new \LogicException(
-            'ParseStrNativeOpsJit: expected double/string long for setStringKeyDouble, got type '.$var->type
+            'ParseStrNativeOpsJit: expected double/string/long/value for setStringKeyDouble, got type '.$var->type
         );
     }
 
