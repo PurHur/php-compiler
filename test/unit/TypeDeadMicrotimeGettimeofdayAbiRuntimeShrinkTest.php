@@ -44,7 +44,7 @@ final class TypeDeadMicrotimeGettimeofdayAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_proc_open'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
     }
 
     public function testRuntimeOwnersDeclareAbisModuleLocally(): void

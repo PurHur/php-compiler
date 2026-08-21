@@ -42,7 +42,7 @@ final class TypeDeadLibcryptPasswordRandomAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_proc_open'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
         $this->assertStringContainsString('LibcryptRuntime::ensureLinked', $type);
         $this->assertStringContainsString('PasswordRandomBytesRuntime::ensureLinked', $type);
     }

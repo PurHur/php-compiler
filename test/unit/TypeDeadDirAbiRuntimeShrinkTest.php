@@ -45,7 +45,8 @@ final class TypeDeadDirAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         $this->assertStringContainsString("registerFunction('__compiler_http_build_query'", $type);
-        $this->assertStringContainsString("addFunction('__compiler_proc_open'", $type);
+        // Next leftover sentinel (proc_close still Type always-on).
+        $this->assertStringContainsString("addFunction('__compiler_proc_close'", $type);
     }
 
     public function testRuntimeOwnerDeclaresDirAbisModuleLocally(): void
