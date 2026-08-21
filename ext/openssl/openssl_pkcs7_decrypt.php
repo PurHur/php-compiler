@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkcs7_decrypt() — S/MIME decrypt (php-src ext/openssl/openssl.c; #6804).
+ * openssl_pkcs7_decrypt() — S/MIME decrypt (php-src ext/openssl/openssl.c; #6804 VM, JIT/AOT #33482).
  */
 final class openssl_pkcs7_decrypt extends Internal
 {
@@ -49,8 +49,19 @@ final class openssl_pkcs7_decrypt extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_pkcs7_decrypt() is not implemented for JIT in this compiler build (issue #6804)'
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError(
+                'openssl_pkcs7_decrypt() expects at least 3 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::pkcs7Decrypt(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3] ?? null
         );
     }
 }

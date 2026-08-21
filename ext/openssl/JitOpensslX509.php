@@ -2290,6 +2290,133 @@ final class JitOpensslX509
     }
 
     /**
+     * openssl_pkcs7_decrypt() — bake {@see VmOpensslPkcs7Native::decrypt}, write plaintext via
+     * {@see StringFilePutContents} / __compiler_file_put_contents.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkcs7_decrypt) / PKCS7_decrypt
+     *
+     * Input/output paths, certificate PEM (or path), and private-key PEM (or path) must be
+     * compile-time literals (thin AOT has no PHP FFI). Decrypt runs in the compiler process;
+     * plaintext is emitted at runtime (peer {@see self::cmsDecrypt} / {@see self::pkcs7Encrypt}).
+     *
+     * When private_key is omitted, the certificate material is used as the key (VM arity).
+     */
+    public static function pkcs7Decrypt(
+        Context $context,
+        JITVariable $input,
+        JITVariable $output,
+        JITVariable $certificate,
+        ?JITVariable $privateKey = null
+    ): Value {
+        $inputPath = JitStringArg::compileTimeLiteral($input);
+        if (null === $inputPath) {
+            throw new \LogicException(
+                'openssl_pkcs7_decrypt() input_filename must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33482)'
+            );
+        }
+        $outputPath = JitStringArg::compileTimeLiteral($output);
+        if (null === $outputPath) {
+            throw new \LogicException(
+                'openssl_pkcs7_decrypt() output_filename must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33482)'
+            );
+        }
+        $certMaterial = JitStringArg::compileTimeLiteral($certificate);
+        if (null === $certMaterial) {
+            throw new \LogicException(
+                'openssl_pkcs7_decrypt() certificate must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33482)'
+            );
+        }
+
+        $keyMaterial = $certMaterial;
+        if (null !== $privateKey && !NamedOptionalCallArgs::isOmittedOptional($privateKey)) {
+            $parsedKey = JitStringArg::compileTimeLiteral($privateKey);
+            if (null === $parsedKey) {
+                throw new \LogicException(
+                    'openssl_pkcs7_decrypt() private_key must be a compile-time string literal '
+                    .'for JIT/AOT in this compiler build (issue #33482)'
+                );
+            }
+            $keyMaterial = $parsedKey;
+        }
+
+        if (!VmOpensslPkcs7Native::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $certPem = VmOpenssl::resolvePemMaterial($certMaterial, 'openssl_pkcs7_decrypt');
+        $keyPem = VmOpenssl::resolvePemMaterial($keyMaterial, 'openssl_pkcs7_decrypt');
+        if (false === $certPem || false === $keyPem) {
+            return self::boxedFalse($context);
+        }
+
+        $bakeOut = tempnam(sys_get_temp_dir(), 'phpc_pkcs7_dec_');
+        if (false === $bakeOut) {
+            return self::boxedFalse($context);
+        }
+
+        $plainBytes = null;
+        try {
+            $ok = VmOpensslPkcs7Native::decrypt(
+                $inputPath,
+                $bakeOut,
+                $certPem,
+                $keyPem
+            );
+            if (!$ok || !is_file($bakeOut)) {
+                return self::boxedFalse($context);
+            }
+            $plainBytes = (string) file_get_contents($bakeOut);
+        } finally {
+            if (is_file($bakeOut)) {
+                @unlink($bakeOut);
+            }
+        }
+
+        StringFilePutContents::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $id = (string) (++self::$blockSerial);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $failBlock = BasicBlockHelper::append($context, 'ossl_pkcs7_dec_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'ossl_pkcs7_dec_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_pkcs7_dec_done_'.$id);
+
+        $pathStr = $context->builder->load($context->constantStringFromString($outputPath));
+        $dataStr = $context->builder->load($context->constantStringFromString($plainBytes));
+        $dataOwned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $dataStr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('__compiler_file_put_contents'),
+            $pathStr,
+            $dataOwned,
+            $i64->constInt(0, false)
+        );
+        $failed = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_SLT,
+            $written,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
+    /**
      * openssl_pkcs12_export() — bake {@see VmOpensslPkcs12Native::createPkcs12} into &$output.
      *
      * php-src: ext/openssl/pkcs12.c PHP_FUNCTION(openssl_pkcs12_export) / PKCS12_create
