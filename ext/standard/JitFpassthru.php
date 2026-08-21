@@ -16,6 +16,7 @@ use PHPLLVM\Value;
  *
  * ABI owned by {@see StreamReadRuntime} after Type always-on drop (#33106) — must
  * ensureLinked before lookup (peer {@see JitFgetc} / {@see JitFlock}).
+ * SplFileObject::fpassthru uses the same invoke on `__spl_fd` (#33360).
  */
 final class JitFpassthru
 {
