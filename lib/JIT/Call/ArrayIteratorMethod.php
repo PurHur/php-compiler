@@ -14,7 +14,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * ArrayIterator / RecursiveArrayIterator thin-AOT methods (#32910, #33606, ext/spl/spl_array.c).
+ * ArrayIterator / RecursiveArrayIterator thin-AOT methods (#32910, #33606, #33613, ext/spl/spl_array.c).
  *
  * Storage is the same `__spl_ht` layout as ArrayObject (#26783 / #26823) — reuse
  * {@see ArrayObjectJitHelper} IR with ArrayIterator ACE names.
@@ -143,6 +143,29 @@ final class ArrayIteratorMethod implements Call
                 static fn () => ArrayObjectJitHelper::compileNatcasesort(
                     $context,
                     $args[0] ?? throw new \LogicException($qualified.'() called without $this')
+                )
+            ),
+            // php-src zim_ArrayIterator_uasort/uksort — exactly 1 callback (#33613 / #9356).
+            'uasort' => $this->compileExact(
+                $context,
+                $args,
+                $qualified,
+                1,
+                static fn () => ArrayObjectJitHelper::compileUasort(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this'),
+                    $args[1]
+                )
+            ),
+            'uksort' => $this->compileExact(
+                $context,
+                $args,
+                $qualified,
+                1,
+                static fn () => ArrayObjectJitHelper::compileUksort(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this'),
+                    $args[1]
                 )
             ),
             default => throw new \LogicException(

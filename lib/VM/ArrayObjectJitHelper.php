@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\KeySortRuntime;
 use PHPCompiler\JIT\Builtin\NaturalSortRuntime;
 use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
+use PHPCompiler\JIT\Builtin\UsortRuntime;
 use PHPCompiler\JIT\Builtin\ValueSortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -376,6 +377,35 @@ final class ArrayObjectJitHelper
     public static function compileNatcasesort(Context $context, JITVariable $receiver): Value
     {
         NaturalSortRuntime::natcasesortByValue($context, self::backingHtVar($context, $receiver));
+
+        return self::trueResult($context);
+    }
+
+    /**
+     * php-src spl_array_object_uasort — in-place user value sort on `__spl_ht` (#33613 / #9356).
+     *
+     * Thin AOT reuses procedural uasort LLVM ({@see UsortRuntime}); NestedJIT keyed
+     * helpers abort under standalone AOT (#27217).
+     */
+    public static function compileUasort(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $callback
+    ): Value {
+        UsortRuntime::uasortValues($context, self::backingHtVar($context, $receiver), $callback);
+
+        return self::trueResult($context);
+    }
+
+    /**
+     * php-src spl_array_object_uksort — in-place user key sort on `__spl_ht` (#33613 / #9356).
+     */
+    public static function compileUksort(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $callback
+    ): Value {
+        UsortRuntime::uksortKeys($context, self::backingHtVar($context, $receiver), $callback);
 
         return self::trueResult($context);
     }

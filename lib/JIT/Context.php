@@ -1364,7 +1364,21 @@ class Context {
         $this->functionProxies['recursivearrayiterator::__construct'] = new Call\ArrayIteratorConstruct(
             'RecursiveArrayIterator'
         );
-        foreach (['count', 'append', 'offsetGet', 'offsetSet', 'offsetExists', 'offsetUnset', 'asort', 'ksort', 'natsort', 'natcasesort'] as $aiMethod) {
+        foreach ([
+            'count',
+            'append',
+            'offsetGet',
+            'offsetSet',
+            'offsetExists',
+            'offsetUnset',
+            'asort',
+            'ksort',
+            'natsort',
+            'natcasesort',
+            // php-src spl_array_object_uasort/uksort — thin AOT was a silent no-op (#33613).
+            'uasort',
+            'uksort',
+        ] as $aiMethod) {
             $this->functionProxies['arrayiterator::'.strtolower($aiMethod)] = new Call\ArrayIteratorMethod(
                 $aiMethod,
                 'ArrayIterator'
@@ -1393,6 +1407,9 @@ class Context {
             'ksort',
             'natsort',
             'natcasesort',
+            // php-src spl_array_object_uasort/uksort — thin AOT was a silent no-op (#33613).
+            'uasort',
+            'uksort',
         ] as $aoMethod) {
             $this->functionProxies['arrayobject::'.strtolower($aoMethod)] = new Call\ArrayObjectMethod($aoMethod);
         }
