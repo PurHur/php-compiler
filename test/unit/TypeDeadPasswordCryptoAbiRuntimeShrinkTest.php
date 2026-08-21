@@ -44,9 +44,7 @@ final class TypeDeadPasswordCryptoAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32855)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('PasswordCryptoRuntime::ensureLinked', $type);
     }
 

@@ -40,9 +40,7 @@ final class TypeDeadTimeSleepAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32721)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
     }
 
     public function testRuntimeOwnerDeclaresTimeSleepAbisModuleLocally(): void

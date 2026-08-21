@@ -30,10 +30,7 @@ final class TypeDeadProcCloseAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_proc_close (#33118)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('ProcessOpen::ensureLinked', $type);
     }
 

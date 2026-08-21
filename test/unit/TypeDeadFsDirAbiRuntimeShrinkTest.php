@@ -42,9 +42,7 @@ final class TypeDeadFsDirAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32438)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_http_build_query'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('FtokRuntime::ensureLinked', $type);
     }
 

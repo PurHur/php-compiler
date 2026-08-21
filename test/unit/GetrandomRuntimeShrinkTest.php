@@ -20,8 +20,8 @@ final class GetrandomRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("addFunction('getrandom'", $type);
         $this->assertStringNotContainsString("registerFunction('getrandom'", $type);
         $this->assertStringContainsString('#32139', $type);
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
     }
 
     public function testNoNestedJitLookupFunctionGetrandomRemains(): void

@@ -29,9 +29,7 @@ final class TypeDeadStripTagsAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_strip_tags (#32971)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('StringStripTags::ensureLinked', $type);
     }
 

@@ -34,9 +34,7 @@ final class TypeDeadVersionCompareAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-declare __compiler_version_compare in a table (#32843)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('StringVersionCompare::ensureLinked', $type);
     }
 

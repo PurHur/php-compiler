@@ -29,9 +29,7 @@ final class TypeDeadMimeContentTypeAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_mime_content_type (#33034)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('MimeContentTypeRuntime::ensureLinked', $type);
     }
 

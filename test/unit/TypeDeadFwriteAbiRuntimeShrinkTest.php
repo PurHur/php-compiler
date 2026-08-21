@@ -29,10 +29,8 @@ final class TypeDeadFwriteAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_fwrite (#33048)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (trigger_error still Type always-on; #33224 strptime / #33222 strftime / #33215 format_datetime dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('StreamIo::ensureLinked', $type);
     }
 

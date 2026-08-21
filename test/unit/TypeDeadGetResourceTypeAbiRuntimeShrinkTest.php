@@ -29,10 +29,7 @@ final class TypeDeadGetResourceTypeAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_get_resource_type (#33183)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('StreamResource::ensureLinked', $type);
     }
 

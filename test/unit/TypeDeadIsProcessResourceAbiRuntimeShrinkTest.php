@@ -30,10 +30,7 @@ final class TypeDeadIsProcessResourceAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_is_process_resource (#33121)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('ProcessOpen::ensureLinked', $type);
     }
 

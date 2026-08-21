@@ -29,11 +29,8 @@ final class TypeDeadStreamPathAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __phpc_stream_path (#33258)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
         $this->assertStringContainsString('StreamPathRuntime::declareStreamPathAbi', $type);
-        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
     }
 
     public function testRuntimeOwnerDeclaresStreamPathAbiModuleLocally(): void
