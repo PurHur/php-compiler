@@ -32,7 +32,7 @@ final class TypeDeadPopenAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (strptime still Type always-on; #33222 strftime / #33215 format_datetime dropped).
+        // Next leftover sentinel (proc_close still Type always-on for this peer guard).
         $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
         $this->assertStringContainsString('StreamIo::ensureLinked', $type);
     }

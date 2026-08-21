@@ -11,7 +11,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_strptime via StrptimeJitHelper PHP (#9132, #25409).
+ * JIT/AOT link for __compiler_strptime via StrptimeJitHelper PHP (#9132, #25409, #33224).
+ *
+ * Owns `__compiler_strptime` ABI module-locally: {@see getNamedFunction} first, then
+ * {@see implementStrptimeBridge}. Do not re-add empty always-on shells in {@see Type} —
+ * leftover decls mint strptime.1 (#31894 / #32122 / #33224).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringStrftime #25365 / VarFetch #25328).
  * Replaces libc strptime / struct tm LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.

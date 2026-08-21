@@ -31,8 +31,8 @@ final class TypeDeadStrftimeAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (strptime still Type always-on; #33222 strftime dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_strptime'", $type);
+        // Next leftover sentinel (phpc_deploy_path still Type always-on; #33225).
+        $this->assertStringContainsString("registerFunction('__compiler_phpc_deploy_path'", $type);
         $this->assertStringContainsString('StringStrftime::ensureLinked', $type);
     }
 
