@@ -18,6 +18,7 @@ use PHPCompiler\ext\standard\StatFieldsJitHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\FputcsvRuntime;
 use PHPCompiler\JIT\Builtin\SplFileObjectSnapshotRuntime;
+use PHPCompiler\JIT\Builtin\SscanfSimpleArrayApply;
 use PHPCompiler\JIT\Builtin\StatPathRuntime;
 use PHPCompiler\JIT\Builtin\StreamIo;
 use PHPCompiler\JIT\Builtin\StreamLifecycle;
@@ -58,6 +59,7 @@ use PHPLLVM\Value;
  * setFlags/getFlags on `__spl_flags` (#33368).
  * setCsvControl/getCsvControl on `__spl_csv_*` (#33371); fgetcsv/fputcsv read props when args omitted.
  * setMaxLineLen/getMaxLineLen on `__spl_max_line_len` (#33377); fgets/fgetcsv use max+1 (#33378).
+ * fscanf on `__spl_fd` — fgets + `__compiler_sscanf_array` (#33382).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
@@ -68,6 +70,7 @@ use PHPLLVM\Value;
  * zim_SplFileObject_setFlags / zim_SplFileObject_getFlags /
  * zim_SplFileObject_setCsvControl / zim_SplFileObject_getCsvControl /
  * zim_SplFileObject_setMaxLineLen / zim_SplFileObject_getMaxLineLen /
+ * zim_SplFileObject_fscanf /
  * zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
@@ -667,6 +670,131 @@ final class SplFileObjectJitHelper
         }
 
         return JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
+    }
+
+    /**
+     * SplFileObject::fscanf — formatted input from live handle (#33382).
+     * php-src: zim_SplFileObject_fscanf → php_stream_get_line + php_sscanf_internal
+     *
+     * Thin AOT cannot NestedJIT VmSscanf on libc-fgets strings (#27663). Array mode with a
+     * compile-time whitespace/%d/%s format uses a thin strtol+token scanner (no NestedJIT).
+     *
+     * @param list<JITVariable> $outArgs
+     */
+    public static function compileFscanf(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $formatArg,
+        JITVariable ...$outArgs
+    ): Value {
+        if ([] !== $outArgs) {
+            throw new \LogicException(
+                'SplFileObject::fscanf() thin-AOT by-ref targets are not implemented yet (#33382)'
+            );
+        }
+        $fmtLit = $formatArg->compileTimeString ?? null;
+        $specs = null !== $fmtLit ? self::parseSimpleScanfSpecs($fmtLit) : null;
+        if (null === $specs) {
+            throw new \LogicException(
+                'SplFileObject::fscanf() thin-AOT array mode needs compile-time %d/%s format (#33382)'
+            );
+        }
+        self::ensureStreamAbis($context);
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $handle = self::loadFd($context, $receiver);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $line = $context->builder->call(
+            $context->lookupFunction('__compiler_fgets'),
+            $handle,
+            self::fgetsBufferLen($context, $obj)
+        );
+        $slotAlloca = $context->builder->alloca($context->getTypeFromString('__value__*'));
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $line, $strPtr->constNull());
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $eofBb = $fn->appendBasicBlock('splfo_fscanf_eof');
+        $nonEmptyBb = $fn->appendBasicBlock('splfo_fscanf_nonempty');
+        $scanBb = $fn->appendBasicBlock('splfo_fscanf_scan');
+        $joinBb = $fn->appendBasicBlock('splfo_fscanf_join');
+        $context->builder->branchIf($isNull, $eofBb, $nonEmptyBb);
+
+        $context->builder->positionAtEnd($eofBb);
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(1, false));
+        $falseSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            JitValueBox::pointer($context, $falseSlot),
+            $context->getTypeFromString('int32')->constInt(0, false)
+        );
+        $context->builder->store($falseSlot, $slotAlloca);
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($nonEmptyBb);
+        $lineLen = $context->builder->call($context->lookupFunction('__string__strlen'), $line);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $lineLen, $i64->constInt(0, false));
+        $context->builder->branchIf($empty, $eofBb, $scanBb);
+
+        $context->builder->positionAtEnd($scanBb);
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        SscanfSimpleArrayApply::ensureLinked($context);
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        }
+        $ht = SscanfSimpleArrayApply::invoke($context, $line, $specs);
+        $okSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $okSlot),
+            $ht
+        );
+        $context->builder->store($okSlot, $slotAlloca);
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($joinBb);
+
+        return $context->builder->load($slotAlloca);
+    }
+
+    /**
+     * @return list<'d'|'s'>|null
+     */
+    private static function parseSimpleScanfSpecs(string $format): ?array
+    {
+        $len = \strlen($format);
+        $i = 0;
+        $specs = [];
+        while ($i < $len) {
+            $ch = $format[$i];
+            if ('%' === $ch) {
+                if ($i + 1 >= $len) {
+                    return null;
+                }
+                ++$i;
+                if ('%' === $format[$i]) {
+                    ++$i;
+                    continue;
+                }
+                while ($i < $len && \in_array($format[$i], ['l', 'h', 'z', 't'], true)) {
+                    ++$i;
+                }
+                if ($i >= $len || ('d' !== $format[$i] && 's' !== $format[$i])) {
+                    return null;
+                }
+                $specs[] = $format[$i];
+                ++$i;
+                continue;
+            }
+            if (\ctype_space($ch)) {
+                ++$i;
+                continue;
+            }
+
+            return null;
+        }
+
+        return [] === $specs ? null : $specs;
     }
 
     /**
