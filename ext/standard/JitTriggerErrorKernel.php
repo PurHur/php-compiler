@@ -18,13 +18,13 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT NestedJIT bridges for __compiler_trigger_error / undefined-array-key (#9293, #19864, #21300, #33234).
  *
  * Quarantined from lib/JIT/Builtin/StringTriggerErrorJit — {@see \PHPCompiler\JIT\Builtin\StringTriggerErrorJit}
- * Do not re-add Type always-on empty decls — leftover mint trigger_error.1 (#31894 / #32122 / #33234).
- */
  * stays the thin orchestrator. User-handler dispatch stays in {@see ErrorHandlerJitRuntime}.
  *
  * Standalone AOT (#21300): drop dishonest no-op thin ABI. trigger_error records via
  * {@see LastErrorRuntime} and prints via thin libc fprintf (user-script AOT has no
  * honest PHP fwrite(STDERR)). Undefined-array-key NestedJITs {@see TriggerErrorJitHelper}.
+ *
+ * Do not re-add Type always-on empty decls — leftover mint trigger_error.1 (#31894 / #32122 / #33234).
  *
  * php-src: Zend/zend_execute_API.c, main/php_errors.c
  */

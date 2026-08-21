@@ -60,11 +60,17 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringTriggerError::ensureLinked($this->context)', $type);
     }
 
-    public function testAssertFailEnsureLinksTriggerErrorBeforeLookup(): void
+    public function testContextLinksTriggerErrorBeforeAssertFail(): void
     {
         $assert = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/AssertFail.php');
         $this->assertStringContainsString('#33234', $assert);
-        $this->assertStringContainsString('StringTriggerError::ensureLinked', $assert);
+        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('#33234', $ctx);
+        $posTrig = strpos($ctx, 'StringTriggerError::ensureStandaloneBodies($this)');
+        $posAssert = strpos($ctx, 'AssertFail::ensureStandaloneBodies($this)');
+        $this->assertNotFalse($posTrig);
+        $this->assertNotFalse($posAssert);
+        $this->assertLessThan($posAssert, $posTrig, 'StringTriggerError must precede AssertFail (#33234)');
     }
 
     public function testNoNewRuntimeCForTriggerErrorAbi(): void
