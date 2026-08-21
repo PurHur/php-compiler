@@ -7,14 +7,20 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\ValueSortKeyedLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 /**
- * JIT/AOT link for asort()/arsort() (#12771, #27227).
+ * JIT/AOT link for asort()/arsort() (#12771, #27227, #33620).
  *
  * NestedJIT {@see \PHPCompiler\ext\standard\ValueSortJitHelper} aborts under thin
  * standalone AOT (same HashTable-method stub class as KeySort / NaturalSort #26975).
- * Emit string-key value bubble sorts already in {@see Type\HashTable}.
+ *
+ * SORT_REGULAR / reverse: always {@see ValueSortKeyedLlvm} (export pairs → value sort →
+ * reorderKeyedPairs). The older `__hashtable__sortStringKeyValues*` ABIs only walk
+ * `strKeys` and no-op on packed `0..n-1` lists — silent wrong keys (#33620).
+ *
+ * SORT_LOCALE_STRING: keep the strKey locale ABI (string-key maps).
  *
  * SSOT (VM): {@see \PHPCompiler\ext\standard\VmArray::asortCopy()} /
  * {@see \PHPCompiler\ext\standard\VmArray::arsortCopy()}
@@ -30,20 +36,37 @@ final class ValueSortRuntime
 
     public static function asortByValue(Context $context, JITVariable $array): void
     {
-        self::invokeByValueSort($context, $array, self::ABI_ASORT);
+        self::sortPreserveKeys($context, $array, false);
     }
 
     public static function asortByValueLocale(Context $context, JITVariable $array): void
     {
-        self::invokeByValueSort($context, $array, self::ABI_ASORT_LOCALE);
+        self::invokeStrKeyAbi($context, $array, self::ABI_ASORT_LOCALE);
     }
 
     public static function arsortByValue(Context $context, JITVariable $array): void
     {
-        self::invokeByValueSort($context, $array, self::ABI_ARSORT);
+        self::sortPreserveKeys($context, $array, true);
     }
 
-    private static function invokeByValueSort(Context $context, JITVariable $array, string $abi): void
+    private static function sortPreserveKeys(Context $context, JITVariable $array, bool $reverse): void
+    {
+        self::ensureLinked($context);
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'asort()/arsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        ValueSortKeyedLlvm::sortValuesPreserveKeys($context, $ht, $reverse);
+        // In-place mutation via HT pointer; store only native slots (peer NaturalSort #26975).
+        // Unconditional store corrupts thin-standalone value-boxed arrays (#27227).
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        }
+    }
+
+    private static function invokeStrKeyAbi(Context $context, JITVariable $array, string $abi): void
     {
         self::ensureLinked($context);
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
@@ -53,8 +76,6 @@ final class ValueSortRuntime
         }
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $context->builder->call($context->lookupFunction($abi), $ht);
-        // In-place mutation via HT pointer; store only native slots (peer NaturalSort #26975).
-        // Unconditional store corrupts thin-standalone value-boxed arrays (#27227).
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
         }
