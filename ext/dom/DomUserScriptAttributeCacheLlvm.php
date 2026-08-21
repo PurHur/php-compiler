@@ -125,9 +125,37 @@ final class DomUserScriptAttributeCacheLlvm
                 return $state['valueByKey'][$key];
             }
         }
+        // createAttribute + $attr->value may run before any module slot exists (#33570).
+        if (isset(self::$pendingValues[$key])) {
+            return self::$pendingValues[$key];
+        }
 
         return null;
     }
+
+    /**
+     * Record Attr::$value for a createAttribute key before setAttributeNode / appendChild (#33570).
+     *
+     * createAttribute only rememberCreate()'s the name; `$attr->value = …` must populate
+     * valueByKey so saveXML PROP_USER_SCRIPT_XMLNS_ATTR sync sees the written value.
+     */
+    public static function rememberLiteralValue(string $namespace, string $localName, string $value): void
+    {
+        $key = $namespace."\0".$localName;
+        if ([] === self::$byModule) {
+            self::$pendingValues[$key] = $value;
+
+            return;
+        }
+        foreach (self::$byModule as &$state) {
+            $state['valueByKey'][$key] = $value;
+        }
+        unset($state);
+        self::$pendingValues[$key] = $value;
+    }
+
+    /** @var array<string, string> */
+    private static array $pendingValues = [];
 
     public static function storeLiteral(
         Context $context,
@@ -225,12 +253,13 @@ final class DomUserScriptAttributeCacheLlvm
             self::$byModule[$id] = [
                 'slotByKey' => [],
                 'presentByKey' => [],
-                'valueByKey' => [],
+                'valueByKey' => self::$pendingValues,
                 'idBearingByKey' => self::$pendingIdBearing,
                 'lastCreateNamespace' => null,
                 'lastCreateLocalName' => null,
             ];
             self::$pendingIdBearing = [];
+            self::$pendingValues = [];
         }
 
         return self::$byModule[$id];

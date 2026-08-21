@@ -31,6 +31,8 @@ use PHPLLVM\Value;
  * DocumentFragment stand-ins (`nodeName` `#document-fragment`) expand children
  * onto the parent (php-src fragment move); linking the fragment itself left
  * `#document-fragment` in childNodes and SIGSEGV'd on item(N) (#33312).
+ * Attr under Element installs via the attribute map (php-src node.c) — treating
+ * Attr like an element child SIGSEGVs on sibling slots (#33570 / peer #19445).
  * insertBefore before a middle sibling rebuilds INNER_XML from the live chain
  * so saveXML order matches childNodes (#33327). Repeated fragment expands in one
  * main use uniquified BB labels + alloca piece merge (#33335). Child open-tag
@@ -54,10 +56,21 @@ final class JitDomAppendChildLiveSlots
         BasicBlockHelper::ensureOpenInsertBlock($context, self::tag('dom_ac_live_slots'));
         self::ensureLayout($context);
 
+        // php-src: Attr under Element installs via attribute map, not childNodes (#33570).
+        $bbAttr = BasicBlockHelper::append($context, self::tag('dom_acls_attr'));
+        $bbNotAttr = BasicBlockHelper::append($context, self::tag('dom_acls_not_attr'));
+        $bbSyncEnd = BasicBlockHelper::append($context, self::tag('dom_acls_sync_end'));
+        $isAttr = JitDomAttributeNodeNS::icmpIsAttrObject($context, $child);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
+
+        $context->builder->positionAtEnd($bbAttr);
+        JitDomAttributeNodeNS::installAttrOnElement($context, $parent, $child);
+        $context->builder->branch($bbSyncEnd);
+
+        $context->builder->positionAtEnd($bbNotAttr);
         // php-src: DocumentFragment children move onto the parent; fragment stays empty (#33312).
         $bbFrag = BasicBlockHelper::append($context, self::tag('dom_acls_frag'));
         $bbNormal = BasicBlockHelper::append($context, self::tag('dom_acls_normal'));
-        $bbSyncEnd = BasicBlockHelper::append($context, self::tag('dom_acls_sync_end'));
         $isFrag = self::isDocumentFragmentNode($context, $child);
         $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
 

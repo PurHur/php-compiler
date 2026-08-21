@@ -541,12 +541,115 @@ final class JitDomAttributeNodeNS
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattr_xmlns_sync');
         $element = self::loadObjectArg($context, $receiver, 'DOMElement setAttribute saveXML sync');
+        self::syncSaveXmlAttrSuffixOnObject($context, $element, $attrs);
+    }
+
+    /**
+     * Value-receiver form for LiveSlots appendChild(Attr) (#33570).
+     *
+     * @param array<string, string> $attrs
+     */
+    public static function syncSaveXmlAttrSuffixOnObject(
+        Context $context,
+        Value $element,
+        array $attrs
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattr_xmlns_sync_obj');
         $suffix = JitDomCreateElementAttrs::formatSuffix($attrs);
         JitDomCreateElement::storeUserScriptXmlnsAttr($context, $element, $suffix);
 
         // Walk from the element so Document/Fragment parents are skipped (do not call
         // rebuildUserScriptInnerXmlFromElementChildren on a raw parent pointer — #33540).
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $element);
+    }
+
+    /**
+     * True when object class_id is DOMAttr / Dom\Attr (peer saveXML #32351).
+     */
+    public static function icmpIsAttrObject(Context $context, Value $node): Value
+    {
+        $objectType = $context->type->object;
+        $classicId = $objectType->lookup(self::CLASS_ATTR);
+        $livingId = $objectType->lookup(self::CLASS_LIVING_ATTR);
+        self::ensureAttrPropertyLayout($objectType, $classicId);
+        self::ensureAttrPropertyLayout($objectType, $livingId);
+        $map = $context->structFieldMap['__object__'];
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($node, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $isClassic = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($classicId, false)
+        );
+        $isLiving = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($livingId, false)
+        );
+
+        return $context->builder->or($isClassic, $isLiving);
+    }
+
+    /**
+     * php-src dom_node_append_child: Attr under Element → attribute map (#33570 / peer #19445).
+     *
+     * Must not walk Element sibling/parent slots (Attr stand-ins SIGSEGV). Installs via
+     * NamedNodeMap pin + PROP_USER_SCRIPT_XMLNS_ATTR sync (same observable as setAttributeNode).
+     */
+    public static function installAttrOnElement(Context $context, Value $element, Value $attr): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ac_install_attr');
+        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace();
+        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        if (null !== $ns && null !== $local) {
+            // null value arg preserves pending/prior valueByKey (do not storeLiteral '').
+            $value = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local);
+            DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr, $value);
+            if ('' === $ns && 'xmlns' !== $local) {
+                $id = JitDomCreateElementAttrs::lastId();
+                $attrs = null !== $id ? JitDomCreateElementAttrs::get($id) : [];
+                $attrs[$local] = $value ?? '';
+                if (null !== $id) {
+                    JitDomCreateElementAttrs::set($id, $local, $attrs[$local]);
+                }
+                self::syncSaveXmlAttrSuffixOnObject($context, $element, $attrs);
+            }
+        }
+        JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+    }
+
+    /**
+     * After setAttributeNode*: sync createAttribute bag into saveXML attr slot (#33570).
+     */
+    public static function syncSaveXmlAfterSetAttributeNode(
+        Context $context,
+        JITVariable $receiver
+    ): void {
+        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace();
+        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        if (null === $ns || null === $local || '' !== $ns || 'xmlns' === $local) {
+            return;
+        }
+        $value = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
+        $id = $receiver->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+        $attrs = $receiver->compileTimeDomAttributes;
+        if (null === $attrs && null !== $id) {
+            $attrs = JitDomCreateElementAttrs::get($id);
+        }
+        if (null === $attrs) {
+            $attrs = [];
+        }
+        $attrs[$local] = $value;
+        $receiver->compileTimeDomAttributes = $attrs;
+        if (null !== $id) {
+            JitDomCreateElementAttrs::set($id, $local, $value);
+            if (null === $receiver->compileTimeDomElementId) {
+                $receiver->compileTimeDomElementId = $id;
+            }
+        }
+        self::syncSaveXmlAttrSuffix($context, $receiver, $attrs);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg, string $label): Value

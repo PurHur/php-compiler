@@ -175,6 +175,15 @@ final class JitDomElementTextContent
                     JITVariable::TYPE_STRING
                 );
             }
+            // createAttribute + $attr->value = … → valueByKey for setAttributeNode/appendChild saveXML (#33570).
+            $valueLit = JitStringBuiltinArg::compileTimeLiteral($value) ?? $value->compileTimeString;
+            if (null !== $valueLit) {
+                $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace();
+                $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+                if (null !== $ns && null !== $local) {
+                    DomUserScriptAttributeCacheLlvm::rememberLiteralValue($ns, $local, $valueLit);
+                }
+            }
 
             return true;
         }

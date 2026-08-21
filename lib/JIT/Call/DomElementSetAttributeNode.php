@@ -11,13 +11,20 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** DOMElement::setAttributeNode() — user-script AOT (#20676). */
+/** DOMElement::setAttributeNode() — user-script AOT (#20676, #33570). */
 final class DomElementSetAttributeNode implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattrnode_invoke_cont');
 
-        return JitDomAttributeNodeNS::invokeSetAttributeNode($context, ...$args);
+        $result = JitDomAttributeNodeNS::invokeSetAttributeNode($context, ...$args);
+
+        // saveXML / INNER_XML rebuild read PROP_USER_SCRIPT_XMLNS_ATTR (#33570 / peer #33509).
+        if (\count($args) >= 1) {
+            JitDomAttributeNodeNS::syncSaveXmlAfterSetAttributeNode($context, $args[0]);
+        }
+
+        return $result;
     }
 }
