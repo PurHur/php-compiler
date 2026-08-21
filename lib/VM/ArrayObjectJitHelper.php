@@ -5,18 +5,23 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\KeySortRuntime;
+use PHPCompiler\JIT\Builtin\NaturalSortRuntime;
 use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
+use PHPCompiler\JIT\Builtin\ValueSortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\HashTableWriteLlvm;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmInternalCompare;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT ArrayObject — `__spl_ht` storage (#26823, #27286, #27567, ext/spl/spl_array.c).
+ * Thin-AOT ArrayObject — `__spl_ht` storage (#26823, #27286, #27567, #33606, ext/spl/spl_array.c).
  */
 final class ArrayObjectJitHelper
 {
@@ -304,6 +309,137 @@ final class ArrayObjectJitHelper
         HashTableHelper::addElement($context, $htVar, $value, null);
 
         return self::voidResult($context);
+    }
+
+    /**
+     * php-src spl_array_object_sort — in-place asort on `__spl_ht` (#33606 / #19480).
+     *
+     * Thin AOT reuses procedural asort LLVM ({@see ValueSortRuntime}); NestedJIT
+     * ValueSortJitHelper aborts under standalone AOT (#27227).
+     */
+    public static function compileAsort(
+        Context $context,
+        JITVariable $receiver,
+        ?JITVariable $flagsArg = null,
+        string $function = 'ArrayObject::asort'
+    ): Value {
+        $htVar = self::backingHtVar($context, $receiver);
+        if (null === $flagsArg) {
+            ValueSortRuntime::asortByValue($context, $htVar);
+        } else {
+            self::asortByValueWithFlags(
+                $context,
+                $htVar,
+                VmInternalCompare::resolveJitSortFlags($context, $flagsArg, $function)
+            );
+        }
+
+        return self::trueResult($context);
+    }
+
+    /**
+     * php-src zim_ArrayObject_ksort — in-place ksort on `__spl_ht` (#33606 / #19480).
+     */
+    public static function compileKsort(
+        Context $context,
+        JITVariable $receiver,
+        ?JITVariable $flagsArg = null,
+        string $function = 'ArrayObject::ksort'
+    ): Value {
+        $htVar = self::backingHtVar($context, $receiver);
+        if (null === $flagsArg) {
+            KeySortRuntime::ksortByKey($context, $htVar);
+        } else {
+            self::ksortByKeyWithFlags(
+                $context,
+                $htVar,
+                VmInternalCompare::resolveJitSortFlags($context, $flagsArg, $function)
+            );
+        }
+
+        return self::trueResult($context);
+    }
+
+    /**
+     * php-src zim_ArrayObject_natsort — natural value sort on `__spl_ht` (#33606 / #19480).
+     */
+    public static function compileNatsort(Context $context, JITVariable $receiver): Value
+    {
+        NaturalSortRuntime::natsortByValue($context, self::backingHtVar($context, $receiver));
+
+        return self::trueResult($context);
+    }
+
+    /**
+     * php-src zim_ArrayObject_natcasesort — case-insensitive natural sort (#33606 / #19480).
+     */
+    public static function compileNatcasesort(Context $context, JITVariable $receiver): Value
+    {
+        NaturalSortRuntime::natcasesortByValue($context, self::backingHtVar($context, $receiver));
+
+        return self::trueResult($context);
+    }
+
+    private static function backingHtVar(Context $context, JITVariable $receiver): JITVariable
+    {
+        $ht = self::htPtr($context, self::loadObject($context, $receiver));
+
+        return new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht);
+    }
+
+    /** Mirror {@see \PHPCompiler\ext\standard\asort_::jitSortByValueWithFlags}. */
+    private static function asortByValueWithFlags(Context $context, JITVariable $array, int $flags): void
+    {
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
+            ValueSortRuntime::asortByValueLocale($context, $array);
+
+            return;
+        }
+        if (
+            StdlibConstants::SORT_REGULAR === $sortType
+            || StdlibConstants::SORT_NUMERIC === $sortType
+            || StdlibConstants::SORT_STRING === $sortType
+        ) {
+            ValueSortRuntime::asortByValue($context, $array);
+
+            return;
+        }
+        if (StdlibConstants::SORT_NATURAL === $sortType) {
+            if (0 !== ($flags & StdlibConstants::SORT_FLAG_CASE)) {
+                NaturalSortRuntime::natcasesortByValue($context, $array);
+            } else {
+                NaturalSortRuntime::natsortByValue($context, $array);
+            }
+
+            return;
+        }
+        ValueSortRuntime::asortByValue($context, $array);
+    }
+
+    /** Mirror {@see \PHPCompiler\ext\standard\ksort_::jitSortByKeyWithFlags}. */
+    private static function ksortByKeyWithFlags(Context $context, JITVariable $array, int $flags): void
+    {
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
+            KeySortRuntime::ksortByKeyLocale($context, $array);
+
+            return;
+        }
+        if (
+            StdlibConstants::SORT_REGULAR === $sortType
+            || StdlibConstants::SORT_STRING === $sortType
+        ) {
+            KeySortRuntime::ksortByKey($context, $array);
+
+            return;
+        }
+        if (StdlibConstants::SORT_NUMERIC === $sortType || StdlibConstants::SORT_NATURAL === $sortType) {
+            throw new \LogicException(
+                'ksort() flags are not supported in JIT/AOT in this compiler build'
+            );
+        }
+        KeySortRuntime::ksortByKey($context, $array);
     }
 
     public static function compileGetArrayCopy(Context $context, JITVariable $receiver): Value
@@ -681,6 +817,15 @@ final class ArrayObjectJitHelper
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $slot)
         );
+
+        return $slot;
+    }
+
+    /** php-src spl_array_object_sort — always returns true on success (#19802). */
+    private static function trueResult(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
 
         return $slot;
     }
