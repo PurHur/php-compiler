@@ -138,8 +138,8 @@ final class ObjectInstancePropertyLlvm
             $object->defineProperty($classId, $name, $object->externalPropertyJitType($class, $name));
             $nameId = $object->propNameIdAfterDefine($name);
         }
-        foreach ($object->propertySetsForClass($classId) as $propset) {
-            if ($propset[0] === $nameId) {
+        $propset = $object->resolvePropertySetForNameId($classId, $nameId);
+        if (null !== $propset) {
                 $slot = $object->propertySlotPtr($obj, $propset[3]);
                 if (Variable::TYPE_VALUE === $propset[2]) {
                     $valueType = $context->getTypeFromString('__value__');
@@ -277,7 +277,6 @@ final class ObjectInstancePropertyLlvm
                 $object->recordSlotReceiver($slot, $obj);
 
                 return $var;
-            }
         }
         throw new \LogicException("Could not find property $name for class $classId");
     }
