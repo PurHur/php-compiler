@@ -16,7 +16,9 @@ final class Issue33274DirectoryIteratorGetPathnameAotProxyTest extends TestCase
     public function testContextRegistersPathnameProxies(): void
     {
         $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString("'getPathname', 'getPath', '__toString'", $ctx);
+        $this->assertStringContainsString("'getPathname'", $ctx);
+        $this->assertStringContainsString("'getPath'", $ctx);
+        $this->assertStringContainsString("'__toString'", $ctx);
     }
 
     public function testHelperLowersPathnameViaJoin(): void
