@@ -65,18 +65,9 @@ final class JitDomCreateDocumentFragment
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
     ): void {
-        if (!$objectType->hasProperty($classId, self::PROP_NODE_NAME)) {
-            $objectType->defineProperty($classId, self::PROP_NODE_NAME, JITVariable::TYPE_STRING);
-        }
-        if (!$objectType->hasProperty($classId, self::PROP_TEXT_CONTENT)) {
-            $objectType->defineProperty($classId, self::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
-        }
-        if (!$objectType->hasProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML)) {
-            $objectType->defineProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML, JITVariable::TYPE_STRING);
-        }
-        if (!$objectType->hasProperty($classId, self::PROP_OWNER_DOCUMENT)) {
-            $objectType->defineProperty($classId, self::PROP_OWNER_DOCUMENT, JITVariable::TYPE_VALUE);
-        }
+        // Full DOMElement stand-in layout (#33546 / #33556 / #33559 / #33564):
+        // Document appendChild of a fragment previously SIGSEGV'd under thin AOT.
+        JitDomCreateElement::ensureDomElementStandInLayout($objectType, $classId);
     }
 
     private static function storeStringLiteral(Context $context, Value $obj, string $prop, string $lit): void

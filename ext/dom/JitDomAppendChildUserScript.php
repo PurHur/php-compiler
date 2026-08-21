@@ -20,6 +20,141 @@ final class JitDomAppendChildUserScript
 
     private const PROP_DOCUMENT_ELEMENT = 'documentElement';
 
+    /**
+     * Document::appendChild — expand DocumentFragment children onto the document (#33564).
+     *
+     * php-src moves fragment children; linking the fragment itself left
+     * {@code firstChild=#document-fragment} and SIGSEGV'd on {@code documentElement->tagName}.
+     */
+    public static function invokeDocumentAppendMaybeFragment(
+        Context $context,
+        JITVariable $documentVar,
+        JITVariable $childVar
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_doc_ac_maybe_frag');
+        if (JitDomRequireDomNodeArg::guardOrAbort($context, $childVar, 'DOMNode::appendChild', 1, 'node')) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
+        $child = self::loadObjectArg($context, $childVar);
+        $retTy = $context->getTypeFromString('__value__*');
+        $retAlloca = BasicBlockHelper::entryAlloca($context, $retTy);
+        $isFrag = JitDomAppendChildLiveSlots::isDocumentFragmentNode($context, $child);
+        $bbFrag = BasicBlockHelper::append($context, 'dom_doc_ac_frag');
+        $bbNormal = BasicBlockHelper::append($context, 'dom_doc_ac_normal');
+        $bbMerge = BasicBlockHelper::append($context, 'dom_doc_ac_merge');
+        $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
+
+        $context->builder->positionAtEnd($bbFrag);
+        $fragRet = self::expandFragmentOntoDocument($context, $documentVar, $child);
+        $context->builder->store($fragRet, $retAlloca);
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbNormal);
+        $normalRet = self::invokeDocumentAppend($context, $documentVar, $childVar);
+        $context->builder->store($normalRet, $retAlloca);
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbMerge);
+
+        return $context->builder->load($retAlloca);
+    }
+
+    /**
+     * Move each fragment child onto the document; return the fragment (php-src) (#33564).
+     */
+    private static function expandFragmentOntoDocument(
+        Context $context,
+        JITVariable $documentVar,
+        Value $fragment
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_doc_ac_frag_expand');
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD, VmDom::PROP_NEXT_SIBLING] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+        }
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $voidPtr = $context->getTypeFromString('void*');
+
+        $firstSlot = $objectType->propertySlotFor($fragment, 'DOMElement', VmDom::PROP_FIRST_CHILD);
+        $firstPtr = $context->builder->load($firstSlot);
+        $firstSlotNull = $context->builder->icmp(Builder::INT_EQ, $firstPtr, $voidPtr->constNull());
+        $bbEmpty = BasicBlockHelper::append($context, 'dom_doc_ac_frag_empty');
+        $bbRead = BasicBlockHelper::append($context, 'dom_doc_ac_frag_read');
+        $bbLoop = BasicBlockHelper::append($context, 'dom_doc_ac_frag_loop');
+        $bbBody = BasicBlockHelper::append($context, 'dom_doc_ac_frag_body');
+        $bbDone = BasicBlockHelper::append($context, 'dom_doc_ac_frag_done');
+        $context->builder->branchIf($firstSlotNull, $bbEmpty, $bbRead);
+
+        $context->builder->positionAtEnd($bbEmpty);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbRead);
+        $firstObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($firstPtr, $context->getTypeFromString('__value__*'))
+        );
+        // Clear fragment child list before moving (php-src leaves fragment empty).
+        $nullBox = JitValueBox::alloc($context);
+        $nullPtr = JitValueBox::pointer($context, $nullBox);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+        $nullJit = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $nullPtr);
+        $objectType->propertyStore($firstSlot, $nullJit, JITVariable::TYPE_VALUE);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($fragment, 'DOMElement', VmDom::PROP_LAST_CHILD),
+            $nullJit,
+            JITVariable::TYPE_VALUE
+        );
+
+        $curAlloca = BasicBlockHelper::entryAlloca($context, $objPtrTy);
+        $context->builder->store($firstObj, $curAlloca);
+        $context->builder->branch($bbLoop);
+
+        $context->builder->positionAtEnd($bbLoop);
+        $cur = $context->builder->load($curAlloca);
+        $curNull = $context->builder->icmp(Builder::INT_EQ, $cur, $objPtrTy->constNull());
+        $context->builder->branchIf($curNull, $bbDone, $bbBody);
+
+        $context->builder->positionAtEnd($bbBody);
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PREVIOUS_SIBLING)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PREVIOUS_SIBLING, JITVariable::TYPE_VALUE);
+        }
+        $nextSlot = $objectType->propertySlotFor($cur, 'DOMElement', VmDom::PROP_NEXT_SIBLING);
+        $nextPtr = $context->builder->load($nextSlot);
+        $nextSlotNull = $context->builder->icmp(Builder::INT_EQ, $nextPtr, $voidPtr->constNull());
+        $bbNextNull = BasicBlockHelper::append($context, 'dom_doc_ac_frag_next_null');
+        $bbNextRead = BasicBlockHelper::append($context, 'dom_doc_ac_frag_next_read');
+        $bbAfterNext = BasicBlockHelper::append($context, 'dom_doc_ac_frag_after_next');
+        $context->builder->branchIf($nextSlotNull, $bbNextNull, $bbNextRead);
+        $context->builder->positionAtEnd($bbNextNull);
+        $context->builder->branch($bbAfterNext);
+        $context->builder->positionAtEnd($bbNextRead);
+        $nextObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($nextPtr, $context->getTypeFromString('__value__*'))
+        );
+        $context->builder->branch($bbAfterNext);
+        $context->builder->positionAtEnd($bbAfterNext);
+        $nextPhi = $context->builder->phi($objPtrTy);
+        $nextPhi->addIncoming($objPtrTy->constNull(), $bbNextNull);
+        $nextPhi->addIncoming($nextObj, $bbNextRead);
+        // Unlink sibling pointers before Document append.
+        $objectType->propertyStore($nextSlot, $nullJit, JITVariable::TYPE_VALUE);
+        $prevSlot = $objectType->propertySlotFor($cur, 'DOMElement', VmDom::PROP_PREVIOUS_SIBLING);
+        $objectType->propertyStore($prevSlot, $nullJit, JITVariable::TYPE_VALUE);
+
+        $curJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $cur);
+        self::invokeDocumentAppend($context, $documentVar, $curJit);
+        $context->builder->store($nextPhi, $curAlloca);
+        $context->builder->branch($bbLoop);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return self::boxObjectResult($context, $fragment);
+    }
+
     public static function invokeDocumentAppend(
         Context $context,
         JITVariable $documentVar,
