@@ -5955,6 +5955,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringTrimMask.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringTrimModeJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUcwords.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUmask.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/UmaskLibcRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUniqid.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnitEnumExists.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/UnlinkLibcRuntime.php';
