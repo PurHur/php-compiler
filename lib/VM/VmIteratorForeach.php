@@ -191,6 +191,115 @@ final class VmIteratorForeach
         return null;
     }
 
+    /**
+     * Untyped `__value__` foreach container: arrays → readHashtable; HT-backed SPL objects
+     * (runtime unserialize without classUserType) → splBackingHashtable (#33665).
+     *
+     * Compile-time `unserialize('O:…')` is tagged in {@see \PHPCompiler\JIT::propagateUnserializeSplFixedArrayResultType};
+     * `unserialize(serialize($x))` is not.
+     */
+    private static function hashtableFromUntypedValueBox(Context $context, JitVariable $array): JitVariable
+    {
+        $valPtr = JitValueBox::valuePtrFromVariable($context, $array);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_OBJECT & 0x7f, false)
+        );
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $objBb = $fn->appendBasicBlock('foreach_value_obj');
+        $arrBb = $fn->appendBasicBlock('foreach_value_arr');
+        $doneBb = $fn->appendBasicBlock('foreach_value_ht_done');
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $htSlot = BasicBlockHelper::entryAlloca($context, $htPtrTy);
+        $context->builder->branchIf($isObject, $objBb, $arrBb);
+
+        $context->builder->positionAtEnd($objBb);
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valPtr
+        );
+        $receiver = new JitVariable(
+            $context,
+            JitVariable::TYPE_OBJECT,
+            JitVariable::KIND_VALUE,
+            $objPtr
+        );
+        $classId = $context->type->object->readRuntimeClassId($objPtr);
+        $htBacked = self::emitIsRuntimeHtBackedClassId($context, $classId);
+        $splBb = $fn->appendBasicBlock('foreach_value_spl_ht');
+        $objMissBb = $fn->appendBasicBlock('foreach_value_obj_miss');
+        $context->builder->branchIf($htBacked, $splBb, $objMissBb);
+
+        $context->builder->positionAtEnd($splBb);
+        $splHt = $context->type->object->splBackingHashtable($receiver);
+        $context->builder->store($context->helper->loadValue($splHt), $htSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($objMissBb);
+        // Non-HT object in VALUE box: keep legacy readHashtable (same SEGV risk as before).
+        $missHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valPtr
+        );
+        $context->builder->store($missHt, $htSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($arrBb);
+        $arrHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valPtr
+        );
+        $context->builder->store($arrHt, $htSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return new JitVariable(
+            $context,
+            JitVariable::TYPE_HASHTABLE,
+            JitVariable::KIND_VALUE,
+            $context->builder->load($htSlot)
+        );
+    }
+
+    /**
+     * OR of class-id equality for HT-backed SPL names registered in this module (#33665).
+     */
+    private static function emitIsRuntimeHtBackedClassId(Context $context, Value $classId): Value
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $acc = $i1->constInt(0, false);
+        $names = SplOuterIteratorHt::classNamesLc();
+        $names[] = 'splstack';
+        $seen = [];
+        foreach ($names as $lc) {
+            if (isset($seen[$lc])) {
+                continue;
+            }
+            $seen[$lc] = true;
+            $id = $context->type->object->classIdForLowerName($lc);
+            if (null === $id) {
+                continue;
+            }
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $context->constantFromInteger($id, 'int64')
+            );
+            $acc = $context->builder->or($acc, $match);
+        }
+
+        return $acc;
+    }
+
     private static function asHashtable(Context $context, JitVariable $array, ?string $containerUserType): JitVariable
     {
         if (JitVariable::TYPE_HASHTABLE === $array->type) {
@@ -225,18 +334,9 @@ final class VmIteratorForeach
             }
         }
         if (JitVariable::TYPE_VALUE === $array->type) {
-            $valPtr = JitValueBox::valuePtrFromVariable($context, $array);
-            $ht = $context->builder->call(
-                $context->lookupFunction('__value__readHashtable'),
-                $valPtr
-            );
-
-            return new JitVariable(
-                $context,
-                JitVariable::TYPE_HASHTABLE,
-                JitVariable::KIND_VALUE,
-                $ht
-            );
+            // Untyped VALUE: arrays use readHashtable; unserialize(serialize($ao)) leaves an
+            // object box without classUserType — probe type byte / class id (#33665 / leftover #33654).
+            return self::hashtableFromUntypedValueBox($context, $array);
         }
         if (JitVariable::TYPE_OBJECT === $array->type) {
             if (self::usesObjectKeys($containerUserType) || self::usesArrayIteratorHt($containerUserType)) {
