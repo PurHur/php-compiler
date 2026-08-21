@@ -466,6 +466,41 @@ final class JitDomAttributeNodeNS
         return $updates;
     }
 
+    /**
+     * After removeAttributeNode: drop createAttribute key from saveXML suffix (#33577).
+     *
+     * Mirror {@see \PHPCompiler\JIT\Call\DomElementRemoveAttribute} — pin/cache clear alone
+     * leaves PROP_USER_SCRIPT_XMLNS_ATTR stale so saveXML still emits the attr.
+     */
+    public static function syncSaveXmlAttrSuffixAfterRemoveAttributeNode(
+        Context $context,
+        JITVariable $elementArg
+    ): void {
+        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        if (null === $local || 'xmlns' === $local) {
+            return;
+        }
+        $id = $elementArg->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+        if (null !== $id) {
+            JitDomCreateElementAttrs::remove($id, $local);
+        }
+        $attrs = $elementArg->compileTimeDomAttributes;
+        if (null === $attrs && null !== $id) {
+            $attrs = JitDomCreateElementAttrs::get($id);
+        }
+        if (null === $attrs) {
+            $attrs = [];
+        } else {
+            unset($attrs[$local]);
+            $elementArg->compileTimeDomAttributes = $attrs;
+        }
+        if ('' === $ns) {
+            DomUserScriptAttributeCacheLlvm::clearLiteral($context, $ns, $local);
+        }
+        self::syncSaveXmlAttrSuffix($context, $elementArg, $attrs);
+    }
+
     public static function materializeAttrFromLiterals(
         Context $context,
         string $namespace,
@@ -1160,7 +1195,7 @@ final class JitDomAttributeNodeNS
             $cont = BasicBlockHelper::append($context, 'dom_rmattrnode_cont_'.$seq);
             $context->builder->branchIf($isMatch, $hit, $cont);
             $context->builder->positionAtEnd($hit);
-            DomUserScriptAttributeCacheLlvm::nullSlot($context, $ns, $local);
+            DomUserScriptAttributeCacheLlvm::clearLiteral($context, $ns, $local);
             if ('' === $ns && 'id' === $local) {
                 DomUserScriptElementCacheLlvm::clearId($context);
             }
