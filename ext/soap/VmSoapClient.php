@@ -2948,6 +2948,105 @@ final class VmSoapClient
     }
 
     /**
+     * php-src APACHE_MAP / apache Map — xsi:type local name Map (#32222 / to_zval_map).
+     */
+    private static function isApacheMapElement(\DOMElement $el, ?string $hintType): bool
+    {
+        [$local, $ns] = self::xsiTypeNameAndNs($el);
+        if ('Map' === $local) {
+            return null === $ns || SoapConstants::APACHE_NAMESPACE === $ns;
+        }
+        if ('Map' === $hintType) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * php-src to_zval_map — item/key/value children → PHP array (#3724, ext/soap/php_encoding.c).
+     *
+     * @param list<\DOMElement>                                                                     $childElements
+     * @param array<string, string>                                                                 $classmap
+     * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
+     * @param array<string, string>                                                                 $elementTypes
+     * @param array<string, array<string, string>>                                                  $complexTypeFields
+     *
+     * @return array<string|int, mixed>|null
+     */
+    private static function decodeApacheMap(
+        \DOMElement $el,
+        array $childElements,
+        bool $singleElementArrays,
+        array $classmap,
+        array $typemap,
+        array $elementTypes,
+        array $complexTypeFields
+    ): ?array {
+        if (0 === \count($childElements)) {
+            if ($el->hasAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'nil')) {
+                return null;
+            }
+
+            return null;
+        }
+        $out = [];
+        foreach ($childElements as $item) {
+            $itemLocal = $item->localName ?? $item->nodeName;
+            if ('item' !== $itemLocal) {
+                continue;
+            }
+            $xmlKey = null;
+            $xmlValue = null;
+            foreach ($item->childNodes as $child) {
+                if (!$child instanceof \DOMElement) {
+                    continue;
+                }
+                $ln = $child->localName ?? $child->nodeName;
+                if ('key' === $ln && null === $xmlKey) {
+                    $xmlKey = $child;
+                } elseif ('value' === $ln && null === $xmlValue) {
+                    $xmlValue = $child;
+                }
+            }
+            if (null === $xmlKey) {
+                throw new \SoapFault('Client', "Encoding: Can't decode apache map, missing key");
+            }
+            if (null === $xmlValue) {
+                throw new \SoapFault('Client', "Encoding: Can't decode apache map, missing value");
+            }
+            $key = self::domElementToValue(
+                $xmlKey,
+                $singleElementArrays,
+                $classmap,
+                $typemap,
+                $elementTypes,
+                null,
+                $complexTypeFields
+            );
+            $value = self::domElementToValue(
+                $xmlValue,
+                $singleElementArrays,
+                $classmap,
+                $typemap,
+                $elementTypes,
+                null,
+                $complexTypeFields
+            );
+            if (\is_string($key) || \is_int($key)) {
+                $out[$key] = $value;
+            } else {
+                throw new \SoapFault(
+                    'Client',
+                    "Encoding: Can't decode apache map, only Strings or Longs are allowed as keys"
+                );
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * php-src to_xml_map — APACHE_MAP item/key/value (#32222).
      *
      * @param array<string|int, mixed> $map
@@ -3597,6 +3696,18 @@ final class VmSoapClient
             if ($child instanceof \DOMElement) {
                 $childElements[] = $child;
             }
+        }
+        // php-src to_zval_map — APACHE_MAP xsi:type Map → PHP assoc array (#3724).
+        if (self::isApacheMapElement($el, $hintType)) {
+            return self::decodeApacheMap(
+                $el,
+                $childElements,
+                $singleElementArrays,
+                $classmap,
+                $typemap,
+                $elementTypes,
+                $complexTypeFields
+            );
         }
         if (0 === \count($childElements)) {
             $text = $el->textContent;
