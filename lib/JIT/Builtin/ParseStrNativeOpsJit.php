@@ -85,6 +85,46 @@ final class ParseStrNativeOpsJit
         );
     }
 
+    /** String-key float write — NestedJIT float lexeme as string → strtod (#33670). */
+    public static function setStringKeyDouble(Context $context, JITVariable $htPtr, JITVariable $key, JITVariable $value): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $doubleVal = self::lowerDoubleArg($context, $value);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyDouble'),
+            $ht,
+            $keyStr,
+            $doubleVal
+        );
+    }
+
+    /** String-key bool write (#33670 / php-src spl_array.c __unserialize). */
+    public static function setStringKeyBool(Context $context, JITVariable $htPtr, JITVariable $key, JITVariable $value): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $boolVal = \PHPCompiler\JIT\JitBoolArg::lower($context, $value, 'phpc_native_ht bool value');
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyBool'),
+            $ht,
+            $keyStr,
+            $boolVal
+        );
+    }
+
+    /** String-key null write (#33670 / php-src stores N; in the bag). */
+    public static function setStringKeyNull(Context $context, JITVariable $htPtr, JITVariable $key): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyNull'),
+            $ht,
+            $keyStr
+        );
+    }
+
     public static function setHashtableAt(Context $context, JITVariable $htPtr, JITVariable $index, JITVariable $childPtr): void
     {
         $ht = self::htFromI64($context, $htPtr);
@@ -186,5 +226,28 @@ final class ParseStrNativeOpsJit
     private static function ownedString(Context $context, Value $str): Value
     {
         return $context->builder->call($context->lookupFunction('__string__separate'), $str);
+    }
+
+    private static function lowerDoubleArg(Context $context, JITVariable $value): Value
+    {
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $value->type) {
+            return $context->helper->loadValue($value);
+        }
+        if (JITVariable::TYPE_STRING === $value->type) {
+            return JitLongArg::lowerStringToDouble(
+                $context,
+                self::ownedString($context, self::loadStringArg($context, $value))
+            );
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $value->type) {
+            return $context->builder->siToFp(
+                JitLongArg::lower($context, $value, 'phpc_native_ht double from long'),
+                $context->getTypeFromString('double')
+            );
+        }
+
+        throw new \LogicException(
+            'ParseStrNativeOpsJit: expected double/string/long for setStringKeyDouble, got '.$value->type
+        );
     }
 }

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * NestedJIT: fill `__spl_ht` from bag storage at `i:1;a:` offset (#33636 / #33663).
+ * NestedJIT: fill `__spl_ht` from bag storage at `i:1;a:` offset (#33636 / #33663 / #33670).
  *
- * Own TU / single method — string-key bags with int / string / null values.
+ * Own TU / single method — string-key bags with int / string / float / bool / null values.
  * `$pos` must point at the `i` of `i:1;a:`.
  * Packed int-key bags stay in {@see UnserializeSplArrayFillIntKeyNestedJitHelper}.
  */
@@ -62,8 +62,8 @@ final class UnserializeSplArrayFillNestedJitHelper
             }
             $pos = $pos + 2;
             if ('N' === $payload[$pos] && $pos + 1 < $len && ';' === $payload[$pos + 1]) {
-                // php-src stores null; NestedJIT has no string-key null setter — skip slot.
                 $pos = $pos + 2;
+                phpc_native_ht_set_string_key_null($htPtr, $key);
             } elseif ('i' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
                 $pos = $pos + 2;
                 $num = 0;
@@ -86,6 +86,33 @@ final class UnserializeSplArrayFillNestedJitHelper
                     $num = 0 - $num;
                 }
                 phpc_native_ht_set_string_key_long($htPtr, $key, $num);
+            } elseif ('d' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
+                // Float lexeme as string → strtod in phpc_native_ht_set_string_key_double (#33670).
+                $pos = $pos + 2;
+                $fstr = '';
+                $sawF = false;
+                while ($pos < $len && ';' !== $payload[$pos]) {
+                    $sawF = true;
+                    $fstr .= $payload[$pos];
+                    $pos = $pos + 1;
+                }
+                if (!$sawF || $pos >= $len || ';' !== $payload[$pos]) {
+                    return 0;
+                }
+                $pos = $pos + 1;
+                phpc_native_ht_set_string_key_double($htPtr, $key, $fstr);
+            } elseif ('b' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+                if ($pos >= $len || ('0' !== $payload[$pos] && '1' !== $payload[$pos])) {
+                    return 0;
+                }
+                $bval = ('1' === $payload[$pos]) ? 1 : 0;
+                $pos = $pos + 1;
+                if ($pos >= $len || ';' !== $payload[$pos]) {
+                    return 0;
+                }
+                $pos = $pos + 1;
+                phpc_native_ht_set_string_key_bool($htPtr, $key, $bval);
             } elseif ('s' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
                 $pos = $pos + 2;
                 $slen = 0;
