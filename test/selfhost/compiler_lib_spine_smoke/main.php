@@ -5944,6 +5944,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringSubstrCompare.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSubstrCount.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSuperglobalName.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSymlink.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SymlinkLibcRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSysGetloadavg.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSyslog.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringTempnam.php';

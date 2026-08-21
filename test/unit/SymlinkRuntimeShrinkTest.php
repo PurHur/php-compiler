@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\SymlinkJitHelper;
 use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
-/** symlink() JIT routes through SymlinkJitHelper PHP not libc symlinkat LLVM (#15544). */
+/** symlink() AOT uses libc symlink(2); VM helper stays on VmFs (#15544 / #33415). */
 final class SymlinkRuntimeShrinkTest extends TestCase
 {
     public function testJitSymlinkUsesPhpBridgeNotLibc(): void
@@ -18,11 +18,20 @@ final class SymlinkRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('symlinkat')", $source);
     }
 
-    public function testStringSymlinkBridgeUsesSymlinkJitHelper(): void
+    public function testStringSymlinkBridgeUsesSymlinkLibcRuntime(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSymlink.php');
-        $this->assertStringContainsString('SymlinkJitHelper', $bridge);
+        // Thin AOT: libc symlink(2) — NestedJIT helper re-enters __phpc_jit_symlink (#33415).
+        $this->assertStringContainsString('SymlinkLibcRuntime', $bridge);
         $this->assertStringNotContainsString("lookupFunction('symlinkat')", $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        // Insert-block restore so mid-emit ensureLinked does not orphan symlink calls (#33415).
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $bridge);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $bridge);
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SymlinkLibcRuntime.php');
+        $this->assertStringContainsString("lookupFunction('symlink')", $libc);
+        $this->assertStringContainsString('LibcExtern::ensureSymlink', $libc);
     }
 
     public function testSymlinkJitHelperDelegatesToVmFs(): void
@@ -59,10 +68,11 @@ final class SymlinkRuntimeShrinkTest extends TestCase
         rmdir($base);
     }
 
-    public function testSpineBundleIncludesSymlinkJitHelper(): void
+    public function testSpineBundleIncludesSymlinkLibcRuntime(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('SymlinkJitHelper.php', $spine);
         $this->assertStringContainsString('StringSymlink.php', $spine);
+        $this->assertStringContainsString('SymlinkLibcRuntime.php', $spine);
     }
 }

@@ -368,6 +368,34 @@ final class LibcExtern
     }
 
     /**
+     * Module-local symlink(2) after LibcExtern always-on drop (#33415).
+     *
+     * User-script symlink() stays on {@see Builtin\StringSymlink} / __phpc_jit_symlink;
+     * {@see Builtin\SymlinkLibcRuntime} calls this before lookupFunction('symlink').
+     * Peer: ensureRmdir (#33403).
+     */
+    public static function ensureSymlink(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $name = 'symlink';
+        try {
+            $context->lookupFunction($name);
+
+            return;
+        } catch (\LogicException $e) {
+        }
+        $fn = $context->module->getNamedFunction($name);
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                $name,
+                $context->context->functionType($i32, false, $i8p, $i8p)
+            );
+        }
+        $context->registerFunction($name, $fn);
+    }
+
+    /**
      * Module-local printf(3) after LibcExtern always-on drop (#31706).
      *
      * User-script printf() stays on JitPrintf / __compiler_printf (#3681); NestedJIT
