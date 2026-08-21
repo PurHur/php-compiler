@@ -263,12 +263,14 @@ final class JitDomAppendChildLiveSlots
     }
 
     /**
-     * php-src dom_node_append_child: remove from a foreign parent before append (#33404).
+     * php-src tree mutation: remove from a foreign parent before append/insert/replace
+     * (#33404 / #33450).
      *
      * Rebuilds INNER_XML on the old parent and its element ancestors so saveXML
-     * on grandparents matches Zend after the move.
+     * on grandparents matches Zend after the move. Shared by
+     * {@see JitDomInsertBeforeLiveSlots} / {@see JitDomReplaceChildLiveSlots}.
      */
-    private static function detachFromForeignParentIfNeeded(
+    public static function detachFromForeignParentIfNeeded(
         Context $context,
         Value $newParent,
         Value $child

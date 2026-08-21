@@ -23,6 +23,8 @@ use PHPLLVM\Value;
  * Prior path always allocated a fresh length=2 list (item0=new, item1=ref),
  * leaving held lists stale and refetch collapsed to 2 (#32801 / re-#32784).
  * DocumentFragment stand-ins expand children before $refChild (#33312).
+ * Cross-parent reparent must unlink the old parent first (php-src
+ * dom_node_insert_before) — peer appendChild #33404 / #33450.
  *
  * Reference: php-src ext/dom/node.c dom_node_insert_before.
  */
@@ -82,6 +84,9 @@ final class JitDomInsertBeforeLiveSlots
         $parentJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $parent);
         $nullBox = self::nullValueVar($context);
 
+        // php-src: if newChild already has a different parent, remove it first (#33450).
+        JitDomAppendChildLiveSlots::detachFromForeignParentIfNeeded($context, $parent, $newChild);
+
         $prev = JitDomParentChildLinkLayout::loadSibling(
             $context,
             $refChild,
@@ -132,6 +137,10 @@ final class JitDomInsertBeforeLiveSlots
 
         $context->builder->positionAtEnd($afterFec);
         self::incrementChildNodesLengthInPlace($context, $parent);
+        // saveXML reads PROP_USER_SCRIPT_INNER_XML — rebuild destination + ancestors
+        // so createElement trees match Zend after cross-parent insert (#33450).
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
     }
 
     /**
