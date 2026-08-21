@@ -720,11 +720,12 @@ class Type extends Builtin {
             $this->context->context->functionType($strPtr, false, $i64)
         );
         $this->context->registerFunction('__phpc_stream_path', $fnStreamPath);
-        $fnFgetcsv = $this->context->module->addFunction(
-            '__compiler_fgetcsv',
-            $this->context->context->functionType($htPtr, false, $i64, $i64, $strPtr, $strPtr, $strPtr)
-        );
-        $this->context->registerFunction('__compiler_fgetcsv', $fnFgetcsv);
+        // __compiler_fgetcsv always-on shell removed (#33189): StringStreamCsv /
+        // StringFgetcsvJit owns the ABI (getNamedFunction first, then addFunction if
+        // absent via implementFgetcsvBridge; Type::initialize still
+        // StringStreamCsv::ensureLinked on the full load path). Leftover Type empty
+        // decls vs Runtime ABI drift mint fgetcsv.1 (#31894 / #32122). User-script
+        // fgetcsv() stays JitFgetcsv / CsvStrGetcsvJitHelper (php-src file.c).
         $fnStrGetcsv = $this->context->module->addFunction(
             '__compiler_str_getcsv',
             $this->context->context->functionType($htPtr, false, $strPtr, $strPtr, $strPtr, $strPtr)
@@ -1077,6 +1078,7 @@ class Type extends Builtin {
         StreamMeta::ensureLinked($this->context);
         StreamRead::ensureLinked($this->context);
         StreamResource::ensureLinked($this->context);
+        StringStreamCsv::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);

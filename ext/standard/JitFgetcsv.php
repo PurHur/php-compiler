@@ -11,7 +11,12 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for fgetcsv() via StringFgetcsvJit (issue #1192, #6750). */
+/**
+ * LLVM lowering for fgetcsv() via StringFgetcsvJit (#1192, #6750; ensureLinked #33189).
+ *
+ * Type no longer always-declares `__compiler_fgetcsv` after the leftover always-on shell
+ * drop (#33189) — must ensureLinked before lookup (peer {@see JitStreamGetContents} #33178).
+ */
 final class JitFgetcsv
 {
     /** @return Value
@@ -24,6 +29,7 @@ final class JitFgetcsv
         Value $enclosureStr,
         Value $escapeStr,
     ): Value {
+        // #33189 — Type dropped always-on __compiler_fgetcsv; link before lookup.
         StringStreamCsv::ensureLinked($context);
 
         $htPtr = $context->getTypeFromString('__hashtable__*');

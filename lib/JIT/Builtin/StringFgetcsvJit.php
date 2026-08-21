@@ -11,7 +11,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_fgetcsv via fgets + CsvStrGetcsvJitHelper (#6750, #9444, #13440, #27180).
+ * JIT/AOT link for __compiler_fgetcsv via fgets + CsvStrGetcsvJitHelper (#6750, #9444, #13440, #27180, #33189).
+ *
+ * Owns `__compiler_fgetcsv` ABI module-locally: {@see getNamedFunction} first, then
+ * {@see addFunction} if absent via {@see implementFgetcsvBridge}. Do not re-add empty
+ * always-on shells in {@see Type} — leftover decls mint fgetcsv.1 (#31894 / #32122 / #33189).
  *
  * Thin AOT must not NestedJIT CsvJitHelper fgetcsvArgv
  * (VmFs::fgetcsv / builtinHandlerFrame missing under NestedJIT). Read one line via
