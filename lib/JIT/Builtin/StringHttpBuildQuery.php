@@ -14,10 +14,12 @@ use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_http_build_query via HttpBuildQueryJitHelper PHP (#9443, #24887, #26869).
+ * JIT/AOT link for __compiler_http_build_query via HttpBuildQueryJitHelper PHP (#9443, #24887, #26869, #33208).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringStrtr #21844).
  * Thin LLVM bridge forwards the ABI; call-site {@see ensureLinked} for thin standalone AOT (#26869).
+ * Type always-on empty decl removed (#33208) so leftover Type shells cannot mint http_build_query.1
+ * (#31894 / #32122).
  * php-src: ext/standard/http.c — http_build_query
  */
 final class StringHttpBuildQuery

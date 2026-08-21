@@ -12,8 +12,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for http_build_query() via __compiler_http_build_query.
+ * LLVM lowering for http_build_query() via __compiler_http_build_query (#33208).
  *
+ * Call-site {@see StringHttpBuildQuery::ensureLinked} before lookup — Type no longer
+ * always-declares the ABI (#31894 / #32122).
  * php-src: ext/standard/http.c — Z_PARAM_ARRAY_OR_OBJECT + get_object_vars (#21950).
  */
 final class JitHttpBuildQuery
