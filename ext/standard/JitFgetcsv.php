@@ -5,22 +5,25 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\StringStreamCsv;
+use PHPCompiler\JIT\Builtin\StringStrGetcsv;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for fgetcsv() via StringFgetcsvJit (#1192, #6750; ensureLinked #33189).
+ * LLVM lowering for fgetcsv() — compose {@see JitFgets} + {@see JitStrGetcsv} (#1192, #6750, #33334).
  *
- * Type no longer always-declares `__compiler_fgetcsv` after the leftover always-on shell
- * drop (#33189) — must ensureLinked before lookup (peer {@see JitStreamGetContents} #33178).
+ * Do not call `__compiler_fgetcsv` (StringFgetcsvJit NestedJIT bridge): thin AOT SIGSEGVs
+ * after c:main_before_php when that ABI NestedJITs CSV helpers mid-function (#33334 / re-#27180).
+ * Peer: {@see JitStrGetcsv} avoids StreamCsv aggregate ensureLinked for the same reason (#27069).
+ *
+ * php-src: ext/standard/file.c — PHP_FUNCTION(fgetcsv)
  */
 final class JitFgetcsv
 {
-    /** @return Value
-     * (array row, or boolean false on failure/EOF) */
+    /** @return Value (__value__* — array row, or boolean false on EOF/failure) */
     public static function invoke(
         Context $context,
         Value $handleLong,
@@ -29,39 +32,63 @@ final class JitFgetcsv
         Value $enclosureStr,
         Value $escapeStr,
     ): Value {
-        // #33189 — Type dropped always-on __compiler_fgetcsv; link before lookup.
-        StringStreamCsv::ensureLinked($context);
+        // Link CSV NestedJIT helpers before emitting into the caller (main). Doing
+        // ensureLinked inside JitStrGetcsv after fgets IR is live still NestedJITs, but
+        // pinning first keeps StreamRead + CSV ABIs stable (#33334).
+        StringStrGetcsv::ensureLinked($context);
 
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $row = $context->builder->call(
-            $context->lookupFunction('__compiler_fgetcsv'),
-            $handleLong,
-            $lengthLong,
+        $i64 = $context->getTypeFromString('int64');
+        // php-src: length <= 0 means no limit; fgets ABI uses length as max (incl. NUL).
+        $defaultCap = $i64->constInt(8192, false);
+        $useDefault = $context->builder->icmp(Builder::INT_SLT, $lengthLong, $i64->constInt(1, false));
+        $fgetsLen = $context->builder->select($useDefault, $defaultCap, $lengthLong);
+
+        $lineBox = JitFgets::invoke($context, $handleLong, $fgetsLen);
+        $linePtr = JitValueBox::pointer($context, $lineBox);
+
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load($context->builder->structGep($linePtr, $map['type']));
+        $i8 = $context->getTypeFromString('int8');
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
+        );
+
+        $eofBb = BasicBlockHelper::append($context, 'fgetcsv_compose_eof');
+        $parseBb = BasicBlockHelper::append($context, 'fgetcsv_compose_parse');
+        $doneBb = BasicBlockHelper::append($context, 'fgetcsv_compose_done');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isBool, $eofBb, $parseBb);
+
+        $context->builder->positionAtEnd($eofBb);
+        // JitFgets writes bool false on EOF — propagate.
+        $context->builder->store($linePtr, $resultSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($parseBb);
+        $lineStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $linePtr
+        );
+        // Own the fgets buffer before NestedJIT str_getcsv — shared/temporary
+        // __string__* from readString UAF'd under thin AOT (#33334).
+        $lineOwned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $lineStr
+        );
+        $csvBox = JitStrGetcsv::invoke(
+            $context,
+            $lineOwned,
             $separatorStr,
             $enclosureStr,
             $escapeStr
         );
-        $failed = $context->builder->icmp(Builder::INT_EQ, $row, $htPtr->constNull());
+        $context->builder->store(JitValueBox::pointer($context, $csvBox), $resultSlot);
+        $context->builder->branch($doneBb);
 
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->positionAtEnd($doneBb);
 
-        $failBlock = BasicBlockHelper::append($context, 'fgetcsv_fail');
-        $okBlock = BasicBlockHelper::append($context, 'fgetcsv_ok');
-        $doneBlock = BasicBlockHelper::append($context, 'fgetcsv_done');
-        $context->builder->branchIf($failed, $failBlock, $okBlock);
-
-        $context->builder->positionAtEnd($failBlock);
-        $i1 = $context->getTypeFromString('int1');
-        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($okBlock);
-        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $ptr, $row);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($doneBlock);
-
-        return $ptr;
+        return $context->builder->load($resultSlot);
     }
 }

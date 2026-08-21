@@ -10,6 +10,7 @@ namespace PHPCompiler\ext\standard;
  * Single-field only — callers walk the fields HashTable in LLVM (peer JitImplode).
  * Avoids {@see CsvJitHelper::formatFieldsArgv} → HashTable::iterate / VmFputcsv /
  * VmCsv, which SIGSEGV under thin standalone NestedJIT.
+ * Loops use strlen (not isset($str[$i])) — NestedJIT isset(string offset) is wrong (#33334).
  *
  * Semantics SSOT: {@see VmCsv::formatLine()} / php-src ext/standard/file.c php_fputcsv.
  */
@@ -24,15 +25,18 @@ final class CsvFputcsvJitHelper
         string $enclosure,
         string $escape,
     ): string {
-        $delim = isset($separator[0]) ? $separator[0] : ',';
-        $enc = isset($enclosure[0]) ? $enclosure[0] : '"';
+        // Prefer strlen + index over isset($str[$i]) — NestedJIT thin AOT treats
+        // isset(string offset) as false / can SIGSEGV (#33334, re-#27180).
+        $delim = '' !== $separator ? $separator[0] : ',';
+        $enc = '' !== $enclosure ? $enclosure[0] : '"';
         // php-src PHP_CSV_NO_ESCAPE — empty $escape does not treat '\' as special (#24561).
-        $hasEsc = isset($escape[0]);
+        $hasEsc = '' !== $escape;
         $esc = $hasEsc ? $escape[0] : '';
 
         $needsQuotes = false;
+        $len = \strlen($field);
         $i = 0;
-        while (isset($field[$i])) {
+        while ($i < $len) {
             $c = $field[$i];
             // php-src FPUTCSV_FLD_CHK: delim, enclosure, escape, CR/LF, space, tab (#29058).
             if ($c === $delim || $c === $enc || ($hasEsc && $c === $esc)
@@ -48,7 +52,7 @@ final class CsvFputcsvJitHelper
 
         $out = $enc;
         $i = 0;
-        while (isset($field[$i])) {
+        while ($i < $len) {
             $c = $field[$i];
             if ($c === $enc) {
                 // php-src — only enclosure is doubled inside quotes.

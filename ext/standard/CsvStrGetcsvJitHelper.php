@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 /**
  * str_getcsv() NestedJIT helper for thin AOT (#27069, #33334, php-in-PHP).
  *
- * Single-function parse (no helper returns of array pairs — NestedJIT failed to
- * advance `$i = $parsed[1]` and hung). Indexed `$fields[$n]=` only; isset lengths.
+ * Length via strlen; char compares via ord() — NestedJIT isset($str[$i]) is false and
+ * `$str[$i] === '"'` can fail for quote bytes (#33334 / re-#27180).
  * Outer parse cursor lives in `$pos[0]` — NestedJIT does not loop-carry a scalar
  * `$i` across the field while (#33334: quoted commas became unquoted splits).
  *
@@ -16,18 +16,12 @@ namespace PHPCompiler\ext\standard;
  */
 final class CsvStrGetcsvJitHelper
 {
-    /**
-     * Strip trailing CR/LF before fgetcsv parse (php-src / {@see VmFs::fgetcsvNative}).
-     */
     public static function stripLineTerminatorsArgv(string $line): string
     {
-        $len = 0;
-        while (isset($line[$len])) {
-            ++$len;
-        }
+        $len = \strlen($line);
         while ($len > 0) {
-            $c = $line[$len - 1];
-            if ("\n" !== $c && "\r" !== $c) {
+            $c = \ord($line[$len - 1]);
+            if (10 !== $c && 13 !== $c) {
                 break;
             }
             --$len;
@@ -54,22 +48,15 @@ final class CsvStrGetcsvJitHelper
         string $enclosure,
         string $escape,
     ): array {
-        // php-src / VmCsv::parseLine — strip trailing CR/LF before parse (#28994).
-        // Inlined from stripLineTerminatorsArgv (no NestedJIT cross-method return).
-        $len = 0;
-        while (isset($input[$len])) {
-            ++$len;
-        }
+        $len = \strlen($input);
         while ($len > 0) {
-            $c = $input[$len - 1];
-            if ("\n" !== $c && "\r" !== $c) {
+            $c = \ord($input[$len - 1]);
+            if (10 !== $c && 13 !== $c) {
                 break;
             }
             --$len;
         }
         if (0 === $len) {
-            // NestedJIT aborts on `return [null]` — empty array signals null-row to the bridge (#27069).
-            // Also covers terminator-only rows after strip (#10623).
             return [];
         }
         $trimmed = '';
@@ -80,10 +67,10 @@ final class CsvStrGetcsvJitHelper
         }
         $input = $trimmed;
 
-        $delim = isset($separator[0]) ? $separator[0] : ',';
-        $enc = isset($enclosure[0]) ? $enclosure[0] : '"';
-        $hasEsc = isset($escape[0]);
-        $esc = $hasEsc ? $escape[0] : '';
+        $delimOrd = \strlen($separator) > 0 ? \ord($separator[0]) : 44; // ','
+        $encOrd = \strlen($enclosure) > 0 ? \ord($enclosure[0]) : 34; // '"'
+        $hasEsc = \strlen($escape) > 0;
+        $escOrd = $hasEsc ? \ord($escape[0]) : 0;
 
         $fields = [];
         $n = 0;
@@ -106,24 +93,28 @@ final class CsvStrGetcsvJitHelper
             }
 
             $j = $i;
-            while ($j < $len && $input[$j] !== $delim && self::isCsvWhitespace($input[$j])) {
+            while ($j < $len) {
+                $cj = \ord($input[$j]);
+                if ($cj === $delimOrd || !(32 === $cj || 9 === $cj || 10 === $cj || 13 === $cj || 11 === $cj || 12 === $cj)) {
+                    break;
+                }
                 ++$j;
             }
 
-            if ($j < $len && $input[$j] === $enc) {
+            if ($j < $len && \ord($input[$j]) === $encOrd) {
                 $i = $j + 1;
                 $field = '';
                 $closed = false;
                 while ($i < $len) {
-                    $c = $input[$i];
-                    if ($hasEsc && $esc !== $enc && $c === $esc && $i + 1 < $len) {
-                        $field .= $esc.$input[$i + 1];
+                    $c = \ord($input[$i]);
+                    if ($hasEsc && $escOrd !== $encOrd && $c === $escOrd && $i + 1 < $len) {
+                        $field .= $escape[0].$input[$i + 1];
                         $i += 2;
                         continue;
                     }
-                    if ($c === $enc) {
-                        if ($i + 1 < $len && $input[$i + 1] === $enc) {
-                            $field .= $enc;
+                    if ($c === $encOrd) {
+                        if ($i + 1 < $len && \ord($input[$i + 1]) === $encOrd) {
+                            $field .= $enclosure[0];
                             $i += 2;
                             continue;
                         }
@@ -131,16 +122,17 @@ final class CsvStrGetcsvJitHelper
                         $closed = true;
                         break;
                     }
-                    $field .= $c;
+                    $field .= $input[$i];
                     ++$i;
                 }
                 if ($closed) {
-                    while ($i < $len && $input[$i] !== $delim) {
+                    while ($i < $len && \ord($input[$i]) !== $delimOrd) {
                         $field .= $input[$i];
                         ++$i;
                     }
                 }
-                if (!$closed && !isset($field[0])) {
+                // Empty unclosed field → "\0" sentinel for NestedJIT (#27069).
+                if (!$closed && 0 === \strlen($field)) {
                     $fields[$n] = "\0";
                 } else {
                     $fields[$n] = $field;
@@ -148,7 +140,7 @@ final class CsvStrGetcsvJitHelper
                 ++$n;
             } else {
                 $field = '';
-                while ($i < $len && $input[$i] !== $delim) {
+                while ($i < $len && \ord($input[$i]) !== $delimOrd) {
                     $field .= $input[$i];
                     ++$i;
                 }
@@ -160,17 +152,12 @@ final class CsvStrGetcsvJitHelper
                 $pos[0] = $i;
                 break;
             }
-            if ($input[$i] === $delim) {
+            if (\ord($input[$i]) === $delimOrd) {
                 ++$i;
             }
             $pos[0] = $i;
         }
 
         return $fields;
-    }
-
-    private static function isCsvWhitespace(string $byte): bool
-    {
-        return ' ' === $byte || "\t" === $byte || "\n" === $byte || "\r" === $byte || "\v" === $byte || "\f" === $byte;
     }
 }
