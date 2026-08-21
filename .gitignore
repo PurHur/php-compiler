@@ -41,3 +41,4 @@ build/libsodium-aegis/
 build/libsodium-src/
 build/helloworld-aot
 build/compliance-shards
+.worktrees/
