@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for stream_copy_to_stream() via __compiler_stream_copy_to_stream (#3272). */
+/**
+ * LLVM lowering for stream_copy_to_stream() via __compiler_stream_copy_to_stream (#3272; ensureLinked #33182).
+ *
+ * ABI owned by {@see StreamReadRuntime} / {@see JitStreamReadBridgeKernel} after Type always-on
+ * drop (#33182) — must ensureLinked before lookup (peer {@see JitFseek} / {@see JitStreamGetContents}).
+ */
 final class JitStreamCopyToStream
 {
     /** @return Value (int bytes copied, or boolean false on failure) */
@@ -21,6 +27,7 @@ final class JitStreamCopyToStream
         Value $maxlengthLong,
         Value $offsetLong,
     ): Value {
+        StreamReadRuntime::ensureLinked($context);
         $copied = $context->builder->call(
             $context->lookupFunction('__compiler_stream_copy_to_stream'),
             $sourceLong,
