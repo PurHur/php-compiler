@@ -7,9 +7,10 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * Stream read dispatch — JIT embed and AOT standalone via StreamReadRuntime PHP (#9393, #12937).
+ * Stream read dispatch — JIT embed and AOT standalone via StreamReadRuntime PHP (#9393, #12937, #33104).
  *
- * php-src: ext/standard/flock.c, ext/standard/streams.c, ext/standard/file.c
+ * Type always-on `__compiler_flock` shell dropped (#33104); Runtime owns getNamedFunction-first.
+ * php-src: ext/standard/flock_compat.c, ext/standard/streams.c, ext/standard/file.c
  */
 final class StreamReadJit
 {

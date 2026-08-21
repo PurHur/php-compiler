@@ -15,11 +15,13 @@ use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #20982).
+ * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #20982, #33104).
  *
  * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
  * via {@see JitVmHelperLink} (StreamLifecycle #20966 / StreamIo #20943 shape — no deferred stub fork).
  * LLVM bridges live in {@see JitStreamReadBridgeKernel}.
+ * Owns `__compiler_flock` module-locally (getNamedFunction first) — Type always-on shell
+ * dropped (#33104 / #32122 name.1 class).
  * SSOT: {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
  * php-src: ext/standard/file.c, ext/standard/flock_compat.c
  */
