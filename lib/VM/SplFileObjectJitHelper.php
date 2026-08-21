@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\ext\standard\JitFlock;
 use PHPCompiler\ext\standard\JitFputcsv;
 use PHPCompiler\ext\standard\JitFread;
+use PHPCompiler\ext\standard\JitFseek;
 use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitFtruncate;
 use PHPCompiler\ext\standard\JitPath;
@@ -39,12 +40,13 @@ use PHPLLVM\Value;
  * ftell/flock on `__spl_fd` (#33336) via JitFtell / JitFlock.
  * ftruncate on `__spl_fd` (#33348) via JitFtruncate (peer procedural #33155).
  * fputcsv on `__spl_fd` (#33340) via JitFputcsv (peer procedural #33334 / #27180).
+ * fseek on `__spl_fd` (#33347) via JitFseek (clears iterator line cache like rewind).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
  * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_ftruncate /
- * zim_SplFileObject_fputcsv / zim_SplFileInfo_openFile
+ * zim_SplFileObject_fputcsv / zim_SplFileObject_fseek / zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -276,6 +278,35 @@ final class SplFileObjectJitHelper
         $handle = self::loadFd($context, $receiver);
 
         return JitFtell::invoke($context, $handle);
+    }
+
+    /**
+     * SplFileObject::fseek — php_stream_seek on live handle (#33347).
+     * php-src: zim_SplFileObject_fseek — clears current line cache like rewind.
+     */
+    public static function compileFseek(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $offsetArg,
+        ?JITVariable $whenceArg = null
+    ): Value {
+        self::ensureStreamAbis($context);
+        $obj = self::loadObject($context, $receiver);
+        $handle = self::loadFd($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $offset = self::loadLong($context, $offsetArg);
+        $whence = null !== $whenceArg
+            ? self::loadLong($context, $whenceArg)
+            : $i64->constInt(0, false); // SEEK_SET
+        $resultPtr = JitFseek::invoke($context, $handle, $offset, $whence);
+        // php-src: after seek, drop cached current_line / has_current_line / eof latch.
+        self::storeLongProp($context, $obj, self::PROP_LINE, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
+
+        return $resultPtr;
     }
 
     /**

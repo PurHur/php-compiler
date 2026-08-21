@@ -53,6 +53,14 @@ final class SplFileObjectMethod implements Call
             ),
             'fgetc' => SplFileObjectJitHelper::compileFgetc($context, $args[0]),
             'ftell' => SplFileObjectJitHelper::compileFtell($context, $args[0]),
+            'fseek' => SplFileObjectJitHelper::compileFseek(
+                $context,
+                $args[0],
+                $args[1] ?? throw new \ArgumentCountError(
+                    'SplFileObject::fseek() expects at least 1 argument, 0 given'
+                ),
+                $args[2] ?? null
+            ),
             'flock' => SplFileObjectJitHelper::compileFlock(
                 $context,
                 $args[0],
