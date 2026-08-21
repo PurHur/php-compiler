@@ -28,7 +28,10 @@ final class JitDomNormalize
             $context->lookupFunction(DomNormalizeRuntime::ABI_NORMALIZE),
             $node
         );
+        // #text stand-ins are outside DomRegistry — NestedJIT merge is a no-op (#33438).
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_normalize_live_slots');
+            JitDomNormalizeLiveSlots::sync($context, $node);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_normalize_post');
         }
 
