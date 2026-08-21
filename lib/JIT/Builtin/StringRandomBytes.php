@@ -10,7 +10,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_random_bytes via RandomBytesJitHelper PHP (#9149, #21186, #29531).
+ * JIT/AOT link for __compiler_random_bytes via RandomBytesJitHelper PHP (#9149, #21186, #29531, #33160).
+ *
+ * Owns `__compiler_random_bytes` module-locally (getNamedFunction first via
+ * {@see JitVmHelperLink::ensureBridge}). Do not re-add empty always-on shells in
+ * {@see Type} — leftover decls mint random_bytes.1 (#31894 / #32122).
  *
  * Embed + thin standalone AOT: {@see RandomBytesJitHelper} via {@see JitVmHelperLink}
  * (HashEquals #20469 / Rename #19215 shape — no user-script null stub).
