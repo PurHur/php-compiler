@@ -11,9 +11,9 @@ use PHPCompiler\VM\DirectoryIteratorJitHelper;
 use PHPLLVM\Value;
 
 /**
- * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289, #33263, #33269, #33274, #33276, #33283).
+ * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289 … #33283).
  *
- * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isFile / getPathname / getSize / getMTime / …
+ * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isFile / getPathname / getSize / getExtension / getMTime / …
  */
 final class DirectoryIteratorMethod implements Call
 {
@@ -61,6 +61,14 @@ final class DirectoryIteratorMethod implements Call
             'getowner' => DirectoryIteratorJitHelper::compileGetOwner($context, $args[0], $this->className),
             'getgroup' => DirectoryIteratorJitHelper::compileGetGroup($context, $args[0], $this->className),
             'getinode' => DirectoryIteratorJitHelper::compileGetInode($context, $args[0], $this->className),
+            'getextension' => DirectoryIteratorJitHelper::compileGetExtension($context, $args[0], $this->className),
+            'getbasename' => DirectoryIteratorJitHelper::compileGetBasename(
+                $context,
+                $args[0],
+                $this->className,
+                $args[1] ?? null
+            ),
+            'gettype' => DirectoryIteratorJitHelper::compileGetType($context, $args[0], $this->className),
             'isfile' => DirectoryIteratorJitHelper::compileIsFile($context, $args[0], $this->className),
             'isdir' => DirectoryIteratorJitHelper::compileIsDir($context, $args[0], $this->className),
             'islink' => DirectoryIteratorJitHelper::compileIsLink($context, $args[0], $this->className),
