@@ -31,8 +31,8 @@ final class TypeDeadFlockAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (fpassthru still Type always-on).
-        $this->assertStringContainsString("registerFunction('__compiler_fpassthru'", $type);
+        // Next leftover sentinel (fsync still Type always-on; fpassthru dropped in #33106).
+        $this->assertStringContainsString("registerFunction('__compiler_fsync'", $type);
         $this->assertStringContainsString('StreamRead::ensureLinked', $type);
     }
 

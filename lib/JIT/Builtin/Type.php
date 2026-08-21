@@ -229,9 +229,11 @@ class Type extends Builtin {
         // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift
         // mint flock.1 (#31894 / #32122). User-script flock() stays JitFlock /
         // StreamReadJitHelper.
-        $fntypeFpassthru = $this->context->context->functionType($i64, false, $i64);
-        $fnFpassthru = $this->context->module->addFunction('__compiler_fpassthru', $fntypeFpassthru);
-        $this->context->registerFunction('__compiler_fpassthru', $fnFpassthru);
+        // __compiler_fpassthru always-on shell removed (#33106): StreamReadRuntime owns the
+        // ABI (getNamedFunction first, then addFunction if absent via implementI64Bridge;
+        // Type::initialize still StreamRead::ensureLinked). Leftover Type empty decls vs
+        // Runtime ABI drift mint fpassthru.1 (#31894 / #32122). User-script fpassthru()
+        // stays StreamReadJitHelper / JitStreamReadBridgeKernel.
         // __compiler_feof always-on shell removed (#33080): JitStreamLifecycleKernel owns
         // the ABI (getNamedFunction first, then addFunction if absent via
         // implementIfMissing; Type::initialize still StreamLifecycle::ensureLinked).
