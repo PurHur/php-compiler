@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\JitPath;
+use PHPCompiler\ext\standard\JitStringConcat;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\SplFileObjectSnapshotRuntime;
 use PHPCompiler\JIT\Builtin\StreamIo;
 use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Builtin\StreamRead;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -22,7 +25,8 @@ use PHPLLVM\Value;
  * (#33308 — concat-loop NestedJIT SIGSEGV'd in __ref__delref).
  * Path accessors read `__pathname` (#33305); also init SplFileInfo `__dir_path`/`__filename`
  * for inherited isFile/getSize/… (#33313).
- * Live stream handle `__spl_fd` for fgets/fwrite/eof (#33318) via StreamIo/StreamRead ABIs.
+ * Live stream handle `__spl_fd` for fwrite (#33318) via StreamIo ABIs.
+ * Iterator I/O (`fgets`/`current`/…) walks the snapshot via cursor + lineNum (#33319).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileInfo_openFile
@@ -35,6 +39,15 @@ final class SplFileObjectJitHelper
 
     /** Live libc stream handle id ({@see StreamIoRuntime} / JitStreamIoKernel). */
     public const PROP_FD = '__spl_fd';
+
+    /** Next unread snapshot index (stream cursor). */
+    public const PROP_CURSOR = '__spl_iter_pos';
+
+    /** SplFileObject::key() — php-src current_line_num. */
+    public const PROP_LINE = '__spl_line_num';
+
+    /** Index of loaded current line, or -1 when none. */
+    public const PROP_CUR = '__spl_cur_idx';
 
     private const CLASS_NAME = 'SplFileObject';
 
@@ -126,47 +139,169 @@ final class SplFileObjectJitHelper
         return $slot;
     }
 
-    /**
-     * SplFileObject::fgets — read one line from live handle (#33318).
-     * php-src: zim_SplFileObject_fgets
-     */
-    public static function compileFgets(Context $context, JITVariable $receiver): Value
+    /** SplFileObject::rewind — reset cursor / line / current (#33319). */
+    public static function compileRewind(Context $context, JITVariable $receiver): Value
     {
-        self::ensureStreamAbis($context);
-        $handle = self::loadFd($context, $receiver);
+        $obj = self::loadObject($context, $receiver);
         $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $line = $context->builder->call(
-            $context->lookupFunction('__compiler_fgets'),
-            $handle,
-            $i64->constInt(8192, false)
-        );
-        $slot = JitValueBox::alloc($context);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $line, $strPtr->constNull());
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $eofBb = $fn->appendBasicBlock('splfo_fgets_eof');
-        $okBb = $fn->appendBasicBlock('splfo_fgets_ok');
-        $joinBb = $fn->appendBasicBlock('splfo_fgets_join');
-        $context->builder->branchIf($isNull, $eofBb, $okBb);
+        self::storeLongProp($context, $obj, self::PROP_CURSOR, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_LINE, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_CUR, $i64->constInt(-1, true));
 
-        $context->builder->positionAtEnd($eofBb);
-        $i32 = $context->getTypeFromString('int32');
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            JitValueBox::pointer($context, $slot),
-            $i32->constInt(0, false)
-        );
-        $context->builder->branch($joinBb);
+        return self::voidResult($context);
+    }
+
+    /** SplFileObject::eof — cursor past last snapshot line (#33319). */
+    public static function compileEof(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $atEnd = self::cursorAtEnd($context, $obj);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $atEnd);
+
+        return $slot;
+    }
+
+    /** SplFileObject::valid — !eof under default flags (#33319). */
+    public static function compileValid(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $atEnd = self::cursorAtEnd($context, $obj);
+        $i1 = $context->getTypeFromString('int1');
+        $ok = $context->builder->icmp(Builder::INT_EQ, $atEnd, $i1->constInt(0, false));
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $ok);
+
+        return $slot;
+    }
+
+    /** SplFileObject::key — current_line_num (#33319). */
+    public static function compileKey(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $line = self::loadLongProp($context, $obj, self::PROP_LINE);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $line);
+
+        return $slot;
+    }
+
+    /**
+     * SplFileObject::current — lazy-read next snapshot line without bumping key (#33319).
+     * php-src: zim_SplFileObject_current / spl_filesystem_file_read_line
+     */
+    public static function compileCurrent(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $cur = self::loadLongProp($context, $obj, self::PROP_CUR);
+        $missing = $context->builder->icmp(Builder::INT_SLT, $cur, $i64->constInt(0, false));
+
+        $needBb = BasicBlockHelper::append($context, 'sfo_cur_need');
+        $haveBb = BasicBlockHelper::append($context, 'sfo_cur_have');
+        $doneBb = BasicBlockHelper::append($context, 'sfo_cur_done');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $out = $context->builder->alloca($strPtrTy);
+        $context->builder->branchIf($missing, $needBb, $haveBb);
+
+        $context->builder->positionAtEnd($needBb);
+        $ok = self::tryReadLine($context, $obj, 0);
+        $okBb = BasicBlockHelper::append($context, 'sfo_cur_ok');
+        $failBb = BasicBlockHelper::append($context, 'sfo_cur_fail');
+        $context->builder->branchIf($ok, $okBb, $failBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->store($empty, $out);
+        $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($okBb);
+        $cur2 = self::loadLongProp($context, $obj, self::PROP_CUR);
+        $context->builder->store(self::lineStringAt($context, $obj, $cur2), $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($haveBb);
+        $context->builder->store(self::lineStringAt($context, $obj, $cur), $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             JitValueBox::pointer($context, $slot),
-            $line
+            $context->builder->load($out)
         );
-        $context->builder->branch($joinBb);
 
-        $context->builder->positionAtEnd($joinBb);
+        return $slot;
+    }
+
+    /**
+     * SplFileObject::next — drop current and bump key; next current() lazy-reads (#33319).
+     */
+    public static function compileNext(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $cur = self::loadLongProp($context, $obj, self::PROP_CUR);
+        $missing = $context->builder->icmp(Builder::INT_SLT, $cur, $i64->constInt(0, false));
+        $needBb = BasicBlockHelper::append($context, 'sfo_next_need');
+        $afterBb = BasicBlockHelper::append($context, 'sfo_next_after');
+        $context->builder->branchIf($missing, $needBb, $afterBb);
+
+        $context->builder->positionAtEnd($needBb);
+        self::tryReadLine($context, $obj, 0);
+        $context->builder->branch($afterBb);
+
+        $context->builder->positionAtEnd($afterBb);
+        self::storeLongProp($context, $obj, self::PROP_CUR, $i64->constInt(-1, true));
+        $line = self::loadLongProp($context, $obj, self::PROP_LINE);
+        self::storeLongProp(
+            $context,
+            $obj,
+            self::PROP_LINE,
+            $context->builder->addNoSignedWrap($line, $i64->constInt(1, false))
+        );
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * SplFileObject::fgets — always advances lineNum by 1 on success (Zend) (#33319).
+     * Past-end returns "" (VM); Zend throws RuntimeException — throw can follow.
+     */
+    public static function compileFgets(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        // Free current before read (php-src spl_filesystem_file_read_ex).
+        self::storeLongProp($context, $obj, self::PROP_CUR, $i64->constInt(-1, true));
+        // Zend increments key on every successful fgets, including the first.
+        $ok = self::tryReadLine($context, $obj, 1);
+
+        $okBb = BasicBlockHelper::append($context, 'sfo_fgets_ok');
+        $eofBb = BasicBlockHelper::append($context, 'sfo_fgets_eof');
+        $doneBb = BasicBlockHelper::append($context, 'sfo_fgets_done');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $out = $context->builder->alloca($strPtrTy);
+        $context->builder->branchIf($ok, $okBb, $eofBb);
+
+        $context->builder->positionAtEnd($eofBb);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->store($empty, $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $cur = self::loadLongProp($context, $obj, self::PROP_CUR);
+        $context->builder->store(self::lineStringAt($context, $obj, $cur), $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $context->builder->load($out)
+        );
 
         return $slot;
     }
@@ -187,7 +322,7 @@ final class SplFileObjectJitHelper
         $i64 = $context->getTypeFromString('int64');
         // JitStreamIoKernel: negative length returns 0 — pass strlen when omitted.
         $length = null !== $lengthArg
-            ? self::loadLong($context, $lengthArg)
+            ? self::loadLongArg($context, $lengthArg)
             : $context->builder->call($context->lookupFunction('__string__strlen'), $data);
         $written = $context->builder->call(
             $context->lookupFunction('__compiler_fwrite'),
@@ -221,36 +356,6 @@ final class SplFileObjectJitHelper
         $context->builder->branch($joinBb);
 
         $context->builder->positionAtEnd($joinBb);
-
-        return $slot;
-    }
-
-    /**
-     * SplFileObject::eof — feof on live handle (#33318).
-     * php-src: zim_SplFileObject_eof
-     */
-    public static function compileEof(Context $context, JITVariable $receiver): Value
-    {
-        self::ensureStreamAbis($context);
-        $handle = self::loadFd($context, $receiver);
-        $flag = $context->builder->call(
-            $context->lookupFunction('__compiler_feof'),
-            $handle
-        );
-        $i32 = $context->getTypeFromString('int32');
-        // __compiler_feof → i32; __value__writeBool wants i32 (#27008).
-        $isEof = $context->builder->icmp(
-            Builder::INT_NE,
-            $flag,
-            $i32->constInt(0, false)
-        );
-        $asI32 = $context->builder->zExt($isEof, $i32);
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            JitValueBox::pointer($context, $slot),
-            $asI32
-        );
 
         return $slot;
     }
@@ -320,7 +425,7 @@ final class SplFileObjectJitHelper
             self::CLASS_NAME,
             false
         );
-        // Live stream handle for fgets/fwrite/eof (#33318); peer VM SplFileObjectStorage.
+        // Live stream handle for fwrite (#33318); peer VM SplFileObjectStorage.
         self::ensureStreamAbis($context);
         $mode = $modeStr ?? $context->builder->load($context->constantStringFromString('r'));
         $fd = $context->builder->call(
@@ -333,22 +438,122 @@ final class SplFileObjectJitHelper
             new JITVariable($context, JITVariable::TYPE_NATIVE_LONG, JITVariable::KIND_VALUE, $fd),
             JITVariable::TYPE_NATIVE_LONG
         );
+        $i64 = $context->getTypeFromString('int64');
+        self::storeLongProp($context, $obj, self::PROP_CURSOR, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_LINE, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_CUR, $i64->constInt(-1, true));
         $objectType->markObjectConstructed($obj);
     }
 
-    private static function loadLong(Context $context, JITVariable $arg): Value
+    /** @return Value i1 — true when a line was loaded */
+    private static function tryReadLine(Context $context, Value $obj, int $lineAdd): Value
     {
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type || JitValueBox::isValueOperand($arg)) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__toLong'),
-                JitValueBox::valuePtrFromVariable($context, $arg)
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $cursor = self::loadLongProp($context, $obj, self::PROP_CURSOR);
+        $n64 = self::htCount($context, $obj);
+        $past = $context->builder->icmp(Builder::INT_SGE, $cursor, $n64);
+
+        $okBb = BasicBlockHelper::append($context, 'sfo_read_ok');
+        $failBb = BasicBlockHelper::append($context, 'sfo_read_fail');
+        $doneBb = BasicBlockHelper::append($context, 'sfo_read_done');
+        $flag = $context->builder->alloca($i1);
+        $context->builder->branchIf($past, $failBb, $okBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->store($i1->constInt(0, false), $flag);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($okBb);
+        self::storeLongProp($context, $obj, self::PROP_CUR, $cursor);
+        self::storeLongProp(
+            $context,
+            $obj,
+            self::PROP_CURSOR,
+            $context->builder->addNoSignedWrap($cursor, $i64->constInt(1, false))
+        );
+        if ($lineAdd > 0) {
+            $line = self::loadLongProp($context, $obj, self::PROP_LINE);
+            self::storeLongProp(
+                $context,
+                $obj,
+                self::PROP_LINE,
+                $context->builder->addNoSignedWrap($line, $i64->constInt($lineAdd, false))
             );
         }
+        $context->builder->store($i1->constInt(1, false), $flag);
+        $context->builder->branch($doneBb);
 
-        return $context->helper->loadValue($arg);
+        $context->builder->positionAtEnd($doneBb);
+
+        return $context->builder->load($flag);
+    }
+
+    private static function cursorAtEnd(Context $context, Value $obj): Value
+    {
+        $cursor = self::loadLongProp($context, $obj, self::PROP_CURSOR);
+        $n64 = self::htCount($context, $obj);
+
+        return $context->builder->icmp(Builder::INT_SGE, $cursor, $n64);
+    }
+
+    private static function htCount(Context $context, Value $obj): Value
+    {
+        $ht = self::htPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->truncOrBitCast($n, $i64);
+    }
+
+    private static function htPtr(Context $context, Value $obj): Value
+    {
+        return $context->helper->loadValue(
+            $context->type->object->splBackingHashtable(
+                new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj)
+            )
+        );
+    }
+
+    /**
+     * Snapshot is explode("\n"); restore terminator for non-final parts so fgets matches Zend.
+     */
+    private static function lineStringAt(Context $context, Value $obj, Value $idx64): Value
+    {
+        $ht = self::htPtr($context, $obj);
+        $sizeT = $context->getTypeFromString('size_t');
+        $idx = $context->builder->truncOrBitCast($idx64, $sizeT);
+        $box = HashTableHelper::readIndexedToValueBox($context, $ht, $idx);
+        $raw = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            JitValueBox::valuePtrFromVariable($context, $box)
+        );
+        $n64 = self::htCount($context, $obj);
+        $i64 = $context->getTypeFromString('int64');
+        $last = $context->builder->sub($n64, $i64->constInt(1, false));
+        $isLast = $context->builder->icmp(Builder::INT_EQ, $idx64, $last);
+
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $out = $context->builder->alloca($strPtrTy);
+        $lastBb = BasicBlockHelper::append($context, 'sfo_line_last');
+        $midBb = BasicBlockHelper::append($context, 'sfo_line_mid');
+        $doneBb = BasicBlockHelper::append($context, 'sfo_line_done');
+        $context->builder->branchIf($isLast, $lastBb, $midBb);
+
+        $context->builder->positionAtEnd($lastBb);
+        $context->builder->store($raw, $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($midBb);
+        $nl = $context->builder->load($context->constantStringFromString("\n"));
+        $withNl = JitStringConcat::concat($context, $raw, $nl);
+        $context->builder->store($withNl, $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $context->builder->load($out);
     }
 
     private static function loadObject(Context $context, JITVariable $receiver): Value
@@ -380,6 +585,47 @@ final class SplFileObjectJitHelper
 
         throw new \LogicException(
             'SplFileObject path must be string, got '.JITVariable::getStringType($arg->type)
+        );
+    }
+
+    private static function loadLongArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type || JitValueBox::isValueOperand($arg)) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__toLong'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
+
+        return $context->helper->loadValue($arg);
+    }
+
+    private static function loadLongProp(Context $context, Value $obj, string $prop): Value
+    {
+        $slot = $context->type->object->propertyFetch($obj, self::CLASS_NAME, $prop);
+        if (JITVariable::TYPE_NATIVE_LONG === $slot->type) {
+            return $context->helper->loadValue($slot);
+        }
+        if (JITVariable::TYPE_VALUE === $slot->type || JitValueBox::isValueOperand($slot)) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__toLong'),
+                JitValueBox::valuePtrFromVariable($context, $slot)
+            );
+        }
+
+        throw new \LogicException("property {$prop} must be native long");
+    }
+
+    private static function storeLongProp(Context $context, Value $obj, string $prop, Value $i64): void
+    {
+        $var = new JITVariable($context, JITVariable::TYPE_NATIVE_LONG, JITVariable::KIND_VALUE, $i64);
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, self::CLASS_NAME, $prop),
+            $var,
+            JITVariable::TYPE_NATIVE_LONG
         );
     }
 

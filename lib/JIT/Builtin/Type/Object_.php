@@ -4151,11 +4151,15 @@ class Object_ extends Type {
             // Slot 0 must be `__spl_ht` for splBackingHashtable (#26783).
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_PATH, Variable::TYPE_STRING);
-            // Live stream handle for fgets/fwrite/eof (#33318).
+            // Live stream handle for fwrite (#33318).
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_FD, Variable::TYPE_NATIVE_LONG);
             // SplFileInfo path props for inherited isFile/getSize/… (#33313).
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_PATH, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FILENAME, Variable::TYPE_STRING);
+            // Iterator cursor / lineNum / current index for fgets (#33319).
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CURSOR, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_LINE, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CUR, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([

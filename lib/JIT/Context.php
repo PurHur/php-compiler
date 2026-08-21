@@ -1499,11 +1499,11 @@ class Context {
             );
         }
         // SplFileObject — `__spl_ht` + `__pathname` + `__spl_fd` (#33305/#33308/#33318);
-        // inherited SplFileInfo stats (#33313).
+        // inherited SplFileInfo stats (#33313); fgets/iterator (#33319).
         $this->type->object->lookup('SplFileObject');
         foreach ([
             '__construct', 'getFilename', 'getPathname', 'getPath', '__toString',
-            'fgets', 'fwrite', 'eof',
+            'rewind', 'valid', 'current', 'key', 'next', 'fgets', 'fwrite', 'eof',
         ] as $sfoMethod) {
             $this->functionProxies['splfileobject::'.strtolower($sfoMethod)] = new Call\SplFileObjectMethod(
                 $sfoMethod
