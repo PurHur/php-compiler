@@ -403,13 +403,12 @@ class Type extends Builtin {
         // (getNamedFunction first; body DirHandleJitHelper). Leftover Type
         // addFunction vs Runtime ABI drift mints opendir.1 (#31894 / #32122).
         $void = $this->context->getTypeFromString('void');
-        $fntypeRandomBytes = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $i64
-        );
-        $fnRandomBytes = $this->context->module->addFunction('__compiler_random_bytes', $fntypeRandomBytes);
-        $this->context->registerFunction('__compiler_random_bytes', $fnRandomBytes);
+        // __compiler_random_bytes always-on shell removed (#33160): StringRandomBytes /
+        // RandomBytesJitHelper owns the ABI (getNamedFunction first via
+        // JitVmHelperLink::ensureBridge; Type::initialize still
+        // StringRandomBytes::ensureLinked). Leftover Type empty decls vs Runtime ABI
+        // drift mint random_bytes.1 (#31894 / #32122). User-script random_bytes() stays
+        // JitRandomBytes / RandomBytesJitHelper (php-src ext/standard/random.c).
         $strPtr = $this->context->getTypeFromString('__string__*');
         $i32 = $this->context->getTypeFromString('int32');
         // __compiler_hash / __compiler_hash_hmac / __compiler_hash_pbkdf2 /
@@ -1029,6 +1028,7 @@ class Type extends Builtin {
         StringVersionCompare::ensureLinked($this->context);
         LibcryptRuntime::ensureLinked($this->context);
         PasswordRandomBytesRuntime::ensureLinked($this->context);
+        StringRandomBytes::ensureLinked($this->context);
         PasswordCryptoRuntime::ensureLinked($this->context);
         StringHashCrypto::ensureLinked($this->context);
         OpensslEncryptRuntime::ensureLinked($this->context);
