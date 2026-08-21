@@ -66,18 +66,8 @@ final class JitStrReplaceSearchReplaceGuard
 
     private static function isKnownArray(JITVariable $arg): bool
     {
-        if (JITVariable::TYPE_HASHTABLE === $arg->type) {
-            return true;
-        }
-        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
-            return true;
-        }
-        // Array init temps are often TYPE_VALUE with this flag (#22827 AOT).
-        if ($arg->valueBoxHashtable ?? false) {
-            return true;
-        }
-
-        return false;
+        // SSOT — TYPE_VALUE + compileTimeArray (#33630) and valueBoxHashtable (#22827).
+        return JitStrReplaceSubject::isKnownArray($arg);
     }
 
     private static function emitRejectIfBoxedArray(

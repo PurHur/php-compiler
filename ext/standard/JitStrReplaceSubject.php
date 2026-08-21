@@ -17,13 +17,23 @@ use PHPCompiler\JIT\Variable as JITVariable;
  */
 final class JitStrReplaceSubject
 {
-    /** Compile-time known array $subject (hashtable / native array / array-init box). */
+    /**
+     * Compile-time known array (hashtable / native array / array-init box / CTA).
+     *
+     * Thin AOT often lowers `['a']` as {@see JITVariable::TYPE_VALUE} with
+     * {@see JITVariable::$compileTimeArray} set but neither HASHTABLE nor
+     * IS_NATIVE_ARRAY — missing that made str_replace treat array $search as a
+     * string and SIGSEGV (#33630).
+     */
     public static function isKnownArray(JITVariable $arg): bool
     {
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
             return true;
         }
         if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return true;
+        }
+        if (\is_array($arg->compileTimeArray)) {
             return true;
         }
 
