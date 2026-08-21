@@ -16,7 +16,12 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for preg_replace() via __compiler_preg_replace (issue #1176, array subject #4055). */
+/**
+ * LLVM lowering for preg_replace() via __compiler_preg_replace (issue #1176, array subject #4055; ensureLinked #33191).
+ *
+ * ABI owned by {@see \PHPCompiler\JIT\Builtin\PregMatchRuntime} after Type always-on drop (#33191) —
+ * must ensureLinked before lookup (peer {@see JitPregMatch}).
+ */
 final class JitPregReplace
 {
     private static int $blockSerial = 0;
