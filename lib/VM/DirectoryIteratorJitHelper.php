@@ -202,6 +202,43 @@ final class DirectoryIteratorJitHelper
     }
 
     /**
+     * SplFileInfo::getPathname / __toString — join(__dir_path, __filename) (#33274).
+     * php-src: zim_SplFileInfo_getPathname / __toString
+     */
+    public static function compileGetPathname(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $pathname
+        );
+
+        return $slot;
+    }
+
+    /**
+     * SplFileInfo::getPath — `__dir_path` only (#33274).
+     * php-src: zim_SplFileInfo_getPath (intern->path)
+     */
+    public static function compileGetPath(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pathSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_PATH);
+        $pathPtr = self::stringFromProperty($context, $pathSlot);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $pathPtr
+        );
+
+        return $slot;
+    }
+
+    /**
      * SplFileInfo::isFile — pathname = join(__dir_path, __filename) (#33263).
      * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isFile
      */
