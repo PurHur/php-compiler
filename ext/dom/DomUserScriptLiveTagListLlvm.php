@@ -10,11 +10,13 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT: live tag-name counts for DOMNodeList::length (#18478, #28605, #33659).
+ * User-script AOT: live tag-name counts for DOMNodeList::length (#18478, #28605, #33659, #33679).
  *
  * {@code getElementsByTagName('*')} must bump on any element append (#33659) —
  * comparing the child local name to {@code *} never matches. Appends before the
  * first query accumulate in {@see GLOBAL_PENDING} and fold into {@see initCount}.
+ * {@see removeChild} must decrement (#33679); {@code insertBefore} must not both
+ * bump pending and refresh compile-time XML (double-count).
  */
 final class DomUserScriptLiveTagListLlvm
 {
@@ -193,6 +195,118 @@ final class DomUserScriptLiveTagListLlvm
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
+    }
+
+    /**
+     * Note an element leaving the tree (removeChild) — mirror of
+     * {@see incrementForChildArg} (#33679 leftover of #33659).
+     *
+     * Pending pre-query appends decrement {@see GLOBAL_PENDING}; active
+     * {@code *} / empty / matching-tag queries decrement {@see GLOBAL_COUNT}
+     * (floored at 0).
+     */
+    public static function decrementForChildArg(Context $context, \PHPCompiler\JIT\Variable $childArg): void
+    {
+        self::ensureGlobals($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_us_live_tag_child_dec');
+        $i64 = $context->getTypeFromString('int64');
+        $one = $i64->constInt(1, false);
+        $zero = $i64->constInt(0, false);
+        $tagGlobal = $context->module->getNamedGlobal(self::GLOBAL_TAG);
+        $countGlobal = $context->module->getNamedGlobal(self::GLOBAL_COUNT);
+        $pendingGlobal = $context->module->getNamedGlobal(self::GLOBAL_PENDING);
+        $storedTag = $context->builder->load($tagGlobal);
+        $hasTag = $context->builder->icmp(
+            Builder::INT_NE,
+            $storedTag,
+            $storedTag->typeOf()->constNull()
+        );
+
+        $bbPending = BasicBlockHelper::append($context, 'dom_us_live_tag_child_dec_pending');
+        $bbActive = BasicBlockHelper::append($context, 'dom_us_live_tag_child_dec_active');
+        $bbDone = BasicBlockHelper::append($context, 'dom_us_live_tag_child_dec_done');
+        $context->builder->branchIf($hasTag, $bbActive, $bbPending);
+
+        $context->builder->positionAtEnd($bbPending);
+        $pending = $context->builder->load($pendingGlobal);
+        $pendingGt = $context->builder->icmp(Builder::INT_SGT, $pending, $zero);
+        $pendingNext = $context->builder->sub($pending, $one);
+        $context->builder->store(
+            $context->builder->select($pendingGt, $pendingNext, $zero),
+            $pendingGlobal
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbActive);
+        $starLit = $context->builder->load($context->constantStringFromString('*'));
+        $emptyLit = $context->builder->load($context->constantStringFromString(''));
+        $cmpStar = \PHPCompiler\JIT\JitStringCompare::strcmp($context, $storedTag, $starLit);
+        $isStar = $context->builder->icmp(Builder::INT_EQ, $cmpStar, $i64->constInt(0, false));
+        $cmpEmpty = \PHPCompiler\JIT\JitStringCompare::strcmp($context, $storedTag, $emptyLit);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $cmpEmpty, $i64->constInt(0, false));
+        $anyElement = $context->builder->or($isStar, $isEmpty);
+
+        $bbAny = BasicBlockHelper::append($context, 'dom_us_live_tag_child_dec_any');
+        $bbExact = BasicBlockHelper::append($context, 'dom_us_live_tag_child_dec_exact');
+        $context->builder->branchIf($anyElement, $bbAny, $bbExact);
+
+        $context->builder->positionAtEnd($bbAny);
+        self::decrementCountFloored($context, $countGlobal, $one, $zero);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbExact);
+        $lit = \PHPCompiler\JIT\JitStringBuiltinArg::compileTimeLiteral($childArg)
+            ?? $childArg->compileTimeString
+            ?? $childArg->compileTimeDomTagName;
+        if (null !== $lit) {
+            $childTag = $context->builder->load(
+                $context->constantStringFromString(strtolower($lit))
+            );
+            self::decrement($context, $childTag);
+        } else {
+            self::decrementCountFloored($context, $countGlobal, $one, $zero);
+        }
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    public static function decrement(Context $context, Value $tagStr): void
+    {
+        self::ensureGlobals($context);
+        $i64 = $context->getTypeFromString('int64');
+        $one = $i64->constInt(1, false);
+        $zero = $i64->constInt(0, false);
+        $storedTag = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_TAG));
+        $tagNull = $storedTag->typeOf()->constNull();
+        $hasTag = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $storedTag,
+            $tagNull
+        );
+        $cmp = \PHPCompiler\JIT\JitStringCompare::strcmp($context, $tagStr, $storedTag);
+        $tagMatch = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+        $match = $context->builder->and($hasTag, $tagMatch);
+        $countGlobal = $context->module->getNamedGlobal(self::GLOBAL_COUNT);
+        $storedCount = $context->builder->load($countGlobal);
+        $gt = $context->builder->icmp(Builder::INT_SGT, $storedCount, $zero);
+        $next = $context->builder->select($gt, $context->builder->sub($storedCount, $one), $zero);
+        $updated = $context->builder->select($match, $next, $storedCount);
+        $context->builder->store($updated, $countGlobal);
+    }
+
+    private static function decrementCountFloored(
+        Context $context,
+        Value $countGlobal,
+        Value $one,
+        Value $zero
+    ): void {
+        $storedCount = $context->builder->load($countGlobal);
+        $gt = $context->builder->icmp(Builder::INT_SGT, $storedCount, $zero);
+        $context->builder->store(
+            $context->builder->select($gt, $context->builder->sub($storedCount, $one), $zero),
+            $countGlobal
+        );
     }
 
     private static function ensureGlobals(Context $context): void
