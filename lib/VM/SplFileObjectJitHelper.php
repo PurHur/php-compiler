@@ -57,6 +57,7 @@ use PHPLLVM\Value;
  * seek (SeekableIterator line) (#33364) — rewind + read-line loop + key bump.
  * setFlags/getFlags on `__spl_flags` (#33368).
  * setCsvControl/getCsvControl on `__spl_csv_*` (#33371); fgetcsv/fputcsv read props when args omitted.
+ * setMaxLineLen/getMaxLineLen on `__spl_max_line_len` (#33377); fgets/fgetcsv use max+1 (#33378).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
@@ -66,6 +67,7 @@ use PHPLLVM\Value;
  * zim_SplFileObject_fgetcsv / zim_SplFileObject_fseek / zim_SplFileObject_seek /
  * zim_SplFileObject_setFlags / zim_SplFileObject_getFlags /
  * zim_SplFileObject_setCsvControl / zim_SplFileObject_getCsvControl /
+ * zim_SplFileObject_setMaxLineLen / zim_SplFileObject_getMaxLineLen /
  * zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
@@ -643,8 +645,13 @@ final class SplFileObjectJitHelper
         // spl_filesystem_file_free_line — drop cached iterator line before CSV read.
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
         $handle = self::loadFd($context, $receiver);
-        // Thin AOT has no max_line_len prop yet — length < 1 → JitFgetcsv default cap.
-        $length = $i64->constInt(-1, true);
+        // length < 1 → JitFgetcsv default cap; else max_line_len+1 (#33378 / #19665).
+        $maxLine = self::loadLongProp($context, $obj, self::PROP_MAX_LINE_LEN);
+        $length = $context->builder->select(
+            $context->builder->icmp(Builder::INT_SGT, $maxLine, $i64->constInt(0, false)),
+            $context->builder->addNoSignedWrap($maxLine, $i64->constInt(1, false)),
+            $i64->constInt(-1, true)
+        );
         // Omitted args → setCsvControl props (#33371); peer php-src intern->u.file.*.
         $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
         $enclosure = self::loadStringProp($context, $obj, self::PROP_CSV_ENC);
@@ -1062,7 +1069,7 @@ final class SplFileObjectJitHelper
         $line = $context->builder->call(
             $context->lookupFunction('__compiler_fgets'),
             $handle,
-            $i64->constInt(8192, false)
+            self::fgetsBufferLen($context, $obj)
         );
         $slot = JitValueBox::alloc($context);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $line, $strPtr->constNull());
@@ -1126,7 +1133,7 @@ final class SplFileObjectJitHelper
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_fgets'),
             $handle,
-            $i64->constInt(8192, false)
+            self::fgetsBufferLen($context, $obj)
         );
         $isNull = $context->builder->icmp(Builder::INT_EQ, $raw, $strPtr->constNull());
         $fn = $context->builder->getInsertBlock()->getParent();
@@ -1276,6 +1283,24 @@ final class SplFileObjectJitHelper
             $context->builder->load($context->constantStringFromString('\\'))
         );
         $objectType->markObjectConstructed($obj);
+    }
+
+    /**
+     * php-src max_line_len+1 get_line buffer; 0 → default 8192 (#33378 / #19665).
+     *
+     * @return Value i64
+     */
+    private static function fgetsBufferLen(Context $context, Value $obj): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $max = self::loadLongProp($context, $obj, self::PROP_MAX_LINE_LEN);
+        $capped = $context->builder->icmp(Builder::INT_SGT, $max, $i64->constInt(0, false));
+
+        return $context->builder->select(
+            $capped,
+            $context->builder->addNoSignedWrap($max, $i64->constInt(1, false)),
+            $i64->constInt(8192, false)
+        );
     }
 
     private static function loadLongProp(Context $context, Value $obj, string $prop): Value
