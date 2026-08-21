@@ -14,7 +14,8 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkcs7_read() — extract cert PEMs from PKCS#7 PEM content (php-src ext/openssl/openssl.c; #20305).
+ * openssl_pkcs7_read() — extract cert PEMs from PKCS#7 PEM content
+ * (php-src ext/openssl/openssl.c; #20305 VM, JIT/AOT #33458).
  */
 final class openssl_pkcs7_read extends Internal
 {
@@ -55,8 +56,12 @@ final class openssl_pkcs7_read extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_pkcs7_read() is not implemented for JIT in this compiler build (issue #20305)'
-        );
+        if (2 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'openssl_pkcs7_read() expects exactly 2 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitOpensslX509::pkcs7Read($context, $args[0], $args[1]);
     }
 }

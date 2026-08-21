@@ -38,6 +38,7 @@ use PHPLLVM\Value;
  * openssl_pkcs12_export() (#32948 leftover of #6420);
  * openssl_pkcs12_export_to_file() (#32948 leftover of #6420);
  * openssl_pkcs12_read() (#33444 leftover of #6420);
+ * openssl_pkcs7_read() (#33458 leftover of #20305);
  * openssl_seal() / openssl_open() (#32979 leftover of #6523).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
@@ -65,6 +66,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/pkcs12.c — PHP_FUNCTION(openssl_pkcs12_export) / PKCS12_create
  * php-src: ext/openssl/pkcs12.c — PHP_FUNCTION(openssl_pkcs12_export_to_file)
  * php-src: ext/openssl/pkcs12.c — PHP_FUNCTION(openssl_pkcs12_read) / PKCS12_parse
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_pkcs7_read) / PEM_read_bio_PKCS7
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -876,6 +878,54 @@ final class JitOpensslX509
             $var = new \PHPCompiler\VM\Variable();
             $var->string($pem);
             $ht->update($key, $var);
+        }
+        $htJit = HashTableHelper::variableFromVmHashTable($context, $ht);
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $certificates);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $outPtr,
+            $context->helper->loadValue($htJit)
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
+
+        return self::boxedBool($context, true);
+    }
+
+    /**
+     * openssl_pkcs7_read() — bake {@see VmOpensslPkcs7Native::read} into &$certificates.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkcs7_read) / PEM_read_bio_PKCS7
+     * By-ref $certificates is written via __value__writeHashtable (peer {@see self::pkcs12Read}).
+     *
+     * PKCS#7 PEM content must be a compile-time string literal (thin AOT has no PHP FFI).
+     */
+    public static function pkcs7Read(
+        Context $context,
+        JITVariable $data,
+        JITVariable $certificates
+    ): Value {
+        $pem = JitStringArg::compileTimeLiteral($data);
+        if (null === $pem) {
+            throw new \LogicException(
+                'openssl_pkcs7_read() data must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33458)'
+            );
+        }
+
+        if (!VmOpensslPkcs7Native::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $certs = VmOpensslPkcs7Native::read($pem);
+        if (false === $certs) {
+            return self::boxedFalse($context);
+        }
+
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($certs as $certPem) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->string($certPem);
+            $ht->append($var);
         }
         $htJit = HashTableHelper::variableFromVmHashTable($context, $ht);
         $outPtr = JitValueBox::valuePtrFromVariable($context, $certificates);
