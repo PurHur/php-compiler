@@ -36,7 +36,19 @@ final class JsonEncodeArrayLlvm
             Variable::KIND_VALUE,
             $ht
         );
-        $packed = (new Call\HashTableIsPackedList())->call($context, $packedVar);
+        $packedNative = (new Call\HashTableIsPackedList())->call($context, $packedVar);
+        // JSON_FORCE_OBJECT=16 — packed lists encode as objects (php-src; ArrayObject #33619).
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $forceObject = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flags, $i64->constInt(16, false)),
+            $i64->constInt(0, false)
+        );
+        $packed = $context->builder->and(
+            $packedNative,
+            $context->builder->icmp(Builder::INT_EQ, $forceObject, $i1->constInt(0, false))
+        );
 
         $pairs = HashTableExportKeyValuePairs::exportPairsForSlice($context, $ht);
         $num = $context->builder->call(
