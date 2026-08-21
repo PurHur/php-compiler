@@ -31,8 +31,8 @@ final class TypeDeadFlockAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (stream_set_timeout still Type always-on; chunk_size dropped in #33127).
-        $this->assertStringContainsString("registerFunction('__compiler_stream_set_timeout'", $type);
+        // Next leftover sentinel (stream_set_write_buffer still Type always-on; timeout dropped in #33134).
+        $this->assertStringContainsString("registerFunction('__compiler_stream_set_write_buffer'", $type);
         $this->assertStringContainsString('StreamRead::ensureLinked', $type);
     }
 
