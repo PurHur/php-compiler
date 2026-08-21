@@ -13,12 +13,16 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for session_gc() via SessionGcJitHelper PHP (#9411, #25916).
+ * JIT/AOT link for session_gc() via SessionGcJitHelper PHP (#9411, #25916, #33261).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StatCache #25882 / ResolveSidecar #25860).
  * Replaces LLVM file-scan in SessionStorageRuntime and session GC apply logic here.
  * Thin AOT call-site {@see ensureLinked} scopes bridge emit to the ABI fn (#32994 / peer #27211).
  * php-src: ext/session/session.c — php_session_gc
+ *
+ * Owns GC ABI decls module-locally (`getNamedFunction` first via
+ * {@see declareSessionGcAbis}) — do not re-add empty always-on shells in
+ * {@see Type} (#31894 / #32122 / #33261).
  */
 final class SessionGcRuntime
 {
@@ -30,6 +34,29 @@ final class SessionGcRuntime
     private const COMPILED_HELPERS = [
         self::GC_EXPIRED_FILES,
     ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        'phpc_session_gc_expired_files',
+        '__phpc_session_gc_apply',
+    ];
+
+    /**
+     * Module-local empty decls for Type::register (#33261).
+     * Bodies come from {@see ensureLinked}.
+     */
+    public static function declareSessionGcAbis(Context $context): void
+    {
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe) {
+                $context->registerFunction($abiName, $probe);
+                continue;
+            }
+            $fn = self::addEmptyDecl($context, $abiName);
+            $context->registerFunction($abiName, $fn);
+        }
+    }
 
     public static function ensureLinked(Context $context): void
     {
@@ -89,12 +116,23 @@ final class SessionGcRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            $context->registerFunction($name, $probe);
+
+            return $probe;
+        }
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
             // fall through
         }
 
+        return self::addEmptyDecl($context, $name);
+    }
+
+    private static function addEmptyDecl(Context $context, string $name): LlvmFunction
+    {
         $valuePtr = $context->getTypeFromString('__value__*');
         $void = $context->getTypeFromString('void');
         $i64 = $context->getTypeFromString('int64');

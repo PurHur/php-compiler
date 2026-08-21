@@ -31,8 +31,8 @@ final class TypeDeadPhpcDeployPathAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (session_start_apply still Type always-on; #33258 stream_path dropped).
-        $this->assertStringContainsString("registerFunction('__phpc_session_start_apply'", $type);
+        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
+        $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString('StringDeployPath::ensureLinked', $type);
     }
 

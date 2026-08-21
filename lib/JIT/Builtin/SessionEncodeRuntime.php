@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for session_encode()/session_decode() (#6086, #9440, #22076, #33005, #33008).
+ * JIT/AOT link for session_encode()/session_decode() (#6086, #9440, #22076, #33005, #33008, #33261).
  *
  * Encode: LLVM wire walk via {@see \PHPCompiler\ext\standard\JitSessionStorageKernel::emitEncodeWireString}
  * (same as save_to_disk — NestedJIT encodeWire sees strlen=0 on HT keys, #21900).
@@ -23,9 +23,38 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Thin AOT call-site {@see ensureLinked} must {@see BasicBlockHelper::scopeLoweringToFunction}
  * so BasicBlockHelper::append does not steal into the in-flight user fn (#32994 / peer #27211).
  * php-src: ext/session/session.c — php_session_encode / php_session_decode
+ *
+ * Owns encode/decode ABI decls module-locally (`getNamedFunction` first via
+ * {@see declareSessionEncodeAbis}) — do not re-add empty always-on shells in
+ * {@see Type} (#31894 / #32122 / #33261).
  */
 final class SessionEncodeRuntime
 {
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        'phpc_session_encode_wire',
+        'phpc_session_decode_wire',
+        '__phpc_session_encode_apply',
+        '__phpc_session_decode_apply',
+    ];
+
+    /**
+     * Module-local empty decls for Type::register (#33261).
+     * Bodies come from {@see ensureLinked}.
+     */
+    public static function declareSessionEncodeAbis(Context $context): void
+    {
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe) {
+                $context->registerFunction($abiName, $probe);
+                continue;
+            }
+            $fn = self::addEmptyDecl($context, $abiName);
+            $context->registerFunction($abiName, $fn);
+        }
+    }
+
     public static function ensureLinked(Context $context): void
     {
         // Save before StorageKernel — they clear the insert block (#32994).
@@ -68,12 +97,23 @@ final class SessionEncodeRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            $context->registerFunction($name, $probe);
+
+            return $probe;
+        }
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
             // fall through
         }
 
+        return self::addEmptyDecl($context, $name);
+    }
+
+    private static function addEmptyDecl(Context $context, string $name): LlvmFunction
+    {
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');

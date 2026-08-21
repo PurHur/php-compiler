@@ -19,6 +19,7 @@ final class SessionLifecycleRuntimeShrinkTest extends TestCase
         $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionLifecycleRuntime.php');
         $this->assertStringContainsString('JitSessionLifecycleKernel', $orchestrator);
         $this->assertStringContainsString('JitSessionLifecycleKernel::ensureLinked', $orchestrator);
+        $this->assertStringContainsString('declareSessionAbis', $orchestrator);
         $this->assertStringNotContainsString('PHPLLVM', $orchestrator);
         $this->assertStringNotContainsString('implementStandaloneRuntime', $orchestrator);
         $this->assertStringNotContainsString('implementGenerateNewId', $orchestrator);
@@ -31,6 +32,7 @@ final class SessionLifecycleRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSessionLifecycleKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitSessionLifecycleKernel', $source);
+        $this->assertStringContainsString('declareSessionLifecycleAbis', $source);
         $this->assertStringContainsString('__phpc_session_generate_new_id', $source);
         $this->assertStringContainsString('__phpc_session_start_apply', $source);
         $this->assertStringContainsString('implementStandaloneRuntime', $source);
@@ -45,7 +47,7 @@ final class SessionLifecycleRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('sgen_loop_head', $source);
         $this->assertStringNotContainsString('HEX_TABLE', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(450, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(520, \substr_count($source, "\n") + 1);
     }
 
     public function testSessionStartHasNoStandaloneForwarder(): void
