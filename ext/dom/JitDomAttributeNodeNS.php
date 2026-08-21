@@ -342,8 +342,38 @@ final class JitDomAttributeNodeNS
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
+        // php-src: setAttributeNode sets Attr::$ownerElement after attribute-map install (#33598).
+        // Peer appendChild(Attr) path: {@see installAttrOntoElement}.
+        self::storeOwnerElement($context, $element, $attr);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Wire Attr::$ownerElement to the Element that owns the attribute map (#33570 / #33598).
+     */
+    private static function storeOwnerElement(Context $context, Value $element, Value $attr): void
+    {
+        if (!$context->type->object->hasProperty(
+            $context->type->object->lookup(self::CLASS_ATTR),
+            self::PROP_OWNER_ELEMENT
+        )) {
+            self::ensureAttrPropertyLayout(
+                $context->type->object,
+                $context->type->object->lookup(self::CLASS_ATTR)
+            );
+        }
+        $ownerJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $element
+        );
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($attr, self::CLASS_ATTR, self::PROP_OWNER_ELEMENT),
+            $ownerJit,
+            JITVariable::TYPE_VALUE
+        );
     }
 
     /**
@@ -367,27 +397,8 @@ final class JitDomAttributeNodeNS
         $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
         DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr, $valueLit);
 
-        // ownerElement — php-src sets after attribute map install.
-        if (!$context->type->object->hasProperty(
-            $context->type->object->lookup(self::CLASS_ATTR),
-            self::PROP_OWNER_ELEMENT
-        )) {
-            self::ensureAttrPropertyLayout(
-                $context->type->object,
-                $context->type->object->lookup(self::CLASS_ATTR)
-            );
-        }
-        $ownerJit = new JITVariable(
-            $context,
-            JITVariable::TYPE_OBJECT,
-            JITVariable::KIND_VALUE,
-            $element
-        );
-        $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($attr, self::CLASS_ATTR, self::PROP_OWNER_ELEMENT),
-            $ownerJit,
-            JITVariable::TYPE_VALUE
-        );
+        // ownerElement — php-src sets after attribute map install (#33570 / #33598).
+        self::storeOwnerElement($context, $element, $attr);
 
         $id = JitDomCreateElementAttrs::lastId();
         if (null === $id) {
