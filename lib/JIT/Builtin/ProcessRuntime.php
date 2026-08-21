@@ -11,11 +11,14 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT process helpers via ProcessJitHelper PHP (#9337, #12950).
+ * JIT/AOT process helpers via ProcessJitHelper PHP (#9337, #12950, #33201).
  *
  * JIT embed and AOT standalone compile thin LLVM bridges; SSOT {@see \PHPCompiler\ext\standard\ProcessJitHelper}.
  * User-script exec capture via {@see ProcessExecCaptureNativeJitHelper} + {@see JitVmHelperLink} (#19006).
  * Deferred shell_exec via {@see JitVmHelperLink} + {@see ProcessJitHelper} (#19086).
+ * Owns `__compiler_shell_exec` / `__compiler_escapeshellarg` / `__compiler_escapeshellcmd`
+ * module-locally ({@see getNamedFunction} first). Do not re-add empty always-on shells in
+ * {@see Type} — leftover decls mint shell_exec.1 (#31894 / #32122).
  * php-src: ext/standard/exec.c — shell_exec, escapeshellarg, escapeshellcmd
  */
 final class ProcessRuntime

@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for escapeshellarg() via ProcessRuntime::__compiler_escapeshellarg (#2779). */
+/** LLVM lowering for escapeshellarg() via ProcessRuntime::__compiler_escapeshellarg (#2779, #33201). */
 final class JitEscapeshellarg
 {
     /** @return Value */
