@@ -31,8 +31,8 @@ final class TypeDeadFtellAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (fgetc still Type always-on).
-        $this->assertStringContainsString("registerFunction('__compiler_fgetc'", $type);
+        // Next leftover sentinel (fgets still Type always-on).
+        $this->assertStringContainsString("registerFunction('__compiler_fgets'", $type);
         $this->assertStringContainsString('StreamRead::ensureLinked', $type);
     }
 
