@@ -11,7 +11,7 @@ use PHPCompiler\VM\SplFileObjectJitHelper;
 use PHPLLVM\Value;
 
 /**
- * SplFileObject thin-AOT methods (#28709, ext/spl/spl_directory.c).
+ * SplFileObject thin-AOT methods (#28709, #33305, ext/spl/spl_directory.c).
  */
 final class SplFileObjectMethod implements Call
 {
@@ -38,6 +38,9 @@ final class SplFileObjectMethod implements Call
                     'SplFileObject::__construct() expects at least 1 argument, 0 given'
                 )
             ),
+            'getfilename' => SplFileObjectJitHelper::compileGetFilename($context, $args[0]),
+            'getpathname', '__tostring' => SplFileObjectJitHelper::compileGetPathname($context, $args[0]),
+            'getpath' => SplFileObjectJitHelper::compileGetPath($context, $args[0]),
             default => throw new \LogicException(
                 'SplFileObject JIT lowering is not implemented for '.$this->method.'()'
             ),

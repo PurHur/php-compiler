@@ -24,11 +24,11 @@ use PHPLLVM\Value;
 
 /**
  * Thin-AOT DirectoryIterator / FilesystemIterator / SplFileInfo — snapshot + path props
- * (#27289, #33263, #33274, #33276, #33280, #33289, #33290, #33298).
+ * (#27289, #33263, #33274, #33276, #33280, #33289, #33290, #33298, #33305).
  *
  * DirectoryIterator construct lists entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}.
  * SplFileInfo construct splits pathname via call-site {@see JitPath} (#33290).
- * getFileInfo/getPathInfo allocate a fresh SplFileInfo (#33298).
+ * getFileInfo/getPathInfo allocate a fresh SplFileInfo (#33298); openFile allocates SplFileObject (#33305).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
  * isFile/isDir/getPath/getPathname/getSize/getExtension/getType/getLinkTarget join `__dir_path`+`__filename`.
  *
@@ -197,9 +197,16 @@ final class DirectoryIteratorJitHelper
 
     /**
      * Split pathname into `__dir_path` + `__filename` (peer SplFileInfoStorage::init / #33290).
+     * Public for SplFileObject construct / openFile parent props (#33305).
+     *
+     * @param string $propClass Class whose property table owns the slots (SplFileInfo or subclass).
      */
-    private static function initSplFileInfoPathProps(Context $context, Value $obj, Value $pathStr): void
-    {
+    public static function initSplFileInfoPathProps(
+        Context $context,
+        Value $obj,
+        Value $pathStr,
+        string $propClass = 'SplFileInfo'
+    ): void {
         // Call-site LLVM (JitPath) — NestedJIT PathJitHelper / string-index helpers segfault
         // under thin AOT (#26905 / #33290). SplFileInfoStorage empty-path vs dirname(".") :
         // when basename length equals pathname length there is no directory component.
@@ -210,9 +217,26 @@ final class DirectoryIteratorJitHelper
         $noDir = $context->builder->icmp(Builder::INT_EQ, $pathLen, $nameLen);
         $empty = $context->builder->load($context->constantStringFromString(''));
         $dirOut = $context->builder->select($noDir, $empty, $dirPtr);
-        self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_PATH, $dirOut);
-        self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_FILENAME, $namePtr);
+        self::storeStringProperty($context, $obj, $propClass, self::PROP_PATH, $dirOut);
+        self::storeStringProperty($context, $obj, $propClass, self::PROP_FILENAME, $namePtr);
         $context->type->object->markObjectConstructed($obj);
+    }
+
+    /**
+     * SplFileInfo::openFile — allocate SplFileObject for pathname (#33305).
+     * php-src: zim_SplFileInfo_openFile / spl_filesystem_object_create_type(SPL_FS_FILE)
+     *
+     * Default file class + mode `r` only; setFileClass / fread are follow-ups.
+     */
+    public static function compileOpenFile(
+        Context $context,
+        JITVariable $receiver,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+
+        return SplFileObjectJitHelper::emitNewFromPathname($context, $pathname);
     }
 
     /** True when $namePtr is "." or "..". */

@@ -4128,7 +4128,7 @@ class Object_ extends Type {
                 'getperms', 'getowner', 'getgroup', 'getinode',
                 '__tostring', 'isfile', 'isdir',
                 'islink', 'getlinktarget', 'isreadable', 'iswritable', 'isexecutable',
-                'getfileinfo', 'getpathinfo',
+                'getfileinfo', 'getpathinfo', 'openfile',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
@@ -4155,7 +4155,7 @@ class Object_ extends Type {
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
-                'fgets', 'eof', 'getfilename',
+                'fgets', 'eof', 'getfilename', 'getpathname', 'getpath', '__tostring',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
