@@ -24,11 +24,11 @@ use PHPLLVM\Value;
 
 /**
  * Thin-AOT DirectoryIterator / FilesystemIterator / SplFileInfo — snapshot + path props
- * (#27289, #33263, #33274, #33276, #33280, #33289, #33290, #33298, #33304).
+ * (#27289, #33263, #33274, #33276, #33280, #33289, #33290, #33298, #33304, #33305).
  *
  * DirectoryIterator construct lists entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}.
  * SplFileInfo construct splits pathname via {@see SplFileInfoStorage::splitPathComponents} (#33304).
- * getFileInfo/getPathInfo allocate a fresh SplFileInfo (#33298).
+ * getFileInfo/getPathInfo allocate a fresh SplFileInfo (#33298); openFile allocates SplFileObject (#33305).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
  * isFile/isDir/getPath/getPathname/getSize/getExtension/getType/getLinkTarget join `__dir_path`+`__filename`.
  *
@@ -169,6 +169,23 @@ final class DirectoryIteratorJitHelper
         $context->builder->positionAtEnd($doneBb);
 
         return $slot;
+    }
+
+    /**
+     * SplFileInfo::openFile — allocate SplFileObject for pathname (#33305).
+     * php-src: zim_SplFileInfo_openFile / spl_filesystem_object_create_type(SPL_FS_FILE)
+     *
+     * Default file class + mode `r` only; setFileClass / fread are follow-ups.
+     */
+    public static function compileOpenFile(
+        Context $context,
+        JITVariable $receiver,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+
+        return SplFileObjectJitHelper::emitNewFromPathname($context, $pathname);
     }
 
     /**

@@ -4128,7 +4128,7 @@ class Object_ extends Type {
                 'getperms', 'getowner', 'getgroup', 'getinode',
                 '__tostring', 'isfile', 'isdir',
                 'islink', 'getlinktarget', 'isreadable', 'iswritable', 'isexecutable',
-                'getfileinfo', 'getpathinfo',
+                'getfileinfo', 'getpathinfo', 'openfile',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
@@ -4151,9 +4151,6 @@ class Object_ extends Type {
             // Slot 0 must be `__spl_ht` for splBackingHashtable (#26783).
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
             $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_PATH, Variable::TYPE_STRING);
-            // SplFileInfo path props for getFilename/getPathname (#33308).
-            $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_PATH, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FILENAME, Variable::TYPE_STRING);
             $this->markHasConstructor($id);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([
