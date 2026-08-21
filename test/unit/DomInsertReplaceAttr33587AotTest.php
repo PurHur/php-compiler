@@ -7,8 +7,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * AOT: insertBefore(Attr) must throw Error, not SIGSEGV (#33587).
  *
- * replaceChild(Attr) still SIGSEGVs under try/catch (dual-emit CFG + DOMException);
- * tracked as follow-up on #33587.
+ * Combined repro also covers replaceChild(Attr) — see
+ * DomInsertBeforeReplaceChildAttr33587AotTest.
  *
  * @group llvm
  */
@@ -16,18 +16,10 @@ final class DomInsertReplaceAttr33587AotTest extends TestCase
 {
     public function testInsertBeforeAttrThrowsError(): void
     {
-        $this->assertAotMatchesZend(
-            __DIR__.'/../repro/issue_33587_dom_insertbefore_attr_aot.php',
-            'Error:Cannot add newnode as the previous sibling of refnode'
-        );
-    }
-
-    private function assertAotMatchesZend(string $src, string $needle): void
-    {
-        $zend = $this->runPhp($src);
-        $aot = $this->runAot($src);
-        $this->assertSame($zend, $aot);
-        $this->assertStringContainsString($needle, $aot);
+        $out = $this->runAot(__DIR__.'/../repro/issue_33587_dom_insertbefore_attr_aot.php');
+        $zend = $this->runPhp(__DIR__.'/../repro/issue_33587_dom_insertbefore_attr_aot.php');
+        $this->assertSame($zend, $out);
+        $this->assertStringContainsString('Cannot add newnode as the previous sibling of refnode', $out);
     }
 
     private function runPhp(string $src): string

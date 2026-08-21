@@ -25,6 +25,7 @@ use PHPLLVM\Value;
  * {@see JitDomAppendChildLiveSlots::expandFragmentChildrenReplace} (#33322).
  * Cross-parent reparent must unlink the old parent first (php-src
  * dom_node_replace_child) — peer appendChild #33404 / #33450.
+ * Attr newChild: Hierarchy Request before sibling slots (#33587).
  *
  * Reference: php-src ext/dom/node.c dom_node_replace_child.
  */
@@ -44,9 +45,27 @@ final class JitDomReplaceChildLiveSlots
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rc_live_slots');
         self::ensureLayout($context);
 
+        // php-src: Attr is not content — Hierarchy Request before sibling splice (#33587).
+        $bbAttr = BasicBlockHelper::append($context, 'dom_rc_ls_attr');
+        $bbNotAttr = BasicBlockHelper::append($context, 'dom_rc_ls_not_attr');
+        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_end');
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
+
+        $context->builder->positionAtEnd($bbAttr);
+        \PHPCompiler\JIT\TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Hierarchy Request Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::HIERARCHY_REQUEST_ERR
+        );
+
+        $context->builder->positionAtEnd($bbNotAttr);
         $bbFrag = BasicBlockHelper::append($context, 'dom_rc_frag');
         $bbNormal = BasicBlockHelper::append($context, 'dom_rc_normal');
-        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_end');
         $isFrag = JitDomAppendChildLiveSlots::isDocumentFragmentNode($context, $newChild);
         $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
 

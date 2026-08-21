@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Call\DomNodeAppendChild;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -22,6 +23,7 @@ use PHPLLVM\Value;
  * DomRegistry bridge then leaves LLVM childNodes/firstChild/parentNode stale —
  * mirror ParentNode::append / replaceChild slot sync (php-src ext/dom/node.c).
  * Live held childNodes: {@see JitDomInsertBeforeLiveSlots}.
+ * Attr + non-null refChild: php-src Error (not attribute-map install) (#33587).
  *
  * Null / omitted refChild ≡ append (php-src). Must use {@see DomNodeAppendChild}
  * (LiveSlots), not historic {@see JitDomAppendChild::invoke} stub (#33031 / re-#26458).
@@ -190,6 +192,9 @@ final class JitDomInsertBefore
         $parent = self::loadObjectArg($context, $parentVar);
         $newChild = self::loadObjectArg($context, $newChildVar);
         $refChild = self::loadObjectArg($context, $refChildVar);
+        // php-src: Attr cannot be previous sibling of a child node — Error, not LiveSlots (#33587).
+        // Must run before Element sibling walks (DOMAttr has no child layout → SIGSEGV).
+        self::rejectAttrAsSiblingBeforeLiveSlots($context, $newChild);
         // Wrong Document / Hierarchy Request before LiveSlots (#30274).
         DomNodeLiveMutationRuntime::assertTreeMutationChildBeforeLiveSlots(
             $context,
@@ -200,6 +205,30 @@ final class JitDomInsertBefore
             DomUserScriptDoctypeLlvm::markAttached();
         }
         JitDomInsertBeforeLiveSlots::sync($context, $parent, $newChild, $refChild);
+    }
+
+    /**
+     * Thin-AOT: DOMAttr / Dom\Attr as insertBefore newChild with a ref sibling (#33587).
+     *
+     * php-src / libxml raises Error (not DOMException). Peer appendChild installs via
+     * the attribute map (#33570); insertBefore(null) routes there via appendAsNullRef.
+     */
+    private static function rejectAttrAsSiblingBeforeLiveSlots(Context $context, Value $newChild): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_attr_guard');
+        $bbAttr = BasicBlockHelper::append($context, 'dom_ib_attr_reject');
+        $bbOk = BasicBlockHelper::append($context, 'dom_ib_attr_ok');
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbOk);
+
+        $context->builder->positionAtEnd($bbAttr);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'Error',
+            'Cannot add newnode as the previous sibling of refnode'
+        );
+
+        $context->builder->positionAtEnd($bbOk);
     }
 
     /**
