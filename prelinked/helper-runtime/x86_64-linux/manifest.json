@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "generated_at": "2026-08-21T04:59:15+00:00",
+    "generated_at": "2026-08-21T05:50:03+00:00",
     "arch": "x86_64-linux",
     "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
     "core_fingerprint": "b54201faefd06aaf26a5",
@@ -9,7 +9,7 @@
     "published_fresh": 174,
     "kept_live_unpublished": 236,
     "total_bytes": 990773889,
-    "refresh": "targeted stale-unit emit+copy for 23 math *JitHelper + ImageTypeToExtension (#33253)",
-    "global_refreshed_at": "2026-08-21T02:42:15+00:00",
-    "refresh_note": "selective publish of 8 stale units (user_release_ready)"
+    "refresh": "targeted DirSnapshot + DirectoryIteratorSnapshot after #33266",
+    "global_refreshed_at": "2026-08-21T05:50:03+00:00",
+    "refresh_note": "selective publish of 2 stale units (#33266 follow-up)"
 }
