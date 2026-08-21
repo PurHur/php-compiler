@@ -11,13 +11,20 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** DOMElement::removeAttributeNode() — user-script AOT (php-src element.c). */
+/** DOMElement::removeAttributeNode() — user-script AOT (php-src element.c; #33577). */
 final class DomElementRemoveAttributeNode implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattrnode_invoke_cont');
 
-        return JitDomAttributeNodeNS::invokeRemoveAttributeNode($context, ...$args);
+        $result = JitDomAttributeNodeNS::invokeRemoveAttributeNode($context, ...$args);
+
+        // Drop attr from saveXML open-tag suffix (peer removeAttribute #33509 / #33577).
+        if (\count($args) >= 1) {
+            JitDomAttributeNodeNS::syncSaveXmlAttrSuffixAfterRemoveAttributeNode($context, $args[0]);
+        }
+
+        return $result;
     }
 }
