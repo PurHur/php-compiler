@@ -29,7 +29,7 @@ final class JitDomGetElementsByTagNameUserScript
         return self::$lastTagQuery;
     }
 
-    /** Clear tag query so childNodes foreach does not reuse a stale tag (#33082). */
+    /** Clear tag query so childNodes/attributes foreach does not reuse a stale tag (#33082/#33099). */
     public static function clearTagQueryState(): void
     {
         self::$lastTagQuery = null;
@@ -65,6 +65,7 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastNsFromElement = false;
         self::$lastTagQuery = null;
         JitDomNodeListForeachSnapshot::clearChildNodesFetch();
+        JitDomNodeListForeachSnapshot::clearAttributesFetch();
         if (\count($args) < 2) {
             return null;
         }
