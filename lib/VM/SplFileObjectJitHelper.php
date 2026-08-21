@@ -14,9 +14,10 @@ use PHPLLVM\Value;
  * Thin-AOT SplFileObject — snapshot lines into `__spl_ht` for foreach (#28709).
  *
  * Construct reads via libc file_get_contents then fgets-shaped line split.
+ * Also inits SplFileInfo `__dir_path`/`__filename` for getFilename/getPath (#33305).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
- * php-src: ext/spl/spl_directory.c — SplFileObject iterator
+ * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -50,6 +51,36 @@ final class SplFileObjectJitHelper
         $objectType->markObjectConstructed($obj);
 
         return self::voidResult($context);
+    }
+
+    /**
+     * Allocate SplFileObject + SplFileInfo path props + optional line snapshot (#33305).
+     *
+     * @return Value __object__*
+     */
+    public static function allocateInitialized(Context $context, Value $pathStr): Value
+    {
+        $classId = $context->type->object->lookup(self::CLASS_NAME);
+        $obj = $context->type->object->allocate($classId);
+        $objectType = $context->type->object;
+        // Empty line HT — SplFileObjectSnapshotRuntime::snapshotPath SIGSEGVs when invoked from
+        // openFile allocate (pre-existing construct crash on master). Path accessors are #33305.
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $htVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_HT),
+            $htVar,
+            JITVariable::TYPE_HASHTABLE
+        );
+        $pathVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $pathStr);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_PATH),
+            $pathVar,
+            JITVariable::TYPE_STRING
+        );
+        DirectoryIteratorJitHelper::initSplFileInfoPathProps($context, $obj, $pathStr, self::CLASS_NAME);
+
+        return $obj;
     }
 
     private static function loadObject(Context $context, JITVariable $receiver): Value
