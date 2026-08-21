@@ -5,23 +5,27 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: foreach after unserialize(SplFixedArray) must match Zend (#33649).
+ * AOT: foreach after unserialize(ArrayObject) must match Zend (#33654).
  *
  * @group llvm
  * @group aot
  */
-final class SplFixedArrayUnserializeForeach33649AotTest extends TestCase
+final class ArrayObjectUnserializeForeach33654AotTest extends TestCase
 {
     public function testForeachMatchesZend(): void
     {
-        $this->assertAotMatchesZend(__DIR__.'/../repro/splfixedarray_unserialize_foreach_aot_33649.php');
+        $this->assertAotMatchesZend(__DIR__.'/../repro/arrayobject_unserialize_foreach_aot_33654.php');
     }
 
     public function testClassUserTypePropagateWired(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
         $this->assertStringContainsString('propagateUnserializeSplHtBackedResultType', $src);
-        $this->assertStringContainsString('#33649', $src);
+        $this->assertStringContainsString('#33654', $src);
+        $this->assertStringContainsString('SplOuterIteratorHt::isHtBacked', $src);
+        $fill = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/UnserializeSplArrayFillNestedJitHelper.php');
+        $this->assertStringContainsString('phpc_native_ht_set_long_at', $fill);
+        $this->assertStringContainsString('#33654', $fill);
     }
 
     private function assertAotMatchesZend(string $src): void
@@ -43,7 +47,7 @@ final class SplFixedArrayUnserializeForeach33649AotTest extends TestCase
     private function runAot(string $src): string
     {
         $root = dirname(__DIR__, 2);
-        $bin = sys_get_temp_dir().'/sfa_fe_33649_'.getmypid().'_'.md5($src);
+        $bin = sys_get_temp_dir().'/ao_fe_33654_'.getmypid().'_'.md5($src);
         $cmd = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src);

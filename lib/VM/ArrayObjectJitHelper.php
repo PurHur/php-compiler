@@ -809,6 +809,7 @@ final class ArrayObjectJitHelper
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_long(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
         ];
         foreach ($internals as $internal) {
             $lc = strtolower($internal->getName());

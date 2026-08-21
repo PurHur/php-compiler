@@ -59,6 +59,11 @@ final class VmObjectPropertyForeach
         if (JitVariable::TYPE_VALUE === $container->type && (null === $containerUserType || '' === $containerUserType)) {
             return false;
         }
+        // SPL HT-backed (ArrayObject / SplFixedArray / …): walk `__spl_ht`, not instance props
+        // (#33654 — tagging classUserType must not steal FE into property foreach).
+        if (SplOuterIteratorHt::isHtBacked($containerUserType)) {
+            return false;
+        }
         if (null !== $containerUserType && '' !== $containerUserType) {
             $classLc = strtolower(ltrim($containerUserType, '\\'));
             if ('object' !== $classLc) {

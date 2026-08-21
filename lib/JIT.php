@@ -12755,7 +12755,7 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
-                    $this->propagateUnserializeSplFixedArrayResultType(
+                    $this->propagateUnserializeSplHtBackedResultType(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall,
                         $callArgs
@@ -15589,13 +15589,19 @@ class JIT {
     }
 
     /**
-     * Tag literal unserialize(SplFixedArray) so foreach uses splBackingHashtable (#33649).
+     * Tag literal unserialize(SPL HT-backed) so foreach uses splBackingHashtable (#33649, #33654).
      *
-     * Without classUserType, TYPE_VALUE boxes take __value__readHashtable → SEGV.
+     * Without classUserType, TYPE_VALUE boxes take __value__readHashtable → SEGV
+     * (ArrayObject / ArrayIterator / SplFixedArray after unserialize).
+     *
+     * Only annotate JIT classUserType — do not force CFG TYPE_OBJECT (that empties
+     * ArrayObject `__spl_ht` under thin AOT). Bag int-key restore is #33654 fillAt.
+     *
+     * php-src: ext/spl/spl_array.c, ext/spl/spl_fixedarray.c — FE over storage / fixed slots.
      *
      * @param list<Variable> $callArgs
      */
-    private function propagateUnserializeSplFixedArrayResultType(
+    private function propagateUnserializeSplHtBackedResultType(
         Operand $result,
         mixed $toCall,
         array $callArgs
@@ -15611,20 +15617,23 @@ class JIT {
             return;
         }
         $literal = JIT\JitStringArg::compileTimeLiteral($payload);
-        if (null === $literal || !\preg_match('/^O:\d+:"SplFixedArray":/', $literal)) {
+        if (null === $literal || !\preg_match('/^O:\d+:"([^"]+)":/', $literal, $m)) {
+            return;
+        }
+        $className = $m[1];
+        if (!\PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($className)) {
             return;
         }
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
         $var = $this->context->getVariableFromOp($result);
-        $var->classUserType = 'SplFixedArray';
-        $result->type = new Type(Type::TYPE_OBJECT, [], 'SplFixedArray');
+        $var->classUserType = $className;
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
-                $this->context->namedVariableBindings[$resolved]->classUserType = 'SplFixedArray';
+                $this->context->namedVariableBindings[$resolved]->classUserType = $className;
             }
             $this->context->bindVariableByName($resolved, $var);
         }
