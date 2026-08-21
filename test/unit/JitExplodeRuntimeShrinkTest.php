@@ -19,6 +19,8 @@ final class JitExplodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmString::explode', $jitExplode);
         $this->assertStringContainsString('phpc_explode_find_delim', $jitExplode);
         $this->assertStringContainsString('VmStringCompare::findOffset', $jitExplode);
+        // Mid-method emit must scope findOffset blocks onto the helper (#33521 / #27211).
+        $this->assertStringContainsString('BasicBlockHelper::scopeLoweringToFunction', $jitExplode);
         $this->assertStringContainsString('function explode(', $jitExplode);
         $this->assertStringNotContainsString('JitStringSearch::findOffsetI32', $jitExplode);
     }

@@ -542,6 +542,12 @@ final class JitExplode
 
     /**
      * Once-per-module LLVM helper: byte offset of $needle in $haystack at/after $offset, or -1.
+     *
+     * Mid-method ensure (e.g. SplFileObject::current READ_CSV arm) must scope
+     * {@see VmStringCompare::findOffset} blocks onto this helper — otherwise
+     * {@see BasicBlockHelper::append} parks jit_find_* blocks on the user method
+     * and Module.php:180 rejects cross-function args (#33521 / #27211; peer
+     * {@see \PHPCompiler\JIT\Builtin\StringStrstr::ensureLinked}).
      */
     private static function ensureFindDelimFunction(Context $context): void
     {
@@ -566,19 +572,27 @@ final class JitExplode
         $fn = null !== $existing
             ? $existing
             : $context->module->addFunction($name, $ft);
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-        // memcmp(3) via LibcExtern::ensureMemcmpDecl after always-on drop (#31954).
-        LibcExtern::ensureMemcmpDecl($context);
-        $found = VmStringCompare::findOffset(
-            $context,
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2),
-            false
-        );
-        $context->builder->returnValue($found);
         $context->registerFunction($name, $fn);
+
+        // Scope before append/findOffset — loweringLlvmFunction may still be the
+        // caller (SplFileObject method) when explode is emitted mid-body (#33521).
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $name, static function () use (
+            $context,
+            $fn
+        ): void {
+            $entry = $fn->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($entry);
+            // memcmp(3) via LibcExtern::ensureMemcmpDecl after always-on drop (#31954).
+            LibcExtern::ensureMemcmpDecl($context);
+            $found = VmStringCompare::findOffset(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2),
+                false
+            );
+            $context->builder->returnValue($found);
+        });
 
         if (null !== $saved) {
             $context->builder->positionAtEnd($saved);
