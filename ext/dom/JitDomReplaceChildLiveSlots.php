@@ -42,9 +42,11 @@ final class JitDomReplaceChildLiveSlots
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rc_live_slots');
         self::ensureLayout($context);
 
+        $pred = $context->builder->getInsertBlock();
         $bbFrag = BasicBlockHelper::append($context, 'dom_rc_frag');
         $bbNormal = BasicBlockHelper::append($context, 'dom_rc_normal');
         $bbEnd = BasicBlockHelper::append($context, 'dom_rc_end');
+        $context->builder->positionAtEnd($pred);
         $isFrag = JitDomAppendChildLiveSlots::isDocumentFragmentNode($context, $newChild);
         $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
 
@@ -157,6 +159,8 @@ final class JitDomReplaceChildLiveSlots
         $item1->addIncoming($loadedSecond, $readPred);
 
         self::refreshChildNodesListInPlace($context, $parent, $childCount, $newFirst, $item1);
+        // saveXML reads PROP_USER_SCRIPT_INNER_XML — refresh after text/element splice (#33335).
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
     }
 
     /**

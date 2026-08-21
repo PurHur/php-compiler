@@ -38,9 +38,11 @@ final class JitDomInsertBeforeLiveSlots
         self::ensureLayout($context);
         JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
 
+        $pred = $context->builder->getInsertBlock();
         $bbFrag = BasicBlockHelper::append($context, 'dom_ib_frag');
         $bbNormal = BasicBlockHelper::append($context, 'dom_ib_normal');
         $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
+        $context->builder->positionAtEnd($pred);
         $isFrag = JitDomAppendChildLiveSlots::isDocumentFragmentNode($context, $newChild);
         $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
 

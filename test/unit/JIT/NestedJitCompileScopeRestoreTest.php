@@ -148,26 +148,32 @@ final class NestedJitCompileScopeRestoreTest extends TestCase
         );
     }
 
-    public function testEnsureOpenInsertBlockPrefersLastOpenOnSealedInsert(): void
+    public function testEnsureOpenInsertBlockPrefersNonEmptyOpenOnClearedInsert(): void
     {
         $root = \dirname(__DIR__, 3);
         $source = (string) \file_get_contents($root.'/lib/JIT/BasicBlockHelper.php');
         $pos = \strpos($source, 'function ensureOpenInsertBlock');
         $this->assertNotFalse($pos);
-        $chunk = \substr($source, $pos, 1200);
+        $chunk = \substr($source, $pos, 1600);
         $this->assertStringContainsString(
             'lastOpenBasicBlock',
             $chunk,
-            'ensureOpenInsertBlock must resume last open BB when insert is cleared/sealed (#26756)'
+            'ensureOpenInsertBlock must resume last open BB when insert is cleared (#26756)'
         );
-        // Sealed-insert path must also consult lastOpenBasicBlock (not only null-insert).
+        $this->assertStringContainsString(
+            'lastOpenBasicBlock($fn, true)',
+            $chunk,
+            'Cleared insert must prefer non-empty open BBs over empty forward arms (#33335)'
+        );
+        // Sealed insert always appends a fresh BB (bisect abcfd80e6 / #26756 cold-build) —
+        // do not jump to an unrelated open block.
         $sealedPos = \strpos($chunk, 'getTerminator()');
         $this->assertNotFalse($sealedPos);
         $afterSealed = \substr($chunk, $sealedPos);
         $this->assertStringContainsString(
-            'lastOpenBasicBlock',
+            'always append a fresh BB',
             $afterSealed,
-            'Sealed insert must prefer last open BB over orphan append (#26756)'
+            'Sealed insert must append fresh BB, not lastOpenBasicBlock (#26756)'
         );
     }
 }

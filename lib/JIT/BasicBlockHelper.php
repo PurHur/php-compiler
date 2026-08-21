@@ -137,7 +137,9 @@ final class BasicBlockHelper
      *
      * Never append instructions after an existing terminator (invalid IR).
      * When insert is cleared mid-function (NestedJIT / const-string builder swap), prefer the
-     * function's last open BB over an orphaned label with no preds (Runtime::parse M5 — #26756).
+     * function's last **non-empty** open BB over an orphaned label with no preds (Runtime::parse M5 — #26756).
+     * Empty forward-declared diamond arms (append/insert/after stubs) must not steal emission —
+     * that heap-corrupts multi-fragment AOT mains (#33335).
      * Sealed insert still appends a fresh BB — do not jump to an unrelated open block (#26756 cold-build).
      */
     public static function ensureOpenInsertBlock(Context $context, string $label): void
@@ -145,12 +147,13 @@ final class BasicBlockHelper
         $insert = self::tryGetInsertBlock($context);
         if (null === $insert) {
             $fn = self::parentFunction($context);
-            $open = self::lastOpenBasicBlock($fn);
+            $open = self::lastOpenBasicBlock($fn, true);
             if (null !== $open) {
                 $context->builder->positionAtEnd($open);
 
                 return;
             }
+            // Only empty forward-declared arms are open — do not resume there (#33335).
             $next = $fn->appendBasicBlock($label);
             $context->builder->positionAtEnd($next);
 
@@ -272,10 +275,14 @@ final class BasicBlockHelper
      * php-llvm swaps {@code getNext}/{@code getPrevious} on basic blocks
      * ({@code getPrevious()} == LLVMGetNextBasicBlock). Walk first→last the same way
      * {@see sealFunction} does, otherwise only the entry BB is inspected (#32363).
+     *
+     * When {@code $preferNonEmpty} is true (ensureOpenInsertBlock resume), skip empty
+     * forward-declared arms so emission stays on the mid-lower body (#33335).
      */
-    public static function lastOpenBasicBlock(Function_ $fn): ?BasicBlock
+    public static function lastOpenBasicBlock(Function_ $fn, bool $preferNonEmpty = false): ?BasicBlock
     {
         $open = null;
+        $openNonEmpty = null;
         if (0 === $fn->countBasicBlocks()) {
             return null;
         }
@@ -283,11 +290,28 @@ final class BasicBlockHelper
         while (null !== $block) {
             if (null === $block->getTerminator()) {
                 $open = $block;
+                if (self::basicBlockHasInstructions($block)) {
+                    $openNonEmpty = $block;
+                }
             }
             $block = $block->getPrevious();
         }
 
+        if ($preferNonEmpty) {
+            return $openNonEmpty;
+        }
+
         return $open;
+    }
+
+    /** Whether $block already has at least one instruction (not an empty forward stub). */
+    public static function basicBlockHasInstructions(BasicBlock $block): bool
+    {
+        try {
+            return null !== $block->getFirstInstruction();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -387,7 +411,7 @@ final class BasicBlockHelper
         if (!$fn instanceof Function_) {
             return;
         }
-        $open = self::lastOpenBasicBlock($fn);
+        $open = self::lastOpenBasicBlock($fn, true);
         if (null === $open) {
             return;
         }
