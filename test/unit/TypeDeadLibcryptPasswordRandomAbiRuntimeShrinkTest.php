@@ -43,7 +43,7 @@ final class TypeDeadLibcryptPasswordRandomAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         // Next leftover sentinel (proc_close dropped in #33118; random_bytes in #33160).
-        $this->assertStringContainsString("registerFunction('__compiler_preg_match_all'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_preg_replace'", $type);
         $this->assertStringContainsString('LibcryptRuntime::ensureLinked', $type);
         $this->assertStringContainsString('PasswordRandomBytesRuntime::ensureLinked', $type);
     }

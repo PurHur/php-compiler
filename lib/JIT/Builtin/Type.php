@@ -532,28 +532,13 @@ class Type extends Builtin {
         // StringPregMatch::ensureLinked). Leftover Type empty decls vs Runtime ABI drift
         // mint preg_match.1 (#31894 / #32122). User-script preg_match() stays JitPregMatch /
         // PregJitHelper (php-src ext/pcre/php_pcre.c).
-        $fntypePregMatch = $this->context->context->functionType(
-            $i64,
-            false,
-            $strPtr,
-            $strPtr
-        );
-        $fnPregMatchAll = $this->context->module->addFunction('__compiler_preg_match_all', $fntypePregMatch);
-        $this->context->registerFunction('__compiler_preg_match_all', $fnPregMatchAll);
-        $valuePtr = $this->context->getTypeFromString('__value__*');
-        $fntypePregMatchEx = $this->context->context->functionType(
-            $i64,
-            false,
-            $strPtr,
-            $strPtr,
-            $valuePtr,
-            $i64,
-            $i64
-        );
-        $fnPregMatchEx = $this->context->module->addFunction('__compiler_preg_match_ex', $fntypePregMatchEx);
-        $this->context->registerFunction('__compiler_preg_match_ex', $fnPregMatchEx);
-        $fnPregMatchAllEx = $this->context->module->addFunction('__compiler_preg_match_all_ex', $fntypePregMatchEx);
-        $this->context->registerFunction('__compiler_preg_match_all_ex', $fnPregMatchAllEx);
+        // __compiler_preg_match_all / __compiler_preg_match_ex / __compiler_preg_match_all_ex
+        // always-on shells removed (#33188): StringPregMatch / StringPregMatchJit /
+        // PregMatchRuntime owns the ABI (getNamedFunction first, then addFunction if absent
+        // via implementI64PairBridge / implementMatchExBridge; Type::initialize still
+        // StringPregMatch::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // preg_match_all.1 / preg_match_ex.1 (#31894 / #32122). User-script stays
+        // JitPregMatchAll / JitPregMatchEx / JitPregMatchAllEx / PregJitHelper.
         $fntypePregReplace = $this->context->context->functionType(
             $strPtr,
             false,
