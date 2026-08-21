@@ -79,6 +79,7 @@ final class JitStreamIoKernel
         self::implementIfMissing($context, '__compiler_fwrite', self::emitFwrite(...));
         self::implementIfMissing($context, '__phpc_try_fopen_stdio', self::emitTryFopenStdio(...));
         self::implementIfMissing($context, '__phpc_try_fopen_php_memory', self::emitTryFopenPhpMemory(...));
+        self::implementIfMissing($context, '__phpc_php_fopen_plain', self::emitPhpFopenPlain(...));
         self::implementIfMissing($context, '__compiler_fopen', self::emitFopen(...));
         self::implementIfMissing($context, '__compiler_popen', self::emitPopen(...));
         self::implementIfMissing($context, '__compiler_tmpfile', self::emitTmpfile(...));
@@ -254,6 +255,10 @@ final class JitStreamIoKernel
                 $name,
                 $context->context->functionType($i8p, false, $i8p, $i8p)
             ),
+            '__phpc_php_fopen_plain' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i8p, false, $i8p, $i8p)
+            ),
             default => throw new \LogicException('JitStreamIoKernel: unknown '.$name),
         };
         $context->registerFunction($name, $fn);
@@ -298,6 +303,7 @@ final class JitStreamIoKernel
             ['strlen', $sizeT, [$i8p]],
             ['ferror', $i32, [$i8p]],
             ['strcmp', $i32, [$i8p, $i8p]],
+            ['strchr', $i8p, [$i8p, $i32]],
             ['dup', $i32, [$i32]],
             ['fdopen', $i8p, [$i32, $i8p]],
             ['close', $i32, [$i32]],
@@ -519,6 +525,108 @@ final class JitStreamIoKernel
     private static function emitFopen(Context $context, LlvmFunction $fn): void
     {
         self::emitOpenHandle($context, $fn, withPath: true);
+    }
+
+    /**
+     * __phpc_php_fopen_plain(path, mode) — libc fopen for r/w/a; open(2)+fdopen for PHP c/x (#33433).
+     *
+     * php-src: main/streams/plain_wrapper.c — php_stream_parse_fopen_modes
+     * (`c` → O_CREAT, `x` → O_CREAT|O_EXCL; glibc fopen rejects both with EINVAL).
+     */
+    private static function emitPhpFopenPlain(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('php_fopen_plain_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $path = $fn->getParam(0);
+        $mode = $fn->getParam(1);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $nullPtr = $i8p->constNull();
+        $zero = $i32->constInt(0, false);
+        // Linux fcntl.h — O_WRONLY=1, O_RDWR=2, O_CREAT=0100, O_EXCL=0200
+        $oWronly = $i32->constInt(1, false);
+        $oRdwr = $i32->constInt(2, false);
+        $oCreat = $i32->constInt(64, false);
+        $oExcl = $i32->constInt(128, false);
+        $mode0666 = $i32->constInt(0666, false);
+
+        $failBb = $fn->appendBasicBlock('php_fopen_plain_fail');
+        $libcBb = $fn->appendBasicBlock('php_fopen_plain_libc');
+        $specialBb = $fn->appendBasicBlock('php_fopen_plain_cx');
+
+        $base = $context->builder->load($mode);
+        $isC = $context->builder->icmp(Builder::INT_EQ, $base, $i8->constInt(\ord('c'), false));
+        $isX = $context->builder->icmp(Builder::INT_EQ, $base, $i8->constInt(\ord('x'), false));
+        $context->builder->branchIf(
+            $context->builder->or($isC, $isX),
+            $specialBb,
+            $libcBb
+        );
+
+        $context->builder->positionAtEnd($libcBb);
+        $libcFp = $context->builder->call($context->lookupFunction('fopen'), $path, $mode);
+        $context->builder->returnValue($libcFp);
+
+        $context->builder->positionAtEnd($specialBb);
+        $plusPtr = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $mode,
+            $i32->constInt(\ord('+'), false)
+        );
+        $hasPlus = $context->builder->icmp(Builder::INT_NE, $plusPtr, $nullPtr);
+        $flagsCreat = $context->builder->select(
+            $isX,
+            $context->builder->or($oCreat, $oExcl),
+            $oCreat
+        );
+        $flags = $context->builder->select(
+            $hasPlus,
+            $context->builder->or($flagsCreat, $oRdwr),
+            $context->builder->or($flagsCreat, $oWronly)
+        );
+        $fdopenMode = $context->builder->select(
+            $hasPlus,
+            self::literalCstr($context, 'r+b'),
+            self::literalCstr($context, 'wb')
+        );
+        $fd = $context->builder->call(
+            $context->lookupFunction('open'),
+            $path,
+            $flags,
+            $mode0666
+        );
+        $openOkBb = $fn->appendBasicBlock('php_fopen_plain_open_ok');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $fd, $zero),
+            $failBb,
+            $openOkBb
+        );
+
+        $context->builder->positionAtEnd($openOkBb);
+        $fp = $context->builder->call(
+            $context->lookupFunction('fdopen'),
+            $fd,
+            $fdopenMode
+        );
+        $fdopenOkBb = $fn->appendBasicBlock('php_fopen_plain_fdopen_ok');
+        $fdopenFailBb = $fn->appendBasicBlock('php_fopen_plain_fdopen_fail');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr),
+            $fdopenFailBb,
+            $fdopenOkBb
+        );
+
+        $context->builder->positionAtEnd($fdopenFailBb);
+        $context->builder->call($context->lookupFunction('close'), $fd);
+        $context->builder->branch($failBb);
+
+        $context->builder->positionAtEnd($fdopenOkBb);
+        $context->builder->returnValue($fp);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullPtr);
     }
 
     /**
@@ -817,8 +925,9 @@ final class JitStreamIoKernel
             $context->builder->branch($mergeBb);
 
             $context->builder->positionAtEnd($plainBb);
+            // PHP modes c/x are not valid libc fopen(3) strings — open(2)+fdopen (#33433).
             $plainFp = $context->builder->call(
-                $context->lookupFunction('fopen'),
+                $context->lookupFunction('__phpc_php_fopen_plain'),
                 self::stringData($context, $path),
                 self::stringData($context, $mode)
             );
