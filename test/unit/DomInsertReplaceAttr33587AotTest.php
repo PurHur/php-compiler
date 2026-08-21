@@ -5,10 +5,7 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: insertBefore(Attr) must throw Error, not SIGSEGV (#33587).
- *
- * replaceChild(Attr) still SIGSEGVs under try/catch (dual-emit CFG + DOMException);
- * tracked as follow-up on #33587.
+ * AOT: insertBefore/replaceChild(Attr) must throw like Zend, not SIGSEGV (#33587).
  *
  * @group llvm
  */
@@ -19,6 +16,14 @@ final class DomInsertReplaceAttr33587AotTest extends TestCase
         $this->assertAotMatchesZend(
             __DIR__.'/../repro/issue_33587_dom_insertbefore_attr_aot.php',
             'Error:Cannot add newnode as the previous sibling of refnode'
+        );
+    }
+
+    public function testReplaceChildAttrThrowsHierarchyRequest(): void
+    {
+        $this->assertAotMatchesZend(
+            __DIR__.'/../repro/issue_33587_dom_replacechild_attr_aot.php',
+            'DOMException:Hierarchy Request Error'
         );
     }
 

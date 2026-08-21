@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -44,9 +45,29 @@ final class JitDomReplaceChildLiveSlots
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rc_live_slots');
         self::ensureLayout($context);
 
+        // php-src: Attr is not content — must not take Element sibling slots (#33587).
+        // Mirror insertBefore LiveSlots Attr reject (Throwable catch; typed DOMException catch
+        // fails module verify for this call shape).
+        $bbAttr = BasicBlockHelper::append($context, 'dom_rc_ls_attr');
+        $bbNotAttr = BasicBlockHelper::append($context, 'dom_rc_ls_not_attr');
+        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_end');
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
+        $context->builder->positionAtEnd($bbAttr);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Hierarchy Request Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::HIERARCHY_REQUEST_ERR
+        );
+        // emitCatchableClassError terminates the block (branch to catch dispatch).
+
+        $context->builder->positionAtEnd($bbNotAttr);
         $bbFrag = BasicBlockHelper::append($context, 'dom_rc_frag');
         $bbNormal = BasicBlockHelper::append($context, 'dom_rc_normal');
-        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_end');
         $isFrag = JitDomAppendChildLiveSlots::isDocumentFragmentNode($context, $newChild);
         $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
 

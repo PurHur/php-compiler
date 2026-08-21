@@ -6761,6 +6761,10 @@ final class VmDom
         if ($newChild->id === $oldChild->id) {
             return $oldChild;
         }
+        // php-src: Attr is not content — Hierarchy Request (peer thin-AOT #33587; unlike appendChild).
+        if (self::isAttr($newChild)) {
+            DomExceptionConstants::raiseHierarchyRequest();
+        }
         // php-src ext/dom/node.c dom_node_replace_child — DocumentFragment expands in place (#21976).
         if (self::isDocumentFragment($newChild)) {
             if (self::isAttr($parent)) {
