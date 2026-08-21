@@ -4128,6 +4128,7 @@ class Object_ extends Type {
                 'getperms', 'getowner', 'getgroup', 'getinode',
                 '__tostring', 'isfile', 'isdir',
                 'islink', 'getlinktarget', 'isreadable', 'iswritable', 'isexecutable',
+                'getfileinfo', 'getpathinfo',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
@@ -4206,6 +4207,7 @@ class Object_ extends Type {
                 'getmtime', 'getatime', 'getctime', 'getperms', 'getowner', 'getgroup', 'getinode',
                 '__tostring',
                 'isfile', 'isdir', 'islink', 'getlinktarget', 'isreadable', 'iswritable', 'isexecutable',
+                'getfileinfo', 'getpathinfo',
             ];
             if ('filesystemiterator' === $lcname) {
                 $methods = array_merge($methods, ['getflags', 'setflags']);
