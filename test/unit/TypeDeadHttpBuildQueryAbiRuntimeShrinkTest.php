@@ -31,8 +31,8 @@ final class TypeDeadHttpBuildQueryAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Prior leftover still Type always-on (#33207 serialize_* / unserialize / phpc_run_command).
-        $this->assertStringContainsString("registerFunction('__compiler_phpc_run_command'", $type);
+        // Next leftover sentinel (unserialize still Type always-on; #33212 phpc_run_command dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_unserialize'", $type);
         $this->assertStringContainsString('StringHttpBuildQuery', $type);
     }
 

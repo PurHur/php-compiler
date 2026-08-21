@@ -17,8 +17,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * User-script exec capture via {@see ProcessExecCaptureNativeJitHelper} + {@see JitVmHelperLink} (#19006).
  * Deferred shell_exec via {@see JitVmHelperLink} + {@see ProcessJitHelper} (#19086).
  * Owns `__compiler_shell_exec` / `__compiler_escapeshellarg` / `__compiler_escapeshellcmd`
- * module-locally ({@see getNamedFunction} first). Do not re-add empty always-on shells in
- * {@see Type} — leftover decls mint shell_exec.1 (#31894 / #32122).
+ * / `__compiler_phpc_run_command` module-locally ({@see getNamedFunction} first). Do not
+ * re-add empty always-on shells in {@see Type} — leftover decls mint shell_exec.1 /
+ * phpc_run_command.1 (#31894 / #32122 / #33201 / #33212).
  * php-src: ext/standard/exec.c — shell_exec, escapeshellarg, escapeshellcmd
  */
 final class ProcessRuntime
