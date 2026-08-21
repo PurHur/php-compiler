@@ -106,6 +106,7 @@ final class JitStreamSyncKernel
         // __phpc_resolve_stream after always-on LibcExtern drop (#32287).
         LibcExtern::ensureResolveStreamDecl($context);
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
 
         foreach ([
