@@ -95,6 +95,9 @@ final class SplTempFileObjectConstruct extends VmClassMethod
             throw new \RuntimeException('SplTempFileObject::__construct(): Failed to open temp stream');
         }
         SplFileInfoStorage::init($object, 'php://temp');
+        // php-src zim_SplTempFileObject___construct — path = ZSTR_EMPTY_ALLOC after open (#33568).
+        // Keeps getFilename() as the full URI and getPath() as "".
+        SplFileInfoStorage::setPath($object, '');
         SplFileObjectStorage::setHandle($object, $handle, 'w+b');
     }
 }
