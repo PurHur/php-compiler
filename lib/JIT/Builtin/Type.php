@@ -224,10 +224,11 @@ class Type extends Builtin {
         // Leftover Type empty decls vs Runtime ABI drift mint is_process_resource.1
         // (#31894 / #32122). User-script process-handle probes stay ProcessOpenJitHelper /
         // JitStreamResourceKernel stub when ProcessOpen is not linked.
-        $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypeGetResources = $this->context->context->functionType($htPtr, false, $strPtr);
-        $fnGetResources = $this->context->module->addFunction('__compiler_get_resources', $fntypeGetResources);
-        $this->context->registerFunction('__compiler_get_resources', $fnGetResources);
+        // __compiler_get_resources always-on shell removed (#33130): StreamResource /
+        // JitStreamResourceKernel owns the ABI (getNamedFunction first, then addFunction if
+        // absent via implementIfMissing; Type::initialize still StreamResource::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint get_resources.1
+        // (#31894 / #32122). User-script get_resources() stays JitStreamResourceKernel.
         // __compiler_flock always-on shell removed (#33104): StreamReadRuntime owns the
         // ABI (getNamedFunction first, then addFunction if absent via
         // JitStreamReadBridgeKernel::implementI32Bridge; Type::initialize still
