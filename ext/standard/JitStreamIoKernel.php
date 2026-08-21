@@ -223,6 +223,14 @@ final class JitStreamIoKernel
                 $name,
                 $context->context->functionType($i32, false, $i64, $i64)
             ),
+            '__compiler_flock' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i32, false, $i64, $i64)
+            ),
+            '__compiler_fpassthru' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i64, false, $i64)
+            ),
             '__phpc_try_fopen_stdio' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i8p, false, $i8p, $i8p)
@@ -276,6 +284,9 @@ final class JitStreamIoKernel
             ['dup', $i32, [$i32]],
             ['fdopen', $i8p, [$i32, $i8p]],
             ['close', $i32, [$i32]],
+            ['fileno', $i32, [$i8p]],
+            ['flock', $i32, [$i32, $i32]],
+            ['write', $i64, [$i32, $i8p, $i64]],
             ['__compiler_stream_filter_apply_write', $strPtr, [$i64, $strPtr]],
             ['__compiler_stream_filter_apply_read', $strPtr, [$i64, $strPtr]],
         ] as [$name, $ret, $params]) {
@@ -1491,6 +1502,276 @@ final class JitStreamIoKernel
 
         $context->builder->positionAtEnd($noBb);
         $context->builder->returnValue($zeroI32);
+    }
+
+    /**
+     * Idempotent libc flock for thin AOT (#33122).
+     *
+     * NestedJIT StreamReadJitHelper→VmFs cannot see JitStreamIoKernel FILE* handles.
+     * Call only from {@see \PHPCompiler\JIT\Builtin\StreamReadRuntime::forceLibcStreamPositionAbis}
+     * after NestedJIT — not from {@see implementForUserScriptLowering} (poisons flock sentinel).
+     * php-src: ext/standard/flock_compat.c — PHP_FUNCTION(flock); LOCK_UN=3 → OS LOCK_UN=8.
+     */
+    public static function implementFlockForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_flock');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('flock_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_flock', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_flock');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_flock');
+        }
+        self::emitFlock($context, $fn);
+        $context->registerFunction('__compiler_flock', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** resolve→fileno→flock(2) with PHP LOCK_* → Linux flags (VmPhpFdStream::phpLockToSys). */
+    private static function emitFlock(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('flock_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $operation = $fn->getParam(1);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $nullPtr = $i8p->constNull();
+        $zero = $i32->constInt(0, false);
+        $one = $i32->constInt(1, false);
+        $three = $i32->constInt(3, false);
+        $four = $i32->constInt(4, false);
+        $eight = $i32->constInt(8, false);
+        $notThree = $i32->constInt(~3, true);
+
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('flock_fail');
+        $filenoBb = $fn->appendBasicBlock('flock_fileno');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr),
+            $failBb,
+            $filenoBb
+        );
+
+        $context->builder->positionAtEnd($filenoBb);
+        $fd = $context->builder->call($context->lookupFunction('fileno'), $fp);
+        $doBb = $fn->appendBasicBlock('flock_do');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $fd, $zero),
+            $failBb,
+            $doBb
+        );
+
+        $context->builder->positionAtEnd($doBb);
+        $op = $context->builder->trunc($operation, $i32);
+        // PHP LOCK_UN=3 is not a single bit; match VmPhpFdStream::phpLockToSys (#33122).
+        $hasUn = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->and($op, $three),
+            $three
+        );
+        $opWithoutUn = $context->builder->select(
+            $hasUn,
+            $context->builder->and($op, $notThree),
+            $op
+        );
+        $sys = $context->builder->select($hasUn, $eight, $zero);
+        $sys = $context->builder->select(
+            $context->builder->icmp(
+                Builder::INT_NE,
+                $context->builder->and($opWithoutUn, $one),
+                $zero
+            ),
+            $context->builder->or($sys, $one),
+            $sys
+        );
+        $two = $i32->constInt(2, false);
+        $sys = $context->builder->select(
+            $context->builder->icmp(
+                Builder::INT_NE,
+                $context->builder->and($opWithoutUn, $two),
+                $zero
+            ),
+            $context->builder->or($sys, $two),
+            $sys
+        );
+        $sys = $context->builder->select(
+            $context->builder->icmp(
+                Builder::INT_NE,
+                $context->builder->and($opWithoutUn, $four),
+                $zero
+            ),
+            $context->builder->or($sys, $four),
+            $sys
+        );
+        $rc = $context->builder->call($context->lookupFunction('flock'), $fd, $sys);
+        $context->builder->returnValue(
+            $context->builder->select(
+                $context->builder->icmp(Builder::INT_EQ, $rc, $zero),
+                $one,
+                $zero
+            )
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($zero);
+    }
+
+    /**
+     * Idempotent libc fpassthru for thin AOT (#33122) — fread chunks → write(1).
+     *
+     * Same NestedJIT FILE* gap as flock; force only via forceLibcStreamPositionAbis.
+     * php-src: ext/standard/file.c — PHP_FUNCTION(fpassthru)
+     */
+    public static function implementFpassthruForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_fpassthru');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('fpassthru_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_fpassthru', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_fpassthru');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_fpassthru');
+        }
+        self::emitFpassthru($context, $fn);
+        $context->registerFunction('__compiler_fpassthru', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** fread → write(STDOUT_FILENO) loop; returns bytes written or -1 (#33122). */
+    private static function emitFpassthru(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('fpassthru_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $nullPtr = $i8p->constNull();
+        $zeroI64 = $i64->constInt(0, false);
+        $minusOne = $i64->constInt(-1, true);
+        $zeroI32 = $i32->constInt(0, false);
+        $oneI32 = $i32->constInt(1, false);
+        $chunk = $sizeT->constInt(self::DEFAULT_BUFFER_SIZE, false);
+
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('fpassthru_fail');
+        $allocBb = $fn->appendBasicBlock('fpassthru_alloc');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr),
+            $failBb,
+            $allocBb
+        );
+
+        $context->builder->positionAtEnd($allocBb);
+        $buf = $context->builder->call($context->lookupFunction('malloc'), $chunk);
+        $loopSetup = $fn->appendBasicBlock('fpassthru_loop_setup');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $buf, $nullPtr),
+            $failBb,
+            $loopSetup
+        );
+
+        $context->builder->positionAtEnd($loopSetup);
+        $totalAlloca = $context->builder->alloca($i64, 1, 'fpassthru_total');
+        $context->builder->store($zeroI64, $totalAlloca);
+        $loopBb = $fn->appendBasicBlock('fpassthru_loop');
+        $context->builder->branch($loopBb);
+
+        $context->builder->positionAtEnd($loopBb);
+        $got = $context->builder->call(
+            $context->lookupFunction('fread'),
+            $buf,
+            $sizeT->constInt(1, false),
+            $chunk,
+            $fp
+        );
+        $gotZero = $context->builder->icmp(Builder::INT_EQ, $got, $sizeT->constInt(0, false));
+        $eofBb = $fn->appendBasicBlock('fpassthru_eof');
+        $writeBb = $fn->appendBasicBlock('fpassthru_write');
+        $context->builder->branchIf($gotZero, $eofBb, $writeBb);
+
+        $context->builder->positionAtEnd($eofBb);
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $hasErr = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('ferror'), $fp),
+            $zeroI32
+        );
+        $okRet = $fn->appendBasicBlock('fpassthru_ok');
+        $context->builder->branchIf($hasErr, $failBb, $okRet);
+        $context->builder->positionAtEnd($okRet);
+        $context->builder->returnValue($context->builder->load($totalAlloca));
+
+        $context->builder->positionAtEnd($writeBb);
+        $gotI64 = $context->builder->truncOrBitCast($got, $i64);
+        $written = $context->builder->call(
+            $context->lookupFunction('write'),
+            $oneI32, // STDOUT_FILENO
+            $buf,
+            $gotI64
+        );
+        $writtenI64 = $context->builder->truncOrBitCast($written, $i64);
+        $writeBad = $context->builder->or(
+            $context->builder->icmp(Builder::INT_SLT, $writtenI64, $zeroI64),
+            $context->builder->icmp(Builder::INT_NE, $writtenI64, $gotI64)
+        );
+        $freeFail = $fn->appendBasicBlock('fpassthru_free_fail');
+        $accBb = $fn->appendBasicBlock('fpassthru_acc');
+        $context->builder->branchIf($writeBad, $freeFail, $accBb);
+
+        $context->builder->positionAtEnd($freeFail);
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $context->builder->branch($failBb);
+
+        $context->builder->positionAtEnd($accBb);
+        $prev = $context->builder->load($totalAlloca);
+        $context->builder->store($context->builder->add($prev, $gotI64), $totalAlloca);
+        $context->builder->branch($loopBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($minusOne);
     }
 
     private static function registerLinkedRuntime(Context $context): void
