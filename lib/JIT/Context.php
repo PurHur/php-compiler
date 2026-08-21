@@ -1471,9 +1471,10 @@ class Context {
             $diLc = strtolower($diClass);
             foreach ([
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next',
-                'isDot', 'getFilename', 'getPath', 'getPathname', 'getSize', '__toString',
+                'isDot', 'getFilename', 'getSize',
                 'isFile', 'isDir',
                 'isLink', 'isReadable', 'isWritable', 'isExecutable',
+                'getPathname', 'getPath', '__toString',
             ] as $diMethod) {
                 $this->functionProxies[$diLc.'::'.strtolower($diMethod)] = new Call\DirectoryIteratorMethod(
                     $diMethod,
@@ -1482,9 +1483,10 @@ class Context {
             }
         }
         foreach ([
-            'getFilename', 'getPath', 'getPathname', 'getSize', '__toString',
+            'getFilename', 'getSize',
             'isFile', 'isDir',
             'isLink', 'isReadable', 'isWritable', 'isExecutable',
+            'getPathname', 'getPath', '__toString',
         ] as $sfiMethod) {
             $this->functionProxies['splfileinfo::'.strtolower($sfiMethod)] = new Call\DirectoryIteratorMethod(
                 $sfiMethod,
