@@ -12,12 +12,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM implementation of assert() failure bridge (issue #6550, #3157, #33237).
+ * LLVM implementation of assert() failure bridge (issue #6550, #3157, #33237, #33241).
  *
- * Owns `__compiler_assert_fail` module-locally (getNamedFunction first, then
- * addFunction if absent). Do not re-add an always-on empty decl in {@see Type} —
- * leftover decls mint assert_fail.1 (#31894 / #32122 / #33237).
- * `__compiler_assert_fail_string` still Type-declared until a follow-up shrink.
+ * Owns `__compiler_assert_fail` and `__compiler_assert_fail_string` module-locally
+ * (getNamedFunction first, then addFunction if absent). Do not re-add always-on
+ * empty decls in {@see Type} — leftover decls mint assert_fail.1 /
+ * assert_fail_string.1 (#31894 / #32122 / #33237 / #33241).
  * php-src: ext/standard/assert.c
  */
 final class AssertFail
@@ -36,8 +36,9 @@ final class AssertFail
             self::implementBodies($context);
         } else {
             // Thin/standalone: declare empty ABI so later ensureStandaloneBodies
-            // can fill; no Type always-on shell (#33237).
+            // can fill; no Type always-on shell (#33237 / #33241).
             self::declareAssertFailAbi($context);
+            self::declareAssertFailStringAbi($context);
         }
     }
 
@@ -70,10 +71,34 @@ final class AssertFail
         return $fn;
     }
 
+    /**
+     * Module-local ABI: getNamedFunction first, then addFunction if absent (#33241).
+     */
+    private static function declareAssertFailStringAbi(Context $context): Value
+    {
+        $abiName = '__compiler_assert_fail_string';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return $probe;
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $void = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($void, false, $strPtr);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+
+        return $fn;
+    }
+
     private static function implementBodies(Context $context): void
     {
         $probe = self::declareAssertFailAbi($context);
-        if ($probe->countBasicBlocks() > 0) {
+        $strFn = self::declareAssertFailStringAbi($context);
+        $needFail = 0 === $probe->countBasicBlocks();
+        $needStr = 0 === $strFn->countBasicBlocks();
+        if (!$needFail && !$needStr) {
             return;
         }
 
@@ -82,9 +107,12 @@ final class AssertFail
         } else {
             AssertionErrorRaise::ensureLinked($context);
         }
-        self::implementAssertFail($context, $probe);
-        $strFn = $context->lookupFunction('__compiler_assert_fail_string');
-        self::implementAssertFailString($context, $strFn);
+        if ($needFail) {
+            self::implementAssertFail($context, $probe);
+        }
+        if ($needStr) {
+            self::implementAssertFailString($context, $strFn);
+        }
     }
 
     private static function implementAssertFail(Context $context, Value $fn): void
