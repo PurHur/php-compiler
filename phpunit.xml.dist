@@ -261,6 +261,8 @@
             <file>./test/compliance/VsprintfVprintfReflection23333JITTest.php</file>
             <file>./test/compliance/SetErrorHandlerReflection23390VMTest.php</file>
             <file>./test/compliance/SetErrorHandlerReflection23390JITTest.php</file>
+            <file>./test/compliance/SetExceptionHandlerReflection23456VMTest.php</file>
+            <file>./test/compliance/SetExceptionHandlerReflection23456JITTest.php</file>
             <file>./test/compliance/StrcspnStrspnStrpbrkNamed23400VMTest.php</file>
             <file>./test/compliance/StrcspnStrspnStrpbrkNamed23400JITTest.php</file>
             <file>./test/compliance/ErrorLogNamed23341VMTest.php</file>
