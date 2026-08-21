@@ -53,13 +53,25 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('StreamGlobalsJit::implementThinIsResource', $source);
         $this->assertStringContainsString('JitMemoryStreamHelper.php', $source);
+        $this->assertStringContainsString('emitFcloseAndClearLlvmHandleSlot', $source);
+        $this->assertStringContainsString('#33426', $source);
         $this->assertStringNotContainsString('isStandaloneInitPhase', $source);
         $this->assertStringNotContainsString('implementDeferredStubs', $source);
         $this->assertStringNotContainsString('shouldDeferInventoryEmitStubs', $source);
         $this->assertStringNotContainsString('implementStandalone', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(360, \substr_count($source, "\n") + 1);
+    }
+
+    public function testLibcHandleKernelFclosesLlvmSlotBeforeClear(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamLibcHandleKernel.php');
+        $this->assertStringContainsString('emitFcloseAndClearLlvmHandleSlot', $source);
+        $this->assertStringContainsString("lookupFunction('fclose')", $source);
+        $this->assertStringContainsString('#33426', $source);
+        $orch = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamLibcHandleRuntime.php');
+        $this->assertStringContainsString('emitFcloseAndClearLlvmHandleSlot', $orch);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void

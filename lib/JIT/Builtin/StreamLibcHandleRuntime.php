@@ -35,4 +35,10 @@ final class StreamLibcHandleRuntime
     {
         JitStreamLibcHandleKernel::emitClearLlvmHandleSlot($context, $handle);
     }
+
+    /** @return Value i32 — 1 when LLVM FILE* slot was fclose'd successfully (#33426) */
+    public static function emitFcloseAndClearLlvmHandleSlot(Context $context, Value $handle): Value
+    {
+        return JitStreamLibcHandleKernel::emitFcloseAndClearLlvmHandleSlot($context, $handle);
+    }
 }
