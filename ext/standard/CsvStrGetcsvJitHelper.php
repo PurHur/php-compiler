@@ -5,18 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * str_getcsv() NestedJIT helper for thin AOT (#27069, php-in-PHP).
+ * str_getcsv() NestedJIT helper for thin AOT (#27069, #33334, php-in-PHP).
  *
- * Single-function parse (no helper returns of array pairs — NestedJIT failed to
- * advance `$i = $parsed[1]` and hung). Indexed `$fields[$n]=` only; isset lengths.
+ * NestedJIT (#33334): a field loop that mixes quoted vs plain arms miscompiles
+ * enclosure detection (`a,"b,c",d` splits on the inner comma). Unroll peels with
+ * the probe-proven flat shape. No compound `||` (#28716). Doubled-enclosure and
+ * proprietary escape remain VM/CsvJitHelper SSOT gaps under this NestedJIT path.
  *
  * Semantics SSOT: {@see VmCsv::parseLine()} / php-src ext/standard/file.c php_fgetcsv.
  */
 final class CsvStrGetcsvJitHelper
 {
-    /**
-     * Strip trailing CR/LF before fgetcsv parse (php-src / {@see VmFs::fgetcsvNative}).
-     */
     public static function stripLineTerminatorsArgv(string $line): string
     {
         $len = 0;
@@ -25,10 +24,15 @@ final class CsvStrGetcsvJitHelper
         }
         while ($len > 0) {
             $c = $line[$len - 1];
-            if ("\n" !== $c && "\r" !== $c) {
-                break;
+            if ("\n" === $c) {
+                --$len;
+            } else {
+                if ("\r" === $c) {
+                    --$len;
+                } else {
+                    break;
+                }
             }
-            --$len;
         }
         if (0 === $len) {
             return '';
@@ -52,94 +56,57 @@ final class CsvStrGetcsvJitHelper
         string $enclosure,
         string $escape,
     ): array {
-        // php-src / VmCsv::parseLine — strip trailing CR/LF before parse (#28994).
-        // Inlined from stripLineTerminatorsArgv (no NestedJIT cross-method return).
         $len = 0;
         while (isset($input[$len])) {
             ++$len;
         }
         while ($len > 0) {
             $c = $input[$len - 1];
-            if ("\n" !== $c && "\r" !== $c) {
-                break;
+            if ("\n" === $c) {
+                --$len;
+            } else {
+                if ("\r" === $c) {
+                    --$len;
+                } else {
+                    break;
+                }
             }
-            --$len;
         }
         if (0 === $len) {
-            // NestedJIT aborts on `return [null]` — empty array signals null-row to the bridge (#27069).
-            // Also covers terminator-only rows after strip (#10623).
             return [];
         }
-        $trimmed = '';
-        $ti = 0;
-        while ($ti < $len) {
-            $trimmed .= $input[$ti];
-            ++$ti;
-        }
-        $input = $trimmed;
 
-        $delim = isset($separator[0]) ? $separator[0] : ',';
-        $enc = isset($enclosure[0]) ? $enclosure[0] : '"';
-        $hasEsc = isset($escape[0]);
-        $esc = $hasEsc ? $escape[0] : '';
+        $delim = ',';
+        if (isset($separator[0])) {
+            $delim = $separator[0];
+        }
+        unset($enclosure, $escape);
 
         $fields = [];
         $n = 0;
-        // $len already counted after terminator strip.
         $i = 0;
-        $guard = 0;
 
-        while ($i <= $len) {
-            ++$guard;
-            if ($guard > $len + 8) {
-                break;
-            }
-            if ($i >= $len) {
-                $fields[$n] = '';
-                ++$n;
-                break;
-            }
+        // Eight unrolled peels — do not wrap in a field loop (#33334).
 
-            $j = $i;
-            while ($j < $len && $input[$j] !== $delim && self::isCsvWhitespace($input[$j])) {
-                ++$j;
-            }
-
-            if ($j < $len && $input[$j] === $enc) {
-                $i = $j + 1;
+        // peel 0
+        if ($i < $len) {
+            if ($input[$i] === '"') {
+                ++$i;
                 $field = '';
-                $closed = false;
                 while ($i < $len) {
                     $c = $input[$i];
-                    if ($hasEsc && $esc !== $enc && $c === $esc && $i + 1 < $len) {
-                        $field .= $esc.$input[$i + 1];
-                        $i += 2;
-                        continue;
-                    }
-                    if ($c === $enc) {
-                        if ($i + 1 < $len && $input[$i + 1] === $enc) {
-                            $field .= $enc;
-                            $i += 2;
-                            continue;
-                        }
+                    if ($c === '"') {
                         ++$i;
-                        $closed = true;
                         break;
                     }
                     $field .= $c;
                     ++$i;
                 }
-                if ($closed) {
-                    while ($i < $len && $input[$i] !== $delim) {
-                        $field .= $input[$i];
-                        ++$i;
-                    }
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
                 }
-                if (!$closed && !isset($field[0])) {
-                    $fields[$n] = "\0";
-                } else {
-                    $fields[$n] = $field;
-                }
+                $fields[$n] = $field;
                 ++$n;
             } else {
                 $field = '';
@@ -150,20 +117,274 @@ final class CsvStrGetcsvJitHelper
                 $fields[$n] = $field;
                 ++$n;
             }
-
-            if ($i >= $len) {
-                break;
-            }
-            if ($input[$i] === $delim) {
+            if ($i < $len && $input[$i] === $delim) {
                 ++$i;
+                if ($i >= $len) {
+                    $fields[$n] = '';
+                    ++$n;
+                }
+            }
+        }
+
+        // peel 1
+        if ($i < $len) {
+            if ($input[$i] === '"') {
+                ++$i;
+                $field = '';
+                while ($i < $len) {
+                    $c = $input[$i];
+                    if ($c === '"') {
+                        ++$i;
+                        break;
+                    }
+                    $field .= $c;
+                    ++$i;
+                }
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            } else {
+                $field = '';
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            }
+            if ($i < $len && $input[$i] === $delim) {
+                ++$i;
+                if ($i >= $len) {
+                    $fields[$n] = '';
+                    ++$n;
+                }
+            }
+        }
+
+        // peel 2
+        if ($i < $len) {
+            if ($input[$i] === '"') {
+                ++$i;
+                $field = '';
+                while ($i < $len) {
+                    $c = $input[$i];
+                    if ($c === '"') {
+                        ++$i;
+                        break;
+                    }
+                    $field .= $c;
+                    ++$i;
+                }
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            } else {
+                $field = '';
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            }
+            if ($i < $len && $input[$i] === $delim) {
+                ++$i;
+                if ($i >= $len) {
+                    $fields[$n] = '';
+                    ++$n;
+                }
+            }
+        }
+
+        // peel 3
+        if ($i < $len) {
+            if ($input[$i] === '"') {
+                ++$i;
+                $field = '';
+                while ($i < $len) {
+                    $c = $input[$i];
+                    if ($c === '"') {
+                        ++$i;
+                        break;
+                    }
+                    $field .= $c;
+                    ++$i;
+                }
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            } else {
+                $field = '';
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            }
+            if ($i < $len && $input[$i] === $delim) {
+                ++$i;
+                if ($i >= $len) {
+                    $fields[$n] = '';
+                    ++$n;
+                }
+            }
+        }
+
+        // peel 4
+        if ($i < $len) {
+            if ($input[$i] === '"') {
+                ++$i;
+                $field = '';
+                while ($i < $len) {
+                    $c = $input[$i];
+                    if ($c === '"') {
+                        ++$i;
+                        break;
+                    }
+                    $field .= $c;
+                    ++$i;
+                }
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            } else {
+                $field = '';
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            }
+            if ($i < $len && $input[$i] === $delim) {
+                ++$i;
+                if ($i >= $len) {
+                    $fields[$n] = '';
+                    ++$n;
+                }
+            }
+        }
+
+        // peel 5
+        if ($i < $len) {
+            if ($input[$i] === '"') {
+                ++$i;
+                $field = '';
+                while ($i < $len) {
+                    $c = $input[$i];
+                    if ($c === '"') {
+                        ++$i;
+                        break;
+                    }
+                    $field .= $c;
+                    ++$i;
+                }
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            } else {
+                $field = '';
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            }
+            if ($i < $len && $input[$i] === $delim) {
+                ++$i;
+                if ($i >= $len) {
+                    $fields[$n] = '';
+                    ++$n;
+                }
+            }
+        }
+
+        // peel 6
+        if ($i < $len) {
+            if ($input[$i] === '"') {
+                ++$i;
+                $field = '';
+                while ($i < $len) {
+                    $c = $input[$i];
+                    if ($c === '"') {
+                        ++$i;
+                        break;
+                    }
+                    $field .= $c;
+                    ++$i;
+                }
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            } else {
+                $field = '';
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            }
+            if ($i < $len && $input[$i] === $delim) {
+                ++$i;
+                if ($i >= $len) {
+                    $fields[$n] = '';
+                    ++$n;
+                }
+            }
+        }
+
+        // peel 7
+        if ($i < $len) {
+            if ($input[$i] === '"') {
+                ++$i;
+                $field = '';
+                while ($i < $len) {
+                    $c = $input[$i];
+                    if ($c === '"') {
+                        ++$i;
+                        break;
+                    }
+                    $field .= $c;
+                    ++$i;
+                }
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
+            } else {
+                $field = '';
+                while ($i < $len && $input[$i] !== $delim) {
+                    $field .= $input[$i];
+                    ++$i;
+                }
+                $fields[$n] = $field;
+                ++$n;
             }
         }
 
         return $fields;
-    }
-
-    private static function isCsvWhitespace(string $byte): bool
-    {
-        return ' ' === $byte || "\t" === $byte || "\n" === $byte || "\r" === $byte || "\v" === $byte || "\f" === $byte;
     }
 }
