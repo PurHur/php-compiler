@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * asort() — sort by value ascending, preserve keys (subset of PHP; issue #2290, #4118, #11991).
  *
  * VM: key-preserving value sort via {@see VmArray::asortCopy()}.
- * JIT/AOT: packed list via SortJitHelper; string-key via __hashtable__sortStringKeyValues.
+ * JIT/AOT: packed list via ValueSortKeyedLlvm (#33620); string-key via __hashtable__sortStringKeyValues.
  * SORT_NATURAL / SORT_NATURAL|SORT_FLAG_CASE reuse natsort LLVM (#32295 / #26975).
  */
 final class asort_ extends Internal

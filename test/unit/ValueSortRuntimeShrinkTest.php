@@ -10,15 +10,15 @@ use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * asort()/arsort() — VM via ValueSortJitHelper; thin AOT via Type\HashTable LLVM (#27227).
+ * asort()/arsort() — VM via ValueSortJitHelper; thin AOT via Type\HashTable LLVM + packed keyed path (#27227, #33620).
  */
 final class ValueSortRuntimeShrinkTest extends TestCase
 {
     public function testValueSortRuntimeUsesHashTableLlvmNotJitHelperBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ValueSortRuntime.php');
-        $this->assertStringContainsString('__hashtable__sortStringKeyValues', $runtime);
-        $this->assertStringContainsString('__hashtable__sortStringKeyValuesReverse', $runtime);
+        $this->assertStringContainsString('ValueSortKeyedLlvm::sortValuesPreserveKeys', $runtime);
+        $this->assertStringContainsString('__hashtable__sortStringKeyValuesLocale', $runtime);
         $this->assertStringNotContainsString('ValueSortJitHelper::', $runtime);
         $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
