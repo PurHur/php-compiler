@@ -32,7 +32,7 @@ final class TypeDeadAssertFailAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         // Next leftover sentinel after #33241 assert_fail_string drop.
-        $this->assertStringContainsString("registerFunction('__compiler_assert_options'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_undefined_array_key_warning_cstr'", $type);
         $this->assertStringContainsString('AssertFail::ensureLinked', $type);
     }
 

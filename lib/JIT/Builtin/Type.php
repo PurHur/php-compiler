@@ -622,20 +622,12 @@ class Type extends Builtin {
         // before lookup). Leftover Type empty decls vs Runtime ABI drift mint
         // assert_fail.1 / assert_fail_string.1 (#31894 / #32122). User-script
         // assert() stays JitAssert (php-src ext/standard/assert.c).
-        $valPtr = $this->context->getTypeFromString('__value__*');
-        $fntypeAssertOptions = $this->context->context->functionType(
-            $void,
-            false,
-            $i32,
-            $i64,
-            $valPtr,
-            $valPtr
-        );
-        $fnAssertOptions = $this->context->module->addFunction(
-            '__compiler_assert_options',
-            $fntypeAssertOptions
-        );
-        $this->context->registerFunction('__compiler_assert_options', $fnAssertOptions);
+        // __compiler_assert_options always-on shell removed (#33245): AssertOptionsRuntime
+        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
+        // still AssertOptionsRuntime::ensureLinked on the full load path; JitAssertOptions
+        // ensureLinked before lookup). Leftover Type empty decls vs Runtime ABI drift mint
+        // assert_options.1 (#31894 / #32122). User-script assert_options() stays
+        // JitAssertOptions (php-src ext/standard/assert.c).
         // Leftover always-on $libcFns removed (#32217 / peer Type I/O #32202 / calendar #32173):
         // time(2) — JitTimeKernel::ensureLibcTime (#30332). User-script time() stays TimeJitHelper.
         // gettimeofday(2) — JitMicrotimeKernel::ensureLibcGettimeofday (#29405).
