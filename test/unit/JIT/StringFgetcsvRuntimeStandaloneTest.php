@@ -24,8 +24,13 @@ final class StringFgetcsvRuntimeStandaloneTest extends TestCase
 
         $fgetcsv = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringFgetcsvJit.php');
         $this->assertStringContainsString('CsvStrGetcsvJitHelper::strGetcsvArgv', $fgetcsv);
+        $this->assertStringContainsString('CsvStrGetcsvJitHelper::appendEscapedPairArgv', $fgetcsv);
         $this->assertStringContainsString('__compiler_fgets', $fgetcsv);
         $this->assertStringNotContainsString('CsvJitHelper::fgetcsvArgv', $fgetcsv);
         $this->assertStringNotContainsString('__phpc_csv_parse_line', $fgetcsv);
+
+        $helper = (string) file_get_contents(__DIR__.'/../../../ext/standard/CsvStrGetcsvJitHelper.php');
+        $this->assertStringContainsString('appendEscapedPairArgv', $helper);
+        $this->assertStringContainsString('#33334', $helper);
     }
 }

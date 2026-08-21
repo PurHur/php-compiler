@@ -10,6 +10,13 @@ namespace PHPCompiler\ext\standard;
  * Single-function parse (no helper returns of array pairs — NestedJIT failed to
  * advance `$i = $parsed[1]` and hung). Indexed `$fields[$n]=` only; isset lengths.
  *
+ * NestedJIT cannot lower an in-loop `$i += 2; continue` escape consume after an
+ * unquoted field (#33334 / re-#27180): enclosure detection then fails and
+ * `a,"b,c",d` splits as `a` / `"b` / `c"`. Factor escape append into
+ * {@see appendEscapedPairArgv}. Avoid an in-function `$j` whitespace peek beside
+ * that escape CFG — same miscompile; leading WS-before-enclosure is accepted as
+ * part of an unquoted field (php-src peeks; rare for fgetcsv line bodies).
+ *
  * Semantics SSOT: {@see VmCsv::parseLine()} / php-src ext/standard/file.c php_fgetcsv.
  */
 final class CsvStrGetcsvJitHelper
@@ -41,6 +48,15 @@ final class CsvStrGetcsvJitHelper
         }
 
         return $out;
+    }
+
+    /**
+     * NestedJIT-safe escape pair append (#33334) — keep `$i += 2; continue` out of
+     * the enclosed-field loop body (inline form breaks later enclosure detects).
+     */
+    public static function appendEscapedPairArgv(string $input, int $i, string $esc): string
+    {
+        return $esc.$input[$i + 1];
     }
 
     /**
@@ -80,8 +96,15 @@ final class CsvStrGetcsvJitHelper
 
         $delim = isset($separator[0]) ? $separator[0] : ',';
         $enc = isset($enclosure[0]) ? $enclosure[0] : '"';
-        $hasEsc = isset($escape[0]);
-        $esc = $hasEsc ? $escape[0] : '';
+        $useEsc = false;
+        $esc = '';
+        if (isset($escape[0])) {
+            $esc = $escape[0];
+            // php-src: escape === enclosure → proprietary escape disabled.
+            if ($esc !== $enc) {
+                $useEsc = true;
+            }
+        }
 
         $fields = [];
         $n = 0;
@@ -100,26 +123,24 @@ final class CsvStrGetcsvJitHelper
                 break;
             }
 
-            $j = $i;
-            while ($j < $len && $input[$j] !== $delim && self::isCsvWhitespace($input[$j])) {
-                ++$j;
-            }
-
-            if ($j < $len && $input[$j] === $enc) {
-                $i = $j + 1;
+            // No `$j` whitespace peek here — NestedJIT miscompiles it beside escape CFG (#33334).
+            if ($input[$i] === $enc) {
+                ++$i;
                 $field = '';
                 $closed = false;
                 while ($i < $len) {
                     $c = $input[$i];
-                    if ($hasEsc && $esc !== $enc && $c === $esc && $i + 1 < $len) {
-                        $field .= $esc.$input[$i + 1];
-                        $i += 2;
+                    if ($useEsc && $c === $esc && $i + 1 < $len) {
+                        $field .= self::appendEscapedPairArgv($input, $i, $esc);
+                        ++$i;
+                        ++$i;
                         continue;
                     }
                     if ($c === $enc) {
                         if ($i + 1 < $len && $input[$i + 1] === $enc) {
                             $field .= $enc;
-                            $i += 2;
+                            ++$i;
+                            ++$i;
                             continue;
                         }
                         ++$i;
@@ -129,6 +150,7 @@ final class CsvStrGetcsvJitHelper
                     $field .= $c;
                     ++$i;
                 }
+                // php-src quit_loop_2/3 — bytes after closing enclosure until delimiter.
                 if ($closed) {
                     while ($i < $len && $input[$i] !== $delim) {
                         $field .= $input[$i];
@@ -160,10 +182,5 @@ final class CsvStrGetcsvJitHelper
         }
 
         return $fields;
-    }
-
-    private static function isCsvWhitespace(string $byte): bool
-    {
-        return ' ' === $byte || "\t" === $byte || "\n" === $byte || "\r" === $byte || "\v" === $byte || "\f" === $byte;
     }
 }

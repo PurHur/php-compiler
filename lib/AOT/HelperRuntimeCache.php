@@ -137,6 +137,8 @@ final class HelperRuntimeCache
         // CsvJitHelper TU + whole-file NestedJIT of fgetcsvArgv/VmFs SIGSEGVd.
         'phpcompiler\\ext\\standard\\csvstrgetcsvjithelper::strgetcsvargv' => true,
         'phpcompiler\\ext\\standard\\csvstrgetcsvjithelper::striplineterminatorsargv' => true,
+        // #33334 — NestedJIT-safe escape pair append (inline $i+=2 continue miscompile).
+        'phpcompiler\\ext\\standard\\csvstrgetcsvjithelper::appendescapedpairargv' => true,
         // #27180 — NestedJIT CsvFputcsvJitHelper::formatFieldArgv (no HashTable::iterate /
         // VmFputcsv); LLVM walks fields (peer JitImplode). Prelinked CsvJitHelper
         // formatFieldsArgv SIGSEGVs under thin AOT.

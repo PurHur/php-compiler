@@ -38,10 +38,13 @@ final class StringStrGetcsv
 
     private const STRIP_LINE_HELPER = 'PHPCompiler\\ext\\standard\\CsvStrGetcsvJitHelper::stripLineTerminatorsArgv';
 
+    private const APPEND_ESCAPED_HELPER = 'PHPCompiler\\ext\\standard\\CsvStrGetcsvJitHelper::appendEscapedPairArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::STR_GETCSV_HELPER,
         self::STRIP_LINE_HELPER,
+        self::APPEND_ESCAPED_HELPER,
     ];
 
     /** @var list<string> */

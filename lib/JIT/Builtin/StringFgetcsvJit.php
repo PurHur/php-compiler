@@ -31,6 +31,8 @@ final class StringFgetcsvJit
 
     private const STRIP_LINE_HELPER = 'PHPCompiler\\ext\\standard\\CsvStrGetcsvJitHelper::stripLineTerminatorsArgv';
 
+    private const APPEND_ESCAPED_HELPER = 'PHPCompiler\\ext\\standard\\CsvStrGetcsvJitHelper::appendEscapedPairArgv';
+
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
         '__compiler_fgetcsv',
@@ -40,6 +42,7 @@ final class StringFgetcsvJit
     private const COMPILED_HELPERS = [
         self::FGETCSV_PARSE_HELPER,
         self::STRIP_LINE_HELPER,
+        self::APPEND_ESCAPED_HELPER,
     ];
 
     public static function implement(Context $context): void
