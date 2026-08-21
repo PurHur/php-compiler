@@ -31,8 +31,8 @@ final class TypeDeadRandomBytesAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (preg_match still Type always-on).
-        $this->assertStringContainsString("registerFunction('__compiler_preg_match'", $type);
+        // Next leftover sentinel (preg_match_all still Type always-on; preg_match dropped in #33187).
+        $this->assertStringContainsString("registerFunction('__compiler_preg_match_all'", $type);
         $this->assertStringContainsString('StringRandomBytes::ensureLinked', $type);
     }
 

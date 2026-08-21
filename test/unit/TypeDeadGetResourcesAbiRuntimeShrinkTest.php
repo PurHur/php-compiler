@@ -31,8 +31,8 @@ final class TypeDeadGetResourcesAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel after get_resource_type drop (#33183); stream_get_contents still Type always-on.
-        $this->assertStringContainsString("registerFunction('__compiler_stream_get_contents'", $type);
+        // Next leftover sentinel (preg_match_all still Type always-on; preg_match dropped in #33187).
+        $this->assertStringContainsString("registerFunction('__compiler_preg_match_all'", $type);
         $this->assertStringContainsString('StreamResource::ensureLinked', $type);
     }
 
