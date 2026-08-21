@@ -15,13 +15,14 @@ use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #20982, #33104, #33106, #33155, #33164, #33166).
+ * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #20982, #33104, #33106, #33155, #33164, #33166, #33168).
  *
  * Owns `__compiler_flock` / `__compiler_fpassthru` / `__compiler_ftruncate` / `__compiler_ftell` /
- * `__compiler_fgetc` (and peer fgets/…) ABI module-locally: {@see getNamedFunction} first, then
- * {@see addFunction} if absent via {@see JitStreamReadBridgeKernel}. Do not re-add empty always-on
- * shells in {@see Type} — leftover decls mint flock.1 / fpassthru.1 / ftruncate.1 / ftell.1 /
- * fgetc.1 (#31894 / #32122).
+ * `__compiler_fgetc` / `__compiler_fgets` (and peer stream_get_line/…) ABI module-locally:
+ * {@see getNamedFunction} first, then {@see addFunction} if absent via
+ * {@see JitStreamReadBridgeKernel}. Do not re-add empty always-on shells in {@see Type} —
+ * leftover decls mint flock.1 / fpassthru.1 / ftruncate.1 / ftell.1 / fgetc.1 / fgets.1
+ * (#31894 / #32122).
  * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
  * via {@see JitVmHelperLink} (StreamLifecycle #20966 / StreamIo #20943 shape — no deferred stub fork).
  * LLVM bridges live in {@see JitStreamReadBridgeKernel}.
