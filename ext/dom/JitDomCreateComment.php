@@ -97,15 +97,12 @@ final class JitDomCreateComment
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
     ): void {
-        foreach ([
-            self::PROP_NODE_NAME,
-            self::PROP_NODE_VALUE,
-            self::PROP_TEXT_CONTENT,
-            self::PROP_DATA,
-        ] as $prop) {
-            if (!$objectType->hasProperty($classId, $prop)) {
-                $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
-            }
+        // Same full DOMElement stand-in layout as createElement (#24973 / #33546):
+        // appendChild reads parentNode / sibling slots; growing the class after
+        // allocate() leaves comment objects undersized and SIGSEGVs.
+        JitDomCreateElement::ensureDomElementStandInLayout($objectType, $classId);
+        if (!$objectType->hasProperty($classId, self::PROP_DATA)) {
+            $objectType->defineProperty($classId, self::PROP_DATA, JITVariable::TYPE_STRING);
         }
     }
 

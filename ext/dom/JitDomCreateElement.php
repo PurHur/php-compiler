@@ -460,6 +460,17 @@ final class JitDomCreateElement
         // Predeclare every thin-AOT slot that later lowering may defineProperty().
         // allocate() bakes prop count at IR-gen time; growing the class mid-function
         // leaves earlier objects undersized so tagName/isEqualNode reads OOB (#24973).
+        // Public for createComment/createTextNode stand-ins that later hit appendChild (#33546).
+        self::ensureDomElementStandInLayout($objectType, $classId);
+    }
+
+    /**
+     * Full DOMElement thin-AOT slot set for createElement and comment/text stand-ins (#33546).
+     */
+    public static function ensureDomElementStandInLayout(
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        int $classId
+    ): void {
         foreach ([
             self::PROP_NODE_NAME => JITVariable::TYPE_STRING,
             self::PROP_TAG_NAME => JITVariable::TYPE_STRING,
