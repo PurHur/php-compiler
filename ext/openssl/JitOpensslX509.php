@@ -40,6 +40,7 @@ use PHPLLVM\Value;
  * openssl_pkcs12_read() (#33444 leftover of #6420);
  * openssl_pkcs7_read() (#33458 leftover of #20305);
  * openssl_cms_read() (#33460 leftover of #6592);
+ * openssl_cms_verify() (#33464 leftover of #6592);
  * openssl_seal() / openssl_open() (#32979 leftover of #6523).
  *
  * php-src: ext/openssl/xp.c — PHP_FUNCTION(openssl_x509_parse)
@@ -69,6 +70,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/pkcs12.c — PHP_FUNCTION(openssl_pkcs12_read) / PKCS12_parse
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_pkcs7_read) / PEM_read_bio_PKCS7
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_cms_read) / PEM_read_bio_CMS / CMS_get1_certs
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_cms_verify) / CMS_verify
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -991,6 +993,168 @@ final class JitOpensslX509
     }
 
     /**
+     * openssl_cms_verify() — bake {@see VmOpensslCmsNative::verify} for compile-time path/flag/encoding
+     * literals; optional content/signers bodies are written at runtime via
+     * {@see \PHPCompiler\JIT\Builtin\StringFilePutContents} / __compiler_file_put_contents
+     * (peer {@see self::exportToFile} / #33460).
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_cms_verify) / CMS_verify
+     *
+     * $ca_info / $untrusted_certificates_filename are accepted as omit/null/compile-time array
+     * or path literals but unused (peer VM {@see VmOpenssl::cmsVerify}).
+     */
+    public static function cmsVerify(
+        Context $context,
+        JITVariable $inputFilename,
+        ?JITVariable $flags = null,
+        ?JITVariable $certificates = null,
+        ?JITVariable $caInfo = null,
+        ?JITVariable $untrustedCertificatesFilename = null,
+        ?JITVariable $content = null,
+        ?JITVariable $encoding = null
+    ): Value {
+        $input = JitStringArg::compileTimeLiteral($inputFilename);
+        if (null === $input) {
+            throw new \LogicException(
+                'openssl_cms_verify() input_filename must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33464)'
+            );
+        }
+
+        $flagsLit = 0;
+        if (null !== $flags) {
+            $parsed = self::compileTimeInt($flags);
+            if (null === $parsed) {
+                throw new \LogicException(
+                    'openssl_cms_verify() flags must be a compile-time int '
+                    .'for JIT/AOT in this compiler build (issue #33464)'
+                );
+            }
+            $flagsLit = $parsed;
+        }
+
+        $signersPath = self::compileTimeNullableString($certificates);
+        if (null === $signersPath) {
+            throw new \LogicException(
+                'openssl_cms_verify() certificates must be omit/null/compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33464)'
+            );
+        }
+
+        if (!self::compileTimeCaInfoOk($caInfo)) {
+            throw new \LogicException(
+                'openssl_cms_verify() ca_info must be omit/null/compile-time array '
+                .'for JIT/AOT in this compiler build (issue #33464)'
+            );
+        }
+
+        $untrustedPath = self::compileTimeNullableString($untrustedCertificatesFilename);
+        if (null === $untrustedPath) {
+            throw new \LogicException(
+                'openssl_cms_verify() untrusted_certificates_filename must be omit/null/compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33464)'
+            );
+        }
+        unset($untrustedPath);
+
+        $contentPath = self::compileTimeNullableString($content);
+        if (null === $contentPath) {
+            throw new \LogicException(
+                'openssl_cms_verify() content must be omit/null/compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33464)'
+            );
+        }
+
+        $encodingLit = OpensslConstants::OPENSSL_ENCODING_SMIME;
+        if (null !== $encoding) {
+            $parsedEnc = self::compileTimeInt($encoding);
+            if (null === $parsedEnc) {
+                throw new \LogicException(
+                    'openssl_cms_verify() encoding must be a compile-time int '
+                    .'for JIT/AOT in this compiler build (issue #33464)'
+                );
+            }
+            $encodingLit = $parsedEnc;
+        }
+
+        if (!VmOpensslCmsNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $signersOut = $signersPath[0];
+        $contentOut = $contentPath[0];
+        $bakeSigners = null;
+        $bakeContent = null;
+        $tmpSigners = null;
+        $tmpContent = null;
+        try {
+            if (null !== $signersOut) {
+                $tmpSigners = sys_get_temp_dir().'/phpc_cms_verify_signers_'.getmypid().'_'.(++self::$blockSerial).'.pem';
+            }
+            if (null !== $contentOut) {
+                $tmpContent = sys_get_temp_dir().'/phpc_cms_verify_content_'.getmypid().'_'.self::$blockSerial.'.txt';
+            }
+            $ok = VmOpensslCmsNative::verify(
+                $input,
+                $flagsLit,
+                $tmpSigners,
+                $tmpContent,
+                $encodingLit
+            );
+            if (!$ok) {
+                return self::boxedFalse($context);
+            }
+            if (null !== $tmpSigners) {
+                $bakeSigners = @file_get_contents($tmpSigners);
+                if (!\is_string($bakeSigners)) {
+                    return self::boxedFalse($context);
+                }
+            }
+            if (null !== $tmpContent) {
+                $bakeContent = @file_get_contents($tmpContent);
+                if (!\is_string($bakeContent)) {
+                    return self::boxedFalse($context);
+                }
+            }
+        } finally {
+            if (null !== $tmpSigners) {
+                @unlink($tmpSigners);
+            }
+            if (null !== $tmpContent) {
+                @unlink($tmpContent);
+            }
+        }
+
+        if (null !== $signersOut && null !== $bakeSigners) {
+            self::emitFilePutContents($context, $signersOut, $bakeSigners);
+        }
+        if (null !== $contentOut && null !== $bakeContent) {
+            self::emitFilePutContents($context, $contentOut, $bakeContent);
+        }
+
+        return self::boxedBool($context, true);
+    }
+
+    /**
+     * Emit {@see __compiler_file_put_contents} for a compile-time path + baked body (peer exportToFile).
+     */
+    private static function emitFilePutContents(Context $context, string $path, string $body): void
+    {
+        $pathStr = $context->builder->load($context->constantStringFromString($path));
+        $dataStr = $context->builder->load($context->constantStringFromString($body));
+        $dataOwned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $dataStr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_file_put_contents'),
+            $pathStr,
+            $dataOwned,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+    }
+
+    /**
      * openssl_pkcs12_export() — bake {@see VmOpensslPkcs12Native::createPkcs12} into &$output.
      *
      * php-src: ext/openssl/pkcs12.c PHP_FUNCTION(openssl_pkcs12_export) / PKCS12_create
@@ -1778,6 +1942,24 @@ final class JitOpensslX509
         }
 
         return JITVariable::TYPE_HASHTABLE === $arg->type;
+    }
+
+    /**
+     * $ca_info for openssl_cms_verify — omit/null/compile-time array (peer VM type check; unused by native).
+     */
+    private static function compileTimeCaInfoOk(?JITVariable $arg): bool
+    {
+        if (null === $arg) {
+            return true;
+        }
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return true;
+        }
+
+        return JITVariable::TYPE_HASHTABLE === $arg->type
+            || JITVariable::TYPE_VALUE === $arg->type
+            || 0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)
+            || null !== ($arg->compileTimeArray ?? null);
     }
 
     private static function compileTimeBool(?JITVariable $arg, bool $default): ?bool

@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_cms_verify() — CMS/S/MIME verify (php-src ext/openssl/openssl.c; #6592).
+ * openssl_cms_verify() — CMS/S/MIME verify (php-src ext/openssl/openssl.c; #6592 VM, JIT/AOT #33464).
  */
 final class openssl_cms_verify extends Internal
 {
@@ -83,8 +83,22 @@ final class openssl_cms_verify extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_cms_verify() is not implemented for JIT in this compiler build (issue #6592)'
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 9) {
+            throw new \ArgumentCountError(
+                'openssl_cms_verify() expects at least 1 argument, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::cmsVerify(
+            $context,
+            $args[0],
+            $argc >= 2 ? $args[1] : null,
+            $argc >= 3 ? $args[2] : null,
+            $argc >= 4 ? $args[3] : null,
+            $argc >= 5 ? $args[4] : null,
+            $argc >= 6 ? $args[5] : null,
+            $argc >= 9 ? $args[8] : null
         );
     }
 }
