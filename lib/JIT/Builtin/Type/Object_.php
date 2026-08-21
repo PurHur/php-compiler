@@ -7496,6 +7496,28 @@ class Object_ extends Type {
         if (null !== $enumIsset) {
             return $enumIsset;
         }
+        // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — isset probes `__spl_ht` like offsetExists
+        // (#33074 leftover of #33068; php-src spl_array_has_property).
+        if (
+            \PHPCompiler\VM\ArrayObjectJitHelper::isArrayAsPropsClass($class)
+            && !str_starts_with($name, '__')
+            && !$this->hasProperty($classId, $name)
+        ) {
+            $classLc = strtolower(ltrim($class, '\\'));
+            $asPropsClass = match ($classLc) {
+                'arrayobject' => 'ArrayObject',
+                'arrayiterator' => 'ArrayIterator',
+                'recursivearrayiterator' => 'RecursiveArrayIterator',
+                default => $class,
+            };
+
+            return \PHPCompiler\VM\ArrayObjectJitHelper::compilePropertyExists(
+                $this->context,
+                $obj,
+                $asPropsClass,
+                $name
+            );
+        }
         if (!$this->hasProperty($classId, $name)) {
             // (object)$resource keeps CFG userType "resource" while runtime value is stdClass
             // (#30793, TypeReconstructor preserves TYPE_OBJECT). Probe stdClass before giving up.
