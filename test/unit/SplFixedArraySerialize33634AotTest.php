@@ -5,28 +5,30 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: serialize(ArrayObject/ArrayIterator) encodes __spl_ht bag (#33625).
+ * AOT: serialize(SplFixedArray) encodes __spl_ht elements (#33634).
  *
  * @group llvm
  * @group aot
  */
-final class ArrayObjectSerialize33625AotTest extends TestCase
+final class SplFixedArraySerialize33634AotTest extends TestCase
 {
     public function testSerializeMatchesZend(): void
     {
-        $this->assertAotMatchesZend(__DIR__.'/../repro/arrayobject_serialize_aot_33625.php');
+        $this->assertAotMatchesZend(__DIR__.'/../repro/splfixedarray_serialize_aot_33634.php');
     }
 
-    public function testHelperWired(): void
+    public function testSplFixedArraySerializePathWired(): void
     {
         $root = dirname(__DIR__, 2);
-        $ser = (string) file_get_contents($root.'/ext/standard/JitSerialize.php');
-        $this->assertStringContainsString('tryEncodeSplHtObject', $ser);
-        $this->assertStringContainsString('#33625', $ser);
-        $helper = (string) file_get_contents($root.'/lib/VM/ArrayObjectJitHelper.php');
-        $this->assertStringContainsString('compileSerialize', $helper);
-        $bag = (string) file_get_contents($root.'/ext/standard/SerializeSplArrayNestedJitHelper.php');
-        $this->assertStringContainsString('encodeWire', $bag);
+        $src = (string) file_get_contents($root.'/ext/standard/JitSerialize.php');
+        $this->assertStringContainsString('tryEncodeSplHtObject', $src);
+        $this->assertStringContainsString('#33634', $src);
+        $helper = (string) file_get_contents($root.'/ext/standard/SerializeSplFixedArrayNestedJitHelper.php');
+        $this->assertStringContainsString('encodeWire', $helper);
+        $this->assertStringContainsString('#33634', $helper);
+        $jit = (string) file_get_contents($root.'/lib/VM/SplFixedArrayJitHelper.php');
+        $this->assertStringContainsString('compileSerialize', $jit);
+        $this->assertStringContainsString('#33634', $jit);
     }
 
     private function assertAotMatchesZend(string $src): void
@@ -48,8 +50,7 @@ final class ArrayObjectSerialize33625AotTest extends TestCase
     private function runAot(string $src): string
     {
         $root = dirname(__DIR__, 2);
-        $bin = sys_get_temp_dir().'/ao_ser_33625_'.getmypid().'_'.md5($src);
-        // Prefer helper-runtime (peer #32925) — NestedJIT HT path aborts with O=0.
+        $bin = sys_get_temp_dir().'/ao_sfa_33634_'.getmypid().'_'.md5($src);
         $cmd = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src);

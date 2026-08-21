@@ -337,6 +337,63 @@ final class SplFixedArrayJitHelper
         $context->builder->positionAtEnd($okBb);
     }
 
+    /**
+     * php-src SplFixedArray serialize — integer-keyed elements from `__spl_ht` (#33634).
+     *
+     * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33625.
+     *
+     * @return Value {@see __string__*} full `O:len:"SplFixedArray":N:{…}` wire
+     */
+    public static function compileSerialize(Context $context, JITVariable $receiver): Value
+    {
+        \PHPCompiler\JIT\Builtin\StringSerialize::ensureLinked($context);
+        $obj = self::loadObject($context, $receiver);
+        $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
+        $classNameStr = \PHPCompiler\JIT\ReflectionBuiltinHelper::getClassName($context, $objVar);
+        $ht = self::htPtr($context, $obj);
+        $logical = 'PHPCompiler\\ext\\standard\\SerializeSplFixedArrayNestedJitHelper::encodeWire';
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/SerializeSplFixedArrayNestedJitHelper.php',
+            [$logical],
+            '#33634'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33634');
+        $strMap = $context->structFieldMap['__string__'];
+        $classLen = $context->builder->load(
+            $context->builder->structGep($classNameStr, $strMap['length'])
+        );
+        $args = [
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $classNameStr,
+                $fn->getParam(0)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $classLen,
+                $fn->getParam(1)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $ht,
+                $fn->getParam(2)->typeOf()
+            ),
+        ];
+        $raw = $context->builder->call($fn, ...$args);
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        return \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr);
+    }
+
+    /** Expose object load for {@see \PHPCompiler\ext\standard\JitSerialize} (#33634). */
+    public static function loadObjectPtr(Context $context, JITVariable $receiver): Value
+    {
+        return self::loadObject($context, $receiver);
+    }
+
     private static function htPtr(Context $context, Value $obj): Value
     {
         return $context->helper->loadValue(
