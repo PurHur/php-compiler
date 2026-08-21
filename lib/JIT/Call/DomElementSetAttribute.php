@@ -19,6 +19,7 @@ final class DomElementSetAttribute implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattr_invoke_cont');
+        $id = null;
         // Side-table: assign/box can drop createElement stamps on the local (#32973).
         if (\count($args) >= 3) {
             $name = $args[1]->compileTimeString;
@@ -46,6 +47,23 @@ final class DomElementSetAttribute implements Call
             }
         }
 
-        return JitDomAttributeNodeNS::invokeSetAttribute($context, ...$args);
+        $result = JitDomAttributeNodeNS::invokeSetAttribute($context, ...$args);
+
+        // saveXML / INNER_XML rebuild read PROP_USER_SCRIPT_XMLNS_ATTR (#33509 / peer #33362).
+        if (\count($args) >= 3) {
+            $name = $args[1]->compileTimeString;
+            $value = $args[2]->compileTimeString;
+            if (null !== $name && null !== $value && 'xmlns' !== $name) {
+                $attrs = $args[0]->compileTimeDomAttributes;
+                if (null === $attrs && null !== $id) {
+                    $attrs = JitDomCreateElementAttrs::get($id);
+                }
+                if (null !== $attrs) {
+                    JitDomAttributeNodeNS::syncSaveXmlAttrSuffix($context, $args[0], $attrs);
+                }
+            }
+        }
+
+        return $result;
     }
 }

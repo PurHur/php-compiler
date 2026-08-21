@@ -65,6 +65,27 @@ final class JitDomCreateElementAttrs
         return self::$attrsById[$id] ?? [];
     }
 
+    /**
+     * Open-tag attribute suffix (leading space) for {@see VmDom::PROP_USER_SCRIPT_XMLNS_ATTR}.
+     *
+     * Matches {@see \PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime} child markup
+     * and importNode (#33362) so saveXML / INNER_XML rebuild keep setAttribute attrs.
+     *
+     * @param array<string, string> $attrs
+     */
+    public static function formatSuffix(array $attrs): string
+    {
+        if ([] === $attrs) {
+            return '';
+        }
+        $parts = [];
+        foreach ($attrs as $name => $value) {
+            $parts[] = $name.'="'.htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8').'"';
+        }
+
+        return ' '.implode(' ', $parts);
+    }
+
     public static function reset(): void
     {
         self::$nextId = 0;

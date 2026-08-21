@@ -521,6 +521,45 @@ final class JitDomAttributeNodeNS
         );
     }
 
+    /**
+     * Sync createElement setAttribute bag → PROP_USER_SCRIPT_XMLNS_ATTR + parent INNER_XML (#33509).
+     *
+     * saveXML / post-appendChild rebuild read the xmlns/attr slot (#33362); without this,
+     * getAttribute works but markup drops attrs. When the element is already attached,
+     * rebuild the parent chain so setattr-after-append matches Zend.
+     *
+     * @param array<string, string> $attrs
+     */
+    public static function syncSaveXmlAttrSuffix(
+        Context $context,
+        JITVariable $receiver,
+        array $attrs
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattr_xmlns_sync');
+        $element = self::loadObjectArg($context, $receiver, 'DOMElement setAttribute saveXML sync');
+        $suffix = JitDomCreateElementAttrs::formatSuffix($attrs);
+        JitDomCreateElement::storeUserScriptXmlnsAttr($context, $element, $suffix);
+
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $parent = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $element,
+            VmDom::PROP_PARENT_NODE,
+            'dom_setattr_par'
+        );
+        $parentNull = $context->builder->icmp(Builder::INT_EQ, $parent, $objPtrTy->constNull());
+        $bbRebuild = BasicBlockHelper::append($context, 'dom_setattr_rebuild_parent');
+        $bbDone = BasicBlockHelper::append($context, 'dom_setattr_xmlns_done');
+        $context->builder->branchIf($parentNull, $bbDone, $bbRebuild);
+
+        $context->builder->positionAtEnd($bbRebuild);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
     private static function loadObjectArg(Context $context, JITVariable $arg, string $label): Value
     {
         if (JITVariable::TYPE_OBJECT === $arg->type) {
