@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\JitPath;
 use PHPCompiler\ext\standard\JitStat;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StatPathRuntime;
+use PHPCompiler\JIT\Builtin\StringPathinfo;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -18,12 +20,13 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263, #33274, #33276).
+ * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263, #33274, #33276, #33280).
  *
  * Construct lists directory entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}
  * (NestedJIT leaf calling DirHandleJitHelper only — StringDir already linked).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
- * isFile/isDir/getPath/getPathname/getSize join `__dir_path`+`__filename` then {@see \PHPCompiler\ext\standard\JitStat}.
+ * isFile/isDir/getPath/getPathname/getSize/getType join `__dir_path`+`__filename` then {@see \PHPCompiler\ext\standard\JitStat}.
+ * getExtension/getBasename use `__filename` (php-src d_name) via pathinfo/basename helpers.
  *
  * php-src: ext/spl/spl_directory.c
  */
@@ -251,6 +254,72 @@ final class DirectoryIteratorJitHelper
         $pathname = self::emitJoinedPathname($context, $obj, $className);
 
         return JitStat::pathFileSizeBoxed($context, $pathname);
+    }
+
+    /**
+     * DirectoryIterator/SplFileInfo::getExtension — pathinfo extension of entry name (#33280).
+     * php-src: zim_DirectoryIterator_getExtension / zim_SplFileInfo_getExtension
+     */
+    public static function compileGetExtension(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $nameSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_FILENAME);
+        $namePtr = self::stringFromProperty($context, $nameSlot);
+        $ext = StringPathinfo::invokeExtension($context, $namePtr);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'di_getext_after_pathinfo');
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $ext
+        );
+
+        return $slot;
+    }
+
+    /**
+     * DirectoryIterator/SplFileInfo::getBasename — optional suffix (#33280).
+     * php-src: zim_DirectoryIterator_getBasename / zim_SplFileInfo_getBasename
+     */
+    public static function compileGetBasename(
+        Context $context,
+        JITVariable $receiver,
+        ?JITVariable $suffixArg,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $nameSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_FILENAME);
+        $namePtr = self::stringFromProperty($context, $nameSlot);
+        if (null === $suffixArg) {
+            $base = $namePtr;
+        } else {
+            $suffix = self::loadString($context, $suffixArg);
+            $base = JitPath::basenameWithSuffix($context, $namePtr, $suffix);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'di_getbasename_after_suffix');
+        }
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $base
+        );
+
+        return $slot;
+    }
+
+    /**
+     * SplFileInfo::getType — pathname then {@see JitStat::pathFiletypeBoxed} (#33280).
+     * php-src: FileInfoFunction(getType, FS_TYPE)
+     */
+    public static function compileGetType(Context $context, JITVariable $receiver, string $className): Value
+    {
+        StatPathRuntime::ensureLinked($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'di_gettype_after_stat_link');
+
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+
+        return JitStat::pathFiletypeBoxed($context, $pathname);
     }
 
     /**
