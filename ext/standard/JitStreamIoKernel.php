@@ -238,6 +238,10 @@ final class JitStreamIoKernel
                 $name,
                 $context->context->functionType($i32, false, $i64, $i64)
             ),
+            '__compiler_fflush' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i32, false, $i64)
+            ),
             '__compiler_stream_supports' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i32, false, $i64, $i64)
@@ -1957,6 +1961,83 @@ final class JitStreamIoKernel
         // fflush so pending fwrite buffers hit the fd before truncate (#33133).
         $context->builder->call($context->lookupFunction('fflush'), $fp);
         $rc = $context->builder->call($context->lookupFunction('ftruncate'), $fd, $size);
+        $context->builder->returnValue(
+            $context->builder->select(
+                $context->builder->icmp(Builder::INT_EQ, $rc, $zero),
+                $one,
+                $zero
+            )
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($zero);
+    }
+
+    /**
+     * Idempotent libc fflush for thin AOT (#33354).
+     *
+     * NestedJIT StreamLifecycleJitHelper→VmFs cannot see JitStreamIoKernel's FILE*
+     * table — replace the bridge after NestedJIT (peer {@see implementFtruncateForce}).
+     * ABI: 1 on success, 0 on failure (matches {@see JitFflush}).
+     */
+    public static function implementFflushForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_fflush');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('fflush_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_fflush', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_fflush');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_fflush');
+        }
+        self::emitFflush($context, $fn);
+        $context->registerFunction('__compiler_fflush', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** resolve → libc fflush; ABI 1 on success, 0 on failure. */
+    private static function emitFflush(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('fflush_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $nullPtr = $i8p->constNull();
+        $zero = $i32->constInt(0, false);
+        $one = $i32->constInt(1, false);
+
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('fflush_fail');
+        $okBb = $fn->appendBasicBlock('fflush_ok');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr),
+            $failBb,
+            $okBb
+        );
+
+        $context->builder->positionAtEnd($okBb);
+        $rc = $context->builder->call($context->lookupFunction('fflush'), $fp);
         $context->builder->returnValue(
             $context->builder->select(
                 $context->builder->icmp(Builder::INT_EQ, $rc, $zero),
