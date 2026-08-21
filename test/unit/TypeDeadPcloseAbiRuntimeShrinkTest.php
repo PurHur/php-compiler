@@ -7,27 +7,28 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on __compiler_feof ABI shell from Builtin\Type (#33080).
+ * Drop leftover always-on __compiler_pclose ABI shell from Builtin\Type (#33093).
  *
  * NestedJIT/AOT bridge stays StreamLifecycleRuntime + JitStreamLifecycleKernel /
- * StreamLifecycleJitHelper. Runtime owner declares module-locally (getNamedFunction
- * first) so leftover Type empty decls cannot mint feof.1 (#31894 / #32122).
+ * StreamLifecycleJitHelper (implementCloseBridge). Runtime owner declares
+ * module-locally (getNamedFunction first) so leftover Type empty decls cannot
+ * mint pclose.1 (#31894 / #32122).
  */
-final class TypeDeadFeofAbiRuntimeShrinkTest extends TestCase
+final class TypeDeadPcloseAbiRuntimeShrinkTest extends TestCase
 {
-    public function testTypeBuiltinDropsLeftoverAlwaysOnFeofAbi(): void
+    public function testTypeBuiltinDropsLeftoverAlwaysOnPcloseAbi(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('#33080', $type);
+        $this->assertStringContainsString('#33093', $type);
         $this->assertDoesNotMatchRegularExpression(
-            '/addFunction\(\s*[\'"]__compiler_feof[\'"]/',
+            '/addFunction\(\s*[\'"]__compiler_pclose[\'"]/',
             $type,
-            'Builtin\\Type must not always-declare __compiler_feof (#33080)'
+            'Builtin\\Type must not always-declare __compiler_pclose (#33093)'
         );
         $this->assertStringNotContainsString(
-            "registerFunction('__compiler_feof'",
+            "registerFunction('__compiler_pclose'",
             $type,
-            'Builtin\\Type must not always-register __compiler_feof (#33080)'
+            'Builtin\\Type must not always-register __compiler_pclose (#33093)'
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
@@ -36,15 +37,17 @@ final class TypeDeadFeofAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamLifecycle::ensureLinked', $type);
     }
 
-    public function testRuntimeOwnerDeclaresFeofAbiModuleLocally(): void
+    public function testRuntimeOwnerDeclaresPcloseAbiModuleLocally(): void
     {
         $owner = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamLifecycleKernel.php');
-        $this->assertStringContainsString('#33080', $owner);
+        $this->assertStringContainsString('#33093', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
         $this->assertStringContainsString('addFunction', $owner);
-        $this->assertStringContainsString('__compiler_feof', $owner);
+        $this->assertStringContainsString('__compiler_pclose', $owner);
+        $this->assertStringContainsString('implementCloseBridge', $owner);
         $this->assertFileExists(__DIR__.'/../../ext/standard/StreamLifecycleJitHelper.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitFeof.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitPclose.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/pclose.php');
     }
 
     public function testTypeInitializeStillEnsureLinksStreamLifecycle(): void
@@ -53,9 +56,9 @@ final class TypeDeadFeofAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamLifecycle::ensureLinked($this->context)', $type);
     }
 
-    public function testNoNewRuntimeCForFeofAbi(): void
+    public function testNoNewRuntimeCForPcloseAbi(): void
     {
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/feof.c');
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/feof.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/pclose.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/pclose.c');
     }
 }
