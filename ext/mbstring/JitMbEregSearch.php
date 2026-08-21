@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding (#30781, #33648, #33655).
+ * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding (#30781, #33648, #33655, #33656).
  *
  * Same shape as {@see JitMbSearch} / {@see mb_internal_encoding}: literals only;
  * search cursor lives in {@see MbstringState} for the duration of one AOT/JIT
@@ -93,6 +93,37 @@ final class JitMbEregSearch
         );
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * mb_ereg_replace() / mb_eregi_replace() — 3-arg literal fold (no $options).
+     * php-src php_mbregex.c (#33656).
+     *
+     * @param JITVariable[] $args
+     */
+    public static function tryEregReplaceFold(
+        Context $context,
+        array $args,
+        bool $caseInsensitive
+    ): ?Value {
+        if (3 !== \count($args)) {
+            return null;
+        }
+        $pattern = JitStringArg::compileTimeLiteral($args[0]);
+        $replacement = JitStringArg::compileTimeLiteral($args[1]);
+        $string = JitStringArg::compileTimeLiteral($args[2]);
+        if (null === $pattern || null === $replacement || null === $string) {
+            return null;
+        }
+
+        MbstringAotFoldState::syncRegexEncodingIntoState($context);
+        $result = VmMbstring::eregReplace($pattern, $replacement, $string, $caseInsensitive);
+        if (!\is_string($result)) {
+            // false/null — leave non-foldable (runtime path still LogicException for now).
+            return null;
+        }
+
+        return $context->builder->load($context->constantStringFromString($result));
     }
 
     /**
