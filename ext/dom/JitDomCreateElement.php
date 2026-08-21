@@ -465,7 +465,7 @@ final class JitDomCreateElement
     }
 
     /**
-     * Full DOMElement thin-AOT slot set for createElement and comment/text stand-ins (#33546).
+     * Full DOMElement thin-AOT slot set for createElement and comment/text/CDATA/PI stand-ins (#33546/#33556).
      */
     public static function ensureDomElementStandInLayout(
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
