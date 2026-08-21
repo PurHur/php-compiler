@@ -32,9 +32,9 @@ final class TypeDeadAssertOptionsAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (undefined_array_key warning still Type always-on).
+        // Next leftover sentinel (pending_header_reset still Type always-on; #33249 undef-key dropped).
         $this->assertStringContainsString(
-            "registerFunction('__compiler_undefined_array_key_warning_cstr'",
+            "registerFunction('__phpc_pending_header_reset'",
             $type
         );
         $this->assertStringContainsString('AssertOptionsRuntime::ensureLinked', $type);
