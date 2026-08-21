@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\IniJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** ini_get/ini_set JIT: always IniJitHelper NestedJIT — no thin false/nop stubs (#9249, #21200). */
+/** ini_get/ini_set JIT: slim IniGetLeafJitHelper NestedJIT under thin AOT (#9249, #21200, #33059). */
 final class IniRuntimeShrinkTest extends TestCase
 {
     public function testIniJitHelperDelegatesToVmIniSemantics(): void
@@ -36,6 +36,8 @@ final class IniRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ini_get_bridge_entry', $source);
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringContainsString('IniGetLeafJitHelper', $source);
+        $this->assertStringContainsString('#33059', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('ensureThinAotLinkStubs', $source);
         $this->assertStringNotContainsString('implementIniGetFalseStub', $source);
@@ -47,10 +49,9 @@ final class IniRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('branchIfKey', $source);
         $this->assertStringNotContainsString("lookupFunction('strcasecmp')", $source);
-        // Thin EG(exception_ignore_args) path for AOT NestedJIT SEGV (#27549) — not a false stub.
+        // EG(exception_ignore_args) thin global retained for AOT exception-trace seeding (#27549).
         $this->assertStringContainsString('phpc_ini_exception_ignore_args', $source);
-        $this->assertStringContainsString('emitThinSetExceptionIgnoreArgs', $source);
-        $this->assertStringContainsString('emitParseBoolIni', $source);
+        $this->assertStringContainsString('loadExceptionIgnoreArgs', $source);
         $lineCount = \substr_count($source, "\n") + 1;
         $this->assertLessThanOrEqual(650, $lineCount);
         $this->assertGreaterThan(400, 1034 - $lineCount);
