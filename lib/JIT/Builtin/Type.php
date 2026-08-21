@@ -94,10 +94,6 @@ class Type extends Builtin {
         // ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // utf8_strlen.1 / utf8_valid.1 (#31894 / #32122). User-script mb_strlen() /
         // mb_check_encoding() stay JitMbStrlen / JitMbCheckEncoding / Utf8JitHelper.
-        $i64 = $this->context->getTypeFromString('int64');
-        $i8p = $this->context->getTypeFromString('int8*');
-        $i32 = $this->context->getTypeFromString('int32');
-        $sizeT = $this->context->getTypeFromString('size_t');
         // Leftover always-on libc decls removed (#32202 / peer Type $libcFns #32173):
         // getenv(3)/putenv(3) — StringGetenv::ensureLibcGetenv / BootstrapCompileSmokeM3Emit::
         //   ensureLibcPutenv after LibcExtern drops (#31637 / #31582). User-script getenv()/
@@ -162,7 +158,6 @@ class Type extends Builtin {
         // StreamIo::ensureLinked → StreamIoJit → StreamIoRuntime). Leftover Type empty
         // decls vs Runtime ABI drift mint fwrite.1 (#31894 / #32122). User-script
         // fwrite() stays JitFwrite / StreamIoJitHelper / JitStreamIoKernel.
-        $strPtr = $this->context->getTypeFromString('__string__*');
         // __compiler_fopen always-on shell removed (#33049): StreamIoRuntime owns the
         // ABI (getNamedFunction first, then addFunction if absent via declareRuntimeFn;
         // Type::initialize still StreamIo::ensureLinked). Leftover Type empty decls vs
@@ -401,15 +396,12 @@ class Type extends Builtin {
         // StringDir / ext/standard Jit*. NestedJIT/AOT bridge is StringDirRuntime
         // (getNamedFunction first; body DirHandleJitHelper). Leftover Type
         // addFunction vs Runtime ABI drift mints opendir.1 (#31894 / #32122).
-        $void = $this->context->getTypeFromString('void');
         // __compiler_random_bytes always-on shell removed (#33160): StringRandomBytes /
         // RandomBytesJitHelper owns the ABI (getNamedFunction first via
         // JitVmHelperLink::ensureBridge; Type::initialize still
         // StringRandomBytes::ensureLinked). Leftover Type empty decls vs Runtime ABI
         // drift mint random_bytes.1 (#31894 / #32122). User-script random_bytes() stays
         // JitRandomBytes / RandomBytesJitHelper (php-src ext/standard/random.c).
-        $strPtr = $this->context->getTypeFromString('__string__*');
-        $i32 = $this->context->getTypeFromString('int32');
         // __compiler_hash / __compiler_hash_hmac / __compiler_hash_pbkdf2 /
         // __compiler_hash_hkdf always-on shells removed (#32876): NestedJIT/AOT
         // bridge is StringHashCrypto → StringHashCryptoPhp (getNamedFunction first via
@@ -462,7 +454,6 @@ class Type extends Builtin {
         // ext/standard/versioning.c). NestedJIT/AOT bridge is StringVersionCompare
         // (getNamedFunction first; Type::initialize still ensureLinked). Leftover
         // Type empty decls vs Runtime ABI drift mints version_compare.1 (#31894 / #32122).
-        $htPtr = $this->context->getTypeFromString('__hashtable__*');
         // __compiler_gettimeofday_array / __compiler_gettimeofday_float always-on
         // shells removed (#32683): user-script gettimeofday() stays JitGettimeofday /
         // GettimeofdayJitHelper (php-src ext/standard/microtime.c). NestedJIT/AOT
@@ -557,12 +548,11 @@ class Type extends Builtin {
         // `__compiler_random_bytes`) and NestedJIT uses /dev/urandom via
         // JitRandomBytesKernel open/read (#29531 / #31817). No NestedJIT getrandom
         // lookups remain. Peer sprintf drop (#32110).
-        $fntypeExit = $this->context->context->functionType($void, false, $i32);
-        $fnExit = $this->context->module->addFunction('exit', $fntypeExit);
-        $this->context->registerFunction('exit', $fnExit);
-        $fntypeAbort = $this->context->context->functionType($void, false);
-        $fnAbort = $this->context->module->addFunction('abort', $fntypeAbort);
-        $this->context->registerFunction('abort', $fnAbort);
+        // exit(3)/abort(3) always-on shells removed (#33267): LibcExtern::ensureExitAbort
+        // owns the ABI (getNamedFunction first). Leftover Type empty decls vs libc ABI
+        // drift mint exit.1 / abort.1 (#31894 / #32122). User-script exit()/die() stay
+        // ScriptExit (php-src Zend/zend_builtin_functions.c).
+        \PHPCompiler\JIT\LibcExtern::ensureExitAbort($this->context);
         // __compiler_format_datetime always-on shell removed (#33215): StringDateTime
         // owns the ABI (getNamedFunction first via implementFormatDatetimeBridge;
         // Type::initialize still StringDateTime::ensureLinked on the full load path).
@@ -629,7 +619,8 @@ class Type extends Builtin {
         // getppid/getgid/getuid/geteuid — JitPosixGet*Kernel::ensureLibc* (#30728–#30803).
         // strerror(3) — SocketErrorRuntime::ensureStrerrorLibc / JitFtok::ensureWarningLibc.
         // getpwuid(3)+geteuid(2) — JitGetCurrentUser::ensureLibcGeteuid/Getpwuid (#32217).
-        // Dead calendar/sleep/getloadavg already dropped (#32173). Keep exit/abort.
+        // Dead calendar/sleep/getloadavg already dropped (#32173).
+        // exit/abort — LibcExtern::ensureExitAbort (#33267).
         // __compiler_preg_split always-on shell removed (#33199): StringPregMatch /
         // PregMatchRuntime owns the ABI (getNamedFunction first via implementSplitBridge;
         // Type::initialize still StringPregMatch::ensureLinked). Leftover Type empty decls

@@ -29,10 +29,8 @@ final class TypeDeadIsSuperglobalNameAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_is_superglobal_name (#33235)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (trigger_error still Type always-on; #33235 is_superglobal dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_trigger_error'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('StringSuperglobalName::ensureLinked', $type);
     }
 

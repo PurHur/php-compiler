@@ -16,7 +16,7 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for exit/die (issue #269). */
+/** LLVM lowering for exit/die (issue #269, #33267). */
 final class ScriptExit
 {
     public static function emitWithMessage(Context $context, Variable $statusArg, Variable $messageArg): void
@@ -248,6 +248,7 @@ final class ScriptExit
 
     private static function emitBoxed(Context $context, Value $boxedPtr): void
     {
+        LibcExtern::ensureExitAbort($context);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($boxedPtr, $map['type'])
@@ -488,6 +489,7 @@ final class ScriptExit
             PendingHeaders::emitFlushForStandalone($context);
             ObOutput::emitEndAllForStandalone($context);
         }
+        LibcExtern::ensureExitAbort($context);
         $i32 = $context->getTypeFromString('int32');
         $trunc = $context->builder->trunc($status, $i32);
         $context->builder->call($context->lookupFunction('exit'), $trunc);
@@ -500,6 +502,7 @@ final class ScriptExit
 
     private static function emitObjectStatus(Context $context, Value $objPtr, ?Variable $arg = null): void
     {
+        LibcExtern::ensureExitAbort($context);
         $enumClass = null !== $arg
             ? JitOperandTypeLabel::compileTimeEnumClassName($context, $arg)
             : null;
@@ -557,6 +560,7 @@ final class ScriptExit
                 $given
             )
         );
+        LibcExtern::ensureExitAbort($context);
         $context->builder->call($context->lookupFunction('abort'));
     }
 

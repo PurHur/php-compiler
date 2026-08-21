@@ -29,10 +29,7 @@ final class TypeDeadAssertFailAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_assert_fail (#33237)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel after #33241 assert_fail_string drop.
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('AssertFail::ensureLinked', $type);
     }
 

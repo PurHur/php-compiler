@@ -47,10 +47,8 @@ final class TypePidTimeLibcFnsRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-declare libc {$sym} in a table (#32217)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // __compiler_env_local_* always-on shells dropped (#32729); keep unrelated sentinels.
-        $this->assertStringContainsString("registerFunction('__compiler_get_meta_tags'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
     }
 
     public function testNestedJitConsumersEnsureDroppedLibcBeforeLookup(): void

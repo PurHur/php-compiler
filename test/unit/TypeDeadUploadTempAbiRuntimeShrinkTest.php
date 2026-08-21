@@ -40,9 +40,7 @@ final class TypeDeadUploadTempAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32499)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_http_build_query'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
     }
 
     public function testKernelOwnerDeclaresUploadTempAbisModuleLocally(): void

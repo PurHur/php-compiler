@@ -45,10 +45,7 @@ final class TypeDeadStreamSocketAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-declare {$sym} in a table (#32807)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('StreamSocketGetNameRuntime::ensureLinked', $type);
         $this->assertStringContainsString('StreamSocketAccept::ensureLinked', $type);
     }

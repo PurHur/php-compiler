@@ -42,8 +42,6 @@ final class TypeDeadLibcFnsRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-declare libc {$sym} (#32173)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
     }
 
     public function testNoNestedJitLookupFunctionRemainsForDroppedLibcFns(): void

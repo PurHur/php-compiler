@@ -44,10 +44,7 @@ final class TypeDeadHashCryptoAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32876)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('StringHashCrypto::ensureLinked', $type);
         // Peer #32875 already dropped these always-on shells
         $this->assertStringContainsString('#32875', $type);

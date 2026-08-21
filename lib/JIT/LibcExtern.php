@@ -135,6 +135,9 @@ final class LibcExtern
             // dropped realpath (#30530).
             // time dropped (#30332): StringTime + TimeJitHelper; TouchLibcRuntime routes via
             // StringTime::invoke (#30472) — no module-local time(2) decl.
+            // exit/abort never lived in this table — Type always-on shells dropped (#33267);
+            // NestedJIT + ScriptExit call ensureExitAbort before lookup. User-script exit()/die()
+            // stay on ScriptExit (php-src Zend/zend_builtin_functions.c) — not this row.
             // printf dropped (#31706): NestedJIT JitHeader / JitSetcookie / JitSessionStorageKernel /
             // ScriptExit declare printf(3) module-locally via ensurePrintf(); user-script printf()
             // stays on JitPrintf / __compiler_printf / printf_ (#3681) — not libc.
@@ -286,6 +289,38 @@ final class LibcExtern
             ['close', $i32, [$i32]],
             ['read', $i64, [$i32, $i8p, $i64]],
             ['write', $i64, [$i32, $i8p, $i64]],
+        ] as [$name, $ret, $params]) {
+            try {
+                $context->lookupFunction($name);
+
+                continue;
+            } catch (\LogicException $e) {
+            }
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, false, ...$params)
+                );
+            }
+            $context->registerFunction($name, $fn);
+        }
+    }
+
+    /**
+     * Module-local exit(3)/abort(3) after Type always-on drop (#33267).
+     *
+     * User-script exit()/die() stay on ScriptExit / zend_builtin_functions.c; NestedJIT
+     * fatal/raise paths and ScriptExit call this before lookupFunction('exit'|'abort').
+     * Peer: ensurePrintf (#31706). Leftover Type empty decls mint exit.1 (#31894 / #32122).
+     */
+    public static function ensureExitAbort(Context $context): void
+    {
+        $void = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
+        foreach ([
+            ['exit', $void, [$i32]],
+            ['abort', $void, []],
         ] as [$name, $ret, $params]) {
             try {
                 $context->lookupFunction($name);

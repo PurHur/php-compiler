@@ -42,11 +42,8 @@ final class TypeDeadDirAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32548)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_http_build_query'", $type);
-        // Next leftover sentinel (trigger_error still Type always-on; #33224 strptime / #33222 strftime / #33215 format_datetime dropped).
-        $this->assertStringContainsString("addFunction('__compiler_proc_close'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
     }
 
     public function testRuntimeOwnerDeclaresDirAbisModuleLocally(): void

@@ -42,10 +42,8 @@ final class TypeDeadCompilerAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32250)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
         // __compiler_number_format always-on shell removed (#32921); ownership in StringFormat.
-        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
     }
 
     public function testNoNestedJitLookupOfDroppedCompilerAbisRemains(): void

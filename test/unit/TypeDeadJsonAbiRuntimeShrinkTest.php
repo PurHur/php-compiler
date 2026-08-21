@@ -47,9 +47,7 @@ final class TypeDeadJsonAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32897)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('StringJsonEncode::ensureLinked', $type);
         $this->assertStringContainsString('StringJsonDecode::ensureLinked', $type);
     }

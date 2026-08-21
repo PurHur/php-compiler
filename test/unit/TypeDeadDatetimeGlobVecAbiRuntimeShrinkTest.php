@@ -44,9 +44,6 @@ final class TypeDeadDatetimeGlobVecAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32636)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("addFunction('exit'", $type);
     }
 
     public function testRuntimeOwnersDeclareDatetimeGlobVecAbisModuleLocally(): void

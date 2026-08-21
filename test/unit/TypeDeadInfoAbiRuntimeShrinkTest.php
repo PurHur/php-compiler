@@ -51,9 +51,7 @@ final class TypeDeadInfoAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-declare {$sym} in a table (#32839)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('StringInfo::ensureLinked', $type);
         $this->assertStringContainsString('StringVersionCompare::ensureLinked', $type);
     }

@@ -40,10 +40,7 @@ final class TypeDeadUndefinedArrayKeyAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register undef-key long ABI (#33249)'
         );
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('StringTriggerError::ensureLinked', $type);
         $this->assertStringContainsString('StringTriggerError::declareUndefinedArrayKeyAbis', $type);
     }

@@ -40,9 +40,7 @@ final class TypeDeadUtf8Latin1AbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32879)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_proc_close'", $type);
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('StringUtf8Latin1::ensureLinked', $type);
     }
 

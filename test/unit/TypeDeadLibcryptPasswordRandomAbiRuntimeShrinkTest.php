@@ -40,10 +40,7 @@ final class TypeDeadLibcryptPasswordRandomAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32851)"
             );
         }
-        $this->assertStringContainsString("addFunction('exit'", $type);
-        $this->assertStringContainsString("addFunction('abort'", $type);
-        // Remaining Type always-on: exit/abort (session ABI shells dropped #33261).
-        $this->assertStringContainsString("addFunction('exit'", $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('LibcryptRuntime::ensureLinked', $type);
         $this->assertStringContainsString('PasswordRandomBytesRuntime::ensureLinked', $type);
     }
