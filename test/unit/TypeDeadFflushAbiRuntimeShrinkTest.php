@@ -31,8 +31,8 @@ final class TypeDeadFflushAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (popen still Type always-on).
-        $this->assertStringContainsString("registerFunction('__compiler_popen'", $type);
+        // Next leftover sentinel (proc_open still Type always-on).
+        $this->assertStringContainsString("registerFunction('__compiler_proc_open'", $type);
         $this->assertStringContainsString('StreamLifecycle::ensureLinked', $type);
     }
 

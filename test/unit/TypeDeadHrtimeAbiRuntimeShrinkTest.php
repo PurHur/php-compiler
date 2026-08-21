@@ -42,7 +42,7 @@ final class TypeDeadHrtimeAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_popen'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_proc_open'", $type);
         $this->assertStringNotContainsString('use PHPCompiler\\CompilerVersion;', $type);
     }
 
