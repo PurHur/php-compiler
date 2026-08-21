@@ -17,7 +17,8 @@ use PHPLLVM\Value;
  *
  * Construct / openFile read via libc file_get_contents then NestedJIT explode line split
  * (#33308 — concat-loop NestedJIT SIGSEGV'd in __ref__delref).
- * Path accessors read `__pathname` (#33305).
+ * Path accessors read `__pathname` (#33305); also init SplFileInfo `__dir_path`/`__filename`
+ * for inherited isFile/getSize/… (#33313).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileInfo_openFile
@@ -144,6 +145,14 @@ final class SplFileObjectJitHelper
             $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_PATH),
             $pathVar,
             JITVariable::TYPE_STRING
+        );
+        // Parent SplFileInfo path props — isFile/getSize/getExtension (#33313).
+        DirectoryIteratorJitHelper::initSplFileInfoPathProps(
+            $context,
+            $obj,
+            $pathStr,
+            self::CLASS_NAME,
+            false
         );
         $objectType->markObjectConstructed($obj);
     }
