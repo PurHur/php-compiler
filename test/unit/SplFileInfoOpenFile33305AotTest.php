@@ -115,7 +115,7 @@ final class SplFileInfoOpenFile33305AotTest extends TestCase
         $this->assertStringContainsString('#33305', $helper);
         $sfo = (string) file_get_contents($root.'/lib/VM/SplFileObjectJitHelper.php');
         $this->assertStringContainsString('emitNewFromPathname', $sfo);
-        $this->assertStringContainsString('HashTableHelper::alloc', $sfo);
+        $this->assertStringContainsString('snapshotPath', $sfo);
         $this->assertStringContainsString('compileGetFilename', $sfo);
     }
 }
