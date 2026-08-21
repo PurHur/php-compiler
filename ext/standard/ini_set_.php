@@ -93,6 +93,14 @@ final class ini_set_ extends Internal
         }
         $optionStr = IniOptionArg::jitOption($context, $args[0], $fn);
         $valueStr = JitIniValueArg::lower($context, $args[1], $fn);
+        $optLit = $args[0]->compileTimeString;
+        $valLit = $args[1]->compileTimeString;
+        if (\is_string($optLit) && '' !== $optLit && \is_string($valLit)) {
+            $thin = JitIni::setLiteral($context, $optLit, $valLit);
+            if (null !== $thin) {
+                return $thin;
+            }
+        }
 
         return JitIni::set($context, $optionStr, $valueStr);
     }

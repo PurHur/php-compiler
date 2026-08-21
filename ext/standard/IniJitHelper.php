@@ -51,6 +51,12 @@ final class IniJitHelper
         'assert.exception',
     ];
 
+    /** Compile-time / thin AOT: NestedJIT-backed ini key (#33059)? */
+    public static function isSupportedIniKey(string $key): bool
+    {
+        return \in_array(strtolower($key), self::SUPPORTED_KEYS, true);
+    }
+
     private const ASSERT_INI_KEYS = [
         'zend.assertions',
         'assert.active',
@@ -230,6 +236,42 @@ final class IniJitHelper
         return self::$registerArgcArgv;
     }
 
+    /**
+     * Seed compiled-module static storage — NestedJIT does not emit PHP static defaults (#11841).
+     *
+     * php-src: ext/standard/ini.c compiled PG() defaults; VM uses {@see VmIni} per request.
+     */
+    public static function resetCompiledModuleDefaults(): void
+    {
+        ErrorSilenceJitHelper::iniRestoreErrorReporting();
+        self::$displayErrorsLocalValue = null;
+        self::$displayErrors = VmIni::parseBoolIni(self::CFG_DISPLAY_ERRORS);
+        ErrorSilenceJitHelper::setDisplayErrors(self::$displayErrors);
+        self::$memoryLimit = VmIni::clampMemoryLimitToMax(self::CFG_MEMORY_LIMIT, null, true);
+        VmIni::syncMemoryLimitFromJit(self::$memoryLimit);
+        self::$maxMemoryLimit = self::CFG_MAX_MEMORY_LIMIT;
+        self::$precision = VmIni::parsePrecision(self::CFG_PRECISION);
+        self::$serializePrecision = self::parseSerializePrecisionIni(self::CFG_SERIALIZE_PRECISION);
+        self::$unserializeMaxDepth = (int) self::CFG_UNSERIALIZE_MAX_DEPTH;
+        self::$unserializeCallbackFunc = '';
+        self::$sessionGcMaxlifetime = 1440;
+        self::$sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+        VmSession::setUseStrictMode(false);
+        VmOpenBasedir::restore();
+        self::$userAgent = '';
+        self::$defaultCharset = self::CFG_DEFAULT_CHARSET;
+        self::$pcreBacktrackLimit = (int) self::CFG_PCRE_BACKTRACK_LIMIT;
+        self::$pcreJit = true;
+        self::$pcreRecursionLimit = (int) self::CFG_PCRE_RECURSION_LIMIT;
+        self::$exceptionStringParamMaxLen = self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
+        VmIni::syncExceptionStringParamMaxLen(self::$exceptionStringParamMaxLen);
+        self::$exceptionIgnoreArgs = self::CFG_EXCEPTION_IGNORE_ARGS;
+        VmIni::syncExceptionIgnoreArgs(self::$exceptionIgnoreArgs);
+        self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+        ExecutionLimitsJitHelper::applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
+        self::$registerArgcArgv = true;
+    }
+
     public static function getUserAgent(): string
     {
         return self::$userAgent;
@@ -246,6 +288,37 @@ final class IniJitHelper
         return self::$precision;
     }
 
+    /**
+     * Render a signed int as a decimal string for thin IniRuntime bridges (#33059).
+     * Avoids NestedJIT sprintf('%d', static) which returns "0".
+     */
+    public static function formatSignedIntForIni(int $n): string
+    {
+        if (0 === $n) {
+            return '0';
+        }
+        $neg = $n < 0;
+        if ($neg) {
+            // Avoid abs(PHP_INT_MIN) overflow — digit walk on the negative value.
+            $digits = '';
+            $v = $n;
+            while (0 !== $v) {
+                $digits = \chr(48 - ($v % 10)).$digits;
+                $v = intdiv($v, 10);
+            }
+
+            return '-'.$digits;
+        }
+        $digits = '';
+        $v = $n;
+        while (0 !== $v) {
+            $digits = \chr(48 + ($v % 10)).$digits;
+            $v = intdiv($v, 10);
+        }
+
+        return $digits;
+    }
+
     /** Sync from VM ini_set path ({@see VmIni}); keeps JIT helpers aligned (#21963). */
     public static function syncPrecision(int $precision): void
     {
@@ -255,6 +328,11 @@ final class IniJitHelper
     public static function getUnserializeMaxDepthInt(): int
     {
         return self::$unserializeMaxDepth;
+    }
+
+    public static function getSessionGcMaxlifetimeInt(): int
+    {
+        return self::$sessionGcMaxlifetime;
     }
 
     public static function syncMaxExecutionTime(int $seconds): void
@@ -279,22 +357,32 @@ final class IniJitHelper
 
     private static function serializePrecisionAsIniString(): string
     {
-        return \sprintf('%d', self::$serializePrecision);
+        // NestedJIT: sprintf('%d', …) mishandles the int (even from get*Int) → "0" (#33059).
+        // String cast of the loaded int matches php-src PG(serialize_precision) rendering.
+        return (string) self::getSerializePrecisionInt();
     }
 
     private static function precisionAsIniString(): string
     {
-        return \sprintf('%d', self::$precision);
+        return (string) self::getPrecisionInt();
     }
 
     private static function sessionGcMaxlifetimeAsIniString(): string
     {
-        return \sprintf('%d', self::$sessionGcMaxlifetime);
+        return (string) self::getSessionGcMaxlifetimeInt();
     }
 
     private static function unserializeMaxDepthAsIniString(): string
     {
-        return \sprintf('%d', self::$unserializeMaxDepth);
+        return (string) self::getUnserializeMaxDepthInt();
+    }
+
+    /** Compiled default when NestedJIT BSS string static is still unset (#33059). */
+    private static function memoryLimitAsIniString(): string
+    {
+        $v = self::$memoryLimit;
+
+        return '' !== $v ? $v : self::CFG_MEMORY_LIMIT;
     }
 
     /** @return string|null null when ini_get() is false */
@@ -331,7 +419,7 @@ final class IniJitHelper
             return self::displayErrorsIniString();
         }
         if ('memory_limit' === $key) {
-            return self::$memoryLimit;
+            return self::memoryLimitAsIniString();
         }
         if ('precision' === $key) {
             return self::precisionAsIniString();

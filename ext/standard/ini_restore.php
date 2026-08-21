@@ -41,7 +41,12 @@ final class ini_restore extends Internal
             return $context->getTypeFromString('int32')->constInt(0, false);
         }
         $optionStr = IniOptionArg::jitOption($context, $args[0], 'ini_restore');
-        JitIni::restore($context, $optionStr);
+        $literal = $args[0]->compileTimeString;
+        if (\is_string($literal) && '' !== $literal) {
+            JitIni::restoreLiteral($context, $literal);
+        } else {
+            JitIni::restore($context, $optionStr);
+        }
 
         return $context->getTypeFromString('int32')->constInt(0, false);
     }

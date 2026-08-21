@@ -31,6 +31,7 @@ final class IniPrecisionTest extends TestCase
 
     public function testIniJitHelperPrecisionRoundTrip(): void
     {
+        IniJitHelper::resetCompiledModuleDefaults();
         $this->assertSame('14', IniJitHelper::iniGet('precision'));
         $this->assertSame('14', IniJitHelper::iniSet('precision', '8'));
         $this->assertSame('8', IniJitHelper::iniGet('precision'));

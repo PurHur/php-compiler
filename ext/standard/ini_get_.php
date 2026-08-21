@@ -72,6 +72,10 @@ final class ini_get_ extends Internal
             return $context->getTypeFromString('__value__*')->constNull();
         }
         $optionStr = IniOptionArg::jitOption($context, $args[0], 'ini_get');
+        $literal = $args[0]->compileTimeString;
+        if (\is_string($literal) && '' !== $literal) {
+            return JitIni::getLiteral($context, $literal);
+        }
 
         return JitIni::get($context, $optionStr);
     }
