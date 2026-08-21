@@ -6,13 +6,19 @@ namespace PHPCompiler\ext\openssl;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_csr_sign() — sign CSR into X.509 certificate (php-src ext/openssl/xp.c; #6421).
+ * openssl_csr_sign() — sign CSR into X.509 certificate (php-src ext/openssl/openssl.c; #6421 VM, JIT/AOT #33517).
+ *
+ * JIT/AOT leftover #33517: catchable argc/TypeError paths (peer openssl_csr_get_public_key #33514).
+ * Happy-path CSR/key → certificate still needs object AOT (#6421 follow-up).
  */
 final class openssl_csr_sign extends Internal
 {
@@ -92,8 +98,76 @@ final class openssl_csr_sign extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 4 || $argc > 6) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                'openssl_csr_sign() expects 4 to 6 arguments, '.$argc.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'openssl_csr_sign_argc_cont');
+
+            return self::jitReturnFalse($context);
+        }
+
+        $badCsr = self::compileTimeNonCsrLabel($args[0]);
+        if (null !== $badCsr) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'openssl_csr_sign(): Argument #1 ($csr) must be of type '
+                .'OpenSSLCertificateSigningRequest|string, '.$badCsr.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'openssl_csr_sign_te_cont');
+
+            return self::jitReturnFalse($context);
+        }
+
+        // CSR/key/cert objects stay VM-shaped (#6421). Clear LogicException on TypeError/argc
+        // gates first (#33517); happy-path bake is a follow-up.
         throw new \LogicException(
-            'openssl_csr_sign() is not implemented for JIT in this compiler build (issue #6421)'
+            'openssl_csr_sign() is not implemented for JIT in this compiler build (issue #6421/#33517)'
         );
+    }
+
+    /**
+     * VM union via resolveCsrPem: OpenSSLCertificateSigningRequest|string.
+     *
+     * @return non-empty-string|null
+     */
+    private static function compileTimeNonCsrLabel(JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return 'null';
+        }
+
+        return match ($arg->type) {
+            JITVariable::TYPE_NATIVE_BOOL => 'bool',
+            JITVariable::TYPE_NATIVE_LONG => 'int',
+            JITVariable::TYPE_NATIVE_DOUBLE => 'float',
+            JITVariable::TYPE_HASHTABLE => 'array',
+            JITVariable::TYPE_STRING => null,
+            JITVariable::TYPE_OBJECT => self::objectTypeErrorLabel($arg),
+            default => 'mixed',
+        };
+    }
+
+    private static function objectTypeErrorLabel(JITVariable $arg): ?string
+    {
+        $class = $arg->classUserType;
+        if (null === $class || '' === $class) {
+            return null;
+        }
+        if (0 === \strcasecmp($class, 'OpenSSLCertificateSigningRequest')) {
+            return null;
+        }
+
+        return $class;
+    }
+
+    private static function jitReturnFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+        return JitValueBox::pointer($context, $slot);
     }
 }
