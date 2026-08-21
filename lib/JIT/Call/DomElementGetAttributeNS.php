@@ -16,6 +16,9 @@ use PHPLLVM\Value;
 
 /**
  * Dom\Element::getAttributeNS() — thin user-script AOT live Attr cache (#27108).
+ *
+ * Null namespace must prefer {@see Variable::$isNullConstant} over a stale
+ * {@see Variable::$compileTimeString} (#33532; mirror setAttributeNS #33528).
  */
 final class DomElementGetAttributeNS implements Call
 {
@@ -31,9 +34,13 @@ final class DomElementGetAttributeNS implements Call
         )) {
             return VmClassMethod::jitArgcDummyReturn($context);
         }
-        $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        if (null === $nsLit && (Variable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant)) {
+        // Prefer isNullConstant → '' before compileTimeString: null NS args often keep a stale
+        // compileTimeString (e.g. cts='k'), which would key the Attr cache as namespace "k" (#33532).
+        // Mirror DomElementSetAttributeNS (#33528): `$ns = $args[1]->isNullConstant ? null : …`.
+        if (Variable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
             $nsLit = '';
+        } else {
+            $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         }
         $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
         if (null === $nsLit || null === $localLit

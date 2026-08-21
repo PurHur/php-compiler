@@ -18,6 +18,7 @@ use PHPLLVM\Value;
  * DOMElement::hasAttributeNS() — user-script AOT live Attr cache (#32398).
  *
  * Returns boxed int 1/0 (truthy) to avoid bool-box ABI gaps in thin AOT.
+ * Null namespace prefers {@see Variable::$isNullConstant} over stale cts (#33532).
  */
 final class DomElementHasAttributeNS implements Call
 {
@@ -32,9 +33,12 @@ final class DomElementHasAttributeNS implements Call
         )) {
             return VmClassMethod::jitArgcDummyReturn($context);
         }
-        $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        if (null === $nsLit && (Variable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
+        // Prefer isNullConstant → '' before compileTimeString (stale cts wins otherwise; #33532).
+        // Mirror DomElementSetAttributeNS (#33528) / DomElementGetAttributeNS.
+        if (Variable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
             $nsLit = '';
+        } else {
+            $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         }
         $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
         $present = null !== $nsLit && null !== $localLit
