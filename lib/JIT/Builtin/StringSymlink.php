@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for symlink() via SymlinkJitHelper PHP.
+ * JIT/AOT link for symlink() via SymlinkJitHelper PHP (#15544, #33417).
  *
+ * User-script AOT: {@see SymlinkJitHelper} via {@see JitVmHelperLink}
+ * (Link #33406 shape — helper SSOT is {@see \PHPCompiler\ext\standard\VmFs::symlink()}).
+ * NestedJIT leaf: module-local symlink(2) decl (avoids re-entering the helper
+ * bridge while NestedJIT compiles SymlinkJitHelper / `@symlink`).
  * Replaces libc symlinkat(2) LLVM in ext/standard/JitSymlink.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmFs::symlink()}.
- * php-src: ext/standard/filestat.c — php_symlink
+ * php-src: ext/standard/link.c — php_symlink
  */
 final class StringSymlink
 {
@@ -30,6 +33,11 @@ final class StringSymlink
         self::INVOKE_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'symlink_bridge_entry';
+
+    /** Module-local symlink(2) — NestedJIT leaf (#33417 / peer link #33406). */
+    private const COMPILER_SYMLINK = '__compiler_symlink';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -42,49 +50,94 @@ final class StringSymlink
 
     public static function invoke(Context $context, Value $target, Value $link): Value
     {
+        // Nested helper compile: libc leaf without re-entering SymlinkJitHelper (#33417).
+        if (NestedJitCompileScope::isActive()) {
+            return self::invokeNestedLeaf($context, $target, $link);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call($context->lookupFunction(self::ABI), $target, $link);
     }
 
+    /** @return Value i1 — true when symlink(2) returns 0 */
+    public static function invokeNestedLeaf(Context $context, Value $targetStr, Value $linkStr): Value
+    {
+        return self::invokeCompilerSymlink($context, $targetStr, $linkStr);
+    }
+
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
         }
 
-        // Restore caller insert block after bridge emit (#19283 / #26323) — clearInsertionPosition
-        // left the user-script builder detached ("Current basic block has no parent function").
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, 'symlink-jit-php');
-
         $strPtr = $context->getTypeFromString('__string__*');
+        // ABI stays i1 for symlink() callers; helper returns int 0/1 so NestedJIT
+        // uses readLong (bool boxes have no readLong arm — always 0; #20603 / #29141).
         $i1 = $context->getTypeFromString('int1');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($i1, false, $strPtr, $strPtr)
-            );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            [$strPtr, $strPtr],
+            $i1,
+            self::INVOKE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#33417'
+        );
+    }
 
-        $entry = $fn->appendBasicBlock('symlink_bridge_entry');
-        $context->builder->positionAtEnd($entry);
+    /** @return Value i1 — true when symlink(2) returns 0 */
+    private static function invokeCompilerSymlink(Context $context, Value $targetStr, Value $linkStr): Value
+    {
+        self::ensureCompilerSymlinkDecl($context);
+        $map = $context->structFieldMap['__string__'];
+        $targetPtr = $context->builder->structGep($targetStr, $map['value']);
+        $linkPtr = $context->builder->structGep($linkStr, $map['value']);
+        $i32 = $context->getTypeFromString('int32');
+        $ret = $context->builder->call(
+            $context->lookupFunction(self::COMPILER_SYMLINK),
+            $targetPtr,
+            $linkPtr
+        );
+        $zero = $i32->constInt(0, false);
 
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_HELPER, 'symlink-jit-php');
-        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$fn->getParam(0), $fn->getParam(1)]);
-        // NestedJIT may box bool as __value__; coerceHelperScalarResult leaves it as always-false (#20652 / #26323).
-        $bool = JitNestedHelperCoerce::extractBoolFromHelperResult($context, $raw);
-        $context->builder->returnValue($bool);
+        return $context->builder->icmp(Builder::INT_EQ, $ret, $zero);
+    }
 
-        $context->registerFunction(self::ABI, $fn);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
+    /**
+     * Declare symlink(2) under a compiler-owned alias (peer {@see StringLink} #33406).
+     * The linker resolves the body from libc via the {@code symlink} symbol name.
+     */
+    private static function ensureCompilerSymlinkDecl(Context $context): void
+    {
+        try {
+            $context->lookupFunction(self::COMPILER_SYMLINK);
+
+            return;
+        } catch (\Throwable $e) {
         }
+        try {
+            $existing = $context->lookupFunction('symlink');
+            $context->registerFunction(self::COMPILER_SYMLINK, $existing);
+
+            return;
+        } catch (\Throwable $e) {
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $ft = $context->context->functionType($i32, false, $i8p, $i8p);
+        $fn = $context->module->addFunction('symlink', $ft);
+        $context->registerFunction('symlink', $fn);
+        $context->registerFunction(self::COMPILER_SYMLINK, $fn);
     }
 }

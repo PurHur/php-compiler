@@ -1024,6 +1024,9 @@ class Context {
             // link(2) NestedJIT leaf (#33406) — whitelist link → link_::call →
             // StringLink::invokeNestedLeaf (module-local link(2); peer rename #29141).
             'link',
+            // symlink(2) NestedJIT leaf (#33417) — whitelist symlink → symlink_::call →
+            // StringSymlink::invokeNestedLeaf (module-local symlink(2); peer link #33406).
+            'symlink',
             // chown(2)/chgrp NestedJIT leaf (#32466) — whitelist → chown_/chgrp_::call →
             // JitChown/JitChgrp::invokeNestedLeaf (module-local chown/fchownat; peer rename).
             'chown',
