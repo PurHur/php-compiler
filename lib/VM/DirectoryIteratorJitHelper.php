@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\JitPath;
+use PHPCompiler\ext\standard\JitReadlink;
 use PHPCompiler\ext\standard\JitStat;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\ext\standard\JitStringIndex;
@@ -16,18 +17,19 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
  * Thin-AOT DirectoryIterator / FilesystemIterator / SplFileInfo — snapshot + path props
- * (#27289, #33263, #33274, #33276, #33280, #33290).
+ * (#27289, #33263, #33274, #33276, #33280, #33289, #33290).
  *
  * DirectoryIterator construct lists entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}.
  * SplFileInfo construct splits pathname via call-site {@see JitPath} (#33290).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
- * isFile/isDir/getPath/getPathname/getSize/getExtension/getType join `__dir_path`+`__filename`.
+ * isFile/isDir/getPath/getPathname/getSize/getExtension/getType/getLinkTarget join `__dir_path`+`__filename`.
  *
  * php-src: ext/spl/spl_directory.c
  */
@@ -282,6 +284,84 @@ final class DirectoryIteratorJitHelper
     }
 
     /**
+     * SplFileInfo::getRealPath — libc realpath(3) on joined pathname (#33287).
+     * php-src: zim_SplFileInfo_getRealPath
+     *
+     * Avoid StringRealpath/NestedJIT PHP realpath() — absolute paths with `..`
+     * currently fail/segfault in RealpathJitHelper under thin AOT.
+     */
+    public static function compileGetRealPath(Context $context, JITVariable $receiver, string $className): Value
+    {
+        self::ensureLibcRealpath($context);
+        LibcExtern::ensureStrlenDecl($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'di_getrealpath_after_libc');
+
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $strMap = $context->structFieldMap['__string__'];
+
+        $pathCstr = $context->builder->pointerCast(
+            $context->builder->structGep($pathname, $strMap['value']),
+            $i8p
+        );
+        $buf = $context->builder->alloca($i8->arrayType(4096));
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $real = $context->builder->call($context->lookupFunction('realpath'), $pathCstr, $bufPtr);
+        $ok = $context->builder->icmp(Builder::INT_NE, $real, $i8p->constNull());
+
+        $failBb = BasicBlockHelper::append($context, 'di_getrealpath_fail');
+        $okBb = BasicBlockHelper::append($context, 'di_getrealpath_ok');
+        $doneBb = BasicBlockHelper::append($context, 'di_getrealpath_done');
+        $slot = JitValueBox::alloc($context);
+        $context->builder->branchIf($ok, $okBb, $failBb);
+
+        $context->builder->positionAtEnd($failBb);
+        JitValueBox::writeBool($context, $slot, $context->context->int1Type()->constInt(0, false));
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufPtr);
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($len, $i64),
+            $context->builder->pointerCast($bufPtr, $charPtr)
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $str
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $slot;
+    }
+
+    /** Module-local realpath(3) after LibcExtern always-on drop (#31534). */
+    private static function ensureLibcRealpath(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        try {
+            $context->lookupFunction('realpath');
+        } catch (\Throwable) {
+            $fn = $context->module->getNamedFunction('realpath');
+            if (null === $fn) {
+                $fn = $context->module->addFunction(
+                    'realpath',
+                    $context->context->functionType($i8p, false, $i8p, $i8p)
+                );
+            }
+            $context->registerFunction('realpath', $fn);
+        }
+    }
+
+    /**
      * SplFileInfo::getMTime (#33283). php-src: zim_SplFileInfo_getMTime
      */
     public static function compileGetMTime(Context $context, JITVariable $receiver, string $className): Value
@@ -335,6 +415,23 @@ final class DirectoryIteratorJitHelper
     public static function compileGetInode(Context $context, JITVariable $receiver, string $className): Value
     {
         return self::compilePathLongStat($context, $receiver, $className, 'inode');
+    }
+
+    /**
+     * SplFileInfo::getLinkTarget — pathname then {@see JitReadlink::invoke} (#33289).
+     * php-src: zim_SplFileInfo_getLinkTarget / php_sys_readlink
+     *
+     * Uses libc readlink(2) (same leaf as userland readlink AOT). NestedJIT
+     * {@see ReadlinkJitHelper} returns false under thin standalone AOT.
+     * Failure: Zend throws RuntimeException; thin AOT returns false — same
+     * empty-heap trade-off as {@see SplHeapJitHelper::compileExtract}.
+     */
+    public static function compileGetLinkTarget(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+
+        return JitReadlink::invoke($context, $pathname);
     }
 
     /** @param 'size'|'mtime'|'atime'|'ctime'|'perms'|'owner'|'group'|'inode' $kind */

@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289 … #33290).
  *
- * php-src: ext/spl/spl_directory.c — zim_SplFileInfo___construct / isFile / getPathname / getSize / …
+ * php-src: ext/spl/spl_directory.c — zim_SplFileInfo___construct / getRealPath / getLinkTarget / …
  */
 final class DirectoryIteratorMethod implements Call
 {
@@ -62,6 +62,7 @@ final class DirectoryIteratorMethod implements Call
             'getpathname' => DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className),
             'getpath' => DirectoryIteratorJitHelper::compileGetPath($context, $args[0], $this->className),
             'getsize' => DirectoryIteratorJitHelper::compileGetSize($context, $args[0], $this->className),
+            'getrealpath' => DirectoryIteratorJitHelper::compileGetRealPath($context, $args[0], $this->className),
             'getmtime' => DirectoryIteratorJitHelper::compileGetMTime($context, $args[0], $this->className),
             'getatime' => DirectoryIteratorJitHelper::compileGetATime($context, $args[0], $this->className),
             'getctime' => DirectoryIteratorJitHelper::compileGetCTime($context, $args[0], $this->className),
@@ -80,6 +81,7 @@ final class DirectoryIteratorMethod implements Call
             'isfile' => DirectoryIteratorJitHelper::compileIsFile($context, $args[0], $this->className),
             'isdir' => DirectoryIteratorJitHelper::compileIsDir($context, $args[0], $this->className),
             'islink' => DirectoryIteratorJitHelper::compileIsLink($context, $args[0], $this->className),
+            'getlinktarget' => DirectoryIteratorJitHelper::compileGetLinkTarget($context, $args[0], $this->className),
             'isreadable' => DirectoryIteratorJitHelper::compileIsReadable($context, $args[0], $this->className),
             'iswritable' => DirectoryIteratorJitHelper::compileIsWritable($context, $args[0], $this->className),
             'isexecutable' => DirectoryIteratorJitHelper::compileIsExecutable($context, $args[0], $this->className),

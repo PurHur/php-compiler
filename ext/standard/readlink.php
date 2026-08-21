@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** readlink() — VM via VmFs; JIT/AOT via ReadlinkJitHelper PHP (#15353). */
+/** readlink() — VM via VmFs; JIT/AOT via libc readlink(2) (#742 / #33289; NestedJIT leaf was AOT-false). */
 final class readlink extends Internal
 {
     public function execute(Frame $frame): void
