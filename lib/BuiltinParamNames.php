@@ -814,6 +814,9 @@ final class BuiltinParamNames
             case 'set_error_handler':
                 // php-src basic_functions.stub.php — callback + error_levels; InternalArgInfo still error_handler/error_types (#23390)
                 return ['callback', 'error_levels='];
+            case 'set_exception_handler':
+                // php-src basic_functions.stub.php — ?callable $callback; InternalArgInfo still exception_handler (#23456)
+                return ['callback'];
             case 'header':
                 return ['header', 'replace', 'response_code'];
             case 'header_register_callback':
