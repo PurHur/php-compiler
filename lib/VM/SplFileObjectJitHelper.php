@@ -60,6 +60,7 @@ use PHPLLVM\Value;
  * setCsvControl/getCsvControl on `__spl_csv_*` (#33371); fgetcsv/fputcsv read props when args omitted.
  * setMaxLineLen/getMaxLineLen on `__spl_max_line_len` (#33377); fgets/fgetcsv use max+1 (#33378).
  * fscanf on `__spl_fd` — fgets + `__compiler_sscanf_array` (#33382).
+ * DROP_NEW_LINE strips trailing \\r\\n / \\n / \\r on line read (#33390).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
@@ -75,6 +76,9 @@ use PHPLLVM\Value;
  */
 final class SplFileObjectJitHelper
 {
+    /** php-src SplFileObject::DROP_NEW_LINE — peer SplFileObjectBuiltin::DROP_NEW_LINE. */
+    private const FLAG_DROP_NEW_LINE = 1;
+
     public const PROP_HT = '__spl_ht';
 
     public const PROP_PATH = '__pathname';
@@ -91,9 +95,8 @@ final class SplFileObjectJitHelper
     /** Cached current_line string. */
     public const PROP_CUR_LINE = '__spl_cur_line';
 
-    /** SplFileObject flags (READ_CSV / DROP_NEW_LINE / …) — php-src flags (#33368). */
+    /** SplFileObject flags (READ_CSV / DROP_NEW_LINE / …) — php-src flags (#33368 / #33390). */
     public const PROP_FLAGS = '__spl_flags';
-
     /** SplFileObject::max_line_len — php-src max_line_len (#33377). */
     public const PROP_MAX_LINE_LEN = '__spl_max_line_len';
 
@@ -1221,6 +1224,8 @@ final class SplFileObjectJitHelper
         $context->builder->branch($joinBb);
 
         $context->builder->positionAtEnd($okBb);
+        $flags = self::loadLongProp($context, $obj, self::PROP_FLAGS);
+        $line = self::emitApplyDropNewLine($context, $line, $flags);
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(1, false));
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $line);
@@ -1243,6 +1248,72 @@ final class SplFileObjectJitHelper
         $context->builder->positionAtEnd($joinBb);
 
         return $slot;
+    }
+
+    /**
+     * php-src DROP_NEW_LINE — strip trailing \\r\\n / \\n / \\r (#33390).
+     * Peer: SplFileObjectStorage::applyDropNewLine. Fresh fgets buffer is separated then length-shrunk.
+     */
+    private static function emitApplyDropNewLine(Context $context, Value $line, Value $flags): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $needBb = $fn->appendBasicBlock('splfo_dnl_need');
+        $doneBb = $fn->appendBasicBlock('splfo_dnl_done');
+        $outSlot = $context->builder->alloca($strPtr);
+        $context->builder->store($line, $outSlot);
+
+        $masked = $context->builder->and($flags, $i64->constInt(self::FLAG_DROP_NEW_LINE, false));
+        $want = $context->builder->icmp(Builder::INT_NE, $masked, $i64->constInt(0, false));
+        $context->builder->branchIf($want, $needBb, $doneBb);
+
+        $context->builder->positionAtEnd($needBb);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $line
+        );
+        $context->builder->store($owned, $outSlot);
+
+        $crlf = $context->builder->load($context->constantStringFromString("\r\n"));
+        $isCrlf = JitStringCompare::suffixIdentical($context, $owned, $crlf);
+        $crlfBb = $fn->appendBasicBlock('splfo_dnl_crlf');
+        $checkOneBb = $fn->appendBasicBlock('splfo_dnl_check_one');
+        $context->builder->branchIf($isCrlf, $crlfBb, $checkOneBb);
+
+        $context->builder->positionAtEnd($crlfBb);
+        self::emitShrinkStringLen($context, $owned, 2);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($checkOneBb);
+        $nl = $context->builder->load($context->constantStringFromString("\n"));
+        $isNl = JitStringCompare::suffixIdentical($context, $owned, $nl);
+        $cr = $context->builder->load($context->constantStringFromString("\r"));
+        $isCr = JitStringCompare::suffixIdentical($context, $owned, $cr);
+        $isOne = $context->builder->or($isNl, $isCr);
+        $oneBb = $fn->appendBasicBlock('splfo_dnl_one');
+        $context->builder->branchIf($isOne, $oneBb, $doneBb);
+
+        $context->builder->positionAtEnd($oneBb);
+        self::emitShrinkStringLen($context, $owned, 1);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $context->builder->load($outSlot);
+    }
+
+    /** Shrink `__string__` length in place (owned buffer after `__string__separate`). */
+    private static function emitShrinkStringLen(Context $context, Value $str, int $by): void
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $lenPtr = $context->builder->structGep($str, $map['length']);
+        $len = $context->builder->load($lenPtr);
+        $context->builder->store(
+            $context->builder->sub($len, $i64->constInt($by, false)),
+            $lenPtr
+        );
     }
 
     /**
@@ -1279,7 +1350,9 @@ final class SplFileObjectJitHelper
         $context->builder->branch($joinBb);
 
         $context->builder->positionAtEnd($okBb);
-        $context->builder->store($raw, $lineSlot);
+        $flags = self::loadLongProp($context, $obj, self::PROP_FLAGS);
+        $stripped = self::emitApplyDropNewLine($context, $raw, $flags);
+        $context->builder->store($stripped, $lineSlot);
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
         $context->builder->branch($joinBb);
 
@@ -1297,7 +1370,6 @@ final class SplFileObjectJitHelper
             );
         }
     }
-
     private static function loadPathname(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);
