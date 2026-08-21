@@ -594,24 +594,12 @@ class Type extends Builtin {
         );
         $fnStrptime = $this->context->module->addFunction('__compiler_strptime', $fntypeStrptime);
         $this->context->registerFunction('__compiler_strptime', $fnStrptime);
-        $f64 = $this->context->getTypeFromString('double');
-        $fntypeDiFmt = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $i64,
-            $i64,
-            $i64,
-            $i64,
-            $i64,
-            $i64,
-            $f64,
-            $i64,
-            $i64,
-            $i64,
-            $strPtr
-        );
-        $fnDiFmt = $this->context->module->addFunction('__compiler_date_interval_format', $fntypeDiFmt);
-        $this->context->registerFunction('__compiler_date_interval_format', $fnDiFmt);
+        // __compiler_date_interval_format always-on shell removed (#33203):
+        // DateIntervalFormatRuntime owns the ABI (getNamedFunction first via
+        // implementFormatBridge; Type::initialize still DateIntervalFormatRuntime::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint date_interval_format.1
+        // (#31894 / #32122). User-script date_interval_format() stays JitDateIntervalFormat
+        // / DateIntervalFormatJitHelper (php-src ext/date/php_date.c).
         // __compiler_idate always-on shell removed (#32250): user-script idate()
         // stays JitIdate IR / IdateJitHelper (#26900). StringIdate::implement()
         // is an intentional no-op.

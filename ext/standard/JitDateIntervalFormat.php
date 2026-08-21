@@ -18,7 +18,10 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for date_interval_format() (#7278 phase 2, ext/date/php_date.c).
+ * LLVM lowering for date_interval_format() (#7278 phase 2, #33203, ext/date/php_date.c).
+ *
+ * Calls DateIntervalFormatRuntime::ensureLinked before ABI lookup (Type no longer
+ * always-declares __compiler_date_interval_format — #33203 / #32122 class).
  */
 final class JitDateIntervalFormat
 {

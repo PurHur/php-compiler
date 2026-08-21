@@ -9,9 +9,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_date_interval_format via DateIntervalFormatJitHelper PHP (#9499, #25121).
+ * JIT/AOT link for __compiler_date_interval_format via DateIntervalFormatJitHelper PHP (#9499, #25121, #33203).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer TimezoneOffset #25042 / Mktime #25116).
+ * Declares module-locally (getNamedFunction first) so leftover Type empty decls cannot mint
+ * date_interval_format.1 (#31894 / #32122 / #33203).
  * Thin LLVM bridge forwards the ABI. php-src: ext/date/php_date.c — PHP_FUNCTION(date_interval_format)
  */
 final class DateIntervalFormatRuntime
