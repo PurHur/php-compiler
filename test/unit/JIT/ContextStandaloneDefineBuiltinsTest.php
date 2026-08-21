@@ -30,6 +30,16 @@ final class ContextStandaloneDefineBuiltinsTest extends TestCase
             (string) \file_get_contents($root.'/ext/standard/JitFtell.php'),
             '#13137'
         );
+        $this->assertStringContainsString(
+            'StreamReadRuntime::ensureLinked',
+            (string) \file_get_contents($root.'/ext/standard/JitFlock.php'),
+            '#33113'
+        );
+        $this->assertStringContainsString(
+            'StreamReadRuntime::ensureLinked',
+            (string) \file_get_contents($root.'/ext/standard/JitFpassthru.php'),
+            '#33113'
+        );
     }
 
     public function testLazyLinkDefinesBootstrapCompileAbiSymbols(): void

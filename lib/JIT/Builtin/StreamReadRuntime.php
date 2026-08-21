@@ -153,9 +153,9 @@ final class StreamReadRuntime
     }
 
     /**
-     * Thin AOT: libc FILE* fgets/fseek/ftell/stream_get_contents matching JitStreamIoKernel
-     * fopen/fwrite (#27663, #27437). NestedJIT StreamReadJitHelper→VmFs cannot see the libc
-     * handle table (php://memory is tmpfile()), so force the ABI after NestedJIT.
+     * Thin AOT: libc FILE* fgets/fseek/ftell/stream_get_contents/flock/fpassthru matching
+     * JitStreamIoKernel fopen/fwrite (#27663, #27437, #33122). NestedJIT StreamReadJitHelper→VmFs
+     * cannot see the libc handle table (php://memory is tmpfile()), so force the ABI after NestedJIT.
      */
     public static function forceLibcStreamPositionAbis(Context $context): void
     {
@@ -163,6 +163,8 @@ final class StreamReadRuntime
         \PHPCompiler\ext\standard\JitStreamIoKernel::implementFseekForce($context);
         \PHPCompiler\ext\standard\JitStreamIoKernel::implementFtellForce($context);
         \PHPCompiler\ext\standard\JitStreamIoKernel::implementStreamGetContentsForce($context);
+        \PHPCompiler\ext\standard\JitStreamIoKernel::implementFlockForce($context);
+        \PHPCompiler\ext\standard\JitStreamIoKernel::implementFpassthruForce($context);
     }
 
     public static function helperFunction(Context $context, string $logical): LlvmFunction
