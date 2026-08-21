@@ -44,6 +44,7 @@ use PHPLLVM\Value;
  * openssl_cms_read() (#33460 leftover of #6592);
  * openssl_cms_verify() (#33464 leftover of #6592);
  * openssl_cms_sign() (#33467 leftover of #6592);
+ * openssl_cms_encrypt() (#33472 leftover of #6592);
  * openssl_pkcs7_verify() (#33466 leftover of #6804);
  * openssl_pkcs7_sign() (#33471 leftover of #6804);
  * openssl_seal() / openssl_open() (#32979 leftover of #6523).
@@ -77,6 +78,7 @@ use PHPLLVM\Value;
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_cms_read) / PEM_read_bio_CMS / CMS_get1_certs
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_cms_verify) / CMS_verify
  * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_cms_sign) / CMS_sign
+ * php-src: ext/openssl/openssl.c — PHP_FUNCTION(openssl_cms_encrypt) / CMS_encrypt
  *
  * Thin-standalone AOT has no PHP FFI, so NestedJIT of {@see VmOpensslX509Native} cannot
  * call `$ffi->X509_free()` (peer JitOpensslError / #32336). Bake results in the
@@ -1420,6 +1422,216 @@ final class JitOpensslX509
      *
      * Default flags match VM: PKCS7_DETACHED when omitted. Optional untrusted path is
      * type-checked only (VM {@see VmOpenssl::pkcs7Sign} ignores it).
+     */
+    /**
+     * openssl_cms_encrypt() — bake {@see VmOpensslCmsNative::encrypt}, write CMS via
+     * {@see StringFilePutContents} / __compiler_file_put_contents.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_cms_encrypt) / CMS_encrypt
+     *
+     * Input/output paths, recipient certificate PEM(s) or path(s), headers, flags, encoding,
+     * and cipher must be compile-time literals (thin AOT has no PHP FFI). Encrypt runs in the
+     * compiler process; the ciphertext blob is emitted at runtime (peer {@see self::cmsSign}).
+     *
+     * $certificate may be a single string literal or a compile-time list of string literals
+     * (peer VM {@see VmOpenssl::coerceRecipientCertPems}).
+     */
+    public static function cmsEncrypt(
+        Context $context,
+        JITVariable $input,
+        JITVariable $output,
+        JITVariable $certificate,
+        JITVariable $headers,
+        ?JITVariable $flags = null,
+        ?JITVariable $encoding = null,
+        ?JITVariable $cipherAlgo = null
+    ): Value {
+        $inputPath = JitStringArg::compileTimeLiteral($input);
+        if (null === $inputPath) {
+            throw new \LogicException(
+                'openssl_cms_encrypt() input_filename must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33472)'
+            );
+        }
+        $outputPath = JitStringArg::compileTimeLiteral($output);
+        if (null === $outputPath) {
+            throw new \LogicException(
+                'openssl_cms_encrypt() output_filename must be a compile-time string literal '
+                .'for JIT/AOT in this compiler build (issue #33472)'
+            );
+        }
+
+        $certMaterials = null;
+        $single = JitStringArg::compileTimeLiteral($certificate);
+        if (null !== $single) {
+            $certMaterials = [$single];
+        } else {
+            $list = self::compileTimeStringList($certificate);
+            if (null !== $list && [] !== $list) {
+                $certMaterials = $list;
+            }
+        }
+        if (null === $certMaterials) {
+            throw new \LogicException(
+                'openssl_cms_encrypt() certificate must be a compile-time string literal or string array '
+                .'for JIT/AOT in this compiler build (issue #33472)'
+            );
+        }
+
+        $headerLines = [];
+        if (null !== $headers && !NamedOptionalCallArgs::isOmittedOptional($headers)
+            && !(JITVariable::TYPE_NULL === $headers->type || ($headers->isNullConstant ?? false))
+        ) {
+            $parsedHeaders = self::compileTimeStringList($headers);
+            if (null === $parsedHeaders) {
+                if (!($headers->compileTimeEmptyArrayLiteral ?? false)
+                    && !self::compileTimeOptionsOk($headers)
+                ) {
+                    throw new \LogicException(
+                        'openssl_cms_encrypt() headers must be omit/null/compile-time array '
+                        .'for JIT/AOT in this compiler build (issue #33472)'
+                    );
+                }
+                $parsedHeaders = [];
+            }
+            $headerLines = $parsedHeaders;
+        }
+        /** @var list<array{0: ?string, 1: string}> $bakedHeaders */
+        $bakedHeaders = [];
+        foreach ($headerLines as $line) {
+            $bakedHeaders[] = [null, $line];
+        }
+
+        $flagsVal = 0;
+        if (null !== $flags && !NamedOptionalCallArgs::isOmittedOptional($flags)) {
+            $parsed = self::compileTimeInt($flags);
+            if (null === $parsed) {
+                throw new \LogicException(
+                    'openssl_cms_encrypt() flags must be a compile-time int '
+                    .'for JIT/AOT in this compiler build (issue #33472)'
+                );
+            }
+            $flagsVal = $parsed;
+        }
+
+        $encodingVal = OpensslConstants::OPENSSL_ENCODING_SMIME;
+        if (null !== $encoding && !NamedOptionalCallArgs::isOmittedOptional($encoding)) {
+            $parsedEnc = self::compileTimeInt($encoding);
+            if (null === $parsedEnc) {
+                throw new \LogicException(
+                    'openssl_cms_encrypt() encoding must be a compile-time int '
+                    .'for JIT/AOT in this compiler build (issue #33472)'
+                );
+            }
+            $encodingVal = $parsedEnc;
+        }
+
+        $cipherVal = OpensslConstants::OPENSSL_CIPHER_AES_128_CBC;
+        if (null !== $cipherAlgo && !NamedOptionalCallArgs::isOmittedOptional($cipherAlgo)) {
+            $parsedCipher = self::compileTimeInt($cipherAlgo);
+            if (null === $parsedCipher) {
+                throw new \LogicException(
+                    'openssl_cms_encrypt() cipher_algo must be a compile-time int '
+                    .'for JIT/AOT in this compiler build (issue #33472)'
+                );
+            }
+            $cipherVal = $parsedCipher;
+        }
+
+        if (!VmOpensslCmsNative::available()) {
+            return self::boxedFalse($context);
+        }
+
+        $resolved = [];
+        foreach ($certMaterials as $material) {
+            $pem = VmOpenssl::resolvePemMaterial($material, 'openssl_cms_encrypt');
+            if (false === $pem) {
+                return self::boxedFalse($context);
+            }
+            $resolved[] = $pem;
+        }
+
+        $bakeOut = tempnam(sys_get_temp_dir(), 'phpc_cms_enc_');
+        if (false === $bakeOut) {
+            return self::boxedFalse($context);
+        }
+
+        $cipherBytes = null;
+        try {
+            $ok = VmOpensslCmsNative::encrypt(
+                $inputPath,
+                $bakeOut,
+                $resolved,
+                $bakedHeaders,
+                $flagsVal,
+                $encodingVal,
+                $cipherVal
+            );
+            if (!$ok || !is_file($bakeOut)) {
+                return self::boxedFalse($context);
+            }
+            $cipherBytes = (string) file_get_contents($bakeOut);
+        } finally {
+            if (is_file($bakeOut)) {
+                @unlink($bakeOut);
+            }
+        }
+
+        StringFilePutContents::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $id = (string) (++self::$blockSerial);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $failBlock = BasicBlockHelper::append($context, 'ossl_cms_encrypt_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'ossl_cms_encrypt_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_cms_encrypt_done_'.$id);
+
+        $pathStr = $context->builder->load($context->constantStringFromString($outputPath));
+        $dataStr = $context->builder->load($context->constantStringFromString($cipherBytes));
+        $dataOwned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $dataStr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('__compiler_file_put_contents'),
+            $pathStr,
+            $dataOwned,
+            $i64->constInt(0, false)
+        );
+        $failed = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_SLT,
+            $written,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
+    /**
+     * openssl_pkcs7_verify() — bake {@see VmOpensslPkcs7Native::verify}.
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkcs7_verify) / PKCS7_verify
+     *
+     * Input path, flags, and optional content/signers paths must be compile-time literals
+     * (thin AOT has no PHP FFI). Verify runs in the compiler process; content and signers
+     * PEMs are emitted via {@see StringFilePutContents} at runtime when those paths are
+     * provided (peer {@see self::cmsVerify} / {@see self::exportToFile}).
+     *
+     * $ca_info / $untrusted / unused trailing path args are type-checked only (VM peer
+     * ignores them in {@see VmOpenssl::pkcs7Verify}).
+     *
+     * Return shape matches php-src: true / false / -1 (error).
      */
     public static function pkcs7Sign(
         Context $context,
