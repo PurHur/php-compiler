@@ -23,10 +23,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263, #33274, #33276, #33280, #33289).
+ * Thin-AOT DirectoryIterator / FilesystemIterator / SplFileInfo — snapshot + path props
+ * (#27289, #33263, #33274, #33276, #33280, #33289, #33290).
  *
- * Construct lists directory entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}
- * (NestedJIT leaf calling DirHandleJitHelper only — StringDir already linked).
+ * DirectoryIterator construct lists entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}.
+ * SplFileInfo construct splits pathname via call-site {@see JitPath} (#33290).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
  * isFile/isDir/getPath/getPathname/getSize/getExtension/getType/getLinkTarget join `__dir_path`+`__filename`.
  *
@@ -84,6 +85,36 @@ final class DirectoryIteratorJitHelper
         self::storeLongPropertyValue($context, $obj, $className, self::PROP_FLAGS, $flags);
         self::storeLongPropertyValue($context, $obj, $className, self::PROP_POS, $i64->constInt(0, false));
         self::syncFilenameFromPos($context, $obj, $className);
+        $objectType->markObjectConstructed($obj);
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * SplFileInfo::__construct($filename) — split into `__dir_path` + `__filename` (#33290).
+     * php-src: zim_SplFileInfo___construct / spl_filesystem_info_set_filename
+     */
+    public static function compileSplFileInfoConstruct(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $pathArg
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $objectType = $context->type->object;
+        $pathStr = self::loadString($context, $pathArg);
+        // Call-site LLVM (JitPath) — NestedJIT PathJitHelper / string-index helpers segfault
+        // under thin AOT (#26905 / #33290). SplFileInfoStorage empty-path vs dirname(".") :
+        // when basename length equals pathname length there is no directory component.
+        $namePtr = JitPath::basename($context, $pathStr);
+        $dirPtr = JitPath::dirname($context, $pathStr);
+        $i64 = $context->getTypeFromString('int64');
+        $pathLen = $context->builder->call($context->lookupFunction('__string__strlen'), $pathStr);
+        $nameLen = $context->builder->call($context->lookupFunction('__string__strlen'), $namePtr);
+        $noDir = $context->builder->icmp(Builder::INT_EQ, $pathLen, $nameLen);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $dirOut = $context->builder->select($noDir, $empty, $dirPtr);
+        self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_PATH, $dirOut);
+        self::storeStringProperty($context, $obj, 'SplFileInfo', self::PROP_FILENAME, $namePtr);
         $objectType->markObjectConstructed($obj);
 
         return self::voidResult($context);
