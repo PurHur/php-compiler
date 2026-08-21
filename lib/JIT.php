@@ -15111,11 +15111,14 @@ class JIT {
     }
 
     /**
-     * Stamp importNode($src) tag/inner on the result so appendChild can refresh C14N (#32987).
+     * Stamp importNode($src, $deep) tag/inner on the result so appendChild can refresh C14N (#32987).
      *
      * Thin-AOT importNode materializes a user-script element but the ASSIGN result Variable
      * previously had no compileTimeDom* metadata — ParentNode sync then skipped the child
      * and left the fold on the pre-mutation loadXML literal.
+     *
+     * `$deep` must gate InnerXml: shallow importNode must not re-stamp source children
+     * onto the result (php-src xmlDocCopyNode deep=0; #33097).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -15135,9 +15138,19 @@ class JIT {
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
+        $deep = false;
+        $deepArg = $callArgs[2] ?? null;
+        if ($deepArg instanceof Variable) {
+            if (null !== $deepArg->compileTimeLong) {
+                $deep = 0 !== $deepArg->compileTimeLong;
+            } elseif (null !== $deepArg->compileTimeString) {
+                $deep = '1' === $deepArg->compileTimeString
+                    || 'true' === strtolower($deepArg->compileTimeString);
+            }
+        }
         $resultVar = $this->context->getVariableFromOp($result);
         $resultVar->compileTimeDomTagName = $tag;
-        $resultVar->compileTimeDomInnerXml = $src->compileTimeDomInnerXml ?? '';
+        $resultVar->compileTimeDomInnerXml = $deep ? ($src->compileTimeDomInnerXml ?? '') : '';
         // Imported node is owned by the destination document — do not keep the source
         // document's loadXML stamp (C14N / refresh must use the append receiver).
         $resultVar->compileTimeDomLoadXml = null;
