@@ -73,6 +73,13 @@ final class JitDomReplaceChild
 
             $context->builder->positionAtEnd($bbEnd);
 
+            // Dual-emit runs invokeDocumentReplace *and* syncUserScriptReplaceSlots at
+            // compile time. refreshCompileTimeXmlReplaceRoot rewrites every
+            // compileTimeDomLoadXml binding to the replacement outer markup (#33379),
+            // which poisons DOMElement::replaceChild saveXML to just <x/>. Force the
+            // mutated flag after both arms so saveXML serializes from live slots.
+            JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+
             return $context->builder->load($resultSlot);
         }
 
@@ -175,19 +182,17 @@ final class JitDomReplaceChild
         DomUserScriptElementCacheLlvm::invalidateIfElement($context, $oldChild);
         DomUserScriptPinnedRootLlvm::pin($context, $newChild);
 
-        // saveXML replays lastCompileTimeXml after loadXML — replace the root markup (#33379).
+        // Do NOT call refreshCompileTimeXmlReplaceRoot here: dual-path emit lowers this
+        // arm even when the runtime parent is a DOMElement, and that helper rewrites
+        // every compileTimeDomLoadXml binding to the new root outer (poisoning element
+        // replaceChild saveXML). Store InnerXml on the new root and mark mutated so
+        // saveXML dumps pinned documentElement slots (#33379 / element peer).
         $newTag = $newChildVar->compileTimeDomTagName ?? null;
+        $newInner = $newChildVar->compileTimeDomInnerXml ?? '';
         if (null !== $newTag && '' !== $newTag) {
-            $newInner = $newChildVar->compileTimeDomInnerXml ?? '';
-            $outer = '' === $newInner
-                ? '<'.$newTag.'/>'
-                : '<'.$newTag.'>'.$newInner.'</'.$newTag.'>';
-            JitDomLoadXMLUserScript::refreshCompileTimeXmlReplaceRoot($outer, $documentVar);
             JitDomCreateElement::storeUserScriptInnerXml($context, $newChild, $newInner);
-        } else {
-            JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
-            JitDomLoadXMLUserScript::clearCompileTimeXmlForDocumentReplace();
         }
+        JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_doc_rc_post');
 

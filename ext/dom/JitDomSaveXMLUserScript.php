@@ -42,8 +42,13 @@ final class JitDomSaveXMLUserScript
         }
 
         $xmlLit = JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xmlLit || '' === trim($xmlLit)) {
-            // No loadXML literal: dump documentElement slots (createElement+appendChild).
+        // replaceChild dual-path marks mutated so we must not replay a fold that may
+        // have been rewritten by the speculative document arm (#33379 element poison).
+        if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()
+            || null === $xmlLit
+            || '' === trim($xmlLit)
+        ) {
+            // No loadXML literal / tree mutated: dump documentElement slots.
             // NestedJIT DomSaveXMLRuntime SIGSEGVs after c:main_before_php (#32361).
             return self::trySerializeDocumentFromSlots($context);
         }
