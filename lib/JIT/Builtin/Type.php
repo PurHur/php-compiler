@@ -246,9 +246,11 @@ class Type extends Builtin {
         // implementIfMissing; Type::initialize still StreamSync::ensureLinked). Leftover
         // Type empty decls vs Runtime ABI drift mint fsync.1 (#31894 / #32122). User-script
         // fsync() stays StreamSync / JitStreamSyncKernel (libc after stream resolve).
-        $fntypeFdatasync = $this->context->context->functionType($i32, false, $i64);
-        $fnFdatasync = $this->context->module->addFunction('__compiler_fdatasync', $fntypeFdatasync);
-        $this->context->registerFunction('__compiler_fdatasync', $fnFdatasync);
+        // __compiler_fdatasync always-on shell removed (#33123): StreamSync / JitStreamSyncKernel
+        // owns the ABI (getNamedFunction first, then addFunction if absent via
+        // implementIfMissing; Type::initialize still StreamSync::ensureLinked). Leftover
+        // Type empty decls vs Runtime ABI drift mint fdatasync.1 (#31894 / #32122). User-script
+        // fdatasync() stays StreamSync / JitStreamSyncKernel (libc after stream resolve).
         $fntypeStreamSetChunkSize = $this->context->context->functionType($i64, false, $i64, $i64);
         $fnStreamSetChunkSize = $this->context->module->addFunction('__compiler_stream_set_chunk_size', $fntypeStreamSetChunkSize);
         $this->context->registerFunction('__compiler_stream_set_chunk_size', $fnStreamSetChunkSize);
