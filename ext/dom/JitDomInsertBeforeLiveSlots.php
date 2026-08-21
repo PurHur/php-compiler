@@ -13,7 +13,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT LLVM slot sync for DOMNode::insertBefore() (#32801).
+ * Thin-AOT LLVM slot sync for DOMNode::insertBefore() (#32801, #33312).
  *
  * Peer {@see JitDomAppendChildLiveSlots} / {@see JitDomReplaceChildLiveSlots} /
  * {@see JitDomRemoveChildLiveSlots}: splice newChild before refChild; refresh the
@@ -22,6 +22,7 @@ use PHPLLVM\Value;
  *
  * Prior path always allocated a fresh length=2 list (item0=new, item1=ref),
  * leaving held lists stale and refetch collapsed to 2 (#32801 / re-#32784).
+ * DocumentFragment stand-ins expand children before $refChild (#33312).
  *
  * Reference: php-src ext/dom/node.c dom_node_insert_before.
  */
@@ -34,6 +35,44 @@ final class JitDomInsertBeforeLiveSlots
         Value $refChild
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_live_slots');
+        self::ensureLayout($context);
+        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
+
+        $bbFrag = BasicBlockHelper::append($context, 'dom_ib_frag');
+        $bbNormal = BasicBlockHelper::append($context, 'dom_ib_normal');
+        $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
+        $isFrag = JitDomAppendChildLiveSlots::isDocumentFragmentNode($context, $newChild);
+        $context->builder->branchIf($isFrag, $bbFrag, $bbNormal);
+
+        $context->builder->positionAtEnd($bbFrag);
+        JitDomAppendChildLiveSlots::expandFragmentChildrenInsertBefore(
+            $context,
+            $parent,
+            $newChild,
+            $refChild
+        );
+        $context->builder->branch($bbSyncEnd);
+
+        $context->builder->positionAtEnd($bbNormal);
+        self::syncNonFragment($context, $parent, $newChild, $refChild);
+        $context->builder->branch($bbSyncEnd);
+
+        $context->builder->positionAtEnd($bbSyncEnd);
+    }
+
+    /**
+     * insertBefore one non-fragment child (#32801 / #33312).
+     *
+     * Fragment expand must call this — not {@see sync} — so codegen does not
+     * re-enter expand via the dead fragment IR arm.
+     */
+    public static function syncNonFragment(
+        Context $context,
+        Value $parent,
+        Value $newChild,
+        Value $refChild
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_nonfrag');
         self::ensureLayout($context);
         JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
 
