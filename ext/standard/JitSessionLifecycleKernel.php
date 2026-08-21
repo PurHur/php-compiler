@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT LLVM for session lifecycle (#5332, #5750, #6968, #9446, #19896, #21564).
+ * JIT/AOT LLVM for session lifecycle (#5332, #5750, #6968, #9446, #19896, #21564, #33261).
  *
  * Quarantined from lib/JIT/Builtin/SessionLifecycleRuntime —
  * {@see \PHPCompiler\JIT\Builtin\SessionLifecycleRuntime} stays the thin orchestrator.
@@ -25,10 +25,26 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * legacy C-symbol forwarder / embed-only simplified stubs (#21564).
  * Replaces lib/AOT/runtime/phpc_session_lifecycle.c. php-src: ext/session/session.c
  * `__phpc_session_generate_new_id` routes through SessionCreateIdJitHelper PHP (#9500).
+ *
+ * Owns lifecycle ABI decls module-locally (`getNamedFunction` first via
+ * {@see declareSessionLifecycleAbis}) — do not re-add empty always-on shells in
+ * {@see \PHPCompiler\JIT\Builtin\Type} (#31894 / #32122 / #33261).
  */
 final class JitSessionLifecycleKernel
 {
     private const G_SG_SESSION = 'sg_SESSION';
+
+    /** @var list<string> */
+    private const LIFECYCLE_ABI_FUNCTIONS = [
+        '__phpc_session_start_apply',
+        '__phpc_session_write_close_apply',
+        '__phpc_session_generate_new_id',
+        '__phpc_session_regenerate_id_apply',
+        '__phpc_session_destroy_apply',
+        '__phpc_session_abort_apply',
+        '__phpc_session_reset_apply',
+        '__phpc_session_unset_apply',
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -44,6 +60,38 @@ final class JitSessionLifecycleKernel
         self::implementStandaloneAbort($context);
         self::implementStandaloneReset($context);
         self::implementStandaloneUnset($context);
+    }
+
+    /**
+     * Module-local empty decls for Type::register (#33261).
+     * Bodies come from {@see ensureLinked}.
+     */
+    public static function declareSessionLifecycleAbis(Context $context): void
+    {
+        $void = $context->getTypeFromString('void');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i8 = $context->getTypeFromString('int8');
+        $applyFt = $context->context->functionType($void, false, $valuePtr);
+
+        foreach (self::LIFECYCLE_ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe) {
+                $context->registerFunction($abiName, $probe);
+                continue;
+            }
+            $ft = match ($abiName) {
+                '__phpc_session_generate_new_id' => $context->context->functionType($void, false),
+                '__phpc_session_regenerate_id_apply' => $context->context->functionType(
+                    $void,
+                    false,
+                    $valuePtr,
+                    $i8
+                ),
+                default => $applyFt,
+            };
+            $fn = $context->module->addFunction($abiName, $ft);
+            $context->registerFunction($abiName, $fn);
+        }
     }
 
     private static function implementGenerateNewId(Context $context): void

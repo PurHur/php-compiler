@@ -630,10 +630,6 @@ class Type extends Builtin {
         // strerror(3) — SocketErrorRuntime::ensureStrerrorLibc / JitFtok::ensureWarningLibc.
         // getpwuid(3)+geteuid(2) — JitGetCurrentUser::ensureLibcGeteuid/Getpwuid (#32217).
         // Dead calendar/sleep/getloadavg already dropped (#32173). Keep exit/abort.
-        $void = $this->context->getTypeFromString('void');
-        $strPtr = $this->context->getTypeFromString('__string__*');
-        $i32 = $this->context->getTypeFromString('int32');
-        $i64 = $this->context->getTypeFromString('int64');
         // __compiler_preg_split always-on shell removed (#33199): StringPregMatch /
         // PregMatchRuntime owns the ABI (getNamedFunction first via implementSplitBridge;
         // Type::initialize still StringPregMatch::ensureLinked). Leftover Type empty decls
@@ -673,8 +669,6 @@ class Type extends Builtin {
         // Type empty decls vs Runtime ABI drift mint str_getcsv.1 (#31894 / #32122).
         // User-script str_getcsv() stays JitStrGetcsv / CsvStrGetcsvJitHelper
         // (php-src ext/standard/file.c — PHP_FUNCTION(str_getcsv)).
-        $valuePtr = $this->context->getTypeFromString('__value__*');
-        $i64 = $this->context->getTypeFromString('int64');
         // __phpc_parse_url_component / __phpc_parse_url_assoc always-on shells removed (#33236):
         // ParseUrlRuntime owns the ABI (getNamedFunction first via implementIfMissing +
         // scopeLoweringToFunction #33226; Type::initialize still ParseUrlRuntime::ensureLinked;
@@ -693,98 +687,14 @@ class Type extends Builtin {
         // (php-src ext/date/php_date.c / ext/standard/basic_functions.c).
         // __phpc_response_headers_flush / __phpc_setcookie_add covered by
         // PendingHeadersRuntime::declarePendingHeaderAbis above (#33255).
-        $fntypeSessionApply = $this->context->context->functionType($void, false, $valuePtr);
-        $fnSessionStart = $this->context->module->addFunction('__phpc_session_start_apply', $fntypeSessionApply);
-        $this->context->registerFunction('__phpc_session_start_apply', $fnSessionStart);
-        $fnSessionWriteClose = $this->context->module->addFunction(
-            '__phpc_session_write_close_apply',
-            $fntypeSessionApply
-        );
-        $this->context->registerFunction('__phpc_session_write_close_apply', $fnSessionWriteClose);
-        $fnSessionGenerateId = $this->context->module->addFunction(
-            '__phpc_session_generate_new_id',
-            $this->context->context->functionType($void, false)
-        );
-        $this->context->registerFunction('__phpc_session_generate_new_id', $fnSessionGenerateId);
-        $fnSessionRegenerate = $this->context->module->addFunction(
-            '__phpc_session_regenerate_id_apply',
-            $this->context->context->functionType(
-                $void,
-                false,
-                $valuePtr,
-                $this->context->getTypeFromString('int8')
-            )
-        );
-        $this->context->registerFunction('__phpc_session_regenerate_id_apply', $fnSessionRegenerate);
-        $fnSessionDestroy = $this->context->module->addFunction(
-            '__phpc_session_destroy_apply',
-            $fntypeSessionApply
-        );
-        $this->context->registerFunction('__phpc_session_destroy_apply', $fnSessionDestroy);
-        $fnSessionAbort = $this->context->module->addFunction(
-            '__phpc_session_abort_apply',
-            $fntypeSessionApply
-        );
-        $this->context->registerFunction('__phpc_session_abort_apply', $fnSessionAbort);
-        $fnSessionReset = $this->context->module->addFunction(
-            '__phpc_session_reset_apply',
-            $fntypeSessionApply
-        );
-        $this->context->registerFunction('__phpc_session_reset_apply', $fnSessionReset);
-        $fnSessionCreateId = $this->context->module->addFunction(
-            '__phpc_session_create_id_apply',
-            $this->context->context->functionType($void, false, $valuePtr, $strPtr)
-        );
-        $this->context->registerFunction('__phpc_session_create_id_apply', $fnSessionCreateId);
-        $fnSessionCreateIdBoxed = $this->context->module->addFunction(
-            '__phpc_session_create_id_apply_boxed',
-            $this->context->context->functionType($void, false, $valuePtr, $valuePtr)
-        );
-        $this->context->registerFunction('__phpc_session_create_id_apply_boxed', $fnSessionCreateIdBoxed);
-        $fnSessionRandomId = $this->context->module->addFunction(
-            'phpc_session_random_id_string',
-            $this->context->context->functionType($strPtr, false)
-        );
-        $this->context->registerFunction('phpc_session_random_id_string', $fnSessionRandomId);
-        $fnSessionGcApply = $this->context->module->addFunction(
-            '__phpc_session_gc_apply',
-            $fntypeSessionApply
-        );
-        $this->context->registerFunction('__phpc_session_gc_apply', $fnSessionGcApply);
-        $fnSessionGcExpired = $this->context->module->addFunction(
-            'phpc_session_gc_expired_files',
-            $this->context->context->functionType($this->context->getTypeFromString('int64'), false)
-        );
-        $this->context->registerFunction('phpc_session_gc_expired_files', $fnSessionGcExpired);
-        $fnSessionUnset = $this->context->module->addFunction(
-            '__phpc_session_unset_apply',
-            $fntypeSessionApply
-        );
-        $this->context->registerFunction('__phpc_session_unset_apply', $fnSessionUnset);
-        $fnSessionEncode = $this->context->module->addFunction(
-            '__phpc_session_encode_apply',
-            $fntypeSessionApply
-        );
-        $this->context->registerFunction('__phpc_session_encode_apply', $fnSessionEncode);
-        $fnSessionDecode = $this->context->module->addFunction(
-            '__phpc_session_decode_apply',
-            $this->context->context->functionType($void, false, $valuePtr, $strPtr)
-        );
-        $this->context->registerFunction('__phpc_session_decode_apply', $fnSessionDecode);
-        $fnSessionEncodeWire = $this->context->module->addFunction(
-            'phpc_session_encode_wire',
-            $this->context->context->functionType($strPtr, false, $this->context->getTypeFromString('__hashtable__*'))
-        );
-        $this->context->registerFunction('phpc_session_encode_wire', $fnSessionEncodeWire);
-        $fnSessionDecodeWire = $this->context->module->addFunction(
-            'phpc_session_decode_wire',
-            $this->context->context->functionType(
-                $this->context->getTypeFromString('__hashtable__*'),
-                false,
-                $strPtr
-            )
-        );
-        $this->context->registerFunction('phpc_session_decode_wire', $fnSessionDecodeWire);
+        // __phpc_session_*_apply / phpc_session_* always-on shells removed (#33261):
+        // SessionLifecycleRuntime / JitSessionLifecycleKernel / SessionCreateIdRuntime /
+        // SessionGcRuntime / SessionEncodeRuntime own the ABI (getNamedFunction first via
+        // declareSessionAbis; Type::initialize still SessionLifecycleRuntime::ensureLinked
+        // on the full load path; thin AOT call-site ensureLinked before lookup). Leftover
+        // Type empty decls vs Runtime ABI drift mint session_*.1 (#31894 / #32122).
+        // User-script session_*() stay JitSession* / VmSession (php-src ext/session/session.c).
+        SessionLifecycleRuntime::declareSessionAbis($this->context);
         // Before NestedJIT: SessionStartOptionsRuntime helpers coerce scalars and
         // emitObjectScalarWarning looks up __compiler_trigger_error (#33248).
         StringTriggerError::ensureLinked($this->context);

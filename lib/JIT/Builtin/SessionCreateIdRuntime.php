@@ -14,11 +14,15 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for session_create_id() via SessionCreateIdJitHelper PHP (#9500, #21941).
+ * JIT/AOT link for session_create_id() via SessionCreateIdJitHelper PHP (#9500, #21941, #33261).
  *
  * Replaces hex-table / entropy LLVM in this file; SSOT {@see \PHPCompiler\ext\standard\VmSession}.
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ProcessRuntime #21857).
  * php-src: ext/session/session.c — php_session_create_id
+ *
+ * Owns create-id ABI decls module-locally (`getNamedFunction` first via
+ * {@see declareSessionCreateIdAbis}) — do not re-add empty always-on shells in
+ * {@see Type} (#31894 / #32122 / #33261).
  *
  * Entropy: `__compiler_random_bytes` (user-script CSPRNG) + NestedJIT `sidFromEntropy`
  * — NestedJIT `\random_bytes` inside SessionCreateIdJitHelper is still near-constant (#21900 / #33023).
@@ -48,6 +52,30 @@ final class SessionCreateIdRuntime
         self::CREATE_ID,
         self::CREATE_ID_WITH_PREFIX,
     ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        'phpc_session_random_id_string',
+        '__phpc_session_create_id_apply',
+        '__phpc_session_create_id_apply_boxed',
+    ];
+
+    /**
+     * Module-local empty decls for Type::register (#33261).
+     * Bodies come from {@see ensureLinked}.
+     */
+    public static function declareSessionCreateIdAbis(Context $context): void
+    {
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe) {
+                $context->registerFunction($abiName, $probe);
+                continue;
+            }
+            $fn = self::addEmptyDecl($context, $abiName);
+            $context->registerFunction($abiName, $fn);
+        }
+    }
 
     public static function ensureLinked(Context $context): void
     {
@@ -106,12 +134,23 @@ final class SessionCreateIdRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            $context->registerFunction($name, $probe);
+
+            return $probe;
+        }
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
             // fall through
         }
 
+        return self::addEmptyDecl($context, $name);
+    }
+
+    private static function addEmptyDecl(Context $context, string $name): LlvmFunction
+    {
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         $void = $context->getTypeFromString('void');
