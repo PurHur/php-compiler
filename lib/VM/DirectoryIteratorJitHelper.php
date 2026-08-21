@@ -18,12 +18,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263).
+ * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263, #33274, #33276).
  *
  * Construct lists directory entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}
  * (NestedJIT leaf calling DirHandleJitHelper only — StringDir already linked).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
- * isFile/isDir join `__dir_path`+`__filename` then {@see \PHPCompiler\ext\standard\JitStat}.
+ * isFile/isDir/getPath/getPathname/getSize join `__dir_path`+`__filename` then {@see \PHPCompiler\ext\standard\JitStat}.
  *
  * php-src: ext/spl/spl_directory.c
  */
@@ -236,6 +236,21 @@ final class DirectoryIteratorJitHelper
         );
 
         return $slot;
+    }
+
+    /**
+     * SplFileInfo::getSize — pathname then {@see JitStat::pathFileSizeBoxed} (#33276).
+     * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_getSize
+     */
+    public static function compileGetSize(Context $context, JITVariable $receiver, string $className): Value
+    {
+        StatPathRuntime::ensureLinked($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'di_getsize_after_stat_link');
+
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+
+        return JitStat::pathFileSizeBoxed($context, $pathname);
     }
 
     /**
