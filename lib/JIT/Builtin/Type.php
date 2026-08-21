@@ -221,9 +221,11 @@ class Type extends Builtin {
         $fntypeFpassthru = $this->context->context->functionType($i64, false, $i64);
         $fnFpassthru = $this->context->module->addFunction('__compiler_fpassthru', $fntypeFpassthru);
         $this->context->registerFunction('__compiler_fpassthru', $fnFpassthru);
-        $fntypeFeof = $this->context->context->functionType($i32, false, $i64);
-        $fnFeof = $this->context->module->addFunction('__compiler_feof', $fntypeFeof);
-        $this->context->registerFunction('__compiler_feof', $fnFeof);
+        // __compiler_feof always-on shell removed (#33080): JitStreamLifecycleKernel owns
+        // the ABI (getNamedFunction first, then addFunction if absent via
+        // implementIfMissing; Type::initialize still StreamLifecycle::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint feof.1 (#31894 / #32122).
+        // User-script feof() stays JitFeof / StreamLifecycleJitHelper.
         $fntypeFsync = $this->context->context->functionType($i32, false, $i64);
         $fnFsync = $this->context->module->addFunction('__compiler_fsync', $fntypeFsync);
         $this->context->registerFunction('__compiler_fsync', $fnFsync);
