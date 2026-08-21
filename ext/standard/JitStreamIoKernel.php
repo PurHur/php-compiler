@@ -227,6 +227,14 @@ final class JitStreamIoKernel
                 $name,
                 $context->context->functionType($i64, false, $i64)
             ),
+            '__compiler_fgetc' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($strPtr, false, $i64)
+            ),
+            '__compiler_ftruncate' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i32, false, $i64, $i64)
+            ),
             '__compiler_stream_supports' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i32, false, $i64, $i64)
@@ -288,6 +296,9 @@ final class JitStreamIoKernel
             ['close', $i32, [$i32]],
             ['fileno', $i32, [$i8p]],
             ['flock', $i32, [$i32, $i32]],
+            ['fgetc', $i32, [$i8p]],
+            ['ftruncate', $i32, [$i32, $i64]],
+            ['fflush', $i32, [$i8p]],
             ['__compiler_stream_filter_apply_write', $strPtr, [$i64, $strPtr]],
             ['__compiler_stream_filter_apply_read', $strPtr, [$i64, $strPtr]],
         ] as [$name, $ret, $params]) {
@@ -1759,6 +1770,200 @@ final class JitStreamIoKernel
 
         $context->builder->positionAtEnd($noBb);
         $context->builder->returnValue($zeroI32);
+    }
+
+    /**
+     * Idempotent libc fgetc for thin AOT (#33133).
+     *
+     * NestedJIT StreamReadJitHelper→VmFs cannot see JitStreamIoKernel FILE* handles.
+     * Call only from forceLibcStreamPositionAbis after NestedJIT.
+     * php-src: ext/standard/file.c — PHP_FUNCTION(fgetc)
+     */
+    public static function implementFgetcForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_fgetc');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('fgetc_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_fgetc', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_fgetc');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_fgetc');
+        }
+        self::emitFgetc($context, $fn);
+        $context->registerFunction('__compiler_fgetc', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** resolve → fgetc(3) → one-byte __string__* (null on EOF/error). */
+    private static function emitFgetc(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('fgetc_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $nullPtr = $i8p->constNull();
+        $minusOne = $i32->constInt(-1, true);
+        $oneI64 = $i64->constInt(1, false);
+
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('fgetc_fail');
+        $readBb = $fn->appendBasicBlock('fgetc_read');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr),
+            $failBb,
+            $readBb
+        );
+
+        $context->builder->positionAtEnd($readBb);
+        $ch = $context->builder->call($context->lookupFunction('fgetc'), $fp);
+        $eofBb = $fn->appendBasicBlock('fgetc_eof');
+        $makeBb = $fn->appendBasicBlock('fgetc_make');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $ch, $minusOne),
+            $eofBb,
+            $makeBb
+        );
+
+        $context->builder->positionAtEnd($eofBb);
+        $context->builder->returnValue($nullStr);
+
+        $context->builder->positionAtEnd($makeBb);
+        $buf = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $sizeT->constInt(1, false)
+        );
+        $bufNull = $context->builder->icmp(Builder::INT_EQ, $buf, $nullPtr);
+        $storeBb = $fn->appendBasicBlock('fgetc_store');
+        $context->builder->branchIf($bufNull, $failBb, $storeBb);
+
+        $context->builder->positionAtEnd($storeBb);
+        $context->builder->store($context->builder->trunc($ch, $i8), $buf);
+        $result = $context->builder->call($context->lookupFunction('__string__init'), $oneI64, $buf);
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $result
+            )
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullStr);
+    }
+
+    /**
+     * Idempotent libc ftruncate for thin AOT (#33133).
+     *
+     * resolve→fileno→ftruncate(2). Call only from forceLibcStreamPositionAbis.
+     * php-src: ext/standard/file.c — PHP_FUNCTION(ftruncate)
+     */
+    public static function implementFtruncateForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_ftruncate');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('ftruncate_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_ftruncate', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_ftruncate');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_ftruncate');
+        }
+        self::emitFtruncate($context, $fn);
+        $context->registerFunction('__compiler_ftruncate', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** resolve → fileno → ftruncate(2); ABI 1 on success, 0 on failure. */
+    private static function emitFtruncate(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ftruncate_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $size = $fn->getParam(1);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $nullPtr = $i8p->constNull();
+        $zero = $i32->constInt(0, false);
+        $one = $i32->constInt(1, false);
+
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('ftruncate_fail');
+        $filenoBb = $fn->appendBasicBlock('ftruncate_fileno');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr),
+            $failBb,
+            $filenoBb
+        );
+
+        $context->builder->positionAtEnd($filenoBb);
+        $fd = $context->builder->call($context->lookupFunction('fileno'), $fp);
+        $doBb = $fn->appendBasicBlock('ftruncate_do');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $fd, $zero),
+            $failBb,
+            $doBb
+        );
+
+        $context->builder->positionAtEnd($doBb);
+        // fflush so pending fwrite buffers hit the fd before truncate (#33133).
+        $context->builder->call($context->lookupFunction('fflush'), $fp);
+        $rc = $context->builder->call($context->lookupFunction('ftruncate'), $fd, $size);
+        $context->builder->returnValue(
+            $context->builder->select(
+                $context->builder->icmp(Builder::INT_EQ, $rc, $zero),
+                $one,
+                $zero
+            )
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($zero);
     }
 
     private static function registerLinkedRuntime(Context $context): void
