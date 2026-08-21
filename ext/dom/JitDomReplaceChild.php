@@ -383,6 +383,7 @@ final class JitDomReplaceChild
      * Rebuild PROP_USER_SCRIPT_INNER_XML so saveXML keeps non-replaced siblings (#28671).
      *
      * Prior path always stored {@code <newTag/>}, dropping remaining children.
+     * createElement-only trees rely on LiveSlots sibling-chain rebuild (#33610).
      */
     private static function syncUserScriptInnerXml(
         Context $context,
@@ -440,9 +441,11 @@ final class JitDomReplaceChild
             return;
         }
 
-        // createElement-only trees / only-child: single-tag inner (legacy #27216).
-        JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $replacement);
-        JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($replacement, $parentVar);
+        // createElement-only trees: LiveSlots already rebuilt INNER_XML from the
+        // sibling chain ({@see JitDomReplaceChildLiveSlots::syncNonFragment}).
+        // Storing only <newTag/> here collapsed multi-child saveXML to the
+        // replacement alone (#33610). Only-child trees still match Zend via that
+        // rebuild (legacy #27216).
     }
 
     /** Null parent/sibling LLVM slots on the detached node (ext/dom/node.c; #19240). */
