@@ -8,22 +8,25 @@ use PHPCompiler\ext\standard\ReadlinkJitHelper;
 use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
-/** readlink() JIT routes through ReadlinkJitHelper PHP not libc readlink LLVM (#15353). */
+/**
+ * readlink() AOT success uses libc readlink(2) (#742 / #33289) — NestedJIT host
+ * `\readlink` returns false under thin standalone (peer JitStatKernel #27013).
+ */
 final class ReadlinkRuntimeShrinkTest extends TestCase
 {
-    public function testJitReadlinkUsesPhpBridgeNotLibc(): void
+    public function testJitReadlinkUsesLibcLeafForThinAot(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitReadlink.php');
-        $this->assertStringContainsString('StringReadlink::invoke', $source);
-        $this->assertStringNotContainsString("lookupFunction('readlink')", $source);
-        $this->assertStringNotContainsString('BUF_SIZE', $source);
+        $this->assertStringContainsString("lookupFunction('readlink')", $source);
+        $this->assertStringContainsString('BUF_SIZE', $source);
+        $this->assertStringContainsString('#33289', $source);
+        $this->assertStringNotContainsString('StringReadlink::invoke', $source);
     }
 
-    public function testStringReadlinkBridgeUsesReadlinkJitHelper(): void
+    public function testStringReadlinkBridgeStillPresentForSpine(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringReadlink.php');
         $this->assertStringContainsString('ReadlinkJitHelper', $bridge);
-        $this->assertStringNotContainsString("lookupFunction('readlink')", $bridge);
     }
 
     public function testReadlinkJitHelperDelegatesToVmFs(): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\JitPath;
+use PHPCompiler\ext\standard\JitReadlink;
 use PHPCompiler\ext\standard\JitStat;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\ext\standard\JitStringIndex;
@@ -22,12 +23,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263, #33274, #33276, #33280).
+ * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263, #33274, #33276, #33280, #33289).
  *
  * Construct lists directory entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}
  * (NestedJIT leaf calling DirHandleJitHelper only — StringDir already linked).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
- * isFile/isDir/getPath/getPathname/getSize/getExtension/getType join `__dir_path`+`__filename`.
+ * isFile/isDir/getPath/getPathname/getSize/getExtension/getType/getLinkTarget join `__dir_path`+`__filename`.
  *
  * php-src: ext/spl/spl_directory.c
  */
@@ -383,6 +384,23 @@ final class DirectoryIteratorJitHelper
     public static function compileGetInode(Context $context, JITVariable $receiver, string $className): Value
     {
         return self::compilePathLongStat($context, $receiver, $className, 'inode');
+    }
+
+    /**
+     * SplFileInfo::getLinkTarget — pathname then {@see JitReadlink::invoke} (#33289).
+     * php-src: zim_SplFileInfo_getLinkTarget / php_sys_readlink
+     *
+     * Uses libc readlink(2) (same leaf as userland readlink AOT). NestedJIT
+     * {@see ReadlinkJitHelper} returns false under thin standalone AOT.
+     * Failure: Zend throws RuntimeException; thin AOT returns false — same
+     * empty-heap trade-off as {@see SplHeapJitHelper::compileExtract}.
+     */
+    public static function compileGetLinkTarget(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pathname = self::emitJoinedPathname($context, $obj, $className);
+
+        return JitReadlink::invoke($context, $pathname);
     }
 
     /** @param 'size'|'mtime'|'atime'|'ctime'|'perms'|'owner'|'group'|'inode' $kind */
