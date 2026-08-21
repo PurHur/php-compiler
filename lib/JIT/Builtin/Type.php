@@ -188,6 +188,11 @@ class Type extends Builtin {
         // implementCloseBridge; Type::initialize still StreamLifecycle::ensureLinked).
         // Leftover Type empty decls vs Runtime ABI drift mint fclose.1 (#31894 / #32122).
         // User-script fclose() stays JitFclose / StreamLifecycleJitHelper.
+        // __compiler_fflush always-on shell removed (#33084): JitStreamLifecycleKernel owns
+        // the ABI (getNamedFunction first, then addFunction if absent via
+        // implementIfMissing; Type::initialize still StreamLifecycle::ensureLinked).
+        // Leftover Type empty decls vs Runtime ABI drift mint fflush.1 (#31894 / #32122).
+        // User-script fflush() stays JitFflush / StreamLifecycleJitHelper.
         $fntypePopen = $this->context->context->functionType($i64, false, $strPtr, $strPtr);
         $fnPopen = $this->context->module->addFunction('__compiler_popen', $fntypePopen);
         $this->context->registerFunction('__compiler_popen', $fnPopen);
@@ -219,9 +224,6 @@ class Type extends Builtin {
         $fntypeFeof = $this->context->context->functionType($i32, false, $i64);
         $fnFeof = $this->context->module->addFunction('__compiler_feof', $fntypeFeof);
         $this->context->registerFunction('__compiler_feof', $fnFeof);
-        $fntypeFflush = $this->context->context->functionType($i32, false, $i64);
-        $fnFflush = $this->context->module->addFunction('__compiler_fflush', $fntypeFflush);
-        $this->context->registerFunction('__compiler_fflush', $fnFflush);
         $fntypeFsync = $this->context->context->functionType($i32, false, $i64);
         $fnFsync = $this->context->module->addFunction('__compiler_fsync', $fntypeFsync);
         $this->context->registerFunction('__compiler_fsync', $fnFsync);
