@@ -55,6 +55,7 @@ use PHPLLVM\Value;
  * fgetcsv on `__spl_fd` (#33346) via JitFgetcsv (peer procedural #33334 / #1192).
  * fseek on `__spl_fd` (#33347) via JitFseek (clears iterator line cache like rewind).
  * seek (SeekableIterator line) (#33364) — rewind + read-line loop + key bump.
+ * setFlags/getFlags on `__spl_flags` (#33368).
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
@@ -62,7 +63,7 @@ use PHPLLVM\Value;
  * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_ftruncate /
  * zim_SplFileObject_fflush / zim_SplFileObject_fpassthru / zim_SplFileObject_fputcsv /
  * zim_SplFileObject_fgetcsv / zim_SplFileObject_fseek / zim_SplFileObject_seek /
- * zim_SplFileInfo_openFile
+ * zim_SplFileObject_setFlags / zim_SplFileObject_getFlags / zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -81,6 +82,9 @@ final class SplFileObjectJitHelper
 
     /** Cached current_line string. */
     public const PROP_CUR_LINE = '__spl_cur_line';
+
+    /** SplFileObject flags (READ_CSV / DROP_NEW_LINE / …) — php-src flags (#33368). */
+    public const PROP_FLAGS = '__spl_flags';
 
     /**
      * Local EOF latch — AOT `__compiler_feof` is wrong after fopen (always 1);
@@ -829,6 +833,40 @@ final class SplFileObjectJitHelper
     }
 
     /**
+     * SplFileObject::setFlags — store flags int (#33368).
+     * php-src: zim_SplFileObject_setFlags — ZEND_PARSE_PARAMETERS_START(1, 1) Z_PARAM_LONG
+     */
+    public static function compileSetFlags(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $flagsArg
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $flags = JitLongArg::lower($context, $flagsArg, 'SplFileObject::setFlags() flags');
+        self::storeLongProp($context, $obj, self::PROP_FLAGS, $flags);
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * SplFileObject::getFlags — read flags int (#33368).
+     * php-src: zim_SplFileObject_getFlags — ZEND_PARSE_PARAMETERS_NONE
+     */
+    public static function compileGetFlags(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $flags = self::loadLongProp($context, $obj, self::PROP_FLAGS);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            JitValueBox::pointer($context, $slot),
+            $flags
+        );
+
+        return $slot;
+    }
+
+    /**
      * SplFileObject::current — lazy-read without bumping key (#33319).
      * php-src: zim_SplFileObject_current
      */
@@ -1107,6 +1145,7 @@ final class SplFileObjectJitHelper
         self::storeLongProp($context, $obj, self::PROP_LINE, $i64->constInt(0, false));
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_FLAGS, $i64->constInt(0, false));
         $empty = $context->builder->load($context->constantStringFromString(''));
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
         $objectType->markObjectConstructed($obj);
