@@ -123,6 +123,14 @@ final class JitDomInsertBeforeLiveSlots
         JitDomParentChildLinkLayout::storeSibling($context, $refChild, VmDom::PROP_PREVIOUS_SIBLING, $newJit);
         JitDomParentChildLinkLayout::storeParentNode($context, $newChild, $parentJit);
 
+        // Document parents use documentElement + Document child-edge slots — Element
+        // INNER_XML rebuild / Element childNodes layout SIGSEGVs (#33584).
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, 'dom_ib_parent');
+        $bbDocDone = BasicBlockHelper::append($context, 'dom_ib_doc_done');
+        $bbElFinish = BasicBlockHelper::append($context, 'dom_ib_el_finish');
+        $context->builder->branchIf($isDoc, $bbDocDone, $bbElFinish);
+
+        $context->builder->positionAtEnd($bbElFinish);
         // firstElementChild when inserting before current first element (#27449).
         $fecObj = JitDomParentChildLinkLayout::loadFirstElementChild($context, $parent, 'dom_ib');
         $fecIsRef = $context->builder->icmp(Builder::INT_EQ, $fecObj, $refChild);
@@ -141,6 +149,9 @@ final class JitDomInsertBeforeLiveSlots
         // so createElement trees match Zend after cross-parent insert (#33450).
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
+        $context->builder->branch($bbDocDone);
+
+        $context->builder->positionAtEnd($bbDocDone);
     }
 
     /**

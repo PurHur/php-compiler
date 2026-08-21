@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\ext\dom\DomUserScriptDoctypeLlvm;
 use PHPCompiler\ext\dom\JitDomAppendChildUserScript;
 use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -23,6 +24,11 @@ final class DomDocumentAppendChild implements Call
         }
         // DocumentFragment: move children onto the document (php-src fragment expand).
         // LiveSlots expand targets Element parents; Document uses UserScript (#33564).
+        // createDocumentType → appendChild: stamp doctype for saveXML (#33584).
+        if (($args[1]->compileTimeDomTagName ?? null) === \PHPCompiler\ext\dom\JitDomCreateDocumentType::TAG_KIND) {
+            DomUserScriptDoctypeLlvm::markAttached();
+        }
+
         return JitDomAppendChildUserScript::invokeDocumentAppendMaybeFragment(
             $context,
             $args[0],

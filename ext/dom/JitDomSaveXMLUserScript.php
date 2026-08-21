@@ -50,7 +50,7 @@ final class JitDomSaveXMLUserScript
         ) {
             // No loadXML literal / tree mutated: dump documentElement slots.
             // NestedJIT DomSaveXMLRuntime SIGSEGVs after c:main_before_php (#32361).
-            return self::trySerializeDocumentFromSlots($context);
+            return self::trySerializeDocumentFromSlots($context, $args[0] ?? null);
         }
         // Document-wide constant replay is only valid for pure user-script loads (#26757).
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
@@ -68,12 +68,15 @@ final class JitDomSaveXMLUserScript
     /**
      * Document-wide saveXML() without a loadXML literal — xmlDocDumpMemory of the
      * createElement+appendChild tree (#32361 / php-src ext/dom/document.c).
+     * Prepends {@code <!DOCTYPE …>} when createDocumentType was appendChild'd /
+     * insertBefore'd onto the document (#33584).
      */
-    private static function trySerializeDocumentFromSlots(Context $context): Value
+    private static function trySerializeDocumentFromSlots(Context $context, ?JITVariable $documentVar = null): Value
     {
+        unset($documentVar);
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
-        foreach (['tagName', 'nodeName', 'textContent', VmDom::PROP_USER_SCRIPT_INNER_XML, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR] as $prop) {
+        foreach (['tagName', 'nodeName', 'textContent', 'name', 'publicId', 'systemId', VmDom::PROP_USER_SCRIPT_INNER_XML, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_STRING);
             }
@@ -81,6 +84,16 @@ final class JitDomSaveXMLUserScript
         $decl = $context->builder->load(
             $context->constantStringFromString("<?xml version=\"1.0\"?>\n")
         );
+        // createDocumentType + Document append/insertBefore stamps this (#33584).
+        $doctypePrefix = DomUserScriptDoctypeLlvm::saveXmlPrefix();
+        if ('' !== $doctypePrefix) {
+            $decl = JitStringConcat::concat(
+                $context,
+                $decl,
+                $context->builder->load($context->constantStringFromString($doctypePrefix)),
+                false
+            );
+        }
         $nl = $context->builder->load($context->constantStringFromString("\n"));
         $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
         $bbEmpty = BasicBlockHelper::append($context, 'dom_savexml_doc_empty');

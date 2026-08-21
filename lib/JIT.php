@@ -12750,6 +12750,9 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $callArgs
                     );
+                    $this->propagateDomCreateDocumentTypeCompileTimeTag(
+                        $block->getOperand($op->arg1)
+                    );
                     $this->propagateDomImportNodeCompileTimeTag(
                         $block->getOperand($op->arg1),
                         $callArgs
@@ -15254,6 +15257,19 @@ class JIT {
             $inner = htmlspecialchars($valueArg->compileTimeString, ENT_QUOTES | ENT_XML1, 'UTF-8');
         }
         $resultVar->compileTimeDomInnerXml = $inner;
+    }
+
+    /** Stamp createDocumentType stand-in tag for Document append/insertBefore (#33584). */
+    private function propagateDomCreateDocumentTypeCompileTimeTag(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomImplementationCreateDocumentType)) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->context->getVariableFromOp($result)->compileTimeDomTagName =
+            \PHPCompiler\ext\dom\JitDomCreateDocumentType::TAG_KIND;
     }
 
     /**
