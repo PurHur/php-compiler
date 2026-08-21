@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -25,7 +26,11 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * false/nop stub fork). Semantics match {@see \PHPCompiler\ext\standard\VmIni}.
  * Owns `__compiler_ini_*` ABI module-locally (getNamedFunction first) after Type
  * always-on shells dropped (#32779 / #32122 name.1 class).
- * php-src: ext/standard/ini.c, main/php_ini.c
+ * Thin LLVM SSOT for precision/serialize_precision/memory_limit under AOT (#33059):
+ * NestedJIT {@see CaseCompareJitHelper} strcasecmp always returns 0 (peer #33039), and
+ * NestedJIT {@see IniJitHelper::iniGet} ?string returns are null at the ABI — so those
+ * keys read/write {@see self::G_PRECISION} / {@see self::G_SERIALIZE_PRECISION} via libc
+ * strcmp (not __compiler_strcasecmp). php-src: ext/standard/ini.c, main/php_ini.c
  */
 final class IniRuntime
 {
@@ -205,28 +210,22 @@ final class IniRuntime
 
     private static function implementIniGetBridge(Context $context, LlvmFunction $fn): void
     {
-        StringCaseCompare::ensureStrcasecmpLinked($context);
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::GET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
         $out = $fn->getParam(1);
         $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
         $thinBb = BasicBlockHelper::append($context, 'ini_get_ignore_args_thin');
-        $nestedBb = BasicBlockHelper::append($context, 'ini_get_nested');
+        $ssotBb = BasicBlockHelper::append($context, 'ini_get_ssot');
         $doneBb = BasicBlockHelper::append($context, 'ini_get_done');
-        $context->builder->branchIf($isIgnore, $thinBb, $nestedBb);
+        $context->builder->branchIf($isIgnore, $thinBb, $ssotBb);
 
         $context->builder->positionAtEnd($thinBb);
         self::emitThinGetExceptionIgnoreArgs($context, $out);
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($nestedBb);
-        $result = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::INI_GET_HELPER),
-            [$option]
-        );
-        self::writeHelperStringOrFalseToValue($context, $out, $result);
+        $context->builder->positionAtEnd($ssotBb);
+        self::emitThinIniGetSsotOrNested($context, $option, $out);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
@@ -248,7 +247,6 @@ final class IniRuntime
 
     private static function implementIniSetBridge(Context $context, LlvmFunction $fn): void
     {
-        StringCaseCompare::ensureStrcasecmpLinked($context);
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::SET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
@@ -256,23 +254,16 @@ final class IniRuntime
         $out = $fn->getParam(2);
         $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
         $thinBb = BasicBlockHelper::append($context, 'ini_set_ignore_args_thin');
-        $nestedBb = BasicBlockHelper::append($context, 'ini_set_nested');
+        $ssotBb = BasicBlockHelper::append($context, 'ini_set_ssot');
         $doneBb = BasicBlockHelper::append($context, 'ini_set_done');
-        $context->builder->branchIf($isIgnore, $thinBb, $nestedBb);
+        $context->builder->branchIf($isIgnore, $thinBb, $ssotBb);
 
         $context->builder->positionAtEnd($thinBb);
         self::emitThinSetExceptionIgnoreArgs($context, $value, $out);
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($nestedBb);
-        $result = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::INI_SET_HELPER),
-            [$option, $value]
-        );
-        self::writeHelperStringOrFalseToValue($context, $out, $result);
-        self::syncSerializePrecisionGlobal($context);
-        self::syncPrecisionGlobal($context);
+        $context->builder->positionAtEnd($ssotBb);
+        self::emitThinIniSetSsotOrNested($context, $option, $value, $out);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
@@ -281,15 +272,14 @@ final class IniRuntime
 
     private static function implementIniRestoreBridge(Context $context, LlvmFunction $fn): void
     {
-        StringCaseCompare::ensureStrcasecmpLinked($context);
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::RESTORE_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
         $isIgnore = self::emitOptionIsExceptionIgnoreArgs($context, $option);
         $thinBb = BasicBlockHelper::append($context, 'ini_restore_ignore_args_thin');
-        $nestedBb = BasicBlockHelper::append($context, 'ini_restore_nested');
+        $ssotBb = BasicBlockHelper::append($context, 'ini_restore_ssot');
         $doneBb = BasicBlockHelper::append($context, 'ini_restore_done');
-        $context->builder->branchIf($isIgnore, $thinBb, $nestedBb);
+        $context->builder->branchIf($isIgnore, $thinBb, $ssotBb);
 
         $context->builder->positionAtEnd($thinBb);
         // php-src compiled default Off (`"0"`) — Zend/zend.c (#28061).
@@ -300,13 +290,8 @@ final class IniRuntime
         );
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($nestedBb);
-        $context->builder->call(
-            self::helperFunction($context, self::INI_RESTORE_HELPER),
-            $option
-        );
-        self::syncSerializePrecisionGlobal($context);
-        self::syncPrecisionGlobal($context);
+        $context->builder->positionAtEnd($ssotBb);
+        self::emitThinIniRestoreSsotOrNested($context, $option);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
@@ -330,23 +315,26 @@ final class IniRuntime
 
     private static function emitOptionIsExceptionIgnoreArgs(Context $context, Value $optionStr): Value
     {
+        return self::emitOptionEqualsKey($context, $optionStr, self::EXCEPTION_IGNORE_ARGS_KEY);
+    }
+
+    /** libc strcmp — NestedJIT __compiler_strcasecmp always returns 0 under thin AOT (#33059 / #33039). */
+    private static function emitOptionEqualsKey(Context $context, Value $optionStr, string $key): Value
+    {
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $strMap = $context->structFieldMap['__string__'];
+        LibcExtern::ensureStrcmpDecl($context);
         $optCstr = $context->builder->pointerCast(
             $context->builder->structGep($optionStr, $strMap['value']),
             $i8p
         );
-        $want = $context->builder->load($context->constantStringFromString(self::EXCEPTION_IGNORE_ARGS_KEY));
+        $want = $context->builder->load($context->constantStringFromString($key));
         $wantCstr = $context->builder->pointerCast(
             $context->builder->structGep($want, $strMap['value']),
             $i8p
         );
-        $cmp = $context->builder->call(
-            $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
-            $optCstr,
-            $wantCstr
-        );
+        $cmp = $context->builder->call($context->lookupFunction('strcmp'), $optCstr, $wantCstr);
 
         return $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
     }
@@ -427,16 +415,174 @@ final class IniRuntime
                 $context->builder->structGep($want, $strMap['value']),
                 $i8p
             );
-            $cmp = $context->builder->call(
-                $context->lookupFunction(StringCaseCompare::ABI_STRCASECMP),
-                $cstr,
-                $wantCstr
-            );
+            LibcExtern::ensureStrcmpDecl($context);
+            $cmp = $context->builder->call($context->lookupFunction('strcmp'), $cstr, $wantCstr);
             $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
             $falsy = false === $falsy ? $eq : $context->builder->or($falsy, $eq);
         }
 
         return $context->builder->xor($falsy, $i1->constInt(1, false));
+    }
+
+
+    /** Thin PG(precision)/serialize_precision/memory_limit — NestedJIT ?string ABI is null (#33059). */
+    private static function emitThinIniGetSsotOrNested(Context $context, Value $option, Value $out): void
+    {
+        $precBb = BasicBlockHelper::append($context, 'ini_get_ssot_precision');
+        $serBb = BasicBlockHelper::append($context, 'ini_get_ssot_serialize');
+        $memBb = BasicBlockHelper::append($context, 'ini_get_ssot_memory');
+        $nestedBb = BasicBlockHelper::append($context, 'ini_get_ssot_nested');
+        $doneBb = BasicBlockHelper::append($context, 'ini_get_ssot_done');
+        $isPrec = self::emitOptionEqualsKey($context, $option, 'precision');
+        $context->builder->branchIf($isPrec, $precBb, $serBb);
+
+        $context->builder->positionAtEnd($precBb);
+        self::emitWriteIntGlobalAsIniString($context, $out, self::G_PRECISION);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($serBb);
+        $isSer = self::emitOptionEqualsKey($context, $option, 'serialize_precision');
+        $serHit = BasicBlockHelper::append($context, 'ini_get_ssot_serialize_hit');
+        $context->builder->branchIf($isSer, $serHit, $memBb);
+        $context->builder->positionAtEnd($serHit);
+        self::emitWriteIntGlobalAsIniString($context, $out, self::G_SERIALIZE_PRECISION);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($memBb);
+        $isMem = self::emitOptionEqualsKey($context, $option, 'memory_limit');
+        $memHit = BasicBlockHelper::append($context, 'ini_get_ssot_memory_hit');
+        $context->builder->branchIf($isMem, $memHit, $nestedBb);
+        $context->builder->positionAtEnd($memHit);
+        $ml = $context->builder->load($context->constantStringFromString('-1'));
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $ml);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($nestedBb);
+        $result = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::INI_GET_HELPER),
+            [$option]
+        );
+        self::writeHelperStringOrFalseToValue($context, $out, $result);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+    }
+
+    private static function emitThinIniSetSsotOrNested(Context $context, Value $option, Value $value, Value $out): void
+    {
+        $precBb = BasicBlockHelper::append($context, 'ini_set_ssot_precision');
+        $serBb = BasicBlockHelper::append($context, 'ini_set_ssot_serialize');
+        $nestedBb = BasicBlockHelper::append($context, 'ini_set_ssot_nested');
+        $doneBb = BasicBlockHelper::append($context, 'ini_set_ssot_done');
+        $isPrec = self::emitOptionEqualsKey($context, $option, 'precision');
+        $context->builder->branchIf($isPrec, $precBb, $serBb);
+
+        $context->builder->positionAtEnd($precBb);
+        self::emitThinSetIntIniGlobal($context, $out, $value, self::G_PRECISION);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($serBb);
+        $isSer = self::emitOptionEqualsKey($context, $option, 'serialize_precision');
+        $serHit = BasicBlockHelper::append($context, 'ini_set_ssot_serialize_hit');
+        $context->builder->branchIf($isSer, $serHit, $nestedBb);
+        $context->builder->positionAtEnd($serHit);
+        self::emitThinSetIntIniGlobal($context, $out, $value, self::G_SERIALIZE_PRECISION);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($nestedBb);
+        $result = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::INI_SET_HELPER),
+            [$option, $value]
+        );
+        self::writeHelperStringOrFalseToValue($context, $out, $result);
+        self::syncSerializePrecisionGlobal($context);
+        self::syncPrecisionGlobal($context);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+    }
+
+    private static function emitThinIniRestoreSsotOrNested(Context $context, Value $option): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $precBb = BasicBlockHelper::append($context, 'ini_restore_ssot_precision');
+        $serBb = BasicBlockHelper::append($context, 'ini_restore_ssot_serialize');
+        $nestedBb = BasicBlockHelper::append($context, 'ini_restore_ssot_nested');
+        $doneBb = BasicBlockHelper::append($context, 'ini_restore_ssot_done');
+        $isPrec = self::emitOptionEqualsKey($context, $option, 'precision');
+        $context->builder->branchIf($isPrec, $precBb, $serBb);
+
+        $context->builder->positionAtEnd($precBb);
+        $context->builder->store($i32->constInt(14, true), self::globalPtr($context, self::G_PRECISION, $i32));
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($serBb);
+        $isSer = self::emitOptionEqualsKey($context, $option, 'serialize_precision');
+        $serHit = BasicBlockHelper::append($context, 'ini_restore_ssot_serialize_hit');
+        $context->builder->branchIf($isSer, $serHit, $nestedBb);
+        $context->builder->positionAtEnd($serHit);
+        $context->builder->store($i32->constInt(-1, true), self::globalPtr($context, self::G_SERIALIZE_PRECISION, $i32));
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($nestedBb);
+        $context->builder->call(self::helperFunction($context, self::INI_RESTORE_HELPER), $option);
+        self::syncSerializePrecisionGlobal($context);
+        self::syncPrecisionGlobal($context);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+    }
+
+    private static function emitWriteIntGlobalAsIniString(Context $context, Value $out, string $globalName): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        LibcExtern::ensureSnprintf($context);
+        LibcExtern::ensureStrlenDecl($context);
+        $buf = BasicBlockHelper::entryAlloca($context, $i8->arrayType(32));
+        $bufPtr = $context->builder->bitcast($buf, $i8p);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%d'), $i8p);
+        $val = $context->builder->load(self::globalPtr($context, $globalName, $i32));
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufPtr,
+            $sizeT->constInt(32, false),
+            $fmt,
+            $val
+        );
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufPtr);
+        $lenI64 = $len->typeOf() === $i64 ? $len : $context->builder->zExt($len, $i64);
+        $str = $context->builder->call($context->lookupFunction('__string__init'), $lenI64, $bufPtr);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
+    }
+
+    private static function emitThinSetIntIniGlobal(Context $context, Value $out, Value $valueStr, string $globalName): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $strMap = $context->structFieldMap['__string__'];
+        self::emitWriteIntGlobalAsIniString($context, $out, $globalName);
+        LibcExtern::ensureStrtolDecl($context);
+        $cstr = $context->builder->pointerCast(
+            $context->builder->structGep($valueStr, $strMap['value']),
+            $i8p
+        );
+        $end = BasicBlockHelper::entryAlloca($context, $i8p);
+        $parsed = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $cstr,
+            $end,
+            $i32->constInt(10, false)
+        );
+        $context->builder->store(
+            $context->builder->trunc($parsed, $i32),
+            self::globalPtr($context, $globalName, $i32)
+        );
     }
 
     private static function writeHelperStringOrFalseToValue(Context $context, Value $out, Value $raw): void
