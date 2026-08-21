@@ -15,7 +15,10 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT serialize() lowering via SerializeNestedJitHelper PHP (#6852, #20773, #27030).
+ * JIT serialize() lowering via SerializeNestedJitHelper PHP (#6852, #20773, #27030; ensureLinked #33207).
+ *
+ * Type no longer always-declares `__compiler_serialize_*` after the leftover always-on shell
+ * drop (#33207) — must {@see StringSerialize::ensureLinked} before lookup.
  *
  * Boxed `__value__*` arrays must use the hashtable ABI; objects use class name +
  * get_object_vars (type-tag, not null HT pointer — peer JitJsonEncode #27020).

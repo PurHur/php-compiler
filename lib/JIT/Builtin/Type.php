@@ -857,39 +857,13 @@ class Type extends Builtin {
         // (JitVmHelperLink::ensureBridge / decode emit addFunction if absent);
         // Type::initialize still ensureLinked. Leftover Type empty decls vs Runtime
         // ABI drift mint xmlrpc_encode.1 (#31894 / #32122).
-        $fntypeSerializeHashtable = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $this->context->getTypeFromString('__hashtable__*'),
-            $this->context->getTypeFromString('int64')
-        );
-        $fnSerializeHashtable = $this->context->module->addFunction(
-            '__compiler_serialize_hashtable',
-            $fntypeSerializeHashtable
-        );
-        $this->context->registerFunction('__compiler_serialize_hashtable', $fnSerializeHashtable);
-        $fntypeSerializeValue = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $valuePtr,
-            $this->context->getTypeFromString('int64')
-        );
-        $fnSerializeValue = $this->context->module->addFunction(
-            '__compiler_serialize_value',
-            $fntypeSerializeValue
-        );
-        $this->context->registerFunction('__compiler_serialize_value', $fnSerializeValue);
-        $fntypeSerializeObject = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
-            false,
-            $strPtr,
-            $this->context->getTypeFromString('__hashtable__*')
-        );
-        $fnSerializeObject = $this->context->module->addFunction(
-            '__compiler_serialize_object',
-            $fntypeSerializeObject
-        );
-        $this->context->registerFunction('__compiler_serialize_object', $fnSerializeObject);
+        // __compiler_serialize_hashtable / __compiler_serialize_value /
+        // __compiler_serialize_object always-on shells removed (#33207): StringSerialize
+        // owns the ABI (getNamedFunction first via bridges / JitVmHelperLink::ensureBridge;
+        // Type::initialize still StringSerialize::ensureLinked on the full load path).
+        // Leftover Type empty decls vs Runtime ABI drift mint serialize_hashtable.1
+        // (#31894 / #32122). User-script serialize() stays JitSerialize /
+        // SerializeNestedJitHelper (php-src ext/standard/var.c).
         // Returns __value__* (ArrayPop #12647 / #20785) — not void+out-pointer.
         $fnUnserialize = $this->context->module->addFunction(
             '__compiler_unserialize',
@@ -1061,6 +1035,7 @@ class Type extends Builtin {
         StreamRead::ensureLinked($this->context);
         StreamResource::ensureLinked($this->context);
         StringStreamCsv::ensureLinked($this->context);
+        StringSerialize::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);

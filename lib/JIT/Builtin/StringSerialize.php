@@ -21,7 +21,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_serialize_* via SerializeNestedJitHelper PHP (#9180, #20773, #27030).
+ * JIT/AOT link for __compiler_serialize_* via SerializeNestedJitHelper PHP (#9180, #20773, #27030, #33207).
+ *
+ * Owns `__compiler_serialize_value` / `__compiler_serialize_hashtable` /
+ * `__compiler_serialize_object` ABI module-locally: {@see getNamedFunction} first, then
+ * bridges / {@see JitVmHelperLink::ensureBridge}. Do not re-add empty always-on shells in
+ * {@see Type} — leftover decls mint serialize_hashtable.1 (#31894 / #32122 / #33207).
  *
  * Object ABI builds the `O:len:"Class":` header via NestedJIT with LLVM-loaded length,
  * then concatenates NestedJIT property bag (peer JsonEncode #27020 shape for arrays).
