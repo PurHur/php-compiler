@@ -7,48 +7,47 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on __compiler_proc_close ABI shell from Builtin\Type (#33118).
+ * Drop leftover always-on __compiler_is_process_resource ABI shell from Builtin\Type (#33121).
  *
- * NestedJIT/AOT bridge stays ProcessOpenEmbedBridge / ProcessOpenJitHelper /
- * JitProcClose (implementI32Bridge). Runtime owner declares module-locally
- * (getNamedFunction first) so leftover Type empty decls cannot mint proc_close.1
- * (#31894 / #32122).
+ * NestedJIT/AOT bridge stays ProcessOpenEmbedBridge / ProcessOpenJitHelper
+ * (implementI32Bridge). Runtime owner declares module-locally
+ * (getNamedFunction first) so leftover Type empty decls cannot mint
+ * is_process_resource.1 (#31894 / #32122).
  */
-final class TypeDeadProcCloseAbiRuntimeShrinkTest extends TestCase
+final class TypeDeadIsProcessResourceAbiRuntimeShrinkTest extends TestCase
 {
-    public function testTypeBuiltinDropsLeftoverAlwaysOnProcCloseAbi(): void
+    public function testTypeBuiltinDropsLeftoverAlwaysOnIsProcessResourceAbi(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('#33118', $type);
+        $this->assertStringContainsString('#33121', $type);
         $this->assertDoesNotMatchRegularExpression(
-            '/addFunction\(\s*[\'"]__compiler_proc_close[\'"]/',
+            '/addFunction\(\s*[\'"]__compiler_is_process_resource[\'"]/',
             $type,
-            'Builtin\\Type must not always-declare __compiler_proc_close (#33118)'
+            'Builtin\\Type must not always-declare __compiler_is_process_resource (#33121)'
         );
         $this->assertStringNotContainsString(
-            "registerFunction('__compiler_proc_close'",
+            "registerFunction('__compiler_is_process_resource'",
             $type,
-            'Builtin\\Type must not always-register __compiler_proc_close (#33118)'
+            'Builtin\\Type must not always-register __compiler_is_process_resource (#33121)'
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (get_resources still Type always-on; is_process_resource dropped in #33121).
+        // Next leftover sentinel (get_resources still Type always-on).
         $this->assertStringContainsString("registerFunction('__compiler_get_resources'", $type);
         $this->assertStringContainsString('ProcessOpen::ensureLinked', $type);
     }
 
-    public function testRuntimeOwnerDeclaresProcCloseAbiModuleLocally(): void
+    public function testRuntimeOwnerDeclaresIsProcessResourceAbiModuleLocally(): void
     {
         $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProcessOpenEmbedBridge.php');
-        $this->assertStringContainsString('#33118', $owner);
+        $this->assertStringContainsString('#33121', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
         $this->assertStringContainsString('addFunction', $owner);
-        $this->assertStringContainsString('__compiler_proc_close', $owner);
+        $this->assertStringContainsString('__compiler_is_process_resource', $owner);
         $this->assertStringContainsString('implementI32Bridge', $owner);
         $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProcessOpen.php');
-        $this->assertStringContainsString('#33118', $orchestrator);
+        $this->assertStringContainsString('#33121', $orchestrator);
         $this->assertFileExists(__DIR__.'/../../ext/standard/ProcessOpenJitHelper.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitProcClose.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/proc_open.php');
     }
 
@@ -58,9 +57,9 @@ final class TypeDeadProcCloseAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ProcessOpen::ensureLinked($this->context)', $type);
     }
 
-    public function testNoNewRuntimeCForProcCloseAbi(): void
+    public function testNoNewRuntimeCForIsProcessResourceAbi(): void
     {
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/proc_close.c');
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/proc_close.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/is_process_resource.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/is_process_resource.c');
     }
 }

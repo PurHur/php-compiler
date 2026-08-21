@@ -32,8 +32,8 @@ final class TypeDeadProcOpenAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (is_process_resource still Type always-on; proc_close dropped in #33118).
-        $this->assertStringContainsString("registerFunction('__compiler_is_process_resource'", $type);
+        // Next leftover sentinel (get_resources still Type always-on; is_process_resource dropped in #33121).
+        $this->assertStringContainsString("registerFunction('__compiler_get_resources'", $type);
         $this->assertStringContainsString('ProcessOpen::ensureLinked', $type);
     }
 
