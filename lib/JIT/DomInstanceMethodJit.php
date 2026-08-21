@@ -1059,14 +1059,20 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            // Pin-scan getNamedItemNS — same DomRegistry abort class (#33116).
+            if ('domnamednodemap::getnameditemns' === $lc
+                || 'dom\\namednodemap::getnameditemns' === $lc
+                || 'dom\\dtdnamednodemap::getnameditemns' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNamedNodeMapGetNamedItemNS();
+
+                return;
+            }
             if ('domnodelist::getiterator' === $lc
-                || 'domnamednodemap::getnameditemns' === $lc
                 || 'domnamednodemap::getiterator' === $lc
                 || 'dom\\nodelist::getiterator' === $lc
                 || 'dom\\htmlcollection::getiterator' === $lc
-                || 'dom\\namednodemap::getnameditemns' === $lc
                 || 'dom\\namednodemap::getiterator' === $lc
-                || 'dom\\dtdnamednodemap::getnameditemns' === $lc
                 || 'dom\\dtdnamednodemap::getiterator' === $lc
                 || 'domtokenlist::getiterator' === $lc
                 || 'dom\\tokenlist::getiterator' === $lc

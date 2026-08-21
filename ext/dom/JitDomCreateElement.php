@@ -245,7 +245,7 @@ final class JitDomCreateElement
      * {@code $el->attributes->length} on an undersized dummy map SIGSEGVs (#32546,
      * peer NodeList length #28672).
      *
-     * @param list<array{qname: string, value: string}> $attrs
+     * @param list<array{qname: string, value: string, namespace?: string}> $attrs
      */
     public static function storeAttributesPresence(
         Context $context,
@@ -280,9 +280,11 @@ final class JitDomCreateElement
             }
             $qname = $pair['qname'];
             $value = $pair['value'];
+            // Resolved xmlns URI for prefixed attrs — getNamedItemNS pin scan (#33116).
+            $namespace = $pair['namespace'] ?? '';
             $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals(
                 $context,
-                '',
+                $namespace,
                 $qname,
                 $value
             );
