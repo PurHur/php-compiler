@@ -720,11 +720,12 @@ class Type extends Builtin {
         // StringStreamCsv::ensureLinked on the full load path). Leftover Type empty
         // decls vs Runtime ABI drift mint fgetcsv.1 (#31894 / #32122). User-script
         // fgetcsv() stays JitFgetcsv / CsvStrGetcsvJitHelper (php-src file.c).
-        $fnStrGetcsv = $this->context->module->addFunction(
-            '__compiler_str_getcsv',
-            $this->context->context->functionType($htPtr, false, $strPtr, $strPtr, $strPtr, $strPtr)
-        );
-        $this->context->registerFunction('__compiler_str_getcsv', $fnStrGetcsv);
+        // __compiler_str_getcsv always-on shell removed (#33196): StringStrGetcsv /
+        // StringStreamCsv owns the ABI (getNamedFunction first via implementStrGetcsvBridge;
+        // Type::initialize still StringStreamCsv::ensureLinked → StringStrGetcsv). Leftover
+        // Type empty decls vs Runtime ABI drift mint str_getcsv.1 (#31894 / #32122).
+        // User-script str_getcsv() stays JitStrGetcsv / CsvStrGetcsvJitHelper
+        // (php-src ext/standard/file.c — PHP_FUNCTION(str_getcsv)).
         $valuePtr = $this->context->getTypeFromString('__value__*');
         $i64 = $this->context->getTypeFromString('int64');
         $i1 = $this->context->getTypeFromString('int1');

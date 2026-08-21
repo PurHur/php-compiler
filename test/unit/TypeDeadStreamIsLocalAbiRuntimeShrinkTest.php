@@ -31,8 +31,8 @@ final class TypeDeadStreamIsLocalAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (str_getcsv still Type always-on after #33199 preg_split drop).
-        $this->assertStringContainsString("registerFunction('__compiler_str_getcsv'", $type);
+        // Next leftover sentinel (serialize_hashtable still Type always-on; #33196 str_getcsv dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_serialize_hashtable'", $type);
         $this->assertStringContainsString('StreamCaps::ensureLinked', $type);
     }
 
