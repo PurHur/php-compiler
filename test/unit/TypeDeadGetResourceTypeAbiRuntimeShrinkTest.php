@@ -7,50 +7,50 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on __compiler_get_resources ABI shell from Builtin\Type (#33130).
+ * Drop leftover always-on __compiler_get_resource_type ABI shell from Builtin\Type (#33183).
  *
  * NestedJIT/AOT bridge stays StreamResource / JitStreamResourceKernel (implementIfMissing).
  * Runtime owner declares module-locally (getNamedFunction first) so leftover Type
- * empty decls cannot mint get_resources.1 (#31894 / #32122).
+ * empty decls cannot mint get_resource_type.1 (#31894 / #32122).
  */
-final class TypeDeadGetResourcesAbiRuntimeShrinkTest extends TestCase
+final class TypeDeadGetResourceTypeAbiRuntimeShrinkTest extends TestCase
 {
-    public function testTypeBuiltinDropsLeftoverAlwaysOnGetResourcesAbi(): void
+    public function testTypeBuiltinDropsLeftoverAlwaysOnGetResourceTypeAbi(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('#33130', $type);
+        $this->assertStringContainsString('#33183', $type);
         $this->assertDoesNotMatchRegularExpression(
-            '/addFunction\(\s*[\'"]__compiler_get_resources[\'"]/',
+            '/addFunction\(\s*[\'"]__compiler_get_resource_type[\'"]/',
             $type,
-            'Builtin\\Type must not always-declare __compiler_get_resources (#33130)'
+            'Builtin\\Type must not always-declare __compiler_get_resource_type (#33183)'
         );
         $this->assertStringNotContainsString(
-            "registerFunction('__compiler_get_resources'",
+            "registerFunction('__compiler_get_resource_type'",
             $type,
-            'Builtin\\Type must not always-register __compiler_get_resources (#33130)'
+            'Builtin\\Type must not always-register __compiler_get_resource_type (#33183)'
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel after get_resource_type drop (#33183); stream_get_contents still Type always-on.
+        // Next leftover sentinel (stream_get_contents still Type always-on; StreamRead chain).
         $this->assertStringContainsString("registerFunction('__compiler_stream_get_contents'", $type);
         $this->assertStringContainsString('StreamResource::ensureLinked', $type);
     }
 
-    public function testRuntimeOwnerDeclaresGetResourcesAbiModuleLocally(): void
+    public function testRuntimeOwnerDeclaresGetResourceTypeAbiModuleLocally(): void
     {
         $owner = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamResourceKernel.php');
-        $this->assertStringContainsString('#33130', $owner);
+        $this->assertStringContainsString('#33183', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
         $this->assertStringContainsString('addFunction', $owner);
-        $this->assertStringContainsString('__compiler_get_resources', $owner);
+        $this->assertStringContainsString('__compiler_get_resource_type', $owner);
         $this->assertStringContainsString('implementIfMissing', $owner);
         $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamResource.php');
-        $this->assertStringContainsString('#33130', $orchestrator);
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitGetResources.php');
+        $this->assertStringContainsString('#33183', $orchestrator);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitGetResourceType.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamResourceKernel.php');
-        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitGetResources.php');
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitGetResourceType.php');
         $this->assertStringContainsString('StreamResource::ensureLinked', $jit);
-        $this->assertStringContainsString('#33130', $jit);
+        $this->assertStringContainsString('#33183', $jit);
     }
 
     public function testTypeInitializeStillEnsureLinksStreamResource(): void
@@ -59,9 +59,9 @@ final class TypeDeadGetResourcesAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamResource::ensureLinked($this->context)', $type);
     }
 
-    public function testNoNewRuntimeCForGetResourcesAbi(): void
+    public function testNoNewRuntimeCForGetResourceTypeAbi(): void
     {
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/get_resources.c');
-        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/get_resources.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/get_resource_type.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/get_resource_type.c');
     }
 }
