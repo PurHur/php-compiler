@@ -194,6 +194,42 @@ final class IssetHelperLlvm
                     $containerOp
                 );
             }
+            // Thin AOT often boxes ArrayObject as TYPE_VALUE; dim isset must not treat the
+            // object as a hashtable (#33079). Prefer offsetExists on the unboxed object.
+            $containerUserType = '';
+            if (null !== $containerOp && null !== $containerOp->type) {
+                $containerUserType = $containerOp->type->userType ?? '';
+            }
+            if (
+                \PHPCompiler\VM\ArrayObjectJitHelper::isArrayAsPropsClass($containerUserType)
+                || \PHPCompiler\VM\ArrayObjectJitHelper::supportsEmptyDimAppend($containerUserType)
+            ) {
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
+                $objPtr = $context->builder->call(
+                    $context->lookupFunction('__value__readObject'),
+                    $valuePtr
+                );
+                $receiver = new Variable(
+                    $context,
+                    Variable::TYPE_OBJECT,
+                    Variable::KIND_VALUE,
+                    $objPtr
+                );
+                $existsSlot = \PHPCompiler\VM\ArrayObjectJitHelper::compileOffsetExists(
+                    $context,
+                    $receiver,
+                    $dim
+                );
+                $existsBoxed = new Variable(
+                    $context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $existsSlot
+                );
+                $existsBoxed->addref();
+
+                return (new \PHPCompiler\ext\standard\boolval())->call($context, $existsBoxed);
+            }
             // Value box holding a string — extract __string__* and use string-offset isset.
             // Without this, isset($s[$i]) on an inferred-string VALUE box falls through to
             // hashtable lookup, which always returns false (#32621, peer str_replace #23912).
@@ -208,10 +244,10 @@ final class IssetHelperLlvm
         }
         if (Variable::TYPE_OBJECT === $container->type && null === $container->objectPropertySlot) {
             $propName = VmIsset::literalStringKey($dimOp);
-            // Literal isset($obj->prop): always use propertyIsSet. Cast temps like (object)$resource
-            // often lack PHPTypes userType; the hashtable fallback wrongly yields false (#30793).
-            // Enum tryFrom()/from() temps similarly lack userType for name/value (#27666).
-            if (null !== $propName) {
+            // Literal isset($obj->prop) only — isset($obj["prop"]) must use ArrayAccess /
+            // dimension handlers (php-src zend_isset_dim). String-literal dims were wrongly
+            // routed here and skipped ArrayObject offsetExists (#33079 / re-#33074).
+            if (null !== $propName && $issetOnProperty) {
                 $hasObjectType = null !== $containerOp
                     && null !== $containerOp->type
                     && Type::TYPE_OBJECT === $containerOp->type->type;
@@ -226,6 +262,31 @@ final class IssetHelperLlvm
         if (Variable::TYPE_OBJECT === $container->type) {
             // isset($obj->prop) must not use ArrayAccess::offsetExists (#19707).
             if (!$issetOnProperty) {
+                $containerUserType = '';
+                if (null !== $containerOp && null !== $containerOp->type) {
+                    $containerUserType = $containerOp->type->userType ?? '';
+                }
+                // Thin-AOT ArrayObject family: same offsetExists lowering as `$ao->offsetExists($k)`
+                // before ArrayAccess PHP dispatch (native SPL isset PHI was wrong — #33079).
+                if (
+                    \PHPCompiler\VM\ArrayObjectJitHelper::isArrayAsPropsClass($containerUserType)
+                    || \PHPCompiler\VM\ArrayObjectJitHelper::supportsEmptyDimAppend($containerUserType)
+                ) {
+                    $existsSlot = \PHPCompiler\VM\ArrayObjectJitHelper::compileOffsetExists(
+                        $context,
+                        $container,
+                        $dim
+                    );
+                    $existsBoxed = new Variable(
+                        $context,
+                        Variable::TYPE_VALUE,
+                        Variable::KIND_VARIABLE,
+                        $existsSlot
+                    );
+                    $existsBoxed->addref();
+
+                    return (new \PHPCompiler\ext\standard\boolval())->call($context, $existsBoxed);
+                }
                 $arrayAccessIsset = ArrayAccessHelper::tryCompileOffsetIsSet(
                     $context,
                     $container,

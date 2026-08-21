@@ -128,8 +128,9 @@ final class EmptyDimensionLlvm
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i1);
-        $phi->addIncoming([$oobEmpty, $oobBlock]);
-        $phi->addIncoming([$valueEmpty, $inBlock]);
+        // PHPLLVM Value::addIncoming(Value, BasicBlock) — array pairs mint invalid PHI (#33079).
+        $phi->addIncoming($oobEmpty, $oobBlock);
+        $phi->addIncoming($valueEmpty, $inBlock);
 
         return $phi;
     }
@@ -177,8 +178,9 @@ final class EmptyDimensionLlvm
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i1);
-        $phi->addIncoming([$missingEmpty, $missingBlock]);
-        $phi->addIncoming([$valueEmpty, $presentBlock]);
+        // PHPLLVM Value::addIncoming(Value, BasicBlock) — array pairs mint invalid PHI (#33079).
+        $phi->addIncoming($missingEmpty, $missingBlock);
+        $phi->addIncoming($valueEmpty, $presentBlock);
 
         return $phi;
     }
