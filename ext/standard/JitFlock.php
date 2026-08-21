@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -12,9 +13,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for flock() via __compiler_flock (issue #3141; soft-null $operation #31462).
+ * LLVM lowering for flock() via __compiler_flock (issue #3141; soft-null $operation #31462; ensureLinked #33113).
  *
  * Compile-time null: soft DEP + catchable ValueError (null→0 is not LOCK_*); strict TypeError.
+ * ABI owned by {@see StreamReadRuntime} / {@see JitStreamReadBridgeKernel} after Type always-on
+ * drop (#33104) — must ensureLinked before lookup (peer {@see JitFgetc}).
  * Runtime invalid LOCK_* values still raise inside {@see StreamReadJitHelper::flockArgv}.
  */
 final class JitFlock
@@ -22,6 +25,7 @@ final class JitFlock
     /** @return Value true when flock succeeds */
     public static function invoke(Context $context, Value $handleLong, Value $operationLong): Value
     {
+        StreamReadRuntime::ensureLinked($context);
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_flock'),
             $handleLong,
