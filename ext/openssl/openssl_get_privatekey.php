@@ -6,13 +6,19 @@ namespace PHPCompiler\ext\openssl;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_get_privatekey() — alias of openssl_pkey_get_private (php-src; #20306).
+ * openssl_get_privatekey() — alias of openssl_pkey_get_private (php-src; #20306 VM, JIT/AOT #33507).
+ *
+ * JIT/AOT leftover #33507: catchable argc/TypeError paths (peer openssl_get_publickey #33503).
+ * Happy-path PEM/key → OpenSSLAsymmetricKey still needs key-object AOT (#6295 follow-up).
  */
 final class openssl_get_privatekey extends Internal
 {
@@ -70,8 +76,112 @@ final class openssl_get_privatekey extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                'openssl_get_privatekey() expects 1 or 2 arguments, '.$argc.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'openssl_get_privatekey_argc_cont');
+
+            return self::jitReturnFalse($context);
+        }
+
+        $badKey = self::compileTimeNonPrivateKeyLabel($args[0]);
+        if (null !== $badKey) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'openssl_get_privatekey(): Argument #1 ($private_key) must be of type '
+                .'OpenSSLAsymmetricKey|string, '.$badKey.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'openssl_get_privatekey_te_key_cont');
+
+            return self::jitReturnFalse($context);
+        }
+
+        if (2 === $argc) {
+            $badPass = self::compileTimeNonPassphraseLabel($args[1]);
+            if (null !== $badPass) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'openssl_get_privatekey(): Argument #2 ($passphrase) must be of type ?string, '
+                    .$badPass.' given'
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'openssl_get_privatekey_te_pass_cont');
+
+                return self::jitReturnFalse($context);
+            }
+        }
+
+        // PEM/key objects stay VM-shaped (#6295). Clear LogicException on TypeError/argc gates
+        // first (#33507); happy-path bake is a follow-up.
         throw new \LogicException(
-            'openssl_get_privatekey() is not implemented for JIT in this compiler build (issue #20306)'
+            'openssl_get_privatekey() is not implemented for JIT in this compiler build (issue #20306/#33507)'
         );
+    }
+
+    /**
+     * Stub union: OpenSSLAsymmetricKey|string.
+     *
+     * @return non-empty-string|null
+     */
+    private static function compileTimeNonPrivateKeyLabel(JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return 'null';
+        }
+
+        return match ($arg->type) {
+            JITVariable::TYPE_NATIVE_BOOL => 'bool',
+            JITVariable::TYPE_NATIVE_LONG => 'int',
+            JITVariable::TYPE_NATIVE_DOUBLE => 'float',
+            JITVariable::TYPE_HASHTABLE => 'array',
+            JITVariable::TYPE_STRING => null,
+            JITVariable::TYPE_OBJECT => self::objectTypeErrorLabel($arg),
+            default => 'mixed',
+        };
+    }
+
+    private static function objectTypeErrorLabel(JITVariable $arg): ?string
+    {
+        $class = $arg->classUserType;
+        if (null === $class || '' === $class) {
+            return null;
+        }
+        if (0 === \strcasecmp($class, 'OpenSSLAsymmetricKey')) {
+            return null;
+        }
+
+        return $class;
+    }
+
+    /** @return non-empty-string|null */
+    private static function compileTimeNonPassphraseLabel(JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return null;
+        }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return null;
+        }
+
+        return match ($arg->type) {
+            JITVariable::TYPE_NATIVE_BOOL => 'bool',
+            JITVariable::TYPE_NATIVE_LONG => 'int',
+            JITVariable::TYPE_NATIVE_DOUBLE => 'float',
+            JITVariable::TYPE_HASHTABLE => 'array',
+            JITVariable::TYPE_OBJECT => (null !== $arg->classUserType && '' !== $arg->classUserType)
+                ? $arg->classUserType
+                : 'object',
+            default => 'mixed',
+        };
+    }
+
+    private static function jitReturnFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+        return JitValueBox::pointer($context, $slot);
     }
 }
