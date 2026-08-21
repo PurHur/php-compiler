@@ -19,8 +19,10 @@ use PHPCompiler\JIT\Builtin\SplFileObjectSnapshotRuntime;
 use PHPCompiler\JIT\Builtin\StreamIo;
 use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Builtin\StreamRead;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
@@ -47,13 +49,15 @@ use PHPLLVM\Value;
  * fputcsv on `__spl_fd` (#33340) via JitFputcsv (peer procedural #33334 / #27180).
  * fgetcsv on `__spl_fd` (#33346) via JitFgetcsv (peer procedural #33334 / #1192).
  * fseek on `__spl_fd` (#33347) via JitFseek (clears iterator line cache like rewind).
+ * seek (SeekableIterator line) (#33364) — rewind + read-line loop + key bump.
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
  * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_ftruncate /
  * zim_SplFileObject_fflush / zim_SplFileObject_fpassthru / zim_SplFileObject_fputcsv /
- * zim_SplFileObject_fgetcsv / zim_SplFileObject_fseek / zim_SplFileInfo_openFile
+ * zim_SplFileObject_fgetcsv / zim_SplFileObject_fseek / zim_SplFileObject_seek /
+ * zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -582,6 +586,114 @@ final class SplFileObjectJitHelper
         return self::voidResult($context);
     }
 
+    /**
+     * SplFileObject::seek — SeekableIterator line seek (#33364).
+     * php-src: zim_SplFileObject_seek — rewind, read_line $line times, bump key (default flags).
+     */
+    public static function compileSeek(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $lineArg
+    ): Value {
+        self::ensureStreamAbis($context);
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $line = JitLongArg::lower($context, $lineArg, 'SplFileObject::seek() line');
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            $context->builder->icmp(Builder::INT_SGE, $line, $i64->constInt(0, false)),
+            'splfo_seek_line',
+            'SplFileObject::seek(): Argument #1 ($line) must be greater than or equal to 0'
+        );
+
+        // Rewind + clear iterator cache (same as compileRewind).
+        $handle = self::loadFd($context, $receiver);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_fseek'),
+            $handle,
+            $i64->constInt(0, false),
+            $i64->constInt(0, false)
+        );
+        self::storeLongProp($context, $obj, self::PROP_LINE, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty);
+
+        $iSlot = $context->builder->alloca($i64);
+        $context->builder->store($i64->constInt(0, false), $iSlot);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $loopHead = $fn->appendBasicBlock('splfo_seek_head');
+        $loopBody = $fn->appendBasicBlock('splfo_seek_body');
+        $afterLoop = $fn->appendBasicBlock('splfo_seek_after');
+        $earlyDone = $fn->appendBasicBlock('splfo_seek_eof');
+        $bumpBb = $fn->appendBasicBlock('splfo_seek_bump');
+        $endBb = $fn->appendBasicBlock('splfo_seek_end');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $i = $context->builder->load($iSlot);
+        $done = $context->builder->icmp(Builder::INT_SGE, $i, $line);
+        $context->builder->branchIf($done, $afterLoop, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        // php-src/VM: fail only when already at EOF before the read attempt; a NULL
+        // get_line while !eof is still SUCCESS with empty current_line (#24331).
+        $atEofBefore = self::loadLongProp($context, $obj, self::PROP_AT_EOF);
+        $alreadyEof = $context->builder->icmp(Builder::INT_NE, $atEofBefore, $i64->constInt(0, false));
+        $doRead = $fn->appendBasicBlock('splfo_seek_do_rd');
+        $context->builder->branchIf($alreadyEof, $earlyDone, $doRead);
+
+        $context->builder->positionAtEnd($doRead);
+        // Match SplFileObjectStorage::readLine — lineAdd=1 when a prior line is cached.
+        $has = self::loadLongProp($context, $obj, self::PROP_HAS);
+        $hadLine = $context->builder->icmp(Builder::INT_NE, $has, $i64->constInt(0, false));
+        $lineAdd1 = $fn->appendBasicBlock('splfo_seek_add1');
+        $lineAdd0 = $fn->appendBasicBlock('splfo_seek_add0');
+        $afterRead = $fn->appendBasicBlock('splfo_seek_after_rd');
+        $context->builder->branchIf($hadLine, $lineAdd1, $lineAdd0);
+
+        $context->builder->positionAtEnd($lineAdd1);
+        self::emitSeekReadLine($context, $receiver, 1);
+        $context->builder->branch($afterRead);
+
+        $context->builder->positionAtEnd($lineAdd0);
+        self::emitSeekReadLine($context, $receiver, 0);
+        $context->builder->branch($afterRead);
+
+        $context->builder->positionAtEnd($afterRead);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($iSlot), $i64->constInt(1, false)),
+            $iSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($earlyDone);
+        $context->builder->branch($endBb);
+
+        $context->builder->positionAtEnd($afterLoop);
+        // Default flags (no READ_AHEAD): bump key and drop cached line (#25321 / php-src).
+        $needBump = $context->builder->icmp(Builder::INT_SGT, $line, $i64->constInt(0, false));
+        $context->builder->branchIf($needBump, $bumpBb, $endBb);
+
+        $context->builder->positionAtEnd($bumpBb);
+        $prev = self::loadLongProp($context, $obj, self::PROP_LINE);
+        self::storeLongProp(
+            $context,
+            $obj,
+            self::PROP_LINE,
+            $context->builder->addNoSignedWrap($prev, $i64->constInt(1, false))
+        );
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $empty2 = $context->builder->load($context->constantStringFromString(''));
+        self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $empty2);
+        $context->builder->branch($endBb);
+
+        $context->builder->positionAtEnd($endBb);
+
+        return self::voidResult($context);
+    }
+
     /** SplFileObject::valid — !at_eof under default flags (#33319). */
     public static function compileValid(Context $context, JITVariable $receiver): Value
     {
@@ -751,6 +863,59 @@ final class SplFileObjectJitHelper
         $context->builder->positionAtEnd($joinBb);
 
         return $slot;
+    }
+
+    /**
+     * Seek read_line — NULL get_line while !eof is empty-line SUCCESS + lineAdd (VM #24331).
+     */
+    private static function emitSeekReadLine(
+        Context $context,
+        JITVariable $receiver,
+        int $lineAdd
+    ): void {
+        self::ensureStreamAbis($context);
+        $obj = self::loadObject($context, $receiver);
+        $handle = self::loadFd($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $raw = $context->builder->call(
+            $context->lookupFunction('__compiler_fgets'),
+            $handle,
+            $i64->constInt(8192, false)
+        );
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $raw, $strPtr->constNull());
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $nullBb = $fn->appendBasicBlock('splfo_seek_rd_null');
+        $okBb = $fn->appendBasicBlock('splfo_seek_rd_ok');
+        $joinBb = $fn->appendBasicBlock('splfo_seek_rd_join');
+        $lineSlot = $context->builder->alloca($strPtr);
+        $context->builder->branchIf($isNull, $nullBb, $okBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        // VM: false === fgets while !feof → empty current_line SUCCESS.
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->store($empty, $lineSlot);
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(1, false));
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->store($raw, $lineSlot);
+        self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($joinBb);
+        $line = $context->builder->load($lineSlot);
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(1, false));
+        self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $line);
+        if ($lineAdd > 0) {
+            $prev = self::loadLongProp($context, $obj, self::PROP_LINE);
+            self::storeLongProp(
+                $context,
+                $obj,
+                self::PROP_LINE,
+                $context->builder->addNoSignedWrap($prev, $i64->constInt($lineAdd, false))
+            );
+        }
     }
 
     private static function loadPathname(Context $context, JITVariable $receiver): Value
