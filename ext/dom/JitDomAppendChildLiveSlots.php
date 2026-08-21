@@ -28,6 +28,8 @@ use PHPLLVM\Value;
  * DocumentFragment stand-ins (`nodeName` `#document-fragment`) expand children
  * onto the parent (php-src fragment move); linking the fragment itself left
  * `#document-fragment` in childNodes and SIGSEGV'd on item(N) (#33312).
+ * insertBefore before a middle sibling rebuilds INNER_XML from the live chain
+ * so saveXML order matches childNodes (#33327).
  *
  * Reference: php-src ext/dom/node.c dom_node_append_child.
  * Peer: {@see JitDomInsertBefore}.
@@ -317,7 +319,11 @@ final class JitDomAppendChildLiveSlots
     }
 
     /**
-     * Move fragment children before $refChild (php-src insertFragmentChildrenBefore) (#33312).
+     * Move fragment children before $refChild (php-src insertFragmentChildrenBefore) (#33312 / #33327).
+     *
+     * Prepend/append-only INNER_XML updates were wrong for middle refs (#33327):
+     * live childNodes matched Zend but saveXML still read end-concatenated markup.
+     * Rebuild parent INNER_XML from the live firstChild→nextSibling chain after expand.
      */
     public static function expandFragmentChildrenInsertBefore(
         Context $context,
@@ -327,20 +333,6 @@ final class JitDomAppendChildLiveSlots
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_frag_expand');
         self::ensureLayout($context);
-        // Prepend fragment markup when inserting before the current first child.
-        $firstBefore = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_ib_frag_pfirst');
-        $atStart = $context->builder->icmp(Builder::INT_EQ, $refChild, $firstBefore);
-        $bbPrepend = BasicBlockHelper::append($context, 'dom_ib_frag_prepend_xml');
-        $bbAppendXml = BasicBlockHelper::append($context, 'dom_ib_frag_append_xml');
-        $bbAfterXml = BasicBlockHelper::append($context, 'dom_ib_frag_after_xml');
-        $context->builder->branchIf($atStart, $bbPrepend, $bbAppendXml);
-        $context->builder->positionAtEnd($bbPrepend);
-        self::concatFragmentInnerXmlOntoParent($context, $parent, $fragment, true);
-        $context->builder->branch($bbAfterXml);
-        $context->builder->positionAtEnd($bbAppendXml);
-        self::concatFragmentInnerXmlOntoParent($context, $parent, $fragment, false);
-        $context->builder->branch($bbAfterXml);
-        $context->builder->positionAtEnd($bbAfterXml);
 
         $objPtrTy = $context->getTypeFromString('__object__*');
         $nullBox = self::nullValueVar($context);
@@ -373,6 +365,147 @@ final class JitDomAppendChildLiveSlots
         $context->builder->branch($bbLoop);
 
         $context->builder->positionAtEnd($bbDone);
+        // saveXML reads PROP_USER_SCRIPT_INNER_XML — sync to live order (#33327).
+        self::rebuildParentInnerXmlFromLiveChildren($context, $parent);
+    }
+
+    /**
+     * Rewrite parent INNER_XML from live children (createElement outer markup) (#33327).
+     *
+     * Empty child INNER_XML → {@code <tag/>}; otherwise {@code <tag>inner</tag>}.
+     */
+    private static function rebuildParentInnerXmlFromLiveChildren(Context $context, Value $parent): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_frag_rebuild_xml');
+        self::ensureLayout($context);
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML)) {
+            $objectType->defineProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML, JITVariable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($classId, 'tagName')) {
+            $objectType->defineProperty($classId, 'tagName', JITVariable::TYPE_STRING);
+        }
+
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $accAlloca = $context->builder->alloca($strPtrTy);
+        $context->builder->store($empty, $accAlloca);
+
+        $first = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_ib_rebuild_first');
+        $curAlloca = $context->builder->alloca($objPtrTy);
+        $context->builder->store($first, $curAlloca);
+
+        $bbLoop = BasicBlockHelper::append($context, 'dom_ib_rebuild_loop');
+        $bbBody = BasicBlockHelper::append($context, 'dom_ib_rebuild_body');
+        $bbDone = BasicBlockHelper::append($context, 'dom_ib_rebuild_done');
+        $context->builder->branch($bbLoop);
+
+        $context->builder->positionAtEnd($bbLoop);
+        $cur = $context->builder->load($curAlloca);
+        $curNull = $context->builder->icmp(Builder::INT_EQ, $cur, $objPtrTy->constNull());
+        $context->builder->branchIf($curNull, $bbDone, $bbBody);
+
+        $context->builder->positionAtEnd($bbBody);
+        $outer = self::childOuterMarkupFromSlots($context, $cur);
+        $acc = $context->builder->load($accAlloca);
+        $merged = JitStringConcat::concat($context, $acc, $outer);
+        $context->builder->store($merged, $accAlloca);
+        $next = self::loadSibling($context, $cur, VmDom::PROP_NEXT_SIBLING, 'dom_ib_rebuild_next');
+        $context->builder->store($next, $curAlloca);
+        $context->builder->branch($bbLoop);
+
+        $context->builder->positionAtEnd($bbDone);
+        $final = $context->builder->load($accAlloca);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $final
+        );
+        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_USER_SCRIPT_INNER_XML),
+            $propVar,
+            JITVariable::TYPE_STRING
+        );
+    }
+
+    /** Outer markup for a thin-AOT createElement child (#33327). */
+    private static function childOuterMarkupFromSlots(Context $context, Value $child): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_child_outer');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMElement');
+        $tagVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $child,
+            'DOMElement',
+            'tagName',
+            $classId
+        );
+        $innerVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $child,
+            'DOMElement',
+            VmDom::PROP_USER_SCRIPT_INNER_XML,
+            $classId
+        );
+        $tag = $context->helper->loadValue($tagVar);
+        $inner = $context->helper->loadValue($innerVar);
+        $map = $context->structFieldMap['__string__'];
+        $innerLen = $context->builder->load($context->builder->structGep($inner, $map['length']));
+        $i64 = $context->getTypeFromString('int64');
+        $emptyInner = $context->builder->icmp(
+            Builder::INT_EQ,
+            $innerLen,
+            $i64->constInt(0, false)
+        );
+
+        $bbEmpty = BasicBlockHelper::append($context, 'dom_ib_outer_empty');
+        $bbFull = BasicBlockHelper::append($context, 'dom_ib_outer_full');
+        $bbMerge = BasicBlockHelper::append($context, 'dom_ib_outer_merge');
+        $context->builder->branchIf($emptyInner, $bbEmpty, $bbFull);
+
+        $context->builder->positionAtEnd($bbEmpty);
+        $lt = $context->builder->load($context->constantStringFromString('<'));
+        $slashGt = $context->builder->load($context->constantStringFromString('/>'));
+        $emptyOuter = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $lt, $tag),
+            $slashGt
+        );
+        $emptyPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbFull);
+        $lt2 = $context->builder->load($context->constantStringFromString('<'));
+        $gt = $context->builder->load($context->constantStringFromString('>'));
+        $ltSlash = $context->builder->load($context->constantStringFromString('</'));
+        $open = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $lt2, $tag),
+            $gt
+        );
+        $close = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $ltSlash, $tag),
+            $gt
+        );
+        $fullOuter = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $open, $inner),
+            $close
+        );
+        $fullPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbMerge);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $phi = $context->builder->phi($strPtrTy);
+        $phi->addIncoming($emptyOuter, $emptyPred);
+        $phi->addIncoming($fullOuter, $fullPred);
+
+        return $phi;
     }
 
     /** Concat fragment INNER_XML onto parent (append or prepend) for AOT saveXML (#33312). */
