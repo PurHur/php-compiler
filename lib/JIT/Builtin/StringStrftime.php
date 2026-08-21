@@ -10,7 +10,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_strftime via StrftimeJitHelper PHP (#9132, #25365).
+ * JIT/AOT link for __compiler_strftime via StrftimeJitHelper PHP (#9132, #25365, #33222).
+ *
+ * Owns `__compiler_strftime` ABI module-locally: {@see getNamedFunction} first, then
+ * {@see implementStrftimeBridge}. Do not re-add empty always-on shells in {@see Type} —
+ * leftover decls mint strftime.1 (#31894 / #32122 / #33222).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer VarFetch #25328 / MathModf #22519).
  * Replaces gmtime/localtime/strftime libc LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
