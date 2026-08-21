@@ -46,8 +46,8 @@ final class TypeDeadHashCryptoAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (pending_header_reset still Type always-on; #33245 assert_options / #33249 undef-key dropped).
-        $this->assertStringContainsString("registerFunction('__phpc_pending_header_reset'", $type);
+        // Next leftover sentinel (stream_path still Type always-on; #33255 pending-header dropped).
+        $this->assertStringContainsString("registerFunction('__phpc_stream_path'", $type);
         $this->assertStringContainsString('StringHashCrypto::ensureLinked', $type);
         // Peer #32875 already dropped these always-on shells
         $this->assertStringContainsString('#32875', $type);

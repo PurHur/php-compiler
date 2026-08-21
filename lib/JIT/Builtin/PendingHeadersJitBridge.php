@@ -18,7 +18,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed + standalone link for pending HTTP headers via PendingHeadersJitHelper PHP (#9545, #20930).
+ * JIT/AOT embed + standalone link for pending HTTP headers via PendingHeadersJitHelper PHP (#9545, #20930, #33255).
+ *
+ * Owns pending-header ABI decls module-locally (`getNamedFunction` first via
+ * {@see fillThinAotLinkStubs} / {@see implement}). Do not re-add empty always-on
+ * shells in {@see Type} (#31894 / #32122 / #33255).
  *
  * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\PendingHeadersJitHelper}
  * via {@see JitVmHelperLink::ensureCompiled} (peer FunctionExistsRuntime #22016 / RewriteVarsRuntime #21968).

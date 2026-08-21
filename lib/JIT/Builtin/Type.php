@@ -632,39 +632,22 @@ class Type extends Builtin {
         // Dead calendar/sleep/getloadavg already dropped (#32173). Keep exit/abort.
         $void = $this->context->getTypeFromString('void');
         $strPtr = $this->context->getTypeFromString('__string__*');
-        $i32 = $this->context->getTypeFromString('int32');
-        $htPtr = $this->context->getTypeFromString('__hashtable__*');
         $i64 = $this->context->getTypeFromString('int64');
         // __compiler_preg_split always-on shell removed (#33199): StringPregMatch /
         // PregMatchRuntime owns the ABI (getNamedFunction first via implementSplitBridge;
         // Type::initialize still StringPregMatch::ensureLinked). Leftover Type empty decls
         // vs Runtime ABI drift mint preg_split.1 (#31894 / #32122). User-script
         // preg_split() stays JitPregSplit / PregJitHelper (php-src ext/pcre/php_pcre.c).
-        $fnPendingReset = $this->context->module->addFunction(
-            '__phpc_pending_header_reset',
-            $this->context->context->functionType($void, false)
-        );
-        $this->context->registerFunction('__phpc_pending_header_reset', $fnPendingReset);
-        $fnHeaderQueueEnable = $this->context->module->addFunction(
-            '__phpc_header_queue_enable',
-            $this->context->context->functionType($void, false)
-        );
-        $this->context->registerFunction('__phpc_header_queue_enable', $fnHeaderQueueEnable);
-        $fnPendingAdd = $this->context->module->addFunction(
-            '__phpc_pending_header_add',
-            $this->context->context->functionType($void, false, $strPtr, $i32)
-        );
-        $this->context->registerFunction('__phpc_pending_header_add', $fnPendingAdd);
-        $fnPendingRemove = $this->context->module->addFunction(
-            '__phpc_pending_header_remove',
-            $this->context->context->functionType($void, false, $strPtr)
-        );
-        $this->context->registerFunction('__phpc_pending_header_remove', $fnPendingRemove);
-        $fnPendingList = $this->context->module->addFunction(
-            '__phpc_pending_header_list',
-            $this->context->context->functionType($htPtr, false)
-        );
-        $this->context->registerFunction('__phpc_pending_header_list', $fnPendingList);
+        // __phpc_pending_header_* / __phpc_header_queue_enable /
+        // __phpc_response_headers_flush / __phpc_setcookie_add always-on shells removed
+        // (#33255): PendingHeadersRuntime / PendingHeadersJitBridge owns the ABI
+        // (getNamedFunction first via fillThinAotLinkStubs / implement; Type::register
+        // ensureThinAotLinkStubs for standalone main reset/flush lookup; Type::initialize
+        // still ensureLinked on non-thin path). Leftover Type empty decls vs Runtime
+        // ABI drift mint pending_header_*.1 (#31894 / #32122). User-script
+        // header()/header_remove()/headers_list()/setcookie() stay header_ /
+        // PendingHeadersJitHelper (php-src ext/standard/head.c).
+        PendingHeadersRuntime::ensureThinAotLinkStubs($this->context);
         // __phpc_glob_vec / __phpc_scandir_vec / __phpc_strvec_free always-on shells
         // removed (#32636): JitFsGlobKernel declares module-locally (getNamedFunction first);
         // user-script glob()/scandir() stay FsGlobJitHelper / VmFsGlob (#27235/#27236).
@@ -690,7 +673,6 @@ class Type extends Builtin {
         // User-script str_getcsv() stays JitStrGetcsv / CsvStrGetcsvJitHelper
         // (php-src ext/standard/file.c — PHP_FUNCTION(str_getcsv)).
         $valuePtr = $this->context->getTypeFromString('__value__*');
-        $i64 = $this->context->getTypeFromString('int64');
         // __phpc_parse_url_component / __phpc_parse_url_assoc always-on shells removed (#33236):
         // ParseUrlRuntime owns the ABI (getNamedFunction first via implementIfMissing +
         // scopeLoweringToFunction #33226; Type::initialize still ParseUrlRuntime::ensureLinked;
@@ -707,16 +689,6 @@ class Type extends Builtin {
         // StringMktime / StringGetrusageRuntime own the ABI (getNamedFunction first);
         // user-script mktime()/getrusage() stay MktimeJitHelper / GetrusageJitHelper
         // (php-src ext/date/php_date.c / ext/standard/basic_functions.c).
-        $fnPendingFlush = $this->context->module->addFunction(
-            '__phpc_response_headers_flush',
-            $this->context->context->functionType($void, false)
-        );
-        $this->context->registerFunction('__phpc_response_headers_flush', $fnPendingFlush);
-        $fnSetcookieAdd = $this->context->module->addFunction(
-            '__phpc_setcookie_add',
-            $this->context->context->functionType($void, false, $strPtr, $strPtr, $i64, $strPtr, $strPtr, $i32, $i32, $strPtr, $i32)
-        );
-        $this->context->registerFunction('__phpc_setcookie_add', $fnSetcookieAdd);
         $fntypeSessionApply = $this->context->context->functionType($void, false, $valuePtr);
         $fnSessionStart = $this->context->module->addFunction('__phpc_session_start_apply', $fntypeSessionApply);
         $this->context->registerFunction('__phpc_session_start_apply', $fnSessionStart);

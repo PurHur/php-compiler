@@ -42,8 +42,8 @@ final class TypeDeadUndefinedArrayKeyAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (pending header still Type always-on; #33249 undef-key dropped).
-        $this->assertStringContainsString("registerFunction('__phpc_pending_header_reset'", $type);
+        // Next leftover sentinel (stream_path still Type always-on; #33255 pending-header dropped).
+        $this->assertStringContainsString("registerFunction('__phpc_stream_path'", $type);
         $this->assertStringContainsString('StringTriggerError::ensureLinked', $type);
         $this->assertStringContainsString('StringTriggerError::declareUndefinedArrayKeyAbis', $type);
     }
