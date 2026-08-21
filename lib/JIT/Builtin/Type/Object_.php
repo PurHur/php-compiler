@@ -4124,7 +4124,7 @@ class Object_ extends Type {
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([
                 '__construct', 'getfilename', 'getpathname', 'getpath', 'getbasename',
-                'getextension', '__tostring', 'isfile', 'isdir',
+                'getextension', 'getsize', '__tostring', 'isfile', 'isdir',
                 'islink', 'isreadable', 'iswritable', 'isexecutable',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
@@ -4199,7 +4199,8 @@ class Object_ extends Type {
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             $methods = [
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
-                'isdot', 'getfilename', 'getpathname', 'getpath', 'gettype', '__tostring',
+                'isdot', 'getfilename', 'getpathname', 'getpath', 'getsize', 'gettype',
+                '__tostring',
                 'isfile', 'isdir', 'islink', 'isreadable', 'iswritable', 'isexecutable',
             ];
             if ('filesystemiterator' === $lcname) {

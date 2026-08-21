@@ -1463,7 +1463,7 @@ class Context {
                 $dirMethod
             );
         }
-        // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289, #33263, #33269).
+        // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289, #33263, #33269, #33274, #33276).
         $this->type->object->lookup('SplFileInfo');
         $this->type->object->lookup('DirectoryIterator');
         $this->type->object->lookup('FilesystemIterator');
@@ -1471,9 +1471,9 @@ class Context {
             $diLc = strtolower($diClass);
             foreach ([
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next',
-                'isDot', 'getFilename', 'isFile', 'isDir',
+                'isDot', 'getFilename', 'getPath', 'getPathname', 'getSize', '__toString',
+                'isFile', 'isDir',
                 'isLink', 'isReadable', 'isWritable', 'isExecutable',
-                'getPathname', 'getPath', '__toString',
             ] as $diMethod) {
                 $this->functionProxies[$diLc.'::'.strtolower($diMethod)] = new Call\DirectoryIteratorMethod(
                     $diMethod,
@@ -1482,9 +1482,9 @@ class Context {
             }
         }
         foreach ([
-            'getFilename', 'isFile', 'isDir',
+            'getFilename', 'getPath', 'getPathname', 'getSize', '__toString',
+            'isFile', 'isDir',
             'isLink', 'isReadable', 'isWritable', 'isExecutable',
-            'getPathname', 'getPath', '__toString',
         ] as $sfiMethod) {
             $this->functionProxies['splfileinfo::'.strtolower($sfiMethod)] = new Call\DirectoryIteratorMethod(
                 $sfiMethod,

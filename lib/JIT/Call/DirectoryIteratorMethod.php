@@ -11,9 +11,9 @@ use PHPCompiler\VM\DirectoryIteratorJitHelper;
 use PHPLLVM\Value;
 
 /**
- * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289, #33263, #33269, #33274).
+ * DirectoryIterator / FilesystemIterator / SplFileInfo thin-AOT methods (#27289, #33263, #33269, #33274, #33276).
  *
- * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isFile / getPathname / …
+ * php-src: ext/spl/spl_directory.c — zim_SplFileInfo_isFile / getPathname / getSize / …
  */
 final class DirectoryIteratorMethod implements Call
 {
@@ -51,14 +51,15 @@ final class DirectoryIteratorMethod implements Call
             'next' => DirectoryIteratorJitHelper::compileNext($context, $args[0], $this->className),
             'isdot' => DirectoryIteratorJitHelper::compileIsDot($context, $args[0], $this->className),
             'getfilename' => DirectoryIteratorJitHelper::compileGetFilename($context, $args[0], $this->className),
+            'getpathname' => DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className),
+            'getpath' => DirectoryIteratorJitHelper::compileGetPath($context, $args[0], $this->className),
+            'getsize' => DirectoryIteratorJitHelper::compileGetSize($context, $args[0], $this->className),
             'isfile' => DirectoryIteratorJitHelper::compileIsFile($context, $args[0], $this->className),
             'isdir' => DirectoryIteratorJitHelper::compileIsDir($context, $args[0], $this->className),
             'islink' => DirectoryIteratorJitHelper::compileIsLink($context, $args[0], $this->className),
             'isreadable' => DirectoryIteratorJitHelper::compileIsReadable($context, $args[0], $this->className),
             'iswritable' => DirectoryIteratorJitHelper::compileIsWritable($context, $args[0], $this->className),
             'isexecutable' => DirectoryIteratorJitHelper::compileIsExecutable($context, $args[0], $this->className),
-            'getpathname' => DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className),
-            'getpath' => DirectoryIteratorJitHelper::compileGetPath($context, $args[0], $this->className),
             // DirectoryIterator::__toString → filename; SplFileInfo::__toString → pathname (php-src).
             '__tostring' => 'SplFileInfo' === $this->className
                 ? DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className)
