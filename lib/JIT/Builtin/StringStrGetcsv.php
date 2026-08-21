@@ -13,7 +13,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_str_getcsv via CsvStrGetcsvJitHelper PHP (#9444, #13358, #26135, #27069).
+ * JIT/AOT link for __compiler_str_getcsv via CsvStrGetcsvJitHelper PHP (#9444, #13358, #26135, #27069, #33196).
+ *
+ * Owns `__compiler_str_getcsv` ABI module-locally (getNamedFunction first). Do not re-add
+ * empty always-on shells in {@see Type} — leftover decls mint str_getcsv.1 (#31894 / #32122).
  *
  * Helper compile: NestedJIT {@see CsvStrGetcsvJitHelper} only (no VmFs / fgetcsvArgv).
  * Bridge: default CSV chars via {@see Context::constantStringFromString} (not raw cstr →

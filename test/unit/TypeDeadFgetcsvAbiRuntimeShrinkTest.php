@@ -31,8 +31,8 @@ final class TypeDeadFgetcsvAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (str_getcsv still Type always-on; CSV chain).
-        $this->assertStringContainsString("registerFunction('__compiler_str_getcsv'", $type);
+        // Next leftover sentinel (serialize_hashtable still Type always-on; str_getcsv dropped in #33196).
+        $this->assertStringContainsString("registerFunction('__compiler_serialize_hashtable'", $type);
         $this->assertStringContainsString('StringStreamCsv::ensureLinked', $type);
     }
 
