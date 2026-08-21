@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for preg_match() decision (no by-ref $matches in JIT v1). */
+/** LLVM lowering for preg_match() decision (no by-ref $matches in JIT v1; ensureLinked #33187). */
 final class JitPregMatch
 {
     private static int $blockSerial = 0;

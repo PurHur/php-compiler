@@ -526,14 +526,18 @@ class Type extends Builtin {
         // __compiler_substr_replace always-on shell removed (#32250): user-script
         // substr_replace() stays VmString / ext/standard/substr_replace.php. No
         // NestedJIT lookupFunction remains.
+        // __compiler_preg_match always-on shell removed (#33187): StringPregMatch /
+        // StringPregMatchJit / PregMatchRuntime owns the ABI (getNamedFunction first,
+        // then addFunction if absent via implementI64PairBridge; Type::initialize still
+        // StringPregMatch::ensureLinked). Leftover Type empty decls vs Runtime ABI drift
+        // mint preg_match.1 (#31894 / #32122). User-script preg_match() stays JitPregMatch /
+        // PregJitHelper (php-src ext/pcre/php_pcre.c).
         $fntypePregMatch = $this->context->context->functionType(
             $i64,
             false,
             $strPtr,
             $strPtr
         );
-        $fnPregMatch = $this->context->module->addFunction('__compiler_preg_match', $fntypePregMatch);
-        $this->context->registerFunction('__compiler_preg_match', $fnPregMatch);
         $fnPregMatchAll = $this->context->module->addFunction('__compiler_preg_match_all', $fntypePregMatch);
         $this->context->registerFunction('__compiler_preg_match_all', $fnPregMatchAll);
         $valuePtr = $this->context->getTypeFromString('__value__*');
@@ -1035,6 +1039,7 @@ class Type extends Builtin {
         StringRandomBytes::ensureLinked($this->context);
         PasswordCryptoRuntime::ensureLinked($this->context);
         StringHashCrypto::ensureLinked($this->context);
+        StringPregMatch::ensureLinked($this->context);
         OpensslEncryptRuntime::ensureLinked($this->context);
         OpensslSignRuntime::ensureLinked($this->context);
         OpensslDigestRuntime::ensureLinked($this->context);
