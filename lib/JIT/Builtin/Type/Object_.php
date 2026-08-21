@@ -4154,6 +4154,10 @@ class Object_ extends Type {
             // SplFileInfo path props for inherited isFile/getSize/… (#33313).
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_PATH, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FILENAME, Variable::TYPE_STRING);
+            // Iterator cursor / lineNum / current index for fgets (#33319).
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CURSOR, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_LINE, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_CUR, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([
