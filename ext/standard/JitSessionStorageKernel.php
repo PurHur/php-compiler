@@ -1298,9 +1298,10 @@ final class JitSessionStorageKernel
         $context->builder->branchIf($hasId, $bbWork, $bbDone);
 
         $context->builder->positionAtEnd($bbWork);
-        // Thin AOT: always printf Set-Cookie from session globals. PendingHeaders
-        // NestedJIT setcookie/addSetcookie aborts under session_write_close (#1974 /
-        // peer #21900 link-stub bypass).
+        // Thin AOT: printf Set-Cookie from session globals when CGI/web (REQUEST_METHOD
+        // set). PendingHeaders NestedJIT setcookie/addSetcookie aborts under
+        // session_write_close (#1974 / peer #21900 link-stub bypass). Bare CLI must
+        // not write cookies to stdout (php-src sapi/cli; #33445).
         if ($context->isThinStandaloneAotMain() || self::pendingSetcookieIsThinLinkStub($context)) {
             self::emitSetcookiePrintfFromGlobals($context, $idLen);
         } else {
@@ -1352,14 +1353,33 @@ final class JitSessionStorageKernel
         return false;
     }
 
-    /** Direct printf from session name/id byte buffers (#21900). */
+    /**
+     * Direct printf from session name/id byte buffers (#21900).
+     *
+     * Gate on getenv("REQUEST_METHOD"): CLI leaves it unset and must not print
+     * Set-Cookie (#33445); CGI/web smokes (#1891) set it and still need the line.
+     */
     private static function emitSetcookiePrintfFromGlobals(Context $context, Value $idLen): void
     {
+        StringGetenv::ensureLibcGetenv($context);
         // Module-local printf(3) after LibcExtern always-on drop (#31706).
         LibcExtern::ensurePrintf($context);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
+        $nullI8p = $i8p->constNull();
+
+        $methodKey = $context->builder->pointerCast(
+            $context->constantFromString('REQUEST_METHOD'),
+            $i8p
+        );
+        $method = $context->builder->call($context->lookupFunction('getenv'), $methodKey);
+        $hasMethod = $context->builder->icmp(Builder::INT_NE, $method, $nullI8p);
+        $bbPrint = BasicBlockHelper::append($context, 'ss_setcookie_printf');
+        $bbCont = BasicBlockHelper::append($context, 'ss_setcookie_printf_cont');
+        $context->builder->branchIf($hasMethod, $bbPrint, $bbCont);
+
+        $context->builder->positionAtEnd($bbPrint);
         $nameLen = $context->builder->load(SessionStorageGlobals::$nameLenGlobal);
         $namePtr = $context->builder->pointerCast(
             $context->builder->inBoundsGEP(
@@ -1389,6 +1409,9 @@ final class JitSessionStorageKernel
             $idLen,
             $idPtr
         );
+        $context->builder->branch($bbCont);
+
+        $context->builder->positionAtEnd($bbCont);
     }
 
     private static function emitCopyIdStringToGlobals(Context $context, Value $idStr): void
