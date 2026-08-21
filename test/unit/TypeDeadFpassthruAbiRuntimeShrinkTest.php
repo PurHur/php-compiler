@@ -32,8 +32,8 @@ final class TypeDeadFpassthruAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (unserialize still Type always-on; #33207 serialize_* dropped).
-        $this->assertStringContainsString("registerFunction('__compiler_unserialize'", $type);
+        // Next leftover sentinel (phpc_deploy_path still Type always-on; #33207 serialize_* dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_phpc_deploy_path'", $type);
         $this->assertStringContainsString('StreamRead::ensureLinked', $type);
     }
 

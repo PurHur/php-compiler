@@ -31,8 +31,8 @@ final class TypeDeadPhpcRunCommandAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (unserialize still Type always-on after #33207/#33212).
-        $this->assertStringContainsString("registerFunction('__compiler_unserialize'", $type);
+        // Next leftover sentinel (phpc_deploy_path still Type always-on after #33212/#33214).
+        $this->assertStringContainsString("registerFunction('__compiler_phpc_deploy_path'", $type);
         $this->assertStringContainsString('ProcessRuntime::ensureLinked', $type);
     }
 
