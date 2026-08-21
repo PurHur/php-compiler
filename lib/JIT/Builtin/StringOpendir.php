@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
@@ -57,6 +58,13 @@ final class StringOpendir
             return;
         }
 
+        // Restore caller insert block after bridge emit (#33409 / peer StringSymlink #26323) —
+        // clearInsertionPosition alone orphans mid-emit opendir() callsites (Module.php:180).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
+        // OpendirJitHelper failure path calls sprintf — NestedJIT AOT needs the ABI (#33409 / peer #21212).
+        StringFormat::ensureLinked($context);
+
         JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#15891');
 
         $strPtr = $context->getTypeFromString('__string__*');
@@ -94,6 +102,10 @@ final class StringOpendir
         $context->builder->returnValue($okPtr);
 
         $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
