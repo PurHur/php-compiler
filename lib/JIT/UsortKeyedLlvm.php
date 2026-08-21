@@ -16,6 +16,9 @@ use PHPLLVM\Value;
  * Emit call-site bubble-sort over {@see HashTableExportKeyValuePairs} + writeback via
  * {@see HashTableMutateNestedLlvm::reorderKeyedPairs}. Cap passes at n².
  *
+ * Packed writeback stringifies int keys first ({@see ValueSortKeyedLlvm::stringifyIntegerPairKeys})
+ * so reorder can use strKeys insertion order — same as asort (#33620 / #33627).
+ *
  * Comparison (spaceship-equivalent for issue repro arrows):
  * - string → {@see JitStringCompare::strcmp} (thin AOT Closure string spaceship returns 0)
  * - otherwise → int64 icmp spaceship (avoids NestedClosureInvoke hangs under thin AOT)
@@ -134,6 +137,9 @@ final class UsortKeyedLlvm
         $context->builder->branch($passHead);
 
         $context->builder->positionAtEnd($writeback);
+        // Packed AOT HTs store int keys in values[index] — foreach is always ascending
+        // index order, so uasort cannot express key order 1 then 0 without strKeys (#33627).
+        ValueSortKeyedLlvm::stringifyIntegerPairKeys($context, $pairs, $prefix.'_strkey');
         HashTableMutateNestedLlvm::reorderKeyedPairs($context, $ht, $pairs);
         $context->builder->branch($done);
 

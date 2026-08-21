@@ -129,9 +129,16 @@ final class ValueSortKeyedLlvm
     /**
      * Replace integer pair keys with their decimal string form so
      * {@see HashTableMutateNestedLlvm::reorderKeyedPairs} uses setAtStringKey.
+     *
+     * Shared with {@see UsortKeyedLlvm} writeback (#33620 / #33627).
+     *
+     * @param string $bbPrefix unique basic-block name prefix (caller must not collide)
      */
-    private static function stringifyIntegerPairKeys(Context $context, Value $pairsHt): void
-    {
+    public static function stringifyIntegerPairKeys(
+        Context $context,
+        Value $pairsHt,
+        string $bbPrefix = 'vsort_strkey'
+    ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $valueMap = $context->structFieldMap['__value__'];
         $sizeT = $context->getTypeFromString('size_t');
@@ -141,9 +148,9 @@ final class ValueSortKeyedLlvm
         $count = $context->builder->load($context->builder->structGep($pairsHt, $map['nextFreeElement']));
         $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->builder->store($zero, $idxSlot);
-        $head = BasicBlockHelper::append($context, 'vsort_strkey_head');
-        $body = BasicBlockHelper::append($context, 'vsort_strkey_body');
-        $done = BasicBlockHelper::append($context, 'vsort_strkey_done');
+        $head = BasicBlockHelper::append($context, $bbPrefix.'_head');
+        $body = BasicBlockHelper::append($context, $bbPrefix.'_body');
+        $done = BasicBlockHelper::append($context, $bbPrefix.'_done');
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
@@ -168,8 +175,8 @@ final class ValueSortKeyedLlvm
             $kind,
             $i8->constInt(Variable::TYPE_NATIVE_LONG & 0x7f, false)
         );
-        $asStr = BasicBlockHelper::append($context, 'vsort_strkey_as_str');
-        $advance = BasicBlockHelper::append($context, 'vsort_strkey_advance');
+        $asStr = BasicBlockHelper::append($context, $bbPrefix.'_as_str');
+        $advance = BasicBlockHelper::append($context, $bbPrefix.'_advance');
         $context->builder->branchIf($isLong, $asStr, $advance);
 
         $context->builder->positionAtEnd($asStr);
