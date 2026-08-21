@@ -33,7 +33,7 @@ final class TypeDeadGetMetaTagsAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
         // Next leftover sentinel after #33048 dropped fwrite.
-        $this->assertStringContainsString("registerFunction('__compiler_tmpfile'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_popen'", $type);
         $this->assertStringContainsString('MetaTagsRuntime::ensureLinked', $type);
     }
 

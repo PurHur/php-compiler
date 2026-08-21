@@ -42,7 +42,7 @@ final class TypeDeadUtf8Latin1AbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        $this->assertStringContainsString("registerFunction('__compiler_tmpfile'", $type);
+        $this->assertStringContainsString("registerFunction('__compiler_popen'", $type);
         $this->assertStringContainsString('StringUtf8Latin1::ensureLinked', $type);
     }
 
