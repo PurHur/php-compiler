@@ -1253,6 +1253,13 @@ final class VmOpenssl
 
         if (null !== $configVar) {
             $configVar = $configVar->resolveIndirect();
+            // php-src stub: options: ?array (#33530 / Zend openssl.stub.php)
+            if (Variable::TYPE_NULL !== $configVar->type && Variable::TYPE_ARRAY !== $configVar->type) {
+                throw new \TypeError(\sprintf(
+                    'openssl_pkey_new(): Argument #1 ($options) must be of type ?array, %s given',
+                    self::typeLabel($configVar)
+                ));
+            }
             if (Variable::TYPE_ARRAY === $configVar->type) {
                 foreach ($configVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
                     if (Variable::TYPE_STRING !== $keyVar->type) {
