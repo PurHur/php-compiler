@@ -11,7 +11,7 @@ use PHPCompiler\VM\SplFileObjectJitHelper;
 use PHPLLVM\Value;
 
 /**
- * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, ext/spl/spl_directory.c).
+ * SplFileObject thin-AOT methods (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, #33346, ext/spl/spl_directory.c).
  */
 final class SplFileObjectMethod implements Call
 {
@@ -78,6 +78,15 @@ final class SplFileObjectMethod implements Call
                 $args[3] ?? null,
                 $args[4] ?? null,
                 $args[5] ?? null
+            ),
+            // php-src zim_SplFileObject_fgetcsv — optional length/separator/enclosure/escape (#33346).
+            'fgetcsv' => SplFileObjectJitHelper::compileFgetcsv(
+                $context,
+                $args[0],
+                $args[1] ?? null,
+                $args[2] ?? null,
+                $args[3] ?? null,
+                $args[4] ?? null
             ),
             'eof' => SplFileObjectJitHelper::compileEof($context, $args[0]),
             'rewind' => SplFileObjectJitHelper::compileRewind($context, $args[0]),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\JitFgetcsv;
 use PHPCompiler\ext\standard\JitFlock;
 use PHPCompiler\ext\standard\JitFputcsv;
 use PHPCompiler\ext\standard\JitFread;
@@ -16,6 +17,7 @@ use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Builtin\StreamRead;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
@@ -37,12 +39,13 @@ use PHPLLVM\Value;
  * fread/fgetc on `__spl_fd` (#33332).
  * ftell/flock on `__spl_fd` (#33336) via JitFtell / JitFlock.
  * fputcsv on `__spl_fd` (#33340) via JitFputcsv (peer procedural #33334 / #27180).
+ * fgetcsv on `__spl_fd` (#33346) via JitFgetcsv.
  * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
  * zim_SplFileObject_ftell / zim_SplFileObject_flock / zim_SplFileObject_fputcsv /
- * zim_SplFileInfo_openFile
+ * zim_SplFileObject_fgetcsv / zim_SplFileInfo_openFile
  */
 final class SplFileObjectJitHelper
 {
@@ -396,6 +399,48 @@ final class SplFileObjectJitHelper
         }
 
         return JitFputcsv::invoke($context, $handle, $fields, $separator, $enclosure, $escape, $eol);
+    }
+
+    /**
+     * SplFileObject::fgetcsv — read line + parse CSV on live handle (#33346).
+     * php-src: zim_SplFileObject_fgetcsv → php_fgetcsv
+     */
+    public static function compileFgetcsv(
+        Context $context,
+        JITVariable $receiver,
+        ?JITVariable $lengthArg = null,
+        ?JITVariable $separatorArg = null,
+        ?JITVariable $enclosureArg = null,
+        ?JITVariable $escapeArg = null
+    ): Value {
+        self::ensureStreamAbis($context);
+        $handle = self::loadFd($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        // Peer free fgetcsv(): omitted/null length → -1 (unlimited; JitFgetcsv selects 8192 cap).
+        $length = $i64->constInt(-1, true);
+        if (null !== $lengthArg && !NamedOptionalCallArgs::isOmittedOptional($lengthArg)
+            && JITVariable::TYPE_NULL !== $lengthArg->type) {
+            $length = $context->builder->truncOrBitCast(
+                JitLongArg::lower($context, $lengthArg, 'SplFileObject::fgetcsv() length'),
+                $i64
+            );
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $separator = $nullStr;
+        $enclosure = $nullStr;
+        $escape = $nullStr;
+        if (null !== $separatorArg && !NamedOptionalCallArgs::isOmittedOptional($separatorArg)) {
+            $separator = JitStringArg::lower($context, $separatorArg, 'SplFileObject::fgetcsv() separator');
+        }
+        if (null !== $enclosureArg && !NamedOptionalCallArgs::isOmittedOptional($enclosureArg)) {
+            $enclosure = JitStringArg::lower($context, $enclosureArg, 'SplFileObject::fgetcsv() enclosure');
+        }
+        if (null !== $escapeArg && !NamedOptionalCallArgs::isOmittedOptional($escapeArg)) {
+            $escape = JitStringArg::lower($context, $escapeArg, 'SplFileObject::fgetcsv() escape');
+        }
+
+        return JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
     }
 
     /**
