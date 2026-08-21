@@ -145,30 +145,35 @@ final class JitJsonEncode
             $kind,
             $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false)
         );
-        // JIT TYPE_NATIVE_DOUBLE (=3) collides with VM TYPE_BOOLEAN — disambiguate before bool (#32326).
-        $isNativeDouble = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)
-        );
+        // Tag collisions (#26367 / #32326 / #33520):
+        //   JIT TYPE_NATIVE_BOOL (=2) ↔ VM TYPE_FLOAT (=2)
+        //   JIT TYPE_NATIVE_DOUBLE (=3) ↔ VM TYPE_BOOLEAN (=3)
+        // Prefer JIT bool (2) before any float/double path. Keep native-double (3) before VM bool
+        // so real doubles are not read as bool bytes; HashTable export must not remap bool→3.
         $isJitBool = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
             $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
+        );
+        $isNativeDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)
         );
         $isVmBool = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
             $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
         );
-        $isBool = $context->builder->or($isJitBool, $isVmBool);
 
         $id = (string) (++self::$blockSerial);
         $htBlock = BasicBlockHelper::append($context, 'json_encode_boxed_ht_'.$id);
         $objCheck = BasicBlockHelper::append($context, 'json_encode_boxed_objchk_'.$id);
         $objBlock = BasicBlockHelper::append($context, 'json_encode_boxed_obj_'.$id);
         $scalarCheck = BasicBlockHelper::append($context, 'json_encode_boxed_scalar_'.$id);
-        $boolScalarCheck = BasicBlockHelper::append($context, 'json_encode_boxed_bool_scalar_'.$id);
+        $jitBoolCheck = BasicBlockHelper::append($context, 'json_encode_boxed_jit_bool_'.$id);
+        $nativeDoubleCheck = BasicBlockHelper::append($context, 'json_encode_boxed_native_double_'.$id);
+        $vmBoolCheck = BasicBlockHelper::append($context, 'json_encode_boxed_vm_bool_'.$id);
         $boolCheck = BasicBlockHelper::append($context, 'json_encode_boxed_bool_'.$id);
         $boolTrueBlock = BasicBlockHelper::append($context, 'json_encode_boxed_bool_true_'.$id);
         $boolFalseBlock = BasicBlockHelper::append($context, 'json_encode_boxed_bool_false_'.$id);
@@ -197,10 +202,16 @@ final class JitJsonEncode
         $context->builder->branchIf($isObj, $objBlock, $scalarCheck);
 
         $context->builder->positionAtEnd($scalarCheck);
-        $context->builder->branchIf($isNativeDouble, $valueBlock, $boolScalarCheck);
+        $context->builder->branchIf($isJitBool, $boolCheck, $jitBoolCheck);
 
-        $context->builder->positionAtEnd($boolScalarCheck);
-        $context->builder->branchIf($isBool, $boolCheck, $valueBlock);
+        $context->builder->positionAtEnd($jitBoolCheck);
+        $context->builder->branchIf($isNativeDouble, $valueBlock, $nativeDoubleCheck);
+
+        $context->builder->positionAtEnd($nativeDoubleCheck);
+        $context->builder->branchIf($isVmBool, $boolCheck, $vmBoolCheck);
+
+        $context->builder->positionAtEnd($vmBoolCheck);
+        $context->builder->branch($valueBlock);
 
         $context->builder->positionAtEnd($boolCheck);
         $boolByte = JitValueBox::readBoolByte($context, $valuePtr);

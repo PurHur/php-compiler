@@ -165,7 +165,8 @@ final class HashTableExportKeyValuePairs implements Call
         $srcPtr = JitValueBox::valuePtrFromVariable($context, $valVar);
         $slot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer($context, $slot, $srcPtr);
-        self::remapJitBoolTagForNestedJson($context, $slot);
+        // Keep JIT TYPE_NATIVE_BOOL (=2). Remapping to VM TYPE_BOOLEAN (=3) made
+        // JitJsonEncode::encodeBoxedValue treat the value as TYPE_NATIVE_DOUBLE (#33520).
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }
@@ -174,35 +175,9 @@ final class HashTableExportKeyValuePairs implements Call
     {
         $slot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer($context, $slot, $entryPtr);
-        self::remapJitBoolTagForNestedJson($context, $slot);
+        // Do not remap TYPE_NATIVE_BOOL → TYPE_BOOLEAN — tag 3 is NATIVE_DOUBLE in encodeBoxedValue (#33520).
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
-    }
-
-    /** JIT TYPE_NATIVE_BOOL (=2) must look like VM TYPE_BOOLEAN (=3) to NestedJIT json_encode (#26367). */
-    private static function remapJitBoolTagForNestedJson(Context $context, Value $slot): void
-    {
-        $ptr = JitValueBox::pointer($context, $slot);
-        $map = $context->structFieldMap['__value__'];
-        $i8 = $context->getTypeFromString('int8');
-        $typeField = $context->builder->structGep($ptr, $map['type']);
-        $typeByte = $context->builder->load($typeField);
-        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $isJitBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
-        );
-        $done = BasicBlockHelper::append($context, 'ht_export_remap_bool_done');
-        $rewrite = BasicBlockHelper::append($context, 'ht_export_remap_bool_do');
-        $context->builder->branchIf($isJitBool, $rewrite, $done);
-        $context->builder->positionAtEnd($rewrite);
-        $context->builder->store(
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_BOOLEAN, false),
-            $typeField
-        );
-        $context->builder->branch($done);
-        $context->builder->positionAtEnd($done);
     }
 
     private static function longValueBox(Context $context, Value $long): Variable
