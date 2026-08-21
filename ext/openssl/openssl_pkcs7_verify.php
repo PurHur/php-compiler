@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkcs7_verify() — S/MIME verify (php-src ext/openssl/openssl.c; #6804).
+ * openssl_pkcs7_verify() — S/MIME verify (php-src ext/openssl/openssl.c; #6804 VM, JIT/AOT #33466).
  */
 final class openssl_pkcs7_verify extends Internal
 {
@@ -67,8 +67,22 @@ final class openssl_pkcs7_verify extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_pkcs7_verify() is not implemented for JIT in this compiler build (issue #6804)'
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 7) {
+            throw new \ArgumentCountError(
+                'openssl_pkcs7_verify() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslX509::pkcs7Verify(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2] ?? null,
+            $args[3] ?? null,
+            $args[4] ?? null,
+            $args[5] ?? null,
+            $args[6] ?? null
         );
     }
 }
