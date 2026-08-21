@@ -389,6 +389,126 @@ final class SplFixedArrayJitHelper
         return \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr);
     }
 
+    /**
+     * Thin AOT: restore SplFixedArray O: integer-keyed bag into `__spl_ht` (#33640).
+     *
+     * Avoids {@see StringUnserialize::emitObjectDecodeRuntime} writing firstIntProp into
+     * slot 0 (corrupts `__spl_ht`). Prefer helper-runtime (peer #32925).
+     * php-src: SplFixedArray::__unserialize / var_unserializer.c
+     */
+    public static function compileUnserializeRestore(
+        Context $context,
+        Value $obj,
+        Value $payloadString
+    ): void {
+        \PHPCompiler\JIT\Builtin\StringUnserialize::ensureObjectHelpersCompiled($context);
+        $internals = [
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
+        ];
+        foreach ($internals as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof \PHPCompiler\JIT\Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
+            }
+        }
+        $findLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplFixedArrayFindNestedJitHelper::afterBrace';
+        $fillLogical = 'PHPCompiler\\ext\\standard\\UnserializeSplFixedArrayFillNestedJitHelper::fillAt';
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplFixedArrayFindNestedJitHelper.php',
+            [$findLogical],
+            '#33640'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplFixedArrayFillNestedJitHelper.php',
+            [$fillLogical],
+            '#33640'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+
+        $payloadOwned = self::nestedJitOwnedString($context, $payloadString);
+        $i64 = $context->getTypeFromString('int64');
+        $findFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $findLogical, '#33640');
+        $fillFn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $fillLogical, '#33640');
+        $offRaw = $context->builder->call(
+            $findFn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $payloadOwned,
+                $findFn->getParam(0)->typeOf()
+            )
+        );
+        $off = \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $offRaw, $i64);
+        $parent = BasicBlockHelper::parentFunction($context);
+        $bbFill = $parent->appendBasicBlock('sfa_unser_fill');
+        $bbDone = $parent->appendBasicBlock('sfa_unser_done');
+        $found = $context->builder->icmp(
+            Builder::INT_SGE,
+            $off,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($found, $bbFill, $bbDone);
+
+        $context->builder->positionAtEnd($bbFill);
+        $ht = self::htPtr($context, $obj);
+        $destI64 = \PHPCompiler\JIT\JitNestedHelperCoerce::ptrToI64($context, $ht);
+        $context->builder->call(
+            $fillFn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $destI64,
+                $fillFn->getParam(0)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $payloadOwned,
+                $fillFn->getParam(1)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $off,
+                $fillFn->getParam(2)->typeOf()
+            )
+        );
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /** Owned `__string__*` copy for NestedJIT PHP string params (#24137 / #33640). */
+    private static function nestedJitOwnedString(Context $context, Value $payload): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $separated = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $payload
+        );
+        $slot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $context->builder->store($separated, $slot);
+        $loaded = $context->builder->load($slot);
+        $map = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $loaded);
+        $src = $context->builder->pointerCast(
+            $context->builder->structGep($loaded, $map['value']),
+            $i8p
+        );
+        $copy = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $src
+        );
+        $context->refcount->disableRefcount($copy);
+
+        return $copy;
+    }
+
     /** Expose object load for {@see \PHPCompiler\ext\standard\JitSerialize} (#33634). */
     public static function loadObjectPtr(Context $context, JITVariable $receiver): Value
     {

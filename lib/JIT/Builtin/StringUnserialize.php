@@ -164,6 +164,7 @@ final class StringUnserialize
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_long(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
         ];
         foreach ($internals as $internal) {
             $lc = strtolower($internal->getName());
@@ -321,6 +322,13 @@ final class StringUnserialize
                     $objVal,
                     $payloadString,
                     $splName
+                );
+            } elseif ('SplFixedArray' === $className) {
+                // Integer-keyed bag into `__spl_ht` — do not write firstIntProp into slot 0 (#33640).
+                \PHPCompiler\VM\SplFixedArrayJitHelper::compileUnserializeRestore(
+                    $context,
+                    $objVal,
+                    $payloadString
                 );
             } else {
                 $voidPtr = $context->getTypeFromString('void*');
