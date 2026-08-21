@@ -31,8 +31,8 @@ final class TypeDeadFreadAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next StreamIo leftover sentinel (tmpfile still Type always-on).
-        $this->assertStringContainsString("registerFunction('__compiler_tmpfile'", $type);
+        // Next StreamIo leftover sentinel after tmpfile (#33067 already dropped).
+        $this->assertStringContainsString("registerFunction('__compiler_popen'", $type);
         $this->assertStringContainsString('StreamIo::ensureLinked', $type);
     }
 
