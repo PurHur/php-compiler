@@ -36,7 +36,8 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT SplFileObject — snapshot lines into `__spl_ht` for foreach (#28709, #33305, #33308).
+ * Thin-AOT SplFileObject — snapshot lines into `__spl_ht` at construct (#28709, #33305, #33308);
+ * foreach walks Iterator protocol so setFlags apply (#33396 / #33319).
  *
  * Construct / openFile read via libc file_get_contents then NestedJIT explode line split
  * (#33308 — concat-loop NestedJIT SIGSEGV'd in __ref__delref).
@@ -62,7 +63,8 @@ use PHPLLVM\Value;
  * fscanf on `__spl_fd` — fgets + `__compiler_sscanf_array` (#33382).
  * hasChildren / getChildren — always false / null (#33388).
  * DROP_NEW_LINE strips trailing \\r\\n / \\n / \\r on line read (#33390).
- * Foreach walks packed `__spl_ht` ({@see SplOuterIteratorHt}).
+ * SKIP_EMPTY omits blank lines on iterator/seek read (#33396); fgets does not skip.
+ * Foreach uses Iterator protocol (not packed `__spl_ht` walk) so flags apply (#33396).
  *
  * php-src: ext/spl/spl_directory.c — SplFileObject iterator / zim_SplFileObject_fgets /
  * zim_SplFileObject_getCurrentLine / zim_SplFileObject_fread / zim_SplFileObject_fgetc /
@@ -80,6 +82,9 @@ final class SplFileObjectJitHelper
     /** php-src SplFileObject::DROP_NEW_LINE — peer SplFileObjectBuiltin::DROP_NEW_LINE. */
     private const FLAG_DROP_NEW_LINE = 1;
 
+    /** php-src SplFileObject::SKIP_EMPTY — peer SplFileObjectBuiltin::SKIP_EMPTY. */
+    private const FLAG_SKIP_EMPTY = 4;
+
     public const PROP_HT = '__spl_ht';
 
     public const PROP_PATH = '__pathname';
@@ -96,7 +101,7 @@ final class SplFileObjectJitHelper
     /** Cached current_line string. */
     public const PROP_CUR_LINE = '__spl_cur_line';
 
-    /** SplFileObject flags (READ_CSV / DROP_NEW_LINE / …) — php-src flags (#33368 / #33390). */
+    /** SplFileObject flags (READ_CSV / DROP_NEW_LINE / SKIP_EMPTY / …) — php-src flags (#33368 / #33390 / #33396). */
     public const PROP_FLAGS = '__spl_flags';
     /** SplFileObject::max_line_len — php-src max_line_len (#33377). */
     public const PROP_MAX_LINE_LEN = '__spl_max_line_len';
@@ -227,7 +232,8 @@ final class SplFileObjectJitHelper
         $i64 = $context->getTypeFromString('int64');
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
 
-        return self::emitReadLineToValueBox($context, $receiver, 1);
+        // fgets does not apply SKIP_EMPTY (Zend zim_SplFileObject_fgets / #33396).
+        return self::emitReadLineToValueBox($context, $receiver, 1, false);
     }
 
     /**
@@ -1179,8 +1185,8 @@ final class SplFileObjectJitHelper
         $context->builder->branchIf($missing, $needBb, $haveBb);
 
         $context->builder->positionAtEnd($needBb);
-        // Lazy read: lineAdd=0 so key stays 0 on first current().
-        $tmp = self::emitReadLineToValueBox($context, $receiver, 0);
+        // Lazy read: lineAdd=0 so key stays 0 on first current(). SKIP_EMPTY (#33396).
+        $tmp = self::emitReadLineToValueBox($context, $receiver, 0, true);
         $context->builder->store($tmp, $slotAlloca);
         $context->builder->branch($doneBb);
 
@@ -1216,7 +1222,7 @@ final class SplFileObjectJitHelper
         $context->builder->branchIf($missing, $needBb, $afterBb);
 
         $context->builder->positionAtEnd($needBb);
-        self::emitReadLineToValueBox($context, $receiver, 0);
+        self::emitReadLineToValueBox($context, $receiver, 0, true);
         $context->builder->branch($afterBb);
 
         $context->builder->positionAtEnd($afterBb);
@@ -1234,30 +1240,37 @@ final class SplFileObjectJitHelper
 
     /**
      * Read one line into PROP_CUR_LINE; bump LINE by $lineAdd; set HAS / AT_EOF.
+     * When $applySkipEmpty, omit blank lines (iterator/seek — php-src read_line / #33396).
+     * fgets passes false so empty lines are returned (Zend parity).
      *
      * @return Value __value__* box (string or false)
      */
     private static function emitReadLineToValueBox(
         Context $context,
         JITVariable $receiver,
-        int $lineAdd
+        int $lineAdd,
+        bool $applySkipEmpty = false
     ): Value {
         self::ensureStreamAbis($context);
         $obj = self::loadObject($context, $receiver);
         $handle = self::loadFd($context, $receiver);
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $loopBb = $fn->appendBasicBlock('splfo_rd_loop');
+        $eofBb = $fn->appendBasicBlock('splfo_rd_eof');
+        $okBb = $fn->appendBasicBlock('splfo_rd_ok');
+        $joinBb = $fn->appendBasicBlock('splfo_rd_join');
+        $slot = JitValueBox::alloc($context);
+        $context->builder->branch($loopBb);
+
+        $context->builder->positionAtEnd($loopBb);
         $line = $context->builder->call(
             $context->lookupFunction('__compiler_fgets'),
             $handle,
             self::fgetsBufferLen($context, $obj)
         );
-        $slot = JitValueBox::alloc($context);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $line, $strPtr->constNull());
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $eofBb = $fn->appendBasicBlock('splfo_rd_eof');
-        $okBb = $fn->appendBasicBlock('splfo_rd_ok');
-        $joinBb = $fn->appendBasicBlock('splfo_rd_join');
         $context->builder->branchIf($isNull, $eofBb, $okBb);
 
         $context->builder->positionAtEnd($eofBb);
@@ -1276,6 +1289,17 @@ final class SplFileObjectJitHelper
         $context->builder->positionAtEnd($okBb);
         $flags = self::loadLongProp($context, $obj, self::PROP_FLAGS);
         $line = self::emitApplyDropNewLine($context, $line, $flags);
+        if ($applySkipEmpty) {
+            $acceptBb = $fn->appendBasicBlock('splfo_rd_accept');
+            $len = $context->builder->call($context->lookupFunction('__string__strlen'), $line);
+            $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(0, false));
+            $skipMasked = $context->builder->and($flags, $i64->constInt(self::FLAG_SKIP_EMPTY, false));
+            $wantSkip = $context->builder->icmp(Builder::INT_NE, $skipMasked, $i64->constInt(0, false));
+            $skip = $context->builder->and($isEmpty, $wantSkip);
+            // Peer SplFileObjectStorage::shouldSkipEmptyLine — continue read_line loop.
+            $context->builder->branchIf($skip, $loopBb, $acceptBb);
+            $context->builder->positionAtEnd($acceptBb);
+        }
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(1, false));
         self::storeStringProp($context, $obj, self::PROP_CUR_LINE, $line);
@@ -1368,6 +1392,7 @@ final class SplFileObjectJitHelper
 
     /**
      * Seek read_line — NULL get_line while !eof is empty-line SUCCESS + lineAdd (VM #24331).
+     * Applies SKIP_EMPTY like iterator read_line (#33396 / php-src).
      */
     private static function emitSeekReadLine(
         Context $context,
@@ -1379,17 +1404,21 @@ final class SplFileObjectJitHelper
         $handle = self::loadFd($context, $receiver);
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $loopBb = $fn->appendBasicBlock('splfo_seek_rd_loop');
+        $nullBb = $fn->appendBasicBlock('splfo_seek_rd_null');
+        $okBb = $fn->appendBasicBlock('splfo_seek_rd_ok');
+        $joinBb = $fn->appendBasicBlock('splfo_seek_rd_join');
+        $lineSlot = $context->builder->alloca($strPtr);
+        $context->builder->branch($loopBb);
+
+        $context->builder->positionAtEnd($loopBb);
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_fgets'),
             $handle,
             self::fgetsBufferLen($context, $obj)
         );
         $isNull = $context->builder->icmp(Builder::INT_EQ, $raw, $strPtr->constNull());
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $nullBb = $fn->appendBasicBlock('splfo_seek_rd_null');
-        $okBb = $fn->appendBasicBlock('splfo_seek_rd_ok');
-        $joinBb = $fn->appendBasicBlock('splfo_seek_rd_join');
-        $lineSlot = $context->builder->alloca($strPtr);
         $context->builder->branchIf($isNull, $nullBb, $okBb);
 
         $context->builder->positionAtEnd($nullBb);
@@ -1402,6 +1431,15 @@ final class SplFileObjectJitHelper
         $context->builder->positionAtEnd($okBb);
         $flags = self::loadLongProp($context, $obj, self::PROP_FLAGS);
         $stripped = self::emitApplyDropNewLine($context, $raw, $flags);
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $stripped);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(0, false));
+        $skipMasked = $context->builder->and($flags, $i64->constInt(self::FLAG_SKIP_EMPTY, false));
+        $wantSkip = $context->builder->icmp(Builder::INT_NE, $skipMasked, $i64->constInt(0, false));
+        $skip = $context->builder->and($isEmpty, $wantSkip);
+        $acceptBb = $fn->appendBasicBlock('splfo_seek_rd_accept');
+        $context->builder->branchIf($skip, $loopBb, $acceptBb);
+
+        $context->builder->positionAtEnd($acceptBb);
         $context->builder->store($stripped, $lineSlot);
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(0, false));
         $context->builder->branch($joinBb);
