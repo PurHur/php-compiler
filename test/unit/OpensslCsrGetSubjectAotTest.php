@@ -7,14 +7,16 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: openssl_csr_get_subject() leftover of #6421 (#32692).
+ * AOT: openssl_csr_get_subject() — PEM fold (#32692) + TypeError/argc gates (#33541).
  *
- * @see php-src ext/openssl/xp.c PHP_FUNCTION(openssl_csr_get_subject)
+ * @see php-src ext/openssl/openssl.c PHP_FUNCTION(openssl_csr_get_subject)
  *
  * @group aot-lint
  */
 final class OpensslCsrGetSubjectAotTest extends TestCase
 {
+    private const EXPECTED_GATES = "null-type\nargc\n";
+
     public function testVmGetSubjectPem(): void
     {
         if (!\PHPCompiler\ext\openssl\VmOpensslCsrNative::available()) {
@@ -68,11 +70,60 @@ final class OpensslCsrGetSubjectAotTest extends TestCase
         }
     }
 
-    public function testCallNoLongerThrowsJitUnimplemented(): void
+    public function testVmTypeErrorAndArgc(): void
+    {
+        $runtime = new Runtime();
+        $code = file_get_contents(dirname(__DIR__).'/repro/issue_33541_openssl_csr_get_subject_aot.php');
+        $this->assertNotFalse($code);
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'issue_33541_openssl_csr_get_subject_aot.php'));
+        $out = (string) ob_get_clean();
+        $this->assertSame(self::EXPECTED_GATES, $out);
+    }
+
+    /**
+     * @group llvm
+     * @group aot
+     */
+    public function testAotTypeErrorAndArgcMatchVm(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/issue_33541_openssl_csr_get_subject_aot.php';
+        $runtime = new Runtime();
+        $code = file_get_contents($src);
+        $this->assertNotFalse($code);
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'issue_33541_openssl_csr_get_subject_aot.php'));
+        $vmOut = (string) ob_get_clean();
+        $this->assertSame(self::EXPECTED_GATES, $vmOut);
+
+        $bin = sys_get_temp_dir().'/phpc_ossl_csr_get_subj_'.getmypid().'.bin';
+        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=1 '.escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        $this->assertFileExists($bin);
+        try {
+            $runOut = [];
+            exec(escapeshellarg($bin).' 2>/dev/null', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame($vmOut, implode("\n", $runOut)."\n");
+        } finally {
+            @unlink($bin);
+        }
+    }
+
+    public function testCallTypeErrorPathNoLongerCompileFatalOnly(): void
     {
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/ext/openssl/openssl_csr_get_subject.php');
-        $this->assertStringNotContainsString('not implemented for JIT', $src);
+        $this->assertStringContainsString('emitTypeErrorAndAbort', $src);
+        $this->assertStringContainsString('emitArgumentCountErrorAndAbort', $src);
         $this->assertStringContainsString('JitOpensslX509::csrGetSubject', $src);
+        $this->assertStringNotContainsString('not implemented for JIT', $src);
         $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/openssl_csr_get_subject.c');
     }
 }
