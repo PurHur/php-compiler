@@ -31,8 +31,8 @@ final class TypeDeadStreamSetBlockingAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (fgets still Type always-on; fgetc dropped in #33166).
-        $this->assertStringContainsString("registerFunction('__compiler_fgets'", $type);
+        // Next leftover sentinel (stream_get_line still Type always-on; fgets dropped in #33168).
+        $this->assertStringContainsString("registerFunction('__compiler_stream_get_line'", $type);
         $this->assertStringContainsString('StreamMeta::ensureLinked', $type);
     }
 

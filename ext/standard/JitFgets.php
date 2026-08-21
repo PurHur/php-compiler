@@ -14,7 +14,12 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for fgets() via __compiler_fgets (issue #1187). */
+/**
+ * LLVM lowering for fgets() via __compiler_fgets (issue #1187; ensureLinked #33168).
+ *
+ * ABI owned by {@see StreamReadRuntime} / {@see JitStreamReadBridgeKernel} after Type always-on
+ * drop (#33168) — must ensureLinked before lookup (peer {@see JitFtell} / {@see JitFgetc} #33113).
+ */
 final class JitFgets
 {
     private const LENGTH_ERROR = 'fgets(): Argument #2 ($length) must be greater than 0';
