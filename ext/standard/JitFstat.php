@@ -11,13 +11,16 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for fstat() via __compiler_fstat / FstatJitHelper PHP (#10460, #3482). */
+/** LLVM lowering for fstat() via __compiler_fstat / FstatJitHelper PHP (#10460, #3482, #33359). */
 final class JitFstat
 {
-    /** @return Value */
+    /** @return Value (__value__* — array or boolean false) */
     public static function invoke(Context $context, Value $handle): Value
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         StreamFstat::ensureLinked($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'fstat_after_link');
 
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $nullHt = $htPtrTy->constNull();
@@ -29,31 +32,25 @@ final class JitFstat
         $failBlock = BasicBlockHelper::append($context, 'fstat_fail');
         $okBlock = BasicBlockHelper::append($context, 'fstat_ok');
         $doneBlock = BasicBlockHelper::append($context, 'fstat_done');
+        // Single slot — avoid PHI of two allocas (thin AOT abort / verify, #33359).
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        $falseSlot = JitValueBox::alloc($context);
-        $falsePtr = JitValueBox::pointer($context, $falseSlot);
-        JitValueBox::writeBool($context, $falseSlot, $context->getTypeFromString('int1')->constInt(0, false));
+        JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(0, false));
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $arraySlot = JitValueBox::alloc($context);
-        $arrayPtr = JitValueBox::pointer($context, $arraySlot);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
-            $arrayPtr,
+            $ptr,
             $statHt
         );
-        $okTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
-        $valuePtrTy = $context->getTypeFromString('__value__*');
-        $result = $context->builder->phi($valuePtrTy);
-        $result->addIncoming($falsePtr, $failBlock);
-        $result->addIncoming($arrayPtr, $okTail);
 
-        return $result;
+        return $ptr;
     }
 }

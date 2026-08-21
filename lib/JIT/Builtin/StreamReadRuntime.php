@@ -173,6 +173,8 @@ final class StreamReadRuntime
         \PHPCompiler\ext\standard\JitStreamIoKernel::implementFgetcForce($context);
         \PHPCompiler\ext\standard\JitStreamIoKernel::implementFtruncateForce($context);
         \PHPCompiler\ext\standard\JitStreamIoKernel::implementFflushForce($context);
+        // fstat NestedJIT VmFs cannot see libc FILE* table (#33359).
+        StreamFstatRuntime::forceLibcFstat($context);
     }
 
     public static function helperFunction(Context $context, string $logical): LlvmFunction

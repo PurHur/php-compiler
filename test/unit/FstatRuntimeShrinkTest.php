@@ -33,8 +33,10 @@ final class FstatRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringContainsString('forceLibcFstat', $source);
+        $this->assertStringContainsString('fstatFdArgv', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertLessThan(150, \substr_count($source, "\n"), 'StreamFstatRuntime must stay thin');
+        $this->assertLessThan(280, \substr_count($source, "\n"), 'StreamFstatRuntime must stay a bridge (+ thin AOT libc force)');
     }
 
     public function testVmStreamFstatMemorySize(): void
@@ -48,6 +50,23 @@ final class FstatRuntimeShrinkTest extends TestCase
         $this->assertSame(3, $stat[7]);
         $this->assertSame(33206, $stat['mode'], 'php://memory mode 100666 octal (#18402)');
         VmPhpMemoryStream::close($handle);
+    }
+
+
+    public function testFstatFdArgvViaProcSelfFd(): void
+    {
+        $path = sys_get_temp_dir().'/phpc_fstat_fd_'.getmypid().'.txt';
+        file_put_contents($path, 'xy');
+        $fp = fopen($path, 'r');
+        $this->assertNotFalse($fp);
+        $fd = fileno($fp);
+        $ht = FstatJitHelper::fstatFdArgv($fd);
+        fclose($fp);
+        @unlink($path);
+        $this->assertNotNull($ht);
+        $size = $ht->find('size');
+        $this->assertNotNull($size);
+        $this->assertSame(2, $size->toInt());
     }
 
     public function testFstatJitHelperDelegatesToVmFs(): void

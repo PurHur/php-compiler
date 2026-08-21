@@ -11,6 +11,7 @@ use PHPCompiler\ext\standard\JitFpassthru;
 use PHPCompiler\ext\standard\JitFputcsv;
 use PHPCompiler\ext\standard\JitFread;
 use PHPCompiler\ext\standard\JitFseek;
+use PHPCompiler\ext\standard\JitFstat;
 use PHPCompiler\ext\standard\JitFtell;
 use PHPCompiler\ext\standard\JitFtruncate;
 use PHPCompiler\ext\standard\JitPath;
@@ -43,6 +44,7 @@ use PHPLLVM\Value;
  * getCurrentLine is the php-src fgets alias (#33321).
  * fread/fgetc on `__spl_fd` (#33332).
  * ftell/flock on `__spl_fd` (#33336) via JitFtell / JitFlock.
+ * fstat on `__spl_fd` (#33359) via JitFstat (thin AOT libc fileno force).
  * ftruncate on `__spl_fd` (#33348) via JitFtruncate (peer procedural #33155).
  * fflush on `__spl_fd` (#33354) via JitFflush (peer procedural #1189).
  * fpassthru on `__spl_fd` (#33358) via JitFpassthru (peer procedural #1194).
@@ -289,6 +291,18 @@ final class SplFileObjectJitHelper
         $handle = self::loadFd($context, $receiver);
 
         return JitFtell::invoke($context, $handle);
+    }
+
+    /**
+     * SplFileObject::fstat — php_stream_stat on live handle (#33359).
+     * php-src: zim_SplFileObject_fstat
+     */
+    public static function compileFstat(Context $context, JITVariable $receiver): Value
+    {
+        self::ensureStreamAbis($context);
+        $handle = self::loadFd($context, $receiver);
+
+        return JitFstat::invoke($context, $handle);
     }
 
     /**
