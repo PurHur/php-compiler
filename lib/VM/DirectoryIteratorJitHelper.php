@@ -21,12 +21,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263, #33274, #33276, #33280).
+ * Thin-AOT DirectoryIterator / FilesystemIterator — snapshot `__spl_ht` + Iterator (#27289, #33263, #33274, #33276, #33280, #33282).
  *
  * Construct lists directory entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}
  * (NestedJIT leaf calling DirHandleJitHelper only — StringDir already linked).
  * current() returns `$this` (DirectoryIterator Zend semantics); isDot/getFilename read `__filename`.
- * isFile/isDir/getPath/getPathname/getSize/getExtension/getType join `__dir_path`+`__filename`.
+ * isFile/isDir/getPath/getPathname/getSize/getExtension/getType/getMTime/… join `__dir_path`+`__filename` then {@see \PHPCompiler\ext\standard\JitStat}.
  *
  * php-src: ext/spl/spl_directory.c
  */
@@ -247,13 +247,91 @@ final class DirectoryIteratorJitHelper
      */
     public static function compileGetSize(Context $context, JITVariable $receiver, string $className): Value
     {
+        return self::compileStatLongField($context, $receiver, $className, 'size');
+    }
+
+    /**
+     * SplFileInfo::getMTime (#33282). php-src: zim_SplFileInfo_getMTime
+     */
+    public static function compileGetMTime(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compileStatLongField($context, $receiver, $className, 'mtime');
+    }
+
+    /**
+     * SplFileInfo::getATime (#33282). php-src: zim_SplFileInfo_getATime
+     */
+    public static function compileGetATime(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compileStatLongField($context, $receiver, $className, 'atime');
+    }
+
+    /**
+     * SplFileInfo::getCTime (#33282). php-src: zim_SplFileInfo_getCTime
+     */
+    public static function compileGetCTime(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compileStatLongField($context, $receiver, $className, 'ctime');
+    }
+
+    /**
+     * SplFileInfo::getPerms (#33282). php-src: zim_SplFileInfo_getPerms
+     */
+    public static function compileGetPerms(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compileStatLongField($context, $receiver, $className, 'perms');
+    }
+
+    /**
+     * SplFileInfo::getInode (#33282). php-src: zim_SplFileInfo_getInode
+     */
+    public static function compileGetInode(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compileStatLongField($context, $receiver, $className, 'inode');
+    }
+
+    /**
+     * SplFileInfo::getOwner (#33282). php-src: zim_SplFileInfo_getOwner
+     */
+    public static function compileGetOwner(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compileStatLongField($context, $receiver, $className, 'owner');
+    }
+
+    /**
+     * SplFileInfo::getGroup (#33282). php-src: zim_SplFileInfo_getGroup
+     */
+    public static function compileGetGroup(Context $context, JITVariable $receiver, string $className): Value
+    {
+        return self::compileStatLongField($context, $receiver, $className, 'group');
+    }
+
+    /**
+     * @param 'size'|'mtime'|'atime'|'ctime'|'perms'|'inode'|'owner'|'group' $field
+     */
+    private static function compileStatLongField(
+        Context $context,
+        JITVariable $receiver,
+        string $className,
+        string $field
+    ): Value {
         StatPathRuntime::ensureLinked($context);
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'di_getsize_after_stat_link');
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'di_stat_field_after_stat_link');
 
         $obj = self::loadObject($context, $receiver);
         $pathname = self::emitJoinedPathname($context, $obj, $className);
 
-        return JitStat::pathFileSizeBoxed($context, $pathname);
+        return match ($field) {
+            'size' => JitStat::pathFileSizeBoxed($context, $pathname),
+            'mtime' => JitStat::pathFileMtimeBoxed($context, $pathname),
+            'atime' => JitStat::pathFileAtimeBoxed($context, $pathname),
+            'ctime' => JitStat::pathFileCtimeBoxed($context, $pathname),
+            'perms' => JitStat::pathFilePermsBoxed($context, $pathname),
+            'inode' => JitStat::pathFileInodeBoxed($context, $pathname),
+            'owner' => JitStat::pathFileOwnerBoxed($context, $pathname),
+            'group' => JitStat::pathFileGroupBoxed($context, $pathname),
+            default => throw new \LogicException('Unknown SplFileInfo stat field: '.$field),
+        };
     }
 
     /**
