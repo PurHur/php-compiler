@@ -27,6 +27,9 @@ final class AssertFail
 
     public static function ensureLinked(Context $context): void
     {
+        // Context ensureStandaloneBodies may run AssertFail before StringTriggerError
+        // (#33234 Type always-on drop) — link trigger_error first.
+        StringTriggerError::ensureLinked($context);
         AssertIniRuntime::ensureGlobals($context);
         AssertionErrorRaise::registerDeclarations($context);
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
@@ -36,6 +39,7 @@ final class AssertFail
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        StringTriggerError::ensureLinked($context);
         AssertIniRuntime::ensureGlobals($context);
         AssertionErrorRaise::registerDeclarations($context);
         self::implementBodies($context);

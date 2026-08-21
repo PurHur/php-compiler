@@ -606,9 +606,14 @@ class Type extends Builtin {
             $fntypeUndefKeyLong
         );
         $this->context->registerFunction('__compiler_undefined_array_key_warning_long', $fnUndefKeyLong);
-        $fntypeTriggerError = $this->context->context->functionType($void, false, $i8p, $sizeT, $i32, $i8p, $i32);
-        $fnTriggerError = $this->context->module->addFunction('__compiler_trigger_error', $fntypeTriggerError);
-        $this->context->registerFunction('__compiler_trigger_error', $fnTriggerError);
+        // __compiler_trigger_error always-on shell removed (#33234): StringTriggerError
+        // / JitTriggerErrorKernel owns the ABI (getNamedFunction first via
+        // implementTriggerErrorBridge; Type::initialize still StringTriggerError::ensureLinked
+        // on the full load path; Context ensureStandaloneBodies + call-site ensureLinked
+        // before lookup). Leftover Type empty decls vs Runtime ABI drift mint
+        // trigger_error.1 (#31894 / #32122). User-script trigger_error()/user_error()
+        // stay trigger_error_ / JitBuiltinWarning (php-src Zend/zend_execute_API.c,
+        // main/php_errors.c, ext/standard/basic_functions.c).
         $fntypeAssertFail = $this->context->context->functionType($void, false, $i8p, $sizeT);
         $fnAssertFail = $this->context->module->addFunction('__compiler_assert_fail', $fntypeAssertFail);
         $this->context->registerFunction('__compiler_assert_fail', $fnAssertFail);

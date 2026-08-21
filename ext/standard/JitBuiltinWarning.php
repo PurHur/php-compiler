@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StatPathRuntime;
+use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\JIT\LibcExtern;
@@ -35,6 +36,7 @@ final class JitBuiltinWarning
      */
     public static function emitImageReadFailed(Context $context, Value $sourceStr, string $function): void
     {
+        StringTriggerError::ensureLinked($context); // Type always-on drop (#33234)
         $map = $context->structFieldMap['__string__'];
         $sourcePtr = $context->builder->structGep($sourceStr, $map['value']);
         $sizeT = $context->getTypeFromString('size_t');
@@ -75,6 +77,7 @@ final class JitBuiltinWarning
     /** php-src streams.c — fopen/file read failure before getimagesize probe (#16408). */
     public static function emitStreamOpenFailed(Context $context, Value $pathStr, string $function): void
     {
+        StringTriggerError::ensureLinked($context); // Type always-on drop (#33234)
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($pathStr, $map['value']);
         $sizeT = $context->getTypeFromString('size_t');
@@ -114,6 +117,8 @@ final class JitBuiltinWarning
 
     private static function emitLevel(Context $context, string $message, int $level): void
     {
+        // Type always-on trigger_error drop (#33234) — must ensureLinked before lookup.
+        StringTriggerError::ensureLinked($context);
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
@@ -163,6 +168,7 @@ final class JitBuiltinWarning
         string $function,
         string $reason
     ): void {
+        StringTriggerError::ensureLinked($context); // Type always-on drop (#33234)
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($pathStr, $map['value']);
         $sizeT = $context->getTypeFromString('size_t');
@@ -202,6 +208,7 @@ final class JitBuiltinWarning
 
     public static function emitPathNoSuchFile(Context $context, Value $pathStr, string $function): void
     {
+        StringTriggerError::ensureLinked($context); // Type always-on drop (#33234)
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($pathStr, $map['value']);
         $sizeT = $context->getTypeFromString('size_t');

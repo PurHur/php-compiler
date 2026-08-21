@@ -102,6 +102,8 @@ final class trigger_error_ extends Internal
             $filePath = ScriptMagic::stringForBlock($context->jitEnclosingBlock, OpCode::SCRIPT_MAGIC_FILE);
         }
         $filePtr = $context->builder->pointerCast($context->constantFromString($filePath), $i8p);
+        // Type always-on trigger_error drop (#33234) — must ensureLinked before lookup.
+        \PHPCompiler\JIT\Builtin\StringTriggerError::ensureLinked($context);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
