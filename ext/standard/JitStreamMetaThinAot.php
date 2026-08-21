@@ -12,13 +12,14 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Thin user-script AOT {@see __compiler_stream_get_meta_data} (#27659, #33154).
+ * Thin user-script AOT {@see __compiler_stream_get_meta_data} (#27659, #33154, #33157).
  *
  * NestedJIT {@see StreamMetaJitHelper} → {@see VmFs} never sees {@see StreamGlobalsJit}
  * slots that {@see JitStreamIoKernel} fopen fills (peer {@see JitStreamLifecycleKernel} #27186).
  * Build the meta hashtable in LLVM from path + FILE* (php-src streamsfuncs.c keys).
  * Do not re-add empty always-on shells in Type — leftover decls mint stream_get_meta_data.1
- * (#31894 / #32122).
+ * (#31894 / #32122). Peer `__compiler_stream_set_blocking` NestedJIT bridge stays
+ * {@see JitStreamMetaKernel} (getNamedFunction first; no Type always-on shell — #33157).
  */
 final class JitStreamMetaThinAot
 {

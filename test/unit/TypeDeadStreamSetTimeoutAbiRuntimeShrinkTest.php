@@ -31,8 +31,8 @@ final class TypeDeadStreamSetTimeoutAbiRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString("addFunction('exit'", $type);
         $this->assertStringContainsString("addFunction('abort'", $type);
-        // Next leftover sentinel (stream_set_blocking still Type always-on; stream_get_meta_data dropped in #33154).
-        $this->assertStringContainsString("registerFunction('__compiler_stream_set_blocking'", $type);
+        // Next leftover sentinel (stream_enable_crypto still Type always-on; stream_set_blocking dropped in #33157).
+        $this->assertStringContainsString("registerFunction('__compiler_stream_enable_crypto'", $type);
         $this->assertStringContainsString('StreamBuffer::ensureLinked', $type);
     }
 
