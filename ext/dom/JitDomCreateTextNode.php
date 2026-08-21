@@ -95,6 +95,20 @@ final class JitDomCreateTextNode
         self::storeStringLiteral($context, $obj, self::PROP_WHOLE_TEXT, $data);
     }
 
+    /** Runtime string rewrite for normalize merge of #text stand-ins (#33438). */
+    public static function overwriteCharacterDataValue(Context $context, Value $obj, Value $dataStr): void
+    {
+        self::$lastMaterializedData = null;
+        JitDomSubstringData::remember(null);
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_STANDIN);
+        self::ensurePropertyLayout($objectType, $classId);
+        self::storeStringValue($context, $obj, self::PROP_NODE_VALUE, $dataStr);
+        self::storeStringValue($context, $obj, self::PROP_TEXT_CONTENT, $dataStr);
+        self::storeStringValue($context, $obj, self::PROP_DATA, $dataStr);
+        self::storeStringValue($context, $obj, self::PROP_WHOLE_TEXT, $dataStr);
+    }
+
     private static function materializeFromRuntimeData(Context $context, JITVariable $dataArg): Value
     {
         self::$lastMaterializedData = null;
