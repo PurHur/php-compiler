@@ -21,11 +21,17 @@ final class MkdirRuntimeShrinkTest extends TestCase
         $this->assertLessThan(25, \substr_count($source, "\n") + 1);
     }
 
-    public function testStringMkdirBridgeUsesMkdirJitHelper(): void
+    public function testStringMkdirBridgeUsesLibcRuntime(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringMkdir.php');
-        $this->assertStringContainsString('MkdirJitHelper', $bridge);
+        $this->assertStringContainsString('MkdirLibcRuntime::emit', $bridge);
         $this->assertStringNotContainsString('__compiler_mkdir', $bridge);
+        // #33402 — restore caller insert block (peer StringChmod #19283)
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $bridge);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $bridge);
+        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MkdirLibcRuntime.php');
+        $this->assertStringContainsString('mkdir(2)', $libc);
+        $this->assertStringContainsString('#33402', $libc);
     }
 
     public function testMkdirJitHelperDelegatesToVmFsDirNative(): void
@@ -46,6 +52,7 @@ final class MkdirRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('MkdirJitHelper.php', $spine);
         $this->assertStringContainsString('StringMkdir.php', $spine);
+        $this->assertStringContainsString('MkdirLibcRuntime.php', $spine);
     }
 
     public function testSessionStorageDeclaresMkdirModuleLocally(): void
