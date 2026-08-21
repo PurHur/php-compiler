@@ -5953,6 +5953,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringUcwords.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUmask.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUniqid.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnitEnumExists.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/UnlinkLibcRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnlink.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnpack.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnserialize.php';

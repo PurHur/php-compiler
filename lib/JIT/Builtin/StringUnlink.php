@@ -4,32 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for unlink() via UnlinkJitHelper PHP (#15471, #19186).
+ * JIT/AOT link for unlink() via thin libc unlink(2) (#33412 / peer mkdir #33402 / touch #28995).
  *
- * User-script AOT and embed route through helper-runtime + {@see UnlinkJitHelper} (#19157 pattern).
- * SSOT: {@see \PHPCompiler\ext\standard\VmFs::unlink()}.
+ * NestedJIT {@see \PHPCompiler\ext\standard\UnlinkJitHelper} re-enters this ABI under AOT
+ * when VmFsUnlinkPure calls host \\unlink(). Platform unlink(2) is the justified thin path.
  * php-src: ext/standard/filestat.c — php_unlink
  */
 final class StringUnlink
 {
     private const ABI = '__phpc_jit_unlink';
-
-    private const HELPER_PATH = '/ext/standard/UnlinkJitHelper.php';
-
-    private const INVOKE_HELPER = 'PHPCompiler\\ext\\standard\\UnlinkJitHelper::invokeArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::INVOKE_HELPER,
-    ];
-
-    private const BRIDGE_ENTRY = 'unlink_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -50,22 +38,33 @@ final class StringUnlink
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
+        $probe = $context->module->getNamedFunction(self::ABI);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI, $probe);
+
             return;
         }
 
+        // Restore caller insert block after bridge emit (#33412 / peer StringChmod #19283) —
+        // clearInsertionPosition alone orphans mid-emit unlink() callsites (Module.php:180).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
         $strPtr = $context->getTypeFromString('__string__*');
         $i1 = $context->getTypeFromString('int1');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI,
-            self::BRIDGE_ENTRY,
-            [$strPtr],
-            $i1,
-            self::INVOKE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#19186'
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI,
+                $context->context->functionType($i1, false, $strPtr)
+            );
+
+        UnlinkLibcRuntime::emit($context, $fn);
+
+        $context->registerFunction(self::ABI, $fn);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
