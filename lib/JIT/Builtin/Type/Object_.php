@@ -194,6 +194,13 @@ class Object_ extends Type {
     /** @var array<int, array<string, int>> class id => instance prop lc => declaring trait/class id (#7418) */
     private array $instancePropertyDeclaringClassId = [];
     /**
+     * Per-slot declaring class for same-name private shadows on one layout (#33439 / #22521).
+     * The name-keyed map alone cannot represent A::$p + B::$p on subclass B.
+     *
+     * @var array<int, array<int, int>> class id => slot index => declaring class id
+     */
+    private array $instancePropertySlotDeclaringClassId = [];
+    /**
      * Trait FQCN origin for instance props imported via `use Trait` (#26593).
      * Declaring class id is the composing class; this map keeps conflict messages accurate.
      *
@@ -1246,6 +1253,33 @@ class Object_ extends Type {
     public function propertySetsForClass(int $classId): array
     {
         return $this->properties[$classId] ?? [];
+    }
+
+    /**
+     * Prefer the slot declared by $classId when multiple same-name (private shadow) slots exist (#33439).
+     *
+     * @return array{0: int, 1: string, 2: int, 3: int}|null
+     */
+    public function resolvePropertySetForNameId(int $classId, int $nameId): ?array
+    {
+        $first = null;
+        $own = null;
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[0] !== $nameId) {
+                continue;
+            }
+            if (null === $first) {
+                $first = $propset;
+            }
+            $decl = $this->instancePropertySlotDeclaringClassId[$classId][$propset[3]]
+                ?? ($this->instancePropertyDeclaringClassId[$classId][strtolower($propset[1])] ?? $classId);
+            if ($decl === $classId) {
+                $own = $propset;
+                break;
+            }
+        }
+
+        return $own ?? $first;
     }
 
     public function recordSlotReceiver(PHPLLVM\Value $slot, PHPLLVM\Value $obj): void
@@ -3178,13 +3212,9 @@ class Object_ extends Type {
         if (null === $nameId) {
             return null;
         }
-        foreach ($this->properties[$classId] ?? [] as $propset) {
-            if ($propset[0] === $nameId) {
-                return $propset[3];
-            }
-        }
+        $propset = $this->resolvePropertySetForNameId($classId, $nameId);
 
-        return null;
+        return null === $propset ? null : $propset[3];
     }
 
     /**
@@ -3224,14 +3254,11 @@ class Object_ extends Type {
      */
     public function markPropertyTypedInitGuard(int $classId, string $name): void
     {
-        foreach ($this->properties[$classId] ?? [] as $propset) {
-            if ($propset[1] !== $name) {
-                continue;
-            }
-            $this->typedPropertyInitGuardSlots[$classId][$propset[3]] = true;
-
+        $propset = $this->findInstancePropertySet($classId, $name);
+        if (null === $propset) {
             return;
         }
+        $this->typedPropertyInitGuardSlots[$classId][$propset[3]] = true;
     }
 
     public function propertySlotRequiresTypedInitGuard(int $classId, int $slotIndex): bool
@@ -3241,14 +3268,11 @@ class Object_ extends Type {
 
     public function markPropertyAllowsNull(int $classId, string $name): void
     {
-        foreach ($this->properties[$classId] ?? [] as $propset) {
-            if ($propset[1] !== $name) {
-                continue;
-            }
-            $this->propertyAllowsNullSlots[$classId][$propset[3]] = true;
-
+        $propset = $this->findInstancePropertySet($classId, $name);
+        if (null === $propset) {
             return;
         }
+        $this->propertyAllowsNullSlots[$classId][$propset[3]] = true;
     }
 
     public function propertySlotAllowsNull(int $classId, int $slotIndex): bool
@@ -3258,14 +3282,11 @@ class Object_ extends Type {
 
     public function markPropertyAllowsArray(int $classId, string $name): void
     {
-        foreach ($this->properties[$classId] ?? [] as $propset) {
-            if ($propset[1] !== $name) {
-                continue;
-            }
-            $this->propertyAllowsArraySlots[$classId][$propset[3]] = true;
-
+        $propset = $this->findInstancePropertySet($classId, $name);
+        if (null === $propset) {
             return;
         }
+        $this->propertyAllowsArraySlots[$classId][$propset[3]] = true;
     }
 
     public function propertySlotAllowsArray(int $classId, int $slotIndex): bool
@@ -3276,14 +3297,11 @@ class Object_ extends Type {
     /** Declared type text for zend_try_array_init TypeError (#31819). */
     public function definePropertyDeclaredTypeLabel(int $classId, string $name, string $label): void
     {
-        foreach ($this->properties[$classId] ?? [] as $propset) {
-            if ($propset[1] !== $name) {
-                continue;
-            }
-            $this->propertyDeclaredTypeLabels[$classId][$propset[3]] = $label;
-
+        $propset = $this->findInstancePropertySet($classId, $name);
+        if (null === $propset) {
             return;
         }
+        $this->propertyDeclaredTypeLabels[$classId][$propset[3]] = $label;
     }
 
     public function propertySlotDeclaredTypeLabel(int $classId, int $slotIndex): string
@@ -5138,14 +5156,23 @@ class Object_ extends Type {
         array $parentPropset
     ): void {
         $nameLc = strtolower($name);
-        $this->instancePropertyDeclaringClassId[$childId][$nameLc]
-            = $this->instancePropertyDeclaringClassId[$parentId][$nameLc] ?? $parentId;
-        $childSet = $this->findInstancePropertySet($childId, $name);
+        $declaringId = $this->instancePropertyDeclaringClassId[$parentId][$nameLc] ?? $parentId;
+        $this->instancePropertyDeclaringClassId[$childId][$nameLc] = $declaringId;
+        $childSet = $this->findInstancePropertySet($childId, $name, false);
         if (null === $childSet) {
             return;
         }
         $parentSlot = $parentPropset[3];
         $childSlot = $childSet[3];
+        $this->instancePropertySlotDeclaringClassId[$childId][$childSlot]
+            = $this->instancePropertySlotDeclaringClassId[$parentId][$parentSlot] ?? $declaringId;
+        // Visibility lives on the declaring class; mirror onto the child name key so
+        // private-vs-override checks see the parent flags before a child redeclare (#33439).
+        if (isset($this->propertyVisibility[$parentId][$nameLc])) {
+            $this->propertyVisibility[$childId][$nameLc] = $this->propertyVisibility[$parentId][$nameLc];
+        } elseif (isset($this->propertyVisibility[$declaringId][$nameLc])) {
+            $this->propertyVisibility[$childId][$nameLc] = $this->propertyVisibility[$declaringId][$nameLc];
+        }
         if (isset($this->typedPropertyInitGuardSlots[$parentId][$parentSlot])) {
             $this->typedPropertyInitGuardSlots[$childId][$childSlot] = true;
         }
@@ -5206,14 +5233,24 @@ class Object_ extends Type {
             if (strtolower($existing[1]) !== $nameLc) {
                 continue;
             }
-            $declaringId = $this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId;
+            $slot = $existing[3];
+            $declaringId = $this->instancePropertySlotDeclaringClassId[$classId][$slot]
+                ?? ($this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId);
             $traitSourceId = $this->instancePropertyTraitSourceId[$classId][$nameLc] ?? null;
             if ($declaringId === $classId && null === $traitSourceId) {
                 // Same class already declared this property — keep the first slot.
                 return;
             }
-            // Class body redeclares a trait property: reuse the slot; finish with
-            // assertClassTraitInstancePropertyMerge after defaults/flags (#22850, #26593).
+            // Parent private slots coexist with same-name child privates (zend_inheritance.c / #22521 / #33439).
+            // Do not reuse the parent slot or run trait composition checks.
+            if (null === $traitSourceId && $declaringId !== $classId) {
+                $parentVis = $this->propertyVisibility($declaringId, $name);
+                if (($parentVis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                    continue;
+                }
+            }
+            // Class body redeclares a trait (or non-private parent) property: reuse the slot;
+            // finish with assertClassTraitInstancePropertyMerge after defaults/flags (#22850, #26593, #33439).
             $originId = $traitSourceId ?? $declaringId;
             $this->pendingTraitInstancePropertyOverride[$classId][$nameLc] = $this->snapshotInstanceProperty(
                 $classId,
@@ -5224,8 +5261,9 @@ class Object_ extends Type {
                 $existing[0], $name, $type, $existing[3],
             ];
             $this->instancePropertyDeclaringClassId[$classId][$nameLc] = $classId;
+            $this->instancePropertySlotDeclaringClassId[$classId][$existing[3]] = $classId;
             unset($this->instancePropertyTraitSourceId[$classId][$nameLc]);
-            // Drop trait default so a class body without an initializer stays unset.
+            // Drop trait/parent default so a class body without an initializer stays unset.
             unset($this->propertyDefaults[$classId][$existing[3]]);
             unset($this->runtimePropertyNewDefaults[$classId][$existing[3]]);
 
@@ -5237,14 +5275,17 @@ class Object_ extends Type {
         if (!isset($this->properties[$classId])) {
             $this->properties[$classId] = [];
         }
+        $slot = count($this->properties[$classId]);
         $this->properties[$classId][] = [
-            $this->propNameMap[$name], $name, $type, count($this->properties[$classId]),
+            $this->propNameMap[$name], $name, $type, $slot,
         ];
         $this->instancePropertyDeclaringClassId[$classId][$nameLc] = $classId;
+        $this->instancePropertySlotDeclaringClassId[$classId][$slot] = $classId;
     }
 
     /**
      * After class-body DECLARE_PROPERTY metadata is applied, merge or fatal vs trait (#22850).
+     * Parent (non-trait) overrides allow different defaults — zend_inheritance.c (#33439).
      */
     public function assertClassTraitInstancePropertyMerge(int $classId, string $name): void
     {
@@ -5259,24 +5300,28 @@ class Object_ extends Type {
             return;
         }
         $className = $this->classNameForId($classId);
-        $traitName = $this->classNameForId((int) $pending['declaringId']);
+        $originName = $this->classNameForId((int) $pending['declaringId']);
+        $originLc = strtolower(ltrim($originName, '\\'));
         if ($this->jitPropertyHasHooks($className, $name)
-            || $this->jitPropertyHasHooks($traitName, $name)) {
+            || $this->jitPropertyHasHooks($originName, $name)) {
             throw new \LogicException(TraitCompositionConflictMessage::sameHookedClassTraitProperty(
                 $className,
-                $traitName,
+                $originName,
                 $name
             ));
         }
-        if ($this->instancePropertySnapshotsCompatible(
-            $pending,
-            $this->snapshotInstanceProperty($classId, $classId, $current)
-        )) {
+        $currentSnap = $this->snapshotInstanceProperty($classId, $classId, $current);
+        if ($this->instancePropertySnapshotsCompatible($pending, $currentSnap)) {
+            return;
+        }
+        // Parent property override: different defaults are OK; visibility/type still must match.
+        if (!$this->isTraitClass($originLc)
+            && $this->instancePropertySnapshotsCompatibleIgnoringDefaults($pending, $currentSnap)) {
             return;
         }
         throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
             $className,
-            $traitName,
+            $originName,
             $name
         ));
     }
@@ -5307,16 +5352,27 @@ class Object_ extends Type {
     /**
      * @return array{0: int, 1: string, 2: int, 3: int}|null
      */
-    private function findInstancePropertySet(int $classId, string $name): ?array
+    private function findInstancePropertySet(int $classId, string $name, bool $preferOwn = true): ?array
     {
         $nameLc = strtolower($name);
+        $first = null;
+        $own = null;
         foreach ($this->properties[$classId] ?? [] as $propset) {
-            if (strtolower($propset[1]) === $nameLc) {
-                return $propset;
+            if (strtolower($propset[1]) !== $nameLc) {
+                continue;
+            }
+            if (null === $first) {
+                $first = $propset;
+            }
+            $decl = $this->instancePropertySlotDeclaringClassId[$classId][$propset[3]]
+                ?? ($this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId);
+            if ($preferOwn && $decl === $classId) {
+                $own = $propset;
+                break;
             }
         }
 
-        return null;
+        return $own ?? $first;
     }
 
     /**
@@ -5324,6 +5380,21 @@ class Object_ extends Type {
      * @param array<string, mixed> $right
      */
     private function instancePropertySnapshotsCompatible(array $left, array $right): bool
+    {
+        if (!$this->instancePropertySnapshotsCompatibleIgnoringDefaults($left, $right)) {
+            return false;
+        }
+
+        return $this->jitPropertyDefaultEntriesCompatible($left['default'] ?? null, $right['default'] ?? null);
+    }
+
+    /**
+     * Parent property override: defaults may differ; traits still require identical defaults (#33439).
+     *
+     * @param array<string, mixed> $left
+     * @param array<string, mixed> $right
+     */
+    private function instancePropertySnapshotsCompatibleIgnoringDefaults(array $left, array $right): bool
     {
         if (MethodVisibility::mask((int) $left['visibility']) !== MethodVisibility::mask((int) $right['visibility'])) {
             return false;
@@ -5342,7 +5413,7 @@ class Object_ extends Type {
             return false;
         }
 
-        return $this->jitPropertyDefaultEntriesCompatible($left['default'] ?? null, $right['default'] ?? null);
+        return true;
     }
 
     /**
@@ -5675,64 +5746,54 @@ class Object_ extends Type {
 
     public function definePropertyDefault(int $classId, string $name, VMVariable $value): void
     {
-        if (VMVariable::TYPE_ARRAY === $value->type) {
-            foreach ($this->properties[$classId] as $propset) {
-                if ($propset[1] !== $name) {
-                    continue;
-                }
-                $table = $value->toArray();
-                if (!$table instanceof \PHPCompiler\VM\HashTable) {
-                    throw new \LogicException('Property array default must be a HashTable');
-                }
-                // Per-instance array default (Zend zend_objects.c). Empty → fresh alloc;
-                // non-empty → rebuild from the folded VM table at each `new` (#24086).
-                if (0 === $table->getNumElements()) {
-                    $this->propertyDefaults[$classId][$propset[3]] = [
-                        'propertyType' => $propset[2],
-                        'type' => Variable::TYPE_HASHTABLE,
-                        'emptyArray' => true,
-                    ];
-                } else {
-                    $this->propertyDefaults[$classId][$propset[3]] = [
-                        'propertyType' => $propset[2],
-                        'type' => Variable::TYPE_HASHTABLE,
-                        'vmTable' => $table,
-                    ];
-                }
-
-                return;
-            }
+        $propset = $this->findInstancePropertySet($classId, $name);
+        if (null === $propset) {
             throw new \LogicException("Property {$name} not defined for class {$classId}");
         }
-        foreach ($this->properties[$classId] as $propset) {
-            if ($propset[1] !== $name) {
-                continue;
+        if (VMVariable::TYPE_ARRAY === $value->type) {
+            $table = $value->toArray();
+            if (!$table instanceof \PHPCompiler\VM\HashTable) {
+                throw new \LogicException('Property array default must be a HashTable');
             }
-            if (EnumCaseSupport::isEnumCaseVariable($value)) {
-                $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
-                if (null === $enumClass) {
-                    throw new \LogicException('Enum case property default requires enum class');
-                }
-                $enumClassId = $this->lookup(strtolower($enumClass->name));
-                $caseKey = \PHPCompiler\ClassConstName::key(EnumCaseSupport::enumCaseNameForVariable($value));
-                $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
+            // Per-instance array default (Zend zend_objects.c). Empty → fresh alloc;
+            // non-empty → rebuild from the folded VM table at each `new` (#24086).
+            if (0 === $table->getNumElements()) {
                 $this->propertyDefaults[$classId][$propset[3]] = [
                     'propertyType' => $propset[2],
-                    'type' => Variable::TYPE_OBJECT,
-                    'global' => $globalName,
+                    'type' => Variable::TYPE_HASHTABLE,
+                    'emptyArray' => true,
                 ];
-
-                return;
+            } else {
+                $this->propertyDefaults[$classId][$propset[3]] = [
+                    'propertyType' => $propset[2],
+                    'type' => Variable::TYPE_HASHTABLE,
+                    'vmTable' => $table,
+                ];
             }
+
+            return;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
+            if (null === $enumClass) {
+                throw new \LogicException('Enum case property default requires enum class');
+            }
+            $enumClassId = $this->lookup(strtolower($enumClass->name));
+            $caseKey = \PHPCompiler\ClassConstName::key(EnumCaseSupport::enumCaseNameForVariable($value));
+            $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
             $this->propertyDefaults[$classId][$propset[3]] = [
                 'propertyType' => $propset[2],
-                'type' => Variable::fromVMVariable($value->type),
-                'value' => $this->compileTimeValueFromVm($value),
+                'type' => Variable::TYPE_OBJECT,
+                'global' => $globalName,
             ];
 
             return;
         }
-        throw new \LogicException("Property {$name} not defined for class {$classId}");
+        $this->propertyDefaults[$classId][$propset[3]] = [
+            'propertyType' => $propset[2],
+            'type' => Variable::fromVMVariable($value->type),
+            'value' => $this->compileTimeValueFromVm($value),
+        ];
     }
 
     public function defineClassConstVisibility(int $classId, string $name, int $visibilityFlags): void
@@ -7352,10 +7413,25 @@ class Object_ extends Type {
             $this->defineProperty($classId, $name, $this->externalPropertyJitType($class, $name));
             $nameId = $this->propNameMap[$name];
         }
+        $first = null;
+        $own = null;
         foreach ($this->properties[$classId] as $propset) {
-            if ($propset[0] === $nameId) {
-                return $this->propertySlotPtr($obj, $propset[3]);
+            if ($propset[0] !== $nameId) {
+                continue;
             }
+            if (null === $first) {
+                $first = $propset;
+            }
+            $decl = $this->instancePropertySlotDeclaringClassId[$classId][$propset[3]]
+                ?? ($this->instancePropertyDeclaringClassId[$classId][strtolower($name)] ?? $classId);
+            if ($decl === $classId) {
+                $own = $propset;
+                break;
+            }
+        }
+        $chosen = $own ?? $first;
+        if (null !== $chosen) {
+            return $this->propertySlotPtr($obj, $chosen[3]);
         }
 
         throw new \LogicException('Property slot not found: '.$class.'::$'.$name);
