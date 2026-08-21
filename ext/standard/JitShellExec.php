@@ -11,7 +11,12 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for shell_exec() via ProcessRuntime::__compiler_shell_exec (popen). */
+/**
+ * LLVM lowering for shell_exec() via ProcessRuntime::__compiler_shell_exec (popen; #33201).
+ *
+ * ABI owned by {@see ProcessRuntime} after Type always-on drop (#33201) — must ensureLinked
+ * before lookup.
+ */
 final class JitShellExec
 {
     /** @return Value */

@@ -907,13 +907,12 @@ class Type extends Builtin {
             $this->context->context->functionType($valuePtr, false, $strPtr)
         );
         $this->context->registerFunction('__compiler_unserialize', $fnUnserialize);
-        $fntypeShellExec = $this->context->context->functionType($strPtr, false, $strPtr);
-        $fnShellExec = $this->context->module->addFunction('__compiler_shell_exec', $fntypeShellExec);
-        $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);
-        $fnEscapeshellarg = $this->context->module->addFunction('__compiler_escapeshellarg', $fntypeShellExec);
-        $this->context->registerFunction('__compiler_escapeshellarg', $fnEscapeshellarg);
-        $fnEscapeshellcmd = $this->context->module->addFunction('__compiler_escapeshellcmd', $fntypeShellExec);
-        $this->context->registerFunction('__compiler_escapeshellcmd', $fnEscapeshellcmd);
+        // __compiler_shell_exec / __compiler_escapeshellarg / __compiler_escapeshellcmd
+        // always-on shells removed (#33201): ProcessRuntime owns the ABI (getNamedFunction
+        // first via implementNullableStringBridge / implementStringBridge; Type::initialize
+        // still ProcessRuntime::ensureLinked). Leftover Type empty decls vs Runtime ABI
+        // drift mint shell_exec.1 (#31894 / #32122). User-script stays JitShellExec /
+        // JitEscapeshellarg / JitEscapeshellcmd (php-src ext/standard/exec.c).
         $fntypePhpcRunCommand = $this->context->context->functionType(
             $this->context->getTypeFromString('__hashtable__*'),
             false,
