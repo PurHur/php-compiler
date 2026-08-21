@@ -216,7 +216,8 @@ final class JitDomCreateElement
         // Non-NS elements: localName === tagName (php-src dom_node_local_name_read; #33014).
         // Must be in allocate() layout — late defineProperty aliases INNER_XML (#33014).
         self::storeStringProperty($context, $obj, $className, VmDom::PROP_LOCAL_NAME, $nameStr);
-        self::storeNullProperty($context, $obj, $className, self::PROP_ATTRIBUTES);
+        // Zend always exposes a live empty DOMNamedNodeMap — null SIGSEGVs on length (#33128).
+        self::storeAttributesPresence($context, $obj, [], $className);
         // Always seed textContent/nodeValue — defineProperty alone leaves a null
         // __string__* and pure-user-script fetches segfault (#25475 / re-#23251).
         self::storeTextContentSlots($context, $obj, '', $className);
@@ -238,12 +239,11 @@ final class JitDomCreateElement
     }
 
     /**
-     * User-script AOT: NamedNodeMap in attributes slot when the element has
-     * non-xmlns attributes (php-src xmlNode->properties != NULL) (#32458).
+     * User-script AOT: NamedNodeMap in attributes slot (php-src xmlNode->properties).
      *
-     * Define {@code length} + pin Attrs **before** allocate() — fetching
-     * {@code $el->attributes->length} on an undersized dummy map SIGSEGVs (#32546,
-     * peer NodeList length #28672).
+     * Always allocates a live map — even length 0 — so {@code $el->attributes->length}
+     * matches Zend (#33128 / #32546). Define {@code length} + pin Attrs **before**
+     * allocate() — undersized dummy maps SIGSEGV on length (peer NodeList #28672).
      *
      * @param list<array{qname: string, value: string, namespace?: string}> $attrs
      */
@@ -253,9 +253,6 @@ final class JitDomCreateElement
         array $attrs,
         string $className = self::CLASS_ELEMENT
     ): void {
-        if ([] === $attrs) {
-            return;
-        }
         $objectType = $context->type->object;
         $elemClassId = $objectType->lookup($className);
         self::ensureElementPropertyLayout($objectType, $elemClassId);
@@ -263,11 +260,12 @@ final class JitDomCreateElement
         JitDomNamedNodeMap::ensureLayout($objectType, $mapClassId);
         $map = $objectType->allocate($mapClassId);
         $objectType->markObjectConstructed($map);
+        $pinCount = min(\count($attrs), JitDomNamedNodeMap::MAX_PINNED_ATTRS);
         $lengthVar = new JITVariable(
             $context,
             JITVariable::TYPE_NATIVE_LONG,
             JITVariable::KIND_VALUE,
-            $context->getTypeFromString('int64')->constInt(\count($attrs), false)
+            $context->getTypeFromString('int64')->constInt($pinCount, false)
         );
         $objectType->propertyStore(
             $objectType->propertySlotFor($map, 'DOMNamedNodeMap', VmDom::PROP_LENGTH),
@@ -296,6 +294,10 @@ final class JitDomCreateElement
             DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
             if ($local !== $qname) {
                 DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
+            }
+            // getAttributeNS keys by namespace URI (#33128 leftover of #33116).
+            if ('' !== $namespace) {
+                DomUserScriptAttributeCacheLlvm::storeLiteral($context, $namespace, $local, $attr, $value);
             }
             $pin = new JITVariable(
                 $context,
@@ -446,7 +448,7 @@ final class JitDomCreateElement
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_NODE_NAME, $nameStr);
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_TAG_NAME, $nameStr);
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, VmDom::PROP_LOCAL_NAME, $nameStr);
-        self::storeNullProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_ATTRIBUTES);
+        self::storeAttributesPresence($context, $obj, [], self::CLASS_ELEMENT);
 
         return $obj;
     }

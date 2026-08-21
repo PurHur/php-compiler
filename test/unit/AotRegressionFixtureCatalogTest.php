@@ -63,6 +63,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'dom_attributes_foreach_33099.phpt',
         'dom_namednodemap_getnameditem_33107.phpt',
         'dom_namednodemap_getnameditemns_33116.phpt',
+        'dom_attributes_map_length_33128.phpt',
         'spl_outer_iterators_ita.phpt',
         'weakreference_main_unset.phpt',
         'reflection_new_lazy_ghost_property.phpt',
