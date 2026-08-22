@@ -12183,9 +12183,22 @@ class JIT {
                         $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     } else {
                         $nameVar = $this->context->getVariableFromOp($nameOp);
+                        $nameSlot = $block->slotForOperand($nameOp);
+                        // Fold ['Class','method']() before closure dispatch: once a closure body
+                        // registers candidates, resolveIndirectCall treats any TYPE_VALUE callee as
+                        // RuntimeIndirectClosureCall and aborts on array callables (#32299 / #33800).
+                        if (null !== $nameSlot && $this->tryInitStaticArrayCallableDirect($block, $nameSlot)) {
+                            $this->context->scope->argOperands = [];
+                            break;
+                        }
+                        if (JIT\BoundMethodCallableHelper::isBoundMethodArrayCallee($nameOp, $nameVar)) {
+                            if ($this->tryInitBoundMethodFccDirect($block, $nameSlot)) {
+                                $this->context->scope->argOperands = [];
+                                break;
+                            }
+                        }
                         $closureCall = JIT\ClosureHelper::resolveCall($this->context, $nameVar);
                         if (null === $closureCall) {
-                            $nameSlot = $block->slotForOperand($nameOp);
                             if (null !== $nameSlot) {
                                 $closureCall = $this->resolveFccClosureCallForCalleeSlot($block, $nameSlot);
                                 if (null !== $closureCall) {
@@ -12202,16 +12215,6 @@ class JIT {
                         if (null !== $nameOp->type && Type::TYPE_OBJECT === $nameOp->type->type) {
                             $this->initJitMethodCall($block, $nameOp, '__invoke', true);
                             break;
-                        }
-                        $nameSlot = $block->slotForOperand($nameOp);
-                        if (JIT\BoundMethodCallableHelper::isBoundMethodArrayCallee($nameOp, $nameVar)) {
-                            if (
-                                $this->tryInitBoundMethodFccDirect($block, $nameSlot)
-                                || $this->tryInitStaticArrayCallableDirect($block, $nameSlot)
-                            ) {
-                                $this->context->scope->argOperands = [];
-                                break;
-                            }
                         }
                         if (null !== $nameSlot) {
                             $this->foldCompileTimeStringFromSlot($block, $nameSlot, $nameVar);

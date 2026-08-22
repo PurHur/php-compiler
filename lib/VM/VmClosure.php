@@ -221,6 +221,12 @@ final class VmClosure
         if (JitVariable::TYPE_STRING === $receiver->type) {
             return null;
         }
+        if (0 !== ($receiver->type & JitVariable::TYPE_HASHTABLE)) {
+            return null;
+        }
+        if (JitVariable::TYPE_VALUE === $receiver->type && null !== $receiver->valueBoxHashtable) {
+            return null;
+        }
         if (JitVariable::TYPE_VALUE === $receiver->type && null !== $receiver->compileTimeString) {
             return null;
         }
