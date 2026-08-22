@@ -39,12 +39,16 @@ final class TypeDeadHttpBuildQueryAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#33208', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
         $this->assertStringContainsString('implementBuildBridge', $owner);
-        $this->assertStringContainsString('__compiler_http_build_query', $owner);
+        $this->assertStringContainsString('__compiler_http_build_query_llvm', $owner);
+        $this->assertStringContainsString('#33711', $owner);
         $this->assertFileExists(__DIR__.'/../../ext/standard/HttpBuildQueryJitHelper.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitHttpBuildQuery.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/HttpBuildQueryArrayLlvm.php');
         $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitHttpBuildQuery.php');
         $this->assertStringContainsString('#33208', $jit);
+        $this->assertStringContainsString('#33711', $jit);
         $this->assertStringContainsString('StringHttpBuildQuery::ensureLinked', $jit);
+        $this->assertStringContainsString('__compiler_http_build_query_llvm', $jit);
     }
 
     public function testStringBuiltinStillImplementsHttpBuildQueryOnFullLoad(): void

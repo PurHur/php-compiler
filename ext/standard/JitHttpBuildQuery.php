@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\StringHttpBuildQuery;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -50,8 +51,9 @@ final class JitHttpBuildQuery
         StringHttpBuildQuery::ensureLinked($context);
         $ht = self::loadData($context, $data);
 
+        // LLVM ABI (#33711) — NestedJIT __compiler_http_build_query SEGVs on runtime HTs.
         return $context->builder->call(
-            $context->lookupFunction('__compiler_http_build_query'),
+            $context->lookupFunction('__compiler_http_build_query_llvm'),
             $ht,
             $prefix,
             $separator,
@@ -68,10 +70,8 @@ final class JitHttpBuildQuery
             return HashTableHelper::materializeNativeArrayForCall($context, $arg);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readHashtable'),
-                JitValueBox::pointer($context, $arg->value)
-            );
+            // Same boxed-HT load as json_encode (#26367 / #33711) — raw ->value pointer SEGVs.
+            return HashTableReadLlvm::loadHashtablePointer($context, $arg);
         }
 
         throw new \LogicException('http_build_query() argument #1 must be array|object in this compiler build');

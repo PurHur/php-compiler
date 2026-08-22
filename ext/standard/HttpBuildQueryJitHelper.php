@@ -9,6 +9,9 @@ use PHPCompiler\VM\HashTable;
 /**
  * http_build_query() NestedJIT helper (#9443, #26869, #27031, php-in-PHP).
  *
+ * Runtime AOT uses {@see \PHPCompiler\JIT\HttpBuildQueryArrayLlvm} (#33711) — NestedJIT
+ * HashTable receivers SEGV on exportKeyValuePairs; this helper is residual / docs only.
+ *
  * Thin-AOT NestedJIT constraints (#27031):
  * - (string) casts on pair slots — not resolveIndirect / toInt / toString.
  * - Nested HT: exportKeyValuePairs on the value Variable (type 6/7) — not toArray()
