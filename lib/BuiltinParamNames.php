@@ -1028,6 +1028,9 @@ final class BuiltinParamNames
             // InternalArgInfo still says varname / single required string (#24855)
             case 'getenv':
                 return ['name=', 'local_only='];
+            // php-src ext/standard/basic_functions.stub.php — string $iptc_block; InternalArgInfo still iptcdata (#27782)
+            case 'iptcparse':
+                return ['iptc_block'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says setting (#23258)
             case 'putenv':
                 return ['assignment'];

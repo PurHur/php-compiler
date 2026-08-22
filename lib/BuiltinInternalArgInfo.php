@@ -120,6 +120,8 @@ final class BuiltinInternalArgInfo
             'strtok' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing array|…|false) (#26115)
             'getenv' => 'array|string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#27782)
+            'iptcparse' => 'array|false',
             // ext/standard/string.stub.php — chop rtrim alias absent from InternalArgInfo (#28255, re-#24039)
             'chop' => 'string',
             // ext/standard/string.stub.php — InternalArgInfo return empty (#23919)

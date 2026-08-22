@@ -35,7 +35,7 @@ final class iptcparse extends Internal
             $frame->calledArgs[0],
             'iptcparse',
             0,
-            'iptcdata'
+            'iptc_block'
         );
         $parsed = VmIptc::parse($data);
         if (false === $parsed) {

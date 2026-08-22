@@ -47,7 +47,7 @@ array (
   ),
 )
 false
-iptcparse(): Argument #1 ($iptcdata) must be of type string, E given
+iptcparse(): Argument #1 ($iptc_block) must be of type string, E given
 true
 true
 true
