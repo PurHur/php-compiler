@@ -878,10 +878,12 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
             'date', 'gmdate' => 1 === $index ? '?int' : null,
             'strtotime' => 1 === $index ? '?int' : null,
-            // ext/standard/basic_functions.stub.php — RoundingMode|int $mode = RoundingMode::HalfAwayFromZero (#28535)
-            'round' => (2 === $index && CompilerVersion::supportsRoundingModeEnum())
-                ? 'RoundingMode|int'
-                : null,
+            // ext/standard/math.stub.php — int|float $num; RoundingMode|int $mode (#24825, #28535)
+            'round' => match ($index) {
+                0 => 'int|float',
+                2 => CompilerVersion::supportsRoundingModeEnum() ? 'RoundingMode|int' : null,
+                default => null,
+            },
             // php-src ext/posix/posix.stub.php — posix_isatty($file_descriptor): bool (untyped; accepts int|resource) (#28899)
             'posix_isatty' => 0 === $index ? '' : null,
             // php-src ext/posix/posix.stub.php — PHP 8.3+; absent from InternalArgInfo (#27918)
