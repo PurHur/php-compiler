@@ -17,11 +17,15 @@ final class DateTimeAddSubAotTest extends AotTest
 {
     public static function providePHPTests(): \Generator
     {
-        $basename = 'datetime_add_sub.phpt';
-        $path = dirname(__DIR__).'/fixtures/aot/cases/'.$basename;
-        if (!is_file($path)) {
-            throw new \RuntimeException('datetime add/sub AOT: missing fixture '.$path);
+        foreach ([
+            'datetime_add_sub.phpt',
+            'datetime_runtime_interval_add_sub.phpt',
+        ] as $basename) {
+            $path = dirname(__DIR__).'/fixtures/aot/cases/'.$basename;
+            if (!is_file($path)) {
+                throw new \RuntimeException('datetime add/sub AOT: missing fixture '.$path);
+            }
+            yield pathinfo($basename, PATHINFO_FILENAME) => self::parsePHPT($path, $basename);
         }
-        yield pathinfo($basename, PATHINFO_FILENAME) => self::parsePHPT($path, $basename);
     }
 }
