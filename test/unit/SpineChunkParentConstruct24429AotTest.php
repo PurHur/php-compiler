@@ -67,13 +67,15 @@ final class SpineChunkParentConstruct24429AotTest extends TestCase
             $joined,
             'SPINE_CHUNK must fall through missing parent::__construct (#24429)'
         );
-        // May still fail later (hollow stubs / verify) — only the constructor wall is asserted.
-        if (0 === $rc && is_file($bin)) {
+        $this->assertSame(0, $rc, $joined);
+        $this->assertFileExists($bin);
+        try {
             exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
-            @unlink($bin);
-            // ExternalMethod null for missing ctor — runtime may not print "ok".
-            $this->assertContains($runRc, [0, 139, 134, 255], implode("\n", $runOut));
-        } else {
+            // ExternalMethod null for a missing ctor is a no-op — acceptable under
+            // SPINE_CHUNK (probe goal is compile-past-abort, not Zend Error fidelity).
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame("ok\n", implode("\n", $runOut)."\n");
+        } finally {
             @unlink($bin);
         }
     }
