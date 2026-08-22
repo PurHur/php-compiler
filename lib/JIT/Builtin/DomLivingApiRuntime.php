@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
@@ -181,6 +182,17 @@ final class DomLivingApiRuntime
         Variable $receiver,
         Variable $other
     ): Value {
+        // php-src ext/dom/php_dom.stub.php — compareDocumentPosition(DOMNode $other): int
+        // (not nullable). Variable null / getElementById miss must TypeError, not GEP (#33733).
+        if (JitDomRequireDomNodeArg::guardOrAbort(
+            $context,
+            $other,
+            'DOMNode::compareDocumentPosition',
+            1,
+            'other'
+        )) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::compareDocumentPositionViaParentSlots($context, $receiver, $other);
         }
@@ -688,6 +700,17 @@ final class DomLivingApiRuntime
         $cmpTags = $fn->appendBasicBlock('dom_isequal_tags_'.$id);
         $done = $fn->appendBasicBlock('dom_isequal_done_'.$id);
         $cont = $fn->appendBasicBlock('dom_isequal_cont_'.$id);
+
+        // ?DOMNode — boxed null / getElementById miss: false, do not GEP tagName (#33733 / #24462).
+        $objPtr = $context->getTypeFromString('__object__*');
+        $otherIsNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $otherLlvm,
+            $objPtr->constNull()
+        );
+        $afterOtherNull = $fn->appendBasicBlock('dom_isequal_after_null_'.$id);
+        $context->builder->branchIf($otherIsNull, $miss, $afterOtherNull);
+        $context->builder->positionAtEnd($afterOtherNull);
 
         $same = $context->builder->icmp(Builder::INT_EQ, $receiverLlvm, $otherLlvm);
         $context->builder->branchIf($same, $hitPtr, $cmpTags);
