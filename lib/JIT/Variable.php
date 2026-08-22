@@ -144,6 +144,13 @@ final class Variable {
     public ?string $compileTimeDomLoadXml = null;
 
     /**
+     * Document-wide saveXML must dump pinned slots — never another doc's lastCompileTimeXml (#33697).
+     *
+     * Set when DOMDocument::appendChild installs a root on a document that never loadXML'd.
+     */
+    public bool $compileTimeDomSaveXmlFromSlots = false;
+
+    /**
      * xmlGetLineNo for a loadXML documentElement / child walk (#32489).
      */
     public ?int $compileTimeDomLineNo = null;

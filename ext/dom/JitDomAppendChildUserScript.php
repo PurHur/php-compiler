@@ -316,6 +316,13 @@ final class JitDomAppendChildUserScript
         );
         // Pin for document-wide saveXML() without loadXML (#32361).
         DomUserScriptPinnedRootLlvm::pin($context, $child);
+        // Empty destinations (no loadXML on *this* doc) must not replay another
+        // document's lastCompileTimeXml on saveXML() (#33697).
+        if (null === ($documentVar->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($documentVar))
+        ) {
+            JitDomLoadXMLUserScript::markDocumentSaveXmlFromSlots($context, $documentVar);
+        }
 
         return self::boxObjectResult($context, $child);
     }
