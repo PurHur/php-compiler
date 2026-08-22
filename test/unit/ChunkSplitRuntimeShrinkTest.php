@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * chunk_split() JIT routes through ChunkSplitJitHelper + VmChunkSplit
- * (#14626, #21399, #26992, #30859).
+ * (#14626, #21399, #26992, #30859, #33894).
  */
 final class ChunkSplitRuntimeShrinkTest extends TestCase
 {
@@ -47,7 +47,10 @@ final class ChunkSplitRuntimeShrinkTest extends TestCase
         );
     }
 
-    /** #30859: NestedJIT-safe VmChunkSplit (strlen/substr; no $s[$i]). */
+    /**
+     * #30859 / #33894: NestedJIT-safe VmChunkSplit — str_split+implode (not recursive
+     * substr walk / $s[$i]); recursive chunkFrom miscompiled under thin AOT.
+     */
     public function testChunkSplitJitHelperDelegatesToVmChunkSplit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/ChunkSplitJitHelper.php');
@@ -58,8 +61,10 @@ final class ChunkSplitRuntimeShrinkTest extends TestCase
 
         $vm = (string) file_get_contents(__DIR__.'/../../ext/standard/VmChunkSplit.php');
         $this->assertStringContainsString('\\strlen(', $vm);
-        $this->assertStringContainsString('\\substr(', $vm);
-        $this->assertStringContainsString('chunkFrom', $vm);
+        $this->assertStringContainsString('\\str_split(', $vm);
+        $this->assertStringContainsString('\\implode(', $vm);
+        $this->assertStringNotContainsString('chunkFrom', $vm);
+        $this->assertStringNotContainsString('\\substr(', $vm);
         $this->assertStringNotContainsString('$string[$', $vm);
         $this->assertStringNotContainsString('isset($', $vm);
     }
