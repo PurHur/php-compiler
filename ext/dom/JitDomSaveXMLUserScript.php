@@ -14,7 +14,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** User-script standalone AOT: pure-LLVM DOMDocument::saveXML() (#18268, #23251). */
+/** User-script standalone AOT: pure-LLVM DOMDocument::saveXML() (#18268, #23251, #33697). */
 final class JitDomSaveXMLUserScript
 {
     public static function shouldUse(Context $context): bool
@@ -41,16 +41,28 @@ final class JitDomSaveXMLUserScript
             return null;
         }
 
-        $xmlLit = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        // Prefer this document's loadXML binding. Never steal lastCompileTimeXml() from
+        // another document — empty destinations after importNode must dump slots (#33697).
+        // Rematerialized loadXML receivers also lose SplObjectStorage identity (#27392);
+        // fall through to documentElement slots (loadXML always stores that property).
+        $documentVar = $args[0] ?? null;
+        if (JitDomLoadXMLUserScript::documentSaveXmlFromSlots($documentVar)) {
+            return self::trySerializeDocumentFromSlots($context, $documentVar);
+        }
+        $xmlLit = null;
+        if (null !== $documentVar) {
+            $xmlLit = $documentVar->compileTimeDomLoadXml
+                ?? JitDomLoadXMLUserScript::compileTimeXmlFor($documentVar);
+        }
         // replaceChild dual-path marks mutated so we must not replay a fold that may
         // have been rewritten by the speculative document arm (#33379 element poison).
         if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()
             || null === $xmlLit
             || '' === trim($xmlLit)
         ) {
-            // No loadXML literal / tree mutated: dump documentElement slots.
+            // No loadXML on *this* document / tree mutated: dump documentElement slots.
             // NestedJIT DomSaveXMLRuntime SIGSEGVs after c:main_before_php (#32361).
-            return self::trySerializeDocumentFromSlots($context, $args[0] ?? null);
+            return self::trySerializeDocumentFromSlots($context, $documentVar);
         }
         // Document-wide constant replay is only valid for pure user-script loads (#26757).
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
@@ -70,10 +82,12 @@ final class JitDomSaveXMLUserScript
      * createElement+appendChild tree (#32361 / php-src ext/dom/document.c).
      * Prepends {@code <!DOCTYPE …>} when createDocumentType was appendChild'd /
      * insertBefore'd onto the document (#33584).
+     *
+     * Prefer the receiver's documentElement over the process-global pin so a second
+     * empty document after importNode does not dump another document's tree (#33697).
      */
     private static function trySerializeDocumentFromSlots(Context $context, ?JITVariable $documentVar = null): Value
     {
-        unset($documentVar);
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
         foreach (['tagName', 'nodeName', 'textContent', 'name', 'publicId', 'systemId', VmDom::PROP_USER_SCRIPT_INNER_XML, VmDom::PROP_USER_SCRIPT_XMLNS_ATTR] as $prop) {
@@ -99,8 +113,9 @@ final class JitDomSaveXMLUserScript
         $bbEmpty = BasicBlockHelper::append($context, 'dom_savexml_doc_empty');
         $bbDump = BasicBlockHelper::append($context, 'dom_savexml_doc_dump');
         $bbDone = BasicBlockHelper::append($context, 'dom_savexml_doc_done');
-        $pinned = DomUserScriptPinnedRootLlvm::load($context);
         $objPtrTy = $context->getTypeFromString('__object__*');
+        $pinned = self::loadReceiverDocumentElement($context, $documentVar)
+            ?? DomUserScriptPinnedRootLlvm::load($context);
         if (null === $pinned) {
             return self::boxStringValue($context, $decl);
         }
@@ -128,6 +143,33 @@ final class JitDomSaveXMLUserScript
         $context->builder->positionAtEnd($bbDone);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Load DOMDocument::$documentElement for document-wide saveXML (#33697).
+     *
+     * The global {@see DomUserScriptPinnedRootLlvm} pin is last-writer-wins across
+     * documents; the receiver property is the php-src xmlDocDumpMemory root.
+     */
+    private static function loadReceiverDocumentElement(Context $context, ?JITVariable $documentVar): ?Value
+    {
+        if (null === $documentVar) {
+            return null;
+        }
+        if (!\in_array($documentVar->type, [JITVariable::TYPE_OBJECT, JITVariable::TYPE_VALUE], true)) {
+            return null;
+        }
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCUMENT_ELEMENT)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
+        }
+        $document = self::loadObjectArg($context, $documentVar);
+        $slot = $objectType->propertySlotFor($document, 'DOMDocument', VmDom::PROP_DOCUMENT_ELEMENT);
+        $ptr = $context->builder->load($slot);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+
+        return $context->builder->pointerCast($ptr, $objPtrTy);
     }
 
     private static function trySerializeNode(Context $context, JITVariable $nodeVar): ?Value

@@ -109,6 +109,34 @@ final class JitDomLoadXMLUserScript
     }
 
     /**
+     * Flag a DOMDocument so document-wide saveXML dumps pinned slots (#33697).
+     *
+     * Used when appendChild installs a root on a document that never loadXML'd —
+     * otherwise saveXML would replay {@see lastCompileTimeXml()} from another doc.
+     */
+    public static function markDocumentSaveXmlFromSlots(Context $context, JITVariable $document): void
+    {
+        $document->compileTimeDomSaveXmlFromSlots = true;
+        if (!isset($context->namedVariableBindings) || !\is_array($context->namedVariableBindings)) {
+            return;
+        }
+        $docVal = $document->value ?? null;
+        foreach ($context->namedVariableBindings as $bound) {
+            if (!$bound instanceof JITVariable) {
+                continue;
+            }
+            if ($bound === $document || (null !== $docVal && $bound->value === $docVal)) {
+                $bound->compileTimeDomSaveXmlFromSlots = true;
+            }
+        }
+    }
+
+    public static function documentSaveXmlFromSlots(?JITVariable $document): bool
+    {
+        return null !== $document && true === $document->compileTimeDomSaveXmlFromSlots;
+    }
+
+    /**
      * Replace the compile-time document root markup after DOMDocument::replaceChild
      * of documentElement so saveXML does not replay the old loadXML literal (#33379).
      */
@@ -428,6 +456,7 @@ final class JitDomLoadXMLUserScript
         self::$treeMutatedSinceLoad = false;
         self::$lastRememberContext = $context;
         $document->compileTimeDomLoadXml = $xml;
+        $document->compileTimeDomSaveXmlFromSlots = false;
         self::propagateCompileTimeDomLoadXmlToAliases($context, $document, $xml);
         if (null === self::$xmlByReceiver) {
             self::$xmlByReceiver = new \SplObjectStorage();
