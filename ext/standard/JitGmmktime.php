@@ -48,6 +48,26 @@ final class JitGmmktime
             return $ptr;
         }
 
+        // Full arity runtime: UTC civil IR — no NestedJIT static lastTimestamp (#33934).
+        if ($argc >= 6 && null !== $minute && null !== $second && null !== $month && null !== $day && null !== $year) {
+            $ts = JitGetdate::timestampFromCivilPublic(
+                $context,
+                self::jitIntArg($context, $year, 6),
+                self::jitIntArg($context, $month, 4),
+                self::jitIntArg($context, $day, 5),
+                self::jitIntArg($context, $hour, 1),
+                self::jitIntArg($context, $minute, 2),
+                self::jitIntArg($context, $second, 3)
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                $ptr,
+                $ts
+            );
+
+            return $ptr;
+        }
+
         StringGmmktime::ensureLinked($context);
         $context->builder->call(
             $context->lookupFunction('__compiler_gmmktime'),
@@ -151,10 +171,15 @@ final class JitGmmktime
             return $context->helper->loadValue($arg);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                $arg->value
-            );
+            // Globals/slots are __value__** — must go through valuePtrFromVariable (#33934).
+            return JitChr::lowerZParamLongArg($context, $arg, 'gmmktime', $position, match ($position) {
+                2 => 'minute',
+                3 => 'second',
+                4 => 'month',
+                5 => 'day',
+                6 => 'year',
+                default => 'arg',
+            });
         }
 
         throw new \LogicException('gmmktime() argument #'.$position.' must be an integer or null in this compiler build');

@@ -46,20 +46,23 @@ final class StringMktime
             return;
         }
 
-        $savedBlock = null;
+        // Preserve caller insert + lowering owner — BasicBlockHelper::append otherwise
+        // steals mkt_false/ok/done into user main (#33934 / peer PowInt #29678).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
         try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementMktimeBridge($context);
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+            self::ensureJitHelperCompiled($context);
+            self::implementMktimeBridge($context);
+            self::registerLinkedRuntime($context);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 
@@ -84,9 +87,17 @@ final class StringMktime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
+        // All bridge blocks on $fn — never BasicBlockHelper::append while user main is
+        // loweringLlvmFunction (#33934 Module.php:180 cross-function refs).
         $entry = $fn->appendBasicBlock('mkt_bridge_entry');
         $nullOutBb = $fn->appendBasicBlock('mkt_null_out');
         $bodyBb = $fn->appendBasicBlock('mkt_body');
+        $falseBb = $fn->appendBasicBlock('mkt_false');
+        $okBb = $fn->appendBasicBlock('mkt_ok');
+        $doneBb = $fn->appendBasicBlock('mkt_done');
+
+        $context->activeFunction = $abiName;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
         $context->builder->positionAtEnd($entry);
 
         $out = $fn->getParam(7);
@@ -119,9 +130,6 @@ final class StringMktime
             $tagI32,
             $i32->constInt(\PHPCompiler\ext\standard\MktimeJitHelper::TAG_FALSE, false)
         );
-        $falseBb = BasicBlockHelper::append($context, 'mkt_false');
-        $okBb = BasicBlockHelper::append($context, 'mkt_ok');
-        $doneBb = BasicBlockHelper::append($context, 'mkt_done');
         $context->builder->branchIf($isFalse, $falseBb, $okBb);
 
         $context->builder->positionAtEnd($falseBb);

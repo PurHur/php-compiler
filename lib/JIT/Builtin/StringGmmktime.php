@@ -46,20 +46,22 @@ final class StringGmmktime
             return;
         }
 
-        $savedBlock = null;
+        // Same steal hazard as StringMktime (#33934) — scope lowering owner.
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
         try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementGmmktimeBridge($context);
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+            self::ensureJitHelperCompiled($context);
+            self::implementGmmktimeBridge($context);
+            self::registerLinkedRuntime($context);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 
@@ -87,6 +89,12 @@ final class StringGmmktime
         $entry = $fn->appendBasicBlock('gmt_bridge_entry');
         $nullOutBb = $fn->appendBasicBlock('gmt_null_out');
         $bodyBb = $fn->appendBasicBlock('gmt_body');
+        $falseBb = $fn->appendBasicBlock('gmt_false');
+        $okBb = $fn->appendBasicBlock('gmt_ok');
+        $doneBb = $fn->appendBasicBlock('gmt_done');
+
+        $context->activeFunction = $abiName;
+        $context->loweringLlvmFunction = $fn instanceof LlvmFunction ? $fn : null;
         $context->builder->positionAtEnd($entry);
 
         $out = $fn->getParam(7);
@@ -119,9 +127,6 @@ final class StringGmmktime
             $tagI32,
             $i32->constInt(\PHPCompiler\ext\standard\GmmktimeJitHelper::TAG_FALSE, false)
         );
-        $falseBb = BasicBlockHelper::append($context, 'gmt_false');
-        $okBb = BasicBlockHelper::append($context, 'gmt_ok');
-        $doneBb = BasicBlockHelper::append($context, 'gmt_done');
         $context->builder->branchIf($isFalse, $falseBb, $okBb);
 
         $context->builder->positionAtEnd($falseBb);
