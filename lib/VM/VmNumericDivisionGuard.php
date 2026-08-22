@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\TryCatchHelper;
+use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -42,6 +43,54 @@ final class VmNumericDivisionGuard
         $context->builder->positionAtEnd($errBlock);
         TryCatchHelper::emitCatchableClassError($context, 'DivisionByZeroError', $message);
         $context->builder->positionAtEnd($okBlock);
+    }
+
+    /**
+     * zend_operators.c mod_function: when op2 is long -1, result is 0 without converting op1.
+     * Must run before float→long precision warnings on the dividend (#32285 / g2_mod.php).
+     *
+     * @param callable(): Value $emitDivisorLong
+     * @param callable(): Value $emitDividendLong invoked only when divisor is not -1
+     */
+    public static function moduloWithNegOneShortCircuit(
+        Context $context,
+        Variable $divisorVar,
+        callable $emitDivisorLong,
+        callable $emitDividendLong
+    ): Value {
+        if (
+            (null !== $divisorVar->compileTimeLong && -1 === (int) $divisorVar->compileTimeLong)
+            || (null !== $divisorVar->compileTimeFloat && -1.0 === (float) $divisorVar->compileTimeFloat)
+        ) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mod_neg1_sc_cont');
+        $i64 = $context->getTypeFromString('int64');
+        $divisor = $context->builder->intCast($emitDivisorLong(), $i64);
+        self::emitZeroLongDivisorGuard($context, $divisor, 'Modulo by zero');
+
+        $negOne = $i64->constInt(-1, true);
+        $isNegOne = $context->builder->icmp(Builder::INT_EQ, $divisor, $negOne);
+        $zeroBlock = BasicBlockHelper::append($context, 'mod_neg1_sc_zero');
+        $computeBlock = BasicBlockHelper::append($context, 'mod_neg1_sc_compute');
+        $doneBlock = BasicBlockHelper::append($context, 'mod_neg1_sc_done');
+        $context->builder->branchIf($isNegOne, $zeroBlock, $computeBlock);
+
+        $context->builder->positionAtEnd($zeroBlock);
+        $zero = $i64->constInt(0, false);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($computeBlock);
+        $rem = self::signedModulo($context, $emitDividendLong(), $divisor);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, 'mod_neg1_sc_result');
+        $phi->addIncoming($zero, $zeroBlock);
+        $phi->addIncoming($rem, $computeBlock);
+
+        return $phi;
     }
 
     /**

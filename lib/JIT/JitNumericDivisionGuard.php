@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\VmNumericDivisionGuard;
 use PHPLLVM\Value;
 
@@ -30,6 +31,21 @@ final class JitNumericDivisionGuard
     public static function signedModulo(Context $context, Value $dividend, Value $divisor): Value
     {
         return VmNumericDivisionGuard::signedModulo($context, $dividend, $divisor);
+    }
+
+    /** op2 == -1 → 0 before dividend float→long conversion (#32285). */
+    public static function moduloWithNegOneShortCircuit(
+        Context $context,
+        Variable $divisorVar,
+        callable $emitDivisorLong,
+        callable $emitDividendLong
+    ): Value {
+        return VmNumericDivisionGuard::moduloWithNegOneShortCircuit(
+            $context,
+            $divisorVar,
+            $emitDivisorLong,
+            $emitDividendLong
+        );
     }
 
     public static function emitIntMinNegOneOverflowGuard(
