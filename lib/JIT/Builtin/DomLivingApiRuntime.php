@@ -645,6 +645,17 @@ final class DomLivingApiRuntime
     public static function invokeIsSameNode(Context $context, Variable $receiver, Variable $other): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_issame_slots');
+        // php-src: isSameNode(DOMNode $otherNode) — not nullable (#33775; peer CDP #33733).
+        // Variable null was loadObject→null ptr then icmp EQ → false (silent wrong).
+        if (JitDomRequireDomNodeArg::guardOrAbort(
+            $context,
+            $other,
+            'DOMNode::isSameNode',
+            1,
+            'otherNode'
+        )) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
         $receiverLlvm = self::loadObject($context, $receiver);
         $otherLlvm = self::loadObject($context, $other);
 
