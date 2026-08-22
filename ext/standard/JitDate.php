@@ -338,34 +338,6 @@ final class JitDate
             );
         }
 
-        // Microseconds — NestedJIT DateTimeFormatRuntime SIGABRTs on thin AOT (#33922).
-        if ('u' === $fmtLit) {
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'date_us_civil');
-            $i8 = $context->getTypeFromString('int8');
-            $i64 = $context->getTypeFromString('int64');
-            $sizeT = $context->getTypeFromString('size_t');
-            $charPtr = $context->getTypeFromString('char*');
-            $us = $microsecond ?? $i64->constInt(0, false);
-            $buf = $context->builder->alloca($i8, 8, 'us_buf');
-            $bufChar = $context->builder->pointerCast($buf, $charPtr);
-            LibcExtern::ensureSnprintf($context);
-            $fmt = $context->builder->pointerCast($context->constantFromString('%06lld'), $charPtr);
-            $written = $context->builder->call(
-                $context->lookupFunction('snprintf'),
-                $bufChar,
-                $sizeT->constInt(8, false),
-                $fmt,
-                $us
-            );
-            $len = $context->builder->sext($written, $i64);
-
-            return $context->builder->call(
-                $context->lookupFunction('__string__init'),
-                $len,
-                $bufChar
-            );
-        }
-
         /** @var array<string, array{0:string,1:list<string>,2:int}> $specs */
         $specs = [
             'Y' => ['%04lld', ['year'], 8],
@@ -375,6 +347,8 @@ final class JitDate
             'H' => ['%02lld', ['hour'], 4],
             'i' => ['%02lld', ['minute'], 4],
             's' => ['%02lld', ['second'], 4],
+            // Bare microseconds — dedicated early-return snprintf SIGSEGV'd (#33930).
+            'u' => ['%06lld', ['micro'], 8],
             'Y-m-d' => ['%04lld-%02lld-%02lld', ['year', 'month', 'day'], 16],
             'Ymd' => ['%04lld%02lld%02lld', ['year', 'month', 'day'], 12],
             'H:i:s' => ['%02lld:%02lld:%02lld', ['hour', 'minute', 'second'], 12],
@@ -389,7 +363,12 @@ final class JitDate
                 ['year', 'month', 'day', 'hour', 'minute', 'second'],
                 32,
             ],
-            // Fractional wall clock — bake micro so format() skips NestedJIT (#33922).
+            // Fractional wall clock — bake micro so format() skips NestedJIT (#33922 / #33930).
+            'H:i:s.u' => [
+                '%02lld:%02lld:%02lld.%06lld',
+                ['hour', 'minute', 'second', 'micro'],
+                16,
+            ],
             'Y-m-d H:i:s.u' => [
                 '%04lld-%02lld-%02lld %02lld:%02lld:%02lld.%06lld',
                 ['year', 'month', 'day', 'hour', 'minute', 'second', 'micro'],
