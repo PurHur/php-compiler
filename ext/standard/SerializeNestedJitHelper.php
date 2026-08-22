@@ -28,8 +28,12 @@ final class SerializeNestedJitHelper
             return 'N;';
         }
         if (2 === $t) {
-            // JIT TYPE_NATIVE_BOOL (#33682 / #33520)
-            return $value->toBool() ? 'b:1;' : 'b:0;';
+            // JIT TYPE_NATIVE_BOOL — if/else avoids NestedJIT i1 ternary stick (#33687 / #33682)
+            if ($value->toBool()) {
+                return 'b:1;';
+            }
+
+            return 'b:0;';
         }
         if (3 === $t) {
             // JIT TYPE_NATIVE_DOUBLE (#33682 / #33520)
@@ -89,7 +93,11 @@ final class SerializeNestedJitHelper
                     } elseif (0 === $et) {
                         $inner .= 'N;';
                     } elseif (2 === $et) {
-                        $inner .= $elem->toBool() ? 'b:1;' : 'b:0;';
+                        if ($elem->toBool()) {
+                            $inner .= 'b:1;';
+                        } else {
+                            $inner .= 'b:0;';
+                        }
                     } elseif (4 === $et) {
                         $inner .= self::quote($elem->toString());
                     } elseif (3 === $et) {
@@ -109,7 +117,11 @@ final class SerializeNestedJitHelper
             } elseif (0 === $t) {
                 $body .= 'N;';
             } elseif (2 === $t) {
-                $body .= $val->toBool() ? 'b:1;' : 'b:0;';
+                if ($val->toBool()) {
+                    $body .= 'b:1;';
+                } else {
+                    $body .= 'b:0;';
+                }
             } elseif (3 === $t) {
                 $body .= 'd:'.((string) $val->toFloat()).';';
             } elseif (4 === $t) {
@@ -141,7 +153,11 @@ final class SerializeNestedJitHelper
                     } elseif (0 === $et) {
                         $inner .= 'N;';
                     } elseif (2 === $et) {
-                        $inner .= $elem->toBool() ? 'b:1;' : 'b:0;';
+                        if ($elem->toBool()) {
+                            $inner .= 'b:1;';
+                        } else {
+                            $inner .= 'b:0;';
+                        }
                     } elseif (4 === $et) {
                         $inner .= self::quote($elem->toString());
                     } elseif (3 === $et) {

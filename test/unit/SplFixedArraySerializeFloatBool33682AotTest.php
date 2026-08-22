@@ -19,17 +19,20 @@ final class SplFixedArraySerializeFloatBool33682AotTest extends TestCase
         $aot = $this->runAot($src);
         $this->assertStringContainsString('d:1.5;', $aot);
         $this->assertStringContainsString('b:1;', $aot);
+        $this->assertStringContainsString('b:0;', $aot);
         $this->assertStringNotContainsString('i:0;b:1;i:1;d:0;', $aot);
         $this->assertSame($zend, $aot);
     }
 
-    public function testHelpersUseJitBoolDoubleTags(): void
+    public function testHelpersDispatchJitBoolBeforeDouble(): void
     {
         $root = dirname(__DIR__, 2);
         $sfa = (string) file_get_contents($root.'/ext/standard/SerializeSplFixedArrayNestedJitHelper.php');
         $this->assertStringContainsString('#33682', $sfa);
-        $this->assertStringContainsString('2 === $t', $sfa);
-        $this->assertStringContainsString('toBool()', $sfa);
+        $this->assertMatchesRegularExpression(
+            '/2 === \$t.*?toBool\(\).*?b:1;.*?b:0;.*?3 === \$t.*?toFloat\(\)/s',
+            $sfa
+        );
         $nested = (string) file_get_contents($root.'/ext/standard/SerializeNestedJitHelper.php');
         $this->assertStringContainsString('#33682', $nested);
         $this->assertStringContainsString('TYPE_NATIVE_BOOL', $nested);

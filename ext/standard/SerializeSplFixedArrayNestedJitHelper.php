@@ -58,10 +58,15 @@ final class SerializeSplFixedArrayNestedJitHelper
             } elseif (0 === $t) {
                 $body .= 'N;';
             } elseif (2 === $t) {
-                // JIT TYPE_NATIVE_BOOL (#33682 / #33520)
-                $body .= $val->toBool() ? 'b:1;' : 'b:0;';
+                // JIT TYPE_NATIVE_BOOL (=2). Prefer if/else — NestedJIT i1 ternary
+                // can stick on the true arm (#33687 / VariableToBool + #21892 / #33682).
+                if ($val->toBool()) {
+                    $body .= 'b:1;';
+                } else {
+                    $body .= 'b:0;';
+                }
             } elseif (3 === $t) {
-                // JIT TYPE_NATIVE_DOUBLE (#33682 / #33520)
+                // JIT TYPE_NATIVE_DOUBLE (=3) — VM TYPE_BOOLEAN collides (#33520 / #33682).
                 $body .= 'd:'.((string) $val->toFloat()).';';
             } elseif (4 === $t) {
                 $vs = $val->toString();
