@@ -17,7 +17,7 @@ use PHPLLVM\Value;
 /**
  * Thin-AOT SplFixedArray — object `__spl_ht` packed storage (#26793).
  *
- * php-src: ext/spl/spl_fixedarray.c — construct / fromArray / count / ArrayAccess / foreach.
+ * php-src: ext/spl/spl_fixedarray.c — construct / fromArray / setSize / toArray / count / ArrayAccess / foreach.
  */
 final class SplFixedArrayJitHelper
 {
@@ -154,6 +154,79 @@ final class SplFixedArrayJitHelper
     public static function compileGetSize(Context $context, JITVariable $receiver): Value
     {
         return self::compileCount($context, $receiver);
+    }
+
+    /**
+     * SplFixedArray::setSize($size) — grow/shrink packed `__spl_ht` (#33784).
+     *
+     * php-src zim_SplFixedArray_setSize: fixed length is nextFreeElement (peer construct /
+     * count). Grow appends null pads; shrink truncates nextFreeElement.
+     */
+    public static function compileSetSize(Context $context, JITVariable $receiver, JITVariable $sizeArg): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $newSizeI64 = self::coerceNonNegativeSize($context, $sizeArg, 'SplFixedArray::setSize');
+        $newSize = $context->builder->truncOrBitCast($newSizeI64, $sizeT);
+        $nextFreePtr = $context->builder->structGep($ht, $map['nextFreeElement']);
+        $oldSize = $context->builder->load($nextFreePtr);
+
+        $growBb = BasicBlockHelper::append($context, 'sfa_setsize_grow');
+        $shrinkBb = BasicBlockHelper::append($context, 'sfa_setsize_shrink');
+        $doneBb = BasicBlockHelper::append($context, 'sfa_setsize_done');
+
+        $needGrow = $context->builder->icmp(Builder::INT_UGT, $newSize, $oldSize);
+        $needShrink = $context->builder->icmp(Builder::INT_ULT, $newSize, $oldSize);
+        $afterEq = BasicBlockHelper::append($context, 'sfa_setsize_after_eq');
+        $context->builder->branchIf($needGrow, $growBb, $afterEq);
+
+        $context->builder->positionAtEnd($afterEq);
+        $context->builder->branchIf($needShrink, $shrinkBb, $doneBb);
+
+        $context->builder->positionAtEnd($growBb);
+        $delta = $context->builder->sub($newSize, $oldSize);
+        $htVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht);
+        self::padNullSlots($context, $htVar, $context->builder->zExt($delta, $context->getTypeFromString('int64')));
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($shrinkBb);
+        $context->builder->store($newSize, $nextFreePtr);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * SplFixedArray::toArray() — packed `__spl_ht` copy as PHP array (#33784).
+     *
+     * Peer {@see ArrayObjectJitHelper::compileGetArrayCopy}.
+     */
+    public static function compileToArray(Context $context, JITVariable $receiver): Value
+    {
+        $ht = self::htPtr($context, self::loadObject($context, $receiver));
+        $copy = new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
+            HashTableHelper::alloc($context)
+        );
+        HashTableHelper::spreadInto(
+            $context,
+            $copy,
+            new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht)
+        );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $slot),
+            $context->helper->loadValue($copy)
+        );
+
+        return $slot;
     }
 
     public static function compileOffsetGet(Context $context, JITVariable $receiver, JITVariable $index): Value
