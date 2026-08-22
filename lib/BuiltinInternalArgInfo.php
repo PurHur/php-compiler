@@ -907,6 +907,8 @@ final class BuiltinInternalArgInfo
                 2, 3 => '?string',
                 default => null,
             },
+            // ext/standard/basic_functions.stub.php — mixed &$var (InternalArgInfo untyped) (#27766)
+            'settype' => 0 === $index ? 'mixed' : null,
             // ext/standard/basic_functions.stub.php — mixed ...$values variadic type (#28177)
             'sprintf', 'printf' => 1 === $index ? 'mixed' : null,
             'fprintf' => 2 === $index ? 'mixed' : null,
