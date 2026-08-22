@@ -221,11 +221,10 @@ final class JitStringBuiltinArg
         if (Variable::TYPE_VALUE === $arg->type) {
             // Boxed null (common when null is arg #1 before an array literal) — Z_PARAM_STR
             // TypeError on 8.4 / strict_types (#19894; same mask as JitStrlen).
-            if (
-                $context->callerStrictTypes
+            $strictNull = $context->callerStrictTypes
                 || ($zparamStrNullGuard && self::requiresZparamStrStrictNullOnForwardProfile())
-                || ($rejectNullOnForwardProfile && self::requiresForwardProfileStrictStringNull())
-            ) {
+                || ($rejectNullOnForwardProfile && self::requiresForwardProfileStrictStringNull());
+            if ($strictNull) {
                 TypeErrorRaise::registerDeclarations($context);
                 TypeErrorRaise::ensureLinked($context);
                 $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
@@ -249,6 +248,47 @@ final class JitStringBuiltinArg
                 $context->builder->positionAtEnd($nullErrBlock);
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
                 $context->builder->positionAtEnd($okBlock);
+            } else {
+                // Trim-family soft-null: boxed null must not reach __value__readString (#21234).
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+                $map = $context->structFieldMap['__value__'];
+                $typeByte = $context->builder->load(
+                    $context->builder->structGep($valuePtr, $map['type'])
+                );
+                $i8 = $context->getTypeFromString('int8');
+                $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+                $nullSoftBlock = BasicBlockHelper::append($context, 'zparam_str_value_soft_null');
+                $okBlock = BasicBlockHelper::append($context, 'zparam_str_value_soft_ok');
+                $mergeBlock = BasicBlockHelper::append($context, 'zparam_str_value_soft_merge');
+                $context->builder->branchIf(
+                    $context->builder->icmp(
+                        Builder::INT_EQ,
+                        $typeKind,
+                        $i8->constInt(VmVariable::TYPE_NULL, false)
+                    ),
+                    $nullSoftBlock,
+                    $okBlock
+                );
+                $context->builder->positionAtEnd($nullSoftBlock);
+                if (!self::requiresForwardProfileStrictStringNull()) {
+                    self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName, $expectedType);
+                }
+                $emptyStr = $context->builder->load($context->constantStringFromString(''));
+                $nullEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($mergeBlock);
+
+                $context->builder->positionAtEnd($okBlock);
+                $strPtr = JitStringArg::stringPtrFromVariable($context, $arg);
+                $okEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($mergeBlock);
+
+                $context->builder->positionAtEnd($mergeBlock);
+                $strPtrType = $context->getTypeFromString('__string__*');
+                $phi = $context->builder->phi($strPtrType);
+                $phi->addIncoming($emptyStr, $nullEnd);
+                $phi->addIncoming($strPtr, $okEnd);
+
+                return $phi;
             }
             // Boxed strings: readString from the value box. Do NOT run
             // JitNativeString::coerce + loadValue — that path miscompiles under

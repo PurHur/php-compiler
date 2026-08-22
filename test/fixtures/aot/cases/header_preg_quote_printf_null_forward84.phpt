@@ -6,8 +6,7 @@ PHP_COMPILER_PROFILE=8.4
 <?php
 $h = null;
 $f = null;
-header($h); // DEP+coerce; must not TypeError
-header('Content-Type: text/plain');
+header($h); // DEP+coerce; must not TypeError or SEGV
 $n = printf($f);
 echo (0 === $n) ? "OK\n" : "BAD\n";
 --EXPECT--

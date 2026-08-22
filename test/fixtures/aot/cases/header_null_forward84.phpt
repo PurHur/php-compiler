@@ -5,8 +5,7 @@ PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $h = null;
-header($h); // DEP+coerce to ''; must not TypeError
-header('Content-Type: text/plain'); // keep CGI flush well-defined after empty soft-null
+header($h); // DEP+coerce to ''; must not TypeError or SEGV
 echo "OK\n";
 --EXPECT--
 OK
