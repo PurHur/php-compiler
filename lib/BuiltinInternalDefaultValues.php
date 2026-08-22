@@ -624,6 +624,10 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'string', 'value' => "\n"],
             3 => ['kind' => 'bool', 'value' => false],
         ],
+        // php-src ext/standard/string.stub.php — bool $use_xhtml = true (bool infer → false) (#24856)
+        'nl2br' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
         'getimagesize' => [
             1 => ['kind' => 'null'],
         ],

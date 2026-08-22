@@ -1137,6 +1137,38 @@ PHP;
         );
     }
 
+    /** @covers issue #24856 */
+    public function testNl2brReflectionUseXhtmlDefaultTrue(): void
+    {
+        $info = ['name' => 'use_xhtml', 'type' => 'bool', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('nl2br', 1, $info, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'nl2br', 1, $info));
+        self::assertTrue($dest->toBool());
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$r = new ReflectionFunction('nl2br');
+foreach ($r->getParameters() as $p) {
+    echo $p->getName();
+    if ($p->isOptional()) {
+        echo '=';
+        echo json_encode($p->getDefaultValue());
+    }
+    echo "\n";
+}
+echo nl2br("a\nb"), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'nl2br_reflection_24856.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "string\nuse_xhtml=true\na<br />\nb\n",
+            ob_get_clean()
+        );
+    }
+
     /** @covers issue #9646 */
     public function testJsonEncodeNamedParameters(): void
     {
