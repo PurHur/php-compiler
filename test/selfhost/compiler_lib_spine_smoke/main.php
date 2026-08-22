@@ -3341,6 +3341,7 @@ require_once __DIR__.'/../../../ext/standard/SinJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SinhJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SleepJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SortJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/SosAttachNativeOpsJit.php';
 require_once __DIR__.'/../../../ext/standard/SoundexJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SplAutoloadDefaultJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SplAutoloadJitHelper.php';
@@ -3435,8 +3436,10 @@ require_once __DIR__.'/../../../ext/standard/UnserializeSplArrayFlagsNestedJitHe
 require_once __DIR__.'/../../../ext/standard/UnserializeSplFixedArrayNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UnserializeSplFixedArrayDoubleNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UnserializeSplFixedArrayBoolNestedJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/UnserializeSplObjectStorageNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SerializeSplArrayNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SerializeSplFixedArrayNestedJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/SerializeSplObjectStorageNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UploadTempJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UrldecodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UrlencodeJitHelper.php';
@@ -4359,6 +4362,9 @@ require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_string_key_bool.
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_string_key_null.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_string_key_object.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_string_key_stdclass_from_ht.php';
+require_once __DIR__.'/../../../ext/standard/phpc_native_sos_attach_empty_stdclass_long.php';
+require_once __DIR__.'/../../../ext/standard/phpc_native_sos_attach_empty_stdclass_null.php';
+require_once __DIR__.'/../../../ext/standard/phpc_native_sos_attach_empty_stdclass_string.php';
 require_once __DIR__.'/../../../ext/standard/phpc_object_invoke_destructor_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_object_is_constructed_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_object_release_storage_native.php';
