@@ -14,7 +14,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitFilterInputTypeArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
-use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -253,18 +252,34 @@ final class filter_input extends Internal
         JITVariable $key,
         JITVariable $filter
     ): Value {
-        $htVar = SuperglobalInit::load($context, $superglobal);
-        $exists = (new array_key_exists())->call($context, $key, $htVar);
+        // IF_G snapshot for GET/POST/COOKIE — not live sg_* (#33946, re-#19640).
+        $htVar = JitFilter::loadInputTable($context, $superglobal);
+        $htLoaded = $context->helper->loadValue($htVar);
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $isNullHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $htLoaded,
+            $htPtrTy->constNull()
+        );
         $missingBlock = BasicBlockHelper::append($context, 'filter_input_missing_'.$superglobal);
         $presentBlock = BasicBlockHelper::append($context, 'filter_input_present_'.$superglobal);
+        $nullSnapBlock = BasicBlockHelper::append($context, 'filter_input_null_snap_'.$superglobal);
         $doneBlock = BasicBlockHelper::append($context, 'filter_input_sg_done_'.$superglobal);
-        $context->builder->branchIf($exists, $presentBlock, $missingBlock);
+        $context->builder->branchIf($isNullHt, $nullSnapBlock, $presentBlock);
+
+        $context->builder->positionAtEnd($nullSnapBlock);
+        $context->builder->branch($missingBlock);
+
+        $context->builder->positionAtEnd($presentBlock);
+        $exists = (new array_key_exists())->call($context, $key, $htVar);
+        $existsPresentBlock = BasicBlockHelper::append($context, 'filter_input_key_present_'.$superglobal);
+        $context->builder->branchIf($exists, $existsPresentBlock, $missingBlock);
 
         $context->builder->positionAtEnd($missingBlock);
         $nullResult = JitFilter::boxedNull($context);
         $context->builder->branch($doneBlock);
 
-        $context->builder->positionAtEnd($presentBlock);
+        $context->builder->positionAtEnd($existsPresentBlock);
         $ht = $context->helper->loadValue($htVar);
         $keyVal = $context->helper->loadValue($key);
         $boxed = $context->builder->call(
