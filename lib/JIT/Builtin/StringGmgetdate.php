@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_gmgetdate via GmgetdateJitHelper PHP (#9181).
+ * JIT/AOT link for __compiler_gmgetdate via GmgetdateJitHelper PHP (#9181, #33952).
  *
  * SSOT: {@see \PHPCompiler\ext\standard\VmDate}
  * php-src: ext/standard/datetime.c — PHP_FUNCTION(gmgetdate)
@@ -39,18 +40,31 @@ final class StringGmgetdate
             return;
         }
 
-        self::ensureJitHelperCompiled($context);
-        $i64 = $context->getTypeFromString('int64');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        HashtableValueOutJitBridge::implement(
-            $context,
-            self::ABI_NAME,
-            'gmg',
-            [$i64, $valuePtr],
-            self::helperFunction($context),
-            static fn (Context $ctx, LlvmFunction $fn): array => [$fn->getParam(0)]
-        );
-        $context->builder->clearInsertionPosition();
+        // Same insert-block discipline as StringMktime (#33952 / #33934).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
+        try {
+            self::ensureJitHelperCompiled($context);
+            $i64 = $context->getTypeFromString('int64');
+            $valuePtr = $context->getTypeFromString('__value__*');
+            HashtableValueOutJitBridge::implement(
+                $context,
+                self::ABI_NAME,
+                'gmg',
+                [$i64, $valuePtr],
+                self::helperFunction($context),
+                static fn (Context $ctx, LlvmFunction $fn): array => [$fn->getParam(0)]
+            );
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $savedBlock) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        }
     }
 
     private static function helperFunction(Context $context): LlvmFunction
