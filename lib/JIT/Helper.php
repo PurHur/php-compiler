@@ -984,17 +984,19 @@ restart:
                 );
                 goto return_bool;
             }
-            // Loose == / != : numeric-string ⊙ boxed float/long (Zend compare_function, #32883).
+            // Loose == / != : identical string content or numeric-string ⊙ boxed (#32883, #33800).
             if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                 $boxedObjEq = $this->tryValueBoxObjectStringLooseEqual($opcode, $right, $leftValue);
                 if (null !== $boxedObjEq) {
                     return $boxedObjEq;
                 }
+                $identical = JitStringCompare::identicalValueToString($this->context, $right, $leftValue);
                 $asDouble = \PHPCompiler\VM\VmValueCompare::stringToDouble($this->context, $leftValue);
-                $eq = $this->context->builder->and(
+                $numericEq = $this->context->builder->and(
                     \PHPCompiler\VM\VmValueCompare::stringIsNumeric($this->context, $leftValue),
                     JitValueCompare::looseEqualValueToNativeDouble($this->context, $right, $asDouble)
                 );
+                $eq = $this->context->builder->or($identical, $numericEq);
                 if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                     $eq = $this->context->builder->xor(
                         $eq,
@@ -1053,18 +1055,20 @@ restart:
                 }
                 goto return_bool;
             }
-            // Loose == / != : boxed float/long ⊙ numeric-string (Zend compare_function, #32883).
+            // Loose == / != : identical string content or boxed ⊙ numeric-string (#32883, #33800).
             // Prior spaceship path compared float→string form ("1.5" vs "1.500…") and mismatched Zend.
             if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                 $boxedObjEq = $this->tryValueBoxObjectStringLooseEqual($opcode, $left, $rightValue);
                 if (null !== $boxedObjEq) {
                     return $boxedObjEq;
                 }
+                $identical = JitStringCompare::identicalStringToValue($this->context, $rightValue, $left);
                 $asDouble = \PHPCompiler\VM\VmValueCompare::stringToDouble($this->context, $rightValue);
-                $eq = $this->context->builder->and(
+                $numericEq = $this->context->builder->and(
                     \PHPCompiler\VM\VmValueCompare::stringIsNumeric($this->context, $rightValue),
                     JitValueCompare::looseEqualValueToNativeDouble($this->context, $left, $asDouble)
                 );
+                $eq = $this->context->builder->or($identical, $numericEq);
                 if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                     $eq = $this->context->builder->xor(
                         $eq,
@@ -2696,14 +2700,16 @@ return_bool:
         $this->context->builder->branch($doneBb);
 
         $this->context->builder->positionAtEnd($strBb);
-        // Non-object VALUE (float/long/string/…) vs native string: loose == must
-        // numeric-convert (Zend compare_function), not identical (#32883).
+        // Non-object VALUE (float/long/string/…) vs native string: identical content
+        // or numeric-string ⊙ boxed (Zend compare_function, #32883, #33800).
         if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+            $identical = JitStringCompare::identicalStringToValue($this->context, $nativeStr, $boxed);
             $asDouble = \PHPCompiler\VM\VmValueCompare::stringToDouble($this->context, $nativeStr);
-            $strResult = $this->context->builder->and(
+            $numericEq = $this->context->builder->and(
                 \PHPCompiler\VM\VmValueCompare::stringIsNumeric($this->context, $nativeStr),
                 JitValueCompare::looseEqualValueToNativeDouble($this->context, $boxed, $asDouble)
             );
+            $strResult = $this->context->builder->or($identical, $numericEq);
             if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                 $strResult = $this->context->builder->xor($strResult, $i1->constInt(1, false));
             }
