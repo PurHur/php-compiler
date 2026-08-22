@@ -2705,27 +2705,36 @@ class JIT {
         );
 
         $cfgParamCount = null !== $block->func ? count($block->func->params) : 0;
+        // $args/$rawTypes are LLVM-shaped (optional $this at 0). CFG params are not —
+        // indexing func->params[$llvmIdx] mis-attributes a trailing variadic onto the
+        // preceding formal (Context typed as HT, ...$args left as object) and fails
+        // module verify on writeHashtable/setObjectAt (#24429 ext/ds DsFactoryFunction::call).
+        $thisParamOffset = $this->llvmThisParamOffset($block);
         foreach ($args as $idx => $arg) {
             $varType = Variable::getTypeFromType($rawTypes[$idx]);
+            $cfgIdx = $idx - $thisParamOffset;
+            $cfgParam = ($cfgIdx >= 0 && $cfgIdx < $cfgParamCount)
+                ? $block->func->params[$cfgIdx]
+                : null;
             if (
-                JIT\NestedJitCompileScope::isActive()
-                && $idx < $cfgParamCount
+                null !== $cfgParam
+                && JIT\NestedJitCompileScope::isActive()
                 && $this->isCfgVmVariableParamType(
-                    $this->declaredTypeFromCfgParam($block->func->params[$idx])
+                    $this->declaredTypeFromCfgParam($cfgParam)
                 )
             ) {
                 $varType = Variable::TYPE_VALUE;
             }
             if (
-                JIT\NestedJitCompileScope::isActive()
-                && $idx < $cfgParamCount
+                null !== $cfgParam
+                && JIT\NestedJitCompileScope::isActive()
                 && $this->isCfgVmHashTableParamType(
-                    $this->declaredTypeFromCfgParam($block->func->params[$idx])
+                    $this->declaredTypeFromCfgParam($cfgParam)
                 )
             ) {
                 $varType = Variable::TYPE_HASHTABLE;
             }
-            if ($idx < $cfgParamCount && $block->func->params[$idx]->variadic) {
+            if (null !== $cfgParam && $cfgParam->variadic) {
                 $varType = Variable::TYPE_HASHTABLE;
             }
             $argVars[] = new Variable($this->context, $varType, Variable::KIND_VALUE, $func->getParam($idx));
