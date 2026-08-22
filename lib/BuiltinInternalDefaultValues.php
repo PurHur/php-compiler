@@ -123,7 +123,7 @@ final class BuiltinInternalDefaultValues
         'php_uname' => [
             0 => ['kind' => 'string', 'value' => 'a'],
         ],
-        // php-src ext/standard/basic_functions.stub.php — ?bool $exclude_disabled = true (#25277)
+        // php-src ext/standard/basic_functions.stub.php — bool $exclude_disabled = true (#25277, #26356)
         'get_defined_functions' => [
             0 => ['kind' => 'bool', 'value' => true],
         ],
