@@ -13576,11 +13576,13 @@ class JIT {
                                     JIT\TypedPropertyUninitGuard::emitBeforeDimWrite($this->context, $fetched);
                                 }
                             }
-                            if ($forceBranchMerge) {
-                                $this->assignOperand($result, $fetched, true);
-                            } else {
-                                $this->context->scope->variables[$result] = $fetched;
-                            }
+                            $this->bindPropertyFetchForCoalesceMerge(
+                                $result,
+                                $fetched,
+                                $op,
+                                $forceBranchMerge,
+                                $forWrite
+                            );
                             break;
                         }
                         $classId = $this->context->type->object->lookup($declaringClass);
@@ -13616,11 +13618,13 @@ class JIT {
                             $lvalue->magicSetReceiver = $receiver;
                             $lvalue->magicSetName = $name->value;
                             $lvalue->objectPropertyClassName = $declaringClass;
-                            if ($forceBranchMerge) {
-                                $this->assignOperand($result, $lvalue, true);
-                            } else {
-                                $this->context->scope->variables[$result] = $lvalue;
-                            }
+                            $this->bindPropertyFetchForCoalesceMerge(
+                                $result,
+                                $lvalue,
+                                $op,
+                                $forceBranchMerge,
+                                $forWrite
+                            );
                             break;
                         }
                         if (
@@ -13648,11 +13652,13 @@ class JIT {
                             $lvalue->magicSetReceiver = $receiver;
                             $lvalue->magicSetName = $name->value;
                             $lvalue->objectPropertyClassName = $declaringClass;
-                            if ($forceBranchMerge) {
-                                $this->assignOperand($result, $lvalue, true);
-                            } else {
-                                $this->context->scope->variables[$result] = $lvalue;
-                            }
+                            $this->bindPropertyFetchForCoalesceMerge(
+                                $result,
+                                $lvalue,
+                                $op,
+                                $forceBranchMerge,
+                                $forWrite
+                            );
                             break;
                         }
                         if (
@@ -13682,11 +13688,13 @@ class JIT {
                                 )
                                 : null;
                             if (null !== $lvalue) {
-                                if ($forceBranchMerge) {
-                                    $this->assignOperand($result, $lvalue, true);
-                                } else {
-                                    $this->context->scope->variables[$result] = $lvalue;
-                                }
+                                $this->bindPropertyFetchForCoalesceMerge(
+                                    $result,
+                                    $lvalue,
+                                    $op,
+                                    $forceBranchMerge,
+                                    $forWrite
+                                );
                                 break;
                             }
                         }
@@ -13961,12 +13969,13 @@ class JIT {
                                 JIT\TypedPropertyUninitGuard::emitBeforeDimWrite($this->context, $fetched);
                             }
                         }
-                        if ($forceBranchMerge || $op->nullsafeFetchPropertyRead) {
-                            // Nullsafe merge must not retain fetch-arm objectPropertySlot (#32988).
-                            $this->assignOperand($result, $fetched, true);
-                        } else {
-                            $this->context->scope->variables[$result] = $fetched;
-                        }
+                        $this->bindPropertyFetchForCoalesceMerge(
+                            $result,
+                            $fetched,
+                            $op,
+                            $forceBranchMerge,
+                            $forWrite
+                        );
                         if ($op->nullsafeFetchPropertyRead && $this->context->hasVariableOp($result)) {
                             $bound = $this->context->getVariableFromOp($result);
                             $bound->objectPropertySlot = null;
@@ -13984,11 +13993,13 @@ class JIT {
                             $declaringClass,
                             $nameVar
                         );
-                        if ($forceBranchMerge) {
-                            $this->assignOperand($result, $fetched, true);
-                        } else {
-                            $this->context->scope->variables[$result] = $fetched;
-                        }
+                        $this->bindPropertyFetchForCoalesceMerge(
+                            $result,
+                            $fetched,
+                            $op,
+                            $forceBranchMerge,
+                            $forWrite
+                        );
                     }
                     break;
                 case OpCode::TYPE_FROM_CALLABLE:
@@ -26420,9 +26431,10 @@ class JIT {
     }
 
     /**
-     * ??= merge temps are stack slots. Class::$prop fetch binds KIND_VALUE plus
-     * staticPropertyGlobal; promoting first drops that lvalue so the store never
-     * reaches the module global and AOT readback stays NULL (#32035, #20877).
+     * ??= merge temps are stack slots. Class::$prop / $obj->prop fetch binds
+     * KIND_VALUE plus staticPropertyGlobal or objectPropertySlot; promoting
+     * first drops that lvalue so the store never reaches the property and AOT
+     * readback stays unset (#32035, #20877, #33748).
      */
     private function persistStaticPropertyBeforeCoalesceMergePromote(Operand $coalesceTarget, Variable $value): void
     {
@@ -26430,10 +26442,46 @@ class JIT {
             return;
         }
         $dest = $this->context->getVariableFromOp($coalesceTarget);
-        if (null === $dest->staticPropertyGlobal || null === $dest->staticPropertyType) {
+        $hasStatic = null !== $dest->staticPropertyGlobal && null !== $dest->staticPropertyType;
+        $hasInstance = null !== $dest->objectPropertySlot && null !== $dest->objectPropertyType;
+        if (!$hasStatic && !$hasInstance) {
             return;
         }
         $this->assignOperand($coalesceTarget, $value, false);
+    }
+
+    /**
+     * ??= write-arm PROPERTY_FETCH_WRITE reuses the coalesce merge operand.
+     * Force-merge assignOperand would strip objectPropertySlot (#3219 / #32988),
+     * so the following ASSIGN stores only the stack box. Copy the lvalue with
+     * force=false so persistStaticPropertyBeforeCoalesceMergePromote can write
+     * the instance slot in this BB (peer of #32035, #33748). Nullsafe still
+     * force-merges so fetch-arm SSA does not leak into the merge (#32988).
+     */
+    private function bindPropertyFetchForCoalesceMerge(
+        Operand $result,
+        Variable $fetched,
+        OpCode $op,
+        bool $forceBranchMerge,
+        bool $forWrite
+    ): void {
+        if ($op->nullsafeFetchPropertyRead) {
+            $this->assignOperand($result, $fetched, true);
+
+            return;
+        }
+        $writeLvalue = $forWrite || OpCode::TYPE_PROPERTY_FETCH_WRITE === $op->type;
+        if ($forceBranchMerge && $writeLvalue) {
+            $this->assignOperand($result, $fetched, false);
+
+            return;
+        }
+        if ($forceBranchMerge) {
+            $this->assignOperand($result, $fetched, true);
+
+            return;
+        }
+        $this->context->scope->variables[$result] = $fetched;
     }
 
     private function ensureCoalesceMergeStackSlot(Operand $mergeOp): void
