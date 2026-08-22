@@ -453,8 +453,8 @@ final class GeneratorYieldFromJitHelper
         Context $context,
         Value $stateParam,
         array $map,
-        \PHPLLVM\Type\IntegerType $i1,
-        \PHPLLVM\Type\IntegerType $i64
+        \PHPLLVM\Type $i1,
+        \PHPLLVM\Type $i64
     ): void {
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);
@@ -492,17 +492,26 @@ final class GeneratorYieldFromJitHelper
         $failBb = $fn->appendBasicBlock('gen_yf_vb_fail_'.$tag);
         $afterArray = $fn->appendBasicBlock('gen_yf_vb_after_array_'.$tag);
 
-        $isArray = $context->builder->icmp(
+        // Mask IS_REFCOUNTED — __value__writeHashtable stores TYPE_HASHTABLE (135), while
+        // some paths store VM TYPE_ARRAY (6). Same dual check as __value__readHashtable (#26977).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isJitHt = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isVmArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
             $i8->constInt(VmVariable::TYPE_ARRAY, false)
         );
+        $isArray = $context->builder->or($isJitHt, $isVmArray);
         $context->builder->branchIf($isArray, $arrayBb, $afterArray);
 
         $context->builder->positionAtEnd($afterArray);
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(VmVariable::TYPE_STRING, false)
         );
         $context->builder->branchIf($isString, $stringBb, $failBb);
