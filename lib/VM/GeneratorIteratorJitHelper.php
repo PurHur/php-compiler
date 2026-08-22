@@ -116,10 +116,12 @@ final class GeneratorIteratorJitHelper
         $context = $jit->context;
         $map = $context->structFieldMap['__generator_state__'];
         $i1 = $context->getTypeFromString('int1');
+        // Always emit into $func / $entryBlock first — GEPs on $stateParam must not land in
+        // an outer loweringLlvmFunction (#33706 / re-#26819).
+        $context->builder->positionAtEnd($entryBlock);
         $hasPendingPtr = $context->builder->structGep($stateParam, $map['has_pending_send']);
         if (null === $yieldOp->arg1) {
             // Plain `yield expr` — discard the sent value (VM #18108 / #23712).
-            $context->builder->positionAtEnd($entryBlock);
             $context->builder->store($i1->constInt(0, false), $hasPendingPtr);
 
             return $entryBlock;
@@ -130,12 +132,10 @@ final class GeneratorIteratorJitHelper
         }
         $resultVar = $context->getVariableFromOp($resultOp);
         $pendingField = $context->builder->structGep($stateParam, $map['pending_send']);
-        $context->builder->positionAtEnd($entryBlock);
         $hasPending = $context->builder->load($hasPendingPtr);
-        $parent = $context->builder->getInsertBlock()->getParent();
-        $copyBb = $parent->appendBasicBlock('gen_inject_send');
-        $nullBb = $parent->appendBasicBlock('gen_inject_null');
-        $doneBb = $parent->appendBasicBlock('gen_inject_done');
+        $copyBb = $func->appendBasicBlock('gen_inject_send');
+        $nullBb = $func->appendBasicBlock('gen_inject_null');
+        $doneBb = $func->appendBasicBlock('gen_inject_done');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_NE, $hasPending, $i1->constInt(0, false)),
             $copyBb,

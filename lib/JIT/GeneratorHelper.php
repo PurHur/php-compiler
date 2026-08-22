@@ -179,9 +179,16 @@ final class GeneratorHelper
         );
         $stateParam = $func->getParam(0);
         $savedBuilder = $context->builder;
+        $savedLoweringLlvm = $context->loweringLlvmFunction;
+        $savedActiveFunction = $context->activeFunction;
         $context->builder = $context->context->builderCreate();
         $context->compilingGeneratorResume = true;
         $context->generatorStateParam = $stateParam;
+        // Pin so JitValueBox::copyFromPointer / BasicBlockHelper::append stay in this
+        // resume fn — otherwise value_copy_* BBs land in the outer void/user fn and
+        // module verify fails (cross-function br / ret i64 in void) (#33706 / re-#26819).
+        $context->loweringLlvmFunction = $func;
+        $context->activeFunction = $lc;
 
         $entry = $func->appendBasicBlock('gen_entry');
         $context->builder->positionAtEnd($entry);
@@ -334,6 +341,8 @@ final class GeneratorHelper
         $context->builder = $savedBuilder;
         $context->compilingGeneratorResume = false;
         $context->generatorStateParam = null;
+        $context->loweringLlvmFunction = $savedLoweringLlvm;
+        $context->activeFunction = $savedActiveFunction;
         $context->generatorCatchDispatchEntry = [];
         // beginTryGeneratorResume pushes handlers that finishPostTryOpcode never pops (#27518).
         while (\count($context->tryCatch->handlerStack) > $handlerStackDepth) {
