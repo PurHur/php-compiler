@@ -203,66 +203,74 @@ final class ObjectInstancePropertyLlvm
 
                     return $var;
                 }
-                // Slot holds a pointer to the native scalar (int64*/double*/int1*), not the
-                // scalar bits themselves. Casting void*→int64 (ptrtoint) or void*→double
-                // (illegal bitcast) made promoted float props fail verify and int props
-                // read the wrong value when a __value__* was stored (#24008).
+                // Slot holds a pointer to the native scalar (int64*/double*/int1*), string, or
+                // object — not the scalar bits themselves. Casting void*→int64 (ptrtoint) or
+                // void*→double (illegal bitcast) made promoted float props fail verify and int
+                // props read the wrong value when a __value__* was stored (#24008).
                 $llvmType = Variable::getStringType($propset[2]);
-                if (\in_array($propset[2], [
+                $isNativeScalarPtr = \in_array($propset[2], [
                     Variable::TYPE_NATIVE_LONG,
                     Variable::TYPE_NATIVE_BOOL,
                     Variable::TYPE_NATIVE_DOUBLE,
-                ], true)) {
+                ], true);
+                $isPointerPropSlot = $isNativeScalarPtr
+                    || Variable::TYPE_STRING === $propset[2]
+                    || Variable::TYPE_OBJECT === $propset[2];
+                if ($isNativeScalarPtr) {
                     $llvmType .= '*';
-                    // Unset / never-assigned typed natives store null void* (#33007). Raise
-                    // before casting null→scalar* (UB → 0). isset must not use this path —
-                    // {@see Object_::propertyIsSet} checks the slot directly.
-                    if (!$forWrite && $object->propertySlotRequiresTypedInitGuard($classId, $propset[3])) {
-                        $voidPtr = $context->getTypeFromString('void*');
-                        $loadedVoid = $context->builder->pointerCast($loaded, $voidPtr);
-                        $isNull = $context->builder->icmp(
-                            \PHPLLVM\Builder::INT_EQ,
-                            $loadedVoid,
-                            $voidPtr->constNull()
-                        );
-                        $fn = $context->builder->getInsertBlock()->getParent();
-                        assert($fn instanceof \PHPLLVM\Value\Function_);
-                        $raiseBb = $fn->appendBasicBlock('typed_native_prop_uninit_'.$classId.'_'.$propset[3]);
-                        $okBb = $fn->appendBasicBlock('typed_native_prop_ok_'.$classId.'_'.$propset[3]);
-                        $context->builder->branchIf($isNull, $raiseBb, $okBb);
+                }
+                // Unset / never-assigned typed pointer slots store null void* (#33007 / #33886).
+                // Raise before casting null→scalar*/__string__*/__object__* (UB → garbage echo).
+                // isset must not use this path — {@see Object_::propertyIsSet} checks the slot.
+                if (
+                    $isPointerPropSlot
+                    && !$forWrite
+                    && $object->propertySlotRequiresTypedInitGuard($classId, $propset[3])
+                ) {
+                    $voidPtr = $context->getTypeFromString('void*');
+                    $loadedVoid = $context->builder->pointerCast($loaded, $voidPtr);
+                    $isNull = $context->builder->icmp(
+                        \PHPLLVM\Builder::INT_EQ,
+                        $loadedVoid,
+                        $voidPtr->constNull()
+                    );
+                    $fn = $context->builder->getInsertBlock()->getParent();
+                    assert($fn instanceof \PHPLLVM\Value\Function_);
+                    $raiseBb = $fn->appendBasicBlock('typed_native_prop_uninit_'.$classId.'_'.$propset[3]);
+                    $okBb = $fn->appendBasicBlock('typed_native_prop_ok_'.$classId.'_'.$propset[3]);
+                    $context->builder->branchIf($isNull, $raiseBb, $okBb);
 
-                        $context->builder->positionAtEnd($raiseBb);
-                        $message = sprintf(
-                            'Typed property %s::$%s must not be accessed before initialization',
-                            MethodVisibility::formatAnonymousScopeForMessage(
-                                $object->instancePropertyDeclaringClassName($classId, $propset[1])
-                            ),
-                            $propset[1]
-                        );
-                        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
-                            TryCatchHelper::emitCatchableClassError($context, 'Error', $message, null);
-                            $stillOpen = BasicBlockHelper::tryGetInsertBlock($context);
-                            if (null !== $stillOpen && null === $stillOpen->getTerminator()) {
-                                TypedPropertyUninitGuard::emitRaiseAndTerminate($context);
-                            }
-                        } else {
-                            $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-                            ErrorRaise::registerDeclarations($context);
-                            ErrorRaise::ensureLinked($context);
-                            if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-                                ErrorRaise::ensureStandaloneBodies($context);
-                            }
-                            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-                            ErrorRaise::emitRaise($context, $message);
-                            if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-                                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
-                            }
+                    $context->builder->positionAtEnd($raiseBb);
+                    $message = sprintf(
+                        'Typed property %s::$%s must not be accessed before initialization',
+                        MethodVisibility::formatAnonymousScopeForMessage(
+                            $object->instancePropertyDeclaringClassName($classId, $propset[1])
+                        ),
+                        $propset[1]
+                    );
+                    if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+                        TryCatchHelper::emitCatchableClassError($context, 'Error', $message, null);
+                        $stillOpen = BasicBlockHelper::tryGetInsertBlock($context);
+                        if (null !== $stillOpen && null === $stillOpen->getTerminator()) {
                             TypedPropertyUninitGuard::emitRaiseAndTerminate($context);
                         }
-
-                        $context->builder->positionAtEnd($okBb);
-                        $loaded = $context->builder->load($slot);
+                    } else {
+                        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+                        ErrorRaise::registerDeclarations($context);
+                        ErrorRaise::ensureLinked($context);
+                        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                            ErrorRaise::ensureStandaloneBodies($context);
+                        }
+                        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+                        ErrorRaise::emitRaise($context, $message);
+                        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+                        }
+                        TypedPropertyUninitGuard::emitRaiseAndTerminate($context);
                     }
+
+                    $context->builder->positionAtEnd($okBb);
+                    $loaded = $context->builder->load($slot);
                 }
                 $typed = $context->builder->pointerCast(
                     $loaded,

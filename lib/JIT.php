@@ -14116,6 +14116,16 @@ class JIT {
                             } else {
                                 JIT\TypedPropertyUninitGuard::emitBeforeDimWrite($this->context, $fetched);
                             }
+                        } elseif (
+                            !$forWrite
+                            && !$op->propertyHookCoalesceRead
+                            && !$op->nullsafeFetchPropertyRead
+                            && !$this->propertyFetchResultUsedOnlyAsIsset($block, $i, (int) $op->arg1)
+                        ) {
+                            // BP_VAR_R: raise while fetch metadata + insert BB are live. Echo-time
+                            // guards can no-op when try/catch already sealed the BB (#33886).
+                            // Skip isset/?? precursors (TYPE_ISSET → COALESCE, #29688).
+                            JIT\TypedPropertyUninitGuard::emitBeforeRead($this->context, $fetched);
                         }
                         if ($forceBranchMerge || $op->nullsafeFetchPropertyRead) {
                             // Nullsafe merge must not retain fetch-arm objectPropertySlot (#32988).
@@ -16566,6 +16576,11 @@ class JIT {
                         $pendingPropertyNewClassName = null;
                     }
                     $this->context->type->object->assertClassTraitInstancePropertyMerge(
+                        $classId,
+                        $name->value
+                    );
+                    // Subclasses may have DECLARE_CLASS'd before this parent slot existed (#33886).
+                    $this->context->type->object->propagateInstancePropertyToSubclasses(
                         $classId,
                         $name->value
                     );
@@ -26733,6 +26748,10 @@ class JIT {
         $boxed->compileTimeLong = $fetched->compileTimeLong;
         $boxed->compileTimeFloat = $fetched->compileTimeFloat;
         $boxed->isNullConstant = $fetched->isNullConstant;
+        // Keep typed-prop identity for BP_VAR_R guards (echo/loadValue). Stripping these
+        // made unset string props echo garbage instead of Error (#33886 / re-#33007);
+        // isset/?? use loadValueQuietForIsset and stay silent (#29688).
+        $this->copyObjectPropertyBacking($boxed, $fetched);
 
         return $boxed;
     }
@@ -27706,6 +27725,32 @@ class JIT {
         }
 
         return OpCode::destSlotUsedAsCompoundAssignRead($next, $destSlot);
+    }
+
+    /**
+     * True when the next meaningful use of the fetch dest is TYPE_ISSET (?? / isset).
+     * Those are BP_VAR_IS and must not raise typed-uninit (#29688 / #33886).
+     */
+    private function propertyFetchResultUsedOnlyAsIsset(Block $block, int $opIndex, int $destSlot): bool
+    {
+        $ops = $block->opCodes;
+        $n = \count($ops);
+        for ($i = $opIndex + 1; $i < $n; ++$i) {
+            $next = $ops[$i];
+            if (OpCode::TYPE_ISSET === $next->type) {
+                return (int) $next->arg2 === $destSlot || (int) $next->arg1 === $destSlot;
+            }
+            // Any other consumer of this slot (echo, assign, call, …) is BP_VAR_R.
+            if (
+                (int) $next->arg1 === $destSlot
+                || (int) ($next->arg2 ?? -1) === $destSlot
+                || (int) ($next->arg3 ?? -1) === $destSlot
+            ) {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     /**
