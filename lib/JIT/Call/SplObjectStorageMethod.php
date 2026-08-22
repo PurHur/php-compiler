@@ -130,6 +130,23 @@ final class SplObjectStorageMethod implements Call
                     $args[0],
                     $args[1]
                 );
+            case 'gethash':
+                // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #33855 / #30999
+                if (!VmClassMethod::requireExactJitUserArgCount(
+                    $context,
+                    $args,
+                    'SplObjectStorage::getHash',
+                    1
+                )) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
+                // Same 32-hex as spl_object_hash / php_spl_object_hash (ext/spl/spl_observer.c).
+                return \PHPCompiler\ext\standard\JitSplObjectHash::invoke(
+                    $context,
+                    $args[1],
+                    'SplObjectStorage::getHash'
+                );
             default:
                 throw new \LogicException(
                     'SplObjectStorage JIT lowering is not implemented for '.$this->method.'()'
