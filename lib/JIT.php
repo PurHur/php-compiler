@@ -24571,7 +24571,20 @@ class JIT {
             }
             // Missing __construct on Class::__construct() / parent::__construct() is
             // "Cannot call constructor" — never __callStatic (zend_object_handlers.c, #25909).
+            // Spine split-TU: parent may live outside the chunk (e.g. VmClassMethod for
+            // ext/ds NestedJIT method classes) — fall through to ExternalMethod so the
+            // probe can reach the stub report instead of aborting (#24429).
             if ('__construct' === $methodLc) {
+                if (\PHPCompiler\AOT\ExternalMethodBind::allowUnresolvedMethodFallthrough(
+                    $this->context,
+                    $declaringClassLc,
+                    $declaringClassId
+                )) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                    $this->context->scope->args = [];
+
+                    return;
+                }
                 throw new \LogicException('Cannot call constructor');
             }
             if (JIT\MagicMethodDispatch::tryInitMagicCallStatic(
