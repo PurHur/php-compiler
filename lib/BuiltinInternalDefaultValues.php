@@ -617,6 +617,13 @@ final class BuiltinInternalDefaultValues
         'version_compare' => [
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/string.stub.php — width=75, break="\n", cut_long_words=false (#25017)
+        // InternalArgInfo int width → 0; string break= has no inferrable default.
+        'wordwrap' => [
+            1 => ['kind' => 'int', 'value' => 75],
+            2 => ['kind' => 'string', 'value' => "\n"],
+            3 => ['kind' => 'bool', 'value' => false],
+        ],
         'getimagesize' => [
             1 => ['kind' => 'null'],
         ],

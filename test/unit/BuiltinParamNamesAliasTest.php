@@ -8,6 +8,7 @@ use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinInternalArgInfo;
 use PHPCompiler\BuiltinInternalDefaultValues;
 use PHPCompiler\BuiltinParamNames;
+use PHPCompiler\Runtime;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
@@ -1090,6 +1091,50 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'cut_long_words', 'wordwrap'));
         // Legacy InternalArgInfo name must not resolve (Zend rejects $cut)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'cut', 'wordwrap'));
+    }
+
+    /** @covers issue #25017 */
+    public function testWordwrapReflectionDefaults(): void
+    {
+        $cases = [
+            [1, 'width', 'int', 75],
+            [2, 'break', 'string', "\n"],
+            [3, 'cut_long_words', 'bool', false],
+        ];
+        foreach ($cases as [$idx, $name, $type, $expected]) {
+            $info = ['name' => $name, 'type' => $type, 'isOptional' => true];
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable('wordwrap', $idx, $info, false), 'wordwrap#'.$idx);
+            $dest = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'wordwrap', $idx, $info), 'wordwrap#'.$idx);
+            if (\is_int($expected)) {
+                self::assertSame($expected, $dest->toInt(), 'wordwrap#'.$idx);
+            } elseif (\is_bool($expected)) {
+                self::assertSame($expected, $dest->toBool(), 'wordwrap#'.$idx);
+            } else {
+                self::assertSame($expected, $dest->toString(), 'wordwrap#'.$idx);
+            }
+        }
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$r = new ReflectionFunction('wordwrap');
+foreach ($r->getParameters() as $p) {
+    echo $p->getName();
+    if ($p->isOptional()) {
+        echo '=';
+        echo json_encode($p->getDefaultValue());
+    }
+    echo "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'wordwrap_reflection_25017.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "string\nwidth=75\nbreak=\"\\n\"\ncut_long_words=false\n",
+            ob_get_clean()
+        );
     }
 
     /** @covers issue #9646 */
