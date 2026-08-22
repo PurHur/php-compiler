@@ -142,12 +142,17 @@ final class JitDomInsertBeforeLiveSlots
         JitDomParentChildLinkLayout::storeSibling($context, $refChild, VmDom::PROP_PREVIOUS_SIBLING, $newJit);
         JitDomParentChildLinkLayout::storeParentNode($context, $newChild, $parentJit);
 
-        // Document parents use documentElement + Document child-edge slots — Element
-        // INNER_XML rebuild / Element childNodes layout SIGSEGVs (#33584).
+        // Document parents: skip Element firstElementChild / INNER_XML rebuild (#33584).
+        // childNodes lives on DOMDocument layout — still bump in place (#32743 / re-#32611).
         $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, 'dom_ib_parent');
-        $bbDocDone = BasicBlockHelper::append($context, 'dom_ib_doc_done');
+        $bbDocFinish = BasicBlockHelper::append($context, 'dom_ib_doc_finish');
         $bbElFinish = BasicBlockHelper::append($context, 'dom_ib_el_finish');
-        $context->builder->branchIf($isDoc, $bbDocDone, $bbElFinish);
+        $bbDone = BasicBlockHelper::append($context, 'dom_ib_sync_done');
+        $context->builder->branchIf($isDoc, $bbDocFinish, $bbElFinish);
+
+        $context->builder->positionAtEnd($bbDocFinish);
+        self::incrementChildNodesLengthInPlace($context, $parent);
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbElFinish);
         // firstElementChild when inserting before current first element (#27449).
@@ -168,9 +173,9 @@ final class JitDomInsertBeforeLiveSlots
         // so createElement trees match Zend after cross-parent insert (#33450).
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
-        $context->builder->branch($bbDocDone);
+        $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbDocDone);
+        $context->builder->positionAtEnd($bbDone);
     }
 
     /**
@@ -304,6 +309,7 @@ final class JitDomInsertBeforeLiveSlots
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
         $nodeClassId = $objectType->lookup('DOMNode');
+        $docClassId = $objectType->lookup('DOMDocument');
         $listClassId = $objectType->lookup('DOMNodeList');
         foreach ([VmDom::PROP_CHILD_NODES] as $prop) {
             if (!$objectType->hasProperty($nodeClassId, $prop)) {
@@ -311,6 +317,9 @@ final class JitDomInsertBeforeLiveSlots
             }
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+            if (!$objectType->hasProperty($docClassId, $prop)) {
+                $objectType->defineProperty($docClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
         foreach ([
@@ -337,7 +346,68 @@ final class JitDomInsertBeforeLiveSlots
 
     private static function loadChildNodesListObject(Context $context, Value $owner): Value
     {
-        return self::loadLink($context, $owner, 'DOMElement', VmDom::PROP_CHILD_NODES, 'dom_ib_cn');
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $owner, 'dom_ib_cn');
+        $bbDoc = BasicBlockHelper::append($context, 'dom_ib_cn_doc');
+        $bbEl = BasicBlockHelper::append($context, 'dom_ib_cn_el');
+        $bbDocDone = BasicBlockHelper::append($context, 'dom_ib_cn_doc_done');
+        $bbElDone = BasicBlockHelper::append($context, 'dom_ib_cn_el_done');
+        $merge = BasicBlockHelper::append($context, 'dom_ib_cn_merge');
+        $context->builder->branchIf($isDoc, $bbDoc, $bbEl);
+
+        $objPtrTy = $context->getTypeFromString('__object__*');
+
+        $context->builder->positionAtEnd($bbDoc);
+        $docVal = self::loadLink($context, $owner, 'DOMDocument', VmDom::PROP_CHILD_NODES, 'dom_ib_cn_read_doc');
+        $context->builder->branch($bbDocDone);
+
+        $context->builder->positionAtEnd($bbEl);
+        $elVal = self::loadLink($context, $owner, 'DOMElement', VmDom::PROP_CHILD_NODES, 'dom_ib_cn_read_el');
+        $context->builder->branch($bbElDone);
+
+        $context->builder->positionAtEnd($bbDocDone);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($bbElDone);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($objPtrTy);
+        $phi->addIncoming($docVal, $bbDocDone);
+        $phi->addIncoming($elVal, $bbElDone);
+
+        return $phi;
+    }
+
+    private static function storeChildNodesListOnOwner(
+        Context $context,
+        Value $owner,
+        JITVariable $listJit
+    ): void {
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $owner, 'dom_ib_cn_store');
+        $bbDoc = BasicBlockHelper::append($context, 'dom_ib_cn_store_doc');
+        $bbEl = BasicBlockHelper::append($context, 'dom_ib_cn_store_el');
+        $merge = BasicBlockHelper::append($context, 'dom_ib_cn_store_done');
+        $context->builder->branchIf($isDoc, $bbDoc, $bbEl);
+
+        $objectType = $context->type->object;
+
+        $context->builder->positionAtEnd($bbDoc);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($owner, 'DOMDocument', VmDom::PROP_CHILD_NODES),
+            $listJit,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($bbEl);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($owner, 'DOMElement', VmDom::PROP_CHILD_NODES),
+            $listJit,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
     }
 
     private static function writeChildNodesList(
@@ -414,11 +484,7 @@ final class JitDomInsertBeforeLiveSlots
         $context->builder->positionAtEnd($bbI1Done);
 
         $listJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $list);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($owner, 'DOMElement', VmDom::PROP_CHILD_NODES),
-            $listJit,
-            JITVariable::TYPE_VALUE
-        );
+        self::storeChildNodesListOnOwner($context, $owner, $listJit);
     }
 
     private static function loadLink(
