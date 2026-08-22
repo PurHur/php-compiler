@@ -29,13 +29,7 @@ final class DefaultTimezoneCivilRuntime
 
     private const IS_DST_HELPER = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::localIsDst';
 
-    private const TOKEN_T = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenT';
-
-    private const TOKEN_E = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenE';
-
-    private const TOKEN_O = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenO';
-
-    private const TOKEN_P = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenP';
+    private const TOKEN = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTimezoneToken';
 
     private const TZ_GET = 'PHPCompiler\\ext\\standard\\DefaultTimezoneJitHelper::defaultTimezoneGet';
 
@@ -47,10 +41,7 @@ final class DefaultTimezoneCivilRuntime
     private const COMPILED_HELPERS = [
         self::CIVIL_HELPER,
         self::IS_DST_HELPER,
-        self::TOKEN_T,
-        self::TOKEN_E,
-        self::TOKEN_O,
-        self::TOKEN_P,
+        self::TOKEN,
         self::TZ_GET,
         self::TZ_SET,
         self::TZ_NOTICE,
@@ -61,20 +52,16 @@ final class DefaultTimezoneCivilRuntime
         self::implement($context);
     }
 
-    /** Emit free date() timezone token via NestedJIT-safe helper (#33956). */
+    /** Emit free date() timezone token via NestedJIT-safe helper (#33956 / #33943 seq). */
     public static function emitTimezoneToken(Context $context, string $token, Value $timestamp): Value
     {
+        if (!\in_array($token, ['T', 'e', 'O', 'P'], true)) {
+            throw new \InvalidArgumentException('unsupported tz token '.$token);
+        }
         self::ensureLinked($context);
-        $logical = match ($token) {
-            'T' => self::TOKEN_T,
-            'e' => self::TOKEN_E,
-            'O' => self::TOKEN_O,
-            'P' => self::TOKEN_P,
-            default => throw new \InvalidArgumentException('unsupported tz token '.$token),
-        };
-        $helper = JitVmHelperLink::lookupCompiled($context, $logical, '#33956');
-        $args = 'e' === $token ? [] : [$timestamp];
-        $raw = JitNestedHelperCoerce::callHelper($context, $helper, $args);
+        $helper = JitVmHelperLink::lookupCompiled($context, self::TOKEN, '#33956');
+        $tokPtr = $context->builder->load($context->constantStringFromString($token));
+        $raw = JitNestedHelperCoerce::callHelper($context, $helper, [$tokPtr, $timestamp]);
 
         return JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
     }
