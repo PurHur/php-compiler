@@ -11,6 +11,7 @@ use PHPLLVM\Value as LlvmValue;
 /**
  * JIT ++/-- with PHP_INT_MAX/MIN → double promotion (#29144),
  * boxed/native float ± 1.0 (#32281), IS_NULL decrement no-op (#32297),
+ * IS_TRUE/IS_FALSE ++/-- no-op (#33761 / #7058),
  * and IS_STRING increment_string / numeric convert (#32435).
  *
  * @see php-src Zend/zend_operators.h fast_long_increment_function /
@@ -180,12 +181,26 @@ final class JitIncDec
             return;
         }
 
+        // zend_operators.c IS_TRUE/IS_FALSE: ++/-- is a no-op (#33761). Untyped `$x=true`
+        // is a value box; readLong(true)→1 then ±1 previously yielded int(2)/int(0).
+        $isBool = JitValueNumeric::valueIsBool($context, $read);
+        $boolBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_bool_noop' : 'dec_vbox_bool_noop');
+        $notBoolBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_not_bool' : 'dec_vbox_not_bool');
+        $doneBlock = BasicBlockHelper::append($context, 'incdec_vbox_typed_done');
+        $context->builder->branchIf($isBool, $boolBlock, $notBoolBlock);
+
+        $context->builder->positionAtEnd($boolBlock);
+        self::emitBoolIncDecNoEffectWarning($context, $increment);
+        $readPtr = JitValueBox::valuePtrFromVariable($context, $read);
+        JitValueBox::copyIntoPointer($context, $writePtr, $readPtr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($notBoolBlock);
         $isDouble = JitValueNumeric::valueIsDouble($context, $read);
         $isString = JitValueNumeric::valueIsJitString($context, $read);
         $strBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_string' : 'dec_vbox_string');
         $floatBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_float' : 'dec_vbox_float');
         $longBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_as_long' : 'dec_vbox_as_long');
-        $doneBlock = BasicBlockHelper::append($context, 'incdec_vbox_typed_done');
         $notStrBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_not_string' : 'dec_vbox_not_string');
         $context->builder->branchIf($isString, $strBlock, $notStrBlock);
 
@@ -234,10 +249,21 @@ final class JitIncDec
         LlvmValue $writePtr,
         bool $increment
     ): void {
+        $isBool = JitValueNumeric::valueIsBool($context, $read);
+        $boolBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_bool_noop' : 'dec_vbox_bool_noop');
+        $notBoolBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_not_bool' : 'dec_vbox_not_bool');
+        $doneBlock = BasicBlockHelper::append($context, 'incdec_vbox_typed_done');
+        $context->builder->branchIf($isBool, $boolBlock, $notBoolBlock);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $readPtr = JitValueBox::valuePtrFromVariable($context, $read);
+        JitValueBox::copyIntoPointer($context, $writePtr, $readPtr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($notBoolBlock);
         $isDouble = JitValueNumeric::valueIsDouble($context, $read);
         $floatBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_float' : 'dec_vbox_float');
         $longBlock = BasicBlockHelper::append($context, $increment ? 'inc_vbox_as_long' : 'dec_vbox_as_long');
-        $doneBlock = BasicBlockHelper::append($context, 'incdec_vbox_typed_done');
         $context->builder->branchIf($isDouble, $floatBlock, $longBlock);
 
         $context->builder->positionAtEnd($floatBlock);
@@ -249,6 +275,43 @@ final class JitIncDec
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /**
+     * PHP 8.3+ E_WARNING for bool ++/-- (RFC saner-inc-dec-operators, #26378 / #33761).
+     */
+    private static function emitBoolIncDecNoEffectWarning(Context $context, bool $increment): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsIncDecNoEffectWarning()) {
+            return;
+        }
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        Builtin\StringTriggerError::ensureLinked($context);
+        $message = \PHPCompiler\VM\Variable::incDecNoEffectWarningMessage(
+            $increment ? 'Increment' : 'Decrement',
+            'bool'
+        );
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast(
+            $context->constantFromString($message),
+            $i8p
+        );
+        $emptyFile = $context->builder->pointerCast(
+            $context->constantFromString(''),
+            $i8p
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $sizeT->constInt(\strlen($message), false),
+            $i32->constInt(\PHPCompiler\VM\ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     private static function writeDoubleIncDecToValuePtr(

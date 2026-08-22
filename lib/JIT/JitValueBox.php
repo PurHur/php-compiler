@@ -298,7 +298,10 @@ final class JitValueBox
     public static function assignToPointer(Context $context, Value $destPtr, Variable $value): void
     {
         $destPtr = self::normalizeValuePtr($context, $destPtr);
-        if (null !== $value->compileTimeLong) {
+        // compileTimeLong is also stamped on TYPE_NATIVE_BOOL CONST_FETCH true/false (#26774)
+        // and copied onto VALUE boxes after `$x = true`. Only integer-typed values may use
+        // the writeLong shortcut — else AOT stores int(1) for bool(true) (#33761).
+        if (null !== $value->compileTimeLong && Variable::TYPE_NATIVE_LONG === $value->type) {
             $context->builder->call(
                 $context->lookupFunction('__value__writeLong'),
                 $destPtr,
