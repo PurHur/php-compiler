@@ -7,12 +7,13 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\HashTable;
 
 /**
- * Thin-standalone NestedJIT serialize() for SPL ArrayObject family (#33625 / #33683).
+ * Thin-standalone NestedJIT serialize() for SPL ArrayObject family (#33625 / #33683 / #33687).
  *
  * Own TU with a single public method — NestedJIT mis-types extra methods in the same file (#27030).
  * Prefer helper-runtime cache (do not force PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925.
  *
  * Object bag values are TYPE_OBJECT (5) — must not fall through to foreach-as-array (SIGSEGV #33683).
+ * AOT HT export uses JIT tags (bool=2, double=3) — not VM float=2 / bool=3 (#33520 / #33687).
  * php-src: ext/spl/spl_array.c — ArrayObject::__serialize integer-keyed bag.
  */
 final class SerializeSplArrayNestedJitHelper
@@ -53,9 +54,16 @@ final class SerializeSplArrayNestedJitHelper
                 $body .= 'i:'.((string) $val->toInt()).';';
             } elseif (0 === $t) {
                 $body .= 'N;';
-            } elseif (3 === $t) {
-                $body .= $val->toBool() ? 'b:1;' : 'b:0;';
             } elseif (2 === $t) {
+                // JIT TYPE_NATIVE_BOOL (=2). Prefer if/else — NestedJIT i1 ternary
+                // can stick on the true arm (#33687 / VariableToBool + #21892).
+                if ($val->toBool()) {
+                    $body .= 'b:1;';
+                } else {
+                    $body .= 'b:0;';
+                }
+            } elseif (3 === $t) {
+                // JIT TYPE_NATIVE_DOUBLE (=3) — VM TYPE_BOOLEAN collides (#33520 / #33687).
                 $body .= 'd:'.((string) $val->toFloat()).';';
             } elseif (4 === $t) {
                 $vs = $val->toString();
@@ -103,14 +111,18 @@ final class SerializeSplArrayNestedJitHelper
                         $inner .= 'i:'.((string) $elem->toInt()).';';
                     } elseif (0 === $et) {
                         $inner .= 'N;';
-                    } elseif (3 === $et) {
-                        $inner .= $elem->toBool() ? 'b:1;' : 'b:0;';
+                    } elseif (2 === $et) {
+                        if ($elem->toBool()) {
+                            $inner .= 'b:1;';
+                        } else {
+                            $inner .= 'b:0;';
+                        }
                     } elseif (4 === $et) {
                         $es = $elem->toString();
                         $inner .= null === $es
                             ? 's:0:"";'
                             : 's:'.((string) \strlen($es)).':"'.$es.'";';
-                    } elseif (2 === $et) {
+                    } elseif (3 === $et) {
                         $inner .= 'd:'.((string) $elem->toFloat()).';';
                     } else {
                         $inner .= 'i:'.((string) $elem->toInt()).';';
