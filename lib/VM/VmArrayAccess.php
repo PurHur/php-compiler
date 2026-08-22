@@ -276,6 +276,16 @@ final class VmArrayAccess
             );
         }
 
+        // TYPE_VALUE without a known class is often a packed/HT box (untyped static
+        // by-value copy, json_decode assoc, …). Treating every such box as ArrayAccess
+        // whenever ArrayObject is linked makes RuntimeIndirectInstanceMethodCall abort
+        // on non-object tags (#33695 / re-#32830). Only unknown TYPE_OBJECT needs
+        // runtime candidate dispatch (#33636 unserialize still promotes to object when
+        // the value tag is object — see JIT.php TYPE_VALUE dim gate + dimFetchValueBoxRead).
+        if (JitVariable::TYPE_VALUE === $container->type) {
+            return false;
+        }
+
         return self::hasRuntimeArrayAccessCandidates($context);
     }
 
