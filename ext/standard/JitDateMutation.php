@@ -285,6 +285,12 @@ final class JitDateMutation
             return $ret;
         }
 
+        // Fluent `$d->modify(..)->modify(..)`: the continuation receiver is the return
+        // value-box, not the named local. Object props update, but `$d`'s compile-time
+        // stamp would stay at the first mutation — format()/getTimestamp prefer that
+        // stamp (#33911). Drop all DateTime stamps so reads use __dt_timestamp (#33935).
+        self::invalidateAllMutableDateTimeInstants($context);
+
         return self::boxObjectPtr($context, $dtObj);
     }
 
@@ -884,6 +890,29 @@ final class JitDateMutation
             $bound->compileTimeDateTimeMicrosecond = null;
             unset($context->dateTimeLocalInstants[$boundName]);
         }
+    }
+
+    /**
+     * Drop every named DateTime compile-time stamp (#33935).
+     *
+     * Used when a mutable mutation's receiver is not the named local (fluent chain
+     * return box). Invalidating only `$args[0]` is a no-op for temps; wiping all
+     * stamps is correct because object `__dt_timestamp` props remain authoritative.
+     */
+    private static function invalidateAllMutableDateTimeInstants(Context $context): void
+    {
+        foreach ($context->namedVariableBindings as $boundName => $bound) {
+            if (!$bound instanceof JITVariable) {
+                continue;
+            }
+            if (null === $bound->compileTimeDateTimeTimestamp) {
+                continue;
+            }
+            $bound->compileTimeDateTimeTimestamp = null;
+            $bound->compileTimeDateTimeMicrosecond = null;
+            unset($context->dateTimeLocalInstants[$boundName]);
+        }
+        $context->dateTimeLocalInstants = [];
     }
 
     private static function boxObjectPtr(Context $context, Value $dtObj): Value
