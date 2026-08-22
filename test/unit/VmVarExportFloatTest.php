@@ -36,4 +36,12 @@ final class VmVarExportFloatTest extends TestCase
             VmVarExportFloat::format(bindec(str_repeat('1', 65)))
         );
     }
+
+    /** Scientific floats use uppercase E (#33901 / zend_gcvt). */
+    public function testScientificExponentIsUppercaseE(): void
+    {
+        $this->assertSame('9.223372036854776E+18', VmVarExportFloat::format((float) (PHP_INT_MAX + 1)));
+        $this->assertSame('1.0E+100', VmVarExportFloat::format(1.0e100));
+        $this->assertSame('-9.223372036854776E+18', VmVarExportFloat::format(-9.223372036854776e18));
+    }
 }

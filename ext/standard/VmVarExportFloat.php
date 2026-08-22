@@ -42,6 +42,8 @@ final class VmVarExportFloat
                 }
             }
         }
+        // libc / dtoa may leave lowercase e; zend_gcvt uses uppercase E (#32316 / #33901).
+        $s = VmZendDoubleString::zendifySnprintfG($s);
         if (false === \strpos($s, '.') && false === \stripos($s, 'e')) {
             return $s.'.0';
         }
