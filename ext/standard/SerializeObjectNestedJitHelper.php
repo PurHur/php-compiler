@@ -7,9 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\HashTable;
 
 /**
- * Thin-standalone NestedJIT serialize() object pieces (#27030).
+ * Thin-standalone NestedJIT serialize() object pieces (#27030 / #33692).
  *
  * Keep each helper to one HT or (string,int) — NestedJIT mis-types richer arities.
+ * AOT HT export uses JIT tags (bool=2, double=3) — not VM float=2 / bool=3 (#33520 / #33687).
  * php-src: ext/standard/var.c — php_var_serialize object branch
  */
 final class SerializeObjectNestedJitHelper
@@ -46,9 +47,16 @@ final class SerializeObjectNestedJitHelper
                 $body .= 'i:'.((string) $val->toInt()).';';
             } elseif (0 === $t) {
                 $body .= 'N;';
-            } elseif (3 === $t) {
-                $body .= $val->toBool() ? 'b:1;' : 'b:0;';
             } elseif (2 === $t) {
+                // JIT TYPE_NATIVE_BOOL (=2). Prefer if/else — NestedJIT i1 ternary
+                // can stick on the true arm (#33687 / VariableToBool + #21892).
+                if ($val->toBool()) {
+                    $body .= 'b:1;';
+                } else {
+                    $body .= 'b:0;';
+                }
+            } elseif (3 === $t) {
+                // JIT TYPE_NATIVE_DOUBLE (=3) — VM TYPE_BOOLEAN collides (#33520 / #33692).
                 $body .= 'd:'.((string) $val->toFloat()).';';
             } elseif (4 === $t) {
                 $vs = (string) $val;
