@@ -313,12 +313,8 @@ final class JitUploadTempKernel
 
     private static function ensureExternal(Context $context, string $name, $ft): void
     {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
-        }
+        // getNamedFunction before addFunction — lookup miss must not mint name.1 (#33832 / peer #33774 / #32122).
+        LibcExtern::ensureExternalDecl($context, $name, $ft);
     }
 
     private static function registerLinkedRuntime(Context $context): void
