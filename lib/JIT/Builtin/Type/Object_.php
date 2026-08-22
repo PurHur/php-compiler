@@ -3773,6 +3773,9 @@ class Object_ extends Type {
             $this->defineProperty($id, 'childNodes', Variable::TYPE_VALUE);
             // Thin AOT nodeType seed (#33607).
             $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
+            // loadHTML/loadXML id-map — late defineProperty after new DOMDocument()
+            // OOB in __object__load_value_slot (#33689 / peer #32736).
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);
             $this->markHasConstructor($id);
         }
         if ('domattr' === $lcname) {
