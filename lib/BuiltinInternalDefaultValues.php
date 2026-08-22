@@ -941,6 +941,11 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'bool', 'value' => false],
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/head.stub.php — bool $replace = true; int $response_code = 0 (#25258)
+        'header' => [
+            1 => ['kind' => 'bool', 'value' => true],
+            2 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src ext/standard/head.stub.php — &$filename = null, &$line = null (untyped; no infer) (#25780)
         'headers_sent' => [
             0 => ['kind' => 'null'],
