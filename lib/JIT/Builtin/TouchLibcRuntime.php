@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\ext\standard\FsDirJitHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -122,28 +123,21 @@ final class TouchLibcRuntime
 
     private static function ensureLibc(Context $context): void
     {
-        // Module-local open/close after LibcExtern always-on drop (#31817); peer #31403 stat.
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
+        // open/close via ensurePosixFd (#31817 / #33774); getNamedFunction first so
+        // lookup miss cannot mint open.1 / close.1 (#31894 / #32122 / #33550).
+        LibcExtern::ensurePosixFd($context);
 
-        foreach (
-            [
-                ['stat', $i32, [$i8p, $i8p]],
-                ['open', $i32, [$i8p, $i32, $i32]],
-                ['close', $i32, [$i32]],
-                ['utime', $i32, [$i8p, $i8p]],
-            ] as [$name, $ret, $params]
-        ) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable) {
-                $fn = $context->module->addFunction(
-                    $name,
-                    $context->context->functionType($ret, false, ...$params)
-                );
-                $context->registerFunction($name, $fn);
-            }
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        foreach ([
+            ['stat', $i32, [$i8p, $i8p]],
+            ['utime', $i32, [$i8p, $i8p]],
+        ] as [$name, $ret, $params]) {
+            LibcExtern::ensureExternalDecl(
+                $context,
+                $name,
+                $context->context->functionType($ret, false, ...$params)
+            );
         }
     }
 
