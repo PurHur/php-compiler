@@ -82,13 +82,18 @@ final class VmNumericDivisionGuard
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($computeBlock);
-        $rem = self::signedModulo($context, $emitDividendLong(), $divisor);
+        // Divisor is known != -1 here; use srem directly (no nested signedModulo() PHI).
+        // emitDividendLong() may branch (JitLongArg); PHI incoming must be the block
+        // that actually branches to $doneBlock, not $computeBlock (#32285 / Module.php:180).
+        $left = $context->builder->intCast($emitDividendLong(), $i64);
+        $rem = $context->builder->signedRem($left, $divisor);
+        $computeDoneBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64, 'mod_neg1_sc_result');
         $phi->addIncoming($zero, $zeroBlock);
-        $phi->addIncoming($rem, $computeBlock);
+        $phi->addIncoming($rem, $computeDoneBlock);
 
         return $phi;
     }
