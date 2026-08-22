@@ -124,8 +124,29 @@ final class CallUnpackCompileTime
         if (self::slotHasByRefMutation($block, $slot)) {
             return null;
         }
+        // `$a[]=` / `$a[$k]=` / unset($a[$k]) after INIT_ARRAY — same cheap-green fold
+        // shape: json_encode($a) emitted the INIT literal and ignored later dims (#33709).
+        if (self::slotHasDimMutation($block, $slot)) {
+            return null;
+        }
 
         return self::tryCompileTimeArrayFromSlot($block, $slot);
+    }
+
+    /**
+     * True when $slot is the container for ARRAY_DIM_FETCH_WRITE or unset($slot[$dim]).
+     *
+     * php-src: Zend/zend_execute.c — ZEND_ASSIGN_DIM / ZEND_UNSET_DIM mutate the HT in place.
+     */
+    private static function slotHasDimMutation(Block $block, int $slot): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::destSlotUsedAsDimWriteContainer($op, $slot)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
