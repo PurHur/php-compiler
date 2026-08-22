@@ -237,6 +237,7 @@
             <file>./test/compliance/IntvalFloatvalStrvalBoolvalNamed23334JITTest.php</file>
             <file>./test/compliance/DoublevalReflection26110VMTest.php</file>
             <file>./test/compliance/DoublevalReflection26110JITTest.php</file>
+            <file>./test/compliance/SettypeReflection27766VMTest.php</file>
             <file>./test/compliance/StrchrReflection25758VMTest.php</file>
             <file>./test/compliance/StrchrReflection25758JITTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437VMTest.php</file>
