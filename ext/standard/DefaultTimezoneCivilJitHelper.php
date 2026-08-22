@@ -115,6 +115,30 @@ final class DefaultTimezoneCivilJitHelper
         return '+00:00';
     }
 
+    /**
+     * Single NestedJIT entry for free date() T/e/O/P (#33956 follow-up).
+     *
+     * Four separate formatToken* helpers inlined into one user function SIGSEGV
+     * after the third unique call (T+e+O then P) — #33943 combined repro.
+     */
+    public static function formatTimezoneToken(string $token, int $timestamp): string
+    {
+        if ('T' === $token) {
+            return self::formatTokenT($timestamp);
+        }
+        if ('e' === $token) {
+            return self::formatTokenE();
+        }
+        if ('O' === $token) {
+            return self::formatTokenO($timestamp);
+        }
+        if ('P' === $token) {
+            return self::formatTokenP($timestamp);
+        }
+
+        return '';
+    }
+
     private static function offsetSeconds(string $tzName, int $timestamp): int
     {
         if ('UTC' === $tzName || 'Etc/UTC' === $tzName || 'GMT' === $tzName || 'Z' === $tzName) {

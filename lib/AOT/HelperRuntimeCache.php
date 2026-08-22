@@ -189,6 +189,7 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\defaulttimezonejithelper::emitinvalidtimezonenotice' => true,
         'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::localciviltimestamp' => true,
         'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::localisdst' => true,
+        'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::formattimezonetoken' => true,
         'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::formattokent' => true,
         'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::formattokene' => true,
         'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::formattokeno' => true,
