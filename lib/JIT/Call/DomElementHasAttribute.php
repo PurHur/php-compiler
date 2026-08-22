@@ -14,9 +14,9 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * Dom\Element::hasAttribute() — thin user-script AOT live Attr cache (#27108).
+ * Dom\Element::hasAttribute() — thin user-script AOT live Attr cache (#27108, #33762).
  *
- * Returns boxed int 1/0 (truthy) to avoid bool-box ABI gaps in thin AOT.
+ * Boxes a real bool (Zend RETURN_BOOL); writeLong 0/1 made var_dump show int (#33762).
  */
 final class DomElementHasAttribute implements Call
 {
@@ -27,14 +27,10 @@ final class DomElementHasAttribute implements Call
             throw new \LogicException('Dom\\Element::hasAttribute() expects receiver and name');
         }
         $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
         $slot = JitValueBox::alloc($context);
         if (null === $nameLit) {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeLong'),
-                JitValueBox::pointer($context, $slot),
-                $i64->constInt(0, false)
-            );
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
 
             return JitValueBox::normalizeValuePtr($context, $slot);
         }
@@ -45,11 +41,7 @@ final class DomElementHasAttribute implements Call
             $attr,
             $objPtr->constNull()
         );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            JitValueBox::pointer($context, $slot),
-            $context->builder->zExt($isPresent, $i64)
-        );
+        JitValueBox::writeBool($context, $slot, $isPresent);
 
         return JitValueBox::normalizeValuePtr($context, $slot);
     }

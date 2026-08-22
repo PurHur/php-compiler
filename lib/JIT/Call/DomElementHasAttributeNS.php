@@ -15,9 +15,9 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * DOMElement::hasAttributeNS() — user-script AOT live Attr cache (#32398).
+ * DOMElement::hasAttributeNS() — user-script AOT live Attr cache (#32398, #33762).
  *
- * Returns boxed int 1/0 (truthy) to avoid bool-box ABI gaps in thin AOT.
+ * Boxes a real bool (Zend RETURN_BOOL); writeLong 0/1 made var_dump show int (#33762).
  */
 final class DomElementHasAttributeNS implements Call
 {
@@ -39,12 +39,8 @@ final class DomElementHasAttributeNS implements Call
             && DomUserScriptAttributeCacheLlvm::hasPresentLiteral($nsLit, $localLit);
 
         $slot = JitValueBox::alloc($context);
-        $i64 = $context->getTypeFromString('int64');
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            JitValueBox::pointer($context, $slot),
-            $i64->constInt($present ? 1 : 0, false)
-        );
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt($present ? 1 : 0, false));
 
         return JitValueBox::normalizeValuePtr($context, $slot);
     }
