@@ -159,9 +159,19 @@ final class DomInstanceMethodJit
         'dom\\element::removeattributenode' => true,
         'dom\\htmlelement::removeattributenode' => true,
         // setIdAttribute* — dedicated true/false ABI (NestedJIT bool unsafe; #29257, #29284).
+        // getElementsByTagName()->item() is typed DOMNode — must hit the proxy (#33957).
         'domelement::setidattribute' => true,
         'domelement::setidattributens' => true,
         'domelement::setidattributenode' => true,
+        'domnode::setidattribute' => true,
+        'domnode::setidattributens' => true,
+        'domnode::setidattributenode' => true,
+        'dom\element::setidattribute' => true,
+        'dom\element::setidattributens' => true,
+        'dom\element::setidattributenode' => true,
+        'dom\htmlelement::setidattribute' => true,
+        'dom\htmlelement::setidattributens' => true,
+        'dom\htmlelement::setidattributenode' => true,
         // DOMAttr::isId() — VmDomInstanceInvoke bridge (#29884, re-#20129).
         'domattr::isid' => true,
         'dom\\attr::isid' => true,
@@ -592,17 +602,29 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domelement::setidattribute' === $lc) {
+            if ('domelement::setidattribute' === $lc
+                || 'domnode::setidattribute' === $lc
+                || 'dom\element::setidattribute' === $lc
+                || 'dom\htmlelement::setidattribute' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomElementSetIdAttribute();
 
                 return;
             }
-            if ('domelement::setidattributens' === $lc) {
+            if ('domelement::setidattributens' === $lc
+                || 'domnode::setidattributens' === $lc
+                || 'dom\element::setidattributens' === $lc
+                || 'dom\htmlelement::setidattributens' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomElementSetIdAttributeNS();
 
                 return;
             }
-            if ('domelement::setidattributenode' === $lc) {
+            if ('domelement::setidattributenode' === $lc
+                || 'domnode::setidattributenode' === $lc
+                || 'dom\element::setidattributenode' === $lc
+                || 'dom\htmlelement::setidattributenode' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomElementSetIdAttributeNode();
 
                 return;
@@ -1421,6 +1443,15 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::setidattribute');
             self::ensureProxy($context, 'domelement::setidattributens');
             self::ensureProxy($context, 'domelement::setidattributenode');
+            self::ensureProxy($context, 'domnode::setidattribute');
+            self::ensureProxy($context, 'domnode::setidattributens');
+            self::ensureProxy($context, 'domnode::setidattributenode');
+            self::ensureProxy($context, 'dom\element::setidattribute');
+            self::ensureProxy($context, 'dom\element::setidattributens');
+            self::ensureProxy($context, 'dom\element::setidattributenode');
+            self::ensureProxy($context, 'dom\htmlelement::setidattribute');
+            self::ensureProxy($context, 'dom\htmlelement::setidattributens');
+            self::ensureProxy($context, 'dom\htmlelement::setidattributenode');
             self::ensureProxy($context, 'domattr::isid');
             self::ensureProxy($context, 'dom\\attr::isid');
             self::ensureProxy($context, 'domdocument::createattributens');
@@ -1474,7 +1505,7 @@ final class DomInstanceMethodJit
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath', 'getlineno'],
-        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported', 'lookupprefix', 'lookupnamespaceuri', 'isdefaultnamespace', 'getlineno'],
+        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getnodepath', 'issupported', 'lookupprefix', 'lookupnamespaceuri', 'isdefaultnamespace', 'getlineno', 'setidattribute', 'setidattributens', 'setidattributenode', 'getattribute'],
         'domimplementation' => ['createdocument', 'createdocumenttype', 'hasfeature'],
         'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Builtin\DomSetIdAttributeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -18,9 +19,9 @@ use PHPLLVM\Value;
  * LLVM lowering for DOMElement::setIdAttribute{,NS,Node}() (#29257, #29284).
  *
  * NestedJIT helper updates DomRegistry without PROP_ELEMENT_ID_MAP sync. Thin AOT
- * stores {@see DomUserScriptElementCacheLlvm} using a compile-time id value (from
- * loadXML literal or a preceding setAttribute('id', …)) so getElementById avoids
- * reading an uninitialized id map after loadXML.
+ * stores {@see DomUserScriptElementCacheLlvm} from runtime getAttribute (not the first
+ * id= in the loadXML literal) so setIdAttribute on a later sibling registers the
+ * correct id (#33957). setAttribute('id', …) history still drives the #29694 skip.
  *
  * setAttribute reusing an id already in the compile-time loadXML literal skips/clears
  * the cache — xmlAddID first-wins after replaceChild (#29694 / re-#25274).
@@ -64,11 +65,7 @@ final class JitDomSetIdAttribute
         );
         if (JitDomDocumentMethodKernel::shouldUse($context) && $isIdTrue) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_post');
-            $fromSetAttribute = false;
-            $idLit = self::resolveCompileTimeIdValue($args[1], $fromSetAttribute);
-            if (null !== $idLit && '' !== $idLit) {
-                self::storeCacheIfElementOwnsId($context, $element, $idLit, $fromSetAttribute);
-            }
+            self::storeCacheAfterSetIdAttribute($context, $element, $nameLlvm, $args[1]);
             $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
             if (null !== $nameLit && '' !== $nameLit) {
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', $nameLit, true);
@@ -109,11 +106,7 @@ final class JitDomSetIdAttribute
         );
         if (JitDomDocumentMethodKernel::shouldUse($context) && $isIdTrue) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_ns_post');
-            $fromSetAttribute = false;
-            $idLit = self::resolveCompileTimeIdValue($args[2], $fromSetAttribute);
-            if (null !== $idLit && '' !== $idLit) {
-                self::storeCacheIfElementOwnsId($context, $element, $idLit, $fromSetAttribute);
-            }
+            self::storeCacheAfterSetIdAttribute($context, $element, $localLlvm, $args[2]);
             $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString ?? '';
             $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
             if (null !== $localLit && '' !== $localLit) {
@@ -167,12 +160,19 @@ final class JitDomSetIdAttribute
         );
         if (JitDomDocumentMethodKernel::shouldUse($context) && $isIdTrue) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_node_post');
-            $fromSetAttribute = false;
-            $idLit = self::resolveCompileTimeNodeIdValue($fromSetAttribute);
-            if (null !== $idLit && '' !== $idLit) {
-                self::storeCacheIfElementOwnsId($context, $element, $idLit, $fromSetAttribute);
+            // Node form: attribute name is typically "id"; apply the same multi-id rule.
+            if (self::countAttrAssignmentsInLoadXmlLiteral('id') > 1) {
+                $idName = $context->builder->load($context->constantStringFromString('id'));
+                self::storeCacheFromRuntimeGetAttribute($context, $element, $idName);
+            } else {
+                $fromSetAttribute = false;
+                $idLit = self::resolveCompileTimeNodeIdValue($fromSetAttribute);
+                if (null !== $idLit && '' !== $idLit) {
+                    self::storeCacheIfElementOwnsId($context, $element, $idLit, $fromSetAttribute);
+                }
             }
         }
+
 
         return self::boxNull($context);
     }
@@ -207,7 +207,7 @@ final class JitDomSetIdAttribute
         if ([] !== self::$setAttributeIdValues && 'id' === $nameLit) {
             $fromSetAttribute = true;
 
-            return self::$setAttributeIdValues[\count(self::$setAttributeIdValues) - 1];
+        $idLit = self::$setAttributeIdValues[\count(self::$setAttributeIdValues) - 1];
         }
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || '' === $xml) {
@@ -231,7 +231,7 @@ final class JitDomSetIdAttribute
         if ([] !== self::$setAttributeIdValues) {
             $fromSetAttribute = true;
 
-            return self::$setAttributeIdValues[\count(self::$setAttributeIdValues) - 1];
+        $idLit = self::$setAttributeIdValues[\count(self::$setAttributeIdValues) - 1];
         }
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || '' === $xml) {
@@ -254,6 +254,126 @@ final class JitDomSetIdAttribute
      *
      * @param bool $fromSetAttribute True when the id value came from setAttribute('id', …).
      */
+    /**
+     * Thin-AOT id-cache update after NestedJIT setIdAttribute* (#33957).
+     *
+     * Multi-id loadXML literals must not first-wins via regex — read the element's
+     * live attribute with getAttribute. Single-id / setAttribute paths keep the
+     * prior compile-time store (avoids getAttribute on paths that already work).
+     */
+    private static function storeCacheAfterSetIdAttribute(
+        Context $context,
+        Value $element,
+        Value $nameLlvm,
+        JITVariable $nameArg
+    ): void {
+        if (self::shouldSkipCacheForSetAttributeReuse($nameArg)) {
+            return;
+        }
+        $fromSetAttribute = false;
+        $idLit = self::resolveCompileTimeIdValue($nameArg, $fromSetAttribute);
+        $nameLit = JitStringBuiltinArg::compileTimeLiteral($nameArg) ?? $nameArg->compileTimeString;
+        $multiId = null !== $nameLit && self::countAttrAssignmentsInLoadXmlLiteral($nameLit) > 1;
+        if ($multiId) {
+            // First-wins loadXML regex binds the wrong sibling (#33957). Prefer the id on the
+            // getElementsByTagName(...)->item(N) target when that compile-time pair is known.
+            $resolved = self::resolveMultiIdAttributeValue($nameLit ?? 'id');
+            if (null !== $resolved && '' !== $resolved) {
+                self::storeCacheFirstWins($context, $element, $resolved, true);
+
+                return;
+            }
+            // Fallback: runtime getAttribute with a fresh "id" literal.
+            self::storeCacheFromRuntimeGetAttribute($context, $element, $nameLlvm);
+
+            return;
+        }
+        if (null !== $idLit && '' !== $idLit) {
+            self::storeCacheIfElementOwnsId($context, $element, $idLit, $fromSetAttribute);
+        }
+    }
+
+    /**
+     * Multi-id loadXML: resolve attribute value for getElementsByTagName($tag)->item($i)
+     * using the last compile-time tag query + item index (#33957).
+     */
+    private static function resolveMultiIdAttributeValue(string $nameLit): ?string
+    {
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === $xml) {
+            return null;
+        }
+        $tag = JitDomGetElementsByTagNameUserScript::lastTagQuery();
+        $index = JitDomNodeListItem::$lastFetchedChildIndex;
+        if (null === $tag || '' === $tag || '*' === $tag || null === $index || $index < 0) {
+            return null;
+        }
+
+        return DomParseSimpleXmlJitHelper::nthTagAttributeValueArgv($xml, $tag, $nameLit, $index + 1);
+    }
+
+    private static function isFromSetAttributeIdName(JITVariable $nameArg, bool $allowNonIdName = false): bool
+    {
+        if ([] === self::$setAttributeIdValues) {
+            return false;
+        }
+        $nameLit = JitStringBuiltinArg::compileTimeLiteral($nameArg) ?? $nameArg->compileTimeString;
+        if (null === $nameLit || '' === $nameLit) {
+            return $allowNonIdName;
+        }
+
+        return $allowNonIdName || 'id' === $nameLit;
+    }
+
+    /**
+     * #29694: setAttribute('id', $v) when loadXML already had id="$v" — DomRegistry
+     * rejects the new registration; do not claim the id in the thin-AOT cache.
+     */
+    private static function shouldSkipCacheForSetAttributeReuse(JITVariable $nameArg, bool $allowNonIdName = false): bool
+    {
+        if (!self::isFromSetAttributeIdName($nameArg, $allowNonIdName)) {
+            return false;
+        }
+        $idLit = self::$setAttributeIdValues[\count(self::$setAttributeIdValues) - 1];
+
+        return '' !== $idLit && self::loadXmlLiteralAlreadyDefinesId($idLit);
+    }
+
+    /** Count name="…" / name='…' assignments in the compile-time loadXML literal. */
+    private static function countAttrAssignmentsInLoadXmlLiteral(string $nameLit): int
+    {
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === $xml) {
+            return 0;
+        }
+        $pattern = '/\b' . preg_quote($nameLit, '/') . '\s*=\s*(["\'])([^"\']*)\1/';
+        if (0 === preg_match_all($pattern, $xml, $m)) {
+            return 0;
+        }
+
+        return \count($m[0]);
+    }
+
+    /**
+     * Key thin-AOT element cache by live getAttribute value (#33957).
+     */
+    private static function storeCacheFromRuntimeGetAttribute(
+        Context $context,
+        Value $element,
+        Value $nameLlvm
+    ): void {
+        DomImportNodeRuntime::ensureGetAttributeLinked($context);
+        // Always pass a fresh "id" literal — reusing $nameLlvm after NestedJIT can be spent (#33957).
+        $nameFresh = $context->builder->load($context->constantStringFromString('id'));
+        $idStr = $context->builder->call(
+            $context->lookupFunction(DomImportNodeRuntime::ABI_GET_ATTRIBUTE),
+            $element,
+            $nameFresh
+        );
+        DomUserScriptElementCacheLlvm::store($context, $element, $idStr, $element);
+    }
+
+
     private static function storeCacheIfElementOwnsId(
         Context $context,
         Value $element,
