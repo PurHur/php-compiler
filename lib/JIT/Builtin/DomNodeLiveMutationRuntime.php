@@ -1255,12 +1255,17 @@ final class DomNodeLiveMutationRuntime
         throw new \LogicException('DOM object live-mutation arg must be object or value box');
     }
 
+    private static int $treeMutAssertSeq = 0;
+
     /**
-     * Thin-AOT LiveSlots preflight (#30274): reject Document-class children before slot sync.
+     * Thin-AOT LiveSlots preflight (#30274 / #33937): reject Document-class children and
+     * foreign-document Element/Text/… children before slot sync.
      *
      * LiveSlots objects use thin {@see __object__} layout (class_id only) — NestedJIT
-     * {@see ObjectEntry::$class} access segfaults. Compare class_id in LLVM and throw
-     * catchable {@see \DOMException} (Wrong Document vs Hierarchy Request via parentNode).
+     * {@see ObjectEntry::$class} access segfaults. Compare class_id / ownerDocument /
+     * parentNode walks in LLVM and throw catchable {@see \DOMException}.
+     *
+     * Peer: {@see VmDom::assertCanReceiveTreeMutationChild} / {@see VmDom::assertSameDocument}.
      */
     public static function assertTreeMutationChildBeforeLiveSlots(
         Context $context,
@@ -1273,24 +1278,12 @@ final class DomNodeLiveMutationRuntime
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
         $classId = $context->builder->load($context->builder->structGep($child, $map['class_id']));
-        $isDoc = $i1->constInt(0, false);
-        foreach (['DOMDocument', 'Dom\\Document', 'Dom\\XMLDocument', 'Dom\\HTMLDocument'] as $className) {
-            try {
-                $expected = $objectType->lookup($className);
-            } catch (\Throwable $e) {
-                continue;
-            }
-            $match = $context->builder->icmp(
-                Builder::INT_EQ,
-                $classId,
-                $i64->constInt($expected, false)
-            );
-            $isDoc = $context->builder->or($isDoc, $match);
-        }
+        $isDoc = self::icmpIsDocumentClass($context, $classId);
 
         $bbDoc = BasicBlockHelper::append($context, 'dom_assert_tree_mut_doc');
+        $bbNode = BasicBlockHelper::append($context, 'dom_assert_tree_mut_node');
         $bbOk = BasicBlockHelper::append($context, 'dom_assert_tree_mut_ok');
-        $context->builder->branchIf($isDoc, $bbDoc, $bbOk);
+        $context->builder->branchIf($isDoc, $bbDoc, $bbNode);
 
         $context->builder->positionAtEnd($bbDoc);
         // Same-document: element.parentNode === document (#30274 / loadXML parentNode wire).
@@ -1338,7 +1331,222 @@ final class DomNodeLiveMutationRuntime
             DomExceptionConstants::WRONG_DOCUMENT_ERR
         );
 
+        // Non-Document child: Wrong Document when both sides resolve to distinct docs (#33937).
+        $context->builder->positionAtEnd($bbNode);
+        self::assertSameOwnerDocumentBeforeLiveSlots($context, $parent, $child, $bbOk);
+        // assertSameOwnerDocumentBeforeLiveSlots branches to $bbOk or throws.
+
         $context->builder->positionAtEnd($bbOk);
+    }
+
+    /**
+     * php-src same-document check for Element/Text/Comment/… (#33937 / re-#22710).
+     *
+     * Resolves owner documents via {@see VmDom::PROP_OWNER_DOCUMENT} (createElement) or a
+     * parentNode walk to Document (loadXML). Null on either side → allow (VmDom::assertSameDocument).
+     */
+    private static function assertSameOwnerDocumentBeforeLiveSlots(
+        Context $context,
+        Value $parent,
+        Value $child,
+        \PHPLLVM\BasicBlock $bbOk
+    ): void {
+        $tag = (string) (self::$treeMutAssertSeq++);
+        $parentDoc = self::resolveOwnerDocumentObject($context, $parent);
+        $childDoc = self::resolveOwnerDocumentObject($context, $child);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $parentNull = $context->builder->icmp(Builder::INT_EQ, $parentDoc, $objPtr->constNull());
+        $childNull = $context->builder->icmp(Builder::INT_EQ, $childDoc, $objPtr->constNull());
+        $skip = $context->builder->or($parentNull, $childNull);
+        $bbCheck = BasicBlockHelper::append($context, 'dom_assert_same_doc_check_'.$tag);
+        $bbWrong = BasicBlockHelper::append($context, 'dom_assert_same_doc_wrong_'.$tag);
+        $context->builder->branchIf($skip, $bbOk, $bbCheck);
+
+        $context->builder->positionAtEnd($bbCheck);
+        $same = $context->builder->icmp(Builder::INT_EQ, $parentDoc, $childDoc);
+        $context->builder->branchIf($same, $bbOk, $bbWrong);
+
+        $context->builder->positionAtEnd($bbWrong);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Wrong Document Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::WRONG_DOCUMENT_ERR
+        );
+    }
+
+    /**
+     * Thin-AOT owner document: Document self, else ownerDocument slot, else parentNode walk.
+     *
+     * @return Value __object__* (nullable)
+     */
+    private static function resolveOwnerDocumentObject(Context $context, Value $node): Value
+    {
+        $tag = (string) (self::$treeMutAssertSeq++);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $objPtr);
+        $map = $context->structFieldMap['__object__'];
+
+        $bbDoc = BasicBlockHelper::append($context, 'dom_resolve_doc_isdoc_'.$tag);
+        $bbWalk = BasicBlockHelper::append($context, 'dom_resolve_doc_walk_'.$tag);
+        $bbDone = BasicBlockHelper::append($context, 'dom_resolve_doc_done_'.$tag);
+
+        $classId = $context->builder->load($context->builder->structGep($node, $map['class_id']));
+        $context->builder->branchIf(self::icmpIsDocumentClass($context, $classId), $bbDoc, $bbWalk);
+
+        $context->builder->positionAtEnd($bbDoc);
+        $context->builder->store($node, $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbWalk);
+        // Unrolled walk: ownerDocument slot, then parentNode hops (loadXML trees are shallow).
+        $cur = $node;
+        for ($hop = 0; $hop < 8; ++$hop) {
+            $hopTag = $tag.'_'.$hop;
+            $ownerSlot = self::loadNullableObjectProp(
+                $context,
+                $cur,
+                'DOMElement',
+                VmDom::PROP_OWNER_DOCUMENT
+            );
+            $bbHasOwner = BasicBlockHelper::append($context, 'dom_resolve_doc_owner_'.$hopTag);
+            $bbNoOwner = BasicBlockHelper::append($context, 'dom_resolve_doc_no_owner_'.$hopTag);
+            $ownerNull = $context->builder->icmp(Builder::INT_EQ, $ownerSlot, $objPtr->constNull());
+            $context->builder->branchIf($ownerNull, $bbNoOwner, $bbHasOwner);
+
+            $context->builder->positionAtEnd($bbHasOwner);
+            $context->builder->store($ownerSlot, $resultSlot);
+            $context->builder->branch($bbDone);
+
+            $context->builder->positionAtEnd($bbNoOwner);
+            $parentObj = self::loadNullableObjectProp(
+                $context,
+                $cur,
+                'DOMElement',
+                VmDom::PROP_PARENT_NODE
+            );
+            $bbHasParent = BasicBlockHelper::append($context, 'dom_resolve_doc_pn_'.$hopTag);
+            $bbNoParent = BasicBlockHelper::append($context, 'dom_resolve_doc_no_pn_'.$hopTag);
+            $parentNull = $context->builder->icmp(Builder::INT_EQ, $parentObj, $objPtr->constNull());
+            $context->builder->branchIf($parentNull, $bbNoParent, $bbHasParent);
+
+            $context->builder->positionAtEnd($bbNoParent);
+            $context->builder->store($objPtr->constNull(), $resultSlot);
+            $context->builder->branch($bbDone);
+
+            $context->builder->positionAtEnd($bbHasParent);
+            $parentClassId = $context->builder->load(
+                $context->builder->structGep($parentObj, $map['class_id'])
+            );
+            $bbParentIsDoc = BasicBlockHelper::append($context, 'dom_resolve_doc_pn_doc_'.$hopTag);
+            $bbParentCont = BasicBlockHelper::append($context, 'dom_resolve_doc_pn_cont_'.$hopTag);
+            $context->builder->branchIf(
+                self::icmpIsDocumentClass($context, $parentClassId),
+                $bbParentIsDoc,
+                $bbParentCont
+            );
+
+            $context->builder->positionAtEnd($bbParentIsDoc);
+            $context->builder->store($parentObj, $resultSlot);
+            $context->builder->branch($bbDone);
+
+            $context->builder->positionAtEnd($bbParentCont);
+            $cur = $parentObj;
+        }
+        $context->builder->store($objPtr->constNull(), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /** @param Value $classId int64 class_id */
+    private static function icmpIsDocumentClass(Context $context, Value $classId): Value
+    {
+        $objectType = $context->type->object;
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $isDoc = $i1->constInt(0, false);
+        foreach (['DOMDocument', 'Dom\\Document', 'Dom\\XMLDocument', 'Dom\\HTMLDocument'] as $className) {
+            try {
+                $expected = $objectType->lookup($className);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($expected, false)
+            );
+            $isDoc = $context->builder->or($isDoc, $match);
+        }
+
+        return $isDoc;
+    }
+
+    /**
+     * Load a TYPE_VALUE object property as nullable {@see __object__*} (null box → null).
+     *
+     * Must not call {@see JitNestedHelperCoerce::isHelperResultNull} on a null slot pointer —
+     * loadXML nodes often leave ownerDocument unset (#33937).
+     */
+    private static function loadNullableObjectProp(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $prop
+    ): Value {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup($className);
+        if (!$objectType->hasProperty($classId, $prop)) {
+            $objectType->defineProperty($classId, $prop, Variable::TYPE_VALUE);
+        }
+        $rawPtr = $context->builder->load(
+            $objectType->propertySlotFor($obj, $className, $prop)
+        );
+        $objPtr = $context->getTypeFromString('__object__*');
+        $tag = (string) (self::$treeMutAssertSeq++);
+        $bbSlotNull = BasicBlockHelper::append($context, 'dom_load_prop_slot_null_'.$tag);
+        $bbSlotHas = BasicBlockHelper::append($context, 'dom_load_prop_slot_has_'.$tag);
+        $bbBoxNull = BasicBlockHelper::append($context, 'dom_load_prop_box_null_'.$tag);
+        $bbHas = BasicBlockHelper::append($context, 'dom_load_prop_has_'.$tag);
+        $bbDone = BasicBlockHelper::append($context, 'dom_load_prop_done_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $objPtr);
+        $voidPtr = $context->getTypeFromString('void*');
+        $slotNull = $context->builder->icmp(Builder::INT_EQ, $rawPtr, $voidPtr->constNull());
+        $context->builder->branchIf($slotNull, $bbSlotNull, $bbSlotHas);
+
+        $context->builder->positionAtEnd($bbSlotNull);
+        $context->builder->store($objPtr->constNull(), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbSlotHas);
+        $valuePtr = $context->builder->pointerCast(
+            $rawPtr,
+            $context->getTypeFromString('__value__*')
+        );
+        $boxNull = JitNestedHelperCoerce::isHelperResultNull($context, $valuePtr);
+        $context->builder->branchIf($boxNull, $bbBoxNull, $bbHas);
+
+        $context->builder->positionAtEnd($bbBoxNull);
+        $context->builder->store($objPtr->constNull(), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbHas);
+        $loaded = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::normalizeValuePtr($context, $valuePtr)
+        );
+        $context->builder->store($loaded, $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return $context->builder->load($resultSlot);
     }
 
     private static function objectAbiFor(string $kind, int $extraArgCount): string
