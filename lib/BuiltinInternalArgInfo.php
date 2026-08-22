@@ -548,6 +548,10 @@ final class BuiltinInternalArgInfo
             'exit', 'die' => 'never',
             // ext/standard/math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595)
             'ceil', 'floor' => 'float',
+            // ext/standard/math.stub.php + basic_functions.stub.php — max/min/pow/fdiv Reflection (#25459)
+            'max', 'min' => 'mixed',
+            'pow' => 'object|int|float',
+            'fdiv' => 'float',
             // ext/standard/basic_functions.stub.php / head.c — InternalArgInfo omits |false / void (#25780)
             'get_headers' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo empty return (#24857)
@@ -1826,6 +1830,16 @@ final class BuiltinInternalArgInfo
             'dirname' => 1 === $index ? 'int' : null,
             // ext/standard/math.stub.php — int|float $num (InternalArgInfo float) (#25595)
             'ceil', 'floor' => 0 === $index ? 'int|float' : null,
+            // ext/standard/math.stub.php + basic_functions.stub.php — max/min/pow/fdiv param types (#25459)
+            'max', 'min' => match ($index) {
+                0, 1 => 'mixed',
+                default => null,
+            },
+            'pow' => match ($index) {
+                0, 1 => 'mixed',
+                default => null,
+            },
+            'fdiv' => ($index === 0 || $index === 1) ? 'float' : null,
             // ext/standard/basic_functions.stub.php — bool $associative = false; $context = null untyped (#25780)
             // InternalArgInfo still says format:int and omits context.
             'get_headers' => match ($index) {

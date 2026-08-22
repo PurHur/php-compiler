@@ -896,6 +896,27 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['iptc_block'], BuiltinParamNames::paramNamesForInternalFunction('iptcparse'));
     }
 
+    /** php-src math.stub.php / basic_functions.stub.php — max/min/pow/fdiv Reflection (#25459). */
+    public function testMaxMinPowFdivReflectionStubTypes(): void
+    {
+        $this->assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('max'));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('min'));
+        $this->assertSame('object|int|float', BuiltinInternalArgInfo::returnTypeLabelForFunction('pow'));
+        $this->assertSame('float', BuiltinInternalArgInfo::returnTypeLabelForFunction('fdiv'));
+        $this->assertSame('float', BuiltinInternalArgInfo::returnTypeLabelForFunction('fmod'));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('max', 0));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('max', 1));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('min', 0));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('pow', 0));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('pow', 1));
+        $this->assertSame('float', BuiltinInternalArgInfo::stubParamTypeOverride('fdiv', 0));
+        $this->assertSame('float', BuiltinInternalArgInfo::stubParamTypeOverride('fdiv', 1));
+        $this->assertSame(['value', '...values'], BuiltinParamNames::forFunction('max'));
+        $this->assertSame(['num', 'exponent'], BuiltinParamNames::forFunction('pow'));
+        $this->assertSame(['num1', 'num2'], BuiltinParamNames::forFunction('fdiv'));
+        $this->assertSame(['num1', 'num2'], BuiltinParamNames::forFunction('fmod'));
+    }
+
     /** php-src ext/standard/image.stub.php — InternalArgInfo return string (missing |false) (#28314). */
     public function testImageTypeToExtensionReflectionReturnUnion(): void
     {
