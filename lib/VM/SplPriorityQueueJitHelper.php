@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MultisortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -17,8 +18,9 @@ use PHPLLVM\Value;
 /**
  * Thin-AOT SplPriorityQueue — parallel `__spl_data` / `__spl_prio` + Iterator (#27277, #28708).
  *
- * php-src: ext/spl/spl_heap.c — SplPriorityQueue insert/extract + destructive foreach
- * (default EXTR_DATA). Priorities stay sorted descending via {@see MultisortRuntime::multisortPacked}.
+ * php-src: ext/spl/spl_heap.c — SplPriorityQueue insert/extract + destructive foreach.
+ * Priorities stay sorted descending via {@see MultisortRuntime::multisortPacked}.
+ * Extract/top/current honour `__spl_flags` (EXTR_DATA / EXTR_PRIORITY / EXTR_BOTH) (#33861).
  */
 final class SplPriorityQueueJitHelper
 {
@@ -102,6 +104,36 @@ final class SplPriorityQueueJitHelper
         return $slot;
     }
 
+    /**
+     * php-src zim_SplPriorityQueue_setExtractFlags — store flags & EXTR_BOTH, return masked (#33861).
+     */
+    public static function compileSetExtractFlags(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $flagsArg
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $flags = JitLongArg::lower($context, $flagsArg, 'SplPriorityQueue::setExtractFlags() flags');
+        $masked = $context->builder->and($flags, $i64->constInt(SplPriorityQueueBuiltin::EXTR_BOTH, false));
+        self::storeLongPropertyValue($context, $obj, self::PROP_FLAGS, $masked);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $masked);
+
+        return $slot;
+    }
+
+    /** php-src zim_SplPriorityQueue_getExtractFlags (#33861). */
+    public static function compileGetExtractFlags(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $flags = self::loadLongProperty($context, $obj, self::PROP_FLAGS);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $flags);
+
+        return $slot;
+    }
+
     /** php-src spl_heap_it_rewind is a no-op; valid/key derive from count (#31601). */
     public static function compileRewind(Context $context, JITVariable $receiver): Value
     {
@@ -125,13 +157,13 @@ final class SplPriorityQueueJitHelper
         return $slot;
     }
 
-    /** Default EXTR_DATA — yield data[0] (flags other than EXTR_DATA stay VM-covered). */
+    /** Honour `__spl_flags` — EXTR_DATA / EXTR_PRIORITY / EXTR_BOTH (#33861). */
     public static function compileCurrent(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);
-        $ht = self::dataPtr($context, $obj);
+        $dataHt = self::dataPtr($context, $obj);
         $map = $context->structFieldMap['__hashtable__'];
-        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $n = $context->builder->load($context->builder->structGep($dataHt, $map['numElements']));
         $sizeT = $context->getTypeFromString('size_t');
         $out = JitValueBox::alloc($context);
         $emptyBb = BasicBlockHelper::append($context, 'splpq_current_empty');
@@ -148,15 +180,13 @@ final class SplPriorityQueueJitHelper
         $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($readBb);
-        $fetched = HashTableHelper::readIndexedToValueBox(
+        self::writeFormattedElement(
             $context,
-            $ht,
-            $sizeT->constInt(0, false)
-        );
-        JitValueBox::copyFromPointer(
-            $context,
+            $obj,
             $out,
-            JitValueBox::valuePtrFromVariable($context, $fetched)
+            $dataHt,
+            self::prioPtr($context, $obj),
+            $sizeT->constInt(0, false)
         );
         $context->builder->branch($merge);
 
@@ -235,16 +265,13 @@ final class SplPriorityQueueJitHelper
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($bodyBb);
-        // Default EXTR_DATA — return data[0] (flags other than EXTR_DATA stay VM-covered).
-        $fetched = HashTableHelper::readIndexedToValueBox(
+        self::writeFormattedElement(
             $context,
-            $dataHt,
-            $sizeT->constInt(0, false)
-        );
-        JitValueBox::copyFromPointer(
-            $context,
+            $obj,
             $out,
-            JitValueBox::valuePtrFromVariable($context, $fetched)
+            $dataHt,
+            self::prioPtr($context, $obj),
+            $sizeT->constInt(0, false)
         );
         if ($remove) {
             self::extractTop($context, $obj);
@@ -255,6 +282,91 @@ final class SplPriorityQueueJitHelper
         $context->builder->positionAtEnd($doneBb);
 
         return $out;
+    }
+
+    /**
+     * php-src SplPriorityQueueBuiltin::formatElement — EXTR_DATA / EXTR_PRIORITY / EXTR_BOTH (#33861).
+     */
+    private static function writeFormattedElement(
+        Context $context,
+        Value $obj,
+        Value $out,
+        Value $dataHt,
+        Value $prioHt,
+        Value $idx
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $flags = self::loadLongProperty($context, $obj, self::PROP_FLAGS);
+        $bothBb = BasicBlockHelper::append($context, 'splpq_fmt_both');
+        $prioBb = BasicBlockHelper::append($context, 'splpq_fmt_prio');
+        $dataBb = BasicBlockHelper::append($context, 'splpq_fmt_data');
+        $mergeBb = BasicBlockHelper::append($context, 'splpq_fmt_merge');
+        $isBoth = $context->builder->icmp(
+            Builder::INT_EQ,
+            $flags,
+            $i64->constInt(SplPriorityQueueBuiltin::EXTR_BOTH, false)
+        );
+        $notBothBb = BasicBlockHelper::append($context, 'splpq_fmt_not_both');
+        $context->builder->branchIf($isBoth, $bothBb, $notBothBb);
+
+        $context->builder->positionAtEnd($notBothBb);
+        $isPrio = $context->builder->icmp(
+            Builder::INT_EQ,
+            $flags,
+            $i64->constInt(SplPriorityQueueBuiltin::EXTR_PRIORITY, false)
+        );
+        $context->builder->branchIf($isPrio, $prioBb, $dataBb);
+
+        $context->builder->positionAtEnd($bothBb);
+        $bothHt = new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
+            HashTableHelper::alloc($context)
+        );
+        HashTableHelper::initArray($context, $bothHt);
+        $dataFetched = HashTableHelper::readIndexedToValueBox($context, $dataHt, $idx);
+        $prioFetched = HashTableHelper::readIndexedToValueBox($context, $prioHt, $idx);
+        $dataKey = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $context->builder->load($context->constantStringFromString('data'))
+        );
+        $prioKey = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $context->builder->load($context->constantStringFromString('priority'))
+        );
+        HashTableHelper::addElement($context, $bothHt, $dataFetched, $dataKey);
+        HashTableHelper::addElement($context, $bothHt, $prioFetched, $prioKey);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $out),
+            $context->helper->loadValue($bothHt)
+        );
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($prioBb);
+        $prioOnly = HashTableHelper::readIndexedToValueBox($context, $prioHt, $idx);
+        JitValueBox::copyFromPointer(
+            $context,
+            $out,
+            JitValueBox::valuePtrFromVariable($context, $prioOnly)
+        );
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($dataBb);
+        $dataOnly = HashTableHelper::readIndexedToValueBox($context, $dataHt, $idx);
+        JitValueBox::copyFromPointer(
+            $context,
+            $out,
+            JitValueBox::valuePtrFromVariable($context, $dataOnly)
+        );
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
     }
 
     private static function extractTop(Context $context, Value $obj): void

@@ -1644,12 +1644,14 @@ class Context {
             }
         }
         // SplPriorityQueue — parallel data/priority HTs + Iterator foreach (#27277, #28708).
+        // setExtractFlags/getExtractFlags — thin AOT was a silent null stub (#33861).
         $this->type->object->lookup('SplPriorityQueue');
         foreach ([
             '__construct', 'insert', 'extract', 'top', 'count',
             'rewind', 'valid', 'current', 'key', 'next',
+            'setExtractFlags', 'getExtractFlags',
         ] as $pqMethod) {
-            $this->functionProxies['splpriorityqueue::'.$pqMethod] = new Call\SplPriorityQueueMethod($pqMethod);
+            $this->functionProxies['splpriorityqueue::'.strtolower($pqMethod)] = new Call\SplPriorityQueueMethod($pqMethod);
         }
         // SplDoublyLinkedList / SplQueue / SplStack — `__spl_ht` deque (#26790, #27311, #28704, #32910).
         foreach ([

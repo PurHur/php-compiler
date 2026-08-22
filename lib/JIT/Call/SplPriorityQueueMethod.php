@@ -104,6 +104,28 @@ final class SplPriorityQueueMethod implements Call
                 0,
                 static fn (Context $ctx, Variable $self): Value => SplPriorityQueueJitHelper::compileNext($ctx, $self)
             ),
+            // php-src zim_SplPriorityQueue_setExtractFlags / getExtractFlags (#33861).
+            'setextractflags' => $this->callExactArg(
+                $context,
+                $args,
+                'SplPriorityQueue::setExtractFlags',
+                1,
+                static fn (Context $ctx, Variable ...$callArgs): Value => SplPriorityQueueJitHelper::compileSetExtractFlags(
+                    $ctx,
+                    $callArgs[0],
+                    $callArgs[1]
+                )
+            ),
+            'getextractflags' => $this->callExactArg(
+                $context,
+                $args,
+                'SplPriorityQueue::getExtractFlags',
+                0,
+                static fn (Context $ctx, Variable $self): Value => SplPriorityQueueJitHelper::compileGetExtractFlags(
+                    $ctx,
+                    $self
+                )
+            ),
             default => throw new \LogicException(
                 'SplPriorityQueue JIT lowering is not implemented for '.$this->method.'()'
             ),
