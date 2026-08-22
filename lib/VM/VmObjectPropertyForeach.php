@@ -65,6 +65,10 @@ final class VmObjectPropertyForeach
             if ('dateperiod' === $classLc) {
                 return false;
             }
+            // WeakMap: walk `__weak_map` HT (object keys), not the private property (#33860).
+            if ('weakmap' === $classLc) {
+                return false;
+            }
             if ('object' !== $classLc) {
                 return !VmIteratorProtocol::classImplementsIteratorProtocol($context, $classLc);
             }

@@ -57,6 +57,7 @@ final class VmIteratorProtocol
             $ut = strtolower(ltrim($containerUserType, '\\'));
             // HT-backed SPL — foreach walks `__spl_ht`, not Iterator method proxies (#26783, #26775, #26825).
             if ('splobjectstorage' === $ut
+                || 'weakmap' === $ut
                 || \PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($containerUserType)) {
                 return false;
             }

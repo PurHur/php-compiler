@@ -19,8 +19,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer InetRuntime #26010).
  * Replaces lib/AOT/runtime/phpc_weakref.c. Ref + map slot tables are LLVM globals for AOT
- * standalone (JitHelper statics are unreliable under NestedJIT); format/resolve still use
- * WeakRefRegistryJitHelper PHP (#9191).
+ * standalone (JitHelper statics are unreliable under NestedJIT). formatObjectKey still uses
+ * WeakRefRegistryJitHelper PHP; map_key_to_object walks LLVM map globals (#9191 / #33860).
  * php-src: Zend/zend_weakrefs.c
  */
 final class WeakRefRegistryRuntime
@@ -497,18 +497,87 @@ final class WeakRefRegistryRuntime
             return;
         }
 
+        // AOT: resolve via LLVM map globals (same tables register_map writes). NestedJIT
+        // mapKeyToObjectPtr(__string__*) marshaling is unreliable for foreach keys (#33860).
+        self::ensureMapGlobals($context);
+        self::ensureExternals($context);
         $objPtrTy = $context->getTypeFromString('__object__*');
         $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($objPtrTy, false, $strPtr);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
-        $entry = $fn->appendBasicBlock('wr_resolve_bridge_entry');
+        $entry = $fn->appendBasicBlock('wr_resolve_entry');
+        $nullKeyBb = $fn->appendBasicBlock('wr_resolve_null_key');
+        $loopInit = $fn->appendBasicBlock('wr_resolve_init');
+        $loopCond = $fn->appendBasicBlock('wr_resolve_cond');
+        $loopBody = $fn->appendBasicBlock('wr_resolve_body');
+        $cmpBb = $fn->appendBasicBlock('wr_resolve_cmp');
+        $foundBb = $fn->appendBasicBlock('wr_resolve_found');
+        $loopInc = $fn->appendBasicBlock('wr_resolve_inc');
+        $missBb = $fn->appendBasicBlock('wr_resolve_miss');
         $context->builder->positionAtEnd($entry);
+
+        $wantKey = $fn->getParam(0);
+        $strNull = $strPtr->constNull();
+        $objNull = $objPtrTy->constNull();
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $wantKey, $strNull),
+            $nullKeyBb,
+            $loopInit
+        );
+
+        $context->builder->positionAtEnd($nullKeyBb);
+        $context->builder->returnValue($objNull);
+
+        $context->builder->positionAtEnd($loopInit);
+        $count = $context->builder->load($context->module->getNamedGlobal(self::G_MAP_COUNT));
+        $idx = $context->builder->alloca($i32, 1, 'wr_resolve_i');
+        $context->builder->store($i32->constInt(0, false), $idx);
+        $context->builder->branch($loopCond);
+
+        $context->builder->positionAtEnd($loopCond);
+        $i = $context->builder->load($idx);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $i, $count),
+            $loopBody,
+            $missBb
+        );
+
+        $context->builder->positionAtEnd($loopBody);
+        $zero = $context->context->int32Type()->constInt(0, false);
+        $keys = $context->module->getNamedGlobal(self::G_MAP_KEYS);
+        $targets = $context->module->getNamedGlobal(self::G_MAP_TARGETS);
+        $storedKey = $context->builder->load($context->builder->gep($keys, $zero, $i));
+        $keyNonNull = $context->builder->icmp(Builder::INT_NE, $storedKey, $strNull);
+        $context->builder->branchIf($keyNonNull, $cmpBb, $loopInc);
+
+        $context->builder->positionAtEnd($cmpBb);
+        $keyMatch = JitStringCompare::identical($context, $storedKey, $wantKey);
+        $context->builder->branchIf($keyMatch, $foundBb, $loopInc);
+
+        $context->builder->positionAtEnd($foundBb);
+        $storedTarget = $context->builder->load($context->builder->gep($targets, $zero, $i));
+        $context->builder->returnValue(
+            $context->builder->pointerCast($storedTarget, $objPtrTy)
+        );
+
+        $context->builder->positionAtEnd($loopInc);
+        $context->builder->store(
+            $context->builder->add($context->builder->load($idx), $i32->constInt(1, false)),
+            $idx
+        );
+        $context->builder->branch($loopCond);
+
+        $context->builder->positionAtEnd($missBb);
+        // Fallback: NestedJIT parse of o:%x when the key is not in the LLVM map table.
         $handle = $context->builder->call(
             self::helperFunction($context, self::MAP_KEY_TO_OBJECT),
-            $fn->getParam(0)
+            $wantKey
         );
-        $context->builder->returnValue($context->builder->intToPtr($handle, $objPtrTy));
+        $context->builder->returnValue(
+            $context->builder->intToPtr($handle, $objPtrTy)
+        );
         $context->registerFunction($abiName, $fn);
     }
 

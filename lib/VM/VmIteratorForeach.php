@@ -447,6 +447,14 @@ final class VmIteratorForeach
 
             return;
         }
+        // WeakMap before generic asHashtable — string-key HT walk, not ObjectProperty (#33860).
+        if (self::usesWeakMapHashtable($containerUserType)) {
+            WeakRefRuntime::ensureLinked($context);
+            WeakRefNative::registerDeclarations($context);
+            self::initHashtableIndex($context, $slotKey);
+
+            return;
+        }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             // SplObjectStorage: walk objKeys; index tracks Zend key() (#28707).
