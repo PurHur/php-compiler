@@ -848,9 +848,15 @@ final class JitDateMutation
     }
 
     /**
-     * Keep format()/getTimestamp() compile-time stamps in sync after mutable add/sub (#33911).
+     * Keep format()/getTimestamp()/getOffset() compile-time stamps in sync after
+     * mutable add/sub/setTimezone (#33911, #33939).
+     *
+     * Method `$this` is often a temporary Variable, not the same instance as
+     * {@see Context::$namedVariableBindings}. Also refresh every binding / local
+     * instant that still carries this unix timestamp so later `$local->format()`
+     * reads (via {@see applyDateTimeLocalInstantToReceiver}) see the new zone.
      */
-    private static function publishMutableDateTimeInstant(
+    public static function publishMutableDateTimeInstant(
         Context $context,
         JITVariable $receiver,
         int $timestamp,
@@ -861,7 +867,13 @@ final class JitDateMutation
         $receiver->compileTimeDateTimeMicrosecond = $microsecond;
         $receiver->compileTimeTimezoneName = $timezone;
         foreach ($context->namedVariableBindings as $boundName => $bound) {
-            if ($bound !== $receiver) {
+            if (
+                $bound !== $receiver
+                && !(
+                    null !== $bound->compileTimeDateTimeTimestamp
+                    && (int) $bound->compileTimeDateTimeTimestamp === $timestamp
+                )
+            ) {
                 continue;
             }
             $bound->compileTimeDateTimeTimestamp = $timestamp;
@@ -872,6 +884,21 @@ final class JitDateMutation
                 'timezone' => $timezone,
                 'microsecond' => $microsecond,
             ];
+            // Keep DateTimeZone-local map aligned so applyDateTimeZoneLocalToReceiver
+            // cannot resurrect the construct zone (#33939).
+            $context->dateTimeZoneLocalNames[$boundName] = $timezone;
+        }
+        // Locals recorded only in dateTimeLocalInstants (no live binding match).
+        foreach ($context->dateTimeLocalInstants as $localName => $instant) {
+            if ((int) ($instant['timestamp'] ?? 0) !== $timestamp) {
+                continue;
+            }
+            $context->dateTimeLocalInstants[$localName] = [
+                'timestamp' => $timestamp,
+                'timezone' => $timezone,
+                'microsecond' => $microsecond,
+            ];
+            $context->dateTimeZoneLocalNames[$localName] = $timezone;
         }
     }
 
@@ -1674,6 +1701,31 @@ final class JitDateMutation
             $tzNameVar,
             JITVariable::TYPE_STRING
         );
+        // Keep format()/getOffset() stamps aligned with the new zone (#33939 / peer #33911).
+        $tzLit = $args[1]->compileTimeTimezoneName;
+        if (null === $tzLit || '' === $tzLit) {
+            $tzLit = $context->lastDateTimeZoneConstructedId;
+        }
+        if (null === $tzLit || '' === $tzLit) {
+            $tzLit = $args[1]->compileTimeString;
+        }
+        $tsLit = $args[0]->compileTimeDateTimeTimestamp;
+        if (
+            null !== $tsLit
+            && null !== $tzLit
+            && '' !== $tzLit
+            && 0 !== \strcasecmp($tzLit, 'DateTime')
+            && 0 !== \strcasecmp($tzLit, 'DateTimeImmutable')
+            && 0 !== \strcasecmp($tzLit, 'DateTimeZone')
+        ) {
+            self::publishMutableDateTimeInstant(
+                $context,
+                $args[0],
+                (int) $tsLit,
+                $tzLit,
+                (int) ($args[0]->compileTimeDateTimeMicrosecond ?? 0)
+            );
+        }
 
         return self::returnObjectArg($context, $args[0]);
     }

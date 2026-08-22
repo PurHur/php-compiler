@@ -92,6 +92,32 @@ final class DateTimeSetTimezone implements Call
                 Variable::TYPE_STRING
             );
             $retObj = $receiver;
+            // format()/getOffset() prefer compile-time stamps (#33911). Refresh the zone
+            // name (instant unchanged) or setTimezone is a silent no-op for reads (#33939).
+            $tzLit = $args[1]->compileTimeTimezoneName;
+            if (null === $tzLit || '' === $tzLit) {
+                $tzLit = $context->lastDateTimeZoneConstructedId;
+            }
+            if (null === $tzLit || '' === $tzLit) {
+                $tzLit = $args[1]->compileTimeString;
+            }
+            $tsLit = $args[0]->compileTimeDateTimeTimestamp;
+            if (
+                null !== $tsLit
+                && null !== $tzLit
+                && '' !== $tzLit
+                && 0 !== \strcasecmp($tzLit, 'DateTime')
+                && 0 !== \strcasecmp($tzLit, 'DateTimeImmutable')
+                && 0 !== \strcasecmp($tzLit, 'DateTimeZone')
+            ) {
+                JitDateMutation::publishMutableDateTimeInstant(
+                    $context,
+                    $args[0],
+                    (int) $tsLit,
+                    $tzLit,
+                    (int) ($args[0]->compileTimeDateTimeMicrosecond ?? 0)
+                );
+            }
         }
 
         $ret = JitValueBox::alloc($context);

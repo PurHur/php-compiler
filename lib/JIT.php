@@ -20832,6 +20832,17 @@ class JIT {
     /** Copy construct stamp onto `$z->getLocation()` receivers (#33727 / peer #29732). */
     private function applyDateTimeZoneLocalToReceiver(Operand $receiverOp, JIT\Variable $receiverVar): void
     {
+        // DateTime(Immutable) receivers already got their zone from
+        // dateTimeLocalInstants in applyDateTimeLocalInstantToReceiver. Do not
+        // overwrite with construct-time dateTimeZoneLocalNames — that made
+        // setTimezone a silent no-op for format()/getOffset() (#33939).
+        if (null !== $receiverVar->compileTimeDateTimeTimestamp) {
+            return;
+        }
+        $hint = strtolower(ltrim((string) ($receiverVar->classUserType ?? ''), '\\'));
+        if ('datetime' === $hint || 'datetimeimmutable' === $hint) {
+            return;
+        }
         $recvName = JIT\OperandName::resolve($receiverOp);
         if (null === $recvName || '' === $recvName) {
             return;
