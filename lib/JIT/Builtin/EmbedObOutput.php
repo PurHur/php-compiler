@@ -38,7 +38,7 @@ final class EmbedObOutput
         }
 
         LibcExtern::register($context);
-        // Ensure decls exist before filling embed noop/zero bodies (#21109 / #9956 / #33802).
+        // Ensure decls exist before filling embed noop/zero bodies (#21109 / #9956 / #33798).
         ObOutputRuntime::declareObAbis($context);
         foreach (self::NOOP_FUNCTIONS as $name) {
             self::implementNoop($context, $name);

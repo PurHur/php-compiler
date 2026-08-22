@@ -765,7 +765,7 @@ class Type extends Builtin {
         // (#20930, #21109): after NativeOps getValue() fix, Sscanf/ObGzhandler abort
         // or segfault mid-init. Link on first use (peer PendingHeaders / STANDALONE #12910).
         HttpResponseCode::implement($this->context);
-        // __phpc_ob_* always-on shells removed (#33802): ObOutputRuntime / ObOutputJitBridge
+        // __phpc_ob_* always-on shells removed (#33798): ObOutputRuntime / ObOutputJitBridge
         // own the ABI (getNamedFunction first; Type::initialize still lazy — thin standalone
         // links via Context::ensureMinimalUserStandaloneBodies / ValueEchoRuntime::ensureLinked;
         // EMBED via EmbedObOutput::implement). Leftover Type empty decls vs Runtime ABI drift
