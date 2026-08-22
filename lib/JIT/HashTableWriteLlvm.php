@@ -1869,14 +1869,22 @@ final class HashTableWriteLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $srcHt,
-            $idx
+        // Skip packed TYPE_UNDEFINED holes only — TYPE_NULL is a real element (Zend
+        // ZEND_ADD_ARRAY_UNPACK / FE_FETCH). offsetIsSet uses isset semantics and drops
+        // nulls from [...$a], ArrayObject/ArrayIterator construct (#33696 / #24261 / #33639).
+        $entry = HashTableReadLlvm::listEntryPointer($context, $srcHt, $idx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $context->structFieldMap['__value__']['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isUndef = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED & 0xff, false)
         );
         $skip = BasicBlockHelper::append($context, 'ht_spread_packed_skip_'.$tag);
         $append = BasicBlockHelper::append($context, 'ht_spread_packed_append_'.$tag);
-        $context->builder->branchIf($isSet, $append, $skip);
+        $context->builder->branchIf($isUndef, $skip, $append);
 
         $context->builder->positionAtEnd($append);
         // Must use runtime nextFreeElement — addElement() bakes a compile-time constant
