@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -56,22 +57,12 @@ final class UnlinkLibcRuntime
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
 
-        // getNamedFunction first — leftover addFunction without it mints unlink.1 (#31894 / #32122).
-        $probe = $context->module->getNamedFunction('unlink');
-        if (null !== $probe) {
-            $context->registerFunction('unlink', $probe);
-
-            return;
-        }
-        try {
-            $context->lookupFunction('unlink');
-        } catch (\Throwable) {
-            $decl = $context->module->addFunction(
-                'unlink',
-                $context->context->functionType($i32, false, $i8p)
-            );
-            $context->registerFunction('unlink', $decl);
-        }
+        // getNamedFunction before addFunction — lookup miss must not mint unlink.1 (#33774 / #32122).
+        LibcExtern::ensureExternalDecl(
+            $context,
+            'unlink',
+            $context->context->functionType($i32, false, $i8p)
+        );
     }
 
     private static function stringData(Context $context, Value $strObj): Value

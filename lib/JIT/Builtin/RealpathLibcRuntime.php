@@ -76,22 +76,12 @@ final class RealpathLibcRuntime
     {
         $i8p = $context->getTypeFromString('int8*');
 
-        // getNamedFunction first — leftover addFunction without it mints realpath.1 (#31894 / #32122).
-        $probe = $context->module->getNamedFunction('realpath');
-        if (null !== $probe) {
-            $context->registerFunction('realpath', $probe);
-
-            return;
-        }
-        try {
-            $context->lookupFunction('realpath');
-        } catch (\Throwable) {
-            $decl = $context->module->addFunction(
-                'realpath',
-                $context->context->functionType($i8p, false, $i8p, $i8p)
-            );
-            $context->registerFunction('realpath', $decl);
-        }
+        // getNamedFunction before addFunction — lookup miss must not mint realpath.1 (#33774 / #32122).
+        LibcExtern::ensureExternalDecl(
+            $context,
+            'realpath',
+            $context->context->functionType($i8p, false, $i8p, $i8p)
+        );
     }
 
     private static function stringData(Context $context, Value $strObj): Value

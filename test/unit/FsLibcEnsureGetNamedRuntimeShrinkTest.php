@@ -29,6 +29,9 @@ final class FsLibcEnsureGetNamedRuntimeShrinkTest extends TestCase
             'MkdirLibcRuntime.php',
             'CopyLibcRuntime.php',
             'ChownLibcRuntime.php',
+            'ChmodLibcRuntime.php',
+            'UnlinkLibcRuntime.php',
+            'RealpathLibcRuntime.php',
         ];
     }
 
@@ -108,6 +111,30 @@ final class FsLibcEnsureGetNamedRuntimeShrinkTest extends TestCase
         );
         $this->assertStringContainsString('LibcExtern::ensureChownFamily', $chown);
         $this->assertStringContainsString('LibcExtern::ensureStrtolDecl', $chown);
+    }
+
+    public function testThinFsLibcPeersUseLibcExtern(): void
+    {
+        $rmdir = (string) file_get_contents(
+            $this->repoRoot.'/lib/JIT/Builtin/RmdirLibcRuntime.php'
+        );
+        $this->assertStringContainsString('LibcExtern::ensureRmdir', $rmdir);
+        $umask = (string) file_get_contents(
+            $this->repoRoot.'/lib/JIT/Builtin/UmaskLibcRuntime.php'
+        );
+        $this->assertStringContainsString('LibcExtern::ensureUmask', $umask);
+        $chmod = (string) file_get_contents(
+            $this->repoRoot.'/lib/JIT/Builtin/ChmodLibcRuntime.php'
+        );
+        $this->assertStringContainsString('LibcExtern::ensureExternalDecl', $chmod);
+        $unlink = (string) file_get_contents(
+            $this->repoRoot.'/lib/JIT/Builtin/UnlinkLibcRuntime.php'
+        );
+        $this->assertStringContainsString('LibcExtern::ensureExternalDecl', $unlink);
+        $realpath = (string) file_get_contents(
+            $this->repoRoot.'/lib/JIT/Builtin/RealpathLibcRuntime.php'
+        );
+        $this->assertStringContainsString('LibcExtern::ensureExternalDecl', $realpath);
     }
 
     public function testNoNewRuntimeCForFsLibcEnsure(): void
