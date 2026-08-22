@@ -137,6 +137,19 @@ final class JitDomSetIdAttribute
         }
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_node_cont');
+
+        // php-src Z_PARAM_OBJ_OF_CLASS(DOMAttr) — null must TypeError, not silent no-op (#33758).
+        if (JitDomRequireDomNodeArg::guardOrAbort(
+            $context,
+            $args[1],
+            'DOMElement::setIdAttributeNode',
+            1,
+            'attr',
+            'DOMAttr'
+        )) {
+            return self::boxNull($context);
+        }
+
         $element = self::loadObjectArg($context, $args[0]);
         $attr = self::loadObjectArg($context, $args[1]);
         $isIdTrue = self::resolveIsIdTrue($context, $args[2]);
