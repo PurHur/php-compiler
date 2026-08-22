@@ -524,12 +524,12 @@ final class JitDateMutation
     /**
      * OOP DateTime{,Immutable}::add/sub (#30760).
      *
-     * Thin user-script AOT cannot NestedJIT {@see DateMutationRuntime}
-     * (`__nativearray__boundscheck` missing, peer #27159 / modify()). Prefer
-     * compile-time {@see VmDateTimeNative::applyIntervalState} when both the
-     * receiver instant and DateInterval spec are known; otherwise LLVM-add a
-     * fixed-length (no year/month) compile-time interval. Full JIT/MCJIT still
-     * falls back to {@see __phpc_date_apply_interval}.
+     * Prefer compile-time {@see VmDateTimeNative::applyIntervalState} when both
+     * the receiver instant and DateInterval spec are known; otherwise LLVM-add
+     * a fixed-length (no year/month) compile-time interval. Runtime variable
+     * intervals (including year/month) fall back to {@see DateMutationRuntime} /
+     * {@see __phpc_date_apply_interval}, or UTC civil IR for thin user-script AOT
+     * ({@see applyRuntimeIntervalViaLlvm}, #33781).
      */
     private static function invokeObjectIntervalMutation(
         Context $context,
@@ -662,14 +662,17 @@ final class JitDateMutation
         }
 
         if ($context->isUserScriptAot()) {
-            throw new \LogicException(
-                $function.'() requires a compile-time DateInterval in this compiler build (#30760)'
-            );
+            if (null !== $intervalState) {
+                self::applyKnownIntervalStateViaLlvm($context, $dtObj, $intervalState, $layout, $add);
+            } else {
+                $intervalObj = self::requireDateIntervalObject($context, $args[1], $function, 1);
+                self::applyRuntimeIntervalViaLlvm($context, $dtObj, $intervalObj, $layout, $add);
+            }
+        } else {
+            $intervalObj = self::requireDateIntervalObject($context, $args[1], $function, 1);
+            DateMutationRuntime::ensureLinked($context);
+            self::applyIntervalToDateTimeObject($context, $dtObj, $intervalObj, $layout, $add);
         }
-
-        DateMutationRuntime::ensureLinked($context);
-        $intervalObj = self::requireDateIntervalObject($context, $args[1], $function, 1);
-        self::applyIntervalToDateTimeObject($context, $dtObj, $intervalObj, $layout, $add);
 
         return self::boxObjectPtr($context, $dtObj);
     }
@@ -735,6 +738,173 @@ final class JitDateMutation
         $newMicro = $context->builder->load($outMicro);
         self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
         self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::MICROSECOND_PROPERTY, $newMicro);
+    }
+
+    /**
+     * Thin AOT: apply compile-time-known DateInterval state to a runtime receiver (#33781).
+     *
+     * @param array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int} $state
+     */
+    private static function applyKnownIntervalStateViaLlvm(
+        Context $context,
+        Value $dtObj,
+        array $state,
+        string $layout,
+        bool $add
+    ): void {
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        $i64 = $context->getTypeFromString('int64');
+
+        $invert = 0 !== (int) $state['invert'];
+        $subtract = $add ? $invert : !$invert;
+        $signLit = $subtract ? -1 : 1;
+
+        $ts = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY);
+        $micro = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::MICROSECOND_PROPERTY);
+
+        $iy = $i64->constInt($signLit * (int) $state['y'], true);
+        $im = $i64->constInt($signLit * (int) $state['m'], true);
+        $id = $i64->constInt($signLit * (int) $state['d'], true);
+
+        $parts = JitGetdate::civilPartsPublic($context, $ts);
+        $year = $context->builder->add($parts['year'], $iy);
+        $month = $context->builder->add($parts['month'], $im);
+        $day = $context->builder->add($parts['day'], $id);
+        $calendarTs = JitGetdate::timestampFromCivilPublic(
+            $context,
+            $year,
+            $month,
+            $day,
+            $parts['hour'],
+            $parts['minute'],
+            $parts['second']
+        );
+
+        $elapsed = (int) $state['h'] * 3600 + (int) $state['i'] * 60 + (int) $state['s'];
+        $deltaSec = $signLit * $elapsed;
+        $newTs = $context->builder->add($calendarTs, $i64->constInt($deltaSec, true));
+
+        $deltaMicro = (int) \round($signLit * (float) $state['f'] * 1_000_000);
+        $newMicro = 0 === $deltaMicro
+            ? $micro
+            : $context->builder->add($micro, $i64->constInt($deltaMicro, true));
+
+        if (0 !== $deltaMicro) {
+            $microLimit = $i64->constInt(1_000_000, false);
+            $zero = $i64->constInt(0, true);
+            $needsCarry = $context->builder->icmp(Builder::INT_SGE, $newMicro, $microLimit);
+            $needsBorrow = $context->builder->icmp(Builder::INT_SLT, $newMicro, $zero);
+            $carriedTs = $context->builder->add($newTs, $context->builder->signedDiv($newMicro, $microLimit));
+            $carriedMicro = $context->builder->signedRem($newMicro, $microLimit);
+            $borrowedTs = $context->builder->sub($newTs, $i64->constInt(1, true));
+            $borrowedMicro = $context->builder->add($newMicro, $microLimit);
+            $borrowOrPlainTs = $context->builder->select($needsBorrow, $borrowedTs, $newTs);
+            $borrowOrPlainMicro = $context->builder->select($needsBorrow, $borrowedMicro, $newMicro);
+            $newTs = $context->builder->select($needsCarry, $carriedTs, $borrowOrPlainTs);
+            $newMicro = $context->builder->select($needsCarry, $carriedMicro, $borrowOrPlainMicro);
+        }
+
+        self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
+        self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::MICROSECOND_PROPERTY, $newMicro);
+    }
+
+    /**
+     * Runtime DateInterval add/sub for thin user-script AOT (#33781).
+     *
+     * Same calendar + elapsed semantics as {@see VmDateTimeNative::applyIntervalState}
+     * via UTC civil IR ({@see JitGetdate}) — avoids NestedJIT DateMutationJitHelper.
+     */
+    private static function applyRuntimeIntervalViaLlvm(
+        Context $context,
+        Value $dtObj,
+        Value $intervalObj,
+        string $layout,
+        bool $add
+    ): void {
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $dbl = $context->getTypeFromString('double');
+
+        $ts = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY);
+        $micro = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::MICROSECOND_PROPERTY);
+
+        $iy = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'y');
+        $im = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'm');
+        $id = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'd');
+        $ih = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'h');
+        $ii = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'i');
+        $is = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 's');
+        $if = self::readDoubleProp($context, $object, $intervalObj, 'DateInterval', 'f');
+        $invert = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'invert');
+
+        // subtract = $add ? invert : !invert; sign = subtract ? -1 : 1
+        $isInverted = $context->builder->icmp(
+            Builder::INT_NE,
+            $invert,
+            $i64->constInt(0, false)
+        );
+        $subtract = $add
+            ? $isInverted
+            : $context->builder->xor($isInverted, $i1->constInt(1, false));
+        $sign = $context->builder->select(
+            $subtract,
+            $i64->constInt(-1, true),
+            $i64->constInt(1, true)
+        );
+
+        $parts = JitGetdate::civilPartsPublic($context, $ts);
+        $year = $context->builder->add($parts['year'], $context->builder->mul($sign, $iy));
+        $month = $context->builder->add($parts['month'], $context->builder->mul($sign, $im));
+        $day = $context->builder->add($parts['day'], $context->builder->mul($sign, $id));
+        $calendarTs = JitGetdate::timestampFromCivilPublic(
+            $context,
+            $year,
+            $month,
+            $day,
+            $parts['hour'],
+            $parts['minute'],
+            $parts['second']
+        );
+
+        $elapsed = $context->builder->add(
+            $context->builder->add(
+                $context->builder->mul($ih, $i64->constInt(3600, false)),
+                $context->builder->mul($ii, $i64->constInt(60, false))
+            ),
+            $is
+        );
+        $deltaSec = $context->builder->mul($sign, $elapsed);
+        $newTs = $context->builder->add($calendarTs, $deltaSec);
+
+        $microScale = $dbl->constReal(1_000_000.0);
+        $signedF = $context->builder->fmul(
+            $context->builder->siToFp($sign, $dbl),
+            $if
+        );
+        $deltaMicroF = $context->builder->fmul($signedF, $microScale);
+        $deltaMicro = $context->builder->fpToSi($deltaMicroF, $i64);
+        $newMicro = $context->builder->add($micro, $deltaMicro);
+
+        $microLimit = $i64->constInt(1_000_000, false);
+        $zero = $i64->constInt(0, true);
+        $needsCarry = $context->builder->icmp(Builder::INT_SGE, $newMicro, $microLimit);
+        $needsBorrow = $context->builder->icmp(Builder::INT_SLT, $newMicro, $zero);
+        $carriedTs = $context->builder->add($newTs, $context->builder->signedDiv($newMicro, $microLimit));
+        $carriedMicro = $context->builder->signedRem($newMicro, $microLimit);
+        $borrowedTs = $context->builder->sub($newTs, $i64->constInt(1, true));
+        $borrowedMicro = $context->builder->add($newMicro, $microLimit);
+        $plainTs = $newTs;
+        $plainMicro = $newMicro;
+        $borrowOrPlainTs = $context->builder->select($needsBorrow, $borrowedTs, $plainTs);
+        $borrowOrPlainMicro = $context->builder->select($needsBorrow, $borrowedMicro, $plainMicro);
+        $finalTs = $context->builder->select($needsCarry, $carriedTs, $borrowOrPlainTs);
+        $finalMicro = $context->builder->select($needsCarry, $carriedMicro, $borrowOrPlainMicro);
+
+        self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $finalTs);
+        self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::MICROSECOND_PROPERTY, $finalMicro);
     }
 
     /**
