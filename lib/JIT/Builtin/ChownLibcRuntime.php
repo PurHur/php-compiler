@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -110,31 +111,26 @@ final class ChownLibcRuntime
 
     private static function ensureLibc(Context $context): void
     {
+        // Canonical decls (#33774): getNamedFunction first — bare lookup→addFunction
+        // catch minted chown.1 / strtol.1 (#31894 / #32122 / #33550).
+        LibcExtern::ensureChownFamily($context);
+        LibcExtern::ensureStrtolDecl($context);
+
         $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
-
         foreach ([
             ['__value__readLong', $i64, [$valuePtr]],
             ['__value__readString', $strPtr, [$valuePtr]],
-            ['strtol', $i64, [$i8p, $i8p->pointerType(0), $i32]],
             ['getpwnam', $i8p, [$i8p]],
             ['getgrnam', $i8p, [$i8p]],
-            ['chown', $i32, [$i8p, $i32, $i32]],
-            ['fchownat', $i32, [$i32, $i8p, $i32, $i32, $i32]],
         ] as [$name, $ret, $params]) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable) {
-                $fn = $context->module->addFunction(
-                    $name,
-                    $context->context->functionType($ret, false, ...$params)
-                );
-                $context->registerFunction($name, $fn);
-            }
+            LibcExtern::ensureExternalDecl(
+                $context,
+                $name,
+                $context->context->functionType($ret, false, ...$params)
+            );
         }
     }
 

@@ -160,31 +160,20 @@ final class MkdirLibcRuntime
 
     private static function ensureLibc(Context $context): void
     {
+        // Canonical decls (#33774): getNamedFunction first — bare lookup→addFunction
+        // catch minted strlen.1 / memcpy.1 / mkdir.1 (#31894 / #32122 / #33550).
         LibcExtern::ensureMallocFamily($context);
+        LibcExtern::ensureStrlenDecl($context);
+        LibcExtern::ensureMemcpyDecl($context);
+        LibcExtern::ensureErrnoLocationDecl($context);
 
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i32p = $context->getTypeFromString('int32*');
-
-        foreach (
-            [
-                ['mkdir', $i32, [$i8p, $i32]],
-                ['strlen', $sizeT, [$i8p]],
-                ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
-                ['__errno_location', $i32p, []],
-            ] as [$name, $ret, $params]
-        ) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable) {
-                $decl = $context->module->addFunction(
-                    $name,
-                    $context->context->functionType($ret, false, ...$params)
-                );
-                $context->registerFunction($name, $decl);
-            }
-        }
+        LibcExtern::ensureExternalDecl(
+            $context,
+            'mkdir',
+            $context->context->functionType($i32, false, $i8p, $i32)
+        );
     }
 
     private static function stringData(Context $context, Value $strObj): Value

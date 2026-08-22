@@ -181,26 +181,22 @@ final class CopyLibcRuntime
 
     private static function ensureLibc(Context $context): void
     {
+        // ensureExternalDecl (#33774): getNamedFunction first — bare lookup→addFunction
+        // catch minted ferror.1 / stat.1 / chmod.1 (#31894 / #32122 / #33550).
         LibcExtern::ensureStdioFile($context);
 
         $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
-
         foreach ([
             ['ferror', $i32, [$i8p]],
             ['stat', $i32, [$i8p, $i8p]],
             ['chmod', $i32, [$i8p, $i32]],
         ] as [$name, $ret, $params]) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable) {
-                $fn = $context->module->addFunction(
-                    $name,
-                    $context->context->functionType($ret, false, ...$params)
-                );
-                $context->registerFunction($name, $fn);
-            }
+            LibcExtern::ensureExternalDecl(
+                $context,
+                $name,
+                $context->context->functionType($ret, false, ...$params)
+            );
         }
     }
 
