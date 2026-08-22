@@ -26,6 +26,11 @@ use PHPLLVM\Value;
  * Profile gate is evaluated in this user-script lowerer (not inside the helper TU):
  * helper-runtime objects are profile-agnostic and would otherwise bake 8.4 support
  * into default-profile binaries.
+ *
+ * php-src `Z_PARAM_OBJ_OF_CLASS(node, dom_node_class_entry)` runs **before** the
+ * 8.2 NYI stub / xmlDOMWrapAdoptNode (ext/dom/document.c). Guard variable-null
+ * and getElementById misses first so AOT TypeErrors instead of NYI or
+ * `Not Supported Error` from a bogus helper object (#33737).
  */
 final class JitDomAdoptNode
 {
@@ -36,6 +41,10 @@ final class JitDomAdoptNode
         }
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_adopt_node_cont');
+
+        if (JitDomRequireDomNodeArg::guardOrAbort($context, $args[1], 'DOMDocument::adoptNode', 1, 'node')) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
 
         if (!CompilerVersion::supportsDomDocumentAdoptNode()) {
             return self::emitNotYetImplemented($context);
