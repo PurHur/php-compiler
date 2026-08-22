@@ -234,7 +234,9 @@ final class ObjectInstancePropertyLlvm
                         $context->builder->positionAtEnd($raiseBb);
                         $message = sprintf(
                             'Typed property %s::$%s must not be accessed before initialization',
-                            MethodVisibility::formatAnonymousScopeForMessage($className),
+                            MethodVisibility::formatAnonymousScopeForMessage(
+                                $object->instancePropertyDeclaringClassName($classId, $propset[1])
+                            ),
                             $propset[1]
                         );
                         if (null !== TryCatchHelper::resolveThrowHandler($context)) {
