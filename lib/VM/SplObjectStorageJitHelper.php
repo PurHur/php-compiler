@@ -107,6 +107,198 @@ final class SplObjectStorageJitHelper
     }
 
     /**
+     * php-src zim_SplObjectStorage_addAll — merge every object+info from $other (#33847).
+     */
+    public static function compileAddAll(Context $context, JITVariable $receiver, JITVariable $other): Value
+    {
+        $destHt = self::htPtr($context, self::loadObject($context, $receiver));
+        $otherObj = self::requireStorageArg($context, $other, 'addAll');
+        if (null === $otherObj) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'sos_addall_after_typeerror');
+
+            return self::voidResult($context);
+        }
+        $srcHt = self::htPtr($context, $otherObj);
+        self::foreachObjKeyNode($context, $srcHt, 'sos_addall', static function (
+            Context $context,
+            Value $node
+        ) use ($destHt): void {
+            $nodeMap = $context->structFieldMap['__objkey_node__'];
+            $keyObj = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+            $valField = $context->builder->structGep($node, $nodeMap['value']);
+            $writable = HashTableHelper::writableObjectKeyValueBox($context, $destHt, $keyObj);
+            JitValueBox::copyIntoPointer(
+                $context,
+                JitValueBox::valuePtrFromVariable($context, $writable),
+                $valField
+            );
+        });
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * php-src zim_SplObjectStorage_removeAll — detach every object present in $other (#33847).
+     */
+    public static function compileRemoveAll(Context $context, JITVariable $receiver, JITVariable $other): Value
+    {
+        $destHt = self::htPtr($context, self::loadObject($context, $receiver));
+        $otherObj = self::requireStorageArg($context, $other, 'removeAll');
+        if (null === $otherObj) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'sos_removeall_after_typeerror');
+
+            return self::voidResult($context);
+        }
+        $srcHt = self::htPtr($context, $otherObj);
+        self::foreachObjKeyNode($context, $srcHt, 'sos_removeall', static function (
+            Context $context,
+            Value $node
+        ) use ($destHt): void {
+            $nodeMap = $context->structFieldMap['__objkey_node__'];
+            $keyObj = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+            HashTableHelper::unsetAtObjectKey($context, $destHt, $keyObj);
+        });
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * php-src zim_SplObjectStorage_removeAllExcept — keep only objects also in $other (#33847).
+     */
+    public static function compileRemoveAllExcept(Context $context, JITVariable $receiver, JITVariable $other): Value
+    {
+        $destHt = self::htPtr($context, self::loadObject($context, $receiver));
+        $otherObj = self::requireStorageArg($context, $other, 'removeAllExcept');
+        if (null === $otherObj) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'sos_rae_after_typeerror');
+
+            return self::voidResult($context);
+        }
+        $keepHt = self::htPtr($context, $otherObj);
+        // Walk dest; save next before unset so the linked list stay walkable.
+        self::foreachObjKeyNode($context, $destHt, 'sos_removeallexcept', static function (
+            Context $context,
+            Value $node
+        ) use ($destHt, $keepHt): void {
+            $nodeMap = $context->structFieldMap['__objkey_node__'];
+            $keyObj = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+            $isKept = $context->builder->call(
+                $context->lookupFunction('__hashtable__objectKeyExists'),
+                $keepHt,
+                $keyObj
+            );
+            $dropBb = BasicBlockHelper::append($context, 'sos_rae_drop');
+            $keepBb = BasicBlockHelper::append($context, 'sos_rae_keep');
+            $context->builder->branchIf($isKept, $keepBb, $dropBb);
+            $context->builder->positionAtEnd($dropBb);
+            HashTableHelper::unsetAtObjectKey($context, $destHt, $keyObj);
+            $context->builder->branch($keepBb);
+            $context->builder->positionAtEnd($keepBb);
+        });
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * Z_PARAM_OBJ_OF_CLASS SplObjectStorage — TypeError cites Argument #1 ($storage) (#33847).
+     *
+     * @return Value|null  __object__* or null after TypeError (caller must not continue in this BB)
+     */
+    private static function requireStorageArg(Context $context, JITVariable $arg, string $method): ?Value
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant)) {
+            \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                \sprintf(
+                    'SplObjectStorage::%s(): Argument #1 ($storage) must be of type SplObjectStorage, null given',
+                    $method
+                )
+            );
+
+            return null;
+        }
+        if (JITVariable::TYPE_OBJECT !== $arg->type && JITVariable::TYPE_VALUE !== $arg->type) {
+            \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                \sprintf(
+                    'SplObjectStorage::%s(): Argument #1 ($storage) must be of type SplObjectStorage, %s given',
+                    $method,
+                    \PHPCompiler\JIT\JitOperandTypeLabel::givenLabel($context, $arg)
+                )
+            );
+
+            return null;
+        }
+
+        $obj = self::loadObject($context, $arg);
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load($context->builder->structGep($obj, $objMap['class_id']));
+        $expectedId = $context->type->object->lookup(self::CLASS_NAME);
+        $i64 = $context->getTypeFromString('int64');
+        $match = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i64->constInt($expectedId, false)
+        );
+        $okBb = BasicBlockHelper::append($context, 'sos_storage_arg_ok');
+        $badBb = BasicBlockHelper::append($context, 'sos_storage_arg_bad');
+        $context->builder->branchIf($match, $okBb, $badBb);
+        $context->builder->positionAtEnd($badBb);
+        // Exact class display name needs a runtime class-name table; "object" is honest for
+        // thin AOT (VM path cites the real class). Functional merge/remove is the #33847 fix.
+        \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            \sprintf(
+                'SplObjectStorage::%s(): Argument #1 ($storage) must be of type SplObjectStorage, object given',
+                $method
+            )
+        );
+        $context->builder->positionAtEnd($okBb);
+
+        return $obj;
+    }
+
+    /**
+     * Walk `__hashtable__.objKeys` linked list; callback receives each `__objkey_node__*`.
+     * Saves `next` before the callback so callers may unset the current key.
+     *
+     * @param callable(Context, Value): void $onNode
+     */
+    private static function foreachObjKeyNode(Context $context, Value $ht, string $prefix, callable $onNode): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__objkey_node__'];
+        $nodePtrType = $context->getTypeFromString('__objkey_node__*');
+        $head = $context->builder->load($context->builder->structGep($ht, $map['objKeys']));
+
+        $pre = BasicBlockHelper::append($context, $prefix.'_pre');
+        $loop = BasicBlockHelper::append($context, $prefix.'_loop');
+        $body = BasicBlockHelper::append($context, $prefix.'_body');
+        $done = BasicBlockHelper::append($context, $prefix.'_done');
+        $context->builder->branch($pre);
+
+        $context->builder->positionAtEnd($pre);
+        $context->builder->branch($loop);
+
+        $context->builder->positionAtEnd($loop);
+        $node = $context->builder->phi($nodePtrType);
+        $node->addIncoming($head, $pre);
+        $hasNode = $context->builder->icmp(Builder::INT_NE, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($hasNode, $body, $done);
+
+        $context->builder->positionAtEnd($body);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $onNode($context, $node);
+        // Callback may leave insert at a different block (e.g. removeAllExcept branch).
+        $after = $context->builder->getInsertBlock();
+        $context->builder->positionAtEnd($after);
+        $context->builder->branch($loop);
+        $node->addIncoming($nextNode, $after);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
      * @param bool $wantInfo true → node value (info); false → node key (object)
      */
     private static function compileAtPos(Context $context, JITVariable $receiver, bool $wantInfo): Value

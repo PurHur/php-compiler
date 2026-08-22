@@ -1370,6 +1370,10 @@ class Context {
         // detach / offsetUnset — thin AOT was a silent no-op (#33841; php-src spl_observer.c).
         $this->functionProxies['splobjectstorage::detach'] = new Call\SplObjectStorageMethod('detach');
         $this->functionProxies['splobjectstorage::offsetunset'] = new Call\SplObjectStorageMethod('offsetunset');
+        // addAll / removeAll / removeAllExcept — thin AOT was a silent no-op (#33847).
+        $this->functionProxies['splobjectstorage::addall'] = new Call\SplObjectStorageMethod('addall');
+        $this->functionProxies['splobjectstorage::removeall'] = new Call\SplObjectStorageMethod('removeall');
+        $this->functionProxies['splobjectstorage::removeallexcept'] = new Call\SplObjectStorageMethod('removeallexcept');
         // Iterator + getInfo/setInfo for thin AOT (#28707; php-src spl_observer.c).
         $this->functionProxies['splobjectstorage::rewind'] = new Call\SplObjectStorageMethod('rewind');
         $this->functionProxies['splobjectstorage::next'] = new Call\SplObjectStorageMethod('next');
