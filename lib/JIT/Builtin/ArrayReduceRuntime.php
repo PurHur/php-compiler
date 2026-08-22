@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\BuiltinRegistry;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
 use PHPCompiler\JIT\ArrayReduceLlvm;
@@ -18,9 +19,15 @@ use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_reduce() via ArrayReduceJitHelper PHP (#12646, #14979).
+ * JIT/AOT link for array_reduce() (#12646, #14979, #33721).
  *
- * Standalone AOT compiles {@see ArrayReduceJitHelper} via JitVmHelperLink bridge (#14438); closure callbacks route through PHP (#14979).
+ * - Closures → {@see ArrayReduceLlvm::reduceWithClosure} (user-module NestedClosureInvoke)
+ * - User-function string names → {@see ArrayReduceLlvm::reduceWithUserFunction}
+ * - Stdlib string builtins → NestedJIT {@see ArrayReduceJitHelper::reduceWithBuiltin}
+ *
+ * Do not NestedJIT a closure helper alongside string callbacks — that registers
+ * NestedClosureInvoke with zero Closure candidates (#24156 / #33721).
+ *
  * SSOT: {@see \PHPCompiler\ext\standard\array_reduce}
  * php-src: ext/standard/array.c — php_array_reduce()
  */
@@ -28,20 +35,13 @@ final class ArrayReduceRuntime
 {
     private const ABI_REDUCE_BUILTIN = '__array_reduce__builtin';
 
-    private const ABI_REDUCE_CLOSURE = '__array_reduce__closure';
-
     private const HELPER_PATH = '/ext/standard/ArrayReduceJitHelper.php';
 
-    private const CLOSURE_INVOKE_PATH = '/ext/standard/VmClosureInvoke.php';
-
     private const REDUCE_BUILTIN_HELPER = 'PHPCompiler\\ext\\standard\\ArrayReduceJitHelper::reduceWithBuiltin';
-
-    private const REDUCE_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\ArrayReduceJitHelper::reduceWithClosure';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::REDUCE_BUILTIN_HELPER,
-        self::REDUCE_CLOSURE_HELPER,
     ];
 
     public static function reduce(
@@ -66,18 +66,23 @@ final class ArrayReduceRuntime
             return ArrayReduceLlvm::reduceWithClosure($context, $ht, $callback, $initialPtr);
         }
 
-        self::ensureLinked($context);
         $name = $callback->compileTimeString;
         if (null === $name) {
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
 
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_REDUCE_BUILTIN),
-            $ht,
-            $context->constantFromString($name),
-            $initialPtr
-        );
+        // Pure LLVM for all compile-time string callbacks — NestedJIT reduceWithBuiltin
+        // segfaults under thin AOT after carry init (#33721). Closures already use Llvm.
+        if (null !== BuiltinRegistry::resolve($name)) {
+            return ArrayReduceLlvm::reduceWithBuiltin($context, $ht, $name, $initialPtr);
+        }
+        if (!$context->functionIsRegistered($name)) {
+            throw new \LogicException(
+                ArrayReduceCallbackPolicy::invalidStringCallbackTypeError($name)
+            );
+        }
+
+        return ArrayReduceLlvm::reduceWithUserFunction($context, $ht, $name, $initialPtr);
     }
 
     public static function ensureLinked(Context $context): void
@@ -96,7 +101,6 @@ final class ArrayReduceRuntime
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
-        NestedClosureInvokeLlvm::ensureLinked($context);
 
         if (self::bridgesComplete($context)) {
             self::registerLinkedRuntime($context);
@@ -113,14 +117,12 @@ final class ArrayReduceRuntime
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
-        // Do not NestedJIT-compile VmClosureInvoke.php here — that bakes NestedClosureInvoke
-        // candidates at first-helper time (before later Closures exist). Call sites use the
-        // NestedClosureInvoke proxy via initJitStaticCall instead (#24156).
+        // Builtin-only NestedJIT — no VmClosureInvoke / NestedClosureInvoke (#33721).
         JitVmHelperLink::ensureCompiledBundle(
             $context,
             [self::HELPER_PATH],
             self::COMPILED_HELPERS,
-            '#24156'
+            '#33721'
         );
         JitVmHelperLink::ensureBridge(
             $context,
@@ -129,17 +131,6 @@ final class ArrayReduceRuntime
             [$htPtr, $strPtr, $valuePtr],
             $valuePtr,
             self::REDUCE_BUILTIN_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14979'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_REDUCE_CLOSURE,
-            'array_reduce_closure_bridge_entry',
-            [$htPtr, $valuePtr, $valuePtr],
-            $valuePtr,
-            self::REDUCE_CLOSURE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#14979'
@@ -170,24 +161,17 @@ final class ArrayReduceRuntime
 
     private static function bridgesComplete(Context $context): bool
     {
-        foreach ([self::ABI_REDUCE_BUILTIN, self::ABI_REDUCE_CLOSURE] as $name) {
-            $probe = $context->module->getNamedFunction($name);
-            if (null === $probe || 0 === $probe->countBasicBlocks()) {
-                return false;
-            }
-        }
+        $probe = $context->module->getNamedFunction(self::ABI_REDUCE_BUILTIN);
 
-        return true;
+        return null !== $probe && 0 !== $probe->countBasicBlocks();
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach ([self::ABI_REDUCE_BUILTIN, self::ABI_REDUCE_CLOSURE] as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ArrayReduceRuntime bridge (#14979)');
-            }
-            $context->registerFunction($name, $fn);
+        $fn = $context->module->getNamedFunction(self::ABI_REDUCE_BUILTIN);
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            throw new \LogicException(self::ABI_REDUCE_BUILTIN.' missing after ArrayReduceRuntime bridge (#14979 / #33721)');
         }
+        $context->registerFunction(self::ABI_REDUCE_BUILTIN, $fn);
     }
 }
