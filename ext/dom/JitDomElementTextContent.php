@@ -453,14 +453,15 @@ final class JitDomElementTextContent
         $context->builder->positionAtEnd($afterStore);
     }
 
-    /** Load __object__* from a DOMNode firstChild/lastChild TYPE_VALUE slot (or null). */
+    /** Load __object__* from a DOMElement firstChild/lastChild TYPE_VALUE slot (or null). */
     private static function loadChildObjectFromSlot(
         Context $context,
         Object_ $objectType,
         Value $receiver,
         string $prop
     ): Value {
-        $childSlot = $objectType->propertySlotFor($receiver, 'DOMNode', $prop);
+        // Peer JitDomDocumentElement::storeFirstLast / JitDomParentNodeProperty (#33807).
+        $childSlot = $objectType->propertySlotFor($receiver, self::CLASS_ELEMENT, $prop);
         $slotPtr = $context->builder->load($childSlot);
         $voidPtr = $context->getTypeFromString('void*');
         $objPtrTy = $context->getTypeFromString('__object__*');
