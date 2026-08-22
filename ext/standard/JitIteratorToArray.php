@@ -506,14 +506,11 @@ final class JitIteratorToArray
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $srcHt,
-            $idx
-        );
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL is a real value (#33705 / #33699).
+        $isUndef = HashTableHelper::packedIndexIsUndefined($context, $srcHt, $idx);
         $skip = $fn->appendBasicBlock('ita_copy_packed_skip');
         $copy = $fn->appendBasicBlock('ita_copy_packed_copy');
-        $context->builder->branchIf($isSet, $copy, $skip);
+        $context->builder->branchIf($isUndef, $skip, $copy);
 
         $context->builder->positionAtEnd($copy);
         $elem = HashTableHelper::readIndexedToValueBox($context, $srcHt, $idx);

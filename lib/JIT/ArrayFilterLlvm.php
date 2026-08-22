@@ -14,6 +14,7 @@ use PHPLLVM\Value;
  *
  * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayFilterJitHelper} declines callback forms under
  * thin AOT; iterate packed slots and invoke the Closure via {@see NestedClosureInvoke}.
+ * Packed walks skip TYPE_UNDEFINED only — TYPE_NULL is kept when the callback returns truthy (#33705).
  *
  * php-src: ext/standard/array.c — php_array_filter()
  */
@@ -73,12 +74,9 @@ final class ArrayFilterLlvm
         $context->builder->branchIf($atEnd, $doneBlock, $check);
 
         $context->builder->positionAtEnd($check);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $src,
-            $srcIdx
-        );
-        $context->builder->branchIf($isSet, $filterBlock, $skip);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL is a real value (#33705 / #33699).
+        $isUndef = HashTableHelper::packedIndexIsUndefined($context, $src, $srcIdx);
+        $context->builder->branchIf($isUndef, $skip, $filterBlock);
 
         $context->builder->positionAtEnd($filterBlock);
         $elem = HashTableHelper::readIndexedToValueBox($context, $src, $srcIdx);
