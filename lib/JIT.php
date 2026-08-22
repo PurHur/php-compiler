@@ -12601,6 +12601,9 @@ class JIT {
                         $this->context->scope->toCall,
                         $callArgs
                     );
+                    if ($this->context->scope->toCall instanceof JIT\Call\DateTimeDiff) {
+                        $this->context->lastDateIntervalDiffState = null;
+                    }
                     $this->context->callerStrictTypes = $prevStrict;
                     break;
                     } finally {
@@ -12918,6 +12921,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $result,
                         $this->calleeReturnsByRef($this->context->scope->toCall)
+                    );
+                    $this->syncDateTimeDiffMetaToResult(
+                        $this->context->scope->toCall,
+                        $block->getOperand($op->arg1)
                     );
                     $this->syncDateTimeConstructMetaToAliases(
                         $this->context->scope->toCall,
@@ -20775,6 +20782,42 @@ class JIT {
         if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
             $receiverVar->classUserType = 'DateInterval';
         }
+    }
+
+    /**
+     * Publish compile-time DateTime::diff state onto the result local for format() (#33912).
+     */
+    private function syncDateTimeDiffMetaToResult(?JIT\Call $toCall, Operand $resultOp): void
+    {
+        if (!$toCall instanceof JIT\Call\DateTimeDiff) {
+            return;
+        }
+        $state = $this->context->lastDateIntervalDiffState;
+        if (!\is_array($state)) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($resultOp)) {
+            $this->context->lastDateIntervalDiffState = null;
+
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($resultOp);
+        $resultVar->compileTimeDateInterval = $state;
+        $resultVar->classUserType = 'DateInterval';
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            $this->context->bindVariableByName($resolved, $resultVar);
+            $this->context->dateIntervalLocalStates[$resolved] = $state;
+        }
+        foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+            if ($bound === $resultVar) {
+                $bound->compileTimeDateInterval = $state;
+                $bound->classUserType = 'DateInterval';
+                $this->context->dateIntervalLocalStates[$boundName] = $state;
+            }
+        }
+        $this->context->lastDateIntervalDiffState = null;
     }
 
     /** Copy construct stamp onto `$z->getLocation()` receivers (#33727 / peer #29732). */

@@ -165,6 +165,14 @@ class Context {
     public array $dateIntervalLocalStates = [];
 
     /**
+     * Compile-time DateTime::diff result state — published onto the result local so
+     * format() can bake without mid-main FormatRuntime ensureLinked (#33912 / #32699).
+     *
+     * @var array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int, days: int}|null
+     */
+    public ?array $lastDateIntervalDiffState = null;
+
+    /**
      * New DateTimeZone result operand/var — construct stamps zone id onto the local (#29732).
      */
     public ?Operand $lastDateTimeZoneNewResultOp = null;
