@@ -728,6 +728,14 @@ final class JitDateMutation
                     DateTimeSupport::MICROSECOND_PROPERTY,
                     $i64->constInt($updated['microsecond'], true)
                 );
+                // format()/getTimestamp() prefer compileTimeDateTimeTimestamp (#33911).
+                // Refresh the stamp + dateTimeLocalInstants or the mutation is a silent no-op.
+                self::publishMutableDateTimeInstant(
+                    $context,
+                    $args[0],
+                    $updated['timestamp'],
+                    $instant['timezone']
+                );
             }
 
             return self::boxObjectPtr($context, $dtObj);
@@ -787,12 +795,19 @@ final class JitDateMutation
                 );
             }
             self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
+            if (!$immutable) {
+                // Runtime delta — drop stale construct stamp so format reads the slot (#33911).
+                self::invalidateMutableDateTimeInstant($context, $args[0]);
+            }
 
             return self::boxObjectPtr($context, $dtObj);
         }
 
         if (null !== $intervalState) {
             self::applyKnownIntervalStateViaLlvm($context, $object, $dtObj, $intervalState, $layout, $add);
+            if (!$immutable) {
+                self::invalidateMutableDateTimeInstant($context, $args[0]);
+            }
 
             return self::boxObjectPtr($context, $dtObj);
         }
@@ -809,8 +824,50 @@ final class JitDateMutation
             DateMutationRuntime::ensureLinked($context);
             self::applyIntervalToDateTimeObject($context, $dtObj, $intervalObj, $layout, $add);
         }
+        if (!$immutable) {
+            self::invalidateMutableDateTimeInstant($context, $args[0]);
+        }
 
         return self::boxObjectPtr($context, $dtObj);
+    }
+
+    /**
+     * Keep format()/getTimestamp() compile-time stamps in sync after mutable add/sub (#33911).
+     */
+    private static function publishMutableDateTimeInstant(
+        Context $context,
+        JITVariable $receiver,
+        int $timestamp,
+        string $timezone
+    ): void {
+        $receiver->compileTimeDateTimeTimestamp = $timestamp;
+        $receiver->compileTimeTimezoneName = $timezone;
+        foreach ($context->namedVariableBindings as $boundName => $bound) {
+            if ($bound !== $receiver) {
+                continue;
+            }
+            $bound->compileTimeDateTimeTimestamp = $timestamp;
+            $bound->compileTimeTimezoneName = $timezone;
+            $context->dateTimeLocalInstants[$boundName] = [
+                'timestamp' => $timestamp,
+                'timezone' => $timezone,
+            ];
+        }
+    }
+
+    /**
+     * Drop construct-time stamps after a runtime LLVM add/sub so reads use __dt_timestamp (#33911).
+     */
+    private static function invalidateMutableDateTimeInstant(Context $context, JITVariable $receiver): void
+    {
+        $receiver->compileTimeDateTimeTimestamp = null;
+        foreach ($context->namedVariableBindings as $boundName => $bound) {
+            if ($bound !== $receiver) {
+                continue;
+            }
+            $bound->compileTimeDateTimeTimestamp = null;
+            unset($context->dateTimeLocalInstants[$boundName]);
+        }
     }
 
     private static function boxObjectPtr(Context $context, Value $dtObj): Value
