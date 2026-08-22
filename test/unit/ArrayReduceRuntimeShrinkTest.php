@@ -17,12 +17,16 @@ final class ArrayReduceRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayReduceRuntime.php');
         $this->assertStringContainsString('ArrayReduceJitHelper', $runtime);
         $this->assertStringContainsString('reduceWithClosure', $runtime);
+        $this->assertStringContainsString('reduceWithUserFunction', $runtime);
+        $this->assertStringContainsString('reduceWithBuiltin', $runtime);
         $this->assertStringNotContainsString('buildReduceArrayWithClosure', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayReduceJitHelper.php');
-        $this->assertStringContainsString('reduceWithClosure', $helper);
-        $this->assertStringContainsString('VmClosureCall', $helper);
+        $this->assertStringContainsString('reduceWithBuiltin', $helper);
+        // Closure path is ArrayReduceLlvm — helper must not NestedJIT VmClosureInvoke (#33721).
+        $this->assertStringNotContainsString('VmClosureInvoke', $helper);
+        $this->assertStringNotContainsString('reduceWithClosure', $helper);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_reduce.php');
         $this->assertStringContainsString('ArrayReduceRuntime::reduce', $builtin);
