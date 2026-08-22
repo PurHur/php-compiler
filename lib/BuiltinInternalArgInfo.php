@@ -1226,6 +1226,12 @@ final class BuiltinInternalArgInfo
                 0, 1 => 'string',
                 default => null,
             },
+            // ext/standard/basic_functions.stub.php — object|array $data, ?string $arg_separator (#25478)
+            'http_build_query' => match ($index) {
+                0 => 'object|array',
+                2 => '?string',
+                default => null,
+            },
             // ext/zlib/zlib.stub.php — array|object $options (InternalArgInfo array / omitted) (#27627, #28592)
             'deflate_init', 'inflate_init' => 1 === $index ? 'object|array' : null,
             // ext/zlib/zlib.stub.php — DeflateContext/InflateContext $context; InternalArgInfo untyped (#28755)
