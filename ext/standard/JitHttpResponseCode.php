@@ -10,6 +10,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\HttpResponseCode as Hrc;
 use PHPCompiler\JIT\Builtin\HttpResponseCodeJit;
+use PHPCompiler\JIT\Builtin\HttpResponseRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
@@ -27,6 +28,9 @@ final class JitHttpResponseCode
                 'http_response_code() expects at most 1 argument, '.$argc.' given'
             );
         }
+
+        // Lazy link after Type::initialize always-on drop (#33965 / peer #33945).
+        HttpResponseRuntime::ensureLinked($context);
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);

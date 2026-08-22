@@ -90,8 +90,9 @@ final class HttpResponseRuntime
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        // Type::initialize already linked bridges; re-entering implement() during C main
-        // wrapper emit clears the insert block and parentless-ifies session/progress IR (#11206).
+        // Context::ensureStandaloneBodies linked bridges before this emit (#33965).
+        // Do not re-enter ensureLinked/implement() here — mid-insert NestedJIT clears
+        // the insert block and parentless-ifies session/progress IR (#11206).
         $context->builder->call($context->lookupFunction('__phpc_http_response_status_reset'));
     }
 

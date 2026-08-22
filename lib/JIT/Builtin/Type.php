@@ -779,7 +779,15 @@ class Type extends Builtin {
         // Eager NestedJIT ensureLinked on EMBED during Type::initialize is fragile
         // (#20930, #21109): after NativeOps getValue() fix, Sscanf/ObGzhandler abort
         // or segfault mid-init. Link on first use (peer PendingHeaders / STANDALONE #12910).
-        HttpResponseCode::implement($this->context);
+        // HttpResponseCode::implement always-on removed (#33965): HttpResponseRuntime owns
+        // the ABI (getNamedFunction first). Thin AOT hello-world must not NestedJIT
+        // http_response_code bridges. Call sites: JitHttpResponseCode::invoke /
+        // PendingHeadersJitBridge / emitStandaloneStatusLine ensureLinked; non-thin
+        // Context ensureStandaloneBodies before emitResetForStandaloneMain (#11206 —
+        // emitReset must not re-enter ensureLinked mid-insert). Leftover Type empty
+        // decls vs Runtime ABI drift mint http_response_code_apply.1 (#31894 / #32122).
+        // User-script http_response_code() stays JitHttpResponseCode / HttpResponseJitHelper
+        // (php-src ext/standard/head.c — php_http_response_code).
         // __phpc_ob_* always-on shells removed (#33798 initialize / #33862 register):
         // ObOutputRuntime / ObOutputJitBridge own the ABI (getNamedFunction first; thin
         // standalone links via Context::ensureMinimalUserStandaloneBodies /
