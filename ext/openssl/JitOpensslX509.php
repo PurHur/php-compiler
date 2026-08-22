@@ -741,6 +741,9 @@ final class JitOpensslX509
      * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkey_derive) / EVP_PKEY_derive
      * Public + private keys are PEM string literals (same coerce surface as thin AOT
      * {@see self::dhComputeKey}). Optional $key_length must be a compile-time int.
+     *
+     * Compile-time null/bool/int/float soft-fail to false (php-src "zz|l" +
+     * php_openssl_pkey_from_zval; VM #26689). Private is checked first (php-src load order).
      */
     public static function pkeyDerive(
         Context $context,
@@ -748,6 +751,13 @@ final class JitOpensslX509
         JITVariable $privateKey,
         ?JITVariable $keyLength = null
     ): Value {
+        // php-src loads private_key first — soft-fail scalars never reach public_key (#26689 / #32852).
+        if (self::isCompileTimeDeriveScalarSoftFail($privateKey)
+            || self::isCompileTimeDeriveScalarSoftFail($publicKey)
+        ) {
+            return self::boxedFalse($context);
+        }
+
         $pub = JitStringArg::compileTimeLiteral($publicKey);
         if (null === $pub) {
             throw new \LogicException(
@@ -784,6 +794,24 @@ final class JitOpensslX509
         }
 
         return self::boxedString($context, $shared);
+    }
+
+    /**
+     * Compile-time non-string/non-object scalars soft-fail for openssl_pkey_derive (#26689).
+     * Arrays are not included — incomplete key arrays raise ValueError on VM/Zend.
+     */
+    private static function isCompileTimeDeriveScalarSoftFail(JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return true;
+        }
+
+        return match ($arg->type) {
+            JITVariable::TYPE_NATIVE_BOOL,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::TYPE_NATIVE_DOUBLE => true,
+            default => false,
+        };
     }
 
     /**
