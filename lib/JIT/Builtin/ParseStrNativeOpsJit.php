@@ -128,6 +128,27 @@ final class ParseStrNativeOpsJit
         );
     }
 
+    /**
+     * String-key object store — NestedJIT ArrayObject bag nested `O:` (#33686).
+     * php-src: Zend HashTable object zval / ext/spl/spl_array.c storage bag
+     */
+    public static function setStringKeyObject(
+        Context $context,
+        JITVariable $htPtr,
+        JITVariable $key,
+        JITVariable $object
+    ): void {
+        $ht = self::htFromI64($context, $htPtr);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $obj = self::objectFromVar($context, $object);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyObject'),
+            $ht,
+            $keyStr,
+            $obj
+        );
+    }
+
     public static function setHashtableAt(Context $context, JITVariable $htPtr, JITVariable $index, JITVariable $childPtr): void
     {
         $ht = self::htFromI64($context, $htPtr);
@@ -249,11 +270,30 @@ final class ParseStrNativeOpsJit
         );
     }
 
+    private static function objectFromVar(Context $context, JITVariable $var): Value
+    {
+        if (JITVariable::TYPE_OBJECT === $var->type) {
+            return $context->helper->loadValue($var);
+        }
+        $ptr = JitValueBox::valuePtrFromVariable($context, $var);
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $ptr
+        );
+    }
+
     private static function htFromI64(Context $context, JITVariable $ptr): Value
     {
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
 
         return JitNestedHelperCoerce::i64ToTypedPtr($context, self::i64FromVar($context, $ptr), $htPtrTy);
+    }
+
+    /** Expose HT pointer coerce for NestedJIT object materialization (#33686). */
+    public static function htPointerFromI64Arg(Context $context, JITVariable $ptr): Value
+    {
+        return self::htFromI64($context, $ptr);
     }
 
     private static function i64FromVar(Context $context, JITVariable $var): Value
