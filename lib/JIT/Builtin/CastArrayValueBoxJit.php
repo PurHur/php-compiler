@@ -28,20 +28,29 @@ final class CastArrayValueBoxJit
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
-
-        $isArray = $context->builder->icmp(
+        // Mask IS_REFCOUNTED — writeHashtable stores JIT TYPE_HASHTABLE (135), writeObject
+        // stores TYPE_OBJECT|IS_REFCOUNTED; unmasked EQ missed both → scalar wrap / SEGV
+        // (#33863, peer __value__readHashtable / ObjectStaticPropertyLlvm #26977).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isJitHt = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isVmArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
             $i8->constInt(VmVariable::TYPE_ARRAY, false)
         );
+        $isArray = $context->builder->or($isJitHt, $isVmArray);
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(VmVariable::TYPE_OBJECT, false)
         );
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(VmVariable::TYPE_NULL, false)
         );
 
@@ -61,33 +70,44 @@ final class CastArrayValueBoxJit
         $context->builder->positionAtEnd($arrayBlock);
         $ht = $context->builder->call($context->lookupFunction('__value__readHashtable'), $valuePtr);
         $copy = HashTableDuplicateRuntime::duplicate($context, $ht);
-        $arrayFromHt = HashTableHelper::emptyVariable($context);
-        HashTableHelper::storeHashtableInArrayVariable($context, $arrayFromHt, $copy);
+        $arrayFromHt = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $copy
+        );
+        $arrayEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($objectBlock);
         $arrayFromObj = CastArrayShared::emitObjectOperandToArray($context, $src, true);
+        $objectEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($nullBlock);
         $empty = HashTableHelper::emptyVariable($context);
+        $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($scalarBlock);
         $wrapped = CastArrayShared::wrapScalarInArray($context, $src);
+        $scalarEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($arrayFromHt->value->typeOf());
-        $phi->addIncoming($arrayFromHt->value, $arrayBlock);
-        $phi->addIncoming($arrayFromObj->value, $objectBlock);
-        $phi->addIncoming($empty->value, $nullBlock);
-        $phi->addIncoming($wrapped->value, $scalarBlock);
+        $phi->addIncoming($arrayFromHt->value, $arrayEnd);
+        $phi->addIncoming($arrayFromObj->value, $objectEnd);
+        $phi->addIncoming($empty->value, $nullEnd);
+        $phi->addIncoming($wrapped->value, $scalarEnd);
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
-        $result = HashTableHelper::emptyVariable($context);
-        $result->value = $phi;
 
-        return $result;
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $phi
+        );
     }
 }

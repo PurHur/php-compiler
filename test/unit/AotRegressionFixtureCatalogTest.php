@@ -78,6 +78,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'http_build_query_nested_27031.phpt',
         'cast_object_resource.phpt',
         'cast_array_bool.phpt',
+        'cast_array_value_box_33863.phpt',
         'cast_object_bool.phpt',
         'cast_object_native_array.phpt',
         'object_bool_not_32471.phpt',

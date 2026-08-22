@@ -60,6 +60,8 @@ final class CastRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('wrapResourceInArray', $source);
         $this->assertStringContainsString('emitObjectOperandToArray', $source);
         $this->assertStringContainsString('wrapScalarInArray', $source);
+        $this->assertStringContainsString('ArrayObjectJitHelper', $source);
+        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
     }
 
     public function testCastArrayCowDuplicateUsesHashTableDuplicateRuntime(): void
