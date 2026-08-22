@@ -1065,10 +1065,13 @@ final class JitDateMutation
         $typeField = $context->structFieldMap['__value__']['type'];
         $typeByte = $context->builder->load($context->builder->structGep($valuePtr, $typeField));
         $i8 = $context->getTypeFromString('int8');
+        // Value-box writers set TYPE_OBJECT|IS_REFCOUNTED (0x85). Compare low 7 bits
+        // like JitMethodExists (#27108) — else createFromDateString() + DateTime::add aborts (#33878).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(VmVariable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(VmVariable::TYPE_OBJECT & 0x7f, false)
         );
         $okBlock = BasicBlockHelper::append($context, 'date_mut_obj_ok');
         $errBlock = BasicBlockHelper::append($context, 'date_mut_obj_err');

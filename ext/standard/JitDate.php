@@ -347,6 +347,11 @@ final class JitDate
             'Ymd' => ['%04lld%02lld%02lld', ['year', 'month', 'day'], 12],
             'H:i:s' => ['%02lld:%02lld:%02lld', ['hour', 'minute', 'second'], 12],
             // Composite literals — NestedJIT FormatDatetime segfaults (#27157).
+            'Y-m-d H:i' => [
+                '%04lld-%02lld-%02lld %02lld:%02lld',
+                ['year', 'month', 'day', 'hour', 'minute'],
+                24,
+            ],
             'Y-m-d H:i:s' => [
                 '%04lld-%02lld-%02lld %02lld:%02lld:%02lld',
                 ['year', 'month', 'day', 'hour', 'minute', 'second'],
