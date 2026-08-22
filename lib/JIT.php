@@ -8358,6 +8358,7 @@ class JIT {
 
         for ($i = $startIndex, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; ++$i) {
             $op = $block->opCodes[$i];
+            $this->context->retainCoalesceInstancePropertyLvalue = false;
             // Current opline for runtime warnings (encapsed CONCAT FETCH_R, #32034).
             if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
                 $this->context->callSiteLine = $op->sourceLocation->startLine;
@@ -8532,7 +8533,7 @@ class JIT {
                         if (!$this->context->hasVariableOp($coalesceTarget)) {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $coalesceTarget);
                         }
-                        $this->persistStaticPropertyBeforeCoalesceMergePromote($coalesceTarget, $value);
+                        $this->persistPropertyBeforeCoalesceMergePromote($coalesceTarget, $value);
                         $mergeDest = $this->context->getVariableFromOp($coalesceTarget);
                         if (Variable::KIND_VALUE === $mergeDest->kind) {
                             $slot = JIT\JitValueBox::alloc($this->context);
@@ -8563,7 +8564,7 @@ class JIT {
                         if (!$this->context->hasVariableOp($coalesceTarget)) {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $coalesceTarget);
                         }
-                        $this->persistStaticPropertyBeforeCoalesceMergePromote($coalesceTarget, $value);
+                        $this->persistPropertyBeforeCoalesceMergePromote($coalesceTarget, $value);
                         $mergeDest = $this->context->getVariableFromOp($coalesceTarget);
                         if (
                             Variable::TYPE_VALUE !== $mergeDest->type
@@ -13963,7 +13964,21 @@ class JIT {
                         }
                         if ($forceBranchMerge || $op->nullsafeFetchPropertyRead) {
                             // Nullsafe merge must not retain fetch-arm objectPropertySlot (#32988).
-                            $this->assignOperand($result, $fetched, true);
+                            // ??= left is often TYPE_PROPERTY_FETCH (not _WRITE) but still an
+                            // assign-lvalue into the coalesce merge — keep the slot (#33748).
+                            $savedRetain = $this->context->retainCoalesceInstancePropertyLvalue;
+                            if (
+                                $forceBranchMerge
+                                && $forWrite
+                                && !$op->nullsafeFetchPropertyRead
+                            ) {
+                                $this->context->retainCoalesceInstancePropertyLvalue = true;
+                            }
+                            try {
+                                $this->assignOperand($result, $fetched, true);
+                            } finally {
+                                $this->context->retainCoalesceInstancePropertyLvalue = $savedRetain;
+                            }
                         } else {
                             $this->context->scope->variables[$result] = $fetched;
                         }
@@ -18193,7 +18208,13 @@ class JIT {
 
             return;
         }
-        if (null !== $result->objectPropertySlot) {
+        if (
+            null !== $result->objectPropertySlot
+            && !(
+                $force
+                && $this->context->retainCoalesceInstancePropertyLvalue
+            )
+        ) {
             if (null === $result->objectPropertyType) {
                 throw new \LogicException('objectPropertySlot requires objectPropertyType');
             }
@@ -18608,6 +18629,14 @@ class JIT {
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName($resolved, $result);
             }
+            // ??= FETCH_OBJ_W: this path used to return without objectPropertySlot, so the
+            // later store wrote only the merge alloca (#33748 / re-#32880).
+            if (
+                $this->context->retainCoalesceInstancePropertyLvalue
+                && null !== $value->objectPropertySlot
+            ) {
+                $this->copyObjectPropertyBacking($result, $value);
+            }
 
             return;
         }
@@ -18755,6 +18784,7 @@ class JIT {
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {
             // wrap
+            $this->maybeCopyObjectPropertyBacking($result, $value, $force);
             $valueRef = $result->value;
             $valueFrom = $value->value;
             if ($value->type & Variable::IS_NATIVE_ARRAY) {
@@ -19840,7 +19870,14 @@ class JIT {
     private function maybeCopyObjectPropertyBacking(Variable $dest, Variable $src, bool $force): void
     {
         // Branch-merge assigns (?-> / ??) must read the unified __value__ slot at the merge block (#3219).
-        if ($force) {
+        // ??= write-fetch is the exception: dropping objectPropertySlot loses the store (#33748).
+        if (
+            $force
+            && $this->context->retainCoalesceInstancePropertyLvalue
+            && null !== $src->objectPropertySlot
+        ) {
+            $this->copyObjectPropertyBacking($dest, $src);
+        } elseif ($force) {
             $dest->objectPropertySlot = null;
             $dest->objectPropertyType = null;
             $dest->objectPropertyReceiver = null;
@@ -26423,14 +26460,18 @@ class JIT {
      * ??= merge temps are stack slots. Class::$prop fetch binds KIND_VALUE plus
      * staticPropertyGlobal; promoting first drops that lvalue so the store never
      * reaches the module global and AOT readback stays NULL (#32035, #20877).
+     * Instance `$o->p ??=` is the same shape with objectPropertySlot (#33748 / re-#32880).
      */
-    private function persistStaticPropertyBeforeCoalesceMergePromote(Operand $coalesceTarget, Variable $value): void
+    private function persistPropertyBeforeCoalesceMergePromote(Operand $coalesceTarget, Variable $value): void
     {
         if (!$this->context->hasVariableOp($coalesceTarget)) {
             return;
         }
         $dest = $this->context->getVariableFromOp($coalesceTarget);
-        if (null === $dest->staticPropertyGlobal || null === $dest->staticPropertyType) {
+        if (
+            (null === $dest->staticPropertyGlobal || null === $dest->staticPropertyType)
+            && (null === $dest->objectPropertySlot || null === $dest->objectPropertyType)
+        ) {
             return;
         }
         $this->assignOperand($coalesceTarget, $value, false);

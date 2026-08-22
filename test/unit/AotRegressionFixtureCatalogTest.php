@@ -152,6 +152,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'object_array_bitwise_typeerror_32486.phpt',
         'dom_getlineno.phpt',
         'dateinterval_format_execute.phpt',
+        'instance_property_coalesce_assign_33748.phpt',
     ];
 
     /**
