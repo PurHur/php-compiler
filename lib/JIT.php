@@ -20065,6 +20065,7 @@ class JIT {
         }
         if ($force || null !== $src->compileTimeDateTimeTimestamp) {
             $dest->compileTimeDateTimeTimestamp = $src->compileTimeDateTimeTimestamp;
+            $dest->compileTimeDateTimeMicrosecond = $src->compileTimeDateTimeMicrosecond;
         }
     }
 
@@ -20101,6 +20102,7 @@ class JIT {
         $this->context->dateTimeLocalInstants[$resolved] = [
             'timestamp' => (int) $value->compileTimeDateTimeTimestamp,
             'timezone' => $value->compileTimeTimezoneName,
+            'microsecond' => (int) ($value->compileTimeDateTimeMicrosecond ?? 0),
         ];
         $this->context->bindVariableByName($resolved, $value);
     }
@@ -20509,9 +20511,15 @@ class JIT {
             : 'DateTime';
         $stamp = static function (JIT\Variable $bound) use ($first, $className): void {
             $bound->compileTimeDateTimeTimestamp = $first->compileTimeDateTimeTimestamp;
+            $bound->compileTimeDateTimeMicrosecond = $first->compileTimeDateTimeMicrosecond;
             $bound->compileTimeTimezoneName = $first->compileTimeTimezoneName;
             $bound->classUserType = $first->classUserType ?? $className;
         };
+        $instant = [
+            'timestamp' => (int) $first->compileTimeDateTimeTimestamp,
+            'timezone' => $first->compileTimeTimezoneName,
+            'microsecond' => (int) ($first->compileTimeDateTimeMicrosecond ?? 0),
+        ];
         $stamp($first);
         $resultVar = $this->context->lastDateTimeNewResultVar;
         if ($resultVar instanceof JIT\Variable) {
@@ -20562,18 +20570,12 @@ class JIT {
         if (null !== $publishName && '' !== $publishName) {
             $resolved = $this->context->resolveRefAliasName($publishName);
             $this->context->bindVariableByName($resolved, $first);
-            $this->context->dateTimeLocalInstants[$resolved] = [
-                'timestamp' => (int) $first->compileTimeDateTimeTimestamp,
-                'timezone' => $first->compileTimeTimezoneName,
-            ];
+            $this->context->dateTimeLocalInstants[$resolved] = $instant;
         }
         foreach ($this->context->namedVariableBindings as $boundName => $bound) {
             if ($bound === $first || $bound === $resultVar) {
                 $stamp($bound);
-                $this->context->dateTimeLocalInstants[$boundName] = [
-                    'timestamp' => (int) $first->compileTimeDateTimeTimestamp,
-                    'timezone' => $first->compileTimeTimezoneName,
-                ];
+                $this->context->dateTimeLocalInstants[$boundName] = $instant;
             }
         }
         $this->context->lastDateTimeNewResultOp = null;
@@ -20752,6 +20754,7 @@ class JIT {
                 $instant = [
                     'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
                     'timezone' => $bound->compileTimeTimezoneName,
+                    'microsecond' => (int) ($bound->compileTimeDateTimeMicrosecond ?? 0),
                 ];
                 $this->context->dateTimeLocalInstants[$resolved] = $instant;
             }
@@ -20760,6 +20763,7 @@ class JIT {
             return;
         }
         $receiverVar->compileTimeDateTimeTimestamp = $instant['timestamp'];
+        $receiverVar->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
         $receiverVar->compileTimeTimezoneName = $instant['timezone'];
         if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
             $receiverVar->classUserType = 'DateTime';

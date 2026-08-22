@@ -199,6 +199,14 @@ final class Variable {
     public ?int $compileTimeDateTimeTimestamp = null;
 
     /**
+     * Microseconds from DateTime::__construct alongside {@see $compileTimeDateTimeTimestamp} (#33915).
+     *
+     * Compile-time DateTime::diff must not force microsecond=0 or fractional spans promote into
+     * whole seconds (Zend f=0.75 → AOT f=0 / s=1).
+     */
+    public ?int $compileTimeDateTimeMicrosecond = null;
+
+    /**
      * DateInterval::__construct() parse when $duration is a compile-time string (#26772).
      *
      * @var array{y:int,m:int,d:int,h:int,i:int,s:int,f:float,invert:int}|null
