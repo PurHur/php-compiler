@@ -7,11 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\HashTable;
 
 /**
- * Thin-standalone NestedJIT serialize() for SPL ArrayObject family (#33625).
+ * Thin-standalone NestedJIT serialize() for SPL ArrayObject family (#33625 / #33683).
  *
  * Own TU with a single public method — NestedJIT mis-types extra methods in the same file (#27030).
  * Prefer helper-runtime cache (do not force PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925.
  *
+ * Object bag values are TYPE_OBJECT (5) — must not fall through to foreach-as-array (SIGSEGV #33683).
  * php-src: ext/spl/spl_array.c — ArrayObject::__serialize integer-keyed bag.
  */
 final class SerializeSplArrayNestedJitHelper
@@ -62,6 +63,16 @@ final class SerializeSplArrayNestedJitHelper
                     $body .= 's:0:"";';
                 } else {
                     $body .= 's:'.((string) \strlen($vs)).':"'.$vs.'";';
+                }
+            } elseif (5 === $t) {
+                // TYPE_OBJECT — foreach-as-array SIGSEGVs (#33683).
+                // NestedJIT cannot call ObjectEntry::propertiesWithNames (wrong receiver).
+                // Delegate to serialize() so JitSerialize/LLVM encodes the object (php-src var.c).
+                $owire = \serialize($val);
+                if (null === $owire || '' === $owire) {
+                    $body .= 'N;';
+                } else {
+                    $body .= $owire;
                 }
             } else {
                 // NestedJIT: $val->toArray() SIGABRTs — key=>value foreach (peer #32925).

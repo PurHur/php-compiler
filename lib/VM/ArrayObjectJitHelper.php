@@ -717,7 +717,7 @@ final class ArrayObjectJitHelper
     }
 
     /**
-     * php-src ArrayObject/ArrayIterator::__serialize bag under thin AOT (#33625).
+     * php-src ArrayObject/ArrayIterator::__serialize bag under thin AOT (#33625 / #33683 object values).
      *
      * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925.
      *
