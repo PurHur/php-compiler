@@ -332,6 +332,13 @@ final class StringUnserialize
                     $objVal,
                     $payloadString
                 );
+            } elseif ('splobjectstorage' === $classLc) {
+                // Object-key pairs into `__spl_ht` — not firstIntProp→slot0 (#33876).
+                \PHPCompiler\VM\SplObjectStorageJitHelper::compileUnserializeRestore(
+                    $context,
+                    $objVal,
+                    $payloadString
+                );
             } else {
                 $voidPtr = $context->getTypeFromString('void*');
                 foreach ($object->instancePropertySets($id) as $propset) {

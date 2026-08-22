@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -104,6 +105,190 @@ final class SplObjectStorageJitHelper
         $context->builder->positionAtEnd($doneBb);
 
         return self::voidResult($context);
+    }
+
+    /**
+     * php-src SplObjectStorage serialize — flat object/info pairs from objKeys (#33876).
+     *
+     * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33625.
+     *
+     * @return Value {@see __string__*} full `O:len:"SplObjectStorage":2:{…}` wire
+     */
+    public static function compileSerialize(Context $context, JITVariable $receiver): Value
+    {
+        \PHPCompiler\JIT\Builtin\StringSerialize::ensureLinked($context);
+        $obj = self::loadObject($context, $receiver);
+        $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
+        $classNameStr = ReflectionBuiltinHelper::getClassName($context, $objVar);
+        $srcHt = self::htPtr($context, $obj);
+        $flat = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt(0, false), $idxSlot);
+
+        self::foreachObjKeyNode($context, $srcHt, 'sos_ser', static function (
+            Context $context,
+            Value $node
+        ) use ($flat, $idxSlot, $i64, $sizeT): void {
+            $nodeMap = $context->structFieldMap['__objkey_node__'];
+            $keyObj = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+            $idx = $context->builder->load($idxSlot);
+            $idxSize = $context->builder->truncOrBitCast($idx, $sizeT);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setObjectAt'),
+                $flat,
+                $idxSize,
+                $keyObj
+            );
+            $context->builder->store(
+                $context->builder->add($idx, $i64->constInt(1, false)),
+                $idxSlot
+            );
+            $idx2 = $context->builder->load($idxSlot);
+            $valField = $context->builder->structGep($node, $nodeMap['value']);
+            $idxBox = JitValueBox::alloc($context);
+            JitValueBox::writeLong($context, $idxBox, $idx2);
+            $idxVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_VALUE,
+                JITVariable::KIND_VARIABLE,
+                $idxBox
+            );
+            $infoVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_VALUE,
+                JITVariable::KIND_VARIABLE,
+                $valField
+            );
+            HashTableHelper::setValueBoxKey($context, $flat, $idxVar, $infoVar);
+            $context->builder->store(
+                $context->builder->add($idx2, $i64->constInt(1, false)),
+                $idxSlot
+            );
+        });
+
+        $logical = 'PHPCompiler\\ext\\standard\\SerializeSplObjectStorageNestedJitHelper::encodeWire';
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/SerializeSplObjectStorageNestedJitHelper.php',
+            [$logical],
+            '#33876'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33876');
+        $strMap = $context->structFieldMap['__string__'];
+        $classLen = $context->builder->load(
+            $context->builder->structGep($classNameStr, $strMap['length'])
+        );
+        $args = [
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $classNameStr,
+                $fn->getParam(0)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $classLen,
+                $fn->getParam(1)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $flat,
+                $fn->getParam(2)->typeOf()
+            ),
+        ];
+        $raw = $context->builder->call($fn, ...$args);
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        return \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr);
+    }
+
+    /** Expose object load for {@see \PHPCompiler\ext\standard\JitSerialize} (#33876). */
+    public static function loadObjectPtr(Context $context, JITVariable $receiver): Value
+    {
+        return self::loadObject($context, $receiver);
+    }
+
+    /**
+     * php-src SplObjectStorage::__unserialize — restore pairs into `__spl_ht` (#33876).
+     *
+     * Do not write firstIntProp into slot 0 (that replaces the HT pointer — SIGSEGV on foreach).
+     * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33636.
+     */
+    public static function compileUnserializeRestore(
+        Context $context,
+        Value $obj,
+        Value $payloadString
+    ): void {
+        \PHPCompiler\JIT\Builtin\StringUnserialize::ensureLinked($context);
+        $internals = [
+            new \PHPCompiler\ext\standard\phpc_native_sos_attach_empty_stdclass_null(),
+            new \PHPCompiler\ext\standard\phpc_native_sos_attach_empty_stdclass_long(),
+            new \PHPCompiler\ext\standard\phpc_native_sos_attach_empty_stdclass_string(),
+        ];
+        foreach ($internals as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof \PHPCompiler\JIT\Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
+            }
+        }
+        $ht = self::htPtr($context, $obj);
+        $logical = 'PHPCompiler\\ext\\standard\\UnserializeSplObjectStorageNestedJitHelper::restoreInto';
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplObjectStorageNestedJitHelper.php',
+            [$logical],
+            '#33876'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33876');
+        $payloadOwned = self::nestedJitOwnedString($context, $payloadString);
+        $destI64 = \PHPCompiler\JIT\JitNestedHelperCoerce::ptrToI64($context, $ht);
+        $context->builder->call(
+            $fn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $destI64,
+                $fn->getParam(0)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $payloadOwned,
+                $fn->getParam(1)->typeOf()
+            )
+        );
+    }
+
+    /** Owned `__string__*` copy for NestedJIT PHP string params (#24137 / #33876). */
+    private static function nestedJitOwnedString(Context $context, Value $payload): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $separated = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $payload
+        );
+        $slot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $context->builder->store($separated, $slot);
+        $loaded = $context->builder->load($slot);
+        $map = $context->structFieldMap['__string__'];
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $loaded);
+        $src = $context->builder->pointerCast(
+            $context->builder->structGep($loaded, $map['value']),
+            $i8p
+        );
+        $copy = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $src
+        );
+        $context->refcount->disableRefcount($copy);
+
+        return $copy;
     }
 
     /**
