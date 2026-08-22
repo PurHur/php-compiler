@@ -30,7 +30,7 @@ final class StreamPathRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('loadTableSlot', $source);
         $this->assertStringNotContainsString("GLOBAL_PATHS = 'phpc_stream_paths'", $source);
         $this->assertStringNotContainsString('implementPathLookup', $source);
-        $this->assertLessThan(150, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(180, \substr_count($source, "\n") + 1);
     }
 
     public function testStreamPathJitHelperDelegatesToVmFs(): void

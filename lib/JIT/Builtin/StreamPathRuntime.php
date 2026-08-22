@@ -14,7 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Owns `__phpc_stream_path` module-locally (`getNamedFunction` first via
  * {@see declareStreamPathAbi} / {@see implement}). Do not re-add empty always-on
- * shells in {@see Type} — leftover decls mint stream_path.1 (#31894 / #32122 / #33258).
+ * shells in {@see Type} — leftover decls mint stream_path.1
+ * (#31894 / #32122 / #33258 / #33874).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SessionNameReject #25092).
  * Replaces LLVM phpc_stream_paths[] table lookup; SSOT {@see \PHPCompiler\ext\standard\VmFs}.
@@ -44,12 +45,14 @@ final class StreamPathRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        // Declare before bridge bodies call lookupFunction (#33874 — was Type::register always-on).
+        self::declareStreamPathAbi($context);
         self::implement($context);
     }
 
     /**
-     * Module-local empty decl for Type::register (#33258).
-     * Body comes from {@see ensureLinked} / {@see implement}.
+     * Module-local empty decl when a call site needs lookup before bodies (#33258 / #33874).
+     * Not called from {@see Type::register} — owners call this or {@see ensureLinked}.
      */
     public static function declareStreamPathAbi(Context $context): void
     {
@@ -69,6 +72,7 @@ final class StreamPathRuntime
 
     public static function implement(Context $context): void
     {
+        self::declareStreamPathAbi($context);
         $probe = $context->module->getNamedFunction('__phpc_stream_path');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
