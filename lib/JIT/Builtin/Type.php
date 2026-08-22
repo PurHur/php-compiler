@@ -591,14 +591,17 @@ class Type extends Builtin {
         // __compiler_trigger_error always-on shell removed (#33234): StringTriggerError
         // / JitTriggerErrorKernel owns the ABI (getNamedFunction first via
         // implementTriggerErrorBridge). Type::register must ensureLinked before any
-        // NestedJIT in register() — SessionStartOptionsRuntime NestedJIT scalar
-        // coerce looks up the ABI (#33248 / HELPER_RUNTIME_O=0). Type::initialize
-        // still ensureLinked on the full (non-STANDALONE) load path; Context
+        // NestedJIT in register() when HELPER_RUNTIME_O=0 (#33248) — HashTable /
+        // other register NestedJIT looks up the ABI. SessionStartOptions NestedJIT
+        // moved to call-site (#33945) and also ensureLinked trigger_error inside
+        // SessionStartOptionsRuntime::ensureLinked. Type::initialize still
+        // ensureLinked on the full (non-STANDALONE) load path; Context
         // ensureStandaloneBodies + call-site ensureLinked before lookup. Leftover
         // Type empty decls vs Runtime ABI drift mint trigger_error.1 (#31894 /
         // #32122). User-script trigger_error()/user_error() stay trigger_error_ /
         // JitBuiltinWarning (php-src Zend/zend_execute_API.c, main/php_errors.c,
         // ext/standard/basic_functions.c).
+        StringTriggerError::ensureLinked($this->context);
         // __compiler_assert_fail / __compiler_assert_fail_string always-on shells
         // removed (#33237 / #33241): AssertFail owns both ABIs (getNamedFunction
         // first, then addFunction if absent; Type::initialize still
@@ -692,10 +695,15 @@ class Type extends Builtin {
         // ensureLinked before lookup). Leftover Type empty decls vs Runtime ABI drift
         // mint session_*.1 (#31894 / #32122). User-script session_*() stay JitSession* /
         // VmSession (php-src ext/session/session.c).
-        // Before NestedJIT: SessionStartOptionsRuntime helpers coerce scalars and
-        // emitObjectScalarWarning looks up __compiler_trigger_error (#33248).
-        StringTriggerError::ensureLinked($this->context);
-        SessionStartOptionsRuntime::ensureLinked($this->context);
+        // __phpc_session_start_options_apply Type::register ensureLinked removed (#33945):
+        // SessionStartOptionsRuntime / JitSessionStartOptions own the ABI
+        // (getNamedFunction first via ensureLinked → NestedJIT; call-site
+        // JitSessionStartOptions::invoke ensureLinked before lookup; StringTriggerError
+        // linked inside SessionStartOptionsRuntime::ensureLinked for NestedJIT scalar
+        // coerce #33248). Leftover Type always-on NestedJIT vs Runtime ABI drift mint
+        // session_start_options_apply.1 (#31894 / #32122). User-script
+        // session_start($options) stays JitSessionStartOptions (php-src
+        // ext/session/session.c).
         // __compiler_json_encode_value / __compiler_json_encode_array /
         // __compiler_json_quote_string / __compiler_json_decode /
         // __compiler_json_last_error / __compiler_json_last_error_msg /

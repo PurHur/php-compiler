@@ -57,15 +57,32 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringTriggerError::ensureLinked($this->context)', $type);
     }
 
-    public function testTypeRegisterLinksTriggerErrorBeforeSessionStartOptionsNestedJit(): void
+    public function testTypeRegisterNoLongerEagerLinksSessionStartOptionsNestedJit(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
         $this->assertStringContainsString('#33248', $type);
-        // Match executable calls only (comments earlier mention the same symbols).
-        $this->assertMatchesRegularExpression(
+        $this->assertStringContainsString('#33945', $type);
+        $this->assertStringNotContainsString(
+            'SessionStartOptionsRuntime::ensureLinked($this->context)',
+            $type,
+            'Type::register must not eagerly NestedJIT SessionStartOptions (#33945)'
+        );
+        // Former register pair (#33248) is gone; register still ensureLinked trigger_error
+        // for HELPER_RUNTIME_O=0 NestedJIT (#33248), initialize still ensureLinked too.
+        $this->assertDoesNotMatchRegularExpression(
             '/StringTriggerError::ensureLinked\(\$this->context\);\s*\n\s*SessionStartOptionsRuntime::ensureLinked\(\$this->context\);/',
             $type,
-            'Type::register must ensureLinked StringTriggerError immediately before SessionStartOptionsRuntime NestedJIT (#33248)'
+            'Type::register must not pair trigger_error ensureLinked with SessionStartOptions NestedJIT (#33945)'
+        );
+        $this->assertStringContainsString(
+            'StringTriggerError::declareUndefinedArrayKeyAbis($this->context)',
+            $type,
+            'Type::register still declares undef-key ABIs for HashTable (#33249)'
+        );
+        $this->assertStringContainsString(
+            'StringTriggerError::ensureLinked($this->context)',
+            $type,
+            'Type::register/initialize still ensureLinked StringTriggerError (#33248)'
         );
     }
 
