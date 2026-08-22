@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\JitDate;
+use PHPCompiler\ext\standard\VmDateTimeNative;
 use PHPCompiler\JIT\Builtin\DateTimeFormatRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -43,9 +44,29 @@ final class DateTimeFormatJitHelper
         }
 
         // Thin AOT under PROFILE=8.4: NestedJIT formatStateArgv civil digests segfault
-        // (#27192). Common compile-time literals use the same UTC civil IR as date()/gmdate()
-        // (#27091/#27121). Matches NestedJIT AOT when date() is unavailable (offset 0).
+        // (#27192). Prefer full compile-time fold (zone-aware) when construct stamped the
+        // instant — UTC civil IR alone miscompiles named zones and T/e/O/P SIGABRT (#33939).
         $fmtLit = JitStringBuiltinArg::compileTimeLiteral($formatArg) ?? $formatArg->compileTimeString;
+        if (\is_string($fmtLit) && null !== $receiver->compileTimeDateTimeTimestamp) {
+            $tzName = $receiver->compileTimeTimezoneName;
+            if (null === $tzName || '' === $tzName) {
+                $tzName = 'UTC';
+            }
+            if (
+                0 !== \strcasecmp($tzName, 'DateTime')
+                && 0 !== \strcasecmp($tzName, 'DateTimeImmutable')
+                && 0 !== \strcasecmp($tzName, 'DateTimeZone')
+            ) {
+                $folded = VmDateTimeNative::format(
+                    (int) $receiver->compileTimeDateTimeTimestamp,
+                    null !== $compileTimeMicro ? $compileTimeMicro : 0,
+                    $tzName,
+                    $fmtLit
+                );
+
+                return $context->builder->load($context->constantStringFromString($folded));
+            }
+        }
         if (\is_string($fmtLit)) {
             $needsMicro = ('u' === $fmtLit || str_contains($fmtLit, '.u') || str_contains($fmtLit, 'u'));
             // Bare 'U' is unix seconds — not microseconds.

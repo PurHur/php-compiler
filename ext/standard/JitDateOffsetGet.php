@@ -123,7 +123,11 @@ final class JitDateOffsetGet
 
     private static function tryCompileTimeOffset(JITVariable $dtArg): ?int
     {
-        if (null === $dtArg->compileTimeLong) {
+        // After #32691 construct stamps live on compileTimeDateTimeTimestamp, not
+        // compileTimeLong (assignToPointer must not writeLong the object). Prefer the
+        // dedicated stamp; keep legacy long recovery (#33939 / peers #33911/#32691).
+        $timestamp = $dtArg->compileTimeDateTimeTimestamp ?? $dtArg->compileTimeLong;
+        if (null === $timestamp) {
             return null;
         }
         $tz = $dtArg->compileTimeTimezoneName;
@@ -141,6 +145,6 @@ final class JitDateOffsetGet
             return null;
         }
 
-        return VmDateTimeNative::timezoneOffsetSeconds($tz, (int) $dtArg->compileTimeLong);
+        return VmDateTimeNative::timezoneOffsetSeconds($tz, (int) $timestamp);
     }
 }
