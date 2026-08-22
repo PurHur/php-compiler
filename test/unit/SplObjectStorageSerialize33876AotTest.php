@@ -17,6 +17,12 @@ final class SplObjectStorageSerialize33876AotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/aot_sos_serialize_roundtrip.php');
     }
 
+    public function testUntypedForeachAfterUnserializeMatchesZend(): void
+    {
+        // Residual after #33882: typed walk() hid SEGV on bare foreach (#33876).
+        $this->assertAotMatchesZend(__DIR__.'/../repro/aot_sos_unserialize_foreach_untyped.php');
+    }
+
     public function testSosSerializePathWired(): void
     {
         $root = dirname(__DIR__, 2);
@@ -36,6 +42,9 @@ final class SplObjectStorageSerialize33876AotTest extends TestCase
         $this->assertStringContainsString('compileUnserializeRestore', $jit);
         $unser = (string) file_get_contents($root.'/lib/JIT/Builtin/StringUnserialize.php');
         $this->assertStringContainsString('splobjectstorage', $unser);
+        $jitMain = (string) file_get_contents($root.'/lib/JIT.php');
+        $this->assertStringContainsString('serializePayloadClass', $jitMain);
+        $this->assertStringContainsString('propagateSerializePayloadClass', $jitMain);
     }
 
     private function assertAotMatchesZend(string $src): void

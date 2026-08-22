@@ -12941,6 +12941,11 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateSerializePayloadClass(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall,
+                        $callArgs
+                    );
                     $this->propagateUnserializeSplFixedArrayResultType(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall,
@@ -13258,9 +13263,14 @@ class JIT {
                             Variable::KIND_VALUE,
                             $this->context->type->object->allocate($classId)
                         );
+                        $obj->classUserType = 'SplObjectStorage';
                         $resultOp = $block->getOperand($op->arg1);
                         $resultOp->type = new Type(Type::TYPE_OBJECT, [], 'SplObjectStorage');
                         $this->assignOperand($resultOp, $obj, true);
+                        // assignOperand may box to TYPE_VALUE — keep class tag for serialize→unserialize (#33876).
+                        if ($this->context->hasVariableOp($resultOp)) {
+                            $this->context->getVariableFromOp($resultOp)->classUserType = 'SplObjectStorage';
+                        }
                         $this->context->type->object->markObjectConstructed(
                             $this->context->helper->loadValue($obj)
                         );
@@ -15817,10 +15827,50 @@ class JIT {
     }
 
     /**
+     * Carry `serialize($obj)` class onto the string temp for unserialize retag (#33876).
+     *
+     * @param list<Variable> $callArgs
+     */
+    private function propagateSerializePayloadClass(
+        Operand $result,
+        mixed $toCall,
+        array $callArgs
+    ): void {
+        if (!($toCall instanceof CoreFunc\Internal)) {
+            return;
+        }
+        if ('serialize' !== strtolower($toCall->getName())) {
+            return;
+        }
+        $src = $callArgs[0] ?? null;
+        if (!($src instanceof Variable)) {
+            return;
+        }
+        $class = $src->classUserType;
+        if (null === $class || '' === $class) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        $var->serializePayloadClass = $class;
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->serializePayloadClass = $class;
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
+    }
+
+    /**
      * Tag literal unserialize(SPL HT-backed) so foreach uses splBackingHashtable (#33649, #33654).
      *
      * Without classUserType, TYPE_VALUE boxes take __value__readHashtable → SEGV.
-     * Covers SplFixedArray (#33649), ArrayObject / ArrayIterator / RecursiveArrayIterator (#33654).
+     * Covers SplFixedArray (#33649), ArrayObject / ArrayIterator / RecursiveArrayIterator (#33654),
+     * SplObjectStorage objKeys foreach after unserialize(serialize($sos)) (#33876 residual).
      *
      * @param list<Variable> $callArgs
      */
@@ -15839,17 +15889,43 @@ class JIT {
         if (!($payload instanceof Variable)) {
             return;
         }
+        $class = null;
         $literal = JIT\JitStringArg::compileTimeLiteral($payload);
-        if (null === $literal
-            || !\preg_match(
-                '/^O:\d+:"(SplFixedArray|ArrayObject|ArrayIterator|RecursiveArrayIterator)":/',
+        if (null !== $literal
+            && \preg_match(
+                '/^O:\d+:"(SplFixedArray|ArrayObject|ArrayIterator|RecursiveArrayIterator|SplObjectStorage)":/',
                 $literal,
                 $m
             )
         ) {
+            $class = $m[1];
+        } elseif (null !== $payload->serializePayloadClass && '' !== $payload->serializePayloadClass) {
+            $hint = $payload->serializePayloadClass;
+            $hintLc = strtolower(ltrim($hint, '\\'));
+            if (\in_array(
+                $hintLc,
+                [
+                    'splfixedarray',
+                    'arrayobject',
+                    'arrayiterator',
+                    'recursivearrayiterator',
+                    'splobjectstorage',
+                ],
+                true
+            )) {
+                $class = match ($hintLc) {
+                    'splfixedarray' => 'SplFixedArray',
+                    'arrayobject' => 'ArrayObject',
+                    'arrayiterator' => 'ArrayIterator',
+                    'recursivearrayiterator' => 'RecursiveArrayIterator',
+                    'splobjectstorage' => 'SplObjectStorage',
+                    default => $hint,
+                };
+            }
+        }
+        if (null === $class) {
             return;
         }
-        $class = $m[1];
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
@@ -26932,6 +27008,9 @@ class JIT {
     ): void {
         if (null !== $source->classUserType) {
             $dest->classUserType = $source->classUserType;
+        }
+        if (null !== $source->serializePayloadClass) {
+            $dest->serializePayloadClass = $source->serializePayloadClass;
         }
         if (null !== $source->compileTimeString) {
             $dest->compileTimeString = $source->compileTimeString;
