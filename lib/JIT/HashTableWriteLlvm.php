@@ -1319,6 +1319,16 @@ final class HashTableWriteLlvm
         }
     }
 
+    /** Unlink object-identity key (SplObjectStorage::detach / offsetUnset; #33841). */
+    public static function unsetAtObjectKey(Context $context, Value $ht, Value $keyObj): void
+    {
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__unsetObjectKey'),
+            $ht,
+            $keyObj
+        );
+    }
+
     private static function setValueBoxAtObjectKey(
         Context $context,
         Value $ht,

@@ -40,6 +40,9 @@ final class SplObjectStorageMethod implements Call
                 return $this->callOffsetGet($context, ...$args);
             case 'offsetset':
                 return $this->callOffsetSet($context, ...$args);
+            case 'detach':
+            case 'offsetunset':
+                return $this->callDetach($context, ...$args);
             case 'rewind':
                 // php-src: ZEND_PARSE_PARAMETERS_NONE — #30999
                 if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SplObjectStorage::rewind', 0)) {
@@ -142,6 +145,28 @@ final class SplObjectStorageMethod implements Call
             return self::voidResult($context);
         }
         HashTableHelper::setAtObjectKey($context, $ht, $keyObj, $args[2]);
+
+        return self::voidResult($context);
+    }
+
+    private function callDetach(Context $context, Variable ...$args): Value
+    {
+        // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — detach / offsetUnset (#30954, #33841).
+        $display = 'offsetunset' === strtolower($this->method)
+            ? 'SplObjectStorage::offsetUnset'
+            : 'SplObjectStorage::detach';
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, $display, 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $ht = self::backingHashtable($context, $args[0]);
+        $keyMethod = 'offsetunset' === strtolower($this->method) ? 'offsetUnset' : 'detach';
+        $keyObj = self::loadKeyObject($context, $args[1], $keyMethod);
+        if (null === $keyObj) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'spl_detach_after_typeerror');
+
+            return self::voidResult($context);
+        }
+        HashTableHelper::unsetAtObjectKey($context, $ht, $keyObj);
 
         return self::voidResult($context);
     }
