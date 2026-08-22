@@ -42,17 +42,17 @@ final class JitHashFile
             $context,
             $path,
             $raw,
-            static fn (Context $ctx, Value $data, Value $r) => JitHash::hash($ctx, $algo, $data, $r)
+            static fn (Context $ctx, Value $data, Value $r) => JitHash::hash($ctx, $algo, $data, $r, 'hash_file')
         );
     }
 
-    public static function hashHmac(Context $context, Value $algo, Value $path, Value $key, Value $raw): Value
+    public static function hashHmac(Context $context, Value $algo, Value $path, Value $key, Value $raw, string $fn = 'hash_hmac_file'): Value
     {
         return self::hashFile(
             $context,
             $path,
             $raw,
-            static fn (Context $ctx, Value $data, Value $r) => JitHash::hashHmac($ctx, $algo, $data, $key, $r)
+            static fn (Context $ctx, Value $data, Value $r) => JitHash::hashHmac($ctx, $algo, $data, $key, $r, $fn)
         );
     }
 

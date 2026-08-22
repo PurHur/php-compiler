@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\StringHashCrypto;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -16,7 +17,7 @@ final class JitHash
 {
     private static int $blockSerial = 0;
 
-    public static function hash(Context $context, Value $algo, Value $data, Value $raw): Value
+    public static function hash(Context $context, Value $algo, Value $data, Value $raw, string $fn = 'hash'): Value
     {
         self::ensureHashCryptoLinked($context);
         $rawI32 = $context->builder->zExt($raw, $context->getTypeFromString('int32'));
@@ -26,11 +27,17 @@ final class JitHash
             $algo,
             $data,
             $rawI32
-        ));
+        ), $fn, false);
     }
 
-    public static function hashHmac(Context $context, Value $algo, Value $data, Value $key, Value $raw): Value
-    {
+    public static function hashHmac(
+        Context $context,
+        Value $algo,
+        Value $data,
+        Value $key,
+        Value $raw,
+        string $fn = 'hash_hmac'
+    ): Value {
         self::ensureHashCryptoLinked($context);
         $rawI32 = $context->builder->zExt($raw, $context->getTypeFromString('int32'));
 
@@ -40,7 +47,7 @@ final class JitHash
             $data,
             $key,
             $rawI32
-        ));
+        ), $fn, true);
     }
 
     public static function hashPbkdf2(
@@ -103,7 +110,7 @@ final class JitHash
         );
     }
 
-    private static function digestToValue(Context $context, Value $digest): Value
+    private static function digestToValue(Context $context, Value $digest, string $fn = '', bool $hmac = false): Value
     {
         $id = (string) (++self::$blockSerial);
         $strPtr = $context->getTypeFromString('__string__*');
@@ -114,6 +121,24 @@ final class JitHash
 
         $failBlock = BasicBlockHelper::append($context, 'hash_fail_'.$id);
         $okBlock = BasicBlockHelper::append($context, 'hash_ok_'.$id);
+
+        if ('' !== $fn) {
+            $context->builder->branchIf($isNull, $failBlock, $okBlock);
+            $context->builder->positionAtEnd($failBlock);
+            $message = $hmac
+                ? VmHash::unknownHmacAlgoMessage($fn)
+                : VmHash::unknownDigestAlgoMessage($fn);
+            ExceptionBridge::emitValueErrorAndAbort($context, $message);
+            $context->builder->positionAtEnd($okBlock);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ptr,
+                $digest
+            );
+
+            return $ptr;
+        }
+
         $doneBlock = BasicBlockHelper::append($context, 'hash_done_'.$id);
         $context->builder->branchIf($isNull, $failBlock, $okBlock);
 
