@@ -925,6 +925,14 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['include_path'], BuiltinParamNames::forFunction('set_include_path'));
     }
 
+    /** php-src basic_functions.stub.php — get_defined_functions(bool $exclude_disabled = true) (#26356). */
+    public function testGetDefinedFunctionsReflectionExcludeDisabledBool(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('get_defined_functions', 0));
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_defined_functions'));
+        $this->assertSame(['exclude_disabled='], BuiltinParamNames::forFunction('get_defined_functions'));
+    }
+
     /** php-src ext/standard/image.stub.php — InternalArgInfo return string (missing |false) (#28314). */
     public function testImageTypeToExtensionReflectionReturnUnion(): void
     {

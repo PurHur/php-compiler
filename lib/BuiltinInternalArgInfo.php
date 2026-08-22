@@ -946,6 +946,8 @@ final class BuiltinInternalArgInfo
             'filter_id' => 0 === $index ? 'string' : null,
             // ext/standard/basic_functions.stub.php — ?bool $enable = null (InternalArgInfo bool) (#28207)
             'ignore_user_abort' => 0 === $index ? '?bool' : null,
+            // ext/standard/basic_functions.stub.php — bool $exclude_disabled = true (InternalArgInfo untyped) (#26356, re-#25277)
+            'get_defined_functions' => 0 === $index ? 'bool' : null,
             // ext/standard/basic_functions.stub.php — ?int $mask = null (InternalArgInfo int) (#28176)
             'umask' => 0 === $index ? '?int' : null,
             // ext/standard/basic_functions.stub.php — string|int $user/$group (InternalArgInfo untyped) (#27812, #28001)
