@@ -105,6 +105,24 @@ final class SplPriorityQueueJitHelper
     }
 
     /**
+     * php-src zim_SplPriorityQueue_isEmpty — data heap count == 0 (#33973).
+     * Missing thin-AOT proxy → silent null (#579); drained queues always looked non-empty.
+     */
+    public static function compileIsEmpty(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::dataPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $empty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $empty);
+
+        return $slot;
+    }
+
+    /**
      * php-src zim_SplPriorityQueue_setExtractFlags — store flags & EXTR_BOTH, return masked (#33861).
      */
     public static function compileSetExtractFlags(

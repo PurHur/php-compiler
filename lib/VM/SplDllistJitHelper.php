@@ -315,6 +315,24 @@ final class SplDllistJitHelper
     }
 
     /**
+     * php-src zim_SplDoublyLinkedList_isEmpty — zend_hash_num_elements == 0 (#33973).
+     * Without a thin-AOT proxy, unbound isEmpty lowered to null (#579) so drained queues
+     * always looked non-empty in boolean context.
+     */
+    public static function compileIsEmpty(Context $context, JITVariable $receiver): Value
+    {
+        $ht = self::htPtr($context, self::loadObject($context, $receiver));
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $empty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $empty);
+
+        return $slot;
+    }
+
+    /**
      * php-src SplDoublyLinkedList serialize — flags + dllist HT + empty members (#33966).
      *
      * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33876.

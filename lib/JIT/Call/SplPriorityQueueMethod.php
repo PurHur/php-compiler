@@ -69,6 +69,14 @@ final class SplPriorityQueueMethod implements Call
                 0,
                 static fn (Context $ctx, Variable $self): Value => SplPriorityQueueJitHelper::compileCount($ctx, $self)
             ),
+            // php-src zim_SplPriorityQueue_isEmpty (#33973) — was silent null without proxy
+            'isempty' => $this->callExactArg(
+                $context,
+                $args,
+                'SplPriorityQueue::isEmpty',
+                0,
+                static fn (Context $ctx, Variable $self): Value => SplPriorityQueueJitHelper::compileIsEmpty($ctx, $self)
+            ),
             'rewind' => $this->callExactArg(
                 $context,
                 $args,

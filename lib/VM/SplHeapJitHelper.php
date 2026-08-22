@@ -91,6 +91,24 @@ final class SplHeapJitHelper
     }
 
     /**
+     * php-src zim_SplHeap_isEmpty — heap count == 0 (#33973).
+     * Missing thin-AOT proxy → silent null (#579); drained heaps always looked non-empty.
+     */
+    public static function compileIsEmpty(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::heapPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $empty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $empty);
+
+        return $slot;
+    }
+
+    /**
      * SplHeap::extract() — return + remove heap top (#27276, ext/spl/spl_heap.c).
      *
      * Empty heap: Zend throws RuntimeException; thin AOT returns null (same trade-off as
