@@ -24,6 +24,8 @@ final class RangeIntRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__range_float__copy', $runtime);
         $this->assertStringContainsString('charRange', $runtime);
         $this->assertStringContainsString('floatRange', $runtime);
+        // #33896: bridge emit must scope lowering to ABI fn (peer ArrayFillRuntime / #27211).
+        $this->assertStringContainsString('scopeLoweringToFunction', $runtime);
         $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('HashTableHelper::buildIntegerRange', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
