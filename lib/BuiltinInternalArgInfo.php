@@ -1681,6 +1681,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/standard/head.stub.php — callable $callback (InternalArgInfo empty) (#25381)
             'header_register_callback' => 0 === $index ? 'callable' : null,
+            // ext/standard/head.stub.php — array|int $expires_or_options = 0 (InternalArgInfo int) (#25380)
+            'setcookie', 'setrawcookie' => 2 === $index ? 'array|int' : null,
             // ext/standard/basic_functions.stub.php — ?array $options = null (InternalArgInfo array) (#25381)
             'stream_context_get_default' => 0 === $index ? '?array' : null,
             // ext/standard/http.stub.php — ?array $options = null; absent from InternalArgInfo (#23878)
