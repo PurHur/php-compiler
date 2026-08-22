@@ -92,6 +92,44 @@ final class SplObjectStorageMethod implements Call
                 }
 
                 return \PHPCompiler\VM\SplObjectStorageJitHelper::compileSetInfo($context, $args[0], $args[1]);
+            case 'addall':
+                // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #33847 / #30999
+                if (!VmClassMethod::requireExactJitUserArgCount(
+                    $context,
+                    $args,
+                    'SplObjectStorage::addAll',
+                    1
+                )) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileAddAll($context, $args[0], $args[1]);
+            case 'removeall':
+                if (!VmClassMethod::requireExactJitUserArgCount(
+                    $context,
+                    $args,
+                    'SplObjectStorage::removeAll',
+                    1
+                )) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileRemoveAll($context, $args[0], $args[1]);
+            case 'removeallexcept':
+                if (!VmClassMethod::requireExactJitUserArgCount(
+                    $context,
+                    $args,
+                    'SplObjectStorage::removeAllExcept',
+                    1
+                )) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileRemoveAllExcept(
+                    $context,
+                    $args[0],
+                    $args[1]
+                );
             default:
                 throw new \LogicException(
                     'SplObjectStorage JIT lowering is not implemented for '.$this->method.'()'
@@ -208,7 +246,7 @@ final class SplObjectStorageMethod implements Call
             return VmClassMethod::jitArgcDummyReturn($context);
         }
         $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
+            $context->lookupFunction('__hashtable__objectKeyExists'),
             $ht,
             $keyObj
         );

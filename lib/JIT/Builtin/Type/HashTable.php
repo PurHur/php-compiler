@@ -114,6 +114,9 @@ class HashTable extends Type
         $this->registerFn('__hashtable__setObjectKeyLong', 'void', ['__hashtable__*', '__object__*', 'int64']);
         $this->registerFn('__hashtable__setObjectKeyObject', 'void', ['__hashtable__*', '__object__*', '__object__*']);
         $this->registerFn('__hashtable__offsetIsSetObjectKey', 'int1', ['__hashtable__*', '__object__*']);
+        // SplObjectStorage::contains / offsetExists — key presence even when info is null (#33847).
+        // Distinct from offsetIsSetObjectKey (array isset: null value → false).
+        $this->registerFn('__hashtable__objectKeyExists', 'int1', ['__hashtable__*', '__object__*']);
         // SplObjectStorage::detach / offsetUnset — peer of set/isset object-key (#33841).
         $this->registerFn('__hashtable__unsetObjectKey', 'void', ['__hashtable__*', '__object__*']);
         $this->registerFn('__value__readHashtable', '__hashtable__*', ['__value__*']);
@@ -193,6 +196,7 @@ class HashTable extends Type
         $this->implementSetObjectKeyLong();
         $this->implementSetObjectKeyObject();
         $this->implementOffsetIsSetObjectKey();
+        $this->implementObjectKeyExists();
         $this->implementValueReadHashtable();
         $this->implementValueWriteHashtable();
         $this->implementHashtablePtrIsNonEmpty();
@@ -1895,6 +1899,26 @@ class HashTable extends Type
         $this->context->builder->returnValue($hasValue);
         $this->context->builder->positionAtEnd($notFound);
         $this->context->builder->returnValue($i1->constInt(0, false));
+    }
+
+    /**
+     * Object-key presence (SplObjectStorage::contains) — true even when stored info is null (#33847).
+     * php-src spl_object_storage_contains checks the handler map, not Z_ISNULL of info.
+     */
+    private function implementObjectKeyExists(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__objectKeyExists');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $valPtr = $this->lookupObjectKeyValue($fn, $block, $ht, $key);
+        $afterLookup = $fn->appendBasicBlock('objkey_exists_after_lookup');
+        $this->context->builder->branch($afterLookup);
+        $this->context->builder->positionAtEnd($afterLookup);
+        $i1 = $this->context->getTypeFromString('int1');
+        $found = $this->context->builder->icmp(Builder::INT_NE, $valPtr, $valPtr->typeOf()->constNull());
+        $this->context->builder->returnValue($found);
     }
 
     private function lookupObjectKeyValue(
