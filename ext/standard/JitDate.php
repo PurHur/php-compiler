@@ -268,6 +268,12 @@ final class JitDate
         // Matches Zend when default timezone is UTC (CI / docker image default).
         $fmtLit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
         if (\is_string($fmtLit) && ($gmt || self::defaultTimezoneIsUtc())) {
+            // Timezone tokens only here — DateTime::format shares tryFormatCivilLiteral and
+            // must not bake UTC for named zones (#33939 / #33943).
+            $tzLit = self::tryFormatUtcTimezoneLiteral($context, $fmtLit, $timestamp, $gmt);
+            if (null !== $tzLit) {
+                return $tzLit;
+            }
             $civil = self::tryFormatCivilLiteral($context, $fmtLit, $timestamp);
             if (null !== $civil) {
                 return $civil;
@@ -409,6 +415,101 @@ final class JitDate
             $callArgs[] = $parts[$key];
         }
         $written = $context->builder->call($context->lookupFunction('snprintf'), ...$callArgs);
+        $len = $context->builder->sext($written, $i64);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $bufChar
+        );
+    }
+
+    /**
+     * Free date()/gmdate() timezone-token literals under UTC/GMT (#33943).
+     *
+     * Kept out of {@see tryFormatCivilLiteral} so DateTime::format named zones stay on
+     * the #33939 fold / NestedJIT path (UTC bake would miscompile America/New_York).
+     */
+    private static function tryFormatUtcTimezoneLiteral(
+        Context $context,
+        string $fmtLit,
+        Value $timestamp,
+        bool $gmt
+    ): ?Value {
+        // Zend: gmdate('T') → GMT; date('T') under UTC → UTC; 'e' is UTC for both.
+        $utcTzConsts = [
+            'T' => $gmt ? 'GMT' : 'UTC',
+            'e' => 'UTC',
+            'O' => '+0000',
+            'P' => '+00:00',
+        ];
+        if (isset($utcTzConsts[$fmtLit])) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'date_utc_tz_lit');
+
+            return $context->builder->load($context->constantStringFromString($utcTzConsts[$fmtLit]));
+        }
+        if ('r' === $fmtLit || 'D, d M Y H:i:s O' === $fmtLit) {
+            return self::tryFormatCivilRfc2822Utc($context, $timestamp);
+        }
+
+        return null;
+    }
+
+    /**
+     * UTC civil IR for date('r') / DATE_RFC2822 — NestedJIT FormatDatetime SIGSEGV (#33943).
+     *
+     * php-src: ext/date/php_date.c — php_format_date token 'r' → "D, d M Y H:i:s O"
+     */
+    private static function tryFormatCivilRfc2822Utc(Context $context, Value $timestamp): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'date_r_civil');
+        $parts = JitGetdate::civilPartsPublic($context, $timestamp);
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+
+        // PHP getdate wday: 0=Sunday … 6=Saturday; 'D' / 'M' abbreviations.
+        $weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        $dAbbr = $context->builder->pointerCast($context->constantFromString('Sat'), $charPtr);
+        foreach ($weekdays as $i => $name) {
+            $is = $context->builder->icmp(Builder::INT_EQ, $parts['wday'], $i64->constInt($i, false));
+            $str = $context->builder->pointerCast($context->constantFromString($name), $charPtr);
+            $dAbbr = $context->builder->select($is, $str, $dAbbr);
+        }
+        $mAbbr = $context->builder->pointerCast($context->constantFromString('Jan'), $charPtr);
+        foreach ($months as $i => $name) {
+            $is = $context->builder->icmp(
+                Builder::INT_EQ,
+                $parts['month'],
+                $i64->constInt($i + 1, false)
+            );
+            $str = $context->builder->pointerCast($context->constantFromString($name), $charPtr);
+            $mAbbr = $context->builder->select($is, $str, $mAbbr);
+        }
+
+        $bufSize = 48;
+        $buf = $context->builder->alloca($i8, $bufSize, 'r_buf');
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        LibcExtern::ensureSnprintf($context);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('%s, %02lld %s %04lld %02lld:%02lld:%02lld +0000'),
+            $charPtr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $sizeT->constInt($bufSize, false),
+            $fmt,
+            $dAbbr,
+            $parts['day'],
+            $mAbbr,
+            $parts['year'],
+            $parts['hour'],
+            $parts['minute'],
+            $parts['second']
+        );
         $len = $context->builder->sext($written, $i64);
 
         return $context->builder->call(
