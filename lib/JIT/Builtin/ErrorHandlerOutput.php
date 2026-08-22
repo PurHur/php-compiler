@@ -6,7 +6,12 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/** LLVM error-handler stack for JIT/AOT (issue #5316, #1379, #1492). */
+/**
+ * Thin facade for tests / explicit link of the error-handler stack (#5316, #1379, #1492).
+ *
+ * Prefer {@see ErrorHandlerJitRuntime::ensureLinked} at call sites. Do not invoke from
+ * {@see Type::initialize} — that always-on path was dropped (#33842; peer #33798 ObOutput).
+ */
 final class ErrorHandlerOutput
 {
     public static function registerExternals(Context $context): void

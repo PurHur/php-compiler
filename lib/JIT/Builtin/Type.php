@@ -897,8 +897,16 @@ class Type extends Builtin {
         IniRuntime::ensureLinked($this->context);
         IncludePathRuntime::ensureLinked($this->context);
         EnvLocalRuntime::ensureLinked($this->context);
-        ErrorHandlerOutput::registerExternals($this->context);
-        ExceptionHandlerOutput::registerExternals($this->context);
+        // __phpc_error_handler_* / __phpc_exception_handler_* always-on shells removed
+        // (#33842): ErrorHandlerJitRuntime / ExceptionHandlerJitRuntime own the ABI
+        // (getNamedFunction first via implement*Bridge). Do not re-add
+        // ErrorHandlerOutput::registerExternals / ExceptionHandlerOutput::registerExternals
+        // here — leftover Type empty decls vs Runtime ABI drift mint
+        // error_handler_*.1 / exception_handler_*.1 (#31894 / #32122). Thin/full
+        // standalone still ensureStandaloneBodies from Context; call sites
+        // (JitErrorHandler / JitExceptionHandler / JitTriggerErrorKernel /
+        // TryCatchHelper) ensureLinked before lookup. php-src:
+        // ext/standard/basic_functions.c — set_error_handler / set_exception_handler.
         StringTriggerError::ensureLinked($this->context);
         CallArgv::implement($this->context);
         ProgressNoteRuntime::ensureLinked($this->context);

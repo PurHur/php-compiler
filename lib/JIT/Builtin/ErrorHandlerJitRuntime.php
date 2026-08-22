@@ -14,12 +14,14 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 use llvm\LLVMValueRef_ptr;
 
 /**
- * JIT/AOT link for __phpc_error_handler_* (#9472, #5316, #17671).
+ * JIT/AOT link for __phpc_error_handler_* (#9472, #5316, #17671, #33842).
  *
  * Stack state uses LLVM module globals ({@see DefineRuntime} pattern) because nested-JIT
  * static property stores in {@see ErrorHandlerJitHelper} omit string slots on standalone AOT.
  * Thin no-op ABI stubs deleted (#21346). VM SSOT remains {@see ErrorHandlerJitHelper}.
  * Depth/top/saved mirrors exception-handler stack shape.
+ * Owns ABI module-locally (getNamedFunction first). Do not re-add always-on
+ * {@see ErrorHandlerOutput::registerExternals} in {@see Type::initialize} (#33842).
  * php-src: ext/standard/basic_functions.c — set_error_handler, restore_error_handler
  */
 final class ErrorHandlerJitRuntime

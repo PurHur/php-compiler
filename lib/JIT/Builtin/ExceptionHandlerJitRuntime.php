@@ -14,13 +14,15 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 use llvm\LLVMValueRef_ptr;
 
 /**
- * JIT/AOT link for __phpc_exception_handler_* (#9473, #21325).
+ * JIT/AOT link for __phpc_exception_handler_* (#9473, #21325, #33842).
  *
  * Stack state uses LLVM module globals ({@see ErrorHandlerJitRuntime} / #17671) because
  * NestedJIT static string stores in {@see \PHPCompiler\ext\standard\ExceptionHandlerJitHelper}
  * still emit `store %__string__*, i64*` and fail module verify. Thin no-op ABI stubs deleted
  * (#21325). Depth/top/saved mirrors error-handler stack (MAX effective depth 2 saved).
  *
+ * Owns ABI module-locally (getNamedFunction first). Do not re-add always-on
+ * {@see ExceptionHandlerOutput::registerExternals} in {@see Type::initialize} (#33842).
  * VM SSOT / unit semantics remain {@see \PHPCompiler\ext\standard\ExceptionHandlerJitHelper}.
  * php-src: ext/standard/basic_functions.c — set_exception_handler, restore_exception_handler
  */
