@@ -30,6 +30,7 @@ final class JitDomRemoveChildLiveSlots
     public static function sync(Context $context, Value $parent, Value $child): void
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rm_live_slots');
+        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
         self::ensureLayout($context);
 
         // php-src: Attr is not content — Not Found before sibling slot walks (#33596).
@@ -55,10 +56,10 @@ final class JitDomRemoveChildLiveSlots
         $objPtrTy = $context->getTypeFromString('__object__*');
         $nullBox = self::nullValueVar($context);
 
-        $prev = self::loadSibling($context, $child, VmDom::PROP_PREVIOUS_SIBLING, 'dom_rm_prev');
-        $next = self::loadSibling($context, $child, VmDom::PROP_NEXT_SIBLING, 'dom_rm_next');
-        $first = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_rm_first');
-        $last = self::loadChildEdge($context, $parent, VmDom::PROP_LAST_CHILD, 'dom_rm_last');
+        $prev = JitDomParentChildLinkLayout::loadSibling($context, $child, VmDom::PROP_PREVIOUS_SIBLING, 'dom_rm_prev');
+        $next = JitDomParentChildLinkLayout::loadSibling($context, $child, VmDom::PROP_NEXT_SIBLING, 'dom_rm_next');
+        $first = JitDomParentChildLinkLayout::loadFirstChild($context, $parent, 'dom_rm');
+        $last = JitDomParentChildLinkLayout::loadLastChild($context, $parent, 'dom_rm');
 
         // prev.next = next
         $bbPrevLink = BasicBlockHelper::append($context, 'dom_rm_prev_link');
@@ -66,7 +67,7 @@ final class JitDomRemoveChildLiveSlots
         $prevNull = $context->builder->icmp(Builder::INT_EQ, $prev, $objPtrTy->constNull());
         $context->builder->branchIf($prevNull, $bbAfterPrev, $bbPrevLink);
         $context->builder->positionAtEnd($bbPrevLink);
-        self::storeSibling($context, $prev, VmDom::PROP_NEXT_SIBLING, self::objectOrNullVar($context, $next));
+        JitDomParentChildLinkLayout::storeSibling($context, $prev, VmDom::PROP_NEXT_SIBLING, self::objectOrNullVar($context, $next));
         $context->builder->branch($bbAfterPrev);
 
         // next.prev = prev
@@ -76,7 +77,7 @@ final class JitDomRemoveChildLiveSlots
         $nextNull = $context->builder->icmp(Builder::INT_EQ, $next, $objPtrTy->constNull());
         $context->builder->branchIf($nextNull, $bbAfterNext, $bbNextLink);
         $context->builder->positionAtEnd($bbNextLink);
-        self::storeSibling($context, $next, VmDom::PROP_PREVIOUS_SIBLING, self::objectOrNullVar($context, $prev));
+        JitDomParentChildLinkLayout::storeSibling($context, $next, VmDom::PROP_PREVIOUS_SIBLING, self::objectOrNullVar($context, $prev));
         $context->builder->branch($bbAfterNext);
 
         // firstChild ← next when removing the first
@@ -86,7 +87,7 @@ final class JitDomRemoveChildLiveSlots
         $firstIsChild = $context->builder->icmp(Builder::INT_EQ, $first, $child);
         $context->builder->branchIf($firstIsChild, $bbSetFirst, $bbAfterFirst);
         $context->builder->positionAtEnd($bbSetFirst);
-        self::storeChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, self::objectOrNullVar($context, $next));
+        JitDomParentChildLinkLayout::storeFirstChild($context, $parent, self::objectOrNullVar($context, $next));
         $context->builder->branch($bbAfterFirst);
 
         // lastChild ← prev when removing the last
@@ -96,16 +97,16 @@ final class JitDomRemoveChildLiveSlots
         $lastIsChild = $context->builder->icmp(Builder::INT_EQ, $last, $child);
         $context->builder->branchIf($lastIsChild, $bbSetLast, $bbAfterLast);
         $context->builder->positionAtEnd($bbSetLast);
-        self::storeChildEdge($context, $parent, VmDom::PROP_LAST_CHILD, self::objectOrNullVar($context, $prev));
+        JitDomParentChildLinkLayout::storeLastChild($context, $parent, self::objectOrNullVar($context, $prev));
         $context->builder->branch($bbAfterLast);
 
         // Detach child — null parent/siblings on DOMElement layout (#28672 / #27411).
         $context->builder->positionAtEnd($bbAfterLast);
-        self::storeSibling($context, $child, VmDom::PROP_PREVIOUS_SIBLING, $nullBox);
-        self::storeSibling($context, $child, VmDom::PROP_NEXT_SIBLING, $nullBox);
-        self::storeSibling($context, $child, VmDom::PROP_PARENT_NODE, $nullBox);
+        JitDomParentChildLinkLayout::storeSibling($context, $child, VmDom::PROP_PREVIOUS_SIBLING, $nullBox);
+        JitDomParentChildLinkLayout::storeSibling($context, $child, VmDom::PROP_NEXT_SIBLING, $nullBox);
+        JitDomParentChildLinkLayout::storeSibling($context, $child, VmDom::PROP_PARENT_NODE, $nullBox);
 
-        $newFirst = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_rm_nfirst');
+        $newFirst = JitDomParentChildLinkLayout::loadFirstChild($context, $parent, 'dom_rm_n');
         // Do not loadSibling(null) — only-child remove leaves firstChild null (#27475).
         $bbSecondNull = BasicBlockHelper::append($context, 'dom_rm_second_null');
         $bbSecondRead = BasicBlockHelper::append($context, 'dom_rm_second_read');
@@ -116,7 +117,7 @@ final class JitDomRemoveChildLiveSlots
         $nullPred = $context->builder->getInsertBlock();
         $context->builder->branch($bbSecondMerge);
         $context->builder->positionAtEnd($bbSecondRead);
-        $loadedSecond = self::loadSibling($context, $newFirst, VmDom::PROP_NEXT_SIBLING, 'dom_rm_nsecond');
+        $loadedSecond = JitDomParentChildLinkLayout::loadSibling($context, $newFirst, VmDom::PROP_NEXT_SIBLING, 'dom_rm_nsecond');
         $readPred = $context->builder->getInsertBlock();
         $context->builder->branch($bbSecondMerge);
         $context->builder->positionAtEnd($bbSecondMerge);
@@ -136,7 +137,7 @@ final class JitDomRemoveChildLiveSlots
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rm_parent_guard');
         $objPtrTy = $context->getTypeFromString('__object__*');
-        $curParent = self::loadSibling($context, $child, VmDom::PROP_PARENT_NODE, 'dom_rm_chk_parent');
+        $curParent = JitDomParentChildLinkLayout::loadSibling($context, $child, VmDom::PROP_PARENT_NODE, 'dom_rm_chk_parent');
         $isChild = $context->builder->icmp(Builder::INT_EQ, $curParent, $parent);
         $bbBad = BasicBlockHelper::append($context, 'dom_rm_not_child');
         $bbOk = BasicBlockHelper::append($context, 'dom_rm_is_child');
@@ -299,19 +300,14 @@ final class JitDomRemoveChildLiveSlots
     {
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
+        $docClassId = $objectType->lookup('DOMDocument');
         $listClassId = $objectType->lookup('DOMNodeList');
-        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD, VmDom::PROP_CHILD_NODES] as $prop) {
+        foreach ([VmDom::PROP_CHILD_NODES] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
-        }
-        foreach ([
-            VmDom::PROP_NEXT_SIBLING,
-            VmDom::PROP_PREVIOUS_SIBLING,
-            VmDom::PROP_PARENT_NODE,
-        ] as $prop) {
-            if (!$objectType->hasProperty($elementClassId, $prop)) {
-                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
+            if (!$objectType->hasProperty($docClassId, $prop)) {
+                $objectType->defineProperty($docClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
         if (!$objectType->hasProperty($listClassId, 'length')) {
@@ -329,7 +325,36 @@ final class JitDomRemoveChildLiveSlots
 
     private static function loadChildNodesListObject(Context $context, Value $owner): Value
     {
-        return self::loadLink($context, $owner, 'DOMElement', VmDom::PROP_CHILD_NODES, 'dom_rm_cn');
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $owner, 'dom_rm_cn');
+        $bbDoc = BasicBlockHelper::append($context, 'dom_rm_cn_doc');
+        $bbEl = BasicBlockHelper::append($context, 'dom_rm_cn_el');
+        $bbDocDone = BasicBlockHelper::append($context, 'dom_rm_cn_doc_done');
+        $bbElDone = BasicBlockHelper::append($context, 'dom_rm_cn_el_done');
+        $merge = BasicBlockHelper::append($context, 'dom_rm_cn_merge');
+        $context->builder->branchIf($isDoc, $bbDoc, $bbEl);
+
+        $objPtrTy = $context->getTypeFromString('__object__*');
+
+        $context->builder->positionAtEnd($bbDoc);
+        $docVal = self::loadLink($context, $owner, 'DOMDocument', VmDom::PROP_CHILD_NODES, 'dom_rm_cn_read_doc');
+        $context->builder->branch($bbDocDone);
+
+        $context->builder->positionAtEnd($bbEl);
+        $elVal = self::loadLink($context, $owner, 'DOMElement', VmDom::PROP_CHILD_NODES, 'dom_rm_cn_read_el');
+        $context->builder->branch($bbElDone);
+
+        $context->builder->positionAtEnd($bbDocDone);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($bbElDone);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($objPtrTy);
+        $phi->addIncoming($docVal, $bbDocDone);
+        $phi->addIncoming($elVal, $bbElDone);
+
+        return $phi;
     }
 
     private static function writeChildNodesList(
@@ -377,55 +402,39 @@ final class JitDomRemoveChildLiveSlots
             );
         }
         $listJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $list);
+        self::storeChildNodesListOnOwner($context, $owner, $listJit);
+    }
+
+    private static function storeChildNodesListOnOwner(
+        Context $context,
+        Value $owner,
+        JITVariable $listJit
+    ): void {
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $owner, 'dom_rm_cn_store');
+        $bbDoc = BasicBlockHelper::append($context, 'dom_rm_cn_store_doc');
+        $bbEl = BasicBlockHelper::append($context, 'dom_rm_cn_store_el');
+        $merge = BasicBlockHelper::append($context, 'dom_rm_cn_store_done');
+        $context->builder->branchIf($isDoc, $bbDoc, $bbEl);
+
+        $objectType = $context->type->object;
+
+        $context->builder->positionAtEnd($bbDoc);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($owner, 'DOMDocument', VmDom::PROP_CHILD_NODES),
+            $listJit,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($bbEl);
         $objectType->propertyStore(
             $objectType->propertySlotFor($owner, 'DOMElement', VmDom::PROP_CHILD_NODES),
             $listJit,
             JITVariable::TYPE_VALUE
         );
-    }
+        $context->builder->branch($merge);
 
-    private static function storeChildEdge(
-        Context $context,
-        Value $parent,
-        string $prop,
-        JITVariable $value
-    ): void {
-        $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($parent, 'DOMElement', $prop),
-            $value,
-            JITVariable::TYPE_VALUE
-        );
-    }
-
-    private static function loadChildEdge(
-        Context $context,
-        Value $obj,
-        string $prop,
-        string $label
-    ): Value {
-        return self::loadLink($context, $obj, 'DOMElement', $prop, $label);
-    }
-
-    private static function storeSibling(
-        Context $context,
-        Value $obj,
-        string $prop,
-        JITVariable $value
-    ): void {
-        $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($obj, 'DOMElement', $prop),
-            $value,
-            JITVariable::TYPE_VALUE
-        );
-    }
-
-    private static function loadSibling(
-        Context $context,
-        Value $obj,
-        string $prop,
-        string $label
-    ): Value {
-        return self::loadLink($context, $obj, 'DOMElement', $prop, $label);
+        $context->builder->positionAtEnd($merge);
     }
 
     private static function loadLink(
