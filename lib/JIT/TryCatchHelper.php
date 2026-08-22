@@ -342,9 +342,29 @@ final class TryCatchHelper
         if (null === $mergeBb) {
             $mergeBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
         }
+        // Mirror beginTry: publish merge into blockStorage + mergeBodyLlvmBb *before*
+        // buildDispatch. Skipping that left catch-without-yield arms with no merge
+        // target → clear_throw + unreachable → AOT SIGSEGV after catch echo (#33726 /
+        // re-#27518). Catch-with-yield still uses gen_catch_resume_* and ignores merge.
+        //
+        // Do not compileIncludedAtEntry the merge into the i64 resume fn — RETURN
+        // lowers as `ret %__value__` and fails module verify. Empty post-try merge
+        // (Terminal_Return only) closes the generator like gen_done; post-try yields
+        // after catch are separate resume points / follow-up.
         if (!$handler->mergeBodyCompiled) {
-            if (!$context->compilingGeneratorResume) {
-                $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBb);
+            $context->scope->blockStorage[$mergeBlock] = $mergeBb;
+            $context->scope->blockEntryStorage[$mergeBlock] = $mergeBb;
+            $mergeBodyBb = self::appendBlock($func, 'try_merge_body_'.self::blockSuffix($handler));
+            $handler->mergeBodyLlvmBb = $mergeBodyBb;
+            $builder->positionAtEnd($mergeBodyBb);
+            if (null !== $context->generatorStateParam) {
+                self::emitGeneratorResumeComplete($context);
+            } else {
+                $builder->returnValue($context->getTypeFromString('int64')->constInt(0, false));
+            }
+            $builder->positionAtEnd($mergeBb);
+            if (null === $mergeBb->getTerminator()) {
+                $builder->branch($mergeBodyBb);
             }
             $handler->mergeBodyCompiled = true;
         }
@@ -355,6 +375,26 @@ final class TryCatchHelper
         }
         $builder->positionAtEnd($branchBlock);
         $builder->branch($tryBodyEntryBb);
+    }
+
+    /**
+     * Empty post-try merge after a generator catch: mark done and return from resume
+     * (Zend closes the generator when catch falls off the end without yielding) (#33726).
+     */
+    private static function emitGeneratorResumeComplete(Context $context): void
+    {
+        $stateParam = $context->generatorStateParam;
+        if (null === $stateParam) {
+            throw new \LogicException('emitGeneratorResumeComplete requires generatorStateParam');
+        }
+        $map = $context->structFieldMap['__generator_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $builder = $context->builder;
+        $builder->store($i1->constInt(1, false), $builder->structGep($stateParam, $map['has_returned']));
+        $builder->store($i1->constInt(1, false), $builder->structGep($stateParam, $map['done']));
+        $builder->store($i1->constInt(0, false), $builder->structGep($stateParam, $map['has_current']));
+        $builder->returnValue($i64->constInt(0, false));
     }
 
     public static function emitMergeEntryCheck(
