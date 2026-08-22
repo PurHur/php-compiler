@@ -30,6 +30,9 @@ final class JitDomElementTextContent
 
     private const PROP_NODE_VALUE = 'nodeValue';
 
+    /** Unique BB labels when Attr/Element textContent arms share one main (#33904). */
+    private static int $tcSeq = 0;
+
     public static function fetch(Object_ $objectType, Value $obj, ?JITVariable $receiverVar = null): JITVariable
     {
         return self::fetchNamed($objectType, $obj, self::PROP_TEXT_CONTENT, $receiverVar);
@@ -49,33 +52,15 @@ final class JitDomElementTextContent
         // textContentArgv SIGSEGVs after c:main_before_php when there was no
         // loadXML (createElement($name, $value) — #32292 / php-src document.c).
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            $classId = $objectType->lookup(self::CLASS_ELEMENT);
             $slotProp = 'nodevalue' === $propLc ? self::PROP_NODE_VALUE : self::PROP_TEXT_CONTENT;
-            if (!$objectType->hasProperty($classId, $slotProp)) {
-                $objectType->defineProperty($classId, $slotProp, JITVariable::TYPE_STRING);
-            }
-            $var = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            // getAttributeNode temps lose DOMAttr as CFG `object`, so the Element
+            // bridge GEPs Attr objects — wrong reads + SIGSEGV writes (#33904 / re-#33864).
+            return self::fetchUserScriptTextContentMaybeAttr(
                 $objectType,
                 $obj,
-                self::CLASS_ELEMENT,
                 $slotProp,
-                $classId
+                $receiverVar
             );
-            $var->objectPropertyReceiver = $obj;
-            $var->objectPropertyName = $slotProp;
-            $var->objectPropertyClassName = self::CLASS_ELEMENT;
-            $var->objectPropertyType = JITVariable::TYPE_STRING;
-            // Carry firstChild/item index from the element Variable so a later
-            // textContent write can splice the parent INNER_XML even if
-            // lastFetched* was overwritten by nextSibling (#33293).
-            if (null !== $receiverVar?->compileTimeDomChildIndex) {
-                $var->compileTimeDomChildIndex = $receiverVar->compileTimeDomChildIndex;
-            }
-            if (null !== $receiverVar?->compileTimeDomTagName) {
-                $var->compileTimeDomTagName = $receiverVar->compileTimeDomTagName;
-            }
-
-            return $var;
         }
 
         DomElementTextContentRuntime::ensureLinked($context);
@@ -157,33 +142,7 @@ final class JitDomElementTextContent
         // Must run before isDomElementTextContent so Attr::$nodeValue is not treated as Element.
         if (self::isDomAttrValueProperty($classLc, $propLc)) {
             $str = self::loadStringValue($context, $value);
-            $attrClass = ('domattr' === $classLc) ? 'DOMAttr' : 'Dom\\Attr';
-            JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
-            $owned = $context->builder->call(
-                $context->lookupFunction('__string__separate'),
-                $str
-            );
-            foreach (['value', 'nodeValue', 'textContent'] as $syncProp) {
-                $context->type->object->propertyStore(
-                    $context->type->object->propertySlotFor($receiver, $attrClass, $syncProp),
-                    new JITVariable(
-                        $context,
-                        JITVariable::TYPE_STRING,
-                        JITVariable::KIND_VALUE,
-                        $owned
-                    ),
-                    JITVariable::TYPE_STRING
-                );
-            }
-            // createAttribute keys need the literal for setAttributeNode / appendChild saveXML (#33570).
-            $valueLit = JitStringBuiltinArg::compileTimeLiteral($value) ?? $value->compileTimeString;
-            if (null !== $valueLit) {
-                $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
-                $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
-                if (null !== $local) {
-                    DomUserScriptAttributeCacheLlvm::setLiteralValue($ns, $local, $valueLit);
-                }
-            }
+            self::emitAttrValueSlotSync($context, $receiver, $str, $value);
 
             return true;
         }
@@ -198,6 +157,19 @@ final class JitDomElementTextContent
         if (JitDomDocumentMethodKernel::shouldUse($context)
             && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
         ) {
+            // Runtime Attr vs Element — same getAttributeNode typing gap as fetch (#33904).
+            $tag = (string) (++self::$tcSeq);
+            $bbAttr = BasicBlockHelper::append($context, 'dom_tc_wr_attr_'.$tag);
+            $bbElem = BasicBlockHelper::append($context, 'dom_tc_wr_elem_'.$tag);
+            $bbDone = BasicBlockHelper::append($context, 'dom_tc_wr_done_'.$tag);
+            $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $receiver);
+            $context->builder->branchIf($isAttr, $bbAttr, $bbElem);
+
+            $context->builder->positionAtEnd($bbAttr);
+            self::emitAttrValueSlotSync($context, $receiver, $str, $value);
+            $context->builder->branch($bbDone);
+
+            $context->builder->positionAtEnd($bbElem);
             self::emitUserScriptDetachAndReplace($context, $receiver, $str);
             // Child saveXML($node) already uses cleared INNER_XML + textContent (#23251).
             // Parent / document saveXML still read the parent's seeded INNER_XML — splice
@@ -217,6 +189,9 @@ final class JitDomElementTextContent
                     JITVariable::TYPE_STRING
                 );
             }
+            $context->builder->branch($bbDone);
+
+            $context->builder->positionAtEnd($bbDone);
 
             return true;
         }
@@ -232,6 +207,116 @@ final class JitDomElementTextContent
         );
 
         return true;
+    }
+
+    /**
+     * User-script textContent/nodeValue fetch — Attr class_id vs Element slots (#33904).
+     */
+    private static function fetchUserScriptTextContentMaybeAttr(
+        Object_ $objectType,
+        Value $obj,
+        string $slotProp,
+        ?JITVariable $receiverVar
+    ): JITVariable {
+        $context = $objectType->jitContext();
+        $tag = (string) (++self::$tcSeq);
+        $bbAttr = BasicBlockHelper::append($context, 'dom_tc_rd_attr_'.$tag);
+        $bbElem = BasicBlockHelper::append($context, 'dom_tc_rd_elem_'.$tag);
+        $bbDone = BasicBlockHelper::append($context, 'dom_tc_rd_done_'.$tag);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $resultPtr = BasicBlockHelper::entryAlloca($context, $strPtrTy);
+
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $obj);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbElem);
+
+        $context->builder->positionAtEnd($bbAttr);
+        $attrClass = JitDomAttributeNodeNS::attrClassForUserScriptCache();
+        JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
+        $attrClassId = $objectType->lookup($attrClass);
+        if (!$objectType->hasProperty($attrClassId, $slotProp)) {
+            $objectType->defineProperty($attrClassId, $slotProp, JITVariable::TYPE_STRING);
+        }
+        $attrFetched = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $obj,
+            $attrClass,
+            $slotProp,
+            $attrClassId
+        );
+        $context->builder->store($context->helper->loadValue($attrFetched), $resultPtr);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbElem);
+        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        if (!$objectType->hasProperty($classId, $slotProp)) {
+            $objectType->defineProperty($classId, $slotProp, JITVariable::TYPE_STRING);
+        }
+        $elemFetched = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $obj,
+            self::CLASS_ELEMENT,
+            $slotProp,
+            $classId
+        );
+        $context->builder->store($context->helper->loadValue($elemFetched), $resultPtr);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+        $var = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $context->builder->load($resultPtr)
+        );
+        // Class name stays DOMElement so tryEmitStore still claims the write; runtime
+        // isAttrNode there selects Attr slot sync (#33904).
+        $var->objectPropertyReceiver = $obj;
+        $var->objectPropertyName = $slotProp;
+        $var->objectPropertyClassName = self::CLASS_ELEMENT;
+        $var->objectPropertyType = JITVariable::TYPE_STRING;
+        if (null !== $receiverVar?->compileTimeDomChildIndex) {
+            $var->compileTimeDomChildIndex = $receiverVar->compileTimeDomChildIndex;
+        }
+        if (null !== $receiverVar?->compileTimeDomTagName) {
+            $var->compileTimeDomTagName = $receiverVar->compileTimeDomTagName;
+        }
+
+        return $var;
+    }
+
+    /** Sync Dom\Attr / DOMAttr value|nodeValue|textContent TYPE_STRING slots (#33864 / #33904). */
+    private static function emitAttrValueSlotSync(
+        Context $context,
+        Value $receiver,
+        Value $str,
+        JITVariable $value
+    ): void {
+        $attrClass = JitDomAttributeNodeNS::attrClassForUserScriptCache();
+        JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        foreach (['value', 'nodeValue', 'textContent'] as $syncProp) {
+            $context->type->object->propertyStore(
+                $context->type->object->propertySlotFor($receiver, $attrClass, $syncProp),
+                new JITVariable(
+                    $context,
+                    JITVariable::TYPE_STRING,
+                    JITVariable::KIND_VALUE,
+                    $owned
+                ),
+                JITVariable::TYPE_STRING
+            );
+        }
+        $valueLit = JitStringBuiltinArg::compileTimeLiteral($value) ?? $value->compileTimeString;
+        if (null !== $valueLit) {
+            $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+            $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+            if (null !== $local) {
+                DomUserScriptAttributeCacheLlvm::setLiteralValue($ns, $local, $valueLit);
+            }
+        }
     }
 
     /**
