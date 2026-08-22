@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class IntMinModNegOne32285AotTest extends TestCase
 {
-    private const EXPECTED = "int(0)\nint(0)\n0\n";
+    private const EXPECTED = "int(0)\nint(0)\nint(0)\n0\n";
 
     public function testVmIntMinModNegOne(): void
     {
@@ -50,6 +50,7 @@ final class IntMinModNegOne32285AotTest extends TestCase
             exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
             $this->assertSame(0, $runRc, implode("\n", $runOut));
             $this->assertSame(self::EXPECTED, implode("\n", $runOut)."\n");
+            $this->assertStringNotContainsString('Deprecated', implode("\n", $runOut));
             $this->assertStringNotContainsString('int(-9223372036854775808)', implode("\n", $runOut));
         } finally {
             @unlink($bin);

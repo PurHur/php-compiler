@@ -421,9 +421,12 @@ restart:
                             'Modulo by zero'
                         );
                         $i64 = $this->context->getTypeFromString('int64');
-                        $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
-                        $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
-                        $result = JitNumericDivisionGuard::signedModulo($this->context, $leftLong, $rightLong);
+                        $result = JitNumericDivisionGuard::moduloWithNegOneShortCircuit(
+                            $this->context,
+                            $right,
+                            fn () => $this->context->builder->fpToSi($rightValue, $i64),
+                            fn () => $this->context->builder->fpToSi($leftValue, $i64)
+                        );
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:
@@ -1222,6 +1225,22 @@ restart:
                 // orderedValueToNativeLong check below; skip JitLongArg::lower
                 // which truncates doubles (#23471).
                 if (!self::isOrderedCompareOpcode($opcode->type)) {
+                if (OpCode::TYPE_MODULO === $opcode->type) {
+                    $i64 = $this->context->getTypeFromString('int64');
+                    $result = JitNumericDivisionGuard::moduloWithNegOneShortCircuit(
+                        $this->context,
+                        $right,
+                        function () use ($rightType, $rightValue, $i64) {
+                            if (Variable::TYPE_NATIVE_BOOL === $rightType) {
+                                return $this->context->builder->zExt($rightValue, $i64);
+                            }
+
+                            return $this->context->builder->intCast($rightValue, $i64);
+                        },
+                        fn () => JitLongArg::lower($this->context, $left, 'binary op left operand')
+                    );
+                    goto return_long;
+                }
                 $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                 if (Variable::TYPE_NATIVE_BOOL === $rightType) {
                     $__right = $this->context->builder->zExt($rightValue, $leftLong->typeOf());
@@ -1290,14 +1309,13 @@ restart:
                         $result = $this->context->builder->fdiv($leftDouble, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_MODULO:
-                        // zend_operators.c mod_function — zval_get_long both sides.
-                        $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
+                        // zend_operators.c mod_function — op2 == -1 before zval_get_long(op1) (#32285).
                         $i64 = $this->context->getTypeFromString('int64');
-                        $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
-                        $result = JitNumericDivisionGuard::signedModulo(
+                        $result = JitNumericDivisionGuard::moduloWithNegOneShortCircuit(
                             $this->context,
-                            $leftLong,
-                            $rightLong
+                            $right,
+                            fn () => $this->context->builder->fpToSi($rightValue, $i64),
+                            fn () => JitLongArg::lower($this->context, $left, 'binary op left operand')
                         );
                         goto return_long;
                     case OpCode::TYPE_EQUAL:
@@ -1451,12 +1469,11 @@ restart:
                         goto return_double;
                     case OpCode::TYPE_MODULO:
                         $i64 = $this->context->getTypeFromString('int64');
-                        $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
-                        $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
-                        $result = JitNumericDivisionGuard::signedModulo(
+                        $result = JitNumericDivisionGuard::moduloWithNegOneShortCircuit(
                             $this->context,
-                            $leftLong,
-                            $rightLong
+                            $right,
+                            fn () => JitLongArg::lower($this->context, $right, 'binary op right operand'),
+                            fn () => $this->context->builder->fpToSi($leftValue, $i64)
                         );
                         goto return_long;
                     case OpCode::TYPE_EQUAL:
