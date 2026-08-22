@@ -12143,6 +12143,16 @@ class JIT {
                     throw new \LogicException('Generators (yield) are VM-only (issue #167)');
                 case OpCode::TYPE_FUNCCALL_INIT:
                     // Nested inline arg call must not clobber outer pending callee (#15217 VM / #27242 AOT).
+                    if ($block->isMainScript()) {
+                        // Literal `echo` between consecutive top-level calls left stale outbound
+                        // state and intermittent SIGSEGV on the next INIT (#23472).
+                        if (null !== $this->context->scope->toCall) {
+                            $this->clearJitOutgoingCallState();
+                        }
+                        if ([] !== $this->context->scope->pendingOutboundCallRestore) {
+                            $this->context->scope->pendingOutboundCallRestore = [];
+                        }
+                    }
                     $this->saveJitPendingOutboundCall();
                     $nameOp = $block->getOperand($op->arg1);
                     if ($nameOp instanceof Operand\Literal) {
