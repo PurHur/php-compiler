@@ -304,8 +304,12 @@ final class JitDate
      * Shared with DateTimeFormatJitHelper — NestedJIT formatStateArgv civil digests
      * segfault under PHP_COMPILER_PROFILE=8.4 thin AOT (#27192).
      */
-    public static function tryFormatCivilLiteral(Context $context, string $fmtLit, Value $timestamp): ?Value
-    {
+    public static function tryFormatCivilLiteral(
+        Context $context,
+        string $fmtLit,
+        Value $timestamp,
+        ?Value $microsecond = null
+    ): ?Value {
         // 'U' is the unix timestamp itself — no civil breakdown (#27121).
         if ('U' === $fmtLit) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'date_u_civil');
@@ -324,6 +328,34 @@ final class JitDate
                 $sizeT->constInt(24, false),
                 $fmt,
                 $timestamp
+            );
+            $len = $context->builder->sext($written, $i64);
+
+            return $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $len,
+                $bufChar
+            );
+        }
+
+        // Microseconds — NestedJIT DateTimeFormatRuntime SIGABRTs on thin AOT (#33922).
+        if ('u' === $fmtLit) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'date_us_civil');
+            $i8 = $context->getTypeFromString('int8');
+            $i64 = $context->getTypeFromString('int64');
+            $sizeT = $context->getTypeFromString('size_t');
+            $charPtr = $context->getTypeFromString('char*');
+            $us = $microsecond ?? $i64->constInt(0, false);
+            $buf = $context->builder->alloca($i8, 8, 'us_buf');
+            $bufChar = $context->builder->pointerCast($buf, $charPtr);
+            LibcExtern::ensureSnprintf($context);
+            $fmt = $context->builder->pointerCast($context->constantFromString('%06lld'), $charPtr);
+            $written = $context->builder->call(
+                $context->lookupFunction('snprintf'),
+                $bufChar,
+                $sizeT->constInt(8, false),
+                $fmt,
+                $us
             );
             $len = $context->builder->sext($written, $i64);
 
@@ -357,6 +389,12 @@ final class JitDate
                 ['year', 'month', 'day', 'hour', 'minute', 'second'],
                 32,
             ],
+            // Fractional wall clock — bake micro so format() skips NestedJIT (#33922).
+            'Y-m-d H:i:s.u' => [
+                '%04lld-%02lld-%02lld %02lld:%02lld:%02lld.%06lld',
+                ['year', 'month', 'day', 'hour', 'minute', 'second', 'micro'],
+                40,
+            ],
             // gmdate('c') / date('c') under UTC — fixed +00:00 (#27157).
             'c' => [
                 '%04lld-%02lld-%02lldT%02lld:%02lld:%02lld+00:00',
@@ -374,6 +412,7 @@ final class JitDate
         // Two-digit year for 'y' — Zend date('y') (#27121 peer).
         $i64 = $context->getTypeFromString('int64');
         $parts['year2'] = $context->builder->signedRem($parts['year'], $i64->constInt(100, false));
+        $parts['micro'] = $microsecond ?? $i64->constInt(0, false);
         $i8 = $context->getTypeFromString('int8');
         $sizeT = $context->getTypeFromString('size_t');
         $charPtr = $context->getTypeFromString('char*');
