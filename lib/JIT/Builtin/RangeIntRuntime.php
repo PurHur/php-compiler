@@ -11,7 +11,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for range() int/char/float lowering (#13502, #27563, #27158).
+ * JIT/AOT link for range() int/char/float lowering (#13502, #27563, #27158, #33896).
  *
  * NestedJIT of {@see \PHPCompiler\ext\standard\RangeIntJitHelper} returns a PHP
  * {@see \PHPCompiler\VM\HashTable} that is not a thin-AOT `__hashtable__` — multi-element
@@ -23,6 +23,10 @@ use PHPLLVM\Value;
  *
  * Float path (#27158) uses `__hashtable__setDoubleAt` with php-src's index×step size
  * formula ({@see \PHPCompiler\ext\standard\VmRange} buildFloatRange).
+ *
+ * Mid-invoke ensureLinked must set {@see Context::$loweringLlvmFunction} to the bridge
+ * fn — otherwise {@see BasicBlockHelper::append} prefers the in-flight user/`main` void
+ * fn and module verify fails (#33896 / peer #27211 HashTableUnionRuntime).
  *
  * VM SSOT remains {@see \PHPCompiler\ext\standard\RangeIntJitHelper} / {@see \PHPCompiler\ext\standard\VmRange}.
  * Zero/oversized step ValueErrors are emitted in {@see \PHPCompiler\ext\standard\range}
@@ -101,7 +105,12 @@ final class RangeIntRuntime
             return;
         }
 
+        // Mid-invoke ensureLinked: BasicBlockHelper::append prefers loweringLlvmFunction
+        // over the bridge insert parent (#27211 / #33896) — without scoping, range_head /
+        // returnValue land in the void user fn (module verify).
         $savedBlock = self::saveInsertBlock($context);
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
@@ -112,53 +121,60 @@ final class RangeIntRuntime
             : $context->module->addFunction(self::ABI_RANGE, $ft);
 
         $entry = $fn->appendBasicBlock('range_int_bridge_entry');
+        $context->registerFunction(self::ABI_RANGE, $fn);
+        $context->activeFunction = self::ABI_RANGE;
+        $context->loweringLlvmFunction = $fn instanceof \PHPLLVM\Value\Function_ ? $fn : null;
         $context->builder->positionAtEnd($entry);
+        try {
+            $start = $fn->getParam(0);
+            $end = $fn->getParam(1);
+            $stepIn = $fn->getParam(2);
 
-        $start = $fn->getParam(0);
-        $end = $fn->getParam(1);
-        $stepIn = $fn->getParam(2);
+            $step = self::normalizeStepSign($context, $start, $end, $stepIn);
 
-        $step = self::normalizeStepSign($context, $start, $end, $stepIn);
+            $ht = HashTableHelper::alloc($context);
+            $iSlot = $context->builder->alloca($i64, 1, 'range_i');
+            $idxSlot = $context->builder->alloca($sizeT, 1, 'range_idx');
+            $context->builder->store($start, $iSlot);
+            $context->builder->store($sizeT->constInt(0, false), $idxSlot);
 
-        $ht = HashTableHelper::alloc($context);
-        $iSlot = $context->builder->alloca($i64, 1, 'range_i');
-        $idxSlot = $context->builder->alloca($sizeT, 1, 'range_idx');
-        $context->builder->store($start, $iSlot);
-        $context->builder->store($sizeT->constInt(0, false), $idxSlot);
+            $setLong = $context->lookupFunction('__hashtable__setLongAt');
+            $done = BasicBlockHelper::append($context, 'range_done');
+            $loopHead = BasicBlockHelper::append($context, 'range_head');
+            $loopBody = BasicBlockHelper::append($context, 'range_body');
+            $context->builder->branch($loopHead);
 
-        $setLong = $context->lookupFunction('__hashtable__setLongAt');
-        $done = BasicBlockHelper::append($context, 'range_done');
-        $loopHead = BasicBlockHelper::append($context, 'range_head');
-        $loopBody = BasicBlockHelper::append($context, 'range_body');
-        $context->builder->branch($loopHead);
+            $context->builder->positionAtEnd($loopHead);
+            $i = $context->builder->load($iSlot);
+            $zero = $i64->constInt(0, false);
+            $stepIsPos = $context->builder->icmp(Builder::INT_SGT, $step, $zero);
+            $condPos = $context->builder->icmp(Builder::INT_SLE, $i, $end);
+            $condNeg = $context->builder->icmp(Builder::INT_SGE, $i, $end);
+            $inRange = $context->builder->select($stepIsPos, $condPos, $condNeg);
+            $context->builder->branchIf($inRange, $loopBody, $done);
 
-        $context->builder->positionAtEnd($loopHead);
-        $i = $context->builder->load($iSlot);
-        $zero = $i64->constInt(0, false);
-        $stepIsPos = $context->builder->icmp(Builder::INT_SGT, $step, $zero);
-        $condPos = $context->builder->icmp(Builder::INT_SLE, $i, $end);
-        $condNeg = $context->builder->icmp(Builder::INT_SGE, $i, $end);
-        $inRange = $context->builder->select($stepIsPos, $condPos, $condNeg);
-        $context->builder->branchIf($inRange, $loopBody, $done);
+            $context->builder->positionAtEnd($loopBody);
+            $idx = $context->builder->load($idxSlot);
+            $context->builder->call($setLong, $ht, $idx, $i);
+            $context->builder->store(
+                $context->builder->addNoSignedWrap($i, $step),
+                $iSlot
+            );
+            $context->builder->store(
+                $context->builder->addNoSignedWrap($idx, $sizeT->constInt(1, false)),
+                $idxSlot
+            );
+            $context->builder->branch($loopHead);
 
-        $context->builder->positionAtEnd($loopBody);
-        $idx = $context->builder->load($idxSlot);
-        $context->builder->call($setLong, $ht, $idx, $i);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($i, $step),
-            $iSlot
-        );
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($idx, $sizeT->constInt(1, false)),
-            $idxSlot
-        );
-        $context->builder->branch($loopHead);
+            $context->builder->positionAtEnd($done);
+            $context->builder->returnValue($ht);
 
-        $context->builder->positionAtEnd($done);
-        $context->builder->returnValue($ht);
-
-        self::registerLinkedRuntime($context, self::ABI_RANGE);
-        self::restoreInsertBlock($context, $savedBlock);
+            self::registerLinkedRuntime($context, self::ABI_RANGE);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            self::restoreInsertBlock($context, $savedBlock);
+        }
     }
 
     private static function implementChar(Context $context): void
@@ -171,6 +187,8 @@ final class RangeIntRuntime
         }
 
         $savedBlock = self::saveInsertBlock($context);
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
@@ -182,61 +200,68 @@ final class RangeIntRuntime
             : $context->module->addFunction(self::ABI_RANGE_CHAR, $ft);
 
         $entry = $fn->appendBasicBlock('range_char_bridge_entry');
+        $context->registerFunction(self::ABI_RANGE_CHAR, $fn);
+        $context->activeFunction = self::ABI_RANGE_CHAR;
+        $context->loweringLlvmFunction = $fn instanceof \PHPLLVM\Value\Function_ ? $fn : null;
         $context->builder->positionAtEnd($entry);
+        try {
+            $start = $fn->getParam(0);
+            $end = $fn->getParam(1);
+            $stepIn = $fn->getParam(2);
 
-        $start = $fn->getParam(0);
-        $end = $fn->getParam(1);
-        $stepIn = $fn->getParam(2);
+            $step = self::normalizeStepSign($context, $start, $end, $stepIn);
 
-        $step = self::normalizeStepSign($context, $start, $end, $stepIn);
+            $ht = HashTableHelper::alloc($context);
+            $iSlot = $context->builder->alloca($i64, 1, 'range_char_i');
+            $idxSlot = $context->builder->alloca($sizeT, 1, 'range_char_idx');
+            $context->builder->store($start, $iSlot);
+            $context->builder->store($sizeT->constInt(0, false), $idxSlot);
 
-        $ht = HashTableHelper::alloc($context);
-        $iSlot = $context->builder->alloca($i64, 1, 'range_char_i');
-        $idxSlot = $context->builder->alloca($sizeT, 1, 'range_char_idx');
-        $context->builder->store($start, $iSlot);
-        $context->builder->store($sizeT->constInt(0, false), $idxSlot);
+            $setString = $context->lookupFunction('__hashtable__setStringAt');
+            $allocFn = $context->lookupFunction('__string__alloc');
+            $map = $context->structFieldMap['__string__'];
+            $done = BasicBlockHelper::append($context, 'range_char_done');
+            $loopHead = BasicBlockHelper::append($context, 'range_char_head');
+            $loopBody = BasicBlockHelper::append($context, 'range_char_body');
+            $context->builder->branch($loopHead);
 
-        $setString = $context->lookupFunction('__hashtable__setStringAt');
-        $allocFn = $context->lookupFunction('__string__alloc');
-        $map = $context->structFieldMap['__string__'];
-        $done = BasicBlockHelper::append($context, 'range_char_done');
-        $loopHead = BasicBlockHelper::append($context, 'range_char_head');
-        $loopBody = BasicBlockHelper::append($context, 'range_char_body');
-        $context->builder->branch($loopHead);
+            $context->builder->positionAtEnd($loopHead);
+            $i = $context->builder->load($iSlot);
+            $zero = $i64->constInt(0, false);
+            $stepIsPos = $context->builder->icmp(Builder::INT_SGT, $step, $zero);
+            $condPos = $context->builder->icmp(Builder::INT_SLE, $i, $end);
+            $condNeg = $context->builder->icmp(Builder::INT_SGE, $i, $end);
+            $inRange = $context->builder->select($stepIsPos, $condPos, $condNeg);
+            $context->builder->branchIf($inRange, $loopBody, $done);
 
-        $context->builder->positionAtEnd($loopHead);
-        $i = $context->builder->load($iSlot);
-        $zero = $i64->constInt(0, false);
-        $stepIsPos = $context->builder->icmp(Builder::INT_SGT, $step, $zero);
-        $condPos = $context->builder->icmp(Builder::INT_SLE, $i, $end);
-        $condNeg = $context->builder->icmp(Builder::INT_SGE, $i, $end);
-        $inRange = $context->builder->select($stepIsPos, $condPos, $condNeg);
-        $context->builder->branchIf($inRange, $loopBody, $done);
+            $context->builder->positionAtEnd($loopBody);
+            $idx = $context->builder->load($idxSlot);
+            // Match ext/standard/chr.php: one-byte string from code point (#27563).
+            $one = $i64->constInt(1, false);
+            $str = $context->builder->call($allocFn, $one);
+            $byte = $context->builder->truncOrBitCast($i, $i8);
+            $valGep = $context->builder->structGep($str, $map['value']);
+            $context->builder->store($byte, $valGep);
+            $context->builder->call($setString, $ht, $idx, $str);
+            $context->builder->store(
+                $context->builder->addNoSignedWrap($i, $step),
+                $iSlot
+            );
+            $context->builder->store(
+                $context->builder->addNoSignedWrap($idx, $sizeT->constInt(1, false)),
+                $idxSlot
+            );
+            $context->builder->branch($loopHead);
 
-        $context->builder->positionAtEnd($loopBody);
-        $idx = $context->builder->load($idxSlot);
-        // Match ext/standard/chr.php: one-byte string from code point (#27563).
-        $one = $i64->constInt(1, false);
-        $str = $context->builder->call($allocFn, $one);
-        $byte = $context->builder->truncOrBitCast($i, $i8);
-        $valGep = $context->builder->structGep($str, $map['value']);
-        $context->builder->store($byte, $valGep);
-        $context->builder->call($setString, $ht, $idx, $str);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($i, $step),
-            $iSlot
-        );
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($idx, $sizeT->constInt(1, false)),
-            $idxSlot
-        );
-        $context->builder->branch($loopHead);
+            $context->builder->positionAtEnd($done);
+            $context->builder->returnValue($ht);
 
-        $context->builder->positionAtEnd($done);
-        $context->builder->returnValue($ht);
-
-        self::registerLinkedRuntime($context, self::ABI_RANGE_CHAR);
-        self::restoreInsertBlock($context, $savedBlock);
+            self::registerLinkedRuntime($context, self::ABI_RANGE_CHAR);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            self::restoreInsertBlock($context, $savedBlock);
+        }
     }
 
     /**
@@ -253,6 +278,8 @@ final class RangeIntRuntime
         }
 
         $savedBlock = self::saveInsertBlock($context);
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
@@ -264,94 +291,101 @@ final class RangeIntRuntime
             : $context->module->addFunction(self::ABI_RANGE_FLOAT, $ft);
 
         $entry = $fn->appendBasicBlock('range_float_bridge_entry');
+        $context->registerFunction(self::ABI_RANGE_FLOAT, $fn);
+        $context->activeFunction = self::ABI_RANGE_FLOAT;
+        $context->loweringLlvmFunction = $fn instanceof \PHPLLVM\Value\Function_ ? $fn : null;
         $context->builder->positionAtEnd($entry);
+        try {
+            $start = $fn->getParam(0);
+            $end = $fn->getParam(1);
+            $stepIn = $fn->getParam(2);
+            $step = self::normalizeFloatStepSign($context, $start, $end, $stepIn);
 
-        $start = $fn->getParam(0);
-        $end = $fn->getParam(1);
-        $stepIn = $fn->getParam(2);
-        $step = self::normalizeFloatStepSign($context, $start, $end, $stepIn);
+            $ht = HashTableHelper::alloc($context);
+            $zeroD = $double->constReal(0.0);
+            $oneD = $double->constReal(1.0);
+            $halfD = $double->constReal(0.5);
+            $stepPos = $context->builder->fcmp(Builder::REAL_OGT, $step, $zeroD);
+            $emptyAsc = $context->builder->fcmp(Builder::REAL_OLT, $end, $start);
+            $emptyDesc = $context->builder->fcmp(Builder::REAL_OGT, $end, $start);
+            $isEmpty = $context->builder->select($stepPos, $emptyAsc, $emptyDesc);
+            $doneEmpty = BasicBlockHelper::append($context, 'range_float_empty');
+            $build = BasicBlockHelper::append($context, 'range_float_build');
+            $context->builder->branchIf($isEmpty, $doneEmpty, $build);
 
-        $ht = HashTableHelper::alloc($context);
-        $zeroD = $double->constReal(0.0);
-        $oneD = $double->constReal(1.0);
-        $halfD = $double->constReal(0.5);
-        $stepPos = $context->builder->fcmp(Builder::REAL_OGT, $step, $zeroD);
-        $emptyAsc = $context->builder->fcmp(Builder::REAL_OLT, $end, $start);
-        $emptyDesc = $context->builder->fcmp(Builder::REAL_OGT, $end, $start);
-        $isEmpty = $context->builder->select($stepPos, $emptyAsc, $emptyDesc);
-        $doneEmpty = BasicBlockHelper::append($context, 'range_float_empty');
-        $build = BasicBlockHelper::append($context, 'range_float_build');
-        $context->builder->branchIf($isEmpty, $doneEmpty, $build);
+            $context->builder->positionAtEnd($doneEmpty);
+            $context->builder->returnValue($ht);
 
-        $context->builder->positionAtEnd($doneEmpty);
-        $context->builder->returnValue($ht);
+            $context->builder->positionAtEnd($build);
+            $spanAsc = $context->builder->fsub($end, $start);
+            $spanDesc = $context->builder->fsub($start, $end);
+            $span = $context->builder->select($stepPos, $spanAsc, $spanDesc);
+            $stepNeg = $context->builder->fcmp(Builder::REAL_OLT, $step, $zeroD);
+            $stepAbs = $context->builder->select(
+                $stepNeg,
+                $context->builder->fsub($zeroD, $step),
+                $step
+            );
+            $sizeExact = $context->builder->fadd(
+                $context->builder->fdiv($span, $stepAbs),
+                $oneD
+            );
+            // PHP_ROUND_HALF_UP on non-negative sizeExact.
+            $size = $context->builder->fptosi(
+                $context->builder->fadd($sizeExact, $halfD),
+                $i64
+            );
 
-        $context->builder->positionAtEnd($build);
-        $spanAsc = $context->builder->fsub($end, $start);
-        $spanDesc = $context->builder->fsub($start, $end);
-        $span = $context->builder->select($stepPos, $spanAsc, $spanDesc);
-        $stepNeg = $context->builder->fcmp(Builder::REAL_OLT, $step, $zeroD);
-        $stepAbs = $context->builder->select(
-            $stepNeg,
-            $context->builder->fsub($zeroD, $step),
-            $step
-        );
-        $sizeExact = $context->builder->fadd(
-            $context->builder->fdiv($span, $stepAbs),
-            $oneD
-        );
-        // PHP_ROUND_HALF_UP on non-negative sizeExact.
-        $size = $context->builder->fptosi(
-            $context->builder->fadd($sizeExact, $halfD),
-            $i64
-        );
+            $iSlot = $context->builder->alloca($i64, 1, 'range_float_i');
+            $idxSlot = $context->builder->alloca($sizeT, 1, 'range_float_idx');
+            $context->builder->store($i64->constInt(0, false), $iSlot);
+            $context->builder->store($sizeT->constInt(0, false), $idxSlot);
 
-        $iSlot = $context->builder->alloca($i64, 1, 'range_float_i');
-        $idxSlot = $context->builder->alloca($sizeT, 1, 'range_float_idx');
-        $context->builder->store($i64->constInt(0, false), $iSlot);
-        $context->builder->store($sizeT->constInt(0, false), $idxSlot);
+            $setDouble = $context->lookupFunction('__hashtable__setDoubleAt');
+            $done = BasicBlockHelper::append($context, 'range_float_done');
+            $loopHead = BasicBlockHelper::append($context, 'range_float_head');
+            $loopBody = BasicBlockHelper::append($context, 'range_float_body');
+            $context->builder->branch($loopHead);
 
-        $setDouble = $context->lookupFunction('__hashtable__setDoubleAt');
-        $done = BasicBlockHelper::append($context, 'range_float_done');
-        $loopHead = BasicBlockHelper::append($context, 'range_float_head');
-        $loopBody = BasicBlockHelper::append($context, 'range_float_body');
-        $context->builder->branch($loopHead);
+            $context->builder->positionAtEnd($loopHead);
+            $i = $context->builder->load($iSlot);
+            $inSize = $context->builder->icmp(Builder::INT_SLT, $i, $size);
+            $context->builder->branchIf($inSize, $loopBody, $done);
 
-        $context->builder->positionAtEnd($loopHead);
-        $i = $context->builder->load($iSlot);
-        $inSize = $context->builder->icmp(Builder::INT_SLT, $i, $size);
-        $context->builder->branchIf($inSize, $loopBody, $done);
+            $context->builder->positionAtEnd($loopBody);
+            $iAsDouble = $context->builder->sitofp($i, $double);
+            $element = $context->builder->fadd(
+                $start,
+                $context->builder->fmul($iAsDouble, $step)
+            );
+            $pastAsc = $context->builder->fcmp(Builder::REAL_OGT, $element, $end);
+            $pastDesc = $context->builder->fcmp(Builder::REAL_OLT, $element, $end);
+            $pastEnd = $context->builder->select($stepPos, $pastAsc, $pastDesc);
+            $storeBb = BasicBlockHelper::append($context, 'range_float_store');
+            $context->builder->branchIf($pastEnd, $done, $storeBb);
 
-        $context->builder->positionAtEnd($loopBody);
-        $iAsDouble = $context->builder->sitofp($i, $double);
-        $element = $context->builder->fadd(
-            $start,
-            $context->builder->fmul($iAsDouble, $step)
-        );
-        $pastAsc = $context->builder->fcmp(Builder::REAL_OGT, $element, $end);
-        $pastDesc = $context->builder->fcmp(Builder::REAL_OLT, $element, $end);
-        $pastEnd = $context->builder->select($stepPos, $pastAsc, $pastDesc);
-        $storeBb = BasicBlockHelper::append($context, 'range_float_store');
-        $context->builder->branchIf($pastEnd, $done, $storeBb);
+            $context->builder->positionAtEnd($storeBb);
+            $idx = $context->builder->load($idxSlot);
+            $context->builder->call($setDouble, $ht, $idx, $element);
+            $context->builder->store(
+                $context->builder->addNoSignedWrap($i, $i64->constInt(1, false)),
+                $iSlot
+            );
+            $context->builder->store(
+                $context->builder->addNoSignedWrap($idx, $sizeT->constInt(1, false)),
+                $idxSlot
+            );
+            $context->builder->branch($loopHead);
 
-        $context->builder->positionAtEnd($storeBb);
-        $idx = $context->builder->load($idxSlot);
-        $context->builder->call($setDouble, $ht, $idx, $element);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($i, $i64->constInt(1, false)),
-            $iSlot
-        );
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($idx, $sizeT->constInt(1, false)),
-            $idxSlot
-        );
-        $context->builder->branch($loopHead);
+            $context->builder->positionAtEnd($done);
+            $context->builder->returnValue($ht);
 
-        $context->builder->positionAtEnd($done);
-        $context->builder->returnValue($ht);
-
-        self::registerLinkedRuntime($context, self::ABI_RANGE_FLOAT);
-        self::restoreInsertBlock($context, $savedBlock);
+            self::registerLinkedRuntime($context, self::ABI_RANGE_FLOAT);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            self::restoreInsertBlock($context, $savedBlock);
+        }
     }
 
     private static function normalizeStepSign(

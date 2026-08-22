@@ -24,6 +24,9 @@ final class RangeIntRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__range_float__copy', $runtime);
         $this->assertStringContainsString('charRange', $runtime);
         $this->assertStringContainsString('floatRange', $runtime);
+        // Mid-invoke ensureLinked must pin loweringLlvmFunction to the bridge (#33896 / #27211).
+        $this->assertStringContainsString('loweringLlvmFunction', $runtime);
+        $this->assertStringContainsString('activeFunction = self::ABI_RANGE', $runtime);
         $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('HashTableHelper::buildIntegerRange', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
