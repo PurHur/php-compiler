@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on session ABI shells from Builtin\Type (#33261).
+ * Drop leftover always-on session ABI shells from Builtin\Type (#33261 / #33909).
  *
  * NestedJIT/AOT bridges stay SessionLifecycleRuntime / JitSessionLifecycleKernel /
  * SessionCreateIdRuntime / SessionGcRuntime / SessionEncodeRuntime
@@ -42,6 +42,7 @@ final class TypeDeadSessionAbiRuntimeShrinkTest extends TestCase
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
         $this->assertStringContainsString('#33261', $type);
+        $this->assertStringContainsString('#33909', $type);
         foreach (self::SESSION_ABIS as $abi) {
             $this->assertDoesNotMatchRegularExpression(
                 '/addFunction\(\s*[\'"]'.preg_quote($abi, '/').'[\'"]/',
@@ -54,7 +55,11 @@ final class TypeDeadSessionAbiRuntimeShrinkTest extends TestCase
                 'Builtin\\Type must not always-register '.$abi.' (#33261)'
             );
         }
-        $this->assertStringContainsString('SessionLifecycleRuntime::declareSessionAbis', $type);
+        $this->assertStringNotContainsString(
+            'SessionLifecycleRuntime::declareSessionAbis($this->context)',
+            $type,
+            'Builtin\\Type::register must not eagerly declare session ABIs (#33909)'
+        );
         $this->assertStringContainsString('SessionLifecycleRuntime::ensureLinked', $type);
         // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
@@ -64,7 +69,14 @@ final class TypeDeadSessionAbiRuntimeShrinkTest extends TestCase
     {
         $orch = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionLifecycleRuntime.php');
         $this->assertStringContainsString('#33261', $orch);
+        $this->assertStringContainsString('#33909', $orch);
         $this->assertStringContainsString('declareSessionAbis', $orch);
+        $this->assertStringContainsString('self::declareSessionAbis($context)', $orch);
+        $this->assertMatchesRegularExpression(
+            '/function ensureLinked\(Context \$context\): void\s*\{[^}]*self::declareSessionAbis\(\$context\);/s',
+            $orch,
+            'SessionLifecycleRuntime::ensureLinked must declare ABI before kernel (#33909)'
+        );
         $this->assertStringContainsString('JitSessionLifecycleKernel::declareSessionLifecycleAbis', $orch);
         $this->assertStringContainsString('SessionCreateIdRuntime::declareSessionCreateIdAbis', $orch);
         $this->assertStringContainsString('SessionGcRuntime::declareSessionGcAbis', $orch);
@@ -88,6 +100,12 @@ final class TypeDeadSessionAbiRuntimeShrinkTest extends TestCase
         $encode = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionEncodeRuntime.php');
         $this->assertStringContainsString('#33261', $encode);
         $this->assertStringContainsString('declareSessionEncodeAbis', $encode);
+    }
+
+    public function testTypeInitializeStillEnsureLinksSessionLifecycle(): void
+    {
+        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertStringContainsString('SessionLifecycleRuntime::ensureLinked($this->context)', $type);
     }
 
     public function testNoNewRuntimeCForSessionAbi(): void

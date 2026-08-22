@@ -28,7 +28,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Owns lifecycle ABI decls module-locally (`getNamedFunction` first via
  * {@see declareSessionLifecycleAbis}) — do not re-add empty always-on shells in
- * {@see \PHPCompiler\JIT\Builtin\Type} (#31894 / #32122 / #33261).
+ * {@see \PHPCompiler\JIT\Builtin\Type} (#31894 / #32122 / #33261 / #33909).
  */
 final class JitSessionLifecycleKernel
 {
@@ -63,7 +63,7 @@ final class JitSessionLifecycleKernel
     }
 
     /**
-     * Module-local empty decls for Type::register (#33261).
+     * Module-local empty decls when a call site needs lookup before bodies (#33261 / #33909).
      * Bodies come from {@see ensureLinked}.
      */
     public static function declareSessionLifecycleAbis(Context $context): void

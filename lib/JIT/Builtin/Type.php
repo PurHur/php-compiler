@@ -683,14 +683,15 @@ class Type extends Builtin {
         // (php-src ext/date/php_date.c / ext/standard/basic_functions.c).
         // __phpc_response_headers_flush / __phpc_setcookie_add covered by
         // PendingHeadersRuntime::ensureLinked / declarePendingHeaderAbis (#33255 / #33891).
-        // __phpc_session_*_apply / phpc_session_* always-on shells removed (#33261):
-        // SessionLifecycleRuntime / JitSessionLifecycleKernel / SessionCreateIdRuntime /
-        // SessionGcRuntime / SessionEncodeRuntime own the ABI (getNamedFunction first via
-        // declareSessionAbis; Type::initialize still SessionLifecycleRuntime::ensureLinked
-        // on the full load path; thin AOT call-site ensureLinked before lookup). Leftover
-        // Type empty decls vs Runtime ABI drift mint session_*.1 (#31894 / #32122).
-        // User-script session_*() stay JitSession* / VmSession (php-src ext/session/session.c).
-        SessionLifecycleRuntime::declareSessionAbis($this->context);
+        // __phpc_session_*_apply / phpc_session_* always-on shells removed (#33261);
+        // Type::register declareSessionAbis removed (#33909): SessionLifecycleRuntime /
+        // JitSessionLifecycleKernel / SessionCreateIdRuntime / SessionGcRuntime /
+        // SessionEncodeRuntime own the ABI (getNamedFunction first via declareSessionAbis
+        // inside SessionLifecycleRuntime::ensureLinked; Type::initialize still
+        // SessionLifecycleRuntime::ensureLinked on the full load path; thin AOT call-site
+        // ensureLinked before lookup). Leftover Type empty decls vs Runtime ABI drift
+        // mint session_*.1 (#31894 / #32122). User-script session_*() stay JitSession* /
+        // VmSession (php-src ext/session/session.c).
         // Before NestedJIT: SessionStartOptionsRuntime helpers coerce scalars and
         // emitObjectScalarWarning looks up __compiler_trigger_error (#33248).
         StringTriggerError::ensureLinked($this->context);
