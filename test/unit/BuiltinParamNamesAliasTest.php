@@ -439,6 +439,30 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('register_shutdown_function'));
     }
 
+    /** @covers issue #23945 — InternalArgInfo still function_name; Zend stub uses callback */
+    public function testRegisterTickFunctionNamedParamMetadata(): void
+    {
+        $names = BuiltinParamNames::forFunction('register_tick_function');
+        self::assertSame(['callback', 'args'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', 'register_tick_function'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'args', 'register_tick_function'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'function_name', 'register_tick_function'));
+        self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('register_tick_function'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('register_tick_function'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('register_tick_function'));
+        self::assertSame('callable', BuiltinInternalArgInfo::stubParamTypeOverride('register_tick_function', 0));
+        self::assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('register_tick_function', 1));
+
+        $unreg = BuiltinParamNames::forFunction('unregister_tick_function');
+        self::assertSame(['callback'], $unreg);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($unreg, 'callback', 'unregister_tick_function'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($unreg, 'function_name', 'unregister_tick_function'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('unregister_tick_function'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('unregister_tick_function'));
+        self::assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('unregister_tick_function'));
+        self::assertSame('callable', BuiltinInternalArgInfo::stubParamTypeOverride('unregister_tick_function', 0));
+    }
+
     /** @covers issue #23803 */
     public function testCompactVariadicNamedParamMetadata(): void
     {

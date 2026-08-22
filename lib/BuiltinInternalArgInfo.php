@@ -641,6 +641,8 @@ final class BuiltinInternalArgInfo
             'get_cfg_var' => 'string|false',
             'ini_restore' => 'void',
             'register_shutdown_function' => 'void',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits void return (#23945)
+            'unregister_tick_function' => 'void',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return bool/false; Zend ?bool=null→int (#28207)
             'ignore_user_abort' => 'int',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#28176)
@@ -1681,6 +1683,13 @@ final class BuiltinInternalArgInfo
             },
             // ext/standard/head.stub.php — callable $callback (InternalArgInfo empty) (#25381)
             'header_register_callback' => 0 === $index ? 'callable' : null,
+            // ext/standard/basic_functions.stub.php — callable $callback; InternalArgInfo still string function_name (#23945)
+            'register_tick_function' => match ($index) {
+                0 => 'callable',
+                1 => 'mixed',
+                default => null,
+            },
+            'unregister_tick_function' => 0 === $index ? 'callable' : null,
             // ext/standard/head.stub.php — array|int $expires_or_options = 0 (InternalArgInfo int) (#25380)
             'setcookie', 'setrawcookie' => 2 === $index ? 'array|int' : null,
             // ext/standard/basic_functions.stub.php — ?array $options = null (InternalArgInfo array) (#25381)

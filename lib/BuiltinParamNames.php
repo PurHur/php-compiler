@@ -811,6 +811,11 @@ final class BuiltinParamNames
             case 'register_shutdown_function':
                 // php-src ext/standard/basic_functions.stub.php — callable $callback, mixed ...$args (#23380)
                 return ['callback', 'args'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still function_name/arg (#23945)
+            case 'register_tick_function':
+                return ['callback', 'args'];
+            case 'unregister_tick_function':
+                return ['callback'];
             case 'set_error_handler':
                 // php-src basic_functions.stub.php — callback + error_levels; InternalArgInfo still error_handler/error_types (#23390)
                 return ['callback', 'error_levels='];
