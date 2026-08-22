@@ -19432,23 +19432,63 @@ class JIT {
                 $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
             );
             $isStreamHandle = $this->context->builder->bitwiseOr($isLong, $isBool);
+            // One shared value-box for both IR arms. The previous split allocated a slot in
+            // the promote arm then replaced `$result->value` with a second (NULL-init) slot
+            // while building the handle arm — so `$d = $d->modify(...)` kept NULL (#33929).
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $destPtr = JIT\JitValueBox::pointer($this->context, $slot);
             $promoteBlock = JIT\BasicBlockHelper::append($this->context, 'assign_object_from_value');
             $handleBlock = JIT\BasicBlockHelper::append($this->context, 'assign_stream_handle_from_value');
             $doneBlock = JIT\BasicBlockHelper::append($this->context, 'assign_object_from_value_done');
             $this->context->builder->branchIf($isStreamHandle, $handleBlock, $promoteBlock);
             $this->context->builder->positionAtEnd($promoteBlock);
             // FETCH_DIM_R into an object-typed CV/temp: keep the boxed zval (#31938).
-            $slot = JIT\JitValueBox::alloc($this->context);
             JIT\JitValueBox::copyFromPointer($this->context, $slot, $valuePtr);
+            $this->context->builder->branch($doneBlock);
+
+            $this->context->builder->positionAtEnd($handleBlock);
+            $longBlock = JIT\BasicBlockHelper::append($this->context, 'assign_stream_handle_long');
+            $boolBlock = JIT\BasicBlockHelper::append($this->context, 'assign_stream_handle_bool');
+            $this->context->builder->branchIf($isLong, $longBlock, $boolBlock);
+            $this->context->builder->positionAtEnd($longBlock);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $destPtr,
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readLong'),
+                    $valuePtr
+                )
+            );
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($boolBlock);
+            JIT\JitValueBox::writeBool(
+                $this->context,
+                $slot,
+                $this->context->builder->truncOrBitCast(
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readLong'),
+                        $valuePtr
+                    ),
+                    $this->context->getTypeFromString('int1')
+                )
+            );
+            $this->context->builder->branch($doneBlock);
+
+            $this->context->builder->positionAtEnd($doneBlock);
             // Do not free() — object-typed slots from fromOp are uninitialized __object__**
             // allocas; delref here segfaults under thin standalone AOT (#31938).
             $result->type = Variable::TYPE_VALUE;
             $result->value = $slot;
             $this->copyValueBoxJitFlags($result, $value, $force);
             $result->addref();
+            $this->context->setVariableOp($resultOp, $result);
             $globalTarget = null;
             $assignResultName = JIT\OperandName::resolve($resultOp);
             if (null !== $assignResultName && '' !== $assignResultName) {
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($assignResultName),
+                    $result
+                );
                 $globalTarget = $this->resolveScriptGlobalAssignTarget($resultOp, $result)
                     ?? $this->recoverScriptGlobalAssignLvalueBySlot($resultOp, $result);
             }
@@ -19486,42 +19526,7 @@ class JIT {
                     );
                 }
             }
-            $this->context->builder->branch($doneBlock);
-
-            $this->context->builder->positionAtEnd($handleBlock);
-            $result->free();
-            $slot = JIT\JitValueBox::alloc($this->context);
-            $destPtr = JIT\JitValueBox::pointer($this->context, $slot);
-            $longBlock = JIT\BasicBlockHelper::append($this->context, 'assign_stream_handle_long');
-            $boolBlock = JIT\BasicBlockHelper::append($this->context, 'assign_stream_handle_bool');
-            $this->context->builder->branchIf($isLong, $longBlock, $boolBlock);
-            $this->context->builder->positionAtEnd($longBlock);
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeLong'),
-                $destPtr,
-                $this->context->builder->call(
-                    $this->context->lookupFunction('__value__readLong'),
-                    $valuePtr
-                )
-            );
-            $this->context->builder->branch($doneBlock);
-            $this->context->builder->positionAtEnd($boolBlock);
-            JIT\JitValueBox::writeBool(
-                $this->context,
-                $slot,
-                $this->context->builder->truncOrBitCast(
-                    $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readLong'),
-                        $valuePtr
-                    ),
-                    $this->context->getTypeFromString('int1')
-                )
-            );
-            $this->context->builder->branch($doneBlock);
-            $result->type = Variable::TYPE_VALUE;
-            $result->value = $slot;
-            $result->addref();
-            $this->context->builder->positionAtEnd($doneBlock);
+            $this->noteDateTimeLocal($resultOp, $value);
             JIT\BasicBlockHelper::branchToFreshContinue($this->context, 'after_assign_object_from_value_handle');
 
             return;
