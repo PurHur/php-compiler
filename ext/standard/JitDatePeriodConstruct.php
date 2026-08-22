@@ -225,8 +225,8 @@ final class JitDatePeriodConstruct
         bool $includeStart,
         bool $includeEnd
     ): void {
-        $startTs = $startVar->compileTimeLong;
-        $endTs = $endVar->compileTimeLong;
+        $startTs = self::compileTimeUnixTs($startVar);
+        $endTs = self::compileTimeUnixTs($endVar);
         $delta = self::intervalDeltaSeconds($intervalVar);
         if (null === $startTs || null === $endTs || null === $delta || 0 === $delta) {
             return;
@@ -250,7 +250,7 @@ final class JitDatePeriodConstruct
             $t += $delta;
         }
         $periodVar->compileTimeDatePeriodTimestamps = $timestamps;
-        $periodVar->compileTimeDatePeriodTimezone = $startVar->compileTimeString ?? 'UTC';
+        $periodVar->compileTimeDatePeriodTimezone = self::compileTimeTz($startVar);
     }
 
     /**
@@ -264,7 +264,7 @@ final class JitDatePeriodConstruct
         int $userRecurrences,
         bool $includeStart
     ): void {
-        $startTs = $startVar->compileTimeLong;
+        $startTs = self::compileTimeUnixTs($startVar);
         $delta = self::intervalDeltaSeconds($intervalVar);
         if (null === $startTs || null === $delta || 0 === $delta) {
             return;
@@ -280,7 +280,38 @@ final class JitDatePeriodConstruct
             $t += $delta;
         }
         $periodVar->compileTimeDatePeriodTimestamps = $timestamps;
-        $periodVar->compileTimeDatePeriodTimezone = $startVar->compileTimeString ?? 'UTC';
+        $periodVar->compileTimeDatePeriodTimezone = self::compileTimeTz($startVar);
+    }
+
+    /**
+     * DateTime instant after #32691 lives on {@see JITVariable::$compileTimeDateTimeTimestamp}
+     * so assignToPointer does not writeLong the object. Fall back to compileTimeLong for
+     * older stamp sites.
+     */
+    private static function compileTimeUnixTs(JITVariable $arg): ?int
+    {
+        if (null !== $arg->compileTimeDateTimeTimestamp) {
+            return (int) $arg->compileTimeDateTimeTimestamp;
+        }
+        if (null !== $arg->compileTimeLong) {
+            return (int) $arg->compileTimeLong;
+        }
+
+        return null;
+    }
+
+    private static function compileTimeTz(JITVariable $arg): string
+    {
+        $tz = $arg->compileTimeTimezoneName;
+        if (null !== $tz && '' !== $tz) {
+            return $tz;
+        }
+        $legacy = $arg->compileTimeString;
+        if (null !== $legacy && '' !== $legacy && !str_starts_with(strtolower($legacy), 'datetime')) {
+            return $legacy;
+        }
+
+        return 'UTC';
     }
 
     private static function intervalDeltaSeconds(JITVariable $intervalVar): ?int

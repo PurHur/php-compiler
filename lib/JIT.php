@@ -12432,6 +12432,11 @@ class JIT {
                     }
                     $this->rewritePendingDateTimeGetOffsetIfNeeded($callArgs);
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
+                    $this->applyDateMetaToDatePeriodConstructArgs(
+                        $this->context->scope->toCall,
+                        $callArgs,
+                        $callOperands
+                    );
                     $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
@@ -12445,6 +12450,10 @@ class JIT {
                         $callArgs
                     );
                     $this->syncDateIntervalConstructMetaToAliases(
+                        $this->context->scope->toCall,
+                        $callArgs
+                    );
+                    $this->syncDatePeriodConstructMetaToAliases(
                         $this->context->scope->toCall,
                         $callArgs
                     );
@@ -12740,6 +12749,11 @@ class JIT {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
                     $this->rewritePendingDateTimeGetOffsetIfNeeded($callArgs);
+                    $this->applyDateMetaToDatePeriodConstructArgs(
+                        $this->context->scope->toCall,
+                        $callArgs,
+                        $callOperands
+                    );
                     $result = $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
@@ -12765,6 +12779,10 @@ class JIT {
                         $callArgs
                     );
                     $this->syncDateIntervalConstructMetaToAliases(
+                        $this->context->scope->toCall,
+                        $callArgs
+                    );
+                    $this->syncDatePeriodConstructMetaToAliases(
                         $this->context->scope->toCall,
                         $callArgs
                     );
@@ -13269,6 +13287,10 @@ class JIT {
                                 if (0 === strcasecmp($resolvedName, 'DateInterval')) {
                                     $this->context->lastDateIntervalNewResultOp = $resultOp;
                                     $this->context->lastDateIntervalNewResultVar = $this->context->getVariableFromOp($resultOp);
+                                }
+                                if (0 === strcasecmp($resolvedName, 'DatePeriod')) {
+                                    $this->context->lastDatePeriodNewResultOp = $resultOp;
+                                    $this->context->lastDatePeriodNewResultVar = $this->context->getVariableFromOp($resultOp);
                                 }
                             } elseif (
                                 null !== ($inheritedCtor = $this->context->type->object->inheritedConstructorProxyLc($resolvedName))
@@ -20215,7 +20237,10 @@ class JIT {
             }
         }
         foreach ($this->context->namedVariableBindings as $boundName => $bound) {
-            if ($bound === $first || $className === ($bound->classUserType ?? '')) {
+            // Only this construction's $this / New_ result — not every DateTime(Immutable)
+            // local. Stamping all same classUserType clobbered $start when $end was
+            // constructed, so DatePeriod($start,$i,$end) got an empty range (#33744).
+            if ($bound === $first || $bound === $resultVar) {
                 $stamp($bound);
                 $this->context->dateTimeLocalInstants[$boundName] = [
                     'timestamp' => (int) $first->compileTimeDateTimeTimestamp,
@@ -20274,6 +20299,80 @@ class JIT {
         }
         $this->context->lastDateIntervalNewResultOp = null;
         $this->context->lastDateIntervalNewResultVar = null;
+    }
+
+    /**
+     * Restore DateTime/DateInterval stamps on DatePeriod::__construct args by local name (#33744).
+     *
+     * @param list<JIT\Variable|array{unpack: JIT\Variable}|array{named: string, value: JIT\Variable}> $callArgs
+     * @param list<Operand|null> $callOperands
+     */
+    private function applyDateMetaToDatePeriodConstructArgs(?JIT\Call $toCall, array $callArgs, array $callOperands): void
+    {
+        if (!$toCall instanceof JIT\Call\DatePeriodConstruct) {
+            return;
+        }
+        foreach ($callArgs as $i => $arg) {
+            if (is_array($arg)) {
+                $arg = $arg['value'] ?? $arg['unpack'] ?? null;
+            }
+            if (!$arg instanceof JIT\Variable) {
+                continue;
+            }
+            $operand = $callOperands[$i] ?? null;
+            if (!$operand instanceof \PHPCfg\Operand) {
+                continue;
+            }
+            $this->applyDateTimeLocalInstantToReceiver($operand, $arg);
+            $this->applyDateIntervalStateToReceiver($operand, $arg);
+        }
+    }
+
+    /**
+     * Copy the compile-time foreach snapshot from DatePeriod $this onto the New_ local (#33744).
+     *
+     * @param list<JIT\Variable|array{unpack: JIT\Variable}> $callArgs
+     */
+    private function syncDatePeriodConstructMetaToAliases(?JIT\Call $toCall, array $callArgs): void
+    {
+        if (!$toCall instanceof JIT\Call\DatePeriodConstruct) {
+            return;
+        }
+        if ([] === $callArgs) {
+            return;
+        }
+        $first = $callArgs[0];
+        if (is_array($first)) {
+            $first = $first['unpack'] ?? null;
+        }
+        if (!$first instanceof JIT\Variable || null === $first->compileTimeDatePeriodTimestamps) {
+            return;
+        }
+        $stamp = static function (JIT\Variable $bound) use ($first): void {
+            $bound->compileTimeDatePeriodTimestamps = $first->compileTimeDatePeriodTimestamps;
+            $bound->compileTimeDatePeriodTimezone = $first->compileTimeDatePeriodTimezone;
+            $bound->classUserType = $first->classUserType ?? 'DatePeriod';
+        };
+        $stamp($first);
+        $resultVar = $this->context->lastDatePeriodNewResultVar;
+        if ($resultVar instanceof JIT\Variable) {
+            $stamp($resultVar);
+        }
+        $resultOp = $this->context->lastDatePeriodNewResultOp;
+        if ($resultOp instanceof \PHPCfg\Operand) {
+            $this->context->scope->variables[$resultOp] = $first;
+            $name = JIT\OperandName::resolve($resultOp);
+            if (null !== $name && '' !== $name) {
+                $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $first);
+            }
+        }
+        foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+            if ($bound === $first || $bound === $resultVar) {
+                $stamp($bound);
+            }
+        }
+        $this->context->lastDatePeriodNewResultOp = null;
+        $this->context->lastDatePeriodNewResultVar = null;
     }
 
     /** Copy compile-time instant onto `$dt->format()` / getTimestamp receivers (#32691). */
