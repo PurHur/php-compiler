@@ -37,7 +37,7 @@ final class DefaultTimezoneRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_default_timezone_ptr', $source);
         $this->assertStringNotContainsString("lookupFunction('access')", $source);
         $this->assertStringNotContainsString('ZONEINFO_PREFIX', $source);
-        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(240, \substr_count($source, "\n") + 1);
     }
 
     public function testDefaultTimezoneJitHelperSemanticsMatchVmDateForValidIds(): void

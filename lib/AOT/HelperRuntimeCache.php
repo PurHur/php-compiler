@@ -182,6 +182,17 @@ final class HelperRuntimeCache
         // #30858 / re-#27011 — prelinked QuotemetaJitHelper unit.o SIGSEGVs under thin AOT;
         // NestedJIT VmQuotemeta (strlen/substr) into the user module (peer #30859).
         'phpcompiler\\ext\\standard\\quotemetajithelper::quotemetaargv' => true,
+        // #33956 / #33950 — default-TZ helper + date() T/e/O/P tokens share NestedJIT statics;
+        // prelinked civil unit still reads VmDate and UTC-bakes free date('T') after set.
+        'phpcompiler\\ext\\standard\\defaulttimezonejithelper::defaulttimezoneget' => true,
+        'phpcompiler\\ext\\standard\\defaulttimezonejithelper::trydefaulttimezoneset' => true,
+        'phpcompiler\\ext\\standard\\defaulttimezonejithelper::emitinvalidtimezonenotice' => true,
+        'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::localciviltimestamp' => true,
+        'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::localisdst' => true,
+        'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::formattokent' => true,
+        'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::formattokene' => true,
+        'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::formattokeno' => true,
+        'phpcompiler\\ext\\standard\\defaulttimezoneciviljithelper::formattokenp' => true,
         // #33059 — prelinked IniJitHelper unit.o returns "0" for every ini_get under thin
         // AOT (NestedJIT PHP static defaults BSS-zero; ?string ABI collapses). Force NestedJIT
         // into the user module (peer #30858 Quotemeta / getenv string|false).
