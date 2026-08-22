@@ -627,14 +627,14 @@ class Type extends Builtin {
         // vs Runtime ABI drift mint preg_split.1 (#31894 / #32122). User-script
         // preg_split() stays JitPregSplit / PregJitHelper (php-src ext/pcre/php_pcre.c).
         // __phpc_pending_header_* / __phpc_header_queue_enable /
-        // __phpc_response_headers_flush / __phpc_setcookie_add always-on shells removed
-        // (#33255): PendingHeadersRuntime / PendingHeadersJitBridge owns the ABI
-        // (getNamedFunction first via declarePendingHeaderAbis; Type::initialize still
-        // PendingHeadersRuntime::ensureLinked on the full load path; thin AOT lazy-links
-        // on first header() use). Leftover Type empty decls vs Runtime ABI drift mint
+        // __phpc_response_headers_flush / __phpc_setcookie_add Type::register
+        // declarePendingHeaderAbis removed (#33891 / peer #33255): PendingHeadersRuntime /
+        // PendingHeadersJitBridge own the ABI (getNamedFunction first via
+        // declarePendingHeaderAbis / ensureLinked → implement). Type::initialize still
+        // PendingHeadersRuntime::ensureLinked on the non-thin path; thin AOT lazy-links
+        // on first header() use. Leftover Type empty decls vs Runtime ABI drift mint
         // pending_header_*.1 (#31894 / #32122). User-script header()/setcookie() stay
         // header_ / JitPendingHeaders (php-src ext/standard/head.c).
-        PendingHeadersRuntime::declarePendingHeaderAbis($this->context);
         // __phpc_ob_* Type::register declareObAbis removed (#33862 / peer #33798 initialize):
         // ObOutputRuntime / ObOutputJitBridge own the ABI (getNamedFunction first via
         // declareIfMissing / EmbedObOutput::declareObAbis; Context ensureMinimalUserStandaloneBodies
@@ -682,7 +682,7 @@ class Type extends Builtin {
         // user-script mktime()/getrusage() stay MktimeJitHelper / GetrusageJitHelper
         // (php-src ext/date/php_date.c / ext/standard/basic_functions.c).
         // __phpc_response_headers_flush / __phpc_setcookie_add covered by
-        // PendingHeadersRuntime::declarePendingHeaderAbis above (#33255).
+        // PendingHeadersRuntime::ensureLinked / declarePendingHeaderAbis (#33255 / #33891).
         // __phpc_session_*_apply / phpc_session_* always-on shells removed (#33261):
         // SessionLifecycleRuntime / JitSessionLifecycleKernel / SessionCreateIdRuntime /
         // SessionGcRuntime / SessionEncodeRuntime own the ABI (getNamedFunction first via
