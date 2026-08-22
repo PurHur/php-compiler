@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_date_interval_format via DateIntervalFormatJitHelper PHP (#9499, #25121, #33203).
+ * JIT/AOT link for __compiler_date_interval_format via DateIntervalFormatJitHelper (#9499, #25121, #33203).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer TimezoneOffset #25042 / Mktime #25116).
- * Declares module-locally (getNamedFunction first) so leftover Type empty decls cannot mint
- * date_interval_format.1 (#31894 / #32122 / #33203).
- * Thin LLVM bridge forwards the ABI. php-src: ext/date/php_date.c — PHP_FUNCTION(date_interval_format)
+ * getNamedFunction-first so leftover Type decls cannot mint date_interval_format.1 (#31894 / #32122).
+ * Save/restore insert block around ensureLinked — mid-main format after DateTime::diff (#33912).
+ * php-src: ext/date/php_date.c — PHP_FUNCTION(date_interval_format)
  */
 final class DateIntervalFormatRuntime
 {
@@ -41,9 +42,11 @@ final class DateIntervalFormatRuntime
 
     public static function implement(Context $context): void
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            self::restoreCallerInsert($context, $savedInsert);
 
             return;
         }
@@ -51,7 +54,16 @@ final class DateIntervalFormatRuntime
         self::ensureJitHelperCompiled($context);
         self::implementFormatBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        self::restoreCallerInsert($context, $savedInsert);
+    }
+
+    private static function restoreCallerInsert(Context $context, ?BasicBlock $savedInsert): void
+    {
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementFormatBridge(Context $context): void

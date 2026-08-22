@@ -406,6 +406,9 @@ final class JitDateMutation
 
         $compileTime = self::tryCompileTimeDiff($context, $args[0], $args[1], $absolute);
         if (null !== $compileTime) {
+            // Stamp for DateInterval::format bake (#32699 peer / #33912) — without this,
+            // format() hits DateIntervalFormatRuntime::ensureLinked mid-main.
+            $context->lastDateIntervalDiffState = $compileTime;
             $i64 = $context->getTypeFromString('int64');
             $dbl = $context->getTypeFromString('double');
 
@@ -1083,15 +1086,18 @@ final class JitDateMutation
                 JITVariable::TYPE_NATIVE_LONG
             );
         }
+        // DateInterval::$f is TYPE_VALUE (peer construct #26772) — NATIVE_DOUBLE in the
+        // void** slot makes format()'s __object__load_value_slot / readDouble mis-read (#33912).
+        $fSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            JitValueBox::pointer($context, $fSlot),
+            $f
+        );
         $objectType->propertyStore(
             $objectType->propertySlotFor($obj, 'DateInterval', 'f'),
-            new JITVariable(
-                $context,
-                JITVariable::TYPE_NATIVE_DOUBLE,
-                JITVariable::KIND_VALUE,
-                $f
-            ),
-            JITVariable::TYPE_NATIVE_DOUBLE
+            new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $fSlot),
+            JITVariable::TYPE_VALUE
         );
         // days is TYPE_VALUE (int|false); write the int from date_diff (#27309).
         $daysSlot = JitValueBox::alloc($context);
