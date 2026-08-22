@@ -261,6 +261,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false (#26187)
             'ini_get' => 'string|false',
             'ini_get_all' => 'array|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#27796)
+            'get_include_path', 'set_include_path' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string/array (missing |false) (#28005, re-#23569)
             'php_ini_loaded_file' => 'string|false',
             'get_extension_funcs' => 'array|false',
