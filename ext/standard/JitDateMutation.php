@@ -511,25 +511,32 @@ final class JitDateMutation
             );
         }
 
-        DateMutationRuntime::ensureLinked($context);
+        if (!$context->isUserScriptAot()) {
+            DateMutationRuntime::ensureLinked($context);
+        }
 
         $dtObj = self::requireDateTimeObject($context, $args[0], $function.'()');
-        $intervalObj = self::requireDateIntervalObject($context, $args[1], $function);
-
-        self::applyIntervalToDateTimeObject($context, $dtObj, $intervalObj, 'DateTime', $add);
+        $intervalState = $args[1]->compileTimeDateInterval;
+        if ($context->isUserScriptAot() && null !== $intervalState) {
+            /** @var ObjectBuiltin $object */
+            $object = $context->type->object;
+            self::applyKnownIntervalStateViaLlvm($context, $object, $dtObj, $intervalState, 'DateTime', $add);
+        } else {
+            $intervalObj = self::requireDateIntervalObject($context, $args[1], $function);
+            self::applyIntervalToDateTimeObject($context, $dtObj, $intervalObj, 'DateTime', $add);
+        }
 
         return self::returnObjectArg($context, $args[0]);
     }
 
     /**
-     * OOP DateTime{,Immutable}::add/sub (#30760).
+     * OOP DateTime{,Immutable}::add/sub (#30760, #33781).
      *
-     * Thin user-script AOT cannot NestedJIT {@see DateMutationRuntime}
-     * (`__nativearray__boundscheck` missing, peer #27159 / modify()). Prefer
-     * compile-time {@see VmDateTimeNative::applyIntervalState} when both the
-     * receiver instant and DateInterval spec are known; otherwise LLVM-add a
-     * fixed-length (no year/month) compile-time interval. Full JIT/MCJIT still
-     * falls back to {@see __phpc_date_apply_interval}.
+     * Prefer compile-time {@see VmDateTimeNative::applyIntervalState} when both
+     * the receiver instant and DateInterval spec are known; otherwise LLVM-add a
+     * fixed-length (no year/month) compile-time interval. Runtime intervals
+     * (variable or year/month) fall back to {@see __phpc_date_apply_interval}
+     * via {@see DateMutationRuntime}.
      */
     private static function invokeObjectIntervalMutation(
         Context $context,
@@ -661,15 +668,19 @@ final class JitDateMutation
             return self::boxObjectPtr($context, $dtObj);
         }
 
-        if ($context->isUserScriptAot()) {
-            throw new \LogicException(
-                $function.'() requires a compile-time DateInterval in this compiler build (#30760)'
-            );
+        if (null !== $intervalState) {
+            self::applyKnownIntervalStateViaLlvm($context, $object, $dtObj, $intervalState, $layout, $add);
+
+            return self::boxObjectPtr($context, $dtObj);
         }
 
-        DateMutationRuntime::ensureLinked($context);
         $intervalObj = self::requireDateIntervalObject($context, $args[1], $function, 1);
-        self::applyIntervalToDateTimeObject($context, $dtObj, $intervalObj, $layout, $add);
+        if ($context->isUserScriptAot()) {
+            self::applyIntervalToDateTimeObjectViaLlvm($context, $dtObj, $intervalObj, $layout, $add);
+        } else {
+            DateMutationRuntime::ensureLinked($context);
+            self::applyIntervalToDateTimeObject($context, $dtObj, $intervalObj, $layout, $add);
+        }
 
         return self::boxObjectPtr($context, $dtObj);
     }
@@ -693,6 +704,12 @@ final class JitDateMutation
         string $layout,
         bool $add
     ): void {
+        if ($context->isUserScriptAot()) {
+            self::applyIntervalToDateTimeObjectViaLlvm($context, $dtObj, $intervalObj, $layout, $add);
+
+            return;
+        }
+
         /** @var ObjectBuiltin $object */
         $object = $context->type->object;
         $ts = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY);
@@ -735,6 +752,145 @@ final class JitDateMutation
         $newMicro = $context->builder->load($outMicro);
         self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
         self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::MICROSECOND_PROPERTY, $newMicro);
+    }
+
+    /**
+     * Apply compile-time-known {@see JITVariable::$compileTimeDateInterval} with a
+     * runtime receiver timestamp (#33781). Uses {@see JitGetdate} civil math with
+     * PHP-known interval scalars — same approach as {@see invokeObjectModify} month/year.
+     *
+     * @param array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int} $intervalState
+     */
+    private static function applyKnownIntervalStateViaLlvm(
+        Context $context,
+        ObjectBuiltin $object,
+        Value $dtObj,
+        array $intervalState,
+        string $layout,
+        bool $add
+    ): void {
+        $invert = 0 !== (int) $intervalState['invert'];
+        $subtract = $add ? $invert : !$invert;
+        $sign = $subtract ? -1 : 1;
+
+        $i64 = $context->getTypeFromString('int64');
+        $signNeg = $i64->constInt($sign, true);
+
+        $ts = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY);
+        $parts = JitGetdate::civilPartsPublic($context, $ts);
+        $year = $context->builder->add(
+            $parts['year'],
+            $context->builder->mul($signNeg, $i64->constInt((int) $intervalState['y'], true))
+        );
+        $month = $context->builder->add(
+            $parts['month'],
+            $context->builder->mul($signNeg, $i64->constInt((int) $intervalState['m'], true))
+        );
+        $day = $context->builder->add(
+            $parts['day'],
+            $context->builder->mul($signNeg, $i64->constInt((int) $intervalState['d'], true))
+        );
+        $calendarTs = JitGetdate::timestampFromCivilPublic(
+            $context,
+            $year,
+            $month,
+            $day,
+            $parts['hour'],
+            $parts['minute'],
+            $parts['second']
+        );
+        $elapsed = (int) $intervalState['h'] * 3600
+            + (int) $intervalState['i'] * 60
+            + (int) $intervalState['s'];
+        $newTs = $context->builder->add(
+            $calendarTs,
+            $context->builder->mul($signNeg, $i64->constInt($sign * $elapsed, true))
+        );
+        $deltaMicro = (int) \round($sign * (float) $intervalState['f'] * 1_000_000);
+        if (0 !== $deltaMicro) {
+            $micro = self::readLongProp(
+                $context,
+                $object,
+                $dtObj,
+                $layout,
+                DateTimeSupport::MICROSECOND_PROPERTY
+            );
+            $newMicro = $context->builder->add($micro, $i64->constInt($deltaMicro, true));
+            self::writeLongProp(
+                $context,
+                $object,
+                $dtObj,
+                $layout,
+                DateTimeSupport::MICROSECOND_PROPERTY,
+                $newMicro
+            );
+        }
+        self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
+    }
+
+    /**
+     * Runtime DateInterval add/sub for thin user-script AOT (#33781).
+     *
+     * NestedJIT {@see DateMutationRuntime} needs {@see __nativearray__boundscheck};
+     * mirror {@see VmDateTimeNative::applyIntervalState} via {@see JitGetdate} civil
+     * math (same UTC approach as {@see invokeObjectModify} month/year, #27262).
+     */
+    private static function applyIntervalToDateTimeObjectViaLlvm(
+        Context $context,
+        Value $dtObj,
+        Value $intervalObj,
+        string $layout,
+        bool $add
+    ): void {
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        $ts = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY);
+
+        $iy = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'y');
+        $im = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'm');
+        $id = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'd');
+        $ih = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'h');
+        $ii = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'i');
+        $is = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 's');
+        $invert = self::readLongProp($context, $object, $intervalObj, 'DateInterval', 'invert');
+
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $i64->constInt(0, false);
+        $invertBit = $context->builder->icmp(Builder::INT_NE, $invert, $zero);
+        $addBit = $i1->constInt($add ? 1 : 0, false);
+        $notInvert = $context->builder->xor($invertBit, $i1->constInt(1, false));
+        $subtract = $context->builder->select($addBit, $invertBit, $notInvert);
+        $signNeg = $context->builder->select(
+            $subtract,
+            $i64->constInt(-1, true),
+            $i64->constInt(1, true)
+        );
+
+        $parts = JitGetdate::civilPartsPublic($context, $ts);
+        $year = $context->builder->add($parts['year'], $context->builder->mul($signNeg, $iy));
+        $month = $context->builder->add($parts['month'], $context->builder->mul($signNeg, $im));
+        $day = $context->builder->add($parts['day'], $context->builder->mul($signNeg, $id));
+        $calendarTs = JitGetdate::timestampFromCivilPublic(
+            $context,
+            $year,
+            $month,
+            $day,
+            $parts['hour'],
+            $parts['minute'],
+            $parts['second']
+        );
+
+        $elapsed = $context->builder->add(
+            $context->builder->mul($ih, $i64->constInt(3600, false)),
+            $context->builder->add(
+                $context->builder->mul($ii, $i64->constInt(60, false)),
+                $is
+            )
+        );
+        $newTs = $context->builder->add($calendarTs, $context->builder->mul($signNeg, $elapsed));
+
+        self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
     }
 
     /**
