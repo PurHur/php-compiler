@@ -266,28 +266,30 @@ final class JitDate
 
         // Thin AOT: NestedJIT FormatDatetime segfaults; common literals via UTC civil IR
         // (#27091 Y-m-d; #27121 date('Y', strtotime(...)) and peer single-token formats).
-        // Matches Zend when default timezone is UTC (CI / docker image default).
-        // Timezone tokens for free date() assume compile-time UTC (#33943); runtime
-        // date_default_timezone_set is tracked in DefaultTimezoneJitHelper (#33950) and
-        // does not yet re-bind this bake (follow-up: runtime token helper).
+        // Free date() T/e/O/P follow runtime set (#33956). date('c'/'r') use civil IR +
+        // runtime O/P suffix (#33964) — NestedJIT year-loop helpers abort.
+        // gmdate() keeps UTC bake (#33943).
         $fmtLit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
-        if (\is_string($fmtLit) && ($gmt || self::defaultTimezoneIsUtc())) {
-            // Free date('T'/'e'/'O'/'P') follows runtime date_default_timezone_set (#33956).
-            // Still UTC-bake date('r') / gmdate() tokens to avoid FormatDatetime SIGSEGV (#33943).
-            if (!$gmt && \in_array($fmtLit, ['T', 'e', 'O', 'P'], true)) {
+        if (!$gmt && \is_string($fmtLit)) {
+            if ('T' === $fmtLit || 'e' === $fmtLit || 'O' === $fmtLit || 'P' === $fmtLit) {
                 return DefaultTimezoneCivilRuntime::emitTimezoneToken($context, $fmtLit, $timestamp);
             }
+            if ('c' === $fmtLit) {
+                return self::emitDateCWithRuntimeOffset($context, $timestamp);
+            }
+            if ('r' === $fmtLit || 'D, d M Y H:i:s O' === $fmtLit) {
+                return self::emitDateRWithRuntimeOffset($context, $timestamp);
+            }
+        }
+        if (\is_string($fmtLit) && ($gmt || self::defaultTimezoneIsUtc())) {
             $tzLit = self::tryFormatUtcTimezoneLiteral($context, $fmtLit, $timestamp, $gmt);
             if (null !== $tzLit) {
                 return $tzLit;
             }
-            $civil = self::tryFormatCivilLiteral($context, $fmtLit, $timestamp);
+            $civil = self::tryFormatCivilLiteral($context, $fmtLit, $timestamp, null, !$gmt);
             if (null !== $civil) {
                 return $civil;
             }
-        }
-        if (\is_string($fmtLit) && !$gmt && \in_array($fmtLit, ['T', 'e', 'O', 'P'], true)) {
-            return DefaultTimezoneCivilRuntime::emitTimezoneToken($context, $fmtLit, $timestamp);
         }
 
         // Soft-null on 8.4 — Zend deprecate+coerce (#21208, reverts #19651 TypeError)
@@ -313,6 +315,128 @@ final class JitDate
     }
 
     /**
+     * date('c') — local civil IR + runtime P offset (#33964).
+     *
+     * Wall clock already comes from {@see JitGetdate::civilPartsPublic} (local);
+     * only the hardcoded +00:00 bake was wrong after date_default_timezone_set.
+     */
+    private static function emitDateCWithRuntimeOffset(Context $context, Value $timestamp): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'date_c_runtime_off');
+        $offStr = DefaultTimezoneCivilRuntime::emitTimezoneToken($context, 'P', $timestamp);
+        $stringMap = $context->structFieldMap['__string__'];
+        $charPtr = $context->getTypeFromString('char*');
+        $offChars = $context->builder->pointerCast(
+            $context->builder->structGep($offStr, $stringMap['value']),
+            $charPtr
+        );
+
+        $parts = JitGetdate::civilPartsPublic($context, $timestamp);
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+        $bufSize = 48;
+        $buf = $context->builder->alloca($i8, $bufSize, 'c_buf');
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        LibcExtern::ensureSnprintf($context);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('%04lld-%02lld-%02lldT%02lld:%02lld:%02lld%s'),
+            $charPtr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $sizeT->constInt($bufSize, false),
+            $fmt,
+            $parts['year'],
+            $parts['month'],
+            $parts['day'],
+            $parts['hour'],
+            $parts['minute'],
+            $parts['second'],
+            $offChars
+        );
+        $len = $context->builder->sext($written, $i64);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $bufChar
+        );
+    }
+
+    /**
+     * date('r') — local civil IR + runtime O offset (#33964).
+     *
+     * php-src: ext/date/php_date.c — php_format_date token 'r'
+     */
+    private static function emitDateRWithRuntimeOffset(Context $context, Value $timestamp): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'date_r_runtime_off');
+        $offStr = DefaultTimezoneCivilRuntime::emitTimezoneToken($context, 'O', $timestamp);
+        $stringMap = $context->structFieldMap['__string__'];
+        $charPtr = $context->getTypeFromString('char*');
+        $offChars = $context->builder->pointerCast(
+            $context->builder->structGep($offStr, $stringMap['value']),
+            $charPtr
+        );
+
+        $parts = JitGetdate::civilPartsPublic($context, $timestamp);
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        $dAbbr = $context->builder->pointerCast($context->constantFromString('Sat'), $charPtr);
+        foreach ($weekdays as $i => $name) {
+            $is = $context->builder->icmp(Builder::INT_EQ, $parts['wday'], $i64->constInt($i, false));
+            $str = $context->builder->pointerCast($context->constantFromString($name), $charPtr);
+            $dAbbr = $context->builder->select($is, $str, $dAbbr);
+        }
+        $mAbbr = $context->builder->pointerCast($context->constantFromString('Jan'), $charPtr);
+        foreach ($months as $i => $name) {
+            $is = $context->builder->icmp(
+                Builder::INT_EQ,
+                $parts['month'],
+                $i64->constInt($i + 1, false)
+            );
+            $str = $context->builder->pointerCast($context->constantFromString($name), $charPtr);
+            $mAbbr = $context->builder->select($is, $str, $mAbbr);
+        }
+
+        $bufSize = 48;
+        $buf = $context->builder->alloca($i8, $bufSize, 'r_buf');
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        LibcExtern::ensureSnprintf($context);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('%s, %02lld %s %04lld %02lld:%02lld:%02lld %s'),
+            $charPtr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $sizeT->constInt($bufSize, false),
+            $fmt,
+            $dAbbr,
+            $parts['day'],
+            $mAbbr,
+            $parts['year'],
+            $parts['hour'],
+            $parts['minute'],
+            $parts['second'],
+            $offChars
+        );
+        $len = $context->builder->sext($written, $i64);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $bufChar
+        );
+    }
+
+    /**
      * Compile-time date()/gmdate()/DateTime::format() literals via civil IR + snprintf
      * (#27091, #27121, #27192).
      *
@@ -324,7 +448,8 @@ final class JitDate
         Context $context,
         string $fmtLit,
         Value $timestamp,
-        ?Value $microsecond = null
+        ?Value $microsecond = null,
+        bool $local = true
     ): ?Value {
         // 'U' is the unix timestamp itself — no civil breakdown (#27121).
         if ('U' === $fmtLit) {
@@ -407,7 +532,7 @@ final class JitDate
         [$printfFmt, $keys, $bufSize] = $specs[$fmtLit];
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'date_civil_lit');
-        $parts = JitGetdate::civilPartsPublic($context, $timestamp);
+        $parts = JitGetdate::civilPartsPublic($context, $timestamp, $local);
         // Two-digit year for 'y' — Zend date('y') (#27121 peer).
         $i64 = $context->getTypeFromString('int64');
         $parts['year2'] = $context->builder->signedRem($parts['year'], $i64->constInt(100, false));
@@ -459,21 +584,22 @@ final class JitDate
             return $context->builder->load($context->constantStringFromString($utcTzConsts[$fmtLit]));
         }
         if ('r' === $fmtLit || 'D, d M Y H:i:s O' === $fmtLit) {
-            return self::tryFormatCivilRfc2822Utc($context, $timestamp);
+            return self::tryFormatCivilRfc2822Utc($context, $timestamp, !$gmt);
         }
 
         return null;
     }
 
     /**
-     * UTC civil IR for date('r') / DATE_RFC2822 — NestedJIT FormatDatetime SIGSEGV (#33943).
+     * UTC/local civil IR for date('r') / DATE_RFC2822 — NestedJIT FormatDatetime SIGSEGV (#33943).
      *
      * php-src: ext/date/php_date.c — php_format_date token 'r' → "D, d M Y H:i:s O"
+     * {@see $local} false for gmdate() after a named default zone (#33964).
      */
-    private static function tryFormatCivilRfc2822Utc(Context $context, Value $timestamp): Value
+    private static function tryFormatCivilRfc2822Utc(Context $context, Value $timestamp, bool $local = true): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'date_r_civil');
-        $parts = JitGetdate::civilPartsPublic($context, $timestamp);
+        $parts = JitGetdate::civilPartsPublic($context, $timestamp, $local);
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
         $sizeT = $context->getTypeFromString('size_t');

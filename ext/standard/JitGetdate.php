@@ -102,9 +102,13 @@ final class JitGetdate
      *
      * @return array{year:Value,month:Value,day:Value,hour:Value,minute:Value,second:Value,wday:Value,yday:Value}
      */
-    public static function civilPartsPublic(Context $context, Value $timestamp): array
+    public static function civilPartsPublic(Context $context, Value $timestamp, bool $local = true): array
     {
-        return self::civilParts($context, self::localCivilTimestamp($context, $timestamp));
+        if ($local) {
+            return self::civilParts($context, self::localCivilTimestamp($context, $timestamp));
+        }
+
+        return self::civilParts($context, $timestamp);
     }
 
     private static function localCivilTimestamp(Context $context, Value $timestamp): Value
