@@ -11,6 +11,9 @@ namespace PHPCompiler\ext\standard;
  * mode state machine (always `$i + 1`) — NestedJIT rejects `$i += 2` / skip-counter
  * decode paths with empty results (#26899).
  *
+ * Decode compares single-byte literals directly (not {@see byteOrd}) — the O(256)
+ * ordinal loop miscompiled under thin AOT and segfaulted on `=` escapes (#26899 reg.).
+ *
  * php-src: ext/standard/quot_print.c
  */
 final class QuotPrintJitHelper
@@ -110,27 +113,26 @@ final class QuotPrintJitHelper
         $hex1 = 0;
         while ($i < $inLen) {
             $ch = $str[$i];
-            $c = self::byteOrd($ch);
             if (0 === $mode) {
-                if (61 === $c) {
+                if ('=' === $ch) {
                     $mode = 1;
                 } else {
                     $out .= $ch;
                 }
             } else {
                 if (1 === $mode) {
-                    $h = self::hexValOrNeg($c);
+                    $h = self::hexValOrNegChar($ch);
                     if ($h >= 0) {
                         $hex1 = $h;
                         $mode = 2;
                     } else {
-                        if (32 === $c || 9 === $c) {
+                        if (' ' === $ch || "\t" === $ch) {
                             $mode = 3;
                         } else {
-                            if (13 === $c) {
+                            if ("\r" === $ch) {
                                 $mode = 4;
                             } else {
-                                if (10 === $c) {
+                                if ("\n" === $ch) {
                                     $mode = 0;
                                 } else {
                                     $out .= '=';
@@ -142,7 +144,7 @@ final class QuotPrintJitHelper
                     }
                 } else {
                     if (2 === $mode) {
-                        $h = self::hexValOrNeg($c);
+                        $h = self::hexValOrNegChar($ch);
                         if ($h >= 0) {
                             $code = ($hex1 << 4) + $h;
                             $out .= self::byteAt($code);
@@ -150,8 +152,7 @@ final class QuotPrintJitHelper
                         } else {
                             $out .= '=';
                             $out .= self::byteAt(self::hexNibbleChar($hex1));
-                            // reprocess current char in mode 0 next — NestedJIT: emit and handle now
-                            if (61 === $c) {
+                            if ('=' === $ch) {
                                 $mode = 1;
                             } else {
                                 $out .= $ch;
@@ -160,18 +161,17 @@ final class QuotPrintJitHelper
                         }
                     } else {
                         if (3 === $mode) {
-                            // mode 3: soft whitespace after '='
-                            if (32 === $c || 9 === $c) {
+                            if (' ' === $ch || "\t" === $ch) {
                                 // stay in mode 3
                             } else {
-                                if (13 === $c) {
+                                if ("\r" === $ch) {
                                     $mode = 4;
                                 } else {
-                                    if (10 === $c) {
+                                    if ("\n" === $ch) {
                                         $mode = 0;
                                     } else {
                                         $out .= '=';
-                                        if (61 === $c) {
+                                        if ('=' === $ch) {
                                             $mode = 1;
                                         } else {
                                             $out .= $ch;
@@ -181,11 +181,10 @@ final class QuotPrintJitHelper
                                 }
                             }
                         } else {
-                            // mode 4: skip LF after soft-break CR
-                            if (10 === $c) {
+                            if ("\n" === $ch) {
                                 $mode = 0;
                             } else {
-                                if (61 === $c) {
+                                if ('=' === $ch) {
                                     $mode = 1;
                                 } else {
                                     $out .= $ch;
@@ -207,6 +206,36 @@ final class QuotPrintJitHelper
         }
 
         return $out;
+    }
+
+    /** @return int hex nibble or -1 */
+    private static function hexValOrNegChar(string $ch): int
+    {
+        return match ($ch) {
+            '0' => 0,
+            '1' => 1,
+            '2' => 2,
+            '3' => 3,
+            '4' => 4,
+            '5' => 5,
+            '6' => 6,
+            '7' => 7,
+            '8' => 8,
+            '9' => 9,
+            'A' => 10,
+            'B' => 11,
+            'C' => 12,
+            'D' => 13,
+            'E' => 14,
+            'F' => 15,
+            'a' => 10,
+            'b' => 11,
+            'c' => 12,
+            'd' => 13,
+            'e' => 14,
+            'f' => 15,
+            default => -1,
+        };
     }
 
     /** @return int hex nibble or -1 */
