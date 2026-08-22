@@ -102,19 +102,16 @@ final class JitDomParentNodeProperty
 
         $context->builder->positionAtEnd($checkFreed);
         $afterFreed = BasicBlockHelper::append($context, 'dom_parent_after_freed');
-        if (JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
-            $sentinel = self::ensureSentinel($context);
-            $isFreed = $context->builder->icmp(Builder::INT_EQ, $parentObj, $sentinel);
-            $fatalBlock = BasicBlockHelper::append($context, 'dom_parent_freed');
-            $context->builder->branchIf($isFreed, $fatalBlock, $afterFreed);
+        // Runtime sentinel compare — markFreed() may run on any user-script textContent detach (#33807).
+        $sentinel = self::ensureSentinel($context);
+        $isFreed = $context->builder->icmp(Builder::INT_EQ, $parentObj, $sentinel);
+        $fatalBlock = BasicBlockHelper::append($context, 'dom_parent_freed');
+        $context->builder->branchIf($isFreed, $fatalBlock, $afterFreed);
 
-            $context->builder->positionAtEnd($fatalBlock);
-            self::emitFreedNodeError($context);
-            if (!$context->builder->getInsertBlock()->getTerminator()) {
-                $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
-            }
-        } else {
-            $context->builder->branch($afterFreed);
+        $context->builder->positionAtEnd($fatalBlock);
+        self::emitFreedNodeError($context);
+        if (!$context->builder->getInsertBlock()->getTerminator()) {
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
         }
 
         $context->builder->positionAtEnd($afterFreed);
