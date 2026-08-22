@@ -88,14 +88,11 @@ final class HashTableCowLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $srcHt,
-            $idx
-        );
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL must survive COW / array_replace (#33699).
+        $isUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $srcHt, $idx);
         $skip = BasicBlockHelper::append($context, 'ht_cow_dup_packed_skip_'.$tag);
         $copy = BasicBlockHelper::append($context, 'ht_cow_dup_packed_copy_'.$tag);
-        $context->builder->branchIf($isSet, $copy, $skip);
+        $context->builder->branchIf($isUndef, $skip, $copy);
 
         $context->builder->positionAtEnd($copy);
         $elem = HashTableReadLlvm::readIndexedToValueBox($context, $srcHt, $idx);
@@ -171,23 +168,25 @@ final class HashTableCowLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $srcSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $srcHt,
-            $idx
-        );
+        // array + : skip UNDEFINED holes; null on either side is a defined key (#33699).
+        $srcUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $srcHt, $idx);
         $skip = BasicBlockHelper::append($context, 'ht_cow_union_packed_skip_'.$tag);
         $checkDest = BasicBlockHelper::append($context, 'ht_cow_union_packed_check_'.$tag);
-        $context->builder->branchIf($srcSet, $checkDest, $skip);
+        $context->builder->branchIf($srcUndef, $skip, $checkDest);
 
         $context->builder->positionAtEnd($checkDest);
-        $destSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $dest,
-            $idx
+        $destNextFree = $context->builder->load(
+            $context->builder->structGep($dest, $map['nextFreeElement'])
         );
+        $destPastEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $destNextFree);
+        $destInRange = BasicBlockHelper::append($context, 'ht_cow_union_packed_dest_in_'.$tag);
         $copy = BasicBlockHelper::append($context, 'ht_cow_union_packed_copy_'.$tag);
-        $context->builder->branchIf($destSet, $skip, $copy);
+        // Past end → missing key (add). In range → null counts as present; only UNDEFINED is missing.
+        $context->builder->branchIf($destPastEnd, $copy, $destInRange);
+
+        $context->builder->positionAtEnd($destInRange);
+        $destUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $dest, $idx);
+        $context->builder->branchIf($destUndef, $copy, $skip);
 
         $context->builder->positionAtEnd($copy);
         $elem = HashTableReadLlvm::readIndexedToValueBox($context, $srcHt, $idx);
@@ -277,14 +276,11 @@ final class HashTableCowLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $srcSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $srcHt,
-            $idx
-        );
+        // Skip TYPE_UNDEFINED holes only — null overlays must apply (#33699).
+        $srcUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $srcHt, $idx);
         $skip = BasicBlockHelper::append($context, 'ht_cow_replace_packed_skip_'.$tag);
         $copy = BasicBlockHelper::append($context, 'ht_cow_replace_packed_copy_'.$tag);
-        $context->builder->branchIf($srcSet, $copy, $skip);
+        $context->builder->branchIf($srcUndef, $skip, $copy);
 
         $context->builder->positionAtEnd($copy);
         $elem = HashTableReadLlvm::readIndexedToValueBox($context, $srcHt, $idx);

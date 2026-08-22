@@ -74,12 +74,9 @@ final class HashTableChangeKeyCaseLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $src,
-            $idx
-        );
-        $context->builder->branchIf($isSet, $take, $next);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL survives change_key_case (#33699).
+        $isUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $src, $idx);
+        $context->builder->branchIf($isUndef, $next, $take);
 
         $context->builder->positionAtEnd($take);
         $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $src, $idx);

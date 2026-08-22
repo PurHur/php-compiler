@@ -972,6 +972,28 @@ final class HashTableReadLlvm
     }
 
     /**
+     * Packed hole check for copy/walk — TYPE_UNDEFINED only, not TYPE_NULL.
+     *
+     * Prefer this over {@see __hashtable__offsetIsSet} (isset semantics) when iterating
+     * defined zvals for array_merge / values / pad / replace / unique / reverse / etc.
+     * (#33699 / #33696 / #24261 / #33639).
+     */
+    public static function packedIndexIsUndefined(Context $context, Value $ht, Value $index): Value
+    {
+        $entry = self::listEntryPointer($context, $ht, $index);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $context->structFieldMap['__value__']['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED & 0xff, false)
+        );
+    }
+
+    /**
      * Live child hashtable at a packed index (nested FETCH_DIM_W intermediate, #24011).
      * Mirrors {@see Builtin\Type\HashTable} `__hashtable__readStringKeyHashtable` for int keys.
      */

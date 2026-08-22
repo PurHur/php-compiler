@@ -395,14 +395,11 @@ final class HashTablePadLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $srcHt,
-            $idx
-        );
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL pads correctly (#33699).
+        $isUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $srcHt, $idx);
         $skip = BasicBlockHelper::append($context, 'ht_pad_shift_skip_'.$tag);
         $copy = BasicBlockHelper::append($context, 'ht_pad_shift_copy_'.$tag);
-        $context->builder->branchIf($isSet, $copy, $skip);
+        $context->builder->branchIf($isUndef, $skip, $copy);
 
         $context->builder->positionAtEnd($copy);
         $elem = HashTableReadLlvm::readIndexedToValueBox($context, $srcHt, $idx);
