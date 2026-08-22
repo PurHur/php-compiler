@@ -511,22 +511,10 @@ final class JitDateMutation
             );
         }
 
-        if (!$context->isUserScriptAot()) {
-            DateMutationRuntime::ensureLinked($context);
-        }
-
-        $dtObj = self::requireDateTimeObject($context, $args[0], $function.'()');
-        $intervalState = $args[1]->compileTimeDateInterval;
-        if ($context->isUserScriptAot() && null !== $intervalState) {
-            /** @var ObjectBuiltin $object */
-            $object = $context->type->object;
-            self::applyKnownIntervalStateViaLlvm($context, $object, $dtObj, $intervalState, 'DateTime', $add);
-        } else {
-            $intervalObj = self::requireDateIntervalObject($context, $args[1], $function);
-            self::applyIntervalToDateTimeObject($context, $dtObj, $intervalObj, 'DateTime', $add);
-        }
-
-        return self::returnObjectArg($context, $args[0]);
+        // Procedural date_add/date_sub share DateTime::add/sub lowering (#33781). The legacy
+        // requireDateTimeObject + returnObjectArg path aborted under user AOT on runtime
+        // month/year intervals (P1M) while the OOP path was already green.
+        return self::invokeObjectIntervalMutationForFunction($context, false, $add, $function, ...$args);
     }
 
     /**
@@ -547,11 +535,26 @@ final class JitDateMutation
         $function = $immutable
             ? ($add ? 'DateTimeImmutable::add' : 'DateTimeImmutable::sub')
             : ($add ? 'DateTime::add' : 'DateTime::sub');
+
+        return self::invokeObjectIntervalMutationForFunction($context, $immutable, $add, $function, ...$args);
+    }
+
+    private static function invokeObjectIntervalMutationForFunction(
+        Context $context,
+        bool $immutable,
+        bool $add,
+        string $function,
+        JITVariable ...$args
+    ): Value {
         $argc = \count($args);
+        $isProcedural = !\str_contains($function, '::');
         if ($argc !== 2) {
+            $message = $isProcedural
+                ? \sprintf('%s() expects exactly 2 arguments, %d given', $function, $argc)
+                : \sprintf('%s() expects exactly 1 argument, %d given', $function, max(0, $argc - 1));
             ExceptionBridge::emitArgumentCountErrorAndAbort(
                 $context,
-                \sprintf('%s() expects exactly 1 argument, %d given', $function, max(0, $argc - 1))
+                $message
             );
             BasicBlockHelper::ensureOpenInsertBlock($context, 'datetime_addsub_argc_cont');
             $ret = JitValueBox::alloc($context);
@@ -674,7 +677,12 @@ final class JitDateMutation
             return self::boxObjectPtr($context, $dtObj);
         }
 
-        $intervalObj = self::requireDateIntervalObject($context, $args[1], $function, 1);
+        $intervalObj = self::requireDateIntervalObject(
+            $context,
+            $args[1],
+            $function,
+            $isProcedural ? 2 : 1
+        );
         if ($context->isUserScriptAot()) {
             self::applyIntervalToDateTimeObjectViaLlvm($context, $dtObj, $intervalObj, $layout, $add);
         } else {
