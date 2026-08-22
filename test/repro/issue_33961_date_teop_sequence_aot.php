@@ -1,6 +1,6 @@
 <?php
 // Combined free date() T/e/O/P/r in one function — four unique NestedJIT token
-// helpers SIGSEGV after O (#33943 regression after #33958).
+// helpers SIGSEGV after O (#33961 / re-#33943 after #33958).
 $ts = strtotime('2024-01-15 12:00:00');
 echo date('T', $ts), "\n";
 echo date('e', $ts), "\n";

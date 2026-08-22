@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
  * @group llvm
  * @group aot
  */
-final class Issue33959DateTeopSequenceAotTest extends TestCase
+final class Issue33961DateTeopSequenceAotTest extends TestCase
 {
     public function testCivilRuntimeUsesSingleTokenDispatcher(): void
     {
@@ -34,8 +34,8 @@ final class Issue33959DateTeopSequenceAotTest extends TestCase
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
         $root = dirname(__DIR__, 2);
-        $src = $root.'/test/repro/issue_33959_date_teop_sequence_aot.php';
-        $bin = sys_get_temp_dir().'/phpc_date_teop_33959_'.getmypid().'.bin';
+        $src = $root.'/test/repro/issue_33961_date_teop_sequence_aot.php';
+        $bin = sys_get_temp_dir().'/phpc_date_teop_33961_'.getmypid().'.bin';
         $compile = 'PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
