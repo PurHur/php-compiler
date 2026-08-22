@@ -42896,6 +42896,81 @@ class Compiler {
         return $slot;
     }
 
+    /** @var int Synthetic echo-materialize locals for {main} FuncCall→echo (#23472). */
+    private static int $echoFuncCallMaterializeSeq = 0;
+
+    /**
+     * Lower `echo f()` in {main} like `$__phpcEchoN = f(); echo $__phpcEchoN` when another
+     * top-level call follows — mirrors named ASSIGN so JIT materializes a stable CV (#23472).
+     */
+    private function materializeCallResultSlotBeforeEcho(Block $block, Operand $expr, ?int $slot): ?int
+    {
+        if (
+            null === $slot
+            || 0 === $block->nOpCodes
+            || !$block->isMainScript()
+        ) {
+            return $slot;
+        }
+        $last = $block->opCodes[$block->nOpCodes - 1];
+        if (
+            OpCode::TYPE_FUNCCALL_EXEC_RETURN !== $last->type
+            || (int) $last->arg1 !== $slot
+            || !$block->callResultFeedsEcho($expr)
+            || !$this->mainHasLaterTopLevelFuncCallAfterEcho($block, $expr)
+        ) {
+            return $slot;
+        }
+        $name = '__phpcEchoMat' . (++self::$echoFuncCallMaterializeSeq);
+        $echoVar = new Operand\Variable(new Operand\Literal($name));
+        $srcOp = $block->getOperand($slot);
+        if (null !== $srcOp?->type) {
+            $echoVar->type = $srcOp->type;
+        }
+        $destSlot = $block->forceFreshVarSlot($echoVar);
+        $resultTemp = new Operand\Temporary();
+        if (null !== $srcOp?->type) {
+            $resultTemp->type = $srcOp->type;
+        }
+        $resultSlot = $block->forceFreshVarSlot($resultTemp, $destSlot);
+        $block->registerNamedAssignDest($echoVar, $destSlot);
+        $block->registerAssignResultLvalue($resultSlot, $destSlot);
+        $block->addOpCode(new OpCode(OpCode::TYPE_ASSIGN, $resultSlot, $destSlot, $slot));
+
+        return $destSlot;
+    }
+
+    /** True when {main} has a FuncCall after the one whose result is echoed. */
+    private function mainHasLaterTopLevelFuncCallAfterEcho(Block $block, Operand $expr): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $children = $block->orig->children;
+        $producerIndex = null;
+        foreach ($children as $i => $child) {
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && property_exists($child, 'result')
+                && $child->result instanceof Operand
+                && $this->operandsReferToSameVariable($expr, $child->result)
+            ) {
+                $producerIndex = $i;
+                break;
+            }
+        }
+        $start = \is_int($producerIndex) ? $producerIndex + 1 : 0;
+        $n = \count($children);
+        for ($i = $start; $i < $n; ++$i) {
+            $child = $children[$i];
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Echo must read the live CV slot after ++/-- or assign-op, not a stale literal (#23842).
      */
@@ -44016,6 +44091,7 @@ class Compiler {
                 } else {
                     $this->compileEmbeddedExprForOperand($terminal->expr, $block);
                     $var = $this->compileOperand($terminal->expr, $block, true);
+                    $var = $this->materializeCallResultSlotBeforeEcho($block, $terminal->expr, $var);
                     $var = $this->resolveEchoEmitSlot($terminal->expr, $block, $var);
                 }
 
