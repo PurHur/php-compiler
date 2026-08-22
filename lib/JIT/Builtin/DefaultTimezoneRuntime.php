@@ -186,11 +186,25 @@ final class DefaultTimezoneRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
+        // Same NestedJIT bundle as CivilRuntime so set/get and date('T') share statics (#33956).
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#24962'
+            [
+                '/ext/standard/DefaultTimezoneJitHelper.php',
+                '/ext/standard/DefaultTimezoneCivilJitHelper.php',
+            ],
+            [
+                self::GET_HELPER,
+                self::SET_HELPER,
+                self::NOTICE_HELPER,
+                'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::localCivilTimestamp',
+                'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::localIsDst',
+                'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenT',
+                'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenE',
+                'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenO',
+                'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenP',
+            ],
+            '#33956'
         );
     }
 

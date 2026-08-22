@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Block;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DefaultTimezoneCivilRuntime;
 use PHPCompiler\JIT\Builtin\DefaultTimezoneRuntime;
 use PHPCompiler\JIT\Builtin\ProcessIdentityJit;
 use PHPCompiler\JIT\Builtin\StringDateTime;
@@ -271,8 +272,11 @@ final class JitDate
         // does not yet re-bind this bake (follow-up: runtime token helper).
         $fmtLit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
         if (\is_string($fmtLit) && ($gmt || self::defaultTimezoneIsUtc())) {
-            // Timezone tokens only here — DateTime::format shares tryFormatCivilLiteral and
-            // must not bake UTC for named zones (#33939 / #33943).
+            // Free date('T'/'e'/'O'/'P') follows runtime date_default_timezone_set (#33956).
+            // Still UTC-bake date('r') / gmdate() tokens to avoid FormatDatetime SIGSEGV (#33943).
+            if (!$gmt && \in_array($fmtLit, ['T', 'e', 'O', 'P'], true)) {
+                return DefaultTimezoneCivilRuntime::emitTimezoneToken($context, $fmtLit, $timestamp);
+            }
             $tzLit = self::tryFormatUtcTimezoneLiteral($context, $fmtLit, $timestamp, $gmt);
             if (null !== $tzLit) {
                 return $tzLit;
@@ -281,6 +285,9 @@ final class JitDate
             if (null !== $civil) {
                 return $civil;
             }
+        }
+        if (\is_string($fmtLit) && !$gmt && \in_array($fmtLit, ['T', 'e', 'O', 'P'], true)) {
+            return DefaultTimezoneCivilRuntime::emitTimezoneToken($context, $fmtLit, $timestamp);
         }
 
         // Soft-null on 8.4 — Zend deprecate+coerce (#21208, reverts #19651 TypeError)

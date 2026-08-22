@@ -6,14 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_default_tz_civil_timestamp via DefaultTimezoneCivilJitHelper (#31047).
+ * JIT/AOT link for default-tz civil + date() T/e/O/P tokens (#31047, #33956).
  *
  * SSOT: {@see \PHPCompiler\ext\standard\DefaultTimezoneCivilJitHelper}
- * php-src: ext/date/lib/timelib.c — timelib_unixtime2local for procedural getdate/idate
+ * php-src: ext/date/lib/timelib.c — timelib_unixtime2local; php_format_date T/e/O/P
  */
 final class DefaultTimezoneCivilRuntime
 {
@@ -21,14 +23,37 @@ final class DefaultTimezoneCivilRuntime
 
     private const HELPER_PATH = '/ext/standard/DefaultTimezoneCivilJitHelper.php';
 
+    private const TZ_HELPER_PATH = '/ext/standard/DefaultTimezoneJitHelper.php';
+
     private const CIVIL_HELPER = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::localCivilTimestamp';
 
     private const IS_DST_HELPER = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::localIsDst';
+
+    private const TOKEN_T = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenT';
+
+    private const TOKEN_E = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenE';
+
+    private const TOKEN_O = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenO';
+
+    private const TOKEN_P = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::formatTokenP';
+
+    private const TZ_GET = 'PHPCompiler\\ext\\standard\\DefaultTimezoneJitHelper::defaultTimezoneGet';
+
+    private const TZ_SET = 'PHPCompiler\\ext\\standard\\DefaultTimezoneJitHelper::tryDefaultTimezoneSet';
+
+    private const TZ_NOTICE = 'PHPCompiler\\ext\\standard\\DefaultTimezoneJitHelper::emitInvalidTimezoneNotice';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::CIVIL_HELPER,
         self::IS_DST_HELPER,
+        self::TOKEN_T,
+        self::TOKEN_E,
+        self::TOKEN_O,
+        self::TOKEN_P,
+        self::TZ_GET,
+        self::TZ_SET,
+        self::TZ_NOTICE,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -36,10 +61,29 @@ final class DefaultTimezoneCivilRuntime
         self::implement($context);
     }
 
+    /** Emit free date() timezone token via NestedJIT-safe helper (#33956). */
+    public static function emitTimezoneToken(Context $context, string $token, Value $timestamp): Value
+    {
+        self::ensureLinked($context);
+        $logical = match ($token) {
+            'T' => self::TOKEN_T,
+            'e' => self::TOKEN_E,
+            'O' => self::TOKEN_O,
+            'P' => self::TOKEN_P,
+            default => throw new \InvalidArgumentException('unsupported tz token '.$token),
+        };
+        $helper = JitVmHelperLink::lookupCompiled($context, $logical, '#33956');
+        $args = 'e' === $token ? [] : [$timestamp];
+        $raw = JitNestedHelperCoerce::callHelper($context, $helper, $args);
+
+        return JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::ensureJitHelperCompiled($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -119,11 +163,11 @@ final class DefaultTimezoneCivilRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
+            [self::TZ_HELPER_PATH, self::HELPER_PATH],
             self::COMPILED_HELPERS,
-            '#31047'
+            '#33956'
         );
     }
 
