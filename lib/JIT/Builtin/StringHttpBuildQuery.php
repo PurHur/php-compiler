@@ -7,17 +7,17 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableNestedExportLlvm;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\HttpBuildQueryArrayLlvm;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_http_build_query via HttpBuildQueryJitHelper PHP (#9443, #24887, #26869, #33208).
+ * JIT/AOT link for __compiler_http_build_query (#9443, #24887, #26869, #33208, #33711).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringStrtr #21844).
- * Thin LLVM bridge forwards the ABI; call-site {@see ensureLinked} for thin standalone AOT (#26869).
+ * Runtime arrays use {@see HttpBuildQueryArrayLlvm} — NestedJIT HttpBuildQueryJitHelper SEGVs
+ * on HashTable receivers (#33711). Helper compile kept for any residual NestedJIT refs.
+ * Thin LLVM bridge; call-site {@see ensureLinked} for thin standalone AOT (#26869).
  * Type always-on empty decl removed (#33208) so leftover Type shells cannot mint http_build_query.1
  * (#31894 / #32122).
  * php-src: ext/standard/http.c — http_build_query
@@ -28,7 +28,9 @@ final class StringHttpBuildQuery
 
     private const BUILD_HELPER = 'PHPCompiler\\ext\\standard\\HttpBuildQueryJitHelper::build';
 
-    private const BRIDGE_ENTRY = 'http_build_query_bridge_entry';
+    private const ABI = '__compiler_http_build_query_llvm';
+
+    private const BRIDGE_ENTRY = 'http_build_query_llvm_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -37,7 +39,7 @@ final class StringHttpBuildQuery
 
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
-        '__compiler_http_build_query',
+        self::ABI,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -56,10 +58,9 @@ final class StringHttpBuildQuery
             return;
         }
 
-        $probe = $context->module->getNamedFunction('__compiler_http_build_query');
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
-            || (null !== $probe && $probe->countBasicBlocks() > 0)
-        ) {
+        $probe = $context->module->getNamedFunction(self::ABI);
+        // Only reuse when this LLVM bridge is present (#33711).
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -79,9 +80,9 @@ final class StringHttpBuildQuery
 
     private static function implementBuildBridge(Context $context): void
     {
-        $abiName = '__compiler_http_build_query';
+        $abiName = self::ABI;
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -94,41 +95,30 @@ final class StringHttpBuildQuery
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
-        $context->builder->positionAtEnd($entry);
-        $resultRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::BUILD_HELPER),
-            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $fn->getParam(3)]
-        );
-        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
-        $context->builder->returnValue($result);
+        // Register before body emit so nested ABI self-calls resolve (#33711).
         $context->registerFunction($abiName, $fn);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            // Pure LLVM walk — NestedJIT helper SEGVs on runtime HT receivers (#33711).
+            $context->builder->returnValue(
+                HttpBuildQueryArrayLlvm::build(
+                    $context,
+                    $fn->getParam(0),
+                    $fn->getParam(1),
+                    $fn->getParam(2),
+                    $fn->getParam(3)
+                )
+            );
+        });
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    /** @internal Used by {@see HttpBuildQueryArrayLlvm} to ensure export ABIs (#33711). */
+    public static function ensureJitHelperCompiled(Context $context): void
     {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#26869');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
+        // LLVM path only — do not NestedJIT-compile HttpBuildQueryJitHelper (SEGV / slow).
         HashTableNestedExportLlvm::ensureLinked($context);
-        NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
-        NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
-        NestedVmVariableMethodLlvm::ensureMethod($context, 'toint');
-        NestedVmVariableMethodLlvm::ensureMethod($context, 'tofloat');
-        NestedVmVariableMethodLlvm::ensureMethod($context, 'tobool');
-        NestedVmVariableMethodLlvm::ensureMethod($context, 'toarray');
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#26869'
-        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
