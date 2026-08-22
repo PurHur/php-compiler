@@ -468,6 +468,7 @@
             <file>./test/compliance/ConvertUudecodeReflectionReturnVMTest.php</file>
             <file>./test/compliance/StrtokReflectionReturnVMTest.php</file>
             <file>./test/compliance/GetenvReflectionReturnVMTest.php</file>
+            <file>./test/compliance/IptcparseReflectionReturnVMTest.php</file>
             <file>./test/compliance/ImageTypeToExtensionReflectionReturnVMTest.php</file>
             <file>./test/compliance/ObGetCleanReflection25593VMTest.php</file>
             <file>./test/compliance/RequiredMangledReflectionReturnVMTest.php</file>

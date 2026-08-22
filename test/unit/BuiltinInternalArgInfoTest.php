@@ -889,6 +889,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('array|string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getenv'));
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — array|false + $iptc_block (#27782). */
+    public function testIptcparseReflectionStubTypes(): void
+    {
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('iptcparse'));
+        $this->assertSame(['iptc_block'], BuiltinParamNames::paramNamesForInternalFunction('iptcparse'));
+    }
+
     /** php-src ext/standard/image.stub.php — InternalArgInfo return string (missing |false) (#28314). */
     public function testImageTypeToExtensionReflectionReturnUnion(): void
     {
