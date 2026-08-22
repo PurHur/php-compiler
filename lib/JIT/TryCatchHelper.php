@@ -338,16 +338,40 @@ final class TryCatchHelper
         $builder = $context->builder;
         $context->scope->blockStorage[$handlerBlock] = $branchBlock;
         $builder->positionAtEnd($branchBlock);
-        $mergeBb = $context->scope->blockStorage[$mergeBlock] ?? null;
-        if (null === $mergeBb) {
-            $mergeBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
-        }
+        // Mirror beginTry merge wiring: dedicated mergeBodyLlvmBb so catch-without-yield
+        // can branch after clear_throw_pending (#33726 / leftover of #27518). Previously
+        // mergeBodyCompiled was set without mergeBodyLlvmBb / blockStorage[merge], so
+        // buildDispatch left the catch arm unterminated → unreachable → AOT SIGSEGV.
+        $mergeHeaderBb = $context->scope->blockStorage[$mergeBlock] ?? null;
         if (!$handler->mergeBodyCompiled) {
-            if (!$context->compilingGeneratorResume) {
-                $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBb);
+            if (null === $mergeHeaderBb) {
+                $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+            }
+            $context->scope->blockStorage[$mergeBlock] = $mergeHeaderBb;
+            $context->scope->blockEntryStorage[$mergeBlock] = $mergeHeaderBb;
+            $mergeBodyBb = self::appendBlock($func, 'try_merge_body_'.self::blockSuffix($handler));
+            $handler->mergeBodyLlvmBb = $mergeBodyBb;
+            if (null === $mergeBodyBb->getTerminator()) {
+                if ($context->compilingGeneratorResume) {
+                    // Empty merge after catch (no further yield) completes the generator —
+                    // same exhaustion as resume_ip past the last yield (zend_generators.c).
+                    $builder->positionAtEnd($mergeBodyBb);
+                    self::emitGeneratorResumeExhausted($context);
+                } else {
+                    $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBodyBb);
+                }
+            }
+            $builder->positionAtEnd($mergeHeaderBb);
+            if (null === $mergeHeaderBb->getTerminator()) {
+                $builder->branch($mergeBodyBb);
             }
             $handler->mergeBodyCompiled = true;
+        } elseif (null === $mergeHeaderBb) {
+            $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+            $context->scope->blockStorage[$mergeBlock] = $mergeHeaderBb;
+            $context->scope->blockEntryStorage[$mergeBlock] = $mergeHeaderBb;
         }
+        $mergeBb = $mergeHeaderBb;
         $handler->dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
         self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args);
         if (null !== $tryOp->block1) {
@@ -355,6 +379,24 @@ final class TryCatchHelper
         }
         $builder->positionAtEnd($branchBlock);
         $builder->branch($tryBodyEntryBb);
+    }
+
+    /**
+     * Mark generator done and return 0 from the resume fn (catch fall-through, #33726).
+     */
+    private static function emitGeneratorResumeExhausted(Context $context): void
+    {
+        $builder = $context->builder;
+        $i64 = $context->getTypeFromString('int64');
+        $state = $context->generatorStateParam;
+        if (null !== $state) {
+            GeneratorHelper::ensureTypes($context);
+            $map = $context->structFieldMap['__generator_state__'];
+            $i1 = $context->getTypeFromString('int1');
+            $builder->store($i1->constInt(1, false), $builder->structGep($state, $map['done']));
+            $builder->store($i1->constInt(0, false), $builder->structGep($state, $map['has_current']));
+        }
+        $builder->returnValue($i64->constInt(0, false));
     }
 
     public static function emitMergeEntryCheck(
