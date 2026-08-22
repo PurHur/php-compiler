@@ -9,11 +9,15 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\JsonEncodeQuoteStringRuntime;
 use PHPCompiler\JIT\Builtin\StringJsonEncode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\DateTimeSupport;
+use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\EnumSupport;
+use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -25,6 +29,7 @@ use PHPLLVM\Value;
  * NestedJIT encodeValue resolveIndirect on those boxes SIGSEGVs (#27020).
  * Objects: NestedJIT encodeValue quotes class names — route via get_object_vars (#28638).
  * DateTime/DateTimeImmutable/DateTimeZone: Zend wire, not empty get_object_vars (#33752 / #14143).
+ * Enum cases: VmJson export wire (JsonSerializable + backing scalar), not get_object_vars (#6880).
  */
 final class JitJsonEncode
 {
@@ -33,6 +38,11 @@ final class JitJsonEncode
     public static function encode(Context $context, JITVariable $arg, Value $flags): Value
     {
         StringJsonEncode::ensureLinked($context);
+
+        $enumFold = self::tryFoldEnumCase($context, $arg, 0);
+        if (null !== $enumFold) {
+            return $enumFold;
+        }
 
         if (JITVariable::TYPE_HASHTABLE === $arg->type || ArrayBuiltinHelper::isNativeArray($arg->type)) {
             $ht = JITVariable::TYPE_HASHTABLE === $arg->type
@@ -178,6 +188,133 @@ final class JitJsonEncode
         }
 
         return null;
+    }
+
+    /**
+     * Fold enum case singletons to Zend json_encode wire (#6880, re-AOT regression).
+     *
+     * Thin AOT routes TYPE_OBJECT enum receivers through get_object_vars → {"name","value"}
+     * instead of backing scalars or JsonSerializable::jsonSerialize(). VmJson::export is
+     * the VM truth — reuse it at compile time when compileTimeEnumCase metadata is present.
+     *
+     * php-src: ext/json/php_json.c — php_json_encode_enum before default object encoding
+     */
+    public static function tryFoldEnumCase(Context $context, JITVariable $arg, int $flags): ?Value
+    {
+        $wire = self::compileTimeEnumCaseWire($context, $arg);
+        if (null === $wire) {
+            return null;
+        }
+
+        try {
+            $encoded = VmJsonFormat::encodeExported($wire, $flags);
+        } catch (VmJsonExportException $e) {
+            if (VmJsonFlags::throwsOnError($flags)) {
+                return JitJsonThrow::emitFromException(
+                    $context,
+                    new \JsonException(VmJson::errorMsgForCode($e->errorCode), $e->errorCode)
+                );
+            }
+            JitJsonEncodeCompileTime::emitSetLastError($context, $e->errorCode);
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return JitValueBox::pointer($context, $slot);
+        } catch (\JsonException $e) {
+            return JitJsonThrow::emitFromException($context, $e);
+        }
+        if (false === $encoded) {
+            $sticky = VmJson::lastError();
+            JitJsonEncodeCompileTime::emitSetLastError($context, $sticky);
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        $sticky = VmJson::lastError();
+        if (0 !== $sticky) {
+            JitJsonEncodeCompileTime::emitSetLastError($context, $sticky);
+        }
+
+        return $context->builder->load($context->constantStringFromString($encoded));
+    }
+
+    /**
+     * @return array<mixed>|bool|float|int|null|string|null
+     */
+    private static function compileTimeEnumCaseWire(Context $context, JITVariable $arg): mixed
+    {
+        if (null === $arg->compileTimeEnumCase) {
+            return null;
+        }
+        $objectBuiltin = $context->type->object;
+        if (!$objectBuiltin instanceof ObjectBuiltin) {
+            return null;
+        }
+        $classId = (int) $arg->compileTimeEnumCase['classId'];
+        $caseKey = (string) $arg->compileTimeEnumCase['caseKey'];
+        if (!$objectBuiltin->isEnumClassId($classId)) {
+            return null;
+        }
+        try {
+            $className = $objectBuiltin->classNameForId($classId);
+        } catch (\LogicException) {
+            return null;
+        }
+        $classLc = strtolower(ltrim($className, '\\'));
+        $ifaces = $objectBuiltin->allInterfacesForClassLc($classLc);
+        $hasJsonSerializable = \in_array('jsonserializable', $ifaces, true);
+
+        if (!$hasJsonSerializable) {
+            $backedType = $objectBuiltin->enumBackedTypeFor($classId);
+            if (null === $backedType) {
+                throw new VmJsonExportException(VmJson::ERROR_NON_BACKED_ENUM);
+            }
+
+            return $objectBuiltin->enumCaseBackingScalarForCase($classId, $caseKey);
+        }
+
+        $vmCtx = $context->runtime->vmContext ?? null;
+        if (null === $vmCtx) {
+            return null;
+        }
+        $vm = $context->runtime->vm();
+        $entry = $vmCtx->classes[$classLc] ?? null;
+        if (null === $entry) {
+            $entry = new ClassEntry($className);
+            $vmCtx->classes[$classLc] = $entry;
+        }
+        $entry->isEnum = true;
+        $entry->backedType = $objectBuiltin->enumBackedTypeFor($classId);
+        $entry->interfaces = array_values(array_filter(
+            $ifaces,
+            static fn (string $iface): bool => $objectBuiltin->isInterfaceClassLc($iface)
+        ));
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $caseVar = new VmVariable();
+        if (!EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($entry, $caseKey, $caseVar)) {
+            $caseName = $objectBuiltin->enumCaseCanonicalName($classId, $caseKey);
+            $backing = new VmVariable(VmVariable::TYPE_NULL);
+            $backing->null();
+            $backedType = $entry->backedType;
+            if (null !== $backedType) {
+                $scalar = $objectBuiltin->enumCaseBackingScalarForCase($classId, $caseKey);
+                match ($backedType) {
+                    'int' => $backing->int((int) $scalar),
+                    'string' => $backing->string((string) $scalar),
+                    default => null,
+                };
+            }
+            $caseVar = EnumCaseSupport::compileTimeCaseVariable($entry, $caseName, $backing);
+        }
+        try {
+            return VmJson::export($caseVar->resolveIndirect(), $vmCtx, $vm, null, 512);
+        } catch (VmJsonExportException $e) {
+            throw $e;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
