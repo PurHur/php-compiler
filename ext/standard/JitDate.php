@@ -266,6 +266,9 @@ final class JitDate
         // Thin AOT: NestedJIT FormatDatetime segfaults; common literals via UTC civil IR
         // (#27091 Y-m-d; #27121 date('Y', strtotime(...)) and peer single-token formats).
         // Matches Zend when default timezone is UTC (CI / docker image default).
+        // Timezone tokens for free date() assume compile-time UTC (#33943); runtime
+        // date_default_timezone_set is tracked in DefaultTimezoneJitHelper (#33950) and
+        // does not yet re-bind this bake (follow-up: runtime token helper).
         $fmtLit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
         if (\is_string($fmtLit) && ($gmt || self::defaultTimezoneIsUtc())) {
             // Timezone tokens only here — DateTime::format shares tryFormatCivilLiteral and
