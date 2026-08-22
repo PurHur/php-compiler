@@ -48,9 +48,12 @@ final class TypeDeadDatetimeGlobVecAbiRuntimeShrinkTest extends TestCase
 
     public function testRuntimeOwnersDeclareDatetimeGlobVecAbisModuleLocally(): void
     {
+        // localtime AOT is JitLocaltime IR (#33952 / peer getdate #26900); StringLocaltime is a no-op.
         $localtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringLocaltime.php');
-        $this->assertStringContainsString('__compiler_localtime', $localtime);
-        $this->assertStringContainsString('getNamedFunction(self::ABI_NAME)', $localtime);
+        $this->assertStringContainsString('Intentionally empty', $localtime);
+        $this->assertStringContainsString('#33952', $localtime);
+        $jitLocaltime = (string) file_get_contents(__DIR__.'/../../ext/standard/JitLocaltime.php');
+        $this->assertStringContainsString('JitGetdate::civilPartsPublic', $jitLocaltime);
 
         $gmgetdate = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGmgetdate.php');
         $this->assertStringContainsString('__compiler_gmgetdate', $gmgetdate);

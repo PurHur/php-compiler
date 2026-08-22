@@ -678,8 +678,10 @@ class Type extends Builtin {
         // stays JitGetdate IR / GetdateJitHelper (#26900). StringGetdate::implement()
         // is an intentional no-op.
         // __compiler_localtime / __compiler_gmgetdate / __compiler_gmmktime always-on
-        // shells removed (#32636): StringLocaltime / StringGmgetdate / StringGmmktime
-        // own the ABI (getNamedFunction first); php-src ext/standard/datetime.c.
+        // shells removed (#32636): StringLocaltime is a no-op — user-script localtime()
+        // stays JitLocaltime IR (#33952 / peer getdate #26900); StringGmgetdate /
+        // StringGmmktime own the remaining ABI (getNamedFunction first);
+        // php-src ext/standard/datetime.c.
         // __compiler_mktime / __compiler_getrusage always-on shells removed (#32651):
         // StringMktime / StringGetrusageRuntime own the ABI (getNamedFunction first);
         // user-script mktime()/getrusage() stay MktimeJitHelper / GetrusageJitHelper

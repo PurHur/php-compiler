@@ -13,13 +13,20 @@ use PHPUnit\Framework\TestCase;
 /** localtime/idate/gmgetdate route through VmDate PHP helpers not libc LLVM (#9181). */
 final class StringTimeBuiltinsRuntimeShrinkTest extends TestCase
 {
-    public function testStringLocaltimeRoutesThroughLocaltimeJitHelper(): void
+    public function testStringLocaltimeIsNoOpLinkForAot(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringLocaltime.php');
+        $this->assertStringContainsString('Intentionally empty', $source);
         $this->assertStringContainsString('LocaltimeJitHelper', $source);
+        $this->assertStringContainsString('#33952', $source);
         $this->assertStringNotContainsString("lookupFunction('localtime')", $source);
         $this->assertStringNotContainsString('__hashtable__setStringKeyLong', $source);
-        $this->assertLessThan(170, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(40, \substr_count($source, "\n") + 1);
+
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitLocaltime.php');
+        $this->assertStringContainsString('JitGetdate::civilPartsPublic', $jit);
+        $this->assertStringContainsString('__hashtable__setStringKeyLong', $jit);
+        $this->assertStringContainsString('#33952', $jit);
     }
 
     public function testStringIdateRoutesThroughIdateJitHelper(): void
