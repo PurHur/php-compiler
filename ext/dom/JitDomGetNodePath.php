@@ -79,10 +79,10 @@ final class JitDomGetNodePath
 
     public static function annotateChildFetch(JITVariable $result, string $propName): void
     {
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         $propLc = strtolower($propName);
         $nested = 'firstchild' === $propLc
             && self::$lastChildFetchWasFirstChild
@@ -94,6 +94,10 @@ final class JitDomGetNodePath
             $parentPath = self::$lastParentPath;
             $parentInner = self::$lastParentInner;
             if (null === $parentInner) {
+                // No parent walk yet — need a loadXML literal (may be destination).
+                if (null === $xml) {
+                    return;
+                }
                 $parentPath = '/'.DomParseSimpleXmlJitHelper::rootTagArgv($xml);
                 $parentInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
             }
@@ -113,10 +117,14 @@ final class JitDomGetNodePath
         $result->compileTimeDomInnerXml = $inner;
         if ('element' === ($siblings[$index]['kind'] ?? '')) {
             $result->compileTimeDomTagName = $siblings[$index]['data'];
+            // Keep lastFetched* in sync when annotateCompileTimeChild early-returned
+            // on the destination (empty) last loadXML — importNode ARG_SEND recovery.
+            JitDomNodeChildProperty::$lastFetchedTagName = $siblings[$index]['data'];
         }
         $result->compileTimeDomChildIndex = $index;
+        JitDomNodeChildProperty::$lastFetchedChildIndex = $index;
         $result->compileTimeDomLineNo = JitDomGetLineNo::childLineNo(
-            JitDomLoadXMLUserScript::lastCompileTimeXmlSource() ?? $xml,
+            JitDomLoadXMLUserScript::lastCompileTimeXmlSource() ?? $xml ?? '',
             (string) $parentInner,
             $index
         );

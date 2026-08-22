@@ -135,13 +135,21 @@ final class DomUserScriptLiveTagListLlvm
      *
      * {@code *} and empty query tags match any element (#33659). Appends before
      * the first query go to {@see GLOBAL_PENDING}.
+     *
+     * Deep importNode/cloneNode subtrees must bump by descendant element count
+     * (xmlDocCopyNode), not +1 for the root only — otherwise
+     * {@code getElementsByTagName('*')} misses nested children after append.
      */
     public static function incrementForChildArg(Context $context, \PHPCompiler\JIT\Variable $childArg): void
     {
         self::ensureGlobals($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_us_live_tag_child_inc');
         $i64 = $context->getTypeFromString('int64');
-        $one = $i64->constInt(1, false);
+        $deltaN = self::compileTimeSubtreeElementCount($childArg);
+        if ($deltaN <= 0) {
+            return;
+        }
+        $delta = $i64->constInt($deltaN, false);
         $tagGlobal = $context->module->getNamedGlobal(self::GLOBAL_TAG);
         $countGlobal = $context->module->getNamedGlobal(self::GLOBAL_COUNT);
         $pendingGlobal = $context->module->getNamedGlobal(self::GLOBAL_PENDING);
@@ -159,7 +167,7 @@ final class DomUserScriptLiveTagListLlvm
 
         $context->builder->positionAtEnd($bbPending);
         $pending = $context->builder->load($pendingGlobal);
-        $context->builder->store($context->builder->add($pending, $one), $pendingGlobal);
+        $context->builder->store($context->builder->add($pending, $delta), $pendingGlobal);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbActive);
@@ -177,24 +185,105 @@ final class DomUserScriptLiveTagListLlvm
 
         $context->builder->positionAtEnd($bbAny);
         $storedCount = $context->builder->load($countGlobal);
-        $context->builder->store($context->builder->add($storedCount, $one), $countGlobal);
+        $context->builder->store($context->builder->add($storedCount, $delta), $countGlobal);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbExact);
+        // Exact tag: bump once for the child local name (createElement). When a prior
+        // getElementsByTagName query is live, count matching names in the subtree.
+        $queryTag = JitDomGetElementsByTagNameUserScript::lastTagQuery();
         $lit = \PHPCompiler\JIT\JitStringBuiltinArg::compileTimeLiteral($childArg)
             ?? $childArg->compileTimeString
-            ?? $childArg->compileTimeDomTagName;
-        if (null !== $lit) {
+            ?? $childArg->compileTimeDomTagName
+            ?? JitDomImportNode::$lastMaterializedTagName;
+        if (null !== $queryTag && '*' !== $queryTag && '' !== $queryTag) {
+            $matchN = self::compileTimeSubtreeTagMatchCount($childArg, $queryTag);
+            if ($matchN > 0) {
+                $childTag = $context->builder->load(
+                    $context->constantStringFromString(strtolower($queryTag))
+                );
+                for ($i = 0; $i < $matchN; ++$i) {
+                    self::increment($context, $childTag);
+                }
+            }
+        } elseif (null !== $lit) {
             $childTag = $context->builder->load(
                 $context->constantStringFromString(strtolower($lit))
             );
             self::increment($context, $childTag);
         } else {
-            self::incrementCount($context);
+            for ($i = 0; $i < $deltaN; ++$i) {
+                self::incrementCount($context);
+            }
         }
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
+    }
+
+    /**
+     * How many elements enter the document with this child (deep subtree).
+     */
+    private static function compileTimeSubtreeElementCount(\PHPCompiler\JIT\Variable $childArg): int
+    {
+        $tag = $childArg->compileTimeDomTagName
+            ?? JitDomImportNode::$lastMaterializedTagName
+            ?? JitDomCloneNode::$lastResultTagName
+            ?? JitDomNodeChildProperty::$lastFetchedTagName;
+        if (null === $tag || '' === $tag) {
+            return 1;
+        }
+        if (str_starts_with($tag, '#')) {
+            return 0;
+        }
+        // ARG_SEND / call-result temps often keep an empty InnerXml stamp while
+        // importNode/cloneNode still hold the deep materialize on statics.
+        $inner = self::resolveChildInnerXml($childArg);
+        $outer = '<'.$tag.'>'.($inner ?? '').'</'.$tag.'>';
+
+        return max(1, DomParseSimpleXmlJitHelper::countTagArgv($outer, '*'));
+    }
+
+    /**
+     * Elements in the entering subtree whose local name matches {@see $queryTag}.
+     */
+    private static function compileTimeSubtreeTagMatchCount(
+        \PHPCompiler\JIT\Variable $childArg,
+        ?string $queryTag
+    ): int {
+        if (null === $queryTag || '' === $queryTag || '*' === $queryTag) {
+            return self::compileTimeSubtreeElementCount($childArg);
+        }
+        $tag = $childArg->compileTimeDomTagName
+            ?? JitDomImportNode::$lastMaterializedTagName
+            ?? JitDomCloneNode::$lastResultTagName
+            ?? JitDomNodeChildProperty::$lastFetchedTagName;
+        if (null === $tag || '' === $tag || str_starts_with($tag, '#')) {
+            return 0;
+        }
+        $inner = self::resolveChildInnerXml($childArg);
+        $outer = '<'.$tag.'>'.($inner ?? '').'</'.$tag.'>';
+
+        return DomParseSimpleXmlJitHelper::countTagArgv($outer, $queryTag);
+    }
+
+    /** Prefer non-empty materialize InnerXml over empty ARG_SEND stamps. */
+    private static function resolveChildInnerXml(\PHPCompiler\JIT\Variable $childArg): ?string
+    {
+        $inner = $childArg->compileTimeDomInnerXml;
+        if (null !== $inner && '' !== $inner) {
+            return $inner;
+        }
+        if (null !== JitDomImportNode::$lastMaterializedInnerXml
+            && '' !== JitDomImportNode::$lastMaterializedInnerXml
+        ) {
+            return JitDomImportNode::$lastMaterializedInnerXml;
+        }
+        if (null !== $inner) {
+            return $inner;
+        }
+
+        return null;
     }
 
     /**

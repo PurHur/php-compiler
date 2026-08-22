@@ -28,8 +28,16 @@ final class JitDomImportNode
 {
     private const CLASS_DOCUMENT = 'DOMDocument';
 
+    /** Tag of the last user-script materialize — ARG_SEND may drop Variable stamps. */
+    public static ?string $lastMaterializedTagName = null;
+
+    /** InnerXml of that materialize — subtree element count for live tag lists. */
+    public static ?string $lastMaterializedInnerXml = null;
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        self::$lastMaterializedTagName = null;
+        self::$lastMaterializedInnerXml = null;
         if (\count($args) < 2) {
             throw new \LogicException('DOMDocument::importNode() expects receiver and node');
         }
@@ -144,6 +152,8 @@ final class JitDomImportNode
      *
      * Prefer the *source node* compile-time tag/inner (#32987) — lastCompileTimeXml is
      * the globally last loadXML and is wrong when importing across two documents.
+     * ARG_SEND temps for `$src->documentElement->firstChild` often drop Variable
+     * stamps; recover via lastFetched* + source-document markup (peer cloneNode #32949).
      *
      * `$deep` mirrors php-src xmlDocCopyNode: shallow omits child markup (#33097).
      * Attribute suffix is always applied (deep does not gate attrs; #33362).
@@ -162,15 +172,83 @@ final class JitDomImportNode
         $id = 'target';
         $fromXml = false;
         $srcTag = $sourceNode->compileTimeDomTagName ?? null;
+        $srcInner = $sourceNode->compileTimeDomInnerXml ?? null;
+        $srcIndex = $sourceNode->compileTimeDomChildIndex ?? null;
+        // ARG_SEND copies drop compile-time DOM stamps (peer cloneNode #32949).
+        // 1) Child edges: lastFetchedChildIndex from firstChild/lastChild walks.
+        // 2) documentElement: annotateDocumentElement clears lastFetched* but leaves
+        //    GetNodePath::$lastPath as a single-segment path ('/x') + $lastInner.
+        if ((null === $srcTag || '' === $srcTag) && null === $sourceNode->compileTimeDomNodePath) {
+            $srcIndex = $srcIndex ?? JitDomNodeChildProperty::$lastFetchedChildIndex;
+            if (null !== $srcIndex) {
+                $srcTag = JitDomNodeChildProperty::$lastFetchedTagName;
+                $srcInner = $srcInner ?? JitDomGetNodePath::$lastInner;
+            } elseif (null !== JitDomGetNodePath::$lastPath
+                && 1 === preg_match('#^/([^/\[\]]+)$#', JitDomGetNodePath::$lastPath, $pathMatch)
+            ) {
+                $srcTag = $pathMatch[1];
+                $srcInner = $srcInner ?? JitDomGetNodePath::$lastInner;
+            }
+        } elseif ((null === $srcTag || '' === $srcTag)
+            && null !== $sourceNode->compileTimeDomNodePath
+            && 1 === preg_match('#/([^/\[\]]+)$#', $sourceNode->compileTimeDomNodePath, $pathMatch)
+        ) {
+            // nodePath survived ARG_SEND but tagName did not.
+            $srcTag = $pathMatch[1];
+            $srcInner = $srcInner ?? $sourceNode->compileTimeDomInnerXml ?? JitDomGetNodePath::$lastInner;
+        }
+        // Seed recovered index/tag so resolveSourceElementMarkup can pick the child.
+        if (null !== $srcIndex && null === $sourceNode->compileTimeDomChildIndex) {
+            $sourceNode->compileTimeDomChildIndex = $srcIndex;
+        }
+        if (null !== $srcTag && '' !== $srcTag && null === $sourceNode->compileTimeDomTagName) {
+            $sourceNode->compileTimeDomTagName = $srcTag;
+        }
         if (null !== $srcTag && '' !== $srcTag) {
             $tag = $srcTag;
-            $inner = $sourceNode->compileTimeDomInnerXml ?? '';
-            $fromXml = true;
+            if (null !== $srcInner) {
+                $inner = $srcInner;
+                $fromXml = true;
+            } else {
+                $dstXml = JitDomLoadXMLUserScript::compileTimeXmlFor($documentVar)
+                    ?? $documentVar->compileTimeDomLoadXml
+                    ?? null;
+                $markup = self::resolveSourceElementMarkup($sourceNode, $tag, $dstXml);
+                if (null !== $markup) {
+                    $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($markup);
+                    if (null !== $parsed) {
+                        $inner = $parsed['inner'];
+                    }
+                }
+                $fromXml = true;
+            }
         }
         if (!$fromXml) {
+            // Cross-document: recover source markup excluding the *destination* loadXML
+            // (lastCompileTimeXml is often the source when documentElement was loaded last).
+            $dstXml = JitDomLoadXMLUserScript::compileTimeXmlFor($documentVar)
+                ?? $documentVar->compileTimeDomLoadXml
+                ?? null;
+            $markup = self::resolveSourceElementMarkup($sourceNode, '', $dstXml);
+            if (null !== $markup) {
+                $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($markup);
+                if (null !== $parsed) {
+                    $tag = $parsed['tag'];
+                    $inner = $parsed['inner'];
+                    $fromXml = true;
+                }
+            }
+        }
+        if (!$fromXml) {
+            $dstXml = JitDomLoadXMLUserScript::compileTimeXmlFor($documentVar)
+                ?? $documentVar->compileTimeDomLoadXml
+                ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+            // Prefer source-bound / non-destination literals — never treat the destination
+            // loadXML root as the imported element when another document exists.
             $xml = $sourceNode->compileTimeDomLoadXml
                 ?? JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
-                ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+                ?? JitDomLoadXMLUserScript::compileTimeXmlExcluding($dstXml)
+                ?? $dstXml;
             if (null !== $xml) {
                 $root = self::parseCompileTimeXmlRoot($xml);
                 if (null !== $root) {
@@ -192,7 +270,10 @@ final class JitDomImportNode
             $text = '';
         }
 
-        $attrInfo = self::resolveSourceAttrInfo($sourceNode, $tag);
+        self::$lastMaterializedTagName = $tag;
+        self::$lastMaterializedInnerXml = $inner;
+
+        $attrInfo = self::resolveSourceAttrInfo($sourceNode, $tag, $documentVar);
 
         $element = JitDomCreateElement::materializeForUserScriptDocument(
             $context,
@@ -202,6 +283,12 @@ final class JitDomImportNode
         );
         if ($deep && '' !== $inner) {
             JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
+            // saveXML reads InnerXml; getElementsByTagName / firstChild need LiveSlots
+            // (peer cloneNode #32949 / xmlDocCopyNode deep).
+            $attrs = $attrInfo['attrs'];
+            $openAttrs = '' === $attrs ? '' : (str_starts_with($attrs, ' ') ? $attrs : ' '.$attrs);
+            $outer = '<'.$tag.$openAttrs.'>'.$inner.'</'.$tag.'>';
+            JitDomDocumentElement::syncChildrenFromXmlPublic($context, $element, $outer);
         }
         // xmlDocCopyNode always copies attributes; #33097 only cleared children (#33362).
         if ('' !== $attrInfo['attrs']) {
@@ -225,7 +312,7 @@ final class JitDomImportNode
     public static function compileTimeAttributesFor(JITVariable $sourceNode, ?string $tag = null): ?array
     {
         $tag = $tag ?? ($sourceNode->compileTimeDomTagName ?? '');
-        $info = self::resolveSourceAttrInfo($sourceNode, (string) $tag);
+        $info = self::resolveSourceAttrInfo($sourceNode, (string) $tag, null);
         if ([] === $info['pairs']) {
             return $sourceNode->compileTimeDomAttributes;
         }
@@ -240,14 +327,16 @@ final class JitDomImportNode
     /**
      * Open-tag attr suffix + NamedNodeMap pairs for the imported source node (#33362).
      *
-     * Cross-document importNode runs after the destination loadXML, so
-     * {@see JitDomLoadXMLUserScript::lastCompileTimeXml()} is the *dst* tree —
-     * recover the source child/root markup from remembered literals instead.
+     * Cross-document importNode must exclude the *destination* loadXML literal —
+     * lastCompileTimeXml may be either document depending on load order.
      *
      * @return array{attrs: string, pairs: list<array{qname: string, value: string}>}
      */
-    private static function resolveSourceAttrInfo(JITVariable $sourceNode, string $tag): array
-    {
+    private static function resolveSourceAttrInfo(
+        JITVariable $sourceNode,
+        string $tag,
+        ?JITVariable $destinationDocument = null
+    ): array {
         $empty = ['attrs' => '', 'pairs' => []];
         if (null !== $sourceNode->compileTimeDomAttributes && [] !== $sourceNode->compileTimeDomAttributes) {
             $parts = [];
@@ -263,7 +352,12 @@ final class JitDomImportNode
             return ['attrs' => $attrs, 'pairs' => $pairs];
         }
 
-        $markup = self::resolveSourceElementMarkup($sourceNode, $tag);
+        $dstXml = null;
+        if (null !== $destinationDocument) {
+            $dstXml = JitDomLoadXMLUserScript::compileTimeXmlFor($destinationDocument)
+                ?? $destinationDocument->compileTimeDomLoadXml;
+        }
+        $markup = self::resolveSourceElementMarkup($sourceNode, $tag, $dstXml);
         if (null === $markup) {
             return $empty;
         }
@@ -285,9 +379,14 @@ final class JitDomImportNode
 
     /**
      * Outer markup of the imported element from compile-time loadXML literals (#33362).
+     *
+     * @param string|null $excludeDstXml Destination document loadXML — never treat as source
      */
-    private static function resolveSourceElementMarkup(JITVariable $sourceNode, string $tag): ?string
-    {
+    private static function resolveSourceElementMarkup(
+        JITVariable $sourceNode,
+        string $tag,
+        ?string $excludeDstXml = null
+    ): ?string {
         $index = $sourceNode->compileTimeDomChildIndex;
         $candidates = [];
         $bound = $sourceNode->compileTimeDomLoadXml
@@ -295,13 +394,17 @@ final class JitDomImportNode
         if (null !== $bound) {
             $candidates[] = $bound;
         }
-        // Destination loadXML is usually last — prefer every other remembered literal first.
-        $exclude = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        // Prefer non-destination remembered literals first.
+        $exclude = $excludeDstXml ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         $alt = JitDomLoadXMLUserScript::compileTimeXmlExcluding($exclude);
         if (null !== $alt) {
             $candidates[] = $alt;
         }
-        if (null !== $exclude) {
+        // Only fall back to the excluded literal when it is *not* the destination
+        // (legacy single-document / source-loaded-last paths).
+        if (null !== $exclude && $exclude !== $excludeDstXml) {
+            $candidates[] = $exclude;
+        } elseif (null !== $exclude && null === $excludeDstXml) {
             $candidates[] = $exclude;
         }
         $seen = [];
