@@ -19,8 +19,8 @@ use PHPLLVM\Value;
 /**
  * mb_eregi() — case-insensitive multibyte regex match (php-src ext/mbstring/php_mbregex.c; #4635, #33648).
  *
- * JIT/AOT leftover #33648: catchable argc/TypeError paths (peer mb_ereg); 2-arg compile-time
- * literal fold via {@see JitMbEregSearch::tryEregFold}. &$regs happy-path remains follow-up.
+ * JIT/AOT: catchable argc/TypeError (#33648); literal fold via {@see JitMbEregSearch::tryEregFold};
+ * runtime via {@see JitMbEreg} → {@see MbEregJitHelper} (#33811).
  */
 final class mb_eregi extends Internal
 {
@@ -97,7 +97,7 @@ final class mb_eregi extends Internal
             return $folded;
         }
 
-        throw new \LogicException('mb_eregi() is not lowered for JIT/AOT in this compiler build');
+        return JitMbEreg::invokeMatch($context, $args, true);
     }
 
     private static function foldFalse(Context $context): Value
