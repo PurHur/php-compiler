@@ -116,6 +116,8 @@ final class BuiltinInternalArgInfo
             'strpos', 'stripos', 'strrpos', 'strripos' => 'int|false',
             // strchr alias: InternalArgInfo return string + only 2 params (#25758, re-#25442)
             'strstr', 'stristr', 'strchr', 'strrchr' => 'string|false',
+            // ext/standard/string.stub.php — InternalArgInfo return string (missing |false) (#25760)
+            'strtok' => 'string|false',
             // ext/standard/string.stub.php — chop rtrim alias absent from InternalArgInfo (#28255, re-#24039)
             'chop' => 'string',
             // ext/standard/string.stub.php — InternalArgInfo return empty (#23919)
