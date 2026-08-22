@@ -142,6 +142,11 @@ final class json_encode extends Internal
             throw new \LogicException('json_encode() flags not supported at runtime in this compiler build');
         }
 
+        $dateFold = JitJsonEncode::tryFoldDateTimeFamily($context, $args[0], $knownFlags ?? 0);
+        if (null !== $dateFold) {
+            return $dateFold;
+        }
+
         return JitJsonEncode::encode($context, $args[0], $flagsVal);
     }
 
