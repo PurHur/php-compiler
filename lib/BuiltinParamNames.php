@@ -1185,7 +1185,7 @@ final class BuiltinParamNames
             case 'debug_zval_dump':
             case 'max':
             case 'min':
-                return ['value', 'values'];
+                return ['value', '...values'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says var (#23308)
             case 'print_r':
             case 'var_export':

@@ -161,6 +161,8 @@ final class BuiltinInternalArgInfo
             'error_clear_last' => 'void',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#28909)
             'debug_print_backtrace' => 'void',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#27982, re-#23679)
+            'debug_zval_dump' => 'void',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return empty; Zend void (#27998)
             'clearstatcache' => 'void',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#28307, #27950)
@@ -917,6 +919,11 @@ final class BuiltinInternalArgInfo
             // ext/standard/basic_functions.stub.php — mixed ...$values variadic type (#28177)
             'sprintf', 'printf' => 1 === $index ? 'mixed' : null,
             'fprintf' => 2 === $index ? 'mixed' : null,
+            // ext/standard/basic_functions.stub.php — mixed $value, mixed ...$values (#27982, re-#23679)
+            'debug_zval_dump' => match ($index) {
+                0, 1 => 'mixed',
+                default => null,
+            },
             // ext/standard/basic_functions.stub.php — show_source(string $filename, bool $return=false) (#28756)
             'show_source' => match ($index) {
                 0 => 'string',
