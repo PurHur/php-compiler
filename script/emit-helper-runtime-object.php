@@ -354,6 +354,8 @@ if (null !== $unitPath) {
         '/ext/standard/DateTimeFormatJitHelper.php' => true,
         // #27068 — NestedJIT FilterEmailValidate into user AOT (const path folds in JitFilter).
         '/ext/filter/FilterEmailValidate.php' => true,
+        // #27206 — unit.o segfaults under HELPER_RUNTIME_O=1; NestedJIT into user AOT (peer EMAIL).
+        '/ext/filter/FilterUrlValidate.php' => true,
         // #26989 — unit.o calls __compiler_preg_match without a provider in the helper TU;
         // NestedJIT into the user module so PregMatchRuntime can link (cold-build hello-world).
         '/ext/standard/PendingHeadersJitHelper.php' => true,
