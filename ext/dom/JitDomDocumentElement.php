@@ -86,19 +86,21 @@ final class JitDomDocumentElement
         \PHPCompiler\JIT\Context $context,
         Value $element,
         string $xml,
-        string $parentPath = ''
+        string $parentPath = '',
+        ?Value $ownerDocument = null
     ): void {
         if ('' === $parentPath) {
             $parentPath = '/'.DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         }
-        self::syncChildrenFromXml($context, $element, $xml, $parentPath);
+        self::syncChildrenFromXml($context, $element, $xml, $parentPath, $ownerDocument);
     }
 
     private static function syncChildrenFromXml(
         \PHPCompiler\JIT\Context $context,
         Value $element,
         string $xml,
-        string $parentPath
+        string $parentPath,
+        ?Value $ownerDocument = null
     ): void {
         // Include blank text / comments so childNodes->length matches Zend (#27260).
         $children = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
@@ -135,7 +137,7 @@ final class JitDomDocumentElement
                         $openAttrs = DomParseSimpleXmlJitHelper::attrSuffixFromOpenTagArgv($node['open']);
                     }
                     $outer = '<'.$node['data'].$openAttrs.'>'.$inner.'</'.$node['data'].'>';
-                    self::syncChildrenFromXml($context, $child, $outer, $childPath);
+                    self::syncChildrenFromXml($context, $child, $outer, $childPath, $ownerDocument);
                 }
             }
             if ('element' === $node['kind'] && isset($node['open']) && \is_string($node['open'])) {
@@ -157,6 +159,28 @@ final class JitDomDocumentElement
                 $parentJit,
                 JITVariable::TYPE_VALUE
             );
+            // Seed ownerDocument for Wrong Document checks / $node->ownerDocument (#33937).
+            if (null !== $ownerDocument) {
+                $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+                if (!$objectType->hasProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT)) {
+                    $objectType->defineProperty(
+                        $elementClassId,
+                        VmDom::PROP_OWNER_DOCUMENT,
+                        JITVariable::TYPE_VALUE
+                    );
+                }
+                $docJit = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_OBJECT,
+                    JITVariable::KIND_VALUE,
+                    $ownerDocument
+                );
+                $objectType->propertyStore(
+                    $objectType->propertySlotFor($child, self::CLASS_ELEMENT, VmDom::PROP_OWNER_DOCUMENT),
+                    $docJit,
+                    JITVariable::TYPE_VALUE
+                );
+            }
             if (null !== $prev) {
                 $childJit = new JITVariable(
                     $context,

@@ -694,7 +694,7 @@ final class JitDomLoadXMLUserScript
             $element,
             DomParseSimpleXmlJitHelper::rootAttributesArgv($xml)
         );
-        JitDomDocumentElement::syncChildrenFromXmlPublic($context, $element, $xml, '/'.$tag);
+        JitDomDocumentElement::syncChildrenFromXmlPublic($context, $element, $xml, '/'.$tag, $document);
 
         $objectType = $context->type->object;
         $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
@@ -725,6 +725,16 @@ final class JitDomLoadXMLUserScript
         );
         $objectType->propertyStore(
             $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+            $docJit,
+            JITVariable::TYPE_VALUE
+        );
+        // Seed ownerDocument so foreign-mutation Wrong Document resolves without
+        // reading an unset slot (#33937 / peer createElement #21687).
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT, JITVariable::TYPE_VALUE);
+        }
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_OWNER_DOCUMENT),
             $docJit,
             JITVariable::TYPE_VALUE
         );
