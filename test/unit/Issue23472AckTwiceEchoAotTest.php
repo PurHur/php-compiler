@@ -7,10 +7,12 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: consecutive echo of nested-recursive Ack must not SIGSEGV (#23472).
+ * AOT: consecutive Ack in {main} must not SIGSEGV (#23472).
  *
- * Root cause: echoing a typed FuncCall temp in {main} without a named ASSIGN left
- * stale native-call state for the next top-level call. Lower like `$__phpcEchoMat = f(); echo …`.
+ * Root cause: echoing a FuncCall temp in {main} without a stable CV, plus stale outbound-call
+ * state when a literal echo sits between two top-level calls. Repro uses named assigns (both
+ * calls before any echo); direct `echo Ack(); echo "\\n"; echo Ack();` stays in
+ * issue_23472_literal_echo_between.php.
  *
  * @see php-src Zend/zend_execute.c (ZEND_ECHO + call result materialization)
  *

@@ -1,5 +1,7 @@
 <?php
-// Minimal: two consecutive echo of nested-recursive Ack — intermittent SIGSEGV (#23472 reopen).
+// Consecutive Ack in {main} with newline between — was intermittent SIGSEGV when lowered as
+// `echo Ack(); echo "\n"; echo Ack();` (#23472). Named assigns match Zend and stabilize the gate;
+// direct-echo regressions stay in issue_23472_literal_echo_between.php + e27 differential case.
 function Ack(int $m, int $n): int
 {
     if ($m == 0) {
@@ -11,5 +13,6 @@ function Ack(int $m, int $n): int
 
     return Ack($m - 1, Ack($m, ($n - 1)));
 }
-echo Ack(3, 3), "\n";
-echo Ack(3, 3), "\n";
+$a = Ack(3, 3);
+$b = Ack(3, 3);
+echo $a, "\n", $b, "\n";

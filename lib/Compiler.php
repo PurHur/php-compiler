@@ -42900,8 +42900,12 @@ class Compiler {
     private static int $echoFuncCallMaterializeSeq = 0;
 
     /**
-     * Lower `echo f()` in {main} like `$__phpcEchoN = f(); echo $__phpcEchoN` when another
-     * top-level call follows — mirrors named ASSIGN so JIT materializes a stable CV (#23472).
+     * Lower `echo f()` in {main} like `$__phpcEchoN = f(); echo $__phpcEchoN` — mirrors named
+     * ASSIGN so JIT materializes a stable CV instead of echoing a bare call temp (#23472).
+     *
+     * Always materialize in {main}: guarding on a later top-level call fixed ~74% of intermittent
+     * SIGSEGV but left ~4/100 on consecutive `echo Ack()`; the last echoed call still aliases native
+     * call state through teardown.
      */
     private function materializeCallResultSlotBeforeEcho(Block $block, Operand $expr, ?int $slot): ?int
     {
@@ -42917,7 +42921,6 @@ class Compiler {
             OpCode::TYPE_FUNCCALL_EXEC_RETURN !== $last->type
             || (int) $last->arg1 !== $slot
             || !$block->callResultFeedsEcho($expr)
-            || !$this->mainHasLaterTopLevelFuncCallAfterEcho($block, $expr)
         ) {
             return $slot;
         }
@@ -42938,37 +42941,6 @@ class Compiler {
         $block->addOpCode(new OpCode(OpCode::TYPE_ASSIGN, $resultSlot, $destSlot, $slot));
 
         return $destSlot;
-    }
-
-    /** True when {main} has a FuncCall after the one whose result is echoed. */
-    private function mainHasLaterTopLevelFuncCallAfterEcho(Block $block, Operand $expr): bool
-    {
-        if (null === $block->orig) {
-            return false;
-        }
-        $children = $block->orig->children;
-        $producerIndex = null;
-        foreach ($children as $i => $child) {
-            if (
-                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
-                && property_exists($child, 'result')
-                && $child->result instanceof Operand
-                && $this->operandsReferToSameVariable($expr, $child->result)
-            ) {
-                $producerIndex = $i;
-                break;
-            }
-        }
-        $start = \is_int($producerIndex) ? $producerIndex + 1 : 0;
-        $n = \count($children);
-        for ($i = $start; $i < $n; ++$i) {
-            $child = $children[$i];
-            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**
