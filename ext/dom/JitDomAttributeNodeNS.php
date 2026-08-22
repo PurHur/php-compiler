@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
@@ -435,13 +436,16 @@ final class JitDomAttributeNodeNS
         $ownerElPtr = $context->builder->load(
             $objectType->propertySlotFor($attr, self::CLASS_ATTR, self::PROP_OWNER_ELEMENT)
         );
-        $voidPtr = $context->getTypeFromString('void*');
-        $objPtr = $context->getTypeFromString('__object__*');
-        $ownerNull = $context->builder->icmp(Builder::INT_EQ, $ownerElPtr, $voidPtr->constNull());
+        $ownerRaw = $context->builder->pointerCast(
+            $ownerElPtr,
+            $context->getTypeFromString('__value__*')
+        );
+        $ownerNull = JitNestedHelperCoerce::isHelperResultNull($context, $ownerRaw);
         $tag = (string) (self::$boxSeq++);
         $bbNull = BasicBlockHelper::append($context, 'dom_attr_owner_null_'.$tag);
         $bbHas = BasicBlockHelper::append($context, 'dom_attr_owner_has_'.$tag);
         $done = BasicBlockHelper::append($context, 'dom_attr_owner_done_'.$tag);
+        $objPtr = $context->getTypeFromString('__object__*');
         $resultSlot = BasicBlockHelper::entryAlloca($context, $objPtr);
         $context->builder->branchIf($ownerNull, $bbNull, $bbHas);
 
@@ -452,7 +456,7 @@ final class JitDomAttributeNodeNS
         $context->builder->positionAtEnd($bbHas);
         $ownerEl = $context->builder->call(
             $context->lookupFunction('__value__readObject'),
-            $context->builder->pointerCast($ownerElPtr, $context->getTypeFromString('__value__*'))
+            JitValueBox::normalizeValuePtr($context, $ownerRaw)
         );
         $ownerDoc = self::readParentNodeObject($context, $ownerEl, self::CLASS_ELEMENT);
         $context->builder->store($ownerDoc, $resultSlot);
@@ -473,13 +477,16 @@ final class JitDomAttributeNodeNS
         $parentPtr = $context->builder->load(
             $objectType->propertySlotFor($node, $className, VmDom::PROP_PARENT_NODE)
         );
-        $voidPtr = $context->getTypeFromString('void*');
-        $objPtr = $context->getTypeFromString('__object__*');
-        $parentNull = $context->builder->icmp(Builder::INT_EQ, $parentPtr, $voidPtr->constNull());
+        $parentRaw = $context->builder->pointerCast(
+            $parentPtr,
+            $context->getTypeFromString('__value__*')
+        );
+        $parentNull = JitNestedHelperCoerce::isHelperResultNull($context, $parentRaw);
         $tag = (string) (self::$boxSeq++);
         $bbNull = BasicBlockHelper::append($context, 'dom_parent_null_'.$tag);
         $bbHas = BasicBlockHelper::append($context, 'dom_parent_has_'.$tag);
         $done = BasicBlockHelper::append($context, 'dom_parent_done_'.$tag);
+        $objPtr = $context->getTypeFromString('__object__*');
         $resultSlot = BasicBlockHelper::entryAlloca($context, $objPtr);
         $context->builder->branchIf($parentNull, $bbNull, $bbHas);
 
@@ -490,7 +497,7 @@ final class JitDomAttributeNodeNS
         $context->builder->positionAtEnd($bbHas);
         $parent = $context->builder->call(
             $context->lookupFunction('__value__readObject'),
-            $context->builder->pointerCast($parentPtr, $context->getTypeFromString('__value__*'))
+            JitValueBox::normalizeValuePtr($context, $parentRaw)
         );
         $context->builder->store($parent, $resultSlot);
         $context->builder->branch($done);

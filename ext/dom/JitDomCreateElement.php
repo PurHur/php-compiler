@@ -73,7 +73,11 @@ final class JitDomCreateElement
 
         $nameLit = self::compileTimeStringArg($args[1]);
         if (null !== $nameLit) {
-            return self::boxObjectResult($context, self::materializeElementFromLiteral($context, $nameLit));
+            $obj = self::materializeElementFromLiteral($context, $nameLit);
+            // #21687 / #33822: null parentNode before setAttributeNode same-doc walk reads the slot.
+            self::storeOwnerAndNullParent($context, $obj, $args[0]);
+
+            return self::boxObjectResult($context, $obj);
         }
 
         return self::boxObjectResult($context, self::materializeElementFromRuntimeName($context, $args[1]));
