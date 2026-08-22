@@ -156,11 +156,14 @@ final class JitDateIntervalCreateFromDateString
             ),
             JITVariable::TYPE_NATIVE_BOOL
         );
+        // constantFromString is a C-string global ([N x i8]*). propertyStore(TYPE_STRING)
+        // calls __string__separate which expects %__string__* — load constantStringFromString
+        // like JitDateMutation TZ slots (#33878).
         $dateStringVar = new JITVariable(
             $context,
             JITVariable::TYPE_STRING,
             JITVariable::KIND_VALUE,
-            $context->constantFromString($dateString)
+            $context->builder->load($context->constantStringFromString($dateString))
         );
         $objectType->propertyStore(
             $objectType->propertySlotFor($obj, self::CLASS_NAME, DateIntervalSupport::DATE_STRING_STORAGE),
