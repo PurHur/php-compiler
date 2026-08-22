@@ -37,6 +37,8 @@ final class SplFixedArrayMethod implements Call
             $this->namedArgsReceiverPrefix = 0;
         } elseif ('__construct' === $method) {
             $this->paramNames = ['size='];
+        } elseif ('setSize' === $method) {
+            $this->paramNames = ['size'];
         } elseif (\in_array($method, ['offsetGet', 'offsetExists', 'offsetUnset'], true)) {
             $this->paramNames = ['index'];
         } elseif ('offsetSet' === $method) {
@@ -64,6 +66,24 @@ final class SplFixedArrayMethod implements Call
                 'SplFixedArray::'.$this->method,
                 0,
                 static fn (Context $ctx, Variable $self): Value => SplFixedArrayJitHelper::compileCount($ctx, $self)
+            ),
+            'toarray' => $this->callExactArg(
+                $context,
+                $args,
+                'SplFixedArray::toArray',
+                0,
+                static fn (Context $ctx, Variable $self): Value => SplFixedArrayJitHelper::compileToArray($ctx, $self)
+            ),
+            'setsize' => $this->callExactArg(
+                $context,
+                $args,
+                'SplFixedArray::setSize',
+                1,
+                static fn (Context $ctx, Variable $self, Variable $size): Value => SplFixedArrayJitHelper::compileSetSize(
+                    $ctx,
+                    $self,
+                    $size
+                )
             ),
             'offsetget' => $this->callExactArg(
                 $context,

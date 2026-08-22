@@ -1657,11 +1657,12 @@ class Context {
                 $this->functionProxies[$dllLc.'::'.$dllMethod] = new Call\SplDllistMethod($dllMethod, $dllClass);
             }
         }
-        // SplFixedArray — `__spl_ht` + fromArray / count / ArrayAccess / foreach (#26793, #28640).
+        // SplFixedArray — `__spl_ht` + fromArray / count / setSize / toArray / ArrayAccess / foreach
+        // (#26793, #28640, #33784).
         // Seed the class so count()/ArrayAccess candidates see Countable before first use.
         $this->type->object->lookup('SplFixedArray');
         foreach ([
-            '__construct', 'fromArray', 'count', 'getSize',
+            '__construct', 'fromArray', 'count', 'getSize', 'setSize', 'toArray',
             'offsetGet', 'offsetSet', 'offsetExists', 'offsetUnset',
         ] as $sfaMethod) {
             $this->functionProxies['splfixedarray::'.strtolower($sfaMethod)] = new Call\SplFixedArrayMethod($sfaMethod);
