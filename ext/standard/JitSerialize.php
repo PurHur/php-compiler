@@ -147,13 +147,16 @@ final class JitSerialize
     }
 
     /**
-     * SPL classes that store in `__spl_ht` — ArrayObject bag (#33625) / SplFixedArray elements (#33634).
+     * SPL classes that store in `__spl_ht` — ArrayObject bag (#33625) / SplFixedArray (#33634) /
+     * SplObjectStorage objKeys (#33876).
      */
     private static function tryEncodeSplHtObject(Context $context, JITVariable $arg): ?Value
     {
         $objectType = $context->type->object;
         $fixedId = $objectType->classIdByName('SplFixedArray')
             ?? $objectType->classIdForLowerName('splfixedarray');
+        $sosId = $objectType->classIdByName('SplObjectStorage')
+            ?? $objectType->classIdForLowerName('splobjectstorage');
         $arrayIds = [];
         foreach (['ArrayObject', 'ArrayIterator', 'RecursiveArrayIterator'] as $name) {
             $id = $objectType->classIdByName($name)
@@ -162,7 +165,7 @@ final class JitSerialize
                 $arrayIds[] = $id;
             }
         }
-        if (null === $fixedId && [] === $arrayIds) {
+        if (null === $fixedId && null === $sosId && [] === $arrayIds) {
             return null;
         }
 
@@ -175,10 +178,12 @@ final class JitSerialize
 
         $id = (string) (++self::$blockSerial);
         $fixedBlock = BasicBlockHelper::append($context, 'serialize_spl_fixed_'.$id);
+        $sosBlock = BasicBlockHelper::append($context, 'serialize_spl_sos_'.$id);
         $arrayBlock = BasicBlockHelper::append($context, 'serialize_spl_array_'.$id);
         $pubBlock = BasicBlockHelper::append($context, 'serialize_spl_pub_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'serialize_spl_done_'.$id);
         $notFixed = BasicBlockHelper::append($context, 'serialize_spl_not_fixed_'.$id);
+        $notSos = BasicBlockHelper::append($context, 'serialize_spl_not_sos_'.$id);
 
         $i64 = $context->getTypeFromString('int64');
         if (null !== $fixedId) {
@@ -193,6 +198,18 @@ final class JitSerialize
         }
 
         $context->builder->positionAtEnd($notFixed);
+        if (null !== $sosId) {
+            $isSos = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($sosId, false)
+            );
+            $context->builder->branchIf($isSos, $sosBlock, $notSos);
+        } else {
+            $context->builder->branch($notSos);
+        }
+
+        $context->builder->positionAtEnd($notSos);
         if ([] !== $arrayIds) {
             $isArray = $context->builder->icmp(
                 Builder::INT_EQ,
@@ -219,6 +236,11 @@ final class JitSerialize
         $fixedEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
+        $context->builder->positionAtEnd($sosBlock);
+        $sosResult = \PHPCompiler\VM\SplObjectStorageJitHelper::compileSerialize($context, $objVar);
+        $sosEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
         $context->builder->positionAtEnd($arrayBlock);
         $arrayResult = ArrayObjectJitHelper::compileSerialize($context, $objVar);
         $arrayEnd = $context->builder->getInsertBlock();
@@ -243,6 +265,7 @@ final class JitSerialize
         $strPtr = $context->getTypeFromString('__string__*');
         $phi = $context->builder->phi($strPtr, 'serialize_spl_ht_phi_'.$id);
         $phi->addIncoming($fixedResult, $fixedEnd);
+        $phi->addIncoming($sosResult, $sosEnd);
         $phi->addIncoming($arrayResult, $arrayEnd);
         $phi->addIncoming($pubResult, $pubEnd);
 

@@ -33,6 +33,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * LLVM materialize (class table must include user classes — emit from JitUnserialize).
  * SPL ArrayObject family: bag restore into `__spl_ht` (#33636) — not firstIntProp→slot0.
  * SplFixedArray: integer-keyed elements into `__spl_ht` (#33640) — same slot-0 trap.
+ * SplObjectStorage: object-key pairs into `__spl_ht` (#33876) — same slot-0 trap.
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -328,6 +329,13 @@ final class StringUnserialize
             } elseif ('splfixedarray' === $classLc) {
                 // Integer-keyed elements into `__spl_ht` — not firstIntProp→slot0 (#33640).
                 \PHPCompiler\VM\SplFixedArrayJitHelper::compileUnserializeRestore(
+                    $context,
+                    $objVal,
+                    $payloadString
+                );
+            } elseif ('splobjectstorage' === $classLc) {
+                // Object-key pairs into `__spl_ht` — not firstIntProp→slot0 (#33876).
+                \PHPCompiler\VM\SplObjectStorageJitHelper::compileUnserializeRestore(
                     $context,
                     $objVal,
                     $payloadString
