@@ -65,6 +65,8 @@ final class ObStorageLlvm
             StreamGlobalsJit::implementThinIsResource($context);
         }
         StringTriggerErrorJit::implement($context);
+        // Before end/flush/clean bodies call emitApplyGzhandlerToString (#33862 / was Type::register).
+        self::ensureGzhandlerFlushStub($context);
         self::implementAppendBytes($context);
         self::implementObStart($context);
         self::implementObStartWithUrlRewriter($context);
@@ -96,6 +98,7 @@ final class ObStorageLlvm
     /** Identity `__phpc_ob_gzhandler_flush` when ObGzhandlerJitRuntime is not linked yet. */
     private static function ensureGzhandlerFlushStub(Context $context): void
     {
+        // Declared early in implement() so emitApplyGzhandlerToString lookup succeeds (#33862).
         $abi = '__phpc_ob_gzhandler_flush';
         $probe = $context->module->getNamedFunction($abi);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {

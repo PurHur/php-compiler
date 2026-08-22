@@ -635,7 +635,12 @@ class Type extends Builtin {
         // pending_header_*.1 (#31894 / #32122). User-script header()/setcookie() stay
         // header_ / JitPendingHeaders (php-src ext/standard/head.c).
         PendingHeadersRuntime::declarePendingHeaderAbis($this->context);
-        ObOutputRuntime::declareObAbis($this->context);
+        // __phpc_ob_* Type::register declareObAbis removed (#33862 / peer #33798 initialize):
+        // ObOutputRuntime / ObOutputJitBridge own the ABI (getNamedFunction first via
+        // declareIfMissing / EmbedObOutput::declareObAbis; Context ensureMinimalUserStandaloneBodies
+        // / ValueEchoRuntime::ensureLinked before lookup). Leftover Type empty decls vs Runtime
+        // ABI drift mint ob_start.1 (#31894 / #32122). User-script ob_*()/echo stay
+        // ObOutputJitHelper (php-src ext/standard/output.c).
         // __phpc_glob_vec / __phpc_scandir_vec / __phpc_strvec_free always-on shells
         // removed (#32636): JitFsGlobKernel declares module-locally (getNamedFunction first);
         // user-script glob()/scandir() stay FsGlobJitHelper / VmFsGlob (#27235/#27236).
@@ -765,12 +770,12 @@ class Type extends Builtin {
         // (#20930, #21109): after NativeOps getValue() fix, Sscanf/ObGzhandler abort
         // or segfault mid-init. Link on first use (peer PendingHeaders / STANDALONE #12910).
         HttpResponseCode::implement($this->context);
-        // __phpc_ob_* always-on shells removed (#33798): ObOutputRuntime / ObOutputJitBridge
-        // own the ABI (getNamedFunction first; Type::initialize still lazy — thin standalone
-        // links via Context::ensureMinimalUserStandaloneBodies / ValueEchoRuntime::ensureLinked;
-        // EMBED via EmbedObOutput::implement). Leftover Type empty decls vs Runtime ABI drift
-        // mint ob_start.1 (#31894 / #32122). User-script ob_*()/echo stay ObOutputJitHelper
-        // (php-src ext/standard/output.c).
+        // __phpc_ob_* always-on shells removed (#33798 initialize / #33862 register):
+        // ObOutputRuntime / ObOutputJitBridge own the ABI (getNamedFunction first; thin
+        // standalone links via Context::ensureMinimalUserStandaloneBodies /
+        // ValueEchoRuntime::ensureLinked; EMBED via EmbedObOutput::implement). Leftover Type
+        // empty decls vs Runtime ABI drift mint ob_start.1 (#31894 / #32122). User-script
+        // ob_*()/echo stay ObOutputJitHelper (php-src ext/standard/output.c).
         // Thin user-script AOT: lazy-link PendingHeaders on first header()/headers_list use
         // — NestedJIT during Type::initialize segfaults (#20930, peer #13571).
         if (!$this->context->isThinStandaloneAotMain()) {
