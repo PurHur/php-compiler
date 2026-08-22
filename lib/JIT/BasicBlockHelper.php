@@ -436,6 +436,50 @@ final class BasicBlockHelper
         return self::entryAllocaForFunction($context, $fn, $type);
     }
 
+    /**
+     * Entry alloca for {@see __value__} with TYPE_NULL tag init after the alloca group (#23472).
+     */
+    public static function entryAllocaValueBox(Context $context): Value
+    {
+        $restore = self::tryGetInsertBlock($context);
+        if (null !== $restore) {
+            $parent = $restore->getParent();
+            if (!$parent instanceof Function_) {
+                throw new \LogicException('entryAllocaValueBox insert block has no parent function');
+            }
+            $fn = $parent;
+        } else {
+            $fn = self::parentFunction($context);
+        }
+        $slot = self::entryAllocaForFunction($context, $fn, $context->getTypeFromString('__value__'));
+        // Init in this function's entry after all allocas — never in the allocating CFG arm.
+        $restoreAfter = self::tryGetInsertBlock($context);
+        self::positionAfterEntryAllocas($context, $fn);
+        $map = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($slot, $map['type'])
+        );
+        self::restoreInsertBlock($context, $restoreAfter);
+
+        return $slot;
+    }
+
+    /**
+     * Null-init a {@see __value__} entry alloca type tag in $fn's entry block (#23472).
+     */
+    public static function nullInitValueBoxAtEntry(Context $context, Function_ $fn, Value $slot): void
+    {
+        $restore = self::tryGetInsertBlock($context);
+        self::positionAfterEntryAllocas($context, $fn);
+        $map = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($slot, $map['type'])
+        );
+        self::restoreInsertBlock($context, $restore);
+    }
+
     public static function entryAllocaForFunction(Context $context, Function_ $fn, Type $type): Value
     {
         $entry = $fn->countBasicBlocks() > 0
@@ -468,10 +512,20 @@ final class BasicBlockHelper
      */
     public static function storeAtFunctionEntry(Context $context, Function_ $fn, Value $value, Value $slot): void
     {
+        $restore = self::tryGetInsertBlock($context);
+        self::positionAfterEntryAllocas($context, $fn);
+        $context->builder->store($value, $slot);
+        // Same sealed-block rule as entryAllocaForFunction (#26756): do not splice before a
+        // terminator or clear insert when the caller will keep emitting.
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    /** Position builder after leading allocas in $fn's entry (before first non-alloca / terminator). */
+    private static function positionAfterEntryAllocas(Context $context, Function_ $fn): void
+    {
         $entry = $fn->countBasicBlocks() > 0
             ? $fn->getEntryBasicBlock()
             : $fn->appendBasicBlock('entry');
-        $restore = self::tryGetInsertBlock($context);
         try {
             $inst = $entry->getFirstInstruction();
             while (null !== $inst && $inst->isAAllocaInst()) {
@@ -496,10 +550,6 @@ final class BasicBlockHelper
                 $context->builder->positionAtEnd($entry);
             }
         }
-        $context->builder->store($value, $slot);
-        // Same sealed-block rule as entryAllocaForFunction (#26756): do not splice before a
-        // terminator or clear insert when the caller will keep emitting.
-        self::restoreInsertBlock($context, $restore);
     }
 
     public static function sealOpenBlock(Context $context, BasicBlock $block): void
