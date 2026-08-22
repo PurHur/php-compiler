@@ -25,6 +25,8 @@ final class JitDomAttributeNodeNS
 {
     private const CLASS_ATTR = 'DOMAttr';
 
+    private const CLASS_ELEMENT = 'DOMElement';
+
     private const PROP_NODE_NAME = 'nodeName';
 
     private const PROP_NAME = 'name';
@@ -294,6 +296,7 @@ final class JitDomAttributeNodeNS
 
     private static function invokeGetUserScript(Context $context, JITVariable ...$args): Value
     {
+        $element = self::loadObjectArg($context, $args[0], 'DOMElement::getAttributeNodeNS() receiver');
         // Prefer isNullConstant over stale compileTimeString — null NS args can carry a
         // leftover cts stamp, keying the Attr cache as namespace "k" instead of "" (#33534).
         $nsLit = self::compileTimeNullableStringArg($args[1]);
@@ -309,6 +312,7 @@ final class JitDomAttributeNodeNS
                     $parsed['value']
                 );
                 DomUserScriptAttributeCacheLlvm::storeLiteral($context, $nsLit, $localLit, $attr);
+                self::wireOwnerElementIfPresent($context, $element, $attr);
 
                 return self::boxObjectResult($context, $attr);
             }
@@ -318,10 +322,10 @@ final class JitDomAttributeNodeNS
         }
 
         if (null !== $nsLit && null !== $localLit) {
-            return self::boxNullableObjectResult(
-                $context,
-                DomUserScriptAttributeCacheLlvm::lookupLiteral($context, $nsLit, $localLit)
-            );
+            $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, $nsLit, $localLit);
+            self::wireOwnerElementIfPresent($context, $element, $attr);
+
+            return self::boxNullableObjectResult($context, $attr);
         }
 
         return self::boxNullResult($context);
@@ -331,6 +335,8 @@ final class JitDomAttributeNodeNS
     {
         $element = self::loadObjectArg($context, $args[0], 'DOMElement::setAttributeNode() receiver');
         $attr = self::loadObjectArg($context, $args[1], 'DOMElement::setAttributeNodeNS() attr');
+        // php-src ext/dom/element.c — WRONG_DOCUMENT_ERR before adopt/move (#22709).
+        self::assertSameDocumentBeforeSetAttributeNode($context, $element, $attr);
         $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace();
         $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
         if (null === $ns || null === $local) {
@@ -371,6 +377,147 @@ final class JitDomAttributeNodeNS
         self::storeOwnerElement($context, $element, $attr);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * php-src ext/dom/element.c — reject foreign-document Attr before attribute-map install (#22709).
+     *
+     * User-script nodes resolve owner documents via parentNode / ownerElement slots
+     * (DomRegistry is not populated under thin AOT).
+     */
+    private static function assertSameDocumentBeforeSetAttributeNode(
+        Context $context,
+        Value $element,
+        Value $attr
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattr_same_doc');
+        $elemDoc = self::readOwnerDocumentFromElement($context, $element);
+        $attrDoc = self::readOwnerDocumentFromAttr($context, $attr);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $elemNull = $context->builder->icmp(Builder::INT_EQ, $elemDoc, $objPtr->constNull());
+        $attrNull = $context->builder->icmp(Builder::INT_EQ, $attrDoc, $objPtr->constNull());
+        $skip = $context->builder->or($elemNull, $attrNull);
+        $bbWrong = BasicBlockHelper::append($context, 'dom_setattr_same_doc_wrong');
+        $bbOk = BasicBlockHelper::append($context, 'dom_setattr_same_doc_ok');
+        $same = $context->builder->icmp(Builder::INT_EQ, $elemDoc, $attrDoc);
+        $bbCheck = BasicBlockHelper::append($context, 'dom_setattr_same_doc_check');
+        $context->builder->branchIf($skip, $bbOk, $bbCheck);
+
+        $context->builder->positionAtEnd($bbCheck);
+        $context->builder->branchIf($same, $bbOk, $bbWrong);
+
+        $context->builder->positionAtEnd($bbWrong);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Wrong Document Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::WRONG_DOCUMENT_ERR
+        );
+
+        $context->builder->positionAtEnd($bbOk);
+    }
+
+    private static function readOwnerDocumentFromElement(Context $context, Value $element): Value
+    {
+        return self::readParentNodeObject($context, $element, self::CLASS_ELEMENT);
+    }
+
+    private static function readOwnerDocumentFromAttr(Context $context, Value $attr): Value
+    {
+        $objectType = $context->type->object;
+        $attrClassId = $objectType->lookup(self::CLASS_ATTR);
+        if (!$objectType->hasProperty($attrClassId, self::PROP_OWNER_ELEMENT)) {
+            self::ensureAttrPropertyLayout($objectType, $attrClassId);
+        }
+        $ownerElPtr = $context->builder->load(
+            $objectType->propertySlotFor($attr, self::CLASS_ATTR, self::PROP_OWNER_ELEMENT)
+        );
+        $voidPtr = $context->getTypeFromString('void*');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $ownerNull = $context->builder->icmp(Builder::INT_EQ, $ownerElPtr, $voidPtr->constNull());
+        $tag = (string) (self::$boxSeq++);
+        $bbNull = BasicBlockHelper::append($context, 'dom_attr_owner_null_'.$tag);
+        $bbHas = BasicBlockHelper::append($context, 'dom_attr_owner_has_'.$tag);
+        $done = BasicBlockHelper::append($context, 'dom_attr_owner_done_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $objPtr);
+        $context->builder->branchIf($ownerNull, $bbNull, $bbHas);
+
+        $context->builder->positionAtEnd($bbNull);
+        $context->builder->store($objPtr->constNull(), $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($bbHas);
+        $ownerEl = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($ownerElPtr, $context->getTypeFromString('__value__*'))
+        );
+        $ownerDoc = self::readParentNodeObject($context, $ownerEl, self::CLASS_ELEMENT);
+        $context->builder->store($ownerDoc, $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function readParentNodeObject(Context $context, Value $node, string $className): Value
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup($className);
+        if (!$objectType->hasProperty($classId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($classId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        }
+        $parentPtr = $context->builder->load(
+            $objectType->propertySlotFor($node, $className, VmDom::PROP_PARENT_NODE)
+        );
+        $voidPtr = $context->getTypeFromString('void*');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $parentNull = $context->builder->icmp(Builder::INT_EQ, $parentPtr, $voidPtr->constNull());
+        $tag = (string) (self::$boxSeq++);
+        $bbNull = BasicBlockHelper::append($context, 'dom_parent_null_'.$tag);
+        $bbHas = BasicBlockHelper::append($context, 'dom_parent_has_'.$tag);
+        $done = BasicBlockHelper::append($context, 'dom_parent_done_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $objPtr);
+        $context->builder->branchIf($parentNull, $bbNull, $bbHas);
+
+        $context->builder->positionAtEnd($bbNull);
+        $context->builder->store($objPtr->constNull(), $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($bbHas);
+        $parent = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($parentPtr, $context->getTypeFromString('__value__*'))
+        );
+        $context->builder->store($parent, $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /** Wire ownerElement when getAttributeNode* returns a live cached Attr (#22709). */
+    private static function wireOwnerElementIfPresent(Context $context, Value $element, Value $attr): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $attr, $objPtr->constNull());
+        $bbNull = BasicBlockHelper::append($context, 'dom_wire_owner_skip_'.(self::$boxSeq++));
+        $bbSet = BasicBlockHelper::append($context, 'dom_wire_owner_set_'.(self::$boxSeq++));
+        $bbDone = BasicBlockHelper::append($context, 'dom_wire_owner_done_'.(self::$boxSeq++));
+        $context->builder->branchIf($isNull, $bbNull, $bbSet);
+
+        $context->builder->positionAtEnd($bbSet);
+        self::storeOwnerElement($context, $element, $attr);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbNull);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     /**
@@ -1307,15 +1454,15 @@ final class JitDomAttributeNodeNS
             throw new \LogicException('DOMElement::getAttributeNode() expects receiver and name');
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getattrnode_cont');
+        $element = self::loadObjectArg($context, $args[0], 'DOMElement::getAttributeNode() receiver');
         // Prefer isNullConstant → "" over stale compileTimeString (peer #33534).
         $nameLit = self::compileTimeNullableStringArg($args[1]);
         if (null !== $nameLit) {
             \PHPCompiler\ext\dom\JitDomAttrRename::rememberFetchedKey('', $nameLit);
+            $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit);
+            self::wireOwnerElementIfPresent($context, $element, $attr);
 
-            return self::boxNullableObjectOrFalseResult(
-                $context,
-                DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit)
-            );
+            return self::boxNullableObjectOrFalseResult($context, $attr);
         }
 
         // Non-literal name without NestedJIT lookup — legacy miss is false, not null (#33773).
