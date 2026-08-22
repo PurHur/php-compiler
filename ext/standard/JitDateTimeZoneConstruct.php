@@ -65,6 +65,7 @@ final class JitDateTimeZoneConstruct
         // Zone id on dedicated field — compileTimeString stays class name from New_ (#29732).
         $args[0]->compileTimeTimezoneName = $name;
         $args[0]->compileTimeString = $name;
+        $context->lastDateTimeZoneConstructedId = $name;
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
