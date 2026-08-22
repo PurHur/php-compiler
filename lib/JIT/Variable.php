@@ -323,6 +323,12 @@ final class Variable {
     /** Compile-time class for `new Foo` results — survives VALUE-box assign (#26825). */
     public ?string $classUserType = null;
 
+    /**
+     * Class carried by `serialize($typedObject)` so `unserialize(...)` can retag
+     * the result for foreach (SplObjectStorage objKeys walk, #33876 residual).
+     */
+    public ?string $serializePayloadClass = null;
+
     /** MCJIT/AOT foreach over a {@see Generator} object (#3074, #3115). */
     public bool $isJitGenerator = false;
 
