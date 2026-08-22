@@ -130,12 +130,9 @@ final class ArrayWalkLlvm
         $context->builder->branchIf($atEnd, $packedDone, $packedCheck);
 
         $context->builder->positionAtEnd($packedCheck);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $ht,
-            $idx
-        );
-        $context->builder->branchIf($isSet, $packedBody, $packedAdvance);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL is a real value (#33710 / #33705).
+        $isUndef = HashTableHelper::packedIndexIsUndefined($context, $ht, $idx);
+        $context->builder->branchIf($isUndef, $packedAdvance, $packedBody);
 
         $context->builder->positionAtEnd($packedBody);
         $entry = HashTableHelper::listEntryPointer($context, $ht, $idx);

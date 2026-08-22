@@ -6,14 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableSliceLlvm;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_slice() via ArraySliceJitHelper PHP (#12410, #17936).
+ * JIT/AOT link for array_slice() via pure {@see HashTableSliceLlvm} (#12410, #33710).
  *
- * Standalone AOT compiles {@see ArraySliceJitHelper} via JitVmHelperLink (#14285); native literal arrays materialize to hashtable then route through PHP (#17936).
+ * Prefer in-module LLVM over NestedJIT {@see ArraySliceJitHelper}: prelinked helper-runtime
+ * objects bake Call-site LLVM and can drop TYPE_NULL until a full helper refresh (#33710).
  * SSOT: {@see \PHPCompiler\VM\HashTable::sliceCopy()}
  * php-src: ext/standard/array.c — php_array_slice()
  */
@@ -38,14 +40,14 @@ final class ArraySliceRuntime
         Value $length,
         ?Value $preserveKeys = null
     ): Value {
-        self::ensureLinked($context);
         $i1 = $context->getTypeFromString('int1');
         $flag = null === $preserveKeys
             ? $i1->constInt(0, false)
             : $preserveKeys;
 
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_SLICE),
+        // Emit in the user module so TYPE_NULL packed elements stay (#33710 / #33639).
+        return HashTableSliceLlvm::slice(
+            $context,
             self::argToHashtable($context, $array),
             $offset,
             $hasLength,

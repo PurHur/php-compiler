@@ -75,12 +75,9 @@ final class JitStrReplaceArray
         $context->builder->branchIf($atEnd, $doneBlock, $check);
 
         $context->builder->positionAtEnd($check);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $src,
-            $srcIdx
-        );
-        $context->builder->branchIf($isSet, $replaceBlock, $skipUnset);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL coerces to "" (#33710 / #33705).
+        $isUndef = HashTableHelper::packedIndexIsUndefined($context, $src, $srcIdx);
+        $context->builder->branchIf($isUndef, $skipUnset, $replaceBlock);
 
         $context->builder->positionAtEnd($replaceBlock);
         // php-src convert_to_string per array subject value (#27165).

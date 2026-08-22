@@ -95,12 +95,9 @@ final class JitPregGrep
     $context->builder->branchIf($atEnd, $doneBlock, $check);
 
     $context->builder->positionAtEnd($check);
-    $isSet = $context->builder->call(
-      $context->lookupFunction('__hashtable__offsetIsSet'),
-      $src,
-      $srcIdx
-    );
-    $context->builder->branchIf($isSet, $matchBlock, $skipUnset);
+    // Skip TYPE_UNDEFINED holes only — TYPE_NULL coerces to "" (#33710 / #33705).
+    $isUndef = HashTableHelper::packedIndexIsUndefined($context, $src, $srcIdx);
+    $context->builder->branchIf($isUndef, $skipUnset, $matchBlock);
 
     $context->builder->positionAtEnd($matchBlock);
     // php-src convert_to_string per element; keep original zval on match (#27164).

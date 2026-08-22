@@ -86,12 +86,9 @@ final class ArrayFindLlvm
         $context->builder->branchIf($atEnd, $strHead, $check);
 
         $context->builder->positionAtEnd($check);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $ht,
-            $i
-        );
-        $context->builder->branchIf($isSet, $body, $advance);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL is a real value (#33710 / #33705).
+        $isUndef = HashTableHelper::packedIndexIsUndefined($context, $ht, $i);
+        $context->builder->branchIf($isUndef, $advance, $body);
 
         $context->builder->positionAtEnd($body);
         $elem = HashTableHelper::readIndexedToValueBox($context, $ht, $i);
