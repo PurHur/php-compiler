@@ -146,6 +146,10 @@ final class json_encode extends Internal
         if (null !== $dateFold) {
             return $dateFold;
         }
+        $enumFold = JitJsonEncode::tryFoldEnumCase($context, $args[0], $knownFlags ?? 0);
+        if (null !== $enumFold) {
+            return $enumFold;
+        }
 
         return JitJsonEncode::encode($context, $args[0], $flagsVal);
     }

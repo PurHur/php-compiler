@@ -26362,13 +26362,53 @@ class JIT {
                 $nameOp->value,
                 $op->classImplements
             );
+            $this->seedVmClassEntryInterfaces($nameOp->value, $op->classImplements);
         }
         $this->context->type->object->inheritInterfaceConstants(
             $this->context->scope->classId,
             $nameOp->value
         );
         $this->context->type->object->finishEnumClass($this->context->scope->classId);
+        $this->seedVmEnumForCompileTimeFolds($nameOp->value, $op, $this->context->scope->classId);
         $this->context->popScope();
+    }
+
+    /**
+     * Register enum methods/interfaces on vmContext for compile-time json_encode folds (#6880).
+     *
+     * MODE_AOT skips VM DECLARE_CLASS, so JsonSerializable::jsonSerialize is otherwise
+     * unreachable during {@see JitJsonEncode::tryFoldEnumCase}.
+     */
+    private function seedVmEnumForCompileTimeFolds(string $enumName, OpCode $op, int $classId): void
+    {
+        $vmContext = $this->context->runtime->vmContext ?? null;
+        if (null === $vmContext || null === $op->block1) {
+            return;
+        }
+        $lc = strtolower(ltrim($enumName, '\\'));
+        if (!isset($vmContext->classes[$lc])) {
+            $vmContext->classes[$lc] = new VM\ClassEntry(ltrim($enumName, '\\'));
+        }
+        $entry = $vmContext->classes[$lc];
+        $entry->isEnum = true;
+        $entry->backedType = $this->context->type->object->enumBackedTypeFor($classId);
+        if ([] !== $op->classImplements) {
+            $entry->interfaces = $op->classImplements;
+        }
+        VM\EnumSupport::ensureBuiltinEnumInterfaces($entry);
+        $bodyBlock = $op->block1;
+        $frame = $bodyBlock->getFrame($vmContext);
+        foreach ($bodyBlock->opCodes as $methodOp) {
+            if (OpCode::TYPE_DECLARE_METHOD !== $methodOp->type || null === $methodOp->block1) {
+                continue;
+            }
+            $methodName = strtolower($frame->scope[$methodOp->arg1]->toString());
+            if (isset($entry->methods[$methodName])) {
+                continue;
+            }
+            $method = new Func\PHP($entry->name.'::'.$methodName, $methodOp->block1);
+            $entry->methods[$methodName] = $method;
+        }
     }
 
     /**
