@@ -741,6 +741,7 @@ final class JitOpensslX509
      * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkey_derive) / EVP_PKEY_derive
      * Public + private keys are PEM string literals (same coerce surface as thin AOT
      * {@see self::dhComputeKey}). Optional $key_length must be a compile-time int.
+     * Compile-time soft-fail scalars (null/bool/int/float) bake to false like VM (#26689 / #32852).
      */
     public static function pkeyDerive(
         Context $context,
@@ -749,14 +750,19 @@ final class JitOpensslX509
         ?JITVariable $keyLength = null
     ): Value {
         $pub = JitStringArg::compileTimeLiteral($publicKey);
-        if (null === $pub) {
-            throw new \LogicException(
-                'openssl_pkey_derive() public_key must be a compile-time string literal '
-                .'for JIT/AOT in this compiler build (issue #32852)'
-            );
-        }
         $priv = JitStringArg::compileTimeLiteral($privateKey);
-        if (null === $priv) {
+        if (null === $pub || null === $priv) {
+            if (self::isCompileTimeSoftFailDeriveKey($publicKey)
+                || self::isCompileTimeSoftFailDeriveKey($privateKey)
+            ) {
+                return self::boxedFalse($context);
+            }
+            if (null === $pub) {
+                throw new \LogicException(
+                    'openssl_pkey_derive() public_key must be a compile-time string literal '
+                    .'for JIT/AOT in this compiler build (issue #32852)'
+                );
+            }
             throw new \LogicException(
                 'openssl_pkey_derive() private_key must be a compile-time string literal '
                 .'for JIT/AOT in this compiler build (issue #32852)'
@@ -784,6 +790,31 @@ final class JitOpensslX509
         }
 
         return self::boxedString($context, $shared);
+    }
+
+    /**
+     * php-src soft-fail for !(IS_STRING || IS_OBJECT) key material (#26689 / #32852 residual).
+     */
+    private static function isCompileTimeSoftFailDeriveKey(JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return true;
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
+            return true;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type || null !== $arg->compileTimeLong) {
+            return true;
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type || null !== $arg->compileTimeFloat) {
+            return true;
+        }
+        $cname = $arg->compileTimeConstantName;
+        if (\is_string($cname) && \in_array(strtolower($cname), ['null', 'true', 'false'], true)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
