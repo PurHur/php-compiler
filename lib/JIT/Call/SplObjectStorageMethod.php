@@ -92,6 +92,43 @@ final class SplObjectStorageMethod implements Call
                 }
 
                 return \PHPCompiler\VM\SplObjectStorageJitHelper::compileSetInfo($context, $args[0], $args[1]);
+            case 'gethash':
+                // php-src: zim_SplObjectStorage_getHash — same wire as spl_object_hash (#33854 / #24292).
+                if (!VmClassMethod::requireExactJitUserArgCount(
+                    $context,
+                    $args,
+                    'SplObjectStorage::getHash',
+                    1
+                )) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+                // Compile-time null / non-object must TypeError like contains (#31509), not SEGV.
+                $hashArg = $args[1];
+                if (Variable::TYPE_OBJECT !== $hashArg->type
+                    && (Variable::TYPE_NULL === $hashArg->type
+                        || !empty($hashArg->isNullConstant)
+                        || Variable::TYPE_VALUE !== $hashArg->type)
+                ) {
+                    $given = Variable::TYPE_NULL === $hashArg->type || !empty($hashArg->isNullConstant)
+                        ? 'null'
+                        : JitOperandTypeLabel::givenLabel($context, $hashArg);
+                    ExceptionBridge::emitTypeErrorAndAbort(
+                        $context,
+                        \sprintf(
+                            'SplObjectStorage::getHash(): Argument #1 ($object) must be of type object, %s given',
+                            $given
+                        )
+                    );
+                    BasicBlockHelper::ensureOpenInsertBlock($context, 'spl_gethash_after_typeerror');
+
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
+                return \PHPCompiler\ext\standard\JitSplObjectHash::invoke(
+                    $context,
+                    $hashArg,
+                    'SplObjectStorage::getHash'
+                );
             case 'addall':
                 // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #33847 / #30999
                 if (!VmClassMethod::requireExactJitUserArgCount(
