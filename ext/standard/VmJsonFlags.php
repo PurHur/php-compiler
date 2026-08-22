@@ -60,7 +60,7 @@ final class VmJsonFlags
     /** @see JSON_THROW_ON_ERROR */
     public const THROW_ON_ERROR = 4194304;
 
-    /** Flags honored by json_encode() in this compiler build (issue #3281, #10555, #10601, #10954, #10956). */
+    /** Flags honored by json_encode() in this compiler build (issue #3281, #10555, #10601, #10954, #10956, #33745). */
     public const ENCODE_SUPPORTED = self::HEX_TAG
         | self::HEX_AMP
         | self::HEX_APOS
@@ -74,7 +74,8 @@ final class VmJsonFlags
         | self::NUMERIC_CHECK
         | self::PRESERVE_ZERO_FRACTION
         | self::INVALID_UTF8_IGNORE
-        | self::INVALID_UTF8_SUBSTITUTE;
+        | self::INVALID_UTF8_SUBSTITUTE
+        | self::UNESCAPED_LINE_TERMINATORS;
 
     /** Flags honored by json_decode() in this compiler build (issue #3267, #11778, #12496). */
     public const DECODE_SUPPORTED = self::OBJECT_AS_ARRAY

@@ -360,9 +360,17 @@ final class VmJsonFormat
             $c = $value[$i];
             $ord = \ord($c);
             if ($unescapedUnicode && $ord >= 0x80) {
-                $run = self::utf8RunLength($value, $i);
-                if ($run > 0) {
-                    $out .= \substr($value, $i, $run);
+                $decoded = self::utf8CodePointAt($value, $i);
+                if (null !== $decoded) {
+                    [$cp, $run] = $decoded;
+                    // php_json_escape_string: U+2028/U+2029 stay \u-escaped unless
+                    // JSON_UNESCAPED_LINE_TERMINATORS (#33745).
+                    $unescapedLine = 0 !== ($flags & VmJsonFlags::UNESCAPED_LINE_TERMINATORS);
+                    if (!$unescapedLine && (0x2028 === $cp || 0x2029 === $cp)) {
+                        $out .= self::escapeUnicodeCodePoint($cp);
+                    } else {
+                        $out .= \substr($value, $i, $run);
+                    }
                     $i += $run - 1;
 
                     continue;

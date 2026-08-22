@@ -17,6 +17,7 @@ use PHPCompiler\VM\Variable;
  * Numeric type codes — NestedJIT mis-types Variable::TYPE_* class constants (#27075 / #27020).
  * No str_replace — NestedJIT helper emit lacks phpc_str_replace (#27078).
  * JSON_FORCE_OBJECT: packed HT → object form including empty {} (#28638 / #33619).
+ * U+2028/U+2029: `\u` unless JSON_UNESCAPED_LINE_TERMINATORS (#33745).
  * php-src: ext/json/php_json.c — php_json_encode
  */
 final class JsonEncodeNestedJitHelper
@@ -37,7 +38,7 @@ final class JsonEncodeNestedJitHelper
             return (string) $value->toFloat();
         }
         if (4 === $t) {
-            return self::quote($value->toString());
+            return self::quote($value->toString(), $flags);
         }
         // TYPE_ARRAY=6; kind 7 HT tags under NestedJIT / IS_REFCOUNTED (#26977).
         if (6 === $t || 7 === $t) {
@@ -45,7 +46,7 @@ final class JsonEncodeNestedJitHelper
         }
 
         // NestedJIT may tag string slots with non-4 type bytes; toInt → 0 (#27078).
-        return self::quote($value->toString());
+        return self::quote($value->toString(), $flags);
     }
 
     public static function encodeHashtable(HashTable $ht, int $flags): ?string
@@ -68,9 +69,9 @@ final class JsonEncodeNestedJitHelper
                 $key = $pair[0];
                 $kt = $key->type & 0x7f;
                 if (1 === $kt) {
-                    $out .= self::quote((string) $key->toInt()).':';
+                    $out .= self::quote((string) $key->toInt(), $flags).':';
                 } else {
-                    $out .= self::quote($key->toString()).':';
+                    $out .= self::quote($key->toString(), $flags).':';
                 }
             }
             $val = $pair[1];
@@ -88,7 +89,7 @@ final class JsonEncodeNestedJitHelper
             } elseif (2 === $t) {
                 $out .= (string) $val->toFloat();
             } elseif (4 === $t) {
-                $out .= self::quote($val->toString());
+                $out .= self::quote($val->toString(), $flags);
             } else {
                 // #27182: helper-runtime array_chunk nested HTs often lack type 6/7.
                 // Value-foreach walks packed chunks (quote/toInt yielded "" / 0).
@@ -120,9 +121,12 @@ final class JsonEncodeNestedJitHelper
     /**
      * php-src json_escape_string subset (NestedJIT-safe — no str_replace).
      *
+     * U+2028/U+2029 UTF-8 stays `\u2028`/`\u2029` unless JSON_UNESCAPED_LINE_TERMINATORS
+     * (2048) (#33745). NestedJIT cannot load VmJsonFlags class constants reliably.
+     *
      * @param mixed $s NestedJIT toString may yield null
      */
-    private static function quote($s): string
+    private static function quote($s, int $flags = 0): string
     {
         if (null === $s) {
             $s = '';
@@ -146,6 +150,12 @@ final class JsonEncodeNestedJitHelper
                 $out .= '\\r';
             } elseif ("\t" === $ch) {
                 $out .= '\\t';
+            } elseif ($i + 2 < $n && "\xE2" === $ch && "\x80" === $s[$i + 1]
+                && 0 === ($flags & 2048)
+                && ("\xA8" === $s[$i + 2] || "\xA9" === $s[$i + 2])) {
+                $out .= '\\u202';
+                $out .= "\xA8" === $s[$i + 2] ? '8' : '9';
+                $i += 2;
             } else {
                 $out .= $ch;
             }
