@@ -464,11 +464,20 @@ class JIT {
         return 0 === $this->context->inlineIncludeDepth;
     }
 
-    /** List-unpack merge that inlines an include still needs assign-block locals (#846). */
+    /**
+     * List-unpack merge that inlines an include still needs assign-block locals (#846).
+     * String-key CFG splits ({@see Compiler::splitCfgBlockAfterStringKeyedArray}) set
+     * {@see Block::$inheritUndefinedLocals} so unnamed temps (e.g. FETCH_STATIC_PROP_R
+     * copies) stay live across the jump — freeDeadVariables before the branch would
+     * delref them and bare `echo C::$a["k"]` reads empty (#33936 / #23354).
+     */
     private function mergeBlockInheritsCallerLocals(?Block $mergeBlock): bool
     {
         if (null === $mergeBlock) {
             return false;
+        }
+        if ($mergeBlock->inheritUndefinedLocals) {
+            return true;
         }
         foreach ($mergeBlock->opCodes as $op) {
             if (OpCode::TYPE_INCLUDE === $op->type) {
