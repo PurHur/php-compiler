@@ -41,6 +41,25 @@ final class JitValueNumeric
         );
     }
 
+    /**
+     * Boxed bool (TYPE_NATIVE_BOOL). zend_operators.c IS_TRUE/IS_FALSE ++/-- is a no-op (#33761).
+     */
+    public static function valueIsBool(Context $context, Variable $boxed): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+    }
+
     /** Boxed string stored as JIT TYPE_STRING (132), not VM TYPE_STRING (4). */
     public static function valueIsJitString(Context $context, Variable $boxed): Value
     {
