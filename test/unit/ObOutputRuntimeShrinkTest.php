@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on ob_* ABI shells from Builtin\Type (#33798).
+ * Drop leftover always-on ob_* ABI shells from Builtin\Type (#33798 / #33862).
  *
  * NestedJIT/AOT bridge stays ObOutputRuntime / ObOutputJitBridge
  * (php-src ext/standard/output.c). Runtime owner declares module-locally
@@ -25,7 +25,6 @@ final class ObOutputRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type::initialize must not eagerly register ob_* empty shells (#33798)'
         );
-        $this->assertStringContainsString('ObOutputRuntime::declareObAbis($this->context)', $type);
         foreach ([
             '__phpc_ob_start',
             '__phpc_ob_echo_cstr',
@@ -40,14 +39,40 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         }
     }
 
+    public function testTypeRegisterDropsAlwaysOnObOutputDeclareAbis(): void
+    {
+        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertStringContainsString('#33862', $type);
+        $this->assertStringNotContainsString(
+            'ObOutputRuntime::declareObAbis($this->context)',
+            $type,
+            'Builtin\\Type::register must not eagerly declare ob_* empty shells (#33862)'
+        );
+        $this->assertStringNotContainsString(
+            'ObOutput::registerExternals($this->context)',
+            $type,
+            'Builtin\\Type must not call ObOutput::registerExternals (#33862)'
+        );
+    }
+
     public function testRuntimeOwnerDeclaresObAbiModuleLocally(): void
     {
         $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputRuntime.php');
-        $this->assertStringContainsString('#33798', $owner);
+        $this->assertStringContainsString('#33862', $owner);
         $this->assertStringContainsString('declareObAbis', $owner);
+        $this->assertStringContainsString('self::declareObAbis($context)', $owner);
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputJitBridge.php');
         $this->assertStringContainsString('getNamedFunction', $bridge);
         $this->assertStringContainsString('__phpc_ob_start', $bridge);
+        $embed = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/EmbedObOutput.php');
+        $this->assertStringContainsString('ObOutputRuntime::declareObAbis($context)', $embed);
+        $storage = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObStorageLlvm.php');
+        $this->assertStringContainsString('#33862', $storage);
+        $this->assertMatchesRegularExpression(
+            '/ensureGzhandlerFlushStub\(\$context\);.*implementObEndClean/s',
+            $storage,
+            'ObStorageLlvm must stub gzhandler flush before end/flush bodies (#33862)'
+        );
     }
 
     public function testContextStillEnsureLinksObOutputForStandalone(): void
