@@ -3438,6 +3438,7 @@ require_once __DIR__.'/../../../ext/standard/UnserializeSplFixedArrayDoubleNeste
 require_once __DIR__.'/../../../ext/standard/UnserializeSplFixedArrayBoolNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UnserializeSplObjectStorageNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SerializeSplArrayNestedJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/SerializeSplDllistNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SerializeSplFixedArrayNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SerializeSplObjectStorageNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UploadTempJitHelper.php';

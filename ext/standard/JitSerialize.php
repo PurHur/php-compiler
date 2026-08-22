@@ -157,10 +157,11 @@ final class JitSerialize
 
     /**
      * SPL classes that store in `__spl_ht` — ArrayObject bag (#33625) / SplFixedArray
-     * elements (#33634) / SplObjectStorage object-key pairs (#33876).
+     * elements (#33634) / SplObjectStorage object-key pairs (#33876) / SplDoublyLinkedList
+     * flags+dllist bag (#33966).
      *
      * Only emit IR / phi incomings for registered SPL ids. Unreachable
-     * SplFixedArray/ArrayObject/SOS compileSerialize blocks in the phi poisoned
+     * SplFixedArray/ArrayObject/SOS/Dllist compileSerialize blocks in the phi poisoned
      * stdClass serialize (SIGSEGV, #33959) while user classes still worked.
      */
     private static function tryEncodeSplHtObject(Context $context, JITVariable $arg): ?Value
@@ -170,6 +171,14 @@ final class JitSerialize
             ?? $objectType->classIdForLowerName('splobjectstorage');
         $fixedId = $objectType->classIdByName('SplFixedArray')
             ?? $objectType->classIdForLowerName('splfixedarray');
+        $dllIds = [];
+        foreach (['SplDoublyLinkedList', 'SplQueue', 'SplStack'] as $name) {
+            $id = $objectType->classIdByName($name)
+                ?? $objectType->classIdForLowerName(strtolower($name));
+            if (null !== $id) {
+                $dllIds[] = $id;
+            }
+        }
         $arrayIds = [];
         foreach (['ArrayObject', 'ArrayIterator', 'RecursiveArrayIterator'] as $name) {
             $id = $objectType->classIdByName($name)
@@ -178,7 +187,7 @@ final class JitSerialize
                 $arrayIds[] = $id;
             }
         }
-        if (null === $sosId && null === $fixedId && [] === $arrayIds) {
+        if (null === $sosId && null === $fixedId && [] === $dllIds && [] === $arrayIds) {
             return null;
         }
 
@@ -233,6 +242,34 @@ final class JitSerialize
             $context->builder->branch($doneBlock);
             $phiIncoming[] = [$fixedResult, $fixedEnd];
             $continue = $notFixed;
+        }
+
+        if ([] !== $dllIds) {
+            $dllBlock = BasicBlockHelper::append($context, 'serialize_spl_dll_'.$id);
+            $notDll = BasicBlockHelper::append($context, 'serialize_spl_not_dll_'.$id);
+            $context->builder->positionAtEnd($continue);
+            $isDll = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($dllIds[0], false)
+            );
+            for ($i = 1, $n = \count($dllIds); $i < $n; ++$i) {
+                $isDll = $context->builder->or(
+                    $isDll,
+                    $context->builder->icmp(
+                        Builder::INT_EQ,
+                        $classId,
+                        $i64->constInt($dllIds[$i], false)
+                    )
+                );
+            }
+            $context->builder->branchIf($isDll, $dllBlock, $notDll);
+            $context->builder->positionAtEnd($dllBlock);
+            $dllResult = \PHPCompiler\VM\SplDllistJitHelper::compileSerialize($context, $objVar);
+            $dllEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+            $phiIncoming[] = [$dllResult, $dllEnd];
+            $continue = $notDll;
         }
 
         if ([] !== $arrayIds) {
