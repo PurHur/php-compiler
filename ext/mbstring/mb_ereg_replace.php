@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -16,7 +18,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_ereg_replace() — multibyte regex replace (php-src ext/mbstring/php_mbregex.c; #4635, #30311).
+ * mb_ereg_replace() — multibyte regex replace (php-src ext/mbstring/php_mbregex.c; #4635, #30311, #33765).
+ *
+ * JIT/AOT leftover #33765: catchable argc/TypeError paths (peer mb_eregi_replace #33656);
+ * 3-arg compile-time literal fold via {@see JitMbEregSearch::tryEregReplaceFold}.
  */
 final class mb_ereg_replace extends Internal
 {
@@ -70,10 +75,16 @@ final class mb_ereg_replace extends Internal
     {
         $argc = \count($args);
         if ($argc < 3 || $argc > 4) {
-            throw new \LogicException('mb_ereg_replace() requires three or four arguments');
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                sprintf('mb_ereg_replace() expects at least 3 arguments, %d given', $argc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_ereg_replace_argc_cont');
+
+            return self::foldFalse($context);
         }
 
-        // Compile-time null string args under caller strict_types → TypeError (#30311).
+        // Compile-time null string args under caller strict_types → TypeError (#33765 / #30311).
         foreach ([
             [0, 'pattern'],
             [1, 'replacement'],
@@ -87,11 +98,17 @@ final class mb_ereg_replace extends Internal
             }
         }
 
+        $folded = JitMbEregSearch::tryEregReplaceFold($context, $args, false);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         throw new \LogicException('mb_ereg_replace() is not lowered for JIT/AOT in this compiler build');
     }
 
     private static function foldFalse(Context $context): Value
     {
+        // Boxed __value__ — matches mb_eregi_replace / ExceptionBridge catchable paths (#33765).
         $slot = JitValueBox::alloc($context);
         $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));

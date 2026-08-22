@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding (#30781, #33648, #33655, #33656).
+ * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding (#30781, #33648, #33655, #33656, #33765).
  *
  * Same shape as {@see JitMbSearch} / {@see mb_internal_encoding}: literals only;
  * search cursor lives in {@see MbstringState} for the duration of one AOT/JIT
@@ -97,7 +97,7 @@ final class JitMbEregSearch
 
     /**
      * mb_ereg_replace() / mb_eregi_replace() — 3-arg literal fold (no $options).
-     * php-src php_mbregex.c (#33656).
+     * php-src php_mbregex.c (#33656 / #33765).
      *
      * @param JITVariable[] $args
      */
