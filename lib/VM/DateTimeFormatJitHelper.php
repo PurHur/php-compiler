@@ -30,6 +30,9 @@ final class DateTimeFormatJitHelper
         $i64 = $context->getTypeFromString('int64');
         $obj = null;
         $objectType = $context->type->object;
+        $compileTimeMicro = null !== $receiver->compileTimeDateTimeMicrosecond
+            ? (int) $receiver->compileTimeDateTimeMicrosecond
+            : null;
         if (null !== $receiver->compileTimeDateTimeTimestamp) {
             $timestamp = $i64->constInt($receiver->compileTimeDateTimeTimestamp, true);
         } else {
@@ -44,7 +47,29 @@ final class DateTimeFormatJitHelper
         // (#27091/#27121). Matches NestedJIT AOT when date() is unavailable (offset 0).
         $fmtLit = JitStringBuiltinArg::compileTimeLiteral($formatArg) ?? $formatArg->compileTimeString;
         if (\is_string($fmtLit)) {
-            $civil = JitDate::tryFormatCivilLiteral($context, $fmtLit, $timestamp);
+            $needsMicro = ('u' === $fmtLit || str_contains($fmtLit, '.u') || str_contains($fmtLit, 'u'));
+            // Bare 'U' is unix seconds — not microseconds.
+            if ('U' === $fmtLit) {
+                $needsMicro = false;
+            }
+            $microForCivil = null;
+            if ($needsMicro) {
+                if (null !== $compileTimeMicro) {
+                    $microForCivil = $i64->constInt($compileTimeMicro, false);
+                } else {
+                    if (null === $obj) {
+                        $obj = ReflectionSetup::loadObjectFromArg($context, $receiver);
+                    }
+                    $microForCivil = $context->helper->loadValue(
+                        $objectType->propertyFetch(
+                            $obj,
+                            self::CLASS_DATETIME,
+                            DateTimeSupport::MICROSECOND_PROPERTY
+                        )
+                    );
+                }
+            }
+            $civil = JitDate::tryFormatCivilLiteral($context, $fmtLit, $timestamp, $microForCivil);
             if (null !== $civil) {
                 return $civil;
             }
@@ -52,7 +77,11 @@ final class DateTimeFormatJitHelper
 
         DateTimeFormatRuntime::ensureLinked($context);
         if (null === $obj && null !== $receiver->compileTimeTimezoneName) {
-            $microsecond = $i64->constInt(0, false);
+            // Prefer dedicated micro stamp (#33915 / #33922); NestedJIT on `u` SIGABRTs.
+            $microsecond = $i64->constInt(
+                null !== $compileTimeMicro ? $compileTimeMicro : 0,
+                false
+            );
             $tzPtr = $context->builder->load(
                 $context->constantStringFromString($receiver->compileTimeTimezoneName)
             );

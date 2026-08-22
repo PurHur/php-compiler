@@ -99,13 +99,17 @@ final class JitDateMutation
      * DateTime::modify() / DateTimeImmutable::modify() / date_modify() (#26789, #27262).
      *
      * Prefer compile-time {@see VmDateTimeNative::modifyRelative} when the receiver carries
-     * {@see JITVariable::$compileTimeLong} from construct. Fixed-length unit deltas (+N day/hour/…)
-     * lower to pure LLVM add. Month/year use UTC civil IR ({@see JitGetdate}) — thin AOT cannot
-     * NestedJIT {@see DateMutationRuntime} (missing {@see __nativearray__boundscheck} / empty
-     * gmmktime helper box, peer #27159).
+     * a construct instant ({@see JITVariable::$compileTimeDateTimeTimestamp} / legacy
+     * {@see JITVariable::$compileTimeLong}; #32691 / #33922). Fixed-length unit deltas
+     * (+N day/hour/…) lower to pure LLVM add. Month/year use UTC civil IR ({@see JitGetdate})
+     * — thin AOT cannot NestedJIT {@see DateMutationRuntime} (missing
+     * {@see __nativearray__boundscheck} / empty gmmktime helper box, peer #27159).
      *
-     * Mutable: in-place timestamp update. Immutable: allocate+copy (or constant allocate) so the
-     * original stays unchanged (php-src zim_DateTimeImmutable_modify).
+     * Mutable: in-place timestamp update via {@see ReflectionSetup::loadObjectFromArg}
+     * (not {@see requireDateTimeObject} — post-construct receivers are often `__value__`
+     * boxes; raw `__object__*` structGep SIGSEGVs / assert-fails, #33922). Immutable:
+     * allocate+copy (or constant allocate) so the original stays unchanged
+     * (php-src zim_DateTimeImmutable_modify).
      */
     public static function invokeObjectModify(
         Context $context,
@@ -170,18 +174,14 @@ final class JitDateMutation
         /** @var ObjectBuiltin $object */
         $object = $context->type->object;
 
-        // Fast path: construct left compileTimeLong on $this — resolve entirely at compile time.
-        if (null !== $args[0]->compileTimeLong) {
-            $tzName = $args[0]->compileTimeString ?? 'UTC';
-            // Timezone from construct; ignore leftover date-string stamps on receivers (#27309 peer).
-            if ('' === $tzName || 1 === preg_match('/^\d{4}-\d{2}-\d{2}/', $tzName)) {
-                $tzName = 'UTC';
-            }
+        // Fast path: construct stamped an instant (#32691 / #33915) — bake modify at compile time.
+        $instant = self::resolveCompileTimeInstant($context, $args[0]);
+        if (null !== $instant) {
             try {
                 $newTs = VmDateTimeNative::modifyRelative(
-                    (int) $args[0]->compileTimeLong,
+                    $instant['timestamp'],
                     $modifierLit,
-                    $tzName
+                    $instant['timezone']
                 );
             } catch (\Throwable $e) {
                 throw new \LogicException(
@@ -190,9 +190,11 @@ final class JitDateMutation
                     $e
                 );
             }
+            $micro = $instant['microsecond'];
+            $tzName = $instant['timezone'];
 
             if ($immutable) {
-                $obj = self::allocateDateTimeLike($context, $layout, $newTs, 0, $tzName);
+                $obj = self::allocateDateTimeLike($context, $layout, $newTs, $micro, $tzName);
                 $ret = JitValueBox::alloc($context);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeObject'),
@@ -203,7 +205,7 @@ final class JitDateMutation
                 return $ret;
             }
 
-            $dtObj = self::requireDateTimeObject($context, $args[0], $function.'()');
+            $dtObj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
             self::writeLongProp(
                 $context,
                 $object,
@@ -212,8 +214,10 @@ final class JitDateMutation
                 DateTimeSupport::TS_PROPERTY,
                 $context->getTypeFromString('int64')->constInt($newTs, false)
             );
+            // Relative modify preserves fractional seconds (php-src timelib).
+            self::publishMutableDateTimeInstant($context, $args[0], $newTs, $tzName, $micro);
 
-            return self::returnObjectArg($context, $args[0]);
+            return self::boxObjectPtr($context, $dtObj);
         }
 
         // Runtime receiver (#26789 day-units; #27262 month/year via modify_delta helper).
@@ -239,7 +243,8 @@ final class JitDateMutation
             }
             $dtObj = $target;
         } else {
-            $dtObj = self::requireDateTimeObject($context, $args[0], $function.'()');
+            // Peer add/sub — load via value-box aware helper (#33922).
+            $dtObj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         }
 
         $ts = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY);
@@ -280,7 +285,7 @@ final class JitDateMutation
             return $ret;
         }
 
-        return self::returnObjectArg($context, $args[0]);
+        return self::boxObjectPtr($context, $dtObj);
     }
 
     /**
