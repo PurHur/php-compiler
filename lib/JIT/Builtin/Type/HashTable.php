@@ -114,6 +114,8 @@ class HashTable extends Type
         $this->registerFn('__hashtable__setObjectKeyLong', 'void', ['__hashtable__*', '__object__*', 'int64']);
         $this->registerFn('__hashtable__setObjectKeyObject', 'void', ['__hashtable__*', '__object__*', '__object__*']);
         $this->registerFn('__hashtable__offsetIsSetObjectKey', 'int1', ['__hashtable__*', '__object__*']);
+        // SplObjectStorage::detach / offsetUnset — peer of set/isset object-key (#33841).
+        $this->registerFn('__hashtable__unsetObjectKey', 'void', ['__hashtable__*', '__object__*']);
         $this->registerFn('__value__readHashtable', '__hashtable__*', ['__value__*']);
         $this->registerFn('__value__writeHashtable', 'void', ['__value__*', '__hashtable__*']);
         $this->registerFn('__hashtable__ptrIsNonEmpty', 'int1', ['__hashtable__*']);
@@ -175,6 +177,7 @@ class HashTable extends Type
         $this->implementOffsetIsSet();
         $this->implementUnsetLongAt();
         $this->implementUnsetStringKey();
+        $this->implementUnsetObjectKey();
         $this->implementSetStringKeyString();
         $this->implementSetStringKeyLong();
         $this->implementSetStringKeyDouble();
@@ -3758,6 +3761,81 @@ class HashTable extends Type
         $updateHead = $fn->appendBasicBlock('strkey_unset_update_head');
         $updatePrev = $fn->appendBasicBlock('strkey_unset_update_prev');
         $afterUnlink = $fn->appendBasicBlock('strkey_unset_after_unlink');
+        $this->context->builder->branchIf($hasPrev, $updatePrev, $updateHead);
+
+        $this->context->builder->positionAtEnd($updateHead);
+        $this->context->builder->store($nextNode, $headSlot);
+        $this->context->builder->branch($afterUnlink);
+
+        $this->context->builder->positionAtEnd($updatePrev);
+        $this->context->builder->store(
+            $nextNode,
+            $this->context->builder->structGep($prev, $nodeMap['next'])
+        );
+        $this->context->builder->branch($afterUnlink);
+
+        $this->context->builder->positionAtEnd($afterUnlink);
+        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
+        $this->context->builder->call($this->context->lookupFunction('__value__writeNull'), $valField);
+        $this->decrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($next);
+        $this->context->builder->store($node, $prevSlot);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->store($nextNode, $currentSlot);
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    /**
+     * Unlink `__objkey_node__` by object identity (SplObjectStorage::detach / offsetUnset; #33841).
+     * Mirrors {@see implementUnsetStringKey()} with pointer EQ instead of string compare.
+     */
+    private function implementUnsetObjectKey(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__unsetObjectKey');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__objkey_node__'];
+        $headSlot = $this->context->builder->structGep($ht, $htMap['objKeys']);
+        $nodePtrType = $this->context->getTypeFromString('__objkey_node__*');
+
+        $prevSlot = $this->context->builder->alloca($nodePtrType, 1, 'objkey_unset_prev');
+        $this->context->builder->store($nodePtrType->constNull(), $prevSlot);
+        $currentSlot = $this->context->builder->alloca($nodePtrType, 1, 'objkey_unset_current');
+        $this->context->builder->store($this->context->builder->load($headSlot), $currentSlot);
+
+        $done = $fn->appendBasicBlock('objkey_unset_done');
+        $loopHead = $fn->appendBasicBlock('objkey_unset_head');
+        $loopBody = $fn->appendBasicBlock('objkey_unset_body');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $node = $this->context->builder->load($currentSlot);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $this->context->builder->branchIf($isNull, $done, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
+        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $nodeKey, $key);
+        $remove = $fn->appendBasicBlock('objkey_unset_remove');
+        $next = $fn->appendBasicBlock('objkey_unset_next');
+        $this->context->builder->branchIf($isMatch, $remove, $next);
+
+        $this->context->builder->positionAtEnd($remove);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $prev = $this->context->builder->load($prevSlot);
+        $hasPrev = $this->context->builder->icmp(Builder::INT_NE, $prev, $nodePtrType->constNull());
+        $updateHead = $fn->appendBasicBlock('objkey_unset_update_head');
+        $updatePrev = $fn->appendBasicBlock('objkey_unset_update_prev');
+        $afterUnlink = $fn->appendBasicBlock('objkey_unset_after_unlink');
         $this->context->builder->branchIf($hasPrev, $updatePrev, $updateHead);
 
         $this->context->builder->positionAtEnd($updateHead);

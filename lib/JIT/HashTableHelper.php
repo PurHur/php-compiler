@@ -306,6 +306,12 @@ final class HashTableHelper
         HashTableWriteLlvm::setAtObjectKey($context, $ht, $keyObj, $element);
     }
 
+    /** SplObjectStorage::detach / offsetUnset — object-identity key (#33841). */
+    public static function unsetAtObjectKey(Context $context, Value $ht, Value $keyObj): void
+    {
+        HashTableWriteLlvm::unsetAtObjectKey($context, $ht, $keyObj);
+    }
+
     /**
      * Array element write: numeric strings use the int index slot (Zend zend_hash.c; #4151).
      */
