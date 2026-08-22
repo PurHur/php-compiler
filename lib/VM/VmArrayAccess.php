@@ -276,6 +276,15 @@ final class VmArrayAccess
             );
         }
 
+        // TYPE_VALUE without a known class is usually a boxed array (untyped static
+        // by-value copy, json_decode assoc, …). Do not route through ArrayAccess
+        // merely because ArrayObject is linked — that aborts on offsetGet (#33695,
+        // #33636 overreach). HT/string dim stays on dimFetchValueBoxRead.
+        // php-src: Zend/zend_execute.c ZEND_FETCH_DIM_R (array vs ArrayAccess).
+        if (JitVariable::TYPE_VALUE === $container->type) {
+            return false;
+        }
+
         return self::hasRuntimeArrayAccessCandidates($context);
     }
 
@@ -362,6 +371,19 @@ final class VmArrayAccess
             if ('' !== $userType && 'object' !== strtolower(ltrim($userType, '\\'))) {
                 $lc = strtolower(ltrim($userType, '\\'));
                 // php-types InternalArgInfo typo: simplexml_load_* → simplemxml_element (#25338).
+                if ('simplemxml_element' === $lc) {
+                    return 'simplexmlelement';
+                }
+
+                return $lc;
+            }
+        }
+
+        // JIT classUserType on VALUE/OBJECT boxes (literal unserialize ArrayObject, #33654).
+        $tagged = $container->classUserType ?? null;
+        if (null !== $tagged && '' !== $tagged) {
+            $lc = strtolower(ltrim($tagged, '\\'));
+            if ('object' !== $lc) {
                 if ('simplemxml_element' === $lc) {
                     return 'simplexmlelement';
                 }
