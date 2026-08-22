@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\ext\dom\JitDomAttributeNodeNS;
+use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -17,6 +18,20 @@ final class DomElementRemoveAttributeNode implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattrnode_invoke_cont');
+
+        // Early-return on null TypeError so saveXML sync is not emitted (#33753 verify).
+        if (\count($args) >= 2
+            && JitDomRequireDomNodeArg::guardOrAbort(
+                $context,
+                $args[1],
+                'DOMElement::removeAttributeNode',
+                1,
+                'attr',
+                'DOMAttr'
+            )
+        ) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
 
         $result = JitDomAttributeNodeNS::invokeRemoveAttributeNode($context, ...$args);
 

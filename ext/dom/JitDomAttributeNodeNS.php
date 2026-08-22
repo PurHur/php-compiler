@@ -78,6 +78,18 @@ final class JitDomAttributeNodeNS
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattrnodens_cont');
 
+        // php-src Z_PARAM_OBJ_OF_CLASS(DOMAttr) before attribute-map install (#33753).
+        if (JitDomRequireDomNodeArg::guardOrAbort(
+            $context,
+            $args[1],
+            'DOMElement::setAttributeNodeNS',
+            1,
+            'attr',
+            'DOMAttr'
+        )) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
+
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::invokeSetUserScript($context, ...$args);
         }
@@ -173,6 +185,18 @@ final class JitDomAttributeNodeNS
         }
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattrnode_cont');
+
+        // php-src Z_PARAM_OBJ_OF_CLASS(DOMAttr) — null must TypeError, not silent no-op (#33753).
+        if (JitDomRequireDomNodeArg::guardOrAbort(
+            $context,
+            $args[1],
+            'DOMElement::setAttributeNode',
+            1,
+            'attr',
+            'DOMAttr'
+        )) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::invokeSetUserScript($context, ...$args);
