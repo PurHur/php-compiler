@@ -11365,6 +11365,11 @@ class JIT {
                         $coalesceVar->compileTimeConstantName = null;
                         $coalesceVar->compileTimeEnumCase = null;
                     }
+                    // ??= arms persist the object store then copy fetch-arm objectPropertySlot
+                    // onto the merge temp (#33748). That GEP does not dominate coalesce_merge
+                    // or a nested outer ?? — module verify "Instruction does not dominate
+                    // all uses" for `$a->p ??= $b->q ??= 9` (#33760, peer TYPE_NULLSAFE #32988).
+                    $this->reseatCoalesceResultAfterPropertyArms($coalesceResult);
                     if (null !== $op->block3) {
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'coalesce_merge');
                         $builder->positionAtEnd($leftTail);
@@ -26454,6 +26459,27 @@ class JIT {
         }
 
         return $dest;
+    }
+
+    /**
+     * After ??= arms persist the store, drop fetch-arm property SSA so the merge
+     * block (and nested outer ??) load the stack box (#33760 / #32988).
+     */
+    private function reseatCoalesceResultAfterPropertyArms(Operand $coalesceResult): void
+    {
+        $this->ensureCoalesceMergeStackSlot($coalesceResult);
+        if (!$this->context->hasVariableOp($coalesceResult)) {
+            return;
+        }
+        $mergeSeat = $this->context->getVariableFromOp($coalesceResult);
+        $mergeSeat->objectPropertySlot = null;
+        $mergeSeat->objectPropertyType = null;
+        $mergeSeat->objectPropertyReceiver = null;
+        $mergeSeat->objectPropertyName = null;
+        $mergeSeat->objectPropertyClassName = null;
+        $mergeSeat->objectPropertyDnfArms = null;
+        $mergeSeat->staticPropertyGlobal = null;
+        $mergeSeat->staticPropertyType = null;
     }
 
     /**
