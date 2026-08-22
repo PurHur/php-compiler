@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -16,6 +17,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer TimezoneLocation #24801).
  * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
  * (thin AOT: "Current basic block has no parent function", #27550 / peer #27088).
+ * NestedJIT string/bool returns must use {@see JitNestedHelperCoerce} (#33950 —
+ * raw call + writeString SIGSEGV; raw bool zext always false — peers IniRuntime /
+ * StringDateTime / #20664 / #8555 / #26773).
  * Replaces phpc_default_timezone_* LLVM globals + zoneinfo access walk.
  * SSOT: {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_default_timezone_get/set)
@@ -95,7 +99,13 @@ final class DefaultTimezoneRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bodyBb);
-        $tzStr = $context->builder->call(self::helperFunction($context, self::GET_HELPER));
+        // NestedJIT may return __value__* / i64 — extract __string__* before writeString (#33950).
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::GET_HELPER),
+            []
+        );
+        $tzStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $out,
@@ -138,13 +148,23 @@ final class DefaultTimezoneRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bodyBb);
-        $ok = $context->builder->call(self::helperFunction($context, self::SET_HELPER), $tz);
+        // Coerce string arg + boxed bool return (#33950 / #8555 — raw zext always false).
+        $okRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::SET_HELPER),
+            [$tz]
+        );
+        $ok = JitNestedHelperCoerce::extractBoolFromHelperResult($context, $okRaw);
         $failBb = $fn->appendBasicBlock('dtz_set_fail');
         $storeBb = $fn->appendBasicBlock('dtz_set_store');
         $context->builder->branchIf($ok, $storeBb, $failBb);
 
         $context->builder->positionAtEnd($failBb);
-        $context->builder->call(self::helperFunction($context, self::NOTICE_HELPER), $tz);
+        JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::NOTICE_HELPER),
+            [$tz]
+        );
         $context->builder->branch($storeBb);
 
         $context->builder->positionAtEnd($storeBb);
