@@ -37,10 +37,9 @@ final class CastArrayShared
         } else {
             HashTableHelper::setAtIndex($context, $ht, $zero, $src);
         }
-        $array = HashTableHelper::emptyVariable($context);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-
-        return $array;
+        // Return the populated HT directly — storeHashtableInArrayVariable is a no-op for
+        // TYPE_HASHTABLE emptyVariable() and would drop $ht (#33863).
+        return new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $ht);
     }
 
     /** Zend convert_to_array(IS_RESOURCE) — array(0 => resource zval) (#15012, #15013). */
@@ -95,16 +94,20 @@ final class CastArrayShared
 
         $context->builder->positionAtEnd($singletonBlock);
         $wrapped = self::wrapResourceInArray($context, $src);
+        // Nested helpers may leave insert past $singletonBlock — PHI preds must be the
+        // actual branch blocks (#33863).
+        $singletonEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($plainBlock);
         $fromObj = self::emitSplOrGetObjectVars($context, $src, $mangledKeys);
+        $plainEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($wrapped->value->typeOf());
-        $phi->addIncoming($wrapped->value, $singletonBlock);
-        $phi->addIncoming($fromObj->value, $plainBlock);
+        $phi->addIncoming($wrapped->value, $singletonEnd);
+        $phi->addIncoming($fromObj->value, $plainEnd);
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
         $result = HashTableHelper::emptyVariable($context);
@@ -135,18 +138,23 @@ final class CastArrayShared
         $context->builder->branchIf($isArray, $splBlock, $govBlock);
 
         $context->builder->positionAtEnd($splBlock);
+        // SPL try-cast returns a boxed `__value__*` array — unwrap before PHI (#33863 / #27020).
         $fromSpl = HashTableHelper::emptyVariable($context);
-        $fromSpl->value = $splBoxed;
+        $fromSpl->value = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $splBoxed
+        );
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($govBlock);
         $fromGov = self::emitGetObjectVarsArray($context, $src, $mangledKeys);
+        $govEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($fromSpl->value->typeOf());
         $phi->addIncoming($fromSpl->value, $splBlock);
-        $phi->addIncoming($fromGov->value, $govBlock);
+        $phi->addIncoming($fromGov->value, $govEnd);
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
         $result = HashTableHelper::emptyVariable($context);
