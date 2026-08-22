@@ -870,6 +870,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getcwd'));
     }
 
+    /** php-src ext/standard/string.stub.php / uuencode.c — InternalArgInfo return string (missing |false) (#25536). */
+    public function testConvertUudecodeReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('convert_uudecode'));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('convert_uuencode'));
+    }
+
     /** php-src ext/standard/image.stub.php — InternalArgInfo return string (missing |false) (#28314). */
     public function testImageTypeToExtensionReflectionReturnUnion(): void
     {

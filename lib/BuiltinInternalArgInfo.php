@@ -289,6 +289,8 @@ final class BuiltinInternalArgInfo
             'deflate_add', 'inflate_add' => 'string|false',
             // ext/standard/base64.c + string.stub.php — InternalArgInfo omits |false (#25477)
             'base64_decode', 'hex2bin' => 'string|false',
+            // ext/standard/string.stub.php / uuencode.c — InternalArgInfo return string (missing |false) (#25536)
+            'convert_uudecode' => 'string|false',
             // ext/standard/basic_functions.stub.php / md5.c — InternalArgInfo return string (missing |false) (#28347)
             'md5_file', 'sha1_file' => 'string|false',
             // ext/standard/link.stub.php / basic_functions.stub.php — InternalArgInfo omits |false (#28425)
