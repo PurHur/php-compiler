@@ -20,14 +20,10 @@ final class JitValueBox
     public static function alloc(Context $context): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'value_box_alloc_cont');
-        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        // Entry alloca + TYPE_NULL after the alloca group — not in the allocating CFG arm —
+        // so freeDeadVariables on sibling returns does not valueDelref stack garbage (#23472).
+        $slot = BasicBlockHelper::entryAllocaValueBox($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'value_box_init_cont');
-        // LLVM alloca is uninitialized; __value__write* calls valueDelref first (issue #AOT heap).
-        $map = $context->structFieldMap['__value__'];
-        $context->builder->store(
-            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
-            $context->builder->structGep($slot, $map['type'])
-        );
 
         return $slot;
     }
@@ -119,13 +115,7 @@ final class JitValueBox
             return self::normalizeValuePtr($context, self::pointer($context, $storage));
         }
         if (self::isValueOperand($var) && Variable::TYPE_VALUE !== $var->type) {
-            $valueType = $context->getTypeFromString('__value__');
-            $storage = BasicBlockHelper::entryAlloca($context, $valueType);
-            $valueMap = $context->structFieldMap['__value__'];
-            $context->builder->store(
-                $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
-                $context->builder->structGep($storage, $valueMap['type'])
-            );
+            $storage = BasicBlockHelper::entryAllocaValueBox($context);
             $context->builder->call(
                 $context->lookupFunction('__object__load_value_slot'),
                 $var->objectPropertySlot,
@@ -170,7 +160,7 @@ final class JitValueBox
             }
             if ('__string__**' === $llvmType) {
                 $str = $context->builder->load($var->value);
-                $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+                $slot = BasicBlockHelper::entryAllocaValueBox($context);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),
                     self::pointer($context, $slot),
@@ -180,7 +170,7 @@ final class JitValueBox
                 return self::normalizeValuePtr($context, self::pointer($context, $slot));
             }
             if ('__string__*' === $llvmType) {
-                $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+                $slot = BasicBlockHelper::entryAllocaValueBox($context);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),
                     self::pointer($context, $slot),
@@ -236,7 +226,7 @@ final class JitValueBox
      */
     private static function valuePtrFromObjectParam(Context $context, Value $objPtr): Value
     {
-        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        $slot = BasicBlockHelper::entryAllocaValueBox($context);
         $destPtr = self::pointer($context, $slot);
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
