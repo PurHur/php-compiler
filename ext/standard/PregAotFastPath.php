@@ -89,6 +89,29 @@ final class PregAotFastPath
         if ('/(a)(b)/' === $pattern || '#(a)(b)#' === $pattern) {
             return self::matchExactAbGroups($subject, $offset);
         }
+        // Single literal / named literal groups — NestedJIT exact compares (#33887).
+        // General classify of `(?<…>` can miscompile under NestedJIT; keep exact like /(a)(b)/.
+        if ('/(x)/' === $pattern || '#(x)#' === $pattern) {
+            $rc = self::matchExactSingleLiteralGroup($subject, $offset, 'x', '');
+            self::rememberNamedCapAfterMatch($pattern, $rc);
+
+            return $rc;
+        }
+        if ('/(?<a>x)/' === $pattern || '#(?<a>x)#' === $pattern
+            || "/(?'a'x)/" === $pattern || "#(?'a'x)#" === $pattern
+            || '/(?P<a>x)/' === $pattern || '#(?P<a>x)#' === $pattern) {
+            $rc = self::matchExactSingleLiteralGroup($subject, $offset, 'x', 'a');
+            self::rememberNamedCapAfterMatch($pattern, $rc);
+
+            return $rc;
+        }
+        if ('/(?P<b>foo)/' === $pattern || '#(?P<b>foo)#' === $pattern
+            || '/(?<b>foo)/' === $pattern || '#(?<b>foo)#' === $pattern) {
+            $rc = self::matchExactSingleLiteralGroup($subject, $offset, 'foo', 'b');
+            self::rememberNamedCapAfterMatch($pattern, $rc);
+
+            return $rc;
+        }
         // Literal prefix + group(s) — NestedJIT exact compares (#33611).
         // General prefix+groups classify segfaults under NestedJIT; keep exact like /(a)(b)/.
         if ('/a(b)/' === $pattern || '#a(b)#' === $pattern) {
@@ -177,6 +200,19 @@ final class PregAotFastPath
         }
         if ('/(?<digit>\\d+)/' === $pattern || '#(?<digit>\\d+)#' === $pattern) {
             self::$capName1 = 'digit';
+
+            return;
+        }
+        if ('/(?<a>x)/' === $pattern || '#(?<a>x)#' === $pattern
+            || "/(?'a'x)/" === $pattern || "#(?'a'x)#" === $pattern
+            || '/(?P<a>x)/' === $pattern || '#(?P<a>x)#' === $pattern) {
+            self::$capName1 = 'a';
+
+            return;
+        }
+        if ('/(?P<b>foo)/' === $pattern || '#(?P<b>foo)#' === $pattern
+            || '/(?<b>foo)/' === $pattern || '#(?<b>foo)#' === $pattern) {
+            self::$capName1 = 'b';
         }
     }
 
@@ -245,6 +281,15 @@ final class PregAotFastPath
             self::$kindName = 'n';
 
             return 3;
+        }
+        // Single / named literal groups — kind 8 for syncCaptureGroupCaps (#33887).
+        if ('/(x)/' === $pattern || '#(x)#' === $pattern
+            || '/(?<a>x)/' === $pattern || '#(?<a>x)#' === $pattern
+            || "/(?'a'x)/" === $pattern || "#(?'a'x)#" === $pattern
+            || '/(?P<a>x)/' === $pattern || '#(?P<a>x)#' === $pattern
+            || '/(?P<b>foo)/' === $pattern || '#(?P<b>foo)#' === $pattern
+            || '/(?<b>foo)/' === $pattern || '#(?<b>foo)#' === $pattern) {
+            return 8;
         }
         // Literal prefix + groups — exact kind for #33611 (matchCount uses dedicated exact matchers).
         if ('/a(b)/' === $pattern || '#a(b)#' === $pattern
@@ -987,6 +1032,36 @@ final class PregAotFastPath
         return 1;
     }
 
+    /**
+     * Single literal capture — NestedJIT-safe (char scan + optional name) (#33887).
+     */
+    private static function matchExactSingleLiteralGroup(
+        string $subject,
+        int $offset,
+        string $lit,
+        string $name
+    ): int {
+        $litLen = \strlen($lit);
+        $subLen = \strlen($subject);
+        $j = $offset;
+        while ($j + $litLen <= $subLen) {
+            if (self::literalEqualsAt($subject, $j, $lit, $litLen)) {
+                self::storeCapAt(0, $lit);
+                self::storeCapAt(1, $lit);
+                self::$capCount = 2;
+                self::$capName1 = '' . $name;
+
+                return 1;
+            }
+            if (0 === $litLen) {
+                break;
+            }
+            ++$j;
+        }
+
+        return 0;
+    }
+
     private static function matchExactAbGroups(string $subject, int $offset): int
     {
         $full = 'ab';
@@ -1048,11 +1123,17 @@ final class PregAotFastPath
         return 0;
     }
 
-    /** Two literal groups `/(a)(b)/` — unrolled stores for NestedJIT (#26888). */
+    /**
+     * One or two literal groups `/(x)/` / `/(a)(b)/` (#26888, #33887).
+     *
+     * Min length was 7 (two-group only), so single `/(x)/` (len 5) returned -2 while
+     * {@see isLiteralGroupsPattern} still classified kind 8.
+     */
     private static function matchLiteralGroups(string $pattern, string $subject, int $offset): int
     {
         $plen = \strlen($pattern);
-        if ($plen < 7) {
+        // `/(x)/` is 5 chars — was incorrectly rejected by plen < 7 (#33887).
+        if ($plen < 5) {
             return -2;
         }
         $delim = \substr($pattern, 0, 1);
@@ -1064,7 +1145,7 @@ final class PregAotFastPath
         }
         $body = \substr($pattern, 1, $plen - 2);
         $blen = \strlen($body);
-        if ($blen < 4 || '(' !== \substr($body, 0, 1)) {
+        if ($blen < 3 || '(' !== \substr($body, 0, 1)) {
             return -2;
         }
         $i = 1;

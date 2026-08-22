@@ -104,6 +104,36 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame('b', PregAotFastPath::lastCap(2));
     }
 
+    /** Issue #33887 — single literal group was rejected by plen<7; named lit groups too. */
+    public function testSingleLiteralCaptureGroup(): void
+    {
+        $this->assertSame(8, PregAotFastPath::patternKind('/(x)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/(x)/', 'x', 0));
+        $this->assertSame(2, PregAotFastPath::lastCapCount());
+        $this->assertSame('x', PregAotFastPath::lastCap(0));
+        $this->assertSame('x', PregAotFastPath::lastCap(1));
+        $this->assertSame('', PregAotFastPath::lastCapName(1));
+
+        $this->assertSame(8, PregAotFastPath::patternKind('/(ab)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/(ab)/', 'zabz', 0));
+        $this->assertSame(2, PregAotFastPath::lastCapCount());
+        $this->assertSame('ab', PregAotFastPath::lastCap(0));
+        $this->assertSame('ab', PregAotFastPath::lastCap(1));
+
+        $this->assertSame(8, PregAotFastPath::patternKind('/(?<a>x)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/(?<a>x)/', 'x', 0));
+        $this->assertSame(2, PregAotFastPath::lastCapCount());
+        $this->assertSame('x', PregAotFastPath::lastCap(0));
+        $this->assertSame('x', PregAotFastPath::lastCap(1));
+        $this->assertSame('a', PregAotFastPath::lastCapName(1));
+        $this->assertSame(1, PregAotFastPath::lastCapHasName(1));
+
+        $this->assertSame(8, PregAotFastPath::patternKind('/(?P<b>foo)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/(?P<b>foo)/', 'foobar', 0));
+        $this->assertSame('foo', PregAotFastPath::lastCap(1));
+        $this->assertSame('b', PregAotFastPath::lastCapName(1));
+    }
+
     public function testSpacePlusReplace(): void
     {
         $this->assertSame(4, PregAotFastPath::patternKind('/\s+/'));
