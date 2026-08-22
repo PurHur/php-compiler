@@ -89,17 +89,19 @@ final class JitDomNodeChildProperty
     /**
      * Seed child index/tag from loadXML literal so replaceChild can rebuild
      * PROP_USER_SCRIPT_INNER_XML without collapsing siblings (#28671 / #33273).
+     *
+     * Prefer the *receiver* tree — lastCompileTimeXml is the globally last load and
+     * is the destination document during cross-document importNode (#32978).
      */
     private static function annotateCompileTimeChild(
         JITVariable $result,
         string $propName,
         ?JITVariable $receiverVar = null
     ): void {
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }
-        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        $nodes = self::compileTimeChildNodesForReceiver($receiverVar);
         if ([] === $nodes) {
             return;
         }
@@ -130,7 +132,34 @@ final class JitDomNodeChildProperty
     }
 
     /**
-     * @param list<array{kind: string, data: string}> $nodes
+     * Direct children of the property receiver (documentElement / element), not the
+     * process-global last loadXML (destination wins after a second load).
+     *
+     * @return list<array{kind: string, data: string, inner?: string, open?: string}>
+     */
+    private static function compileTimeChildNodesForReceiver(?JITVariable $receiverVar): array
+    {
+        if (null !== $receiverVar) {
+            $inner = $receiverVar->compileTimeDomInnerXml;
+            if (null !== $inner && '' !== $inner) {
+                return DomParseSimpleXmlJitHelper::parseSiblingNodesArgv($inner);
+            }
+            $bound = $receiverVar->compileTimeDomLoadXml
+                ?? JitDomLoadXMLUserScript::compileTimeXmlFor($receiverVar);
+            if (null !== $bound) {
+                return DomParseSimpleXmlJitHelper::directChildNodesArgv($bound);
+            }
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml) {
+            return [];
+        }
+
+        return DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+    }
+
+    /**
+     * @param list<array{kind: string, data: string, inner?: string, open?: string}> $nodes
      */
     private static function stampChildIndex(JITVariable $result, array $nodes, int $index): void
     {
@@ -139,6 +168,10 @@ final class JitDomNodeChildProperty
         if ('element' === ($nodes[$index]['kind'] ?? '')) {
             $result->compileTimeDomTagName = $nodes[$index]['data'];
             self::$lastFetchedTagName = $nodes[$index]['data'];
+            $inner = $nodes[$index]['inner'] ?? null;
+            if (null !== $inner) {
+                $result->compileTimeDomInnerXml = $inner;
+            }
         }
     }
 }
