@@ -97,14 +97,16 @@ final class JitJsonEncode
     /**
      * Public props via get_object_vars + FORCE_OBJECT so empty objects encode as {} (#28638).
      * ArrayObject/ArrayIterator store in `__spl_ht` — get_object_vars is empty under thin AOT (#33619).
+     * SplFixedArray::jsonSerialize → toArray(); encode `__spl_ht` without FORCE_OBJECT (#33723).
      * php-src: ext/json/json_encoder.c — php_json_encode_object / zend_get_properties_for
      * php-src: ext/spl/spl_array.c — spl_array_get_properties returns the array HT
+     * php-src: ext/spl/spl_fixedarray.c — zim_SplFixedArray_jsonSerialize
      */
     private static function encodeObjectPublicProps(Context $context, JITVariable $arg, Value $flags): Value
     {
         $force = $context->getTypeFromString('int64')->constInt(VmJsonFlags::FORCE_OBJECT, false);
         $flagsObj = $context->builder->or($flags, $force);
-        $splEncoded = self::tryEncodeSplArrayObjectStorage($context, $arg, $flagsObj);
+        $splEncoded = self::tryEncodeSplArrayObjectStorage($context, $arg, $flags, $flagsObj);
         if (null !== $splEncoded) {
             return $splEncoded;
         }
@@ -124,13 +126,19 @@ final class JitJsonEncode
     }
 
     /**
-     * Encode ArrayObject family via `__spl_ht` (php-src spl_array_get_properties; #33619).
+     * Encode SPL storage via `__spl_ht` (#33619 / #33723).
+     *
+     * ArrayObject family: FORCE_OBJECT (php-src spl_array_get_properties → object wire).
+     * SplFixedArray: original flags only (JsonSerializable toArray → JSON array, not {}).
+     * Null pads leave numElements < nextFreeElement (#27285); sync before encode so
+     * isPackedList is true (jsonSerialize includes null holes as list elements).
      *
      * Returns null when the operand is not a resolved object pointer we can class-id dispatch.
      */
     private static function tryEncodeSplArrayObjectStorage(
         Context $context,
         JITVariable $arg,
+        Value $flags,
         Value $flagsObj
     ): ?Value {
         $objVar = self::resolveObjectReceiver($context, $arg);
@@ -142,6 +150,7 @@ final class JitJsonEncode
         $aoId = $objectType->lookup('ArrayObject');
         $aiId = $objectType->lookup('ArrayIterator');
         $raiId = $objectType->lookup('RecursiveArrayIterator');
+        $fixedId = $objectType->lookup('SplFixedArray');
         $objPtr = $context->helper->loadValue($objVar);
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
@@ -163,7 +172,13 @@ final class JitJsonEncode
             $classId,
             $i64->constInt($raiId, false)
         );
-        $isSpl = $context->builder->or($context->builder->or($isAo, $isAi), $isRai);
+        $isFixed = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i64->constInt($fixedId, false)
+        );
+        $isSplArray = $context->builder->or($context->builder->or($isAo, $isAi), $isRai);
+        $isSpl = $context->builder->or($isSplArray, $isFixed);
 
         $id = (string) (++self::$blockSerial);
         $splBlock = BasicBlockHelper::append($context, 'json_encode_spl_array_'.$id);
@@ -172,6 +187,31 @@ final class JitJsonEncode
         $context->builder->branchIf($isSpl, $splBlock, $plainBlock);
 
         $context->builder->positionAtEnd($splBlock);
+        $fixedBlock = BasicBlockHelper::append($context, 'json_encode_spl_fixed_'.$id);
+        $aoBlock = BasicBlockHelper::append($context, 'json_encode_spl_ao_'.$id);
+        $context->builder->branchIf($isFixed, $fixedBlock, $aoBlock);
+
+        $context->builder->positionAtEnd($fixedBlock);
+        $htVarFixed = $objectType->splBackingHashtable($objVar);
+        $htFixed = $context->helper->loadValue($htVarFixed);
+        // toArray/jsonSerialize: every slot is an element (null pads included) (#33723 / #27285).
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $slotCount = $context->builder->load(
+            $context->builder->structGep($htFixed, $htMap['nextFreeElement'])
+        );
+        $context->builder->store(
+            $slotCount,
+            $context->builder->structGep($htFixed, $htMap['numElements'])
+        );
+        $fixedResult = $context->builder->call(
+            $context->lookupFunction('__compiler_json_encode_array'),
+            $htFixed,
+            $flags
+        );
+        $fixedEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($aoBlock);
         $htVar = $objectType->splBackingHashtable($objVar);
         $splResult = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
@@ -198,6 +238,7 @@ final class JitJsonEncode
         $context->builder->positionAtEnd($doneBlock);
         $strPtr = $context->getTypeFromString('__string__*');
         $phi = $context->builder->phi($strPtr, 'json_encode_spl_phi_'.$id);
+        $phi->addIncoming($fixedResult, $fixedEnd);
         $phi->addIncoming($splResult, $splEnd);
         $phi->addIncoming($plainResult, $plainEnd);
 
