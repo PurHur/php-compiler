@@ -83,12 +83,13 @@ final class VmNumericDivisionGuard
 
         $context->builder->positionAtEnd($computeBlock);
         $rem = self::signedModulo($context, $emitDividendLong(), $divisor);
+        $afterModBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64, 'mod_neg1_sc_result');
         $phi->addIncoming($zero, $zeroBlock);
-        $phi->addIncoming($rem, $computeBlock);
+        $phi->addIncoming($rem, $afterModBlock);
 
         return $phi;
     }
