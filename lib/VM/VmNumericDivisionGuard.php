@@ -82,13 +82,17 @@ final class VmNumericDivisionGuard
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($computeBlock);
-        $rem = self::signedModulo($context, $emitDividendLong(), $divisor);
+        // Divisor is not -1 on this edge; plain srem avoids nesting signedModulo()'s PHI
+        // inside this block's PHI (LLVM verify: inner phi does not dominate outer phi).
+        $left = $context->builder->intCast($emitDividendLong(), $i64);
+        $rem = $context->builder->signedRem($left, $divisor);
+        $computeEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64, 'mod_neg1_sc_result');
         $phi->addIncoming($zero, $zeroBlock);
-        $phi->addIncoming($rem, $computeBlock);
+        $phi->addIncoming($rem, $computeEndBlock);
 
         return $phi;
     }
