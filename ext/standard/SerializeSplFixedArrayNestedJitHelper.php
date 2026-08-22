@@ -14,6 +14,10 @@ use PHPCompiler\VM\HashTable;
  *
  * Relies on HashTableExportKeyValuePairs including TYPE_NULL (skip TYPE_UNDEFINED only) so
  * SplFixedArray holes emit as i:k;N; (#33639 / php-src spl_fixedarray.c).
+ *
+ * AOT HT export keeps JIT tags (#33520): NATIVE_BOOL=2, NATIVE_DOUBLE=3 — not VM FLOAT=2 /
+ * BOOLEAN=3. Swapped dispatch mis-emits float↔bool wire then SEGVs on unserialize (#33682).
+ * php-src: ext/spl/spl_fixedarray.c
  */
 final class SerializeSplFixedArrayNestedJitHelper
 {
@@ -53,9 +57,11 @@ final class SerializeSplFixedArrayNestedJitHelper
                 $body .= 'i:'.((string) $val->toInt()).';';
             } elseif (0 === $t) {
                 $body .= 'N;';
-            } elseif (3 === $t) {
-                $body .= $val->toBool() ? 'b:1;' : 'b:0;';
             } elseif (2 === $t) {
+                // JIT TYPE_NATIVE_BOOL (#33682 / #33520)
+                $body .= $val->toBool() ? 'b:1;' : 'b:0;';
+            } elseif (3 === $t) {
+                // JIT TYPE_NATIVE_DOUBLE (#33682 / #33520)
                 $body .= 'd:'.((string) $val->toFloat()).';';
             } elseif (4 === $t) {
                 $vs = $val->toString();

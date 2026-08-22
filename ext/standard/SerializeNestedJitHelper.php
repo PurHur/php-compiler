@@ -13,6 +13,7 @@ use PHPCompiler\VM\Variable;
  * Context-free: no VmSerialize / runtime-vm (those SIGSEGV under thin AOT NestedJIT).
  * Mirrors {@see JsonEncodeNestedJitHelper} (#27020) structure closely — NestedJIT is
  * sensitive to helper shape (extra methods in the same TU have mis-typed $pair slots).
+ * AOT HT export keeps JIT tags (#33520): NATIVE_BOOL=2, NATIVE_DOUBLE=3 (#33682).
  * php-src: ext/standard/var.c — php_var_serialize
  */
 final class SerializeNestedJitHelper
@@ -26,10 +27,12 @@ final class SerializeNestedJitHelper
         if (0 === $t) {
             return 'N;';
         }
-        if (3 === $t) {
+        if (2 === $t) {
+            // JIT TYPE_NATIVE_BOOL (#33682 / #33520)
             return $value->toBool() ? 'b:1;' : 'b:0;';
         }
-        if (2 === $t) {
+        if (3 === $t) {
+            // JIT TYPE_NATIVE_DOUBLE (#33682 / #33520)
             return 'd:'.((string) $value->toFloat()).';';
         }
         if (4 === $t) {
@@ -85,11 +88,11 @@ final class SerializeNestedJitHelper
                         $inner .= 'i:'.((string) $elem->toInt()).';';
                     } elseif (0 === $et) {
                         $inner .= 'N;';
-                    } elseif (3 === $et) {
+                    } elseif (2 === $et) {
                         $inner .= $elem->toBool() ? 'b:1;' : 'b:0;';
                     } elseif (4 === $et) {
                         $inner .= self::quote($elem->toString());
-                    } elseif (2 === $et) {
+                    } elseif (3 === $et) {
                         $inner .= 'd:'.((string) $elem->toFloat()).';';
                     } else {
                         $inner .= 'i:'.((string) $elem->toInt()).';';
@@ -105,9 +108,9 @@ final class SerializeNestedJitHelper
                 $body .= 'i:'.((string) $val->toInt()).';';
             } elseif (0 === $t) {
                 $body .= 'N;';
-            } elseif (3 === $t) {
-                $body .= $val->toBool() ? 'b:1;' : 'b:0;';
             } elseif (2 === $t) {
+                $body .= $val->toBool() ? 'b:1;' : 'b:0;';
+            } elseif (3 === $t) {
                 $body .= 'd:'.((string) $val->toFloat()).';';
             } elseif (4 === $t) {
                 $body .= self::quote($val->toString());
@@ -137,11 +140,11 @@ final class SerializeNestedJitHelper
                         $inner .= 'i:'.((string) $elem->toInt()).';';
                     } elseif (0 === $et) {
                         $inner .= 'N;';
-                    } elseif (3 === $et) {
+                    } elseif (2 === $et) {
                         $inner .= $elem->toBool() ? 'b:1;' : 'b:0;';
                     } elseif (4 === $et) {
                         $inner .= self::quote($elem->toString());
-                    } elseif (2 === $et) {
+                    } elseif (3 === $et) {
                         $inner .= 'd:'.((string) $elem->toFloat()).';';
                     } else {
                         $inner .= 'i:'.((string) $elem->toInt()).';';
