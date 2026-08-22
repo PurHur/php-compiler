@@ -84,7 +84,8 @@ final class PendingHeadersJitBridge
     ];
 
     /**
-     * Empty module-local decls only (no NestedJIT) for Type::register (#33255).
+     * Empty module-local decls only (no NestedJIT) when lookup precedes bodies
+     * (#33255 / #33891). Not called from {@see Type::register}.
      */
     public static function declarePendingHeaderAbis(Context $context): void
     {
@@ -175,12 +176,13 @@ final class PendingHeadersJitBridge
     }
 
     /**
-     * Thin AOT link fillers for Type::register empty ABI shells (#20932 regression).
+     * Thin AOT link fillers for pending-header ABI shells (#20932 regression).
      *
-     * Type declares pending-header symbols without bodies; helper-runtime units and
-     * ScriptExit call them. NestedJIT during Type::initialize segfaults (#13571), so
-     * fill no-op / alloc stubs here for link + HelloWorld. Real NestedJIT still runs
-     * via {@see implement} when ensureLinked is invoked with empty bodies.
+     * Declares getNamedFunction-first when absent (no Type::register always-on after
+     * #33891). Helper-runtime units and ScriptExit call them. NestedJIT during
+     * Type::initialize segfaults (#13571), so fill no-op / alloc stubs here for link
+     * + HelloWorld. Real NestedJIT still runs via {@see implement} when ensureLinked
+     * is invoked with empty bodies.
      */
     public static function fillThinAotLinkStubs(Context $context): void
     {

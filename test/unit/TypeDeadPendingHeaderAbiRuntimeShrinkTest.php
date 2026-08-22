@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on pending-header ABI shells from Builtin\Type (#33255).
+ * Drop leftover always-on pending-header ABI shells from Builtin\Type (#33255 / #33891).
  *
  * NestedJIT/AOT bridge stays PendingHeadersRuntime / PendingHeadersJitBridge
  * (php-src ext/standard/head.c). Runtime owner declares module-locally
@@ -20,6 +20,7 @@ final class TypeDeadPendingHeaderAbiRuntimeShrinkTest extends TestCase
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
         $this->assertStringContainsString('#33255', $type);
+        $this->assertStringContainsString('#33891', $type);
         foreach ([
             '__phpc_pending_header_reset',
             '__phpc_pending_header_add',
@@ -40,8 +41,11 @@ final class TypeDeadPendingHeaderAbiRuntimeShrinkTest extends TestCase
                 'Builtin\\Type must not always-register '.$abi.' (#33255)'
             );
         }
-        // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('PendingHeadersRuntime::declarePendingHeaderAbis', $type);
+        $this->assertStringNotContainsString(
+            'PendingHeadersRuntime::declarePendingHeaderAbis($this->context)',
+            $type,
+            'Builtin\\Type::register must not eagerly declare pending-header ABIs (#33891)'
+        );
         $this->assertStringContainsString('PendingHeadersRuntime::ensureLinked', $type);
     }
 
@@ -49,9 +53,17 @@ final class TypeDeadPendingHeaderAbiRuntimeShrinkTest extends TestCase
     {
         $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersRuntime.php');
         $this->assertStringContainsString('#33255', $owner);
+        $this->assertStringContainsString('#33891', $owner);
         $this->assertStringContainsString('declarePendingHeaderAbis', $owner);
+        $this->assertStringContainsString('self::declarePendingHeaderAbis($context)', $owner);
+        $this->assertMatchesRegularExpression(
+            '/function ensureLinked\(Context \$context\): void\s*\{[^}]*self::declarePendingHeaderAbis\(\$context\);/s',
+            $owner,
+            'PendingHeadersRuntime::ensureLinked must declare ABI before implement (#33891)'
+        );
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersJitBridge.php');
         $this->assertStringContainsString('#33255', $bridge);
+        $this->assertStringContainsString('#33891', $bridge);
         $this->assertStringContainsString('declarePendingHeaderAbis', $bridge);
         $this->assertStringContainsString('getNamedFunction', $bridge);
         $this->assertStringContainsString('__phpc_pending_header_reset', $bridge);
