@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -15,6 +16,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Declares module-locally (getNamedFunction first) so leftover Type empty decls cannot mint
  * date_interval_format.1 (#31894 / #32122 / #33203).
  * Thin LLVM bridge forwards the ABI. php-src: ext/date/php_date.c — PHP_FUNCTION(date_interval_format)
+ *
+ * Mid-main ensureLinked must restore the caller's insert block (#33912 / peer #27406 / #27550).
  */
 final class DateIntervalFormatRuntime
 {
@@ -48,10 +51,15 @@ final class DateIntervalFormatRuntime
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementFormatBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementFormatBridge(Context $context): void
@@ -103,7 +111,6 @@ final class DateIntervalFormatRuntime
         );
         $context->builder->returnValue($result);
         $context->registerFunction(self::ABI_NAME, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

@@ -28,6 +28,7 @@ final class DateIntervalFormatRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('DateIntervalFormatStandaloneLlvm', $source);
         $this->assertStringNotContainsString('emitFormatCode', $source);
         $this->assertStringNotContainsString('implementFormat(', $source);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
         $this->assertLessThan(150, \substr_count($source, "\n") + 1);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/DateIntervalFormatStandaloneLlvm.php');

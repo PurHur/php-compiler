@@ -165,6 +165,13 @@ class Context {
     public array $dateIntervalLocalStates = [];
 
     /**
+     * Compile-time DateInterval from DateTime::diff / date_diff awaiting result assign (#33912).
+     *
+     * @var array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int, days: int}|null
+     */
+    public ?array $pendingDateIntervalDiffState = null;
+
+    /**
      * New DateTimeZone result operand/var — construct stamps zone id onto the local (#29732).
      */
     public ?Operand $lastDateTimeZoneNewResultOp = null;

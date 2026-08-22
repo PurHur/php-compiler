@@ -12583,6 +12583,8 @@ class JIT {
                     );
                     $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
+                    // Discarded DateTime::diff — drop pending format stamp (#33912).
+                    $this->context->pendingDateIntervalDiffState = null;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->syncDateTimeZoneConstructMetaToAliases(
                         $this->context->scope->toCall,
@@ -12918,6 +12920,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $result,
                         $this->calleeReturnsByRef($this->context->scope->toCall)
+                    );
+                    $this->syncDateIntervalDiffMetaToResult(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
                     );
                     $this->syncDateTimeConstructMetaToAliases(
                         $this->context->scope->toCall,
@@ -20620,6 +20626,40 @@ class JIT {
         }
         $this->context->lastDateIntervalNewResultOp = null;
         $this->context->lastDateIntervalNewResultVar = null;
+    }
+
+    /**
+     * Publish compile-time DateTime::diff / date_diff state onto the result local (#33912).
+     */
+    private function syncDateIntervalDiffMetaToResult(Operand $resultOp, ?JIT\Call $toCall): void
+    {
+        $state = $this->context->pendingDateIntervalDiffState;
+        $this->context->pendingDateIntervalDiffState = null;
+        if (!\is_array($state)) {
+            return;
+        }
+        $isDiff = $toCall instanceof JIT\Call\DateTimeDiff
+            || ($toCall instanceof CoreFunc\Internal && 'date_diff' === strtolower($toCall->getName()));
+        if (!$isDiff) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($resultOp)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($resultOp);
+        $var->compileTimeDateInterval = $state;
+        $var->classUserType = 'DateInterval';
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null === $name || '' === $name) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        $this->context->dateIntervalLocalStates[$resolved] = $state;
+        $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+        if ($bound instanceof JIT\Variable) {
+            $bound->compileTimeDateInterval = $state;
+            $bound->classUserType = 'DateInterval';
+        }
     }
 
     /**
