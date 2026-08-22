@@ -22,7 +22,9 @@ final class JitSessionStartOptions
         SessionStartOptionsRuntime::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
         $outPtr = JitValueBox::pointer($context, $slot);
-        $optionsPtr = $context->helper->loadValue($options);
+        // ABI is (__value__* out, __value__* options) — pass a value pointer, not a
+        // loaded %__value__ struct (#33945 / Module.php:180 call signature).
+        $optionsPtr = JitValueBox::valuePtrFromVariable($context, $options);
         $context->builder->call(
             $context->lookupFunction(SessionStartOptionsRuntime::ABI),
             $outPtr,
