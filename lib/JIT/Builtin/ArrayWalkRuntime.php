@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\BuiltinRegistry;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\ArrayWalkLlvm;
@@ -19,12 +20,12 @@ use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_walk() / array_walk_recursive() via ArrayWalkJitHelper PHP (#14875, #14877, #14933).
+ * JIT/AOT link for array_walk() / array_walk_recursive() (#14875, #14877, #14933, #33728).
  *
- * Standalone AOT compiles {@see ArrayWalkJitHelper} via JitVmHelperLink bridge (string builtin + closure).
- * Thin AOT must publish sg_vm_context + NestedClosureInvoke before NestedJIT of the helper
- * (VmClosureCall needs an active VM context — #27632 / peer UsortRuntime #24142).
- * In-place HT mutation: skip unconditional storeHashtableInArrayVariable on value boxes (#27227).
+ * - Closures → {@see ArrayWalkLlvm::walkWithClosure} (NestedClosureInvoke)
+ * - String stdlib / user-fn names → {@see ArrayWalkLlvm} Call/Internal on live HT slots (#33728)
+ * - NestedJIT ArrayWalkJitHelper kept for userdata closure bridges only
+ *
  * SSOT: {@see \PHPCompiler\ext\standard\array_walk}, {@see \PHPCompiler\ext\standard\array_walk_recursive}
  * php-src: ext/standard/array.c — php_array_walk() / php_array_walk_recursive()
  */
@@ -74,14 +75,17 @@ final class ArrayWalkRuntime
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
 
-        self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call(
-            $context->lookupFunction(self::ABI_WALK_BUILTIN),
-            $ht,
-            $context->constantFromString($name)
-        );
-        self::storeIfNative($context, $array, $ht);
+        // Pure LLVM — NestedJIT helper cannot resolve user-fn strings; cstr vs __string__* (#33728).
+        if (null !== BuiltinRegistry::resolve($name)) {
+            ArrayWalkLlvm::walkWithBuiltin($context, $ht, $name, false);
+        } elseif ($context->functionIsRegistered($name)) {
+            ArrayWalkLlvm::walkWithUserFunction($context, $ht, $name, false);
+        } else {
+            throw new \LogicException(
+                ArrayMapCallbackPolicy::jitRejectionMessage()
+            );
+        }
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
@@ -104,14 +108,16 @@ final class ArrayWalkRuntime
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
 
-        self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call(
-            $context->lookupFunction(self::ABI_WALK_RECURSIVE_BUILTIN),
-            $ht,
-            $context->constantFromString($name)
-        );
-        self::storeIfNative($context, $array, $ht);
+        if (null !== BuiltinRegistry::resolve($name)) {
+            ArrayWalkLlvm::walkWithBuiltin($context, $ht, $name, true);
+        } elseif ($context->functionIsRegistered($name)) {
+            ArrayWalkLlvm::walkWithUserFunction($context, $ht, $name, true);
+        } else {
+            throw new \LogicException(
+                ArrayMapCallbackPolicy::jitRejectionMessage()
+            );
+        }
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
