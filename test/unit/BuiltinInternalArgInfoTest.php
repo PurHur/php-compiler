@@ -2271,6 +2271,19 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('void', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('debug_print_backtrace'));
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — void + mixed params (#27982, re-#23679). */
+    public function testDebugZvalDumpReflectionStubTypes(): void
+    {
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('debug_zval_dump'));
+        $this->assertSame('void', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('debug_zval_dump'));
+        $value = BuiltinInternalArgInfo::paramInfoForFunction('debug_zval_dump', 0);
+        $this->assertNotNull($value);
+        $this->assertSame('mixed', $value['type']);
+        $values = BuiltinInternalArgInfo::paramInfoForFunction('debug_zval_dump', 1);
+        $this->assertNotNull($values);
+        $this->assertSame('mixed', $values['type']);
+    }
+
     /** php-src ext/standard/basic_functions.stub.php — void + filename="" (#27998). */
     public function testClearstatcacheReflectionStubTypes(): void
     {
