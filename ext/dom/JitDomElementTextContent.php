@@ -119,13 +119,13 @@ final class JitDomElementTextContent
         return false;
     }
 
-    /** Dom\Attr / DOMAttr::$value|nodeValue — sync TYPE_STRING slots (#27108). */
+    /** Dom\Attr / DOMAttr::$value|nodeValue|textContent — sync TYPE_STRING slots (#27108, #33864). */
     public static function isDomAttrValueProperty(string $classLc, string $propLc): bool
     {
         $propLc = strtolower($propLc);
         $classLc = strtolower(str_replace('/', '\\', ltrim($classLc, '\\')));
         if (\in_array($classLc, ['dom\\attr', 'domattr'], true)
-            && \in_array($propLc, ['value', 'nodevalue'], true)
+            && \in_array($propLc, ['value', 'nodevalue', 'textcontent'], true)
         ) {
             return true;
         }
@@ -153,7 +153,7 @@ final class JitDomElementTextContent
 
         $receiver = $lvalue->objectPropertyReceiver;
 
-        // Living / classic Attr value|nodeValue — direct TYPE_STRING slot write (#27108).
+        // Living / classic Attr value|nodeValue|textContent — direct TYPE_STRING slot write (#27108, #33864).
         // Must run before isDomElementTextContent so Attr::$nodeValue is not treated as Element.
         if (self::isDomAttrValueProperty($classLc, $propLc)) {
             $str = self::loadStringValue($context, $value);
@@ -163,7 +163,7 @@ final class JitDomElementTextContent
                 $context->lookupFunction('__string__separate'),
                 $str
             );
-            foreach (['value', 'nodeValue'] as $syncProp) {
+            foreach (['value', 'nodeValue', 'textContent'] as $syncProp) {
                 $context->type->object->propertyStore(
                     $context->type->object->propertySlotFor($receiver, $attrClass, $syncProp),
                     new JITVariable(

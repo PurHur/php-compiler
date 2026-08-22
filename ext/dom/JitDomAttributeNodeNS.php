@@ -36,6 +36,9 @@ final class JitDomAttributeNodeNS
 
     private const PROP_NODE_VALUE = 'nodeValue';
 
+    /** php-src node.c: Attr textContent mirrors value/nodeValue (#33864). */
+    private const PROP_TEXT_CONTENT = 'textContent';
+
     private const PROP_OWNER_ELEMENT = 'ownerElement';
 
     private const PROP_NAMESPACE_URI = 'namespaceURI';
@@ -712,6 +715,7 @@ final class JitDomAttributeNodeNS
         self::storeStringProperty($context, $obj, self::PROP_NAME, $nameProp, $className);
         self::storeStringProperty($context, $obj, self::PROP_VALUE, $value, $className);
         self::storeStringProperty($context, $obj, self::PROP_NODE_VALUE, $value, $className);
+        self::storeStringProperty($context, $obj, self::PROP_TEXT_CONTENT, $value, $className);
         self::storeStringProperty($context, $obj, self::PROP_NAMESPACE_URI, $namespace, $className);
         self::storeStringProperty($context, $obj, self::PROP_LOCAL_NAME, $localName, $className);
         self::storeStringProperty($context, $obj, self::PROP_PREFIX, $prefix, $className);
@@ -780,6 +784,7 @@ final class JitDomAttributeNodeNS
         $valueStr = $value ?? $context->builder->load($context->constantStringFromString(''));
         self::storeStringPropertyValue($context, $obj, self::PROP_VALUE, $valueStr);
         self::storeStringPropertyValue($context, $obj, self::PROP_NODE_VALUE, $valueStr);
+        self::storeStringPropertyValue($context, $obj, self::PROP_TEXT_CONTENT, $valueStr);
         self::storeStringPropertyValue($context, $obj, self::PROP_NAMESPACE_URI, $namespace);
         self::storeStringPropertyValue($context, $obj, self::PROP_LOCAL_NAME, $qualifiedName);
         self::storeStringProperty($context, $obj, self::PROP_PREFIX, '');
@@ -809,6 +814,7 @@ final class JitDomAttributeNodeNS
             self::PROP_NAME,
             self::PROP_VALUE,
             self::PROP_NODE_VALUE,
+            self::PROP_TEXT_CONTENT,
             self::PROP_NAMESPACE_URI,
             self::PROP_LOCAL_NAME,
             self::PROP_PREFIX,
@@ -1180,6 +1186,7 @@ final class JitDomAttributeNodeNS
         $context->builder->positionAtEnd($updateBlock);
         self::storeStringProperty($context, $existing, self::PROP_VALUE, $valueLit);
         self::storeStringProperty($context, $existing, self::PROP_NODE_VALUE, $valueLit);
+        self::storeStringProperty($context, $existing, self::PROP_TEXT_CONTENT, $valueLit);
         $context->builder->store($existing, $resultSlot);
         $context->builder->branch($doneBlock);
 
@@ -1218,6 +1225,7 @@ final class JitDomAttributeNodeNS
         $context->builder->positionAtEnd($updateBlock);
         self::storeStringProperty($context, $existing, self::PROP_VALUE, $valueLit);
         self::storeStringProperty($context, $existing, self::PROP_NODE_VALUE, $valueLit);
+        self::storeStringProperty($context, $existing, self::PROP_TEXT_CONTENT, $valueLit);
         DomUserScriptAttributeCacheLlvm::storeLiteral($context, $namespace, $localName, $existing, $valueLit);
         $context->builder->store($existing, $resultSlot);
         $context->builder->branch($doneBlock);
