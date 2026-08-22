@@ -23,15 +23,14 @@ final class JitPow
             throw new \LogicException('pow() requires exactly two arguments');
         }
 
-        if ($context->powReturnValueBox) {
-            return self::invokeBoxedIntAware($context, ...$args);
-        }
-
-        return self::invokeBoxedLibcPow($context, ...$args);
+        // Zend pow_function and ** share the integer fast path (zend_operators.c).
+        // TYPE_POW already set powReturnValueBox; pow() FUNCCALL must not skip it —
+        // leftover float-only path made AOT var_dump(pow(2,3)) print float(8) (#33848 / #3678).
+        return self::invokeBoxedIntAware($context, ...$args);
     }
 
     /**
-     * Power operator ** — preserve int in the value box when both operands are long.
+     * pow() / ** — preserve int in the value box when both operands are long.
      */
     private static function invokeBoxedIntAware(Context $context, JITVariable ...$args): Value
     {
@@ -57,15 +56,6 @@ final class JitPow
 
             return $slotPtr;
         }
-
-        return self::writeLibcPowToSlot($context, $slotPtr, ...$args);
-    }
-
-    /** pow() FUNCCALL — boxed double (matches gettimeofday float path for assign). */
-    private static function invokeBoxedLibcPow(Context $context, JITVariable ...$args): Value
-    {
-        $slot = JitValueBox::alloc($context);
-        $slotPtr = JitValueBox::pointer($context, $slot);
 
         return self::writeLibcPowToSlot($context, $slotPtr, ...$args);
     }
