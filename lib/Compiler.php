@@ -3251,11 +3251,22 @@ class Compiler {
         ) {
             return false;
         }
-        foreach ($block->opCodes as $prev) {
-            if (OpCode::TYPE_INIT_ARRAY === $prev->type && null !== $prev->arg3) {
+        // Same class of Temporary loss: StaticPropertyFetch emitted just before this dim
+        // must stay in the same CFG block. TYPE_JUMP after INIT_ARRAY drops the fetch
+        // Temporary and AOT dim-reads empty (#33936 / peer #23354).
+        $prev = $ops[$index - 1] ?? null;
+        if (
+            $prev instanceof Op\Expr\StaticPropertyFetch
+            && null !== $op->var
+            && $this->operandsReferToSameVariable($op->var, $prev->result)
+        ) {
+            return false;
+        }
+        foreach ($block->opCodes as $prevOp) {
+            if (OpCode::TYPE_INIT_ARRAY === $prevOp->type && null !== $prevOp->arg3) {
                 return true;
             }
-            if (OpCode::TYPE_INCLUDE === $prev->type && null !== $prev->arg2) {
+            if (OpCode::TYPE_INCLUDE === $prevOp->type && null !== $prevOp->arg2) {
                 return true;
             }
         }

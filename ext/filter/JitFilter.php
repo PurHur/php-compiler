@@ -21,6 +21,7 @@ use PHPCompiler\JIT\Builtin\StringFilterUrl;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -29,6 +30,66 @@ use PHPLLVM\Value;
 final class JitFilter
 {
     private static int $blockSerial = 0;
+
+    /**
+     * php-src IF_G snapshot global for filter_input / filter_has_var (#33946, re-#19640).
+     * GET/POST/COOKIE are immutable request tables; ENV/SERVER stay on live sg_*.
+     */
+    public static function filterInputSnapshotGlobalName(string $superglobal): ?string
+    {
+        return match ($superglobal) {
+            '_GET' => 'if_GET',
+            '_POST' => 'if_POST',
+            '_COOKIE' => 'if_COOKIE',
+            default => null,
+        };
+    }
+
+    /** Declare if_GET / if_POST / if_COOKIE module globals (null until refresh snapshots). */
+    public static function ensureFilterInputSnapshotGlobals(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        foreach (['if_GET', 'if_POST', 'if_COOKIE'] as $name) {
+            if (null === $context->module->getNamedGlobal($name)) {
+                $g = $context->module->addGlobal($htPtr, $name);
+                $g->setInitializer($htPtr->constNull());
+            }
+        }
+    }
+
+    /**
+     * Load IF_G snapshot for GET/POST/COOKIE; other INPUT_* use live sg_*.
+     * When if_* is still null (MCJIT embed / pre-refresh), fall back to live sg_*
+     * so existing JIT CGI paths keep working; standalone AOT refresh always
+     * materializes if_* (empty or filled) before user code (#33946).
+     */
+    public static function loadInputTable(Context $context, string $superglobal): JITVariable
+    {
+        $ifName = self::filterInputSnapshotGlobalName($superglobal);
+        if (null === $ifName) {
+            return SuperglobalInit::load($context, $superglobal);
+        }
+        self::ensureFilterInputSnapshotGlobals($context);
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $ifGlobal = $context->module->getNamedGlobal($ifName);
+        $ifSlot = $context->builder->pointerCast($ifGlobal, $htPtrTy->pointerType(0));
+        $ifLoaded = $context->builder->load($ifSlot);
+        $liveVar = SuperglobalInit::load($context, $superglobal);
+        $liveHt = $context->helper->loadValue($liveVar);
+        $isNullIf = $context->builder->icmp(
+            Builder::INT_EQ,
+            $ifLoaded,
+            $htPtrTy->constNull()
+        );
+        $ht = $context->builder->select($isNullIf, $liveHt, $ifLoaded);
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
+            $ht
+        );
+    }
 
     public static function loadFilterId(Context $context, JITVariable $filter): Value
     {

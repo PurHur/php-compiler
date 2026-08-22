@@ -15,6 +15,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * SSOT: {@see \PHPCompiler\ext\standard\SessionStartOptionsJitHelper}.
  * php-src: ext/session/session.c — PHP_FUNCTION(session_start)
+ *
+ * Type::register no longer ensureLinked this ABI always-on (#33945); call-site
+ * {@see \PHPCompiler\ext\standard\JitSessionStartOptions::invoke} owns the link.
  */
 final class SessionStartOptionsRuntime
 {
@@ -37,6 +40,11 @@ final class SessionStartOptionsRuntime
 
             return;
         }
+
+        // NestedJIT scalar coerce looks up __compiler_trigger_error (#33248 / #33945).
+        // Type::register no longer ensureLinked this ABI always-on — link trigger_error
+        // here before compiling SessionStartOptionsJitHelper.
+        StringTriggerError::ensureLinked($context);
 
         $savedBlock = null;
         try {

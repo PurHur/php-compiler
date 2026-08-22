@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\filter\JitFilter;
 use PHPCompiler\JIT\Builtin\EnvironMirrorRuntime;
+use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPCompiler\JIT\Builtin\MultipartRuntime;
 use PHPCompiler\JIT\Builtin\ParseStrRuntime;
 use PHPCompiler\JIT\Builtin\PendingHeadersRuntime;
@@ -49,6 +51,7 @@ final class JitSuperglobalRefreshKernel
         LibcExtern::ensureStrncmp($context);
         StringGetenv::ensureLibcGetenv($context);
         self::ensureGlobals($context);
+        HashTableDuplicateRuntime::ensureLinked($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
         EnvironMirrorRuntime::ensureLinked($context);
@@ -145,6 +148,8 @@ final class JitSuperglobalRefreshKernel
         $getHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $context->builder->store($getHt, self::sgGlobalPtr($context, 'sg_GET'));
         self::parseFormEncodedFromCstrSlot($context, $getHt, $queryCstr);
+        // IF_G snapshot — filter_input must not see later $_GET writes (#33946, re-#19640).
+        self::storeFilterInputSnapshot($context, 'if_GET', $getHt);
 
         $postHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $filesHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
@@ -159,6 +164,7 @@ final class JitSuperglobalRefreshKernel
         self::populatePostBodyFromCstrSlot($context, $postHt, $filesHt, $contentTypeCstr, $postBodyCstr);
         $context->builder->branch($afterPostBb);
         $context->builder->positionAtEnd($afterPostBb);
+        self::storeFilterInputSnapshot($context, 'if_POST', $postHt);
 
         $requestHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $context->builder->store($requestHt, self::sgGlobalPtr($context, 'sg_REQUEST'));
@@ -222,6 +228,7 @@ final class JitSuperglobalRefreshKernel
         self::parseCookieFromCstrSlot($context, $cookieHt, $cookieCstr);
         $context->builder->branch($cookieDoneBb);
         $context->builder->positionAtEnd($cookieDoneBb);
+        self::storeFilterInputSnapshot($context, 'if_COOKIE', $cookieHt);
 
         foreach (['sg_ENV', 'sg_SESSION'] as $globalName) {
             $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
@@ -556,6 +563,14 @@ final class JitSuperglobalRefreshKernel
         return $context->builder->pointerCast($global, $htPtr->pointerType(0));
     }
 
+    /** Deep-copy request table into IF_G if_* for filter_input (#33946). */
+    private static function storeFilterInputSnapshot(Context $context, string $ifGlobal, Value $srcHt): void
+    {
+        HashTableDuplicateRuntime::ensureLinked($context);
+        $copy = HashTableDuplicateRuntime::duplicate($context, $srcHt);
+        $context->builder->store($copy, self::sgGlobalPtr($context, $ifGlobal));
+    }
+
     private static function ensureGlobals(Context $context): void
     {
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -565,6 +580,7 @@ final class JitSuperglobalRefreshKernel
                 $g->setInitializer($htPtr->constNull());
             }
         }
+        JitFilter::ensureFilterInputSnapshotGlobals($context);
     }
 
     /**
@@ -587,6 +603,7 @@ final class JitSuperglobalRefreshKernel
         LibcExtern::register($context);
         StringGetenv::ensureLibcGetenv($context);
         self::ensureGlobals($context);
+        HashTableDuplicateRuntime::ensureLinked($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
         EnvironMirrorRuntime::ensureLinked($context);
@@ -602,6 +619,7 @@ final class JitSuperglobalRefreshKernel
         MultipartRuntime::ensureUserScriptNoOpPopulateStub($context);
         EnvironMirrorRuntime::ensureLinked($context);
         self::ensureGlobals($context);
+        HashTableDuplicateRuntime::ensureLinked($context);
         self::ensureHeaderQueueExternal($context);
     }
 

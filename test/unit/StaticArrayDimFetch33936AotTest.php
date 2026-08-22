@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class StaticArrayDimFetch33936AotTest extends TestCase
 {
-    private const EXPECTED = "1\n1:1\n1\n1\n9:1\n";
+    private const EXPECTED = "1\n1\n1:1\n1\n1\n9:1\n";
 
     public function testVmStaticArrayDimFetch(): void
     {
