@@ -154,6 +154,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'dateinterval_format_execute.phpt',
         'instance_property_coalesce_assign_33748.phpt',
         'dom/dom_hasattr_bool_33762.phpt',
+        'dom/dom_getattrnode_false_33773.phpt',
     ];
 
     /**

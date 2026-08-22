@@ -840,6 +840,37 @@ final class JitDomAttributeNodeNS
     }
 
     /**
+     * Classic DOMElement::getAttributeNode miss → false (not null). Living Dom\* uses null (#26062 / #33773).
+     */
+    private static function boxNullableObjectOrFalseResult(Context $context, Value $object): Value
+    {
+        $tag = (string) (self::$boxSeq++);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $object,
+            $objPtr->constNull()
+        );
+        $falseBlock = BasicBlockHelper::append($context, 'dom_attr_box_false_'.$tag);
+        $objBlock = BasicBlockHelper::append($context, 'dom_attr_box_obj_f_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'dom_attr_box_done_f_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isNull, $falseBlock, $objBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->store(self::boxBoolResult($context, false), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        $context->builder->store(self::boxObjectResult($context, $object), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
      * True when compile-time name is (or will be) keyed in the live Attr cache (#19281).
      */
     public static function userScriptAttrCacheHasName(Context $context, ?JITVariable $nameArg): bool
@@ -1267,6 +1298,8 @@ final class JitDomAttributeNodeNS
 
     /**
      * DOMElement::getAttributeNode() — user-script AOT live Attr cache (#19281, #27108).
+     *
+     * Classic DOMElement miss → false (php-src element.c / #26062); soft-null name → "" (#33773).
      */
     public static function invokeGetAttributeNode(Context $context, JITVariable ...$args): Value
     {
@@ -1274,17 +1307,19 @@ final class JitDomAttributeNodeNS
             throw new \LogicException('DOMElement::getAttributeNode() expects receiver and name');
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getattrnode_cont');
-        $nameLit = self::compileTimeStringArg($args[1]);
+        // Prefer isNullConstant → "" over stale compileTimeString (peer #33534).
+        $nameLit = self::compileTimeNullableStringArg($args[1]);
         if (null !== $nameLit) {
             \PHPCompiler\ext\dom\JitDomAttrRename::rememberFetchedKey('', $nameLit);
 
-            return self::boxNullableObjectResult(
+            return self::boxNullableObjectOrFalseResult(
                 $context,
                 DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit)
             );
         }
 
-        return self::boxNullResult($context);
+        // Non-literal name without NestedJIT lookup — legacy miss is false, not null (#33773).
+        return self::boxBoolResult($context, false);
     }
 
     /**
