@@ -13,6 +13,7 @@ use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -23,6 +24,7 @@ use PHPLLVM\Value;
  * Boxed `__value__*` arrays (get_object_vars AOT) must use the hashtable ABI —
  * NestedJIT encodeValue resolveIndirect on those boxes SIGSEGVs (#27020).
  * Objects: NestedJIT encodeValue quotes class names — route via get_object_vars (#28638).
+ * DateTime/DateTimeImmutable/DateTimeZone: Zend wire, not empty get_object_vars (#33752 / #14143).
  */
 final class JitJsonEncode
 {
@@ -50,6 +52,11 @@ final class JitJsonEncode
             );
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
+            $dateFold = self::tryFoldDateTimeFamily($context, $arg, 0);
+            if (null !== $dateFold) {
+                return $dateFold;
+            }
+
             return self::stringOrFalse(
                 $context,
                 self::encodeObjectPublicProps($context, $arg, $flags)
@@ -95,15 +102,103 @@ final class JitJsonEncode
     }
 
     /**
+     * Fold DateTime / DateTimeImmutable / DateTimeZone to Zend JSON wire (#33752, re-#14143).
+     *
+     * Thin AOT `get_object_vars` strips `__dt_*` storage (#22445) → `{}`. Use the same
+     * compile-time stamps {@see JitDateTimeConstruct} / {@see JitDateTimeZoneConstruct}
+     * already leave on the receiver (peer SplFixedArray `#33723`).
+     *
+     * php-src: ext/json/php_json.c + ext/date/php_date.c date object handlers
+     */
+    public static function tryFoldDateTimeFamily(Context $context, JITVariable $arg, int $flags): ?Value
+    {
+        $wire = self::compileTimeDateTimeFamilyWire($arg);
+        if (null === $wire) {
+            return null;
+        }
+
+        try {
+            $encoded = VmJsonFormat::encodeExported($wire, $flags);
+        } catch (VmJsonExportException $e) {
+            if (VmJsonFlags::throwsOnError($flags)) {
+                return JitJsonThrow::emitFromException(
+                    $context,
+                    new \JsonException(VmJson::errorMsgForCode($e->errorCode), $e->errorCode)
+                );
+            }
+            JitJsonEncodeCompileTime::emitSetLastError($context, $e->errorCode);
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return JitValueBox::pointer($context, $slot);
+        } catch (\JsonException $e) {
+            return JitJsonThrow::emitFromException($context, $e);
+        }
+        if (false === $encoded) {
+            $sticky = VmJson::lastError();
+            JitJsonEncodeCompileTime::emitSetLastError($context, $sticky);
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        $sticky = VmJson::lastError();
+        if (0 !== $sticky) {
+            JitJsonEncodeCompileTime::emitSetLastError($context, $sticky);
+        }
+
+        return $context->builder->load($context->constantStringFromString($encoded));
+    }
+
+    /**
+     * @return array{date: string, timezone_type: int, timezone: string}|array{timezone_type: int, timezone: string}|null
+     */
+    private static function compileTimeDateTimeFamilyWire(JITVariable $arg): ?array
+    {
+        if (null !== $arg->compileTimeDateTimeTimestamp) {
+            $tz = $arg->compileTimeTimezoneName ?? 'UTC';
+            $timestamp = (int) $arg->compileTimeDateTimeTimestamp;
+            // Construct path stores microsecond 0 for literal fixtures; format matches Zend (#14143).
+            $micro = 0;
+
+            return [
+                'date' => VmDateTimeNative::formatZendDateWire($timestamp, $micro, $tz),
+                'timezone_type' => DateTimeSupport::zendTimezoneWireType($tz),
+                'timezone' => $tz,
+            ];
+        }
+        // DateTimeZone::__construct stamps zone id without a DateTime timestamp (#29732 / #33752).
+        if (null !== $arg->compileTimeTimezoneName && '' !== $arg->compileTimeTimezoneName) {
+            $tz = $arg->compileTimeTimezoneName;
+
+            return [
+                'timezone_type' => DateTimeSupport::zendTimezoneWireType($tz),
+                'timezone' => $tz,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
      * Public props via get_object_vars + FORCE_OBJECT so empty objects encode as {} (#28638).
      * ArrayObject/ArrayIterator store in `__spl_ht` — get_object_vars is empty under thin AOT (#33619).
      * SplFixedArray::jsonSerialize → toArray(); encode `__spl_ht` without FORCE_OBJECT (#33723).
+     * DateTime* Zend wire folded in {@see tryFoldDateTimeFamily} (#33752).
      * php-src: ext/json/json_encoder.c — php_json_encode_object / zend_get_properties_for
      * php-src: ext/spl/spl_array.c — spl_array_get_properties returns the array HT
      * php-src: ext/spl/spl_fixedarray.c — zim_SplFixedArray_jsonSerialize
      */
     private static function encodeObjectPublicProps(Context $context, JITVariable $arg, Value $flags): Value
     {
+        $dateFold = self::tryFoldDateTimeFamily($context, $arg, 0);
+        if (null !== $dateFold) {
+            // Already a string* / false box — callers of encode() wrap TYPE_OBJECT; this
+            // path is also used from encodeBoxedValue which expects a raw string*.
+            // Constant DateTime wire is always a string pointer.
+            return $dateFold;
+        }
+
         $force = $context->getTypeFromString('int64')->constInt(VmJsonFlags::FORCE_OBJECT, false);
         $flagsObj = $context->builder->or($flags, $force);
         $splEncoded = self::tryEncodeSplArrayObjectStorage($context, $arg, $flags, $flagsObj);
