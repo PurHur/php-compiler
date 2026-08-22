@@ -199,6 +199,14 @@ final class Variable {
     public ?int $compileTimeDateTimeTimestamp = null;
 
     /**
+     * Fractional microseconds from DateTime::__construct (0–999999) (#33915).
+     *
+     * Kept beside {@see $compileTimeDateTimeTimestamp} so compile-time diff does not
+     * force microsecond=0 and promote fractional seconds into whole seconds.
+     */
+    public ?int $compileTimeDateTimeMicrosecond = null;
+
+    /**
      * DateInterval::__construct() parse when $duration is a compile-time string (#26772).
      *
      * @var array{y:int,m:int,d:int,h:int,i:int,s:int,f:float,invert:int}|null

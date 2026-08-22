@@ -94,6 +94,7 @@ final class JitDateTimeConstruct
         // getTimestamp/format called __value__readObject on a string box and SIGSEGV'd
         // (peer DateTimeZone compileTimeTimezoneName, #29732).
         $args[0]->compileTimeDateTimeTimestamp = $parsed['timestamp'];
+        $args[0]->compileTimeDateTimeMicrosecond = $parsed['microsecond'];
         $args[0]->compileTimeTimezoneName = $parsed['timezone'];
 
         $slot = JitValueBox::alloc($context);
