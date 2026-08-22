@@ -137,9 +137,9 @@ class Context {
     public ?Variable $lastDateTimeNewResultVar = null;
 
     /**
-     * Local name → unix instant + zone for DateTime / DateTimeImmutable (#32691).
+     * Local name → unix instant + zone (+ micro) for DateTime / DateTimeImmutable (#32691, #33915).
      *
-     * @var array<string, array{timestamp: int, timezone: ?string}>
+     * @var array<string, array{timestamp: int, timezone: ?string, microsecond?: int}>
      */
     public array $dateTimeLocalInstants = [];
 

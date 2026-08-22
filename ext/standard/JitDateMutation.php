@@ -581,7 +581,8 @@ final class JitDateMutation
 
             return [
                 'timestamp' => (int) $arg->compileTimeDateTimeTimestamp,
-                'microsecond' => 0,
+                // Prefer construct micro stamp — do not force 0 (#33915 / leftover #33912).
+                'microsecond' => (int) ($arg->compileTimeDateTimeMicrosecond ?? 0),
                 'timezone' => $tz,
             ];
         }
@@ -737,7 +738,8 @@ final class JitDateMutation
                     $context,
                     $args[0],
                     $updated['timestamp'],
-                    $instant['timezone']
+                    $instant['timezone'],
+                    (int) $updated['microsecond']
                 );
             }
 
@@ -841,19 +843,23 @@ final class JitDateMutation
         Context $context,
         JITVariable $receiver,
         int $timestamp,
-        string $timezone
+        string $timezone,
+        int $microsecond = 0
     ): void {
         $receiver->compileTimeDateTimeTimestamp = $timestamp;
+        $receiver->compileTimeDateTimeMicrosecond = $microsecond;
         $receiver->compileTimeTimezoneName = $timezone;
         foreach ($context->namedVariableBindings as $boundName => $bound) {
             if ($bound !== $receiver) {
                 continue;
             }
             $bound->compileTimeDateTimeTimestamp = $timestamp;
+            $bound->compileTimeDateTimeMicrosecond = $microsecond;
             $bound->compileTimeTimezoneName = $timezone;
             $context->dateTimeLocalInstants[$boundName] = [
                 'timestamp' => $timestamp,
                 'timezone' => $timezone,
+                'microsecond' => $microsecond,
             ];
         }
     }
@@ -864,11 +870,13 @@ final class JitDateMutation
     private static function invalidateMutableDateTimeInstant(Context $context, JITVariable $receiver): void
     {
         $receiver->compileTimeDateTimeTimestamp = null;
+        $receiver->compileTimeDateTimeMicrosecond = null;
         foreach ($context->namedVariableBindings as $boundName => $bound) {
             if ($bound !== $receiver) {
                 continue;
             }
             $bound->compileTimeDateTimeTimestamp = null;
+            $bound->compileTimeDateTimeMicrosecond = null;
             unset($context->dateTimeLocalInstants[$boundName]);
         }
     }
