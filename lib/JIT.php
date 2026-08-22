@@ -11398,6 +11398,8 @@ class JIT {
                             $op->block3->syntheticCfgBranch = $savedSynthetic;
                         }
                         unset($this->context->coalesceAssignTargets[$coalesceResult]);
+                        $this->releaseCoalesceMergeSlotMapping($block, $coalesceResult);
+                        $this->clearCoalesceFetchArmPropertySlotsInScope();
                         if ($this->context->inlineIncludeDepth > 0) {
                             // Do not set inlineIncludeExitBlock to the ?? merge block (#866, #784).
                             break;
@@ -11406,6 +11408,8 @@ class JIT {
                         return $merged;
                     }
                     unset($this->context->coalesceAssignTargets[$coalesceResult]);
+                    $this->releaseCoalesceMergeSlotMapping($block, $coalesceResult);
+                    $this->clearCoalesceFetchArmPropertySlotsInScope();
                     if ($this->context->inlineIncludeDepth > 0) {
                         // Two-branch ?? without merge: continue in the including TU (#866).
                         break;
@@ -13338,6 +13342,17 @@ class JIT {
                 case OpCode::TYPE_PROPERTY_FETCH_WRITE:
                     JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'prop_fetch_cont');
                     $result = $block->getOperand($op->arg1);
+                    // Prior ??= fetch may leave a branch-local objectPropertySlot on a reused
+                    // CFG temp; drop it before this fetch so later loads dominate (#33760).
+                    if ($this->context->hasVariableOp($result)) {
+                        $stale = $this->context->getVariableFromOp($result);
+                        $stale->objectPropertySlot = null;
+                        $stale->objectPropertyType = null;
+                        $stale->objectPropertyReceiver = null;
+                        $stale->objectPropertyName = null;
+                        $stale->objectPropertyClassName = null;
+                        $stale->objectPropertyDnfArms = null;
+                    }
                     $obj = $block->getOperand($op->arg2);
                     $name = $block->getOperand($op->arg3);
                     $propName = $name instanceof Operand\Literal ? $name->value : null;
@@ -13587,6 +13602,7 @@ class JIT {
                                 $name->value,
                                 $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1)
                             );
+                            $this->stampPropertyFetchReceiverOp($fetched, $obj);
                             JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
                             if ($forDimWrite) {
                                 if ($this->varFetchDestUsedAsDimRwContainer($block, $i, (int) $op->arg1)) {
@@ -13598,7 +13614,7 @@ class JIT {
                             if ($forceBranchMerge) {
                                 $this->assignOperand($result, $fetched, true);
                             } else {
-                                $this->context->scope->variables[$result] = $fetched;
+                                $this->bindPropertyFetchResult($result, $fetched, $forWrite);
                             }
                             break;
                         }
@@ -13971,6 +13987,7 @@ class JIT {
                             $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1),
                             $this->context->getVariableFromOp($obj)
                         );
+                        $this->stampPropertyFetchReceiverOp($fetched, $obj);
                         JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
                         if ($forDimWrite) {
                             // BP_VAR_W auto-init (#31770); BP_VAR_RW ++/+= must Error (#31784).
@@ -13998,7 +14015,7 @@ class JIT {
                                 $this->context->retainCoalesceInstancePropertyLvalue = $savedRetain;
                             }
                         } else {
-                            $this->context->scope->variables[$result] = $fetched;
+                            $this->bindPropertyFetchResult($result, $fetched, $forWrite);
                         }
                         if ($op->nullsafeFetchPropertyRead && $this->context->hasVariableOp($result)) {
                             $bound = $this->context->getVariableFromOp($result);
@@ -14017,10 +14034,11 @@ class JIT {
                             $declaringClass,
                             $nameVar
                         );
+                        $this->stampPropertyFetchReceiverOp($fetched, $obj);
                         if ($forceBranchMerge) {
                             $this->assignOperand($result, $fetched, true);
                         } else {
-                            $this->context->scope->variables[$result] = $fetched;
+                            $this->bindPropertyFetchResult($result, $fetched, $forWrite);
                         }
                     }
                     break;
@@ -19930,6 +19948,7 @@ class JIT {
         $dest->objectPropertySlot = $src->objectPropertySlot;
         $dest->objectPropertyType = $src->objectPropertyType;
         $dest->objectPropertyReceiver = $src->objectPropertyReceiver;
+        $dest->objectPropertyReceiverOp = $src->objectPropertyReceiverOp;
         $dest->objectPropertyName = $src->objectPropertyName;
         $dest->objectPropertyClassName = $src->objectPropertyClassName;
         $dest->objectPropertyDnfArms = $src->objectPropertyDnfArms;
@@ -26533,6 +26552,80 @@ class JIT {
         $mergeSeat->objectPropertyDnfArms = null;
         $mergeSeat->staticPropertyGlobal = null;
         $mergeSeat->staticPropertyType = null;
+    }
+
+    private function stampPropertyFetchReceiverOp(Variable $fetched, Operand $receiverOp): void
+    {
+        $fetched->objectPropertyReceiverOp = $receiverOp;
+    }
+
+    private function releaseCoalesceMergeSlotMapping(Block $block, Operand $coalesceResult): void
+    {
+        $mergeSlot = $block->slotForOperand($coalesceResult);
+        if (null !== $mergeSlot) {
+            unset($this->context->coalesceMergeSlotOperands[$mergeSlot]);
+        }
+    }
+
+    /**
+     * Read fetches keep objectPropertySlot on branch-local SSA; ARG_SEND / var_dump load it later
+     * from a block where the GEP does not dominate (#33760, peer #32988).
+     */
+    private function bindPropertyFetchResult(Operand $result, Variable $fetched, bool $forWrite): void
+    {
+        $this->context->scope->variables[$result] = $forWrite
+            ? $fetched
+            : $this->reseatPropertyFetchReadIntoValueBox($fetched);
+    }
+
+    private function reseatPropertyFetchReadIntoValueBox(Variable $fetched): Variable
+    {
+        if (null === $fetched->objectPropertySlot || null === $fetched->objectPropertyType) {
+            return $fetched;
+        }
+        $slot = JIT\JitValueBox::alloc($this->context);
+        JIT\Builtin\Type\ObjectInstancePropertyLlvm::boxFetchedPropertyIntoValue(
+            $this->context->type->object,
+            $slot,
+            $fetched,
+            $fetched->objectPropertyType
+        );
+        $boxed = new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $boxed->compileTimeString = $fetched->compileTimeString;
+        $boxed->compileTimeLong = $fetched->compileTimeLong;
+        $boxed->compileTimeFloat = $fetched->compileTimeFloat;
+        $boxed->isNullConstant = $fetched->isNullConstant;
+
+        return $boxed;
+    }
+
+    /**
+     * ?? / ??= fetch arms bind objectPropertySlot in branch-only SSA. Later PROPERTY_FETCH or
+     * ARG_SEND that reuses the scope Variable loads a GEP that does not dominate — e.g. second
+     * `$a->p ??= $b->q ??=` then var_dump($a->p, $b->q) (#33760, peer #32988).
+     */
+    private function clearCoalesceFetchArmPropertySlotsInScope(): void
+    {
+        foreach ($this->context->scope->variables as $op) {
+            if ($this->context->coalesceAssignTargets->contains($op)) {
+                continue;
+            }
+            $var = $this->context->scope->variables[$op];
+            if (null === $var->objectPropertySlot) {
+                continue;
+            }
+            $var->objectPropertySlot = null;
+            $var->objectPropertyType = null;
+            $var->objectPropertyReceiver = null;
+            $var->objectPropertyName = null;
+            $var->objectPropertyClassName = null;
+            $var->objectPropertyDnfArms = null;
+        }
     }
 
     /**
