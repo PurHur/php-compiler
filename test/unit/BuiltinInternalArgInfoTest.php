@@ -883,6 +883,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('strtok'));
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing array|…|false) (#26115). */
+    public function testGetenvReflectionReturnUnion(): void
+    {
+        $this->assertSame('array|string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getenv'));
+    }
+
     /** php-src ext/standard/image.stub.php — InternalArgInfo return string (missing |false) (#28314). */
     public function testImageTypeToExtensionReflectionReturnUnion(): void
     {
