@@ -648,12 +648,11 @@ class Type extends Builtin {
         // __phpc_stat always-on shell removed (#32651): StatArrayRuntime declares
         // module-locally (getNamedFunction first); user-script stat()/lstat() stay
         // StatArrayJitHelper / VmFs::statInfo (php-src ext/standard/filestat.c).
-        // __phpc_stream_path always-on shell removed (#33258): StreamPathRuntime owns
-        // the ABI (getNamedFunction first via declareStreamPathAbi / implement). Leftover
-        // Type empty decls vs Runtime ABI drift mint stream_path.1 (#31894 / #32122).
-        // User-script stream path metadata stays StreamPathJitHelper / VmFs
-        // (php-src ext/standard/streamsfuncs.c).
-        StreamPathRuntime::declareStreamPathAbi($this->context);
+        // __phpc_stream_path Type::register declareStreamPathAbi removed (#33874 / peer #33258):
+        // StreamPathRuntime owns the ABI (getNamedFunction first via declareStreamPathAbi /
+        // ensureLinked → implement). Leftover Type empty decls vs Runtime ABI drift mint
+        // stream_path.1 (#31894 / #32122). User-script stream path metadata stays
+        // StreamPathJitHelper / VmFs (php-src ext/standard/streamsfuncs.c).
         // __compiler_fgetcsv always-on shell removed (#33189): StringStreamCsv /
         // StringFgetcsvJit owns the ABI (getNamedFunction first, then addFunction if
         // absent via implementFgetcsvBridge; Type::initialize still
