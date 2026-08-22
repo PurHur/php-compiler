@@ -1,4 +1,5 @@
 <?php
+// @differential-repeat: 10 heap corruption is intermittent here (#23472)
 // #23472: nested recursive call with BinaryOp first arg — AOT must not clobber both ARG_SENDs
 function Ack(int $m, int $n): int {
     if ($m == 0) return $n + 1;
