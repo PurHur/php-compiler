@@ -18,6 +18,7 @@ use PHPCompiler\ext\dom\JitDomNodeChildProperty;
 use PHPCompiler\ext\dom\JitDomNodeListItem;
 use PHPCompiler\ext\dom\JitDomParentChildLinkLayout;
 use PHPCompiler\ext\dom\JitDomReplaceChildLiveSlots;
+use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
@@ -179,6 +180,23 @@ final class DomNodeLiveMutationRuntime
         $minArity = 'replacechildren' === $kind ? 0 : 1;
         if ($extraArgCount < $minArity) {
             throw new \LogicException('DomNodeLiveMutationRuntime unsupported arity');
+        }
+        // php-src ParentNode nodes: DOMNode|string — null must TypeError before LiveSlots (#33741).
+        $method = match ($kind) {
+            'append' => 'DOMElement::append',
+            'prepend' => 'DOMElement::prepend',
+            'replacechildren' => 'DOMElement::replaceChildren',
+            default => 'DOMElement::append',
+        };
+        foreach ($extraArgs as $i => $arg) {
+            if (JitDomRequireDomNodeArg::guardDomNodeOrStringOrAbort(
+                $context,
+                $arg,
+                $method,
+                $i + 1
+            )) {
+                return self::nullValuePtr($context);
+            }
         }
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             if ('replacechildren' === $kind) {

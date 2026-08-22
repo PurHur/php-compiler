@@ -58,6 +58,43 @@ final class JitDomRequireDomNodeArg
         return false;
     }
 
+    /**
+     * ParentNode::append/prepend/replaceChildren — DOMNode|string (php-src parentnode.c; #33741).
+     *
+     * Strings are valid; only null TypeErrors. Message matches Zend (no $param name).
+     *
+     * @return bool true when compile-time null was handled (caller must return immediately)
+     */
+    public static function guardDomNodeOrStringOrAbort(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $userArgIndex
+    ): bool {
+        if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_OBJECT === $arg->type) {
+            return false;
+        }
+
+        $message = \sprintf(
+            '%s(): Argument #%d must be of type DOMNode|string, null given',
+            $function,
+            $userArgIndex
+        );
+
+        if (self::isCompileTimeNull($arg)) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_req_node_or_str_null');
+            ExceptionBridge::emitTypeErrorAndAbort($context, $message);
+
+            return true;
+        }
+
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            self::emitRuntimeNullTypeErrorOrContinue($context, $arg, $message);
+        }
+
+        return false;
+    }
+
     public static function boxNullResult(Context $context): Value
     {
         $slot = JitValueBox::alloc($context);
