@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * chunk_split() NestedJIT/AOT SSOT (#30859 / re-#26992).
+ * chunk_split() NestedJIT/AOT SSOT (#30859 / re-#26992 / #33894).
  *
  * Peer {@see VmConvertUu} / htmlspecialchars recursive escapeFrom (#25345):
- * NestedJIT-bundle with {@see ChunkSplitJitHelper}. Use strlen/substr — not
- * `$s[$i]` / isset-length loops. Prefer recursive offset walk over a mutating
- * `$i = $i + $length` loop (thin AOT NestedJIT reused the first chunk).
+ * NestedJIT-bundle with {@see ChunkSplitJitHelper}. Prefer strlen/substr — not
+ * `$s[$i]` / isset-length loops.
+ *
+ * Recursive offset walk (#30859) still miscompiled under thin AOT NestedJIT:
+ * `chunk_split('abcd', 2, ':')` → `abcd:cd:` instead of Zend `ab:cd:` (#33894).
+ * `str_split` + `implode` matches Zend under the same NestedJIT path.
  *
  * php-src: ext/standard/string.c — PHP_FUNCTION(chunk_split)
  */
@@ -26,30 +29,7 @@ final class VmChunkSplit
             return $separator;
         }
 
-        return self::chunkFrom($string, 0, $byteLen, $length, $separator);
-    }
-
-    /**
-     * Recursive offset walk — NestedJIT-safe vs mutating loop index (#30859 / peer #25345).
-     */
-    private static function chunkFrom(
-        string $string,
-        int $offset,
-        int $byteLen,
-        int $length,
-        string $separator
-    ): string {
-        if ($offset >= $byteLen) {
-            return '';
-        }
-        $remain = $byteLen - $offset;
-        $chunkLen = $length;
-        if ($chunkLen > $remain) {
-            $chunkLen = $remain;
-        }
-        $chunk = \substr($string, $offset, $chunkLen);
-        $next = $offset + $length;
-
-        return $chunk.$separator.self::chunkFrom($string, $next, $byteLen, $length, $separator);
+        // Zend-equivalent shape — NestedJIT-safe vs recursive substr walk (#33894).
+        return \implode($separator, \str_split($string, $length)).$separator;
     }
 }

@@ -7,10 +7,11 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: chunk_split() must match Zend without segfault (#30859 / re-#26992).
+ * AOT: chunk_split() must match Zend without segfault (#30859 / re-#26992 / #33894).
  *
  * Root cause: NestedJIT string-index / isset-length helpers abort under thin AOT;
- * helpers use strlen/substr like VmConvertUu (#30811).
+ * recursive strlen/substr walk then silent-wrong (#33894: abcd:cd: vs ab:cd:).
+ * Helpers use str_split+implode (Zend-equivalent) like peer string builtins.
  *
  * php-src: ext/standard/string.c — PHP_FUNCTION(chunk_split)
  *
