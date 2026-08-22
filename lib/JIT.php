@@ -20313,6 +20313,37 @@ class JIT {
         }
     }
 
+    /** Copy construct stamp onto `$z->getLocation()` receivers (#33727 / peer #29732). */
+    private function applyDateTimeZoneLocalToReceiver(Operand $receiverOp, JIT\Variable $receiverVar): void
+    {
+        $recvName = JIT\OperandName::resolve($receiverOp);
+        if (null === $recvName || '' === $recvName) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($recvName);
+        $zoneId = $this->context->dateTimeZoneLocalNames[$resolved] ?? null;
+        if (null === $zoneId || '' === $zoneId) {
+            $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+            if ($bound instanceof JIT\Variable && null !== $bound->compileTimeTimezoneName && '' !== $bound->compileTimeTimezoneName) {
+                $zoneId = $bound->compileTimeTimezoneName;
+            }
+        }
+        if (null === $zoneId || '' === $zoneId) {
+            return;
+        }
+        $receiverVar->compileTimeTimezoneName = $zoneId;
+        $this->context->dateTimeZoneLocalNames[$resolved] = $zoneId;
+        if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
+            $receiverVar->classUserType = 'DateTimeZone';
+        }
+        if (
+            null === $receiverVar->compileTimeString
+            || 'DateTimeZone' === $receiverVar->compileTimeString
+        ) {
+            $receiverVar->compileTimeString = $zoneId;
+        }
+    }
+
     /**
      * @param list<JIT\Variable|array{unpack: JIT\Variable}> $callArgs
      */
@@ -22126,6 +22157,7 @@ class JIT {
         $methodLcEarlyDispatch = strtolower($methodName);
         $this->applyDateTimeLocalInstantToReceiver($receiverOp, $receiverVar);
         $this->applyDateIntervalStateToReceiver($receiverOp, $receiverVar);
+        $this->applyDateTimeZoneLocalToReceiver($receiverOp, $receiverVar);
         $recvHintLc = strtolower(ltrim(
             (string) ($receiverVar->classUserType ?? $receiverOp->type?->userType ?? ''),
             '\\'
@@ -22159,11 +22191,11 @@ class JIT {
 
             return;
         }
-        // DateTimeZone::{getOffset,getTransitions,getName} — CFG often types `$z` as plain
-        // `object`, so the Call proxy never binds and ExternalMethod returns 0/null (#29732).
+        // DateTimeZone::{getOffset,getTransitions,getName,getLocation} — CFG often types `$z` as plain
+        // `object`, so the Call proxy never binds and ExternalMethod returns 0/null (#29732, #33727).
         // DateTime::getOffset() shares the method name; EXEC rewrites when argc==1 (#30761).
         if (
-            \in_array($methodLcEarlyDispatch, ['getoffset', 'gettransitions', 'getname'], true)
+            \in_array($methodLcEarlyDispatch, ['getoffset', 'gettransitions', 'getname', 'getlocation'], true)
             && $this->context->functionIsRegistered('datetimezone::'.$methodLcEarlyDispatch)
         ) {
             $recvName = JIT\OperandName::resolve($receiverOp);
@@ -22429,7 +22461,7 @@ class JIT {
                     $declaringClassLc = 'reflectionattribute';
                 }
             } elseif (
-                \in_array($methodLc, ['getoffset', 'gettransitions', 'getname'], true)
+                \in_array($methodLc, ['getoffset', 'gettransitions', 'getname', 'getlocation'], true)
                 && (
                     'datetimezone' === $receiverHintLc
                     || (null !== ($receiverVar->compileTimeTimezoneName ?? null)
@@ -22438,7 +22470,7 @@ class JIT {
                 && $this->context->functionIsRegistered('datetimezone::'.$methodLc)
             ) {
                 // Stored `$z = new DateTimeZone(...)` often loses CFG object userType; route
-                // zone methods via compileTimeTimezoneName / classUserType (#29732 / #29733 / #29734).
+                // zone methods via compileTimeTimezoneName / classUserType (#29732 / #29733 / #29734 / #33727).
                 $className = 'DateTimeZone';
                 $declaringClassLc = 'datetimezone';
             } elseif (

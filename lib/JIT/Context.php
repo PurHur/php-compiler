@@ -168,6 +168,12 @@ class Context {
     public ?string $lastAssignedDateTimeZoneLocalName = null;
 
     /**
+     * Most recent DateTimeZone::__construct literal id — `$z->getLocation()` receivers often
+     * lack compileTimeTimezoneName after assign (#33727). Sequential construct+method is OK.
+     */
+    public ?string $lastDateTimeZoneConstructedId = null;
+
+    /**
      * Local name → IANA/offset id for DateTimeZone instances (method dispatch) (#29732).
      *
      * @var array<string, string>
@@ -1910,6 +1916,8 @@ class Context {
         $this->functionProxies['datetimezone::gettransitions'] = new Call\DateTimeZoneGetTransitions();
         // DateTimeZone::getName — avoid ExternalMethod silent NULL on thin AOT (#27307).
         $this->functionProxies['datetimezone::getname'] = new Call\DateTimeZoneGetName();
+        // php-src zim_DateTimeZone_getLocation — thin AOT was silent NULL (#33727).
+        $this->functionProxies['datetimezone::getlocation'] = new Call\DateTimeZoneGetLocation();
         // DateTimeZone::getOffset — avoid ExternalMethod silent NULL on thin AOT (#27308).
         $this->functionProxies['datetimezone::getoffset'] = new Call\DateTimeZoneGetOffset();
         // DateTimeZone::listIdentifiers — avoid ExternalMethod silent NULL on thin AOT (#29735).
