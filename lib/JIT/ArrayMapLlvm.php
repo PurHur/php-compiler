@@ -12,10 +12,11 @@ use PHPLLVM\Value;
 
 /**
  * Pure LLVM for array_map(null|compile-time-string-builtin|Closure) under thin standalone AOT
- * (#23974 / #24156).
+ * (#23974 / #24156 / #33705).
  *
  * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayMapJitHelper} still segfaults / returns
  * null on foreach + PHP-array collect for Closures (#24156). Peer of {@see HashTableSliceLlvm}.
+ * Packed walks skip TYPE_UNDEFINED only — TYPE_NULL is kept (#33705 / #33699).
  *
  * php-src: ext/standard/array.c — php_array_map()
  */
@@ -132,12 +133,9 @@ final class ArrayMapLlvm
         $context->builder->branchIf($atEnd, $doneBlock, $check);
 
         $context->builder->positionAtEnd($check);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $src,
-            $srcIdx
-        );
-        $context->builder->branchIf($isSet, $mapBlock, $skip);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL is a real value (#33705 / #33699).
+        $isUndef = HashTableHelper::packedIndexIsUndefined($context, $src, $srcIdx);
+        $context->builder->branchIf($isUndef, $skip, $mapBlock);
 
         $context->builder->positionAtEnd($mapBlock);
         $elem = HashTableHelper::readIndexedToValueBox($context, $src, $srcIdx);
