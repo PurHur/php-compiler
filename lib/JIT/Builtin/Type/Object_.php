@@ -3261,9 +3261,55 @@ class Object_ extends Type {
         $this->typedPropertyInitGuardSlots[$classId][$propset[3]] = true;
     }
 
+    /**
+     * Push a newly declared parent instance property onto subclasses that already
+     * ran {@see inheritParentInstanceProperties} while the parent still had no slots
+     * (php-cfg emits DECLARE_CLASS for the child before the parent's DECLARE_PROPERTY
+     * body in some shapes — #33886 / re-#33007 / #31895).
+     */
+    public function propagateInstancePropertyToSubclasses(int $parentId, string $name): void
+    {
+        $parentSet = $this->findInstancePropertySet($parentId, $name, false);
+        if (null === $parentSet) {
+            return;
+        }
+        $parentLc = strtolower($this->classNameForId($parentId));
+        foreach ($this->classParentLc as $childLc => $pLc) {
+            if ($pLc !== $parentLc || !isset($this->classes[$childLc])) {
+                continue;
+            }
+            $childId = $this->classes[$childLc];
+            if (!$this->hasProperty($childId, $name)) {
+                $this->defineProperty($childId, $name, $parentSet[2]);
+            }
+            $this->copyInheritedInstancePropertySlotMeta($childId, $parentId, $name, $parentSet);
+            $this->propagateInstancePropertyToSubclasses($childId, $name);
+        }
+    }
+
     public function propertySlotRequiresTypedInitGuard(int $classId, int $slotIndex): bool
     {
-        return isset($this->typedPropertyInitGuardSlots[$classId][$slotIndex]);
+        if (isset($this->typedPropertyInitGuardSlots[$classId][$slotIndex])) {
+            return true;
+        }
+        // Child classId may lack a copied flag when inherit ran before the parent
+        // DECLARE_PROPERTY typed-guard mark, or slot maps diverged (#33886 / re-#33007).
+        $declId = $this->instancePropertySlotDeclaringClassId[$classId][$slotIndex] ?? null;
+        if (null === $declId || $declId === $classId) {
+            return false;
+        }
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[3] !== $slotIndex) {
+                continue;
+            }
+            $declSet = $this->findInstancePropertySet($declId, $propset[1], false);
+            if (null !== $declSet && isset($this->typedPropertyInitGuardSlots[$declId][$declSet[3]])) {
+                return true;
+            }
+            break;
+        }
+
+        return false;
     }
 
     public function markPropertyAllowsNull(int $classId, string $name): void
@@ -7879,8 +7925,10 @@ class Object_ extends Type {
      * Declared-property unset → UNDEF slot (zend_std_unset_property / ObjectEntry::unsetProperty).
      *
      * Value-boxed slots get a heap {@see __value__} with {@see VmVariable::TYPE_UNDEFINED} so
-     * {@see TypedPropertyUninitGuard} fires on read (#4863, #33007). Native scalar slots store a
-     * null void* — fetch treats null + typed-init-guard as uninitialized (#33007).
+     * {@see TypedPropertyUninitGuard} fires on read (#4863, #33007). Pointer slots (natives,
+     * string, object) store a null void* — fetch treats null + typed-init-guard as uninitialized
+     * (#33007 / #33886). String/object must not receive a `__value__*` here: fetch casts the slot
+     * to `__string__*` / `__object__*` and would reinterpret the box as a live pointer.
      */
     public function propertyMarkUndefined(PHPLLVM\Value $slot, int $propertyType): void
     {
@@ -7889,6 +7937,8 @@ class Object_ extends Type {
             Variable::TYPE_NATIVE_LONG,
             Variable::TYPE_NATIVE_BOOL,
             Variable::TYPE_NATIVE_DOUBLE,
+            Variable::TYPE_STRING,
+            Variable::TYPE_OBJECT,
         ], true)) {
             $this->context->builder->store($voidPtr->constNull(), $slot);
 

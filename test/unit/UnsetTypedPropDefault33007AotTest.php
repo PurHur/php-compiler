@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: unset() on typed property with default — read throws Error (#33007, re-#4863).
+ * AOT: unset() on typed property with default — read throws Error (#33007, #33886, re-#4863).
  *
  * @see php-src Zend/zend_object_handlers.c zend_std_unset_property
  *
@@ -36,7 +36,7 @@ final class UnsetTypedPropDefault33007AotTest extends TestCase
         }
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/repro/issue_33007_unset_typed_prop_aot.php';
-        $bin = sys_get_temp_dir().'/phpc_issue_33007_'.getmypid().'.bin';
+        $bin = sys_get_temp_dir().'/phpc_issue_33886_'.getmypid().'.bin';
         $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
