@@ -60,6 +60,9 @@ final class CastRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('wrapResourceInArray', $source);
         $this->assertStringContainsString('emitObjectOperandToArray', $source);
         $this->assertStringContainsString('wrapScalarInArray', $source);
+        // SPL try-cast box must unwrap before hashtable PHI (#33863 / #27020).
+        $this->assertStringContainsString('__value__readHashtable', $source);
+        $this->assertStringContainsString('getInsertBlock', $source);
     }
 
     public function testCastArrayCowDuplicateUsesHashTableDuplicateRuntime(): void

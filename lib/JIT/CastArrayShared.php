@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\JitGetObjectVars;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\CastArrayRuntime;
+use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
+use PHPCompiler\VM\ArrayObjectJitHelper;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** Shared (array) cast helpers for CastHelper + CastArrayValueBoxJit (#10046, #19631). */
+/** Shared (array) cast helpers for CastHelper + CastArrayValueBoxJit (#10046, #19631, #33863). */
 final class CastArrayShared
 {
     public static function ensureInsertBlock(Context $context, string $label): void
@@ -37,10 +40,13 @@ final class CastArrayShared
         } else {
             HashTableHelper::setAtIndex($context, $ht, $zero, $src);
         }
-        $array = HashTableHelper::emptyVariable($context);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-
-        return $array;
+        // emptyVariable()+storeHashtable is a no-op for TYPE_HASHTABLE (#33863) — return $ht.
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $ht
+        );
     }
 
     /** Zend convert_to_array(IS_RESOURCE) — array(0 => resource zval) (#15012, #15013). */
@@ -95,16 +101,19 @@ final class CastArrayShared
 
         $context->builder->positionAtEnd($singletonBlock);
         $wrapped = self::wrapResourceInArray($context, $src);
+        // wrapScalarInArray / setAtIndex may leave a different open block (#26818 / #33863).
+        $singletonEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($plainBlock);
         $fromObj = self::emitSplOrGetObjectVars($context, $src, $mangledKeys);
+        $plainEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($wrapped->value->typeOf());
-        $phi->addIncoming($wrapped->value, $singletonBlock);
-        $phi->addIncoming($fromObj->value, $plainBlock);
+        $phi->addIncoming($wrapped->value, $singletonEnd);
+        $phi->addIncoming($fromObj->value, $plainEnd);
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
         $result = HashTableHelper::emptyVariable($context);
@@ -115,15 +124,22 @@ final class CastArrayShared
 
     private static function emitSplOrGetObjectVars(Context $context, Variable $src, bool $mangledKeys): Variable
     {
+        // Thin standalone AOT: NestedJIT SplArrayCastJitHelper SIGSEGVs (#33863). Use
+        // `__spl_ht` via ArrayObjectJitHelper (peer getArrayCopy) then get_object_vars.
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return self::emitStandaloneSplOrGetObjectVars($context, $src, $mangledKeys);
+        }
+
         $operandPtr = self::operandToValueBox($context, $src);
         $splBoxed = CastArrayRuntime::callTrySplArrayCast($context, $operandPtr);
         $typeByte = $context->builder->load(
             $context->builder->structGep($splBoxed, $context->structFieldMap['__value__']['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isArray = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(VmVariable::TYPE_ARRAY, false)
         );
 
@@ -135,18 +151,95 @@ final class CastArrayShared
         $context->builder->branchIf($isArray, $splBlock, $govBlock);
 
         $context->builder->positionAtEnd($splBlock);
-        $fromSpl = HashTableHelper::emptyVariable($context);
-        $fromSpl->value = $splBoxed;
+        // trySplArrayCast returns a boxed `__value__*` — unwrap before PHI vs get_object_vars
+        // hashtable (#33863; peer emitGetObjectVarsArray / #27020).
+        $fromSplHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $splBoxed
+        );
+        $fromSpl = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $fromSplHt
+        );
+        $splEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($govBlock);
         $fromGov = self::emitGetObjectVarsArray($context, $src, $mangledKeys);
+        $govEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($fromSpl->value->typeOf());
-        $phi->addIncoming($fromSpl->value, $splBlock);
-        $phi->addIncoming($fromGov->value, $govBlock);
+        $phi->addIncoming($fromSpl->value, $splEnd);
+        $phi->addIncoming($fromGov->value, $govEnd);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+        $result = HashTableHelper::emptyVariable($context);
+        $result->value = $phi;
+
+        return $result;
+    }
+
+    /**
+     * Standalone AOT: ArrayObject/ArrayIterator → dup `__spl_ht`; else get_object_vars.
+     * php-src: ext/spl/spl_array.c — spl_array_get_properties_for(ZEND_PROP_PURPOSE_ARRAY_CAST)
+     */
+    private static function emitStandaloneSplOrGetObjectVars(
+        Context $context,
+        Variable $src,
+        bool $mangledKeys
+    ): Variable {
+        $object = $context->type->object;
+        if (!$object instanceof ObjectBuiltin) {
+            return self::emitGetObjectVarsArray($context, $src, $mangledKeys);
+        }
+        $aoId = $object->lookup('ArrayObject');
+        $objPtr = self::loadObjectPtrFromOperand($context, $src);
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $objMap['class_id'])
+        );
+        $isSpl = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $context->constantFromInteger($aoId, 'int64')
+        );
+
+        $splBlock = BasicBlockHelper::append($context, 'cast_array_thin_spl');
+        $govBlock = BasicBlockHelper::append($context, 'cast_array_thin_gov');
+        $mergeBlock = BasicBlockHelper::append($context, 'cast_array_thin_merge');
+        $doneBlock = BasicBlockHelper::append($context, 'cast_array_thin_done');
+
+        $context->builder->branchIf($isSpl, $splBlock, $govBlock);
+
+        $context->builder->positionAtEnd($splBlock);
+        HashTableDuplicateRuntime::ensureLinked($context);
+        $boxed = ArrayObjectJitHelper::compileGetArrayCopy($context, $src);
+        $fromSplHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::pointer($context, $boxed)
+        );
+        $fromSpl = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $fromSplHt
+        );
+        $splEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($govBlock);
+        $fromGov = self::emitGetObjectVarsArray($context, $src, $mangledKeys);
+        $govEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($fromSpl->value->typeOf());
+        $phi->addIncoming($fromSpl->value, $splEnd);
+        $phi->addIncoming($fromGov->value, $govEnd);
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
         $result = HashTableHelper::emptyVariable($context);
