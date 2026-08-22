@@ -2268,6 +2268,9 @@ class Context {
                 // Thin user-script AOT still needs pending Error clear/abort for final/readonly
                 // property writes (#23665, #3149). Session/header resets stay full-init only.
                 if (!$this->isThinStandaloneAotMain()) {
+                    // Link HttpResponse before emitReset — not inside emitReset (#11206 /
+                    // #33965). Type::initialize no longer always-on implements.
+                    Builtin\HttpResponseRuntime::ensureStandaloneBodies($this);
                     $emitInStandaloneMain(fn () => Builtin\HttpResponseCode::emitResetForStandaloneMain($this));
                     $emitInStandaloneMain(fn () => Builtin\SessionId::emitResetForStandaloneMain($this));
                     $emitInStandaloneMain(fn () => Builtin\SessionName::emitResetForStandaloneMain($this));
