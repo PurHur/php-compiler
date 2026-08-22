@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
@@ -181,6 +182,16 @@ final class DomLivingApiRuntime
         Variable $receiver,
         Variable $other
     ): Value {
+        // php-src: compareDocumentPosition(DOMNode $other) — not nullable (#33733).
+        if (JitDomRequireDomNodeArg::guardOrAbort(
+            $context,
+            $other,
+            'DOMNode::compareDocumentPosition',
+            1,
+            'other'
+        )) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::compareDocumentPositionViaParentSlots($context, $receiver, $other);
         }
@@ -678,6 +689,7 @@ final class DomLivingApiRuntime
         $id = (string) $seq++;
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_isequal_slots_'.$id);
         $i1 = $context->getTypeFromString('int1');
+        $objPtr = $context->getTypeFromString('__object__*');
         $receiverLlvm = self::loadObject($context, $receiver);
         $otherLlvm = self::loadObject($context, $other);
 
@@ -688,6 +700,16 @@ final class DomLivingApiRuntime
         $cmpTags = $fn->appendBasicBlock('dom_isequal_tags_'.$id);
         $done = $fn->appendBasicBlock('dom_isequal_done_'.$id);
         $cont = $fn->appendBasicBlock('dom_isequal_cont_'.$id);
+
+        // Runtime null in a value box → false (?DOMNode); avoid tagName GEP on null (#33733).
+        $otherIsNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $otherLlvm,
+            $objPtr->constNull()
+        );
+        $afterOtherNull = $fn->appendBasicBlock('dom_isequal_after_other_null_'.$id);
+        $context->builder->branchIf($otherIsNull, $miss, $afterOtherNull);
+        $context->builder->positionAtEnd($afterOtherNull);
 
         $same = $context->builder->icmp(Builder::INT_EQ, $receiverLlvm, $otherLlvm);
         $context->builder->branchIf($same, $hitPtr, $cmpTags);
