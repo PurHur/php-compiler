@@ -313,6 +313,12 @@ class Context {
     /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
+    /**
+     * PROPERTY_FETCH_WRITE feeding ??= : keep objectPropertySlot on force-merge copies (#33748).
+     * ?-> / ?? reads leave this false so merge seats stay stack boxes (#32988 / #3219).
+     */
+    public bool $retainCoalesceInstancePropertyLvalue = false;
+
     /** Scope slot => ?? result operand for runtime reload at chained call-arg send (#17590). */
     public array $coalesceMergeSlotOperands = [];
 

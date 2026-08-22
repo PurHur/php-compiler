@@ -150,17 +150,21 @@ final class ObjectInstancePropertyLlvm
                         $storage = $context->builder->alloca($valueType);
                     } else {
                         $storage = BasicBlockHelper::entryAlloca($context, $valueType);
-                        $valueMap = $context->structFieldMap['__value__'];
-                        $context->builder->store(
-                            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
-                            $context->builder->structGep($storage, $valueMap['type'])
-                        );
-                        $context->builder->call(
-                            $context->lookupFunction('__object__load_value_slot'),
-                            $slot,
-                            $storage
-                        );
                     }
+                    // ??= BP_VAR_IS must see the live slot (UNDEF/null vs set). WRITE used to
+                    // skip the load, so coalesce took the left branch on an empty alloca
+                    // and never stored (#33748 / re-#32880). Keep current-block alloca
+                    // for #32349 (do not entryAlloca on the write path).
+                    $valueMap = $context->structFieldMap['__value__'];
+                    $context->builder->store(
+                        $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                        $context->builder->structGep($storage, $valueMap['type'])
+                    );
+                    $context->builder->call(
+                        $context->lookupFunction('__object__load_value_slot'),
+                        $slot,
+                        $storage
+                    );
                     $var = new Variable(
                         $context,
                         $propset[2],
