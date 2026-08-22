@@ -61,6 +61,10 @@ final class VmObjectPropertyForeach
         }
         if (null !== $containerUserType && '' !== $containerUserType) {
             $classLc = strtolower(ltrim($containerUserType, '\\'));
+            // DatePeriod foreach is the date snapshot, not public start/end/interval (#33744).
+            if ('dateperiod' === $classLc) {
+                return false;
+            }
             if ('object' !== $classLc) {
                 return !VmIteratorProtocol::classImplementsIteratorProtocol($context, $classLc);
             }

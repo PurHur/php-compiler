@@ -421,14 +421,15 @@ final class VmIteratorForeach
 
             return;
         }
-        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
-            ObjectPropertyForeachHelper::compileReset($context, $array, $slotKey);
+        // Before object-property foreach — DatePeriod public props are not the iterator
+        // (#26772 / #33744). rewind/clone remains AOT-unsafe.
+        if (DatePeriodForeachSnapshot::canLower($array)) {
+            DatePeriodForeachSnapshot::compileReset($context, $array, $slotKey);
 
             return;
         }
-        // Before Iterator protocol — DatePeriod rewind/clone is AOT-unsafe (#26772).
-        if (DatePeriodForeachSnapshot::canLower($array)) {
-            DatePeriodForeachSnapshot::compileReset($context, $array, $slotKey);
+        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
+            ObjectPropertyForeachHelper::compileReset($context, $array, $slotKey);
 
             return;
         }

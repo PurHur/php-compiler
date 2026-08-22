@@ -151,6 +151,13 @@ class Context {
     public ?Variable $lastDateIntervalNewResultVar = null;
 
     /**
+     * New DatePeriod result — construct stamps foreach snapshot onto the local (#33744).
+     */
+    public ?Operand $lastDatePeriodNewResultOp = null;
+
+    public ?Variable $lastDatePeriodNewResultVar = null;
+
+    /**
      * Local name → parsed DateInterval state for format() (#32699).
      *
      * @var array<string, array<string, mixed>>

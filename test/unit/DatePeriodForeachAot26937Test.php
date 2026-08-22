@@ -20,14 +20,14 @@ final class DatePeriodForeachAot26937Test extends TestCase
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
         $root = dirname(__DIR__, 2);
-        $src = $root.'/test/repro/issue_26937_dateperiod_foreach_aot.php';
+        $src = $root.'/test/repro/maintainer_gap_aot_dateperiod_foreach.php';
         $bin = sys_get_temp_dir().'/phpc_dp_26937_'.getmypid().'.bin';
         $compile = 'PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $compileOut, $compileRc);
         $this->assertSame(0, $compileRc, implode("\n", $compileOut));
-        $expect = "2024-01-01\n2024-01-02\n2024-01-03\n";
+        $expect = "2020-01-01,2020-01-02,2020-01-03,2020-01-04\n";
         try {
             for ($i = 0; $i < 10; ++$i) {
                 $runOut = [];
