@@ -1645,7 +1645,7 @@ class Context {
             'splheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_USER,
         ] as $heapLc => $heapKind) {
             foreach ([
-                '__construct', 'insert', 'extract', 'top', 'count',
+                '__construct', 'insert', 'extract', 'top', 'count', 'isempty',
                 'rewind', 'valid', 'current', 'key', 'next',
             ] as $heapMethod) {
                 $this->functionProxies[$heapLc.'::'.$heapMethod] = new Call\SplHeapMethod($heapMethod, $heapKind);
@@ -1655,7 +1655,7 @@ class Context {
         // setExtractFlags/getExtractFlags — thin AOT was a silent null stub (#33861).
         $this->type->object->lookup('SplPriorityQueue');
         foreach ([
-            '__construct', 'insert', 'extract', 'top', 'count',
+            '__construct', 'insert', 'extract', 'top', 'count', 'isEmpty',
             'rewind', 'valid', 'current', 'key', 'next',
             'setExtractFlags', 'getExtractFlags',
         ] as $pqMethod) {
@@ -1668,7 +1668,8 @@ class Context {
             'splstack' => 'SplStack',
         ] as $dllLc => $dllClass) {
             $this->type->object->lookup($dllClass);
-            $dllMethods = ['__construct', 'push', 'pop', 'shift', 'unshift', 'top', 'bottom', 'count'];
+            // isEmpty: without proxy, thin AOT silent-nulls (#579) — always falsy (#33973).
+            $dllMethods = ['__construct', 'push', 'pop', 'shift', 'unshift', 'top', 'bottom', 'count', 'isempty'];
             if ('splqueue' === $dllLc) {
                 $dllMethods = array_merge($dllMethods, ['enqueue', 'dequeue']);
             }

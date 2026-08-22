@@ -99,6 +99,14 @@ final class SplDllistMethod implements Call
                 0,
                 static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileCount($ctx, $self)
             ),
+            // php-src zim_SplDoublyLinkedList_isEmpty (#33973) — was silent null without proxy
+            'isempty' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::isEmpty',
+                0,
+                static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileIsEmpty($ctx, $self)
+            ),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),

@@ -71,6 +71,14 @@ final class SplHeapMethod implements Call
                 0,
                 static fn (Context $ctx, Variable $self): Value => SplHeapJitHelper::compileCount($ctx, $self)
             ),
+            // php-src zim_SplHeap_isEmpty (#33973) — was silent null without proxy
+            'isempty' => $this->callExactArg(
+                $context,
+                $args,
+                'SplHeap::isEmpty',
+                0,
+                static fn (Context $ctx, Variable $self): Value => SplHeapJitHelper::compileIsEmpty($ctx, $self)
+            ),
             'rewind' => $this->callExactArg(
                 $context,
                 $args,
