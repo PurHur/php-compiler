@@ -1099,13 +1099,49 @@ final class JitUnlikeCompare
             $context->builder->and($rightIsObj, $leftIsLong)
         );
         $needsUnlike = $context->builder->or($objVsStr, $objVsLong);
+        $bothStr = $context->builder->and($leftIsStr, $rightIsStr);
         $tag = 'vbox_pair_'.spl_object_id($context);
         $unlikeBb = BasicBlockHelper::append($context, $tag.'_unlike');
+        $preGenBb = BasicBlockHelper::append($context, $tag.'_pre_gen');
+        $bothStrBb = BasicBlockHelper::append($context, $tag.'_both_str');
         $genBb = BasicBlockHelper::append($context, $tag.'_gen');
         $doneBb = BasicBlockHelper::append($context, $tag.'_done');
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
-        $context->builder->branchIf($needsUnlike, $unlikeBb, $genBb);
+        $context->builder->branchIf($needsUnlike, $unlikeBb, $preGenBb);
+
+        $bothStrEnd = null;
+        $bothStrVal = null;
+        if (self::isLooseEqualOp($opType)) {
+            // Two boxed IS_STRING operands: strcmp + numeric-string (Zend compare_function).
+            // __value__spaceship can read stale after switch JUMPIF chains (#33800).
+            $context->builder->positionAtEnd($preGenBb);
+            $context->builder->branchIf($bothStr, $bothStrBb, $genBb);
+
+            $context->builder->positionAtEnd($bothStrBb);
+            $readStr = $context->lookupFunction('__value__readString');
+            $leftStrNative = $context->builder->call(
+                $readStr,
+                $context->builder->pointerCast($leftPtr, $readStr->getParam(0)->typeOf())
+            );
+            $rightStrNative = $context->builder->call(
+                $readStr,
+                $context->builder->pointerCast($rightPtr, $readStr->getParam(0)->typeOf())
+            );
+            $eq = \PHPCompiler\VM\VmValueCompare::looseEqualStringToString(
+                $context,
+                $leftStrNative,
+                $rightStrNative
+            );
+            $bothStrVal = OpCode::TYPE_NOT_EQUAL === $opType
+                ? $context->builder->xor($eq, $i1->constInt(1, false))
+                : $eq;
+            $bothStrEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBb);
+        } else {
+            $context->builder->positionAtEnd($preGenBb);
+            $context->builder->branch($genBb);
+        }
 
         $context->builder->positionAtEnd($unlikeBb);
         if (self::isIdenticalOp($opType)) {
@@ -1276,6 +1312,9 @@ final class JitUnlikeCompare
         }
         $phi = $context->builder->phi($i1, $tag.'_done_phi');
         $phi->addIncoming($unlikeVal, $unlikeEnd);
+        if (null !== $bothStrEnd && null !== $bothStrVal) {
+            $phi->addIncoming($bothStrVal, $bothStrEnd);
+        }
         $phi->addIncoming($genVal, $genEnd);
 
         return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $phi);
