@@ -53,7 +53,7 @@ final class ObStatusRuntime
             }
         }
 
-        ObOutput::registerExternals($context);
+        ObOutputRuntime::ensureLinked($context);
         self::ensureBufferUsedDecl($context);
         self::ensureHashtableHelpers($context);
         self::ensureJitHelperCompiled($context);
