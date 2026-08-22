@@ -10,10 +10,39 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Error-handler stack uses module globals on standalone AOT (#17671); no thin ABI fork (#21346).
- * VM SSOT stays ErrorHandlerJitHelper.
+ * Type::initialize must not eagerly registerExternals (#33842). VM SSOT stays ErrorHandlerJitHelper.
  */
 final class ErrorHandlerRuntimeShrinkTest extends TestCase
 {
+    public function testTypeInitializeDropsAlwaysOnErrorHandlerExternals(): void
+    {
+        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertStringContainsString('#33842', $type);
+        $this->assertStringNotContainsString(
+            'ErrorHandlerOutput::registerExternals($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly link error-handler stack (#33842)'
+        );
+        foreach ([
+            '__phpc_error_handler_dispatch',
+            '__phpc_error_handler_set_apply',
+            '__phpc_error_handler_restore_apply',
+            '__phpc_error_handler_get_apply',
+        ] as $abi) {
+            $this->assertDoesNotMatchRegularExpression(
+                '/addFunction\(\s*[\'"]'.preg_quote($abi, '/').'[\'"]/',
+                $type,
+                'Builtin\\Type must not always-declare '.$abi.' (#33842)'
+            );
+        }
+    }
+
+    public function testContextStillEnsureLinksErrorHandlerForStandalone(): void
+    {
+        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('ErrorHandlerJitRuntime::ensureStandaloneBodies($this)', $ctx);
+    }
+
     public function testNoStandaloneThinAbiFork(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ErrorHandlerJitRuntime.php');
@@ -25,6 +54,7 @@ final class ErrorHandlerRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('implementDispatchBridge', $source);
         $this->assertStringContainsString('implementSetApplyBridge', $source);
         $this->assertStringContainsString('implementGetApplyBridge', $source);
+        $this->assertStringContainsString('#33842', $source);
     }
 
     public function testErrorHandlerJitRuntimeUsesModuleStackGlobals(): void
