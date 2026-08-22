@@ -220,7 +220,13 @@ final class InternalStrictArg
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::raiseTypeErrorAndAbort(
                 $context,
-                self::message($context, $function, $argNumber, $paramName, 'int', $arg)
+                sprintf(
+                    '%s(): Argument #%d ($%s) must be of type %s, null given',
+                    $function,
+                    $argNumber,
+                    $paramName,
+                    'int'
+                )
             );
 
             return;
@@ -250,7 +256,13 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($failBlock);
         self::raiseTypeErrorAndAbort(
             $context,
-            self::message($context, $function, $argNumber, $paramName, 'int', $arg)
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type %s, null given',
+                $function,
+                $argNumber,
+                $paramName,
+                'int'
+            )
         );
         $context->builder->positionAtEnd($okBlock);
     }
@@ -266,7 +278,13 @@ final class InternalStrictArg
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::raiseTypeErrorAndAbort(
                 $context,
-                self::message($context, $function, $argNumber, $paramName, 'bool', $arg)
+                sprintf(
+                    '%s(): Argument #%d ($%s) must be of type %s, null given',
+                    $function,
+                    $argNumber,
+                    $paramName,
+                    'bool'
+                )
             );
 
             return;
@@ -296,7 +314,13 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($failBlock);
         self::raiseTypeErrorAndAbort(
             $context,
-            self::message($context, $function, $argNumber, $paramName, 'bool', $arg)
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type %s, null given',
+                $function,
+                $argNumber,
+                $paramName,
+                'bool'
+            )
         );
         $context->builder->positionAtEnd($okBlock);
     }

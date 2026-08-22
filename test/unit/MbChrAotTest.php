@@ -72,4 +72,32 @@ final class MbChrAotTest extends TestCase
         $this->assertStringContainsString('#33536', $src);
         $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/mb_chr.c');
     }
+
+    /**
+     * @group llvm
+     * @group aot
+     */
+    public function testNullStrictTypeErrorMessageMatchesZendOnAot(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/maintainer_gap_mb_chr_ord_null_strict.php';
+        $zendCmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($src).' 2>&1';
+        exec($zendCmd, $zendOut, $zendRc);
+        $this->assertSame(0, $zendRc, implode("\n", $zendOut));
+        $zend = implode("\n", $zendOut);
+
+        $bin = sys_get_temp_dir().'/phpc_mb_chr_null_'.getmypid().'.bin';
+        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        exec(escapeshellarg($bin).' 2>&1', $aotOut, $aotRc);
+        $this->assertSame(0, $aotRc, implode("\n", $aotOut));
+        $this->assertSame($zend, implode("\n", $aotOut));
+        @unlink($bin);
+    }
 }
