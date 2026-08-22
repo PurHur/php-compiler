@@ -760,7 +760,19 @@ final class BuiltinParamNames
             case 'array_replace':
             case 'array_replace_recursive':
                 return ['array', '...replacements'];
-            // php-src ext/standard/array.stub.php — array $array, array ...$rest (callback in rest) (#23959)
+            // php-src ext/standard/array.stub.php — array $array, array ...$arrays (#23593)
+            case 'array_diff':
+            case 'array_diff_assoc':
+            case 'array_diff_key':
+            case 'array_intersect':
+            case 'array_intersect_assoc':
+            case 'array_intersect_key':
+                return ['array', '...arrays'];
+            // php-src ext/standard/array.stub.php — array $array, array ...$rest (callback in rest) (#23593, #23959)
+            case 'array_diff_uassoc':
+            case 'array_diff_ukey':
+            case 'array_intersect_uassoc':
+            case 'array_intersect_ukey':
             case 'array_udiff':
             case 'array_udiff_assoc':
             case 'array_udiff_uassoc':
