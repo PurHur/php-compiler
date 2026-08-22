@@ -13,6 +13,7 @@ use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\ext\dom\JitDomNodeChildProperty;
 use PHPCompiler\ext\dom\JitDomRemoveChild;
 use PHPCompiler\ext\dom\JitDomReplaceChild;
+use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
@@ -74,6 +75,23 @@ final class DomNodeChildNodeMutationRuntime
         }
         if ($extraArgCount < 1 || $extraArgCount > DomNodeLiveMutationRuntime::MAX_EXTRA_ARGS) {
             throw new \LogicException('DomNodeChildNodeMutationRuntime unsupported arity');
+        }
+
+        // php-src ChildNode nodes: DOMNode|string — null must TypeError before LiveSlots (#33746 / peer #33741).
+        $method = match ($kind) {
+            'before' => 'DOMElement::before',
+            'after' => 'DOMElement::after',
+            default => 'DOMElement::replaceWith',
+        };
+        foreach ($extraArgs as $i => $arg) {
+            if (JitDomRequireDomNodeArg::guardDomNodeOrStringOrAbort(
+                $context,
+                $arg,
+                $method,
+                $i + 1
+            )) {
+                return self::nullValuePtr($context);
+            }
         }
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
