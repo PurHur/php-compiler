@@ -14,7 +14,8 @@ use PHPLLVM\Value;
  * openssl_pkey_derive() — EVP_PKEY_derive (php-src ext/openssl/openssl.c / pkey.c; #15428 VM, JIT/AOT #32852).
  *
  * Args are untyped zvals in php-src (`zend_parse_parameters(..., "zz|l")`); invalid scalars soft-fail
- * to false via php_openssl_pkey_from_zval — not TypeError.
+ * to false via php_openssl_pkey_from_zval — not TypeError (#26689). Thin AOT bakes that soft-fail for
+ * compile-time null/bool/int/float in {@see JitOpensslX509::pkeyDerive}.
  *
  * Reflection / named args: Zend stub `public_key`, `private_key`, `int $key_length = 0`: `string|false`
  * (absent from php-types InternalArgInfo — see BuiltinParamNames / BuiltinInternalArgInfo).
