@@ -74,22 +74,25 @@ final class JitPasswordAlgo
             return $i64->constInt(VmPassword::PASSWORD_ARGON2ID, false);
         }
 
-        return null;
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            $context->constantFromBool(false),
+            'pw_algo_const_str',
+            VmPassword::PASSWORD_ALGO_INVALID_MSG
+        );
+
+        return $i64->constInt(VmPassword::PASSWORD_BCRYPT, false);
     }
 
     private static function lowerNativeInt(Context $context, JITVariable $arg): Value
     {
         $algo = $context->helper->loadValue($arg);
-        $bcrypt = $context->getTypeFromString('int64')->constInt(VmPassword::PASSWORD_BCRYPT, false);
-        $supported = $context->builder->icmp(Builder::INT_EQ, $algo, $bcrypt);
-        $okBlock = BasicBlockHelper::append($context, 'pw_algo_native_ok');
-        $badBlock = BasicBlockHelper::append($context, 'pw_algo_native_bad');
-        $context->builder->branchIf($supported, $okBlock, $badBlock);
-
-        $context->builder->positionAtEnd($badBlock);
-        self::emitValueErrorAndAbort($context);
-
-        $context->builder->positionAtEnd($okBlock);
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            self::algoIsSupported($context, $algo),
+            'pw_algo_native',
+            VmPassword::PASSWORD_ALGO_INVALID_MSG
+        );
 
         return $algo;
     }
@@ -141,16 +144,12 @@ final class JitPasswordAlgo
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
-        $intOk = BasicBlockHelper::append($context, 'pw_algo_box_int_ok');
-        $intBad = BasicBlockHelper::append($context, 'pw_algo_box_int_bad');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $intVal, $bcrypt),
-            $intOk,
-            $intBad
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            self::algoIsSupported($context, $intVal),
+            'pw_algo_box_int',
+            VmPassword::PASSWORD_ALGO_INVALID_MSG
         );
-        $context->builder->positionAtEnd($intBad);
-        self::emitValueErrorAndAbort($context);
-        $context->builder->positionAtEnd($intOk);
         $intEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -171,17 +170,13 @@ final class JitPasswordAlgo
             self::stringData($context, $strPtr),
             self::cstr($context, '2y')
         );
-        $strOk = BasicBlockHelper::append($context, 'pw_algo_box_str_ok');
-        $strBad = BasicBlockHelper::append($context, 'pw_algo_box_str_bad');
         $i32 = $context->getTypeFromString('int32');
-        $context->builder->branchIf(
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
             $context->builder->icmp(Builder::INT_EQ, $is2y, $i32->constInt(0, false)),
-            $strOk,
-            $strBad
+            'pw_algo_box_str',
+            VmPassword::PASSWORD_ALGO_INVALID_MSG
         );
-        $context->builder->positionAtEnd($strBad);
-        self::emitValueErrorAndAbort($context);
-        $context->builder->positionAtEnd($strOk);
         $strEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -216,6 +211,32 @@ final class JitPasswordAlgo
         return $phi;
     }
 
+    /** php-src php_password_algo_find — PASSWORD_BCRYPT / PASSWORD_ARGON2* only (#5039). */
+    private static function algoIsSupported(Context $context, Value $algo): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $isBcrypt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $algo,
+            $i64->constInt(VmPassword::PASSWORD_BCRYPT, false)
+        );
+        if (!VmPasswordNative::argon2Available()) {
+            return $isBcrypt;
+        }
+        $isArgon2i = $context->builder->icmp(
+            Builder::INT_EQ,
+            $algo,
+            $i64->constInt(VmPassword::PASSWORD_ARGON2I, false)
+        );
+        $isArgon2id = $context->builder->icmp(
+            Builder::INT_EQ,
+            $algo,
+            $i64->constInt(VmPassword::PASSWORD_ARGON2ID, false)
+        );
+
+        return $context->builder->or($isBcrypt, $context->builder->or($isArgon2i, $isArgon2id));
+    }
+
     private static function stringData(Context $context, Value $str): Value
     {
         $map = $context->structFieldMap['__string__'];
@@ -229,14 +250,6 @@ final class JitPasswordAlgo
     private static function cstr(Context $context, string $literal): Value
     {
         return $context->pointerFromStringConstant($literal);
-    }
-
-    private static function emitValueErrorAndAbort(Context $context): void
-    {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError($context, VmPassword::PASSWORD_ALGO_INVALID_MSG);
-        $context->builder->call($context->lookupFunction('abort'));
     }
 
     private static function emitTypeErrorAndAbort(
