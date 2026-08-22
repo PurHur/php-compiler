@@ -244,9 +244,10 @@ final class StringVarExport
 
         $context->builder->positionAtEnd($doubleBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $arg);
-        // php_var_export_ex uses PG(serialize_precision) then forces a decimal so
-        // re-import stays float (VmVarExportFloat / #32746) — not echo precision.
-        $doubleRaw = ZendDoubleStringRuntime::formatH($context, $doubleVal);
+        // php_var_export_ex / smart_str_append_double → zend_gcvt uppercase E (#33901),
+        // then force a decimal so re-import stays float (VmVarExportFloat / #32746).
+        // formatH alone keeps libc lowercase e; formatVarDumpH applies zendifyGcvt.
+        $doubleRaw = ZendDoubleStringRuntime::formatVarDumpH($context, $doubleVal);
         $doubleStr = self::ensureVarExportFloatDecimal($context, $doubleRaw);
         $doubleEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);

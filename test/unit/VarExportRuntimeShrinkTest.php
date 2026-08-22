@@ -19,6 +19,9 @@ final class VarExportRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('implementThinScalarBridge', $source);
         $this->assertStringContainsString('__compiler_var_export_format_string', $source);
         $this->assertStringContainsString('#27574', $source);
+        // Thin AOT scientific floats: zend_gcvt uppercase E (#33901), not libc lowercase e.
+        $this->assertStringContainsString('formatVarDumpH', $source);
+        $this->assertStringContainsString('#33901', $source);
         $this->assertStringNotContainsString('JitVarExportKernel', $source);
         $this->assertStringNotContainsString('var_export_user_script_bridge', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
