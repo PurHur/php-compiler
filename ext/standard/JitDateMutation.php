@@ -405,26 +405,130 @@ final class JitDateMutation
         }
 
         $compileTime = self::tryCompileTimeDiff($context, $args[0], $args[1], $absolute);
-        if (null === $compileTime) {
+        if (null !== $compileTime) {
+            $i64 = $context->getTypeFromString('int64');
+            $dbl = $context->getTypeFromString('double');
+
+            return self::materializeDateIntervalFromScalars(
+                $context,
+                $i64->constInt($compileTime['y'], true),
+                $i64->constInt($compileTime['m'], true),
+                $i64->constInt($compileTime['d'], true),
+                $i64->constInt($compileTime['h'], true),
+                $i64->constInt($compileTime['i'], true),
+                $i64->constInt($compileTime['s'], true),
+                $dbl->constReal($compileTime['f']),
+                $i64->constInt($compileTime['invert'], true),
+                $i64->constInt($compileTime['days'], true)
+            );
+        }
+
+        // Receiver stamps often drop after a later `new DateTime` (re-#27309 / #32691).
+        // NestedJIT DateMutationRuntime needs __nativearray__boundscheck — unavailable under
+        // thin user AOT (same gate as date_add/sub). Prefer compile-time; else fail honestly.
+        if ($context->isUserScriptAot()) {
             throw new \LogicException(
                 $function.'() requires compile-time DateTime receivers in this compiler build (#27309)'
             );
         }
 
+        return self::lowerDiffRuntime($context, $args[0], $args[1], $absolute);
+    }
+
+    /**
+     * Runtime DateTime::diff / date_diff via {@see __phpc_date_diff_scalars} (re-#27309).
+     */
+    private static function lowerDiffRuntime(
+        Context $context,
+        JITVariable $baseArg,
+        JITVariable $targetArg,
+        bool $absolute
+    ): Value {
+        DateMutationRuntime::ensureLinked($context);
+
+        $baseObj = self::requireDateTimeObject($context, $baseArg, 'DateTime::diff()');
+        $targetObj = self::requireDateTimeObject($context, $targetArg, 'DateTime::diff()');
+        /** @var ObjectBuiltin $object */
+        $object = $context->type->object;
+        $layout = 'DateTime';
+        $baseClass = $baseArg->classUserType;
+        if (\is_string($baseClass) && 0 === strcasecmp(ltrim($baseClass, '\\'), 'DateTimeImmutable')) {
+            $layout = 'DateTimeImmutable';
+        }
+        $targetLayout = $layout;
+        $targetClass = $targetArg->classUserType;
+        if (\is_string($targetClass) && 0 === strcasecmp(ltrim($targetClass, '\\'), 'DateTimeImmutable')) {
+            $targetLayout = 'DateTimeImmutable';
+        }
+
+        $baseTs = self::readLongProp($context, $object, $baseObj, $layout, DateTimeSupport::TS_PROPERTY);
+        $baseUs = self::readLongProp(
+            $context,
+            $object,
+            $baseObj,
+            $layout,
+            DateTimeSupport::MICROSECOND_PROPERTY
+        );
+        $targetTs = self::readLongProp(
+            $context,
+            $object,
+            $targetObj,
+            $targetLayout,
+            DateTimeSupport::TS_PROPERTY
+        );
+        $targetUs = self::readLongProp(
+            $context,
+            $object,
+            $targetObj,
+            $targetLayout,
+            DateTimeSupport::MICROSECOND_PROPERTY
+        );
+        $tz = self::readStringProp($context, $object, $baseObj, $layout, DateTimeSupport::TZ_PROPERTY);
+        $tzCstr = self::stringData($context, $tz);
+
         $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
         $dbl = $context->getTypeFromString('double');
+        $outY = $context->builder->alloca($i64, 1, 'date_df_out_y');
+        $outM = $context->builder->alloca($i64, 1, 'date_df_out_m');
+        $outD = $context->builder->alloca($i64, 1, 'date_df_out_d');
+        $outH = $context->builder->alloca($i64, 1, 'date_df_out_h');
+        $outI = $context->builder->alloca($i64, 1, 'date_df_out_i');
+        $outS = $context->builder->alloca($i64, 1, 'date_df_out_s');
+        $outF = $context->builder->alloca($dbl, 1, 'date_df_out_f');
+        $outInvert = $context->builder->alloca($i64, 1, 'date_df_out_invert');
+        $outDays = $context->builder->alloca($i64, 1, 'date_df_out_days');
+
+        $context->builder->call(
+            $context->lookupFunction('__phpc_date_diff_scalars'),
+            $baseTs,
+            $baseUs,
+            $targetTs,
+            $targetUs,
+            $i1->constInt($absolute ? 1 : 0, false),
+            $tzCstr,
+            $outY,
+            $outM,
+            $outD,
+            $outH,
+            $outI,
+            $outS,
+            $outF,
+            $outInvert,
+            $outDays
+        );
 
         return self::materializeDateIntervalFromScalars(
             $context,
-            $i64->constInt($compileTime['y'], true),
-            $i64->constInt($compileTime['m'], true),
-            $i64->constInt($compileTime['d'], true),
-            $i64->constInt($compileTime['h'], true),
-            $i64->constInt($compileTime['i'], true),
-            $i64->constInt($compileTime['s'], true),
-            $dbl->constReal($compileTime['f']),
-            $i64->constInt($compileTime['invert'], true),
-            $i64->constInt($compileTime['days'], true)
+            $context->builder->load($outY),
+            $context->builder->load($outM),
+            $context->builder->load($outD),
+            $context->builder->load($outH),
+            $context->builder->load($outI),
+            $context->builder->load($outS),
+            $context->builder->load($outF),
+            $context->builder->load($outInvert),
+            $context->builder->load($outDays)
         );
     }
 
@@ -456,15 +560,31 @@ final class JitDateMutation
     /**
      * Recover construct-time instant from a DateTime receiver / arg (#27309).
      *
-     * Method `$this` is often TYPE_OBJECT without {@see JITVariable::$compileTimeLong};
-     * the time literal may still sit on {@see JITVariable::$compileTimeString}.
+     * After #32691 / #29732, {@see JitDateTimeConstruct} stamps
+     * {@see JITVariable::$compileTimeDateTimeTimestamp} + {@see JITVariable::$compileTimeTimezoneName}
+     * — not {@see JITVariable::$compileTimeLong} / {@see JITVariable::$compileTimeString}
+     * (those collide with integer/class-name assign semantics). Prefer the dedicated stamps;
+     * keep legacy long/string recovery for older call sites.
      *
      * @return array{timestamp: int, microsecond: int, timezone: string}|null
      */
     private static function resolveCompileTimeInstant(Context $context, JITVariable $arg): ?array
     {
+        if (null !== $arg->compileTimeDateTimeTimestamp) {
+            $tz = $arg->compileTimeTimezoneName;
+            if (null === $tz || '' === $tz) {
+                $tz = 'UTC';
+            }
+
+            return [
+                'timestamp' => (int) $arg->compileTimeDateTimeTimestamp,
+                'microsecond' => 0,
+                'timezone' => $tz,
+            ];
+        }
+
         if (null !== $arg->compileTimeLong) {
-            $tz = $arg->compileTimeString;
+            $tz = $arg->compileTimeTimezoneName ?? $arg->compileTimeString;
             // Timezone from construct; ignore leftover date-string stamps on receivers.
             if (null === $tz || '' === $tz || 1 === preg_match('/^\d{4}-\d{2}-\d{2}/', $tz)) {
                 $tz = 'UTC';
