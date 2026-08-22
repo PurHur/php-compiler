@@ -8,6 +8,7 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -86,34 +87,18 @@ final class JitSubstrReplaceArray
         $context->builder->branchIf($atEnd, $doneBlock, $check);
 
         $context->builder->positionAtEnd($check);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $src,
-            $srcIdx
-        );
-        $context->builder->branchIf($isSet, $replaceBlock, $skipUnset);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL is a real element (#33710 / #33705).
+        $isUndef = HashTableHelper::packedIndexIsUndefined($context, $src, $srcIdx);
+        $context->builder->branchIf($isUndef, $skipUnset, $replaceBlock);
 
         $context->builder->positionAtEnd($replaceBlock);
-        $entry = self::listEntryAt($context, $src, $srcIdx);
-        $valueMap = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($entry, $valueMap['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
-        );
-        $doReplaceBlock = BasicBlockHelper::append($context, 'substr_replace_arr_do_'.$id);
-        $context->builder->branchIf($isString, $doReplaceBlock, $skipUnset);
-
-        $context->builder->positionAtEnd($doReplaceBlock);
+        // php-src convert_to_string per array subject value (peer str_replace #27165 / #33710).
         $strPtrTy = $context->getTypeFromString('__string__*');
         $itemResultSlot = $context->builder->alloca($strPtrTy, 1, 'substr_replace_arr_item_'.$id);
-        $subject = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $entry
+        $entryBox = HashTableHelper::readIndexedToValueBox($context, $src, $srcIdx);
+        $subject = (new strval())->valueToString(
+            $context,
+            JitValueBox::pointer($context, $entryBox->value)
         );
         $replaced = JitSubstrReplace::replace(
             $context,
@@ -153,15 +138,5 @@ final class JitSubstrReplaceArray
         $phi->addIncoming($dest, $head);
 
         return $phi;
-    }
-
-    private static function listEntryAt(Context $context, Value $ht, Value $index): Value
-    {
-        $map = $context->structFieldMap['__hashtable__'];
-        $values = $context->builder->load(
-            $context->builder->structGep($ht, $map['values'])
-        );
-
-        return $context->builder->inBoundsGep($values, $index);
     }
 }

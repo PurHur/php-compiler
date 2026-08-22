@@ -1778,7 +1778,8 @@ final class HashTable {
             $out = new self();
             $values = iterator_to_array($this->iterate(true), false);
             for ($i = $offset; $i < $offset + $takeLen; ++$i) {
-                if (!isset($values[$i])) {
+                // array_key_exists — isset() drops TYPE_NULL / PHP null (#33710).
+                if (!\array_key_exists($i, $values)) {
                     break;
                 }
                 $copy = new Variable();

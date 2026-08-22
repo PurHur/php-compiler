@@ -5,9 +5,10 @@ declare(strict_types=1);
 /**
  * LLVM JIT helper for implode() — glue plus __hashtable__ values (#24010, #26970).
  *
- * Walks packed slots (offsetIsSet) then string-key values — php_implode uses
- * ZEND_HASH_FOREACH_VAL (insertion order). Pure string-keyed tables (array_flip)
- * must not be read as packed indices 0..numElements-1 (#26970).
+ * Walks packed slots (TYPE_UNDEFINED holes only — keep TYPE_NULL, #33710) then
+ * string-key values — php_implode uses ZEND_HASH_FOREACH_VAL (insertion order).
+ * Pure string-keyed tables (array_flip) must not be read as packed indices
+ * 0..numElements-1 (#26970).
  *
  * Elements are coerced with strval() (php-src php_implode); do not assume __string__*.
  */
@@ -82,12 +83,9 @@ final class JitImplode
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $haystack,
-            $idx
-        );
-        $context->builder->branchIf($isSet, $take, $next);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL is a real value (#33710 / #33705).
+        $isUndef = HashTableHelper::packedIndexIsUndefined($context, $haystack, $idx);
+        $context->builder->branchIf($isUndef, $next, $take);
 
         $context->builder->positionAtEnd($take);
         $partBox = HashTableHelper::readIndexedToValueBox($context, $haystack, $idx);
