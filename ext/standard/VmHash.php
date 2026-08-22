@@ -172,6 +172,18 @@ final class VmHash
         return 0 === $result;
     }
 
+    /** JIT/AOT unknown-algo ValueError text (peer private ensure* paths). */
+    public static function unknownDigestAlgoMessage(string $fn): string
+    {
+        return self::unknownDigestAlgoMsg($fn);
+    }
+
+    /** JIT/AOT unknown-algo ValueError text — hash_hmac_file() cites its own name (#30646). */
+    public static function unknownHmacAlgoMessage(string $fn): string
+    {
+        return self::unknownHmacAlgoMsg($fn);
+    }
+
     private static function unknownDigestAlgoMsg(string $fn): string
     {
         if ('hash' === $fn) {
