@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -26,7 +27,21 @@ final class DomInstanceMethodJit
     /** User-script AOT: dedicated LLVM bridges (#17954, #18268). */
     private static function isUserScriptDirectMethod(string $proxyLc): bool
     {
-        return isset(self::USER_SCRIPT_DIRECT_METHODS[$proxyLc]);
+        if (!isset(self::USER_SCRIPT_DIRECT_METHODS[$proxyLc])) {
+            return false;
+        }
+        // Match VmDom registration — withhold 8.4+/8.5+ APIs on older profiles (#33763).
+        if (str_contains($proxyLc, 'insertadjacentelement')) {
+            return CompilerVersion::supportsDomElementInsertAdjacentElement();
+        }
+        if (str_contains($proxyLc, 'insertadjacenttext')) {
+            return CompilerVersion::supportsDomElementInsertAdjacentText();
+        }
+        if (str_contains($proxyLc, 'insertadjacenthtml')) {
+            return CompilerVersion::supportsDomElementInsertAdjacentHtml();
+        }
+
+        return true;
     }
 
     /** User-script AOT: generic VmDomInstanceInvoke bridge (#18493). */
@@ -698,6 +713,9 @@ final class DomInstanceMethodJit
                 || 'dom\\element::insertadjacentelement' === $lc
                 || 'dom\\htmlelement::insertadjacentelement' === $lc
             ) {
+                if (!CompilerVersion::supportsDomElementInsertAdjacentElement()) {
+                    return;
+                }
                 $context->functionProxies[$lc] = new Call\DomElementInsertAdjacentElement();
 
                 return;
@@ -706,6 +724,9 @@ final class DomInstanceMethodJit
                 || 'dom\\element::insertadjacenttext' === $lc
                 || 'dom\\htmlelement::insertadjacenttext' === $lc
             ) {
+                if (!CompilerVersion::supportsDomElementInsertAdjacentText()) {
+                    return;
+                }
                 $context->functionProxies[$lc] = new Call\DomElementInsertAdjacentText();
 
                 return;
@@ -714,6 +735,9 @@ final class DomInstanceMethodJit
                 || 'dom\\element::insertadjacenthtml' === $lc
                 || 'dom\\htmlelement::insertadjacenthtml' === $lc
             ) {
+                if (!CompilerVersion::supportsDomElementInsertAdjacentHtml()) {
+                    return;
+                }
                 if (!preg_match('/^(dom(?:\\\\[a-z0-9_]+|[a-z0-9_]*))::([a-z0-9_]+)$/', $lc, $adjMatches)) {
                     return;
                 }
@@ -1197,15 +1221,21 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::replacechildren');
             self::ensureProxy($context, 'domdocumentfragment::replacechildren');
             self::ensureProxy($context, 'domelement::toggleattribute');
-            self::ensureProxy($context, 'domelement::insertadjacentelement');
-            self::ensureProxy($context, 'domelement::insertadjacenttext');
-            self::ensureProxy($context, 'domelement::insertadjacenthtml');
-            self::ensureProxy($context, 'dom\\element::insertadjacentelement');
-            self::ensureProxy($context, 'dom\\element::insertadjacenttext');
-            self::ensureProxy($context, 'dom\\element::insertadjacenthtml');
-            self::ensureProxy($context, 'dom\\htmlelement::insertadjacentelement');
-            self::ensureProxy($context, 'dom\\htmlelement::insertadjacenttext');
-            self::ensureProxy($context, 'dom\\htmlelement::insertadjacenthtml');
+            if (CompilerVersion::supportsDomElementInsertAdjacentElement()) {
+                self::ensureProxy($context, 'domelement::insertadjacentelement');
+                self::ensureProxy($context, 'dom\\element::insertadjacentelement');
+                self::ensureProxy($context, 'dom\\htmlelement::insertadjacentelement');
+            }
+            if (CompilerVersion::supportsDomElementInsertAdjacentText()) {
+                self::ensureProxy($context, 'domelement::insertadjacenttext');
+                self::ensureProxy($context, 'dom\\element::insertadjacenttext');
+                self::ensureProxy($context, 'dom\\htmlelement::insertadjacenttext');
+            }
+            if (CompilerVersion::supportsDomElementInsertAdjacentHtml()) {
+                self::ensureProxy($context, 'domelement::insertadjacenthtml');
+                self::ensureProxy($context, 'dom\\element::insertadjacenthtml');
+                self::ensureProxy($context, 'dom\\htmlelement::insertadjacenthtml');
+            }
             self::ensureProxy($context, 'domtext::substringdata');
             self::ensureProxy($context, 'domcomment::substringdata');
             self::ensureProxy($context, 'domcdatasection::substringdata');

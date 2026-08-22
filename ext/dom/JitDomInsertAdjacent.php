@@ -11,6 +11,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -18,6 +19,10 @@ use PHPLLVM\Value;
  *
  * php-src: ext/dom/php_dom.c php_dom_insert_adjacent
  *          ext/dom/element.c PHP_METHOD(DOMElement, insertAdjacentText)
+ *
+ * Null $element is legal (?DOMElement) and returns null — variable null is
+ * TYPE_VALUE without isNullConstant; readObject on that box SIGSEGVs (#33763,
+ * peer #33031 / #33716).
  */
 final class JitDomInsertAdjacent
 {
@@ -44,25 +49,15 @@ final class JitDomInsertAdjacent
         }
 
         $nodeArg = $args[2];
-        if (JITVariable::TYPE_NULL === $nodeArg->type || ($nodeArg->isNullConstant ?? false)) {
+        if (self::isCompileTimeNull($nodeArg)) {
             return self::boxNull($context);
         }
-
-        DomInsertAdjacentRuntime::ensureLinked($context);
-        $element = self::loadObjectArg($context, $args[0], 'DOMElement::insertAdjacentElement()');
-        $node = self::loadObjectArg($context, $nodeArg, 'DOMElement::insertAdjacentElement()');
-        $whereStr = $context->builder->load($context->constantStringFromString($where));
-        $context->builder->call(
-            $context->lookupFunction(DomInsertAdjacentRuntime::ABI_ELEMENT),
-            $element,
-            $whereStr,
-            $node
-        );
-        if ('afterbegin' === $where || 'beforeend' === $where) {
-            self::syncEmptyParentChildSlots($context, $element, $node);
+        // Variable null ($n = null): TYPE_VALUE, no isNullConstant (#33763).
+        if (JITVariable::TYPE_VALUE === $nodeArg->type) {
+            return self::invokeElementMaybeNullNode($context, $args[0], $where, $nodeArg);
         }
 
-        return self::boxObject($context, $node);
+        return self::invokeElementWithObjectNode($context, $args[0], $where, $nodeArg);
     }
 
     public static function invokeText(Context $context, JITVariable ...$args): Value
@@ -100,6 +95,83 @@ final class JitDomInsertAdjacent
         );
 
         return self::boxNull($context);
+    }
+
+    private static function isCompileTimeNull(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
+    }
+
+    /**
+     * Runtime null check for boxed TYPE_VALUE before __value__readObject (#33763).
+     * php-src: Z_PARAM_OBJ_OF_CLASS_OR_NULL — null → return null.
+     */
+    private static function invokeElementMaybeNullNode(
+        Context $context,
+        JITVariable $receiver,
+        string $where,
+        JITVariable $nodeArg
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_iae_maybe_null');
+        $nodePtr = JitValueBox::valuePtrFromVariable($context, $nodeArg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($nodePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NULL, false)
+        );
+
+        $nullBlock = BasicBlockHelper::append($context, 'dom_iae_node_null');
+        $objBlock = BasicBlockHelper::append($context, 'dom_iae_node_obj');
+        $doneBlock = BasicBlockHelper::append($context, 'dom_iae_node_done');
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $nullResult = self::boxNull($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_iae_node_null_ret');
+        $nullPred = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        $objResult = self::invokeElementWithObjectNode($context, $receiver, $where, $nodeArg);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_iae_node_obj_ret');
+        $objPred = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($context->getTypeFromString('__value__*'));
+        $phi->addIncoming($nullResult, $nullPred);
+        $phi->addIncoming($objResult, $objPred);
+
+        return $phi;
+    }
+
+    private static function invokeElementWithObjectNode(
+        Context $context,
+        JITVariable $receiver,
+        string $where,
+        JITVariable $nodeArg
+    ): Value {
+        DomInsertAdjacentRuntime::ensureLinked($context);
+        $element = self::loadObjectArg($context, $receiver, 'DOMElement::insertAdjacentElement()');
+        $node = self::loadObjectArg($context, $nodeArg, 'DOMElement::insertAdjacentElement()');
+        $whereStr = $context->builder->load($context->constantStringFromString($where));
+        $context->builder->call(
+            $context->lookupFunction(DomInsertAdjacentRuntime::ABI_ELEMENT),
+            $element,
+            $whereStr,
+            $node
+        );
+        if ('afterbegin' === $where || 'beforeend' === $where) {
+            self::syncEmptyParentChildSlots($context, $element, $node);
+        }
+
+        return self::boxObject($context, $node);
     }
 
     private static function syncEmptyParentChildSlots(
