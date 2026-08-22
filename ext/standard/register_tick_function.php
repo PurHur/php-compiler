@@ -29,11 +29,11 @@ final class register_tick_function extends Internal
         $argc = \count($frame->calledArgs);
         $callable = $frame->calledArgs[0];
         if (EnumCaseSupport::isEnumCaseVariable($callable)) {
-            throw new \TypeError('register_tick_function(): Argument #1 ($function) must be a valid callback');
+            throw new \TypeError('register_tick_function(): Argument #1 ($callback) must be a valid callback, no array or string given');
         }
         $resolved = $callable->resolveIndirect();
         if (!VmClosureCall::isClosure($resolved) && !VmCallable::isCallable($frame->vmContext, $callable)) {
-            throw new \TypeError('register_tick_function(): Argument #1 ($function) must be a valid callback');
+            throw new \TypeError('register_tick_function(): Argument #1 ($callback) must be a valid callback');
         }
         $extra = [];
         for ($i = 1; $i < $argc; ++$i) {

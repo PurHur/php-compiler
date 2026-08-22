@@ -28,11 +28,11 @@ final class unregister_tick_function extends Internal
         $this->requireAtLeastArgCount($frame, 'unregister_tick_function', 1);
         $callable = $frame->calledArgs[0];
         if (EnumCaseSupport::isEnumCaseVariable($callable)) {
-            throw new \TypeError('unregister_tick_function(): Argument #1 ($function) must be a valid callback');
+            throw new \TypeError('unregister_tick_function(): Argument #1 ($callback) must be a valid callback, no array or string given');
         }
         $resolved = $callable->resolveIndirect();
         if (!VmClosureCall::isClosure($resolved) && !VmCallable::isCallable($frame->vmContext, $callable)) {
-            throw new \TypeError('unregister_tick_function(): Argument #1 ($function) must be a valid callback');
+            throw new \TypeError('unregister_tick_function(): Argument #1 ($callback) must be a valid callback');
         }
         $callableCopy = new Variable();
         $callableCopy->copyFrom($resolved);
