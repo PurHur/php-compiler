@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\JIT\Call\NestedClosureInvoke;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Pure LLVM array_walk / array_walk_recursive (Closure) for thin standalone AOT (#27632 / #33713).
+ * Pure LLVM array_walk / array_walk_recursive for thin standalone AOT (#27632 / #33713 / #33728).
  *
  * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayWalkJitHelper} segfaults under thin AOT
  * (same class as ArrayMapJitHelper #24156 / ArrayReduceLlvm). Emit packed + string-key walks
  * with live HT value slots so by-ref &$value mutates in place (php_array_walk).
  * Body emit must {@see BasicBlockHelper::scopeLoweringToFunction} so packed BBs stay in the
  * ABI fn when the outer user fn owns {@see Context::$loweringLlvmFunction} (#33713 / peer #33706).
+ *
+ * String callbacks (#33728): do not NestedJIT `__array_walk__builtin` with a C-string global —
+ * the ABI is `__string__*`, and NestedJIT of the closure helpers alongside a string-only
+ * module hits NestedClosureInvoke with zero candidates (#33721). Lower user-fn / builtin
+ * names here via {@see Call}.
  *
  * php-src: ext/standard/array.c — php_array_walk / php_array_walk_recursive
  */
@@ -48,6 +54,71 @@ final class ArrayWalkLlvm
             $ht,
             JitValueBox::valuePtrFromVariable($context, $closure)
         );
+    }
+
+    /** Compile-time string stdlib builtin (intval, …) (#33728). */
+    public static function walkWithBuiltin(Context $context, Value $ht, string $builtinName): void
+    {
+        self::walkWithNamedCall(
+            $context,
+            $ht,
+            VmInternalCall::resolveStringCallback($builtinName),
+            false,
+            'aw_bi_'.self::abiToken($builtinName)
+        );
+    }
+
+    public static function walkRecursiveWithBuiltin(Context $context, Value $ht, string $builtinName): void
+    {
+        self::walkWithNamedCall(
+            $context,
+            $ht,
+            VmInternalCall::resolveStringCallback($builtinName),
+            true,
+            'awr_bi_'.self::abiToken($builtinName)
+        );
+    }
+
+    /** Compile-time string user-function name in this TU (#33728). */
+    public static function walkWithUserFunction(Context $context, Value $ht, string $functionName): void
+    {
+        $proxy = $context->resolveFunctionProxy(strtolower(ltrim($functionName, '\\')));
+        self::walkWithNamedCall(
+            $context,
+            $ht,
+            $proxy,
+            false,
+            'aw_uf_'.self::abiToken($functionName)
+        );
+    }
+
+    public static function walkRecursiveWithUserFunction(Context $context, Value $ht, string $functionName): void
+    {
+        $proxy = $context->resolveFunctionProxy(strtolower(ltrim($functionName, '\\')));
+        self::walkWithNamedCall(
+            $context,
+            $ht,
+            $proxy,
+            true,
+            'awr_uf_'.self::abiToken($functionName)
+        );
+    }
+
+    private static function abiToken(string $name): string
+    {
+        return substr(hash('sha256', strtolower(ltrim($name, '\\'))), 0, 16);
+    }
+
+    private static function walkWithNamedCall(
+        Context $context,
+        Value $ht,
+        Call $callback,
+        bool $recursive,
+        string $abiName
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, $abiName.'_cont');
+        $fn = self::ensureNamedWalkFunction($context, $recursive, $abiName, $callback);
+        $context->builder->call($fn, $ht);
     }
 
     private static function ensureWalkFunction(Context $context, bool $recursive): LlvmFunction
@@ -96,11 +167,61 @@ final class ArrayWalkLlvm
         return $fn;
     }
 
-    private static function emitWalkBody(Context $context, LlvmFunction $fn, bool $recursive): void
-    {
+    private static function ensureNamedWalkFunction(
+        Context $context,
+        bool $recursive,
+        string $name,
+        Call $callback
+    ): LlvmFunction {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return $probe;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $fn = $probe;
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                $name,
+                $context->context->functionType(
+                    $context->context->voidType(),
+                    false,
+                    $htPtr
+                )
+            );
+        }
+        $context->registerFunction($name, $fn);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $name, static function () use ($context, $fn, $recursive, $callback): void {
+            $entry = $fn->appendBasicBlock($recursive ? 'awr_named_entry' : 'aw_named_entry');
+            $context->builder->positionAtEnd($entry);
+            self::emitWalkBody($context, $fn, $recursive, $callback);
+        });
+
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+
+        return $fn;
+    }
+
+    private static function emitWalkBody(
+        Context $context,
+        LlvmFunction $fn,
+        bool $recursive,
+        ?Call $named = null
+    ): void {
         $ht = $fn->getParam(0);
-        $closurePtr = $fn->getParam(1);
-        $prefix = $recursive ? 'awr_llvm' : 'aw_llvm';
+        $closurePtr = null === $named ? $fn->getParam(1) : null;
+        $prefix = $recursive
+            ? (null === $named ? 'awr_llvm' : 'awr_named')
+            : (null === $named ? 'aw_llvm' : 'aw_named');
         $map = $context->structFieldMap['__hashtable__'];
         $valueMap = $context->structFieldMap['__value__'];
         $sizeT = $context->getTypeFromString('size_t');
@@ -108,12 +229,15 @@ final class ArrayWalkLlvm
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
 
-        $closureVar = new Variable(
-            $context,
-            Variable::TYPE_VALUE,
-            Variable::KIND_VARIABLE,
-            $closurePtr
-        );
+        $closureVar = null;
+        if (null !== $closurePtr) {
+            $closureVar = new Variable(
+                $context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $closurePtr
+            );
+        }
 
         $nextFree = $context->builder->load(
             $context->builder->structGep($ht, $map['nextFreeElement'])
@@ -154,14 +278,30 @@ final class ArrayWalkLlvm
                 $context->lookupFunction('__value__readHashtable'),
                 $entry
             );
-            $context->builder->call($fn, $child, $closurePtr);
+            self::callWalkAbi($context, $fn, $child, $closurePtr);
             $context->builder->branch($packedAdvance);
 
             $context->builder->positionAtEnd($leafBlock);
-            self::invokeClosure($context, $closureVar, $entry, $idx, $i64, $prefix.'_packed');
+            self::invokeLeaf(
+                $context,
+                $named,
+                $closureVar,
+                $entry,
+                $idx,
+                $i64,
+                $prefix.'_packed'
+            );
             $context->builder->branch($packedAdvance);
         } else {
-            self::invokeClosure($context, $closureVar, $entry, $idx, $i64, $prefix.'_packed');
+            self::invokeLeaf(
+                $context,
+                $named,
+                $closureVar,
+                $entry,
+                $idx,
+                $i64,
+                $prefix.'_packed'
+            );
             $context->builder->branch($packedAdvance);
         }
 
@@ -173,7 +313,7 @@ final class ArrayWalkLlvm
         $context->builder->branch($packedHead);
 
         $context->builder->positionAtEnd($packedDone);
-        self::emitStringKeyWalk($context, $fn, $ht, $closurePtr, $closureVar, $recursive, $prefix);
+        self::emitStringKeyWalk($context, $fn, $ht, $closurePtr, $closureVar, $named, $recursive, $prefix);
         $context->builder->returnVoid();
     }
 
@@ -181,8 +321,9 @@ final class ArrayWalkLlvm
         Context $context,
         LlvmFunction $fn,
         Value $ht,
-        Value $closurePtr,
-        Variable $closureVar,
+        ?Value $closurePtr,
+        ?Variable $closureVar,
+        ?Call $named,
         bool $recursive,
         string $prefix
     ): void {
@@ -223,12 +364,13 @@ final class ArrayWalkLlvm
                 $context->lookupFunction('__value__readHashtable'),
                 $valEntry
             );
-            $context->builder->call($fn, $child, $closurePtr);
+            self::callWalkAbi($context, $fn, $child, $closurePtr);
             $context->builder->branch($strNext);
 
             $context->builder->positionAtEnd($leafBlock);
-            self::invokeClosureWithStringKey(
+            self::invokeLeafWithStringKey(
                 $context,
+                $named,
                 $closureVar,
                 $valEntry,
                 $keyStr,
@@ -236,8 +378,9 @@ final class ArrayWalkLlvm
             );
             $context->builder->branch($strNext);
         } else {
-            self::invokeClosureWithStringKey(
+            self::invokeLeafWithStringKey(
                 $context,
+                $named,
                 $closureVar,
                 $valEntry,
                 $keyStr,
@@ -268,9 +411,24 @@ final class ArrayWalkLlvm
         );
     }
 
-    private static function invokeClosure(
+    private static function callWalkAbi(
         Context $context,
-        Variable $closureVar,
+        LlvmFunction $fn,
+        Value $childHt,
+        ?Value $closurePtr
+    ): void {
+        if (null === $closurePtr) {
+            $context->builder->call($fn, $childHt);
+
+            return;
+        }
+        $context->builder->call($fn, $childHt, $closurePtr);
+    }
+
+    private static function invokeLeaf(
+        Context $context,
+        ?Call $named,
+        ?Variable $closureVar,
         Value $entry,
         Value $idx,
         $i64,
@@ -292,12 +450,21 @@ final class ArrayWalkLlvm
             $keySlot
         );
         BasicBlockHelper::ensureOpenInsertBlock($context, $tag.'_invoke');
+        if (null !== $named) {
+            $named->call($context, $valueVar, $keyVar);
+
+            return;
+        }
+        if (null === $closureVar) {
+            throw new \LogicException('ArrayWalkLlvm leaf invoke needs Call or Closure (#33728)');
+        }
         (new NestedClosureInvoke())->call($context, $closureVar, $valueVar, $keyVar);
     }
 
-    private static function invokeClosureWithStringKey(
+    private static function invokeLeafWithStringKey(
         Context $context,
-        Variable $closureVar,
+        ?Call $named,
+        ?Variable $closureVar,
         Value $entry,
         Value $keyStr,
         string $tag
@@ -321,6 +488,14 @@ final class ArrayWalkLlvm
             $keySlot
         );
         BasicBlockHelper::ensureOpenInsertBlock($context, $tag.'_invoke');
+        if (null !== $named) {
+            $named->call($context, $valueVar, $keyVar);
+
+            return;
+        }
+        if (null === $closureVar) {
+            throw new \LogicException('ArrayWalkLlvm string-key invoke needs Call or Closure (#33728)');
+        }
         (new NestedClosureInvoke())->call($context, $closureVar, $valueVar, $keyVar);
     }
 }
