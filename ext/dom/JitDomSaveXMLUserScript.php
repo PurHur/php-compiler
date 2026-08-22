@@ -31,6 +31,12 @@ final class JitDomSaveXMLUserScript
         // `saveXML(options: …)` must not treat int arg #1 as $node (#32018 / #25182).
         [$nodeArg] = JitDomSaveSerializationArgs::parse($args);
         if (JitDomSaveSerializationArgs::isNodeScoped($nodeArg)) {
+            // Variable null ($n = null): TYPE_VALUE without isNullConstant. php-src
+            // Z_PARAM_OBJ_OF_CLASS_OR_NULL → document-wide dump; __value__readObject on
+            // a null box SIGSEGVs under AOT (#33881, peer insertAdjacent #33763).
+            if (JITVariable::TYPE_VALUE === $nodeArg->type) {
+                return self::tryInvokeMaybeNullNode($context, $args[0] ?? null, $nodeArg);
+            }
             $serialized = self::trySerializeNode($context, $nodeArg);
             if (null !== $serialized) {
                 return $serialized;
@@ -41,11 +47,69 @@ final class JitDomSaveXMLUserScript
             return null;
         }
 
+        return self::tryInvokeDocumentWide($context, $args[0] ?? null);
+    }
+
+    /**
+     * Runtime null check for boxed TYPE_VALUE before loadObjectArg (#33881).
+     * php-src: saveXML(?DOMNode $node = null) — null → xmlDocDumpMemory.
+     */
+    private static function tryInvokeMaybeNullNode(
+        Context $context,
+        ?JITVariable $documentVar,
+        JITVariable $nodeArg
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_savexml_maybe_null');
+        $nodePtr = JitValueBox::valuePtrFromVariable($context, $nodeArg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($nodePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NULL, false)
+        );
+
+        $nullBlock = BasicBlockHelper::append($context, 'dom_savexml_node_null');
+        $objBlock = BasicBlockHelper::append($context, 'dom_savexml_node_obj');
+        $doneBlock = BasicBlockHelper::append($context, 'dom_savexml_node_done');
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $nullResult = self::tryInvokeDocumentWide($context, $documentVar)
+            ?? self::trySerializeDocumentFromSlots($context, $documentVar);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_savexml_node_null_ret');
+        $nullPred = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        // TYPE_VALUE object path always returns a Value from trySerializeNode.
+        $objResult = self::trySerializeNode($context, $nodeArg)
+            ?? self::trySerializeDocumentFromSlots($context, $documentVar);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_savexml_node_obj_ret');
+        $objPred = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($context->getTypeFromString('__value__*'));
+        $phi->addIncoming($nullResult, $nullPred);
+        $phi->addIncoming($objResult, $objPred);
+
+        return $phi;
+    }
+
+    /**
+     * Document-wide saveXML() — omitted / null $node (php-src xmlDocDumpMemory).
+     */
+    private static function tryInvokeDocumentWide(Context $context, ?JITVariable $documentVar): ?Value
+    {
         // Prefer this document's loadXML binding. Never steal lastCompileTimeXml() from
         // another document — empty destinations after importNode must dump slots (#33697).
         // Rematerialized loadXML receivers also lose SplObjectStorage identity (#27392);
         // fall through to documentElement slots (loadXML always stores that property).
-        $documentVar = $args[0] ?? null;
         if (JitDomLoadXMLUserScript::documentSaveXmlFromSlots($documentVar)) {
             return self::trySerializeDocumentFromSlots($context, $documentVar);
         }
