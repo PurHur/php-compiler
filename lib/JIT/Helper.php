@@ -15,6 +15,7 @@ namespace PHPCompiler\JIT;
 require_once __DIR__.'/../OpCodeNames.php';
 
 use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\OpCode;
 use function PHPCompiler\opcode_type_name;
@@ -2421,7 +2422,8 @@ return_bool:
             }
         }
         if (null !== $variable->objectPropertySlot) {
-            $loaded = $this->context->builder->load($variable->objectPropertySlot);
+            $slotPtr = ObjectInstancePropertyLlvm::dominatingSlotPtr($this->context->type->object, $variable);
+            $loaded = $this->context->builder->load($slotPtr);
             if (null === $variable->objectPropertyType) {
                 throw new \LogicException('objectPropertySlot requires objectPropertyType');
             }

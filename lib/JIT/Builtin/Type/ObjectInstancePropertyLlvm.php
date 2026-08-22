@@ -515,4 +515,68 @@ final class ObjectInstancePropertyLlvm
             'Dynamic property fetch JIT box unsupported type: '.Variable::getStringType($propertyType)
         );
     }
+
+    /**
+     * Fetch-arm objectPropertySlot SSA may not dominate later ARG_SEND / var_dump (#33760).
+     * Re-emit propertySlotPtr in the current block when receiver/class/name are known.
+     */
+    public static function dominatingSlotPtr(Object_ $object, Variable $variable): Value
+    {
+        $context = $object->jitContext();
+        $receiver = null !== $variable->objectPropertyReceiverOp
+            ? self::reloadPropertyReceiver($context, $variable->objectPropertyReceiverOp)
+            : $variable->objectPropertyReceiver;
+        if (
+            null !== $receiver
+            && null !== $variable->objectPropertyClassName
+            && null !== $variable->objectPropertyName
+        ) {
+            $resolved = $object->resolvePropertySlot(
+                $variable->objectPropertyClassName,
+                $variable->objectPropertyName
+            );
+            if (null !== $resolved) {
+                return $object->propertySlotPtr(
+                    $receiver,
+                    $resolved[1]
+                );
+            }
+        }
+        if (null === $variable->objectPropertySlot) {
+            throw new \LogicException('objectPropertySlot requires objectPropertyType');
+        }
+
+        return $variable->objectPropertySlot;
+    }
+
+    private static function reloadPropertyReceiver(
+        \PHPCompiler\JIT\Context $context,
+        \PHPCfg\Operand $objOp
+    ): Value {
+        $name = \PHPCompiler\JIT\OperandName::resolve($objOp);
+        if (null !== $name && '' !== $name) {
+            $resolved = $context->resolveRefAliasName($name);
+            if (isset($context->namedVariableBindings[$resolved])) {
+                $bound = $context->namedVariableBindings[$resolved];
+                if (Variable::TYPE_OBJECT === $bound->type) {
+                    return $context->helper->loadValue($bound);
+                }
+            }
+        }
+        $var = $context->getVariableFromOpInScopes($objOp);
+        if (Variable::TYPE_OBJECT === $var->type) {
+            return $context->helper->loadValue($var);
+        }
+        if (Variable::TYPE_VALUE === $var->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $var)
+            );
+        }
+
+        throw new \LogicException(
+            'Property fetch receiver must be object or object-valued property, got '
+            .Variable::getStringType($var->type)
+        );
+    }
 }

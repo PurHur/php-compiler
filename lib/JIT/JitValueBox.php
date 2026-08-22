@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPLLVM\Builder;
 use PHPLLVM\Type as LlvmType;
 use PHPLLVM\Value;
@@ -108,12 +109,14 @@ final class JitValueBox
             null !== $var->objectPropertySlot
             && Variable::TYPE_VALUE === $var->objectPropertyType
         ) {
-            $heapPtr = $context->builder->pointerCast(
-                $context->builder->load($var->objectPropertySlot),
-                $context->getTypeFromString('__value__*')
+            $storage = self::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__object__load_value_slot'),
+                ObjectInstancePropertyLlvm::dominatingSlotPtr($context->type->object, $var),
+                $storage
             );
 
-            return self::normalizeValuePtr($context, $heapPtr);
+            return self::normalizeValuePtr($context, self::pointer($context, $storage));
         }
         if (self::isValueOperand($var) && Variable::TYPE_VALUE !== $var->type) {
             $valueType = $context->getTypeFromString('__value__');

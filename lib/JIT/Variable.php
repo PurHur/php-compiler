@@ -240,6 +240,9 @@ final class Variable {
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
     public ?\PHPLLVM\Value $objectPropertySlot = null;
 
+    /** CFG receiver operand for {@see $objectPropertySlot} reload at dominating sends (#33760). */
+    public ?\PHPCfg\Operand $objectPropertyReceiverOp = null;
+
     /** Value-box alloca for `new Variable()` temps after copyFrom in NestedJIT (#24156). */
     public ?\PHPLLVM\Value $nestedHelperValueSlot = null;
 
