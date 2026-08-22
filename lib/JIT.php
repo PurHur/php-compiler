@@ -501,6 +501,11 @@ class JIT {
         if (null === $ifMerge || $ifMerge !== $elseMerge) {
             return false;
         }
+        // `$c + ($cond ? a : b)` merges into PLUS then RETURN — not a pure ?: return.
+        // Early-returning arm assigns would skip the PLUS and drop the carry (#33719).
+        if (!$this->mergeBlockIsPureTernaryReturn($ifMerge)) {
+            return false;
+        }
         $phi = $this->ternaryReturnPhiOperand($ifMerge);
         if (null === $phi) {
             return false;
@@ -512,6 +517,26 @@ class JIT {
         // the ?: phi before breaking; require an arm assign (#878).
         return null !== $this->ternaryPhiAssignSourceOperand($ifBlock, $ifMerge)
             || null !== $this->ternaryPhiAssignSourceOperand($elseBlock, $ifMerge);
+    }
+
+    /**
+     * True when the ?: merge is only a RETURN of the phi (no PLUS/CONCAT/ASSIGN first).
+     *
+     * `$c + ($v === null ? 10 : $v)` has PLUS before RETURN — arms must fall through (#33719).
+     */
+    private function mergeBlockIsPureTernaryReturn(Block $mergeBlock): bool
+    {
+        $sawReturn = false;
+        foreach ($mergeBlock->opCodes as $mergeOp) {
+            if (OpCode::TYPE_RETURN === $mergeOp->type || OpCode::TYPE_RETURN_VOID === $mergeOp->type) {
+                $sawReturn = true;
+                break;
+            }
+            // Any other opcode means the ternary feeds an expression, not a bare return.
+            return false;
+        }
+
+        return $sawReturn;
     }
 
     /**
@@ -17595,14 +17620,8 @@ class JIT {
         if (null === $merge) {
             return false;
         }
-        $mergeReturns = false;
-        foreach ($merge->opCodes as $mergeOp) {
-            if (OpCode::TYPE_RETURN === $mergeOp->type) {
-                $mergeReturns = true;
-                break;
-            }
-        }
-        if (!$mergeReturns) {
+        // Do not emitJitReturnFromValue when merge still has PLUS/etc. (#33719).
+        if (!$this->mergeBlockIsPureTernaryReturn($merge)) {
             return false;
         }
         $limit = min($branch->nOpCodes, \count($branch->opCodes));
