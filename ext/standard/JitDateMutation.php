@@ -2004,8 +2004,15 @@ final class JitDateMutation
         JITVariable $receiverArg,
         Value $dtObj
     ): Value {
+        // Mutable receivers from `new DateTime` are often TYPE_OBJECT with value
+        // typed `__object__**`. returnObjectArg() passes that to __value__writeObject
+        // (expects `__object__*`) → module verification failure (#33924). Peer
+        // add/sub returns boxObjectPtr($dtObj) (#33911). Drop construct-time stamps
+        // so format()/getTimestamp() read the written __dt_timestamp.
         if (!$immutable) {
-            return self::returnObjectArg($context, $receiverArg);
+            self::invalidateMutableDateTimeInstant($context, $receiverArg);
+
+            return self::boxObjectPtr($context, $dtObj);
         }
         $ret = JitValueBox::alloc($context);
         $context->builder->call(
