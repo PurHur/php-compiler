@@ -7,7 +7,8 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
-/** Register LLVM declarations for JIT/AOT ob_*() runtime (issue #118, #1056). */
+/** Register LLVM declarations for JIT/AOT ob_*() runtime (issue #118, #1056). Module-local
+ * decls only — bodies owned by {@see ObOutputRuntime} / {@see ObOutputJitBridge} (#33798). */
 final class ObOutput
 {
     public static function registerExternals(Context $context): void

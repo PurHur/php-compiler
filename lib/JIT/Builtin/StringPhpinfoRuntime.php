@@ -54,7 +54,6 @@ final class StringPhpinfoRuntime
             return;
         }
 
-        ObOutput::registerExternals($context);
         ObOutputRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementPhpinfoBridge($context);
