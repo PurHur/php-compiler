@@ -158,10 +158,14 @@ final class DomInstanceMethodJit
         'domelement::removeattributenode' => true,
         'dom\\element::removeattributenode' => true,
         'dom\\htmlelement::removeattributenode' => true,
-        // setIdAttribute* — dedicated true/false ABI (NestedJIT bool unsafe; #29257, #29284).
+        // setIdAttribute* — dedicated true/false ABI (NestedJIT bool unsafe; #29257, #29284, #33957).
         'domelement::setidattribute' => true,
         'domelement::setidattributens' => true,
         'domelement::setidattributenode' => true,
+        // getElementsByTagName/item temps → DOMNode; must not ExternalMethod-null (#33957).
+        'domnode::setidattribute' => true,
+        'domnode::setidattributens' => true,
+        'domnode::setidattributenode' => true,
         // DOMAttr::isId() — VmDomInstanceInvoke bridge (#29884, re-#20129).
         'domattr::isid' => true,
         'dom\\attr::isid' => true,
@@ -592,17 +596,23 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domelement::setidattribute' === $lc) {
+            if ('domelement::setidattribute' === $lc
+                || 'domnode::setidattribute' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomElementSetIdAttribute();
 
                 return;
             }
-            if ('domelement::setidattributens' === $lc) {
+            if ('domelement::setidattributens' === $lc
+                || 'domnode::setidattributens' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomElementSetIdAttributeNS();
 
                 return;
             }
-            if ('domelement::setidattributenode' === $lc) {
+            if ('domelement::setidattributenode' === $lc
+                || 'domnode::setidattributenode' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomElementSetIdAttributeNode();
 
                 return;
@@ -1419,8 +1429,11 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\element::removeattributenode');
             self::ensureProxy($context, 'dom\\htmlelement::removeattributenode');
             self::ensureProxy($context, 'domelement::setidattribute');
+            self::ensureProxy($context, 'domnode::setidattribute');
             self::ensureProxy($context, 'domelement::setidattributens');
+            self::ensureProxy($context, 'domnode::setidattributens');
             self::ensureProxy($context, 'domelement::setidattributenode');
+            self::ensureProxy($context, 'domnode::setidattributenode');
             self::ensureProxy($context, 'domattr::isid');
             self::ensureProxy($context, 'dom\\attr::isid');
             self::ensureProxy($context, 'domdocument::createattributens');

@@ -23180,12 +23180,11 @@ class JIT {
                 || 'setidattributens' === $methodLc
                 || 'setidattributenode' === $methodLc
             ) {
-                // firstChild / item() temps → :object; bind before ExternalMethod (#29257, #29284).
+                // getElementsByTagName/item temps → :object → DOMNode; ExternalMethod null (#33957).
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::'.$methodLc);
-                if ($this->context->functionIsRegistered('domelement::'.$methodLc)) {
-                    $className = 'DOMElement';
-                    $declaringClassLc = 'domelement';
-                }
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::'.$methodLc);
+                $className = 'DOMElement';
+                $declaringClassLc = 'domelement';
             } elseif ('isid' === $methodLc) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domattr::isid');
                 if ($this->context->functionIsRegistered('domattr::isid')) {

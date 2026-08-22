@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\JIT\Builtin\DomGetElementByIdRuntime;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -82,9 +83,9 @@ final class JitDomGetElementById
 
         // Thin AOT: consult DomUserScriptElementCache before PROP_ELEMENT_ID_MAP.
         // loadXML without ID-typed attrs leaves the map uninitialized; reading it
-        // segfaults (#31367). setIdAttribute (#29257) and loadHTML/loadXML indexed
-        // IDs populate the cache so lookups stay safe. Cache-inactive → return null
-        // (same as an authoritative cache miss); do not touch PROP_ELEMENT_ID_MAP.
+        // segfaults (#31367). setIdAttribute (#29257/#33957) updates DomRegistry via
+        // NestedJIT even when the LLVM cache is cold (e.g. getElementsByTagName temps);
+        // on cache miss/inactive fall through to NestedJIT — never PROP_ELEMENT_ID_MAP.
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $cacheActive = DomUserScriptElementCacheLlvm::isActive($context);
             $cacheBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_first');
@@ -113,16 +114,26 @@ final class JitDomGetElementById
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $hitBoxed), $resultSlot);
             $context->builder->branch($doneBlock);
 
-            // Cache active but id miss — null (map may be uninitialized after loadXML).
+            // Cache active but id miss — DomRegistry may still have setIdAttribute (#33957).
             $context->builder->positionAtEnd($cacheMiss);
-            $nullBoxed = self::boxNullResult($context);
-            $context->builder->store(JitValueBox::normalizeValuePtr($context, $nullBoxed), $resultSlot);
+            $context->builder->store(
+                JitValueBox::normalizeValuePtr(
+                    $context,
+                    self::callNestedGetElementById($context, $document, $idStr)
+                ),
+                $resultSlot
+            );
             $context->builder->branch($doneBlock);
 
-            // Cache never activated (e.g. loadXML with plain id= not ID-typed) (#31367).
+            // Cache never activated — NestedJIT DomRegistry, not PROP_ELEMENT_ID_MAP (#31367/#33957).
             $context->builder->positionAtEnd($inactiveBlock);
-            $nullInactive = self::boxNullResult($context);
-            $context->builder->store(JitValueBox::normalizeValuePtr($context, $nullInactive), $resultSlot);
+            $context->builder->store(
+                JitValueBox::normalizeValuePtr(
+                    $context,
+                    self::callNestedGetElementById($context, $document, $idStr)
+                ),
+                $resultSlot
+            );
             $context->builder->branch($doneBlock);
 
             $context->builder->positionAtEnd($doneBlock);
@@ -148,6 +159,32 @@ final class JitDomGetElementById
     private static function strcmpStringPtrs(Context $context, Value $leftStr, Value $rightStr): Value
     {
         return JitStringCompare::strcmp($context, $leftStr, $rightStr);
+    }
+
+    /**
+     * NestedJIT DomRegistry getElementById — safe when PROP_ELEMENT_ID_MAP is cold (#33957).
+     *
+     * @return Value {@see __value__*} nullable object box
+     */
+    private static function callNestedGetElementById(
+        Context $context,
+        Value $document,
+        Value $idStr
+    ): Value {
+        JitDomDocumentMethodKernel::ensureGetElementByIdBridge($context);
+        $idBox = JitValueBox::alloc($context);
+        $idPtr = JitValueBox::pointer($context, $idBox);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $idPtr,
+            $idStr
+        );
+
+        return $context->builder->call(
+            $context->lookupFunction(DomGetElementByIdRuntime::ABI_NAME),
+            $document,
+            $idPtr
+        );
     }
 
     /**
