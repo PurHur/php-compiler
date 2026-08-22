@@ -810,6 +810,8 @@ final class ArrayObjectJitHelper
             new \PHPCompiler\ext\standard\phpc_native_ht_alloc(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_object(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_stdclass_from_ht(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_long(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_double(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_bool(),
