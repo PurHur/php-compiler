@@ -47,13 +47,24 @@ final class RecursiveTreeIteratorBuildRuntime
 
             return;
         }
+        // Mid-invoke ensureLinked: HashTable*Llvm / strval append via BasicBlockHelper
+        // prefers Context::$loweringLlvmFunction (user main) over the walk insert parent —
+        // without scoping, rti_walk_* / ht_values_* cross functions (Module.php:180; re-#27584 /
+        // peer #33896 range, #33934 mktime).
         $saved = BasicBlockHelper::tryGetInsertBlock($context);
-        self::emitWalk($context);
-        self::emitBuild($context, $probe);
-        if (null !== $saved) {
-            BasicBlockHelper::restoreInsertBlock($context, $saved);
-        } else {
-            $context->builder->clearInsertionPosition();
+        $savedActive = $context->activeFunction;
+        $savedLowering = $context->loweringLlvmFunction;
+        try {
+            self::emitWalk($context);
+            self::emitBuild($context, $probe);
+        } finally {
+            $context->activeFunction = $savedActive;
+            $context->loweringLlvmFunction = $savedLowering;
+            if (null !== $saved) {
+                BasicBlockHelper::restoreInsertBlock($context, $saved);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
         }
     }
 
@@ -62,19 +73,29 @@ final class RecursiveTreeIteratorBuildRuntime
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $ft = $context->context->functionType($htPtr, false, $htPtr);
         $fn = null !== $probe ? $probe : $context->module->addFunction(self::ABI, $ft);
-        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
-        $context->builder->positionAtEnd($entry);
-        $src = $fn->getParam(0);
-        $out = HashTableHelper::alloc($context);
-        $emptyPrefix = $context->builder->load($context->constantStringFromString(''));
-        $context->builder->call(
-            $context->lookupFunction(self::WALK_ABI),
-            $src,
-            $out,
-            $emptyPrefix
-        );
-        $context->builder->returnValue($out);
         $context->registerFunction(self::ABI, $fn);
+        if (!$fn instanceof LlvmFunction) {
+            throw new \LogicException(self::ABI.' must be an LLVM function');
+        }
+        BasicBlockHelper::scopeLoweringToFunction(
+            $context,
+            $fn,
+            self::ABI,
+            static function () use ($context, $fn): void {
+                $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+                $context->builder->positionAtEnd($entry);
+                $src = $fn->getParam(0);
+                $out = HashTableHelper::alloc($context);
+                $emptyPrefix = $context->builder->load($context->constantStringFromString(''));
+                $context->builder->call(
+                    $context->lookupFunction(self::WALK_ABI),
+                    $src,
+                    $out,
+                    $emptyPrefix
+                );
+                $context->builder->returnValue($out);
+            }
+        );
     }
 
     private static function emitWalk(Context $context): void
@@ -92,102 +113,112 @@ final class RecursiveTreeIteratorBuildRuntime
         $fn = null !== $existing ? $existing : $context->module->addFunction(self::WALK_ABI, $ft);
         // Register before body so the recursive self-call can resolve (#27584).
         $context->registerFunction(self::WALK_ABI, $fn);
-        $entry = $fn->appendBasicBlock('rti_walk_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $src = $fn->getParam(0);
-        $out = $fn->getParam(1);
-        $ancestor = $fn->getParam(2);
-
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $one = $sizeT->constInt(1, false);
-        $values = HashTableValuesLlvm::values($context, $src);
-        $num = $context->builder->call(
-            $context->lookupFunction('__hashtable__getNumElements'),
-            $values
-        );
-        $idxSlot = BasicBlockHelper::entryAllocaForFunction($context, $fn, $sizeT);
-        $context->builder->store($zero, $idxSlot);
-
-        $head = $fn->appendBasicBlock('rti_walk_head');
-        $body = $fn->appendBasicBlock('rti_walk_body');
-        $done = $fn->appendBasicBlock('rti_walk_done');
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $idx = $context->builder->load($idxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
-        $context->builder->branchIf($atEnd, $done, $body);
-
-        $context->builder->positionAtEnd($body);
-        $val = HashTableReadLlvm::readIndexedToValueBox($context, $values, $idx);
-        $isLast = $context->builder->icmp(
-            Builder::INT_EQ,
-            $context->builder->addNoSignedWrap($idx, $one),
-            $num
-        );
-        $branchMark = $context->builder->select(
-            $isLast,
-            $context->builder->load($context->constantStringFromString('\\-')),
-            $context->builder->load($context->constantStringFromString('|-'))
-        );
-        $prefix = self::concatStr($context, $ancestor, $branchMark);
-        $valPtr = JitValueBox::valuePtrFromVariable($context, $val);
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valPtr, $context->structFieldMap['__value__']['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $isArray = $context->builder->icmp(
-            Builder::INT_EQ,
-            $context->builder->and($typeByte, $i8->constInt(0x7f, false)),
-            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
-        );
-        $arrBb = $fn->appendBasicBlock('rti_walk_arr');
-        $leafBb = $fn->appendBasicBlock('rti_walk_leaf');
-        $advBb = $fn->appendBasicBlock('rti_walk_adv');
-        $context->builder->branchIf($isArray, $arrBb, $leafBb);
-
-        $context->builder->positionAtEnd($arrBb);
-        $lineArr = self::concatStr(
+        if (!$fn instanceof LlvmFunction) {
+            throw new \LogicException(self::WALK_ABI.' must be an LLVM function');
+        }
+        BasicBlockHelper::scopeLoweringToFunction(
             $context,
-            $prefix,
-            $context->builder->load($context->constantStringFromString('Array'))
-        );
-        self::appendString($context, $out, $lineArr);
-        $childAncestor = self::concatStr(
-            $context,
-            $ancestor,
-            $context->builder->select(
-                $isLast,
-                $context->builder->load($context->constantStringFromString('  ')),
-                $context->builder->load($context->constantStringFromString('| '))
-            )
-        );
-        $childHt = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            $valPtr
-        );
-        $context->builder->call(
-            $context->lookupFunction(self::WALK_ABI),
-            $childHt,
-            $out,
-            $childAncestor
-        );
-        $context->builder->branch($advBb);
+            $fn,
+            self::WALK_ABI,
+            static function () use ($context, $fn): void {
+                $entry = $fn->appendBasicBlock('rti_walk_entry');
+                $context->builder->positionAtEnd($entry);
 
-        $context->builder->positionAtEnd($leafBb);
-        $leafStr = (new strval())->valueToString($context, $valPtr);
-        $lineLeaf = self::concatStr($context, $prefix, $leafStr);
-        self::appendString($context, $out, $lineLeaf);
-        $context->builder->branch($advBb);
+                $src = $fn->getParam(0);
+                $out = $fn->getParam(1);
+                $ancestor = $fn->getParam(2);
 
-        $context->builder->positionAtEnd($advBb);
-        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
-        $context->builder->branch($head);
+                $sizeT = $context->getTypeFromString('size_t');
+                $zero = $sizeT->constInt(0, false);
+                $one = $sizeT->constInt(1, false);
+                $values = HashTableValuesLlvm::values($context, $src);
+                $num = $context->builder->call(
+                    $context->lookupFunction('__hashtable__getNumElements'),
+                    $values
+                );
+                $idxSlot = BasicBlockHelper::entryAllocaForFunction($context, $fn, $sizeT);
+                $context->builder->store($zero, $idxSlot);
 
-        $context->builder->positionAtEnd($done);
-        $context->builder->returnVoid();
+                $head = $fn->appendBasicBlock('rti_walk_head');
+                $body = $fn->appendBasicBlock('rti_walk_body');
+                $done = $fn->appendBasicBlock('rti_walk_done');
+                $context->builder->branch($head);
+
+                $context->builder->positionAtEnd($head);
+                $idx = $context->builder->load($idxSlot);
+                $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+                $context->builder->branchIf($atEnd, $done, $body);
+
+                $context->builder->positionAtEnd($body);
+                $val = HashTableReadLlvm::readIndexedToValueBox($context, $values, $idx);
+                $isLast = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->builder->addNoSignedWrap($idx, $one),
+                    $num
+                );
+                $branchMark = $context->builder->select(
+                    $isLast,
+                    $context->builder->load($context->constantStringFromString('\\-')),
+                    $context->builder->load($context->constantStringFromString('|-'))
+                );
+                $prefix = self::concatStr($context, $ancestor, $branchMark);
+                $valPtr = JitValueBox::valuePtrFromVariable($context, $val);
+                $typeByte = $context->builder->load(
+                    $context->builder->structGep($valPtr, $context->structFieldMap['__value__']['type'])
+                );
+                $i8 = $context->getTypeFromString('int8');
+                $isArray = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->builder->and($typeByte, $i8->constInt(0x7f, false)),
+                    $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+                );
+                $arrBb = $fn->appendBasicBlock('rti_walk_arr');
+                $leafBb = $fn->appendBasicBlock('rti_walk_leaf');
+                $advBb = $fn->appendBasicBlock('rti_walk_adv');
+                $context->builder->branchIf($isArray, $arrBb, $leafBb);
+
+                $context->builder->positionAtEnd($arrBb);
+                $lineArr = self::concatStr(
+                    $context,
+                    $prefix,
+                    $context->builder->load($context->constantStringFromString('Array'))
+                );
+                self::appendString($context, $out, $lineArr);
+                $childAncestor = self::concatStr(
+                    $context,
+                    $ancestor,
+                    $context->builder->select(
+                        $isLast,
+                        $context->builder->load($context->constantStringFromString('  ')),
+                        $context->builder->load($context->constantStringFromString('| '))
+                    )
+                );
+                $childHt = $context->builder->call(
+                    $context->lookupFunction('__value__readHashtable'),
+                    $valPtr
+                );
+                $context->builder->call(
+                    $context->lookupFunction(self::WALK_ABI),
+                    $childHt,
+                    $out,
+                    $childAncestor
+                );
+                $context->builder->branch($advBb);
+
+                $context->builder->positionAtEnd($leafBb);
+                $leafStr = (new strval())->valueToString($context, $valPtr);
+                $lineLeaf = self::concatStr($context, $prefix, $leafStr);
+                self::appendString($context, $out, $lineLeaf);
+                $context->builder->branch($advBb);
+
+                $context->builder->positionAtEnd($advBb);
+                $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+                $context->builder->branch($head);
+
+                $context->builder->positionAtEnd($done);
+                $context->builder->returnVoid();
+            }
+        );
     }
 
     private static function concatStr(Context $context, Value $left, Value $right): Value
