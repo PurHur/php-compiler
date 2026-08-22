@@ -19,8 +19,8 @@ use PHPLLVM\Value;
 /**
  * mb_ereg_match() — match at start of string (php-src ext/mbstring/php_mbregex.c; #20024, #33655).
  *
- * JIT/AOT leftover #33655: catchable argc/TypeError paths (peer mb_ereg #33648);
- * compile-time literal fold via {@see JitMbEregSearch::tryEregMatchFold}.
+ * JIT/AOT: catchable argc/TypeError (#33655); literal fold via {@see JitMbEregSearch::tryEregMatchFold};
+ * runtime via {@see JitMbEreg} → {@see MbEregJitHelper} (#33811).
  */
 final class mb_ereg_match extends Internal
 {
@@ -120,7 +120,7 @@ final class mb_ereg_match extends Internal
             return $folded;
         }
 
-        throw new \LogicException('mb_ereg_match() is not lowered for JIT/AOT in this compiler build');
+        return JitMbEreg::invokeMatchAnchored($context, $args);
     }
 
     private static function foldFalse(Context $context): Value
