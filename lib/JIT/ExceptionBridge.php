@@ -72,6 +72,12 @@ final class ExceptionBridge
 
     /**
      * Builtin operand TypeError — catchable in active try/catch, fatal when uncaught (#4564).
+     *
+     * When the throw site is a non-{main} function/closure with no local try, pend + return
+     * so the caller's {@see TryCatchHelper::emitCheckPendingThrowAfterCall} can land in an
+     * outer catch — same shape as return-type TypeError (#26486). Aborting in-place made
+     * DOMNode::appendChild(null) (and peers via {@see ExceptionBridge}) uncatchable across
+     * closure boundaries under AOT (#33971).
      */
     public static function emitTypeErrorAndAbort(Context $context, string $message): void
     {
@@ -86,11 +92,37 @@ final class ExceptionBridge
 
         TypeErrorRaise::emitRaise($context, $message);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            if (self::shouldPendTypeErrorForCaller($context)) {
+                TypeErrorRaise::ensureStandaloneBodies($context);
+                TryCatchHelper::emitPendTypeErrorForCaller($context, $message);
+                $fn = $context->builder->getInsertBlock()?->getParent();
+                if ($fn instanceof \PHPLLVM\Value\Function_) {
+                    TryCatchHelper::emitPropagateReturnAfterPendingThrow($context, $fn);
+
+                    return;
+                }
+            }
             $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
         } else {
             $context->builder->call($context->lookupFunction('abort'));
             $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
         }
+    }
+
+    /**
+     * Non-{main} user/closure bodies: cross-function TypeError must propagate (#26486 shape).
+     *
+     * NestedJIT helper compiles and {main} keep in-place abort — thin AOT may skip the
+     * post-main type-error abort flush.
+     */
+    private static function shouldPendTypeErrorForCaller(Context $context): bool
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return false;
+        }
+        $active = strtolower($context->activeFunction);
+
+        return '' !== $active && '{main}' !== $active && 'main' !== $active;
     }
 
     /**
