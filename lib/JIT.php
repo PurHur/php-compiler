@@ -12575,6 +12575,7 @@ class JIT {
                     }
                     $this->rewritePendingDateTimeGetOffsetIfNeeded($callArgs);
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
+                    $this->applyDateTimeLocalInstantsToCallArgs($callArgs, $callOperands);
                     $this->applyDateMetaToDatePeriodConstructArgs(
                         $this->context->scope->toCall,
                         $callArgs,
@@ -12892,6 +12893,7 @@ class JIT {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
                     $this->rewritePendingDateTimeGetOffsetIfNeeded($callArgs);
+                    $this->applyDateTimeLocalInstantsToCallArgs($callArgs, $callOperands);
                     $this->applyDateMetaToDatePeriodConstructArgs(
                         $this->context->scope->toCall,
                         $callArgs,
@@ -20509,22 +20511,56 @@ class JIT {
             $stamp($resultVar);
         }
         $resultOp = $this->context->lastDateTimeNewResultOp;
+        $publishName = null;
         if ($resultOp instanceof \PHPCfg\Operand) {
             $this->context->scope->variables[$resultOp] = $first;
-            $name = JIT\OperandName::resolve($resultOp);
-            if (null !== $name && '' !== $name) {
-                $resolved = $this->context->resolveRefAliasName($name);
-                $this->context->bindVariableByName($resolved, $first);
-                $this->context->dateTimeLocalInstants[$resolved] = [
-                    'timestamp' => (int) $first->compileTimeDateTimeTimestamp,
-                    'timezone' => $first->compileTimeTimezoneName,
-                ];
+            $publishName = JIT\OperandName::resolve($resultOp);
+        }
+        // Temporary New_ results often have no Operand name (#32691 / re-#27309). Prefer a
+        // named binding that is literally this Variable; else the first DateTime-shaped
+        // local that still lacks a stamp (so `$a = new …; $b = new …` does not clobber `$a`
+        // when `$b` is constructed — peer #33744).
+        if (null === $publishName || '' === $publishName) {
+            foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+                if ($bound === $first || $bound === $resultVar) {
+                    $publishName = $boundName;
+                    break;
+                }
             }
         }
+        if (null === $publishName || '' === $publishName) {
+            foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+                if (!$bound instanceof JIT\Variable) {
+                    continue;
+                }
+                if (null !== $bound->compileTimeDateTimeTimestamp) {
+                    continue;
+                }
+                $hint = strtolower(ltrim((string) ($bound->classUserType ?? ''), '\\'));
+                $legacy = (string) ($bound->compileTimeString ?? '');
+                // New_ locals often only have compileTimeString=class name / empty userType until
+                // we stamp them here — allow empty hint so `$a` is found (re-#27309).
+                if (
+                    '' !== $hint
+                    && !\in_array($hint, ['datetime', 'datetimeimmutable'], true)
+                    && !\in_array($legacy, ['DateTime', 'DateTimeImmutable'], true)
+                ) {
+                    continue;
+                }
+                $publishName = $boundName;
+                $stamp($bound);
+                break;
+            }
+        }
+        if (null !== $publishName && '' !== $publishName) {
+            $resolved = $this->context->resolveRefAliasName($publishName);
+            $this->context->bindVariableByName($resolved, $first);
+            $this->context->dateTimeLocalInstants[$resolved] = [
+                'timestamp' => (int) $first->compileTimeDateTimeTimestamp,
+                'timezone' => $first->compileTimeTimezoneName,
+            ];
+        }
         foreach ($this->context->namedVariableBindings as $boundName => $bound) {
-            // Only this construction's $this / New_ result — not every DateTime(Immutable)
-            // local. Stamping all same classUserType clobbered $start when $end was
-            // constructed, so DatePeriod($start,$i,$end) got an empty range (#33744).
             if ($bound === $first || $bound === $resultVar) {
                 $stamp($bound);
                 $this->context->dateTimeLocalInstants[$boundName] = [
@@ -20584,6 +20620,37 @@ class JIT {
         }
         $this->context->lastDateIntervalNewResultOp = null;
         $this->context->lastDateIntervalNewResultVar = null;
+    }
+
+    /**
+     * Restore DateTime construct stamps on call args by local name (re-#27309 / peer #32691).
+     *
+     * Method `$this` is stamped in {@see initJitMethodCall} and prepended to {@see Scope::$args}
+     * without an {@see Scope::$argOperands} entry. Pair operands from the end so `$a->diff($b)`
+     * still restores `$b`'s instant (date_diff($a,$b) has matching lengths).
+     *
+     * @param list<JIT\Variable|array{unpack: JIT\Variable}|array{named: string, value: JIT\Variable}> $callArgs
+     * @param list<Operand|null> $callOperands
+     */
+    private function applyDateTimeLocalInstantsToCallArgs(array $callArgs, array $callOperands): void
+    {
+        $opOffset = \count($callArgs) - \count($callOperands);
+        if ($opOffset < 0) {
+            $opOffset = 0;
+        }
+        foreach ($callArgs as $i => $arg) {
+            if (is_array($arg)) {
+                $arg = $arg['value'] ?? $arg['unpack'] ?? null;
+            }
+            if (!$arg instanceof JIT\Variable) {
+                continue;
+            }
+            $operand = $callOperands[$i - $opOffset] ?? null;
+            if (!$operand instanceof \PHPCfg\Operand) {
+                continue;
+            }
+            $this->applyDateTimeLocalInstantToReceiver($operand, $arg);
+        }
     }
 
     /**
@@ -20669,6 +20736,19 @@ class JIT {
         }
         $resolved = $this->context->resolveRefAliasName($recvName);
         $instant = $this->context->dateTimeLocalInstants[$resolved] ?? null;
+        if (null === $instant) {
+            // Fall back to the named binding — dateTimeLocalInstants can stay empty when
+            // New_/construct sync misses the local, while the binding still carries the
+            // dedicated #32691 stamp (re-#27309 DateTime::diff).
+            $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+            if ($bound instanceof JIT\Variable && null !== $bound->compileTimeDateTimeTimestamp) {
+                $instant = [
+                    'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
+                    'timezone' => $bound->compileTimeTimezoneName,
+                ];
+                $this->context->dateTimeLocalInstants[$resolved] = $instant;
+            }
+        }
         if (null === $instant) {
             return;
         }
