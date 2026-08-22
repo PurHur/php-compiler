@@ -1191,24 +1191,19 @@ final class JitDateMutation
 
     private static function returnObjectArg(Context $context, JITVariable $arg): Value
     {
+        // TYPE_OBJECT `$arg->value` is often `__object__**` (slot); `__value__writeObject`
+        // requires `__object__*` — load first or module verify fails (#33925).
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            $slot = JitValueBox::alloc($context);
-            $ptr = JitValueBox::pointer($context, $slot);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeObject'),
-                $ptr,
-                $arg->value
-            );
+            $obj = ReflectionSetup::loadObjectFromArg($context, $arg);
 
-            return $ptr;
+            return self::boxObjectPtr($context, $obj);
         }
 
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
         JitValueBox::copyFromPointer($context, $slot, $valuePtr);
 
-        return $ptr;
+        return $slot;
     }
 
     private static function requireDateTimeObject(
@@ -1539,16 +1534,17 @@ final class JitDateMutation
         } else {
             self::writeTimestampAndClearMicro($context, $receiver, $layout, $timestamp);
             $retObj = $receiver;
+            // format()/getTimestamp() prefer compileTimeDateTimeTimestamp (#33911 / #33925).
+            $tsLit = $args[1]->compileTimeLong;
+            if (null !== $tsLit) {
+                $tzName = $args[0]->compileTimeTimezoneName ?? 'UTC';
+                self::publishMutableDateTimeInstant($context, $args[0], (int) $tsLit, $tzName, 0);
+            } else {
+                self::invalidateMutableDateTimeInstant($context, $args[0]);
+            }
         }
 
-        $ret = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            JitValueBox::pointer($context, $ret),
-            $retObj
-        );
-
-        return $ret;
+        return self::boxObjectPtr($context, $retObj);
     }
 
     private static function rejectNonObjectTimestampArg(
@@ -2016,17 +2012,9 @@ final class JitDateMutation
         // so format()/getTimestamp() read the written __dt_timestamp.
         if (!$immutable) {
             self::invalidateMutableDateTimeInstant($context, $receiverArg);
-
-            return self::boxObjectPtr($context, $dtObj);
         }
-        $ret = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            JitValueBox::pointer($context, $ret),
-            $dtObj
-        );
 
-        return $ret;
+        return self::boxObjectPtr($context, $dtObj);
     }
 
     /**
