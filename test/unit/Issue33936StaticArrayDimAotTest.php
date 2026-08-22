@@ -37,7 +37,7 @@ final class Issue33936StaticArrayDimAotTest extends TestCase
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $compileOut, $compileRc);
         $this->assertSame(0, $compileRc, implode("\n", $compileOut));
-        $expected = "1\n1\n1:1\n";
+        $expected = "1\n1\n1:1\n1\n1\n9:1\n";
         try {
             for ($i = 0; $i < 5; ++$i) {
                 $runOut = [];
