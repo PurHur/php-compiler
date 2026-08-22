@@ -135,18 +135,11 @@ final class HashTableCombineLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $keySet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $keysHt,
-            $idx
-        );
-        $valSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $valuesHt,
-            $idx
-        );
-        $both = $context->builder->and($keySet, $valSet);
-        $context->builder->branchIf($both, $take, $next);
+        // Both sides need a defined slot — TYPE_NULL is valid (#33699).
+        $keyUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $keysHt, $idx);
+        $valUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $valuesHt, $idx);
+        $eitherHole = $context->builder->or($keyUndef, $valUndef);
+        $context->builder->branchIf($eitherHole, $next, $take);
 
         $context->builder->positionAtEnd($take);
         $keyVar = HashTableReadLlvm::readIndexedToValueBox($context, $keysHt, $idx);
@@ -240,12 +233,9 @@ final class HashTableCombineLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $src,
-            $idx
-        );
-        $context->builder->branchIf($isSet, $take, $next);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL combines (#33699).
+        $isUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $src, $idx);
+        $context->builder->branchIf($isUndef, $next, $take);
 
         $context->builder->positionAtEnd($take);
         $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $src, $idx);

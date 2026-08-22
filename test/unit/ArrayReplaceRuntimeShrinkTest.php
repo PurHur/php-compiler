@@ -10,20 +10,21 @@ use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * array_replace() NestedJIT via JitVmHelperLink::ensureCompiled (#23807 / peer #22954).
+ * array_replace() call-site HashTableCowLlvm (#33699 / peer ArrayMerge #27546).
  */
 final class ArrayReplaceRuntimeShrinkTest extends TestCase
 {
-    public function testArrayReplaceRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayReplaceRuntimeUsesCallSiteCowLlvm(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayReplaceRuntime.php');
-        $this->assertStringContainsString('ArrayReplaceJitHelper', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringContainsString('HashTableCowLlvm', $runtime);
+        $this->assertStringContainsString('HashTableCowLlvm::duplicate', $runtime);
+        $this->assertStringContainsString('HashTableCowLlvm::replace', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink::lookupCompiled', $runtime);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
         $this->assertStringNotContainsString('parseAndCompile', $runtime);
         $this->assertStringNotContainsString('new JIT(', $runtime);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayReplace', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);

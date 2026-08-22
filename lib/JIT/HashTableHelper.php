@@ -105,6 +105,12 @@ final class HashTableHelper
         return HashTableReadLlvm::listEntryPointer($context, $ht, $index);
     }
 
+    /** Packed TYPE_UNDEFINED hole — not isset; keeps TYPE_NULL (#33699). */
+    public static function packedIndexIsUndefined(Context $context, Value $ht, Value $index): Value
+    {
+        return HashTableReadLlvm::packedIndexIsUndefined($context, $ht, $index);
+    }
+
     public static function offsetUnset(Context $context, Variable $container, Variable $dim): void
     {
         HashTableWriteLlvm::offsetUnset($context, $container, $dim);

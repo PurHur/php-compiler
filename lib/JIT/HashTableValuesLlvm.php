@@ -64,12 +64,9 @@ final class HashTableValuesLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $srcHt,
-            $idx
-        );
-        $context->builder->branchIf($isSet, $take, $next);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL is a real value (#33699).
+        $isUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $srcHt, $idx);
+        $context->builder->branchIf($isUndef, $next, $take);
 
         $context->builder->positionAtEnd($take);
         $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $srcHt, $idx);

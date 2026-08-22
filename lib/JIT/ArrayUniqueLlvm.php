@@ -84,12 +84,9 @@ final class ArrayUniqueLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $src,
-            $idx
-        );
-        $context->builder->branchIf($isSet, $keep, $next);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL must stay unique (#33699).
+        $isUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $src, $idx);
+        $context->builder->branchIf($isUndef, $next, $keep);
 
         $context->builder->positionAtEnd($keep);
         $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $src, $idx);
@@ -202,12 +199,9 @@ final class ArrayUniqueLlvm
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $src,
-            $idx
-        );
-        $context->builder->branchIf($isSet, $keep, $next);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL must stay unique (#33699).
+        $isUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $src, $idx);
+        $context->builder->branchIf($isUndef, $next, $keep);
 
         $context->builder->positionAtEnd($keep);
         $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $src, $idx);

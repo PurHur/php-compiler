@@ -103,13 +103,10 @@ final class HashTableReverseLlvm
         $context->builder->branchIf($pastStart, $done, $body);
 
         $context->builder->positionAtEnd($body);
+        // Skip TYPE_UNDEFINED holes only — TYPE_NULL must reverse (#33699).
         $idxSize = JitNestedHelperCoerce::i64ToScalar($context, $idx, $sizeT);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $srcHt,
-            $idxSize
-        );
-        $context->builder->branchIf($isSet, $take, $next);
+        $isUndef = HashTableReadLlvm::packedIndexIsUndefined($context, $srcHt, $idxSize);
+        $context->builder->branchIf($isUndef, $next, $take);
 
         $context->builder->positionAtEnd($take);
         $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $srcHt, $idxSize);
