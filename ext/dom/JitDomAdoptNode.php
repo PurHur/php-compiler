@@ -37,6 +37,17 @@ final class JitDomAdoptNode
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_adopt_node_cont');
 
+        // php-src Z_PARAM_OBJ_OF_CLASS before NYI / xmlDOMWrapAdoptNode (#33737).
+        if (JitDomRequireDomNodeArg::guardOrAbort(
+            $context,
+            $args[1],
+            'DOMDocument::adoptNode',
+            1,
+            'node'
+        )) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
+
         if (!CompilerVersion::supportsDomDocumentAdoptNode()) {
             return self::emitNotYetImplemented($context);
         }
