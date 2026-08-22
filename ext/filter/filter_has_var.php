@@ -13,7 +13,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitFilterInputTypeArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
-use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -153,7 +152,7 @@ final class filter_has_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($badTypeBlock);
-        $badResult = JitFilter::boxedFalse($context);
+        $badResult = $context->getTypeFromString('int1')->constInt(0, false);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($getBlock);
@@ -183,8 +182,35 @@ final class filter_has_var extends Internal
         string $superglobal,
         JITVariable $key
     ): Value {
-        $htVar = SuperglobalInit::load($context, $superglobal);
+        // IF_G snapshot for GET/POST/COOKIE (#33946, re-#19640).
+        $htVar = JitFilter::loadInputTable($context, $superglobal);
+        $htLoaded = $context->helper->loadValue($htVar);
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $i1 = $context->getTypeFromString('int1');
+        $isNullHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $htLoaded,
+            $htPtrTy->constNull()
+        );
+        $falseBlock = BasicBlockHelper::append($context, 'filter_has_var_null_snap_'.$superglobal);
+        $checkBlock = BasicBlockHelper::append($context, 'filter_has_var_check_'.$superglobal);
+        $doneBlock = BasicBlockHelper::append($context, 'filter_has_var_done_'.$superglobal);
+        $context->builder->branchIf($isNullHt, $falseBlock, $checkBlock);
 
-        return (new array_key_exists())->call($context, $key, $htVar);
+        $context->builder->positionAtEnd($falseBlock);
+        $falseResult = $i1->constInt(0, false);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($checkBlock);
+        $exists = (new array_key_exists())->call($context, $key, $htVar);
+        $checkTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($falseResult, $falseBlock);
+        $phi->addIncoming($exists, $checkTail);
+
+        return $phi;
     }
 }
