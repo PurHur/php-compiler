@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPLLVM;
 use PHPLLVM\Value;
 
@@ -117,12 +118,16 @@ final class TypeErrorRaise
         $okBb = BasicBlockHelper::append($context, $blockPrefix.'_'.$okSuffix);
         $context->builder->branchIf($successCondition, $okBb, $failBb);
         $context->builder->positionAtEnd($failBb);
-        self::emitValueError($context, $errorMessage);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'ValueError', $errorMessage);
         } else {
-            $context->builder->call($context->lookupFunction('abort'));
-            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            self::emitValueError($context, $errorMessage);
+            if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+            } else {
+                $context->builder->call($context->lookupFunction('abort'));
+                $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            }
         }
         $context->builder->positionAtEnd($okBb);
     }
