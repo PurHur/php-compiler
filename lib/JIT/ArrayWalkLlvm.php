@@ -10,11 +10,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Pure LLVM array_walk / array_walk_recursive (Closure) for thin standalone AOT (#27632).
+ * Pure LLVM array_walk / array_walk_recursive (Closure) for thin standalone AOT (#27632 / #33713).
  *
  * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayWalkJitHelper} segfaults under thin AOT
  * (same class as ArrayMapJitHelper #24156 / ArrayReduceLlvm). Emit packed + string-key walks
  * with live HT value slots so by-ref &$value mutates in place (php_array_walk).
+ * Body emit must {@see BasicBlockHelper::scopeLoweringToFunction} so packed BBs stay in the
+ * ABI fn when the outer user fn owns {@see Context::$loweringLlvmFunction} (#33713 / peer #33706).
  *
  * php-src: ext/standard/array.c — php_array_walk / php_array_walk_recursive
  */
@@ -59,7 +61,6 @@ final class ArrayWalkLlvm
         }
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
-        $savedActive = $context->activeFunction;
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $valuePtr = $context->getTypeFromString('__value__*');
@@ -76,13 +77,16 @@ final class ArrayWalkLlvm
             );
         }
         $context->registerFunction($name, $fn);
-        $context->activeFunction = $name;
 
-        $entry = $fn->appendBasicBlock($recursive ? 'awr_llvm_entry' : 'aw_llvm_entry');
-        $context->builder->positionAtEnd($entry);
-        self::emitWalkBody($context, $fn, $recursive);
+        // Pin loweringLlvmFunction so BasicBlockHelper::append / JitValueBox helpers stay
+        // inside this ABI fn — otherwise packed walk BBs land in the outer user fn and
+        // module verify fails (cross-function br / arg) (#33713 / re-#26969 / peer #33706).
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $name, static function () use ($context, $fn, $recursive): void {
+            $entry = $fn->appendBasicBlock($recursive ? 'awr_llvm_entry' : 'aw_llvm_entry');
+            $context->builder->positionAtEnd($entry);
+            self::emitWalkBody($context, $fn, $recursive);
+        });
 
-        $context->activeFunction = $savedActive;
         if (null !== $savedBlock) {
             BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
