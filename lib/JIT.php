@@ -12443,6 +12443,11 @@ class JIT {
                         $callArgs,
                         $callOperands
                     );
+                    $this->applyDateMetaToDateTimeAddSubArgs(
+                        $this->context->scope->toCall,
+                        $callArgs,
+                        $callOperands
+                    );
                     $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
@@ -12756,6 +12761,11 @@ class JIT {
                     }
                     $this->rewritePendingDateTimeGetOffsetIfNeeded($callArgs);
                     $this->applyDateMetaToDatePeriodConstructArgs(
+                        $this->context->scope->toCall,
+                        $callArgs,
+                        $callOperands
+                    );
+                    $this->applyDateMetaToDateTimeAddSubArgs(
                         $this->context->scope->toCall,
                         $callArgs,
                         $callOperands
@@ -18628,7 +18638,9 @@ class JIT {
             $this->syncCompileTimeDatePeriod($result, $value, false);
             $result->compileTimeLong = $value->compileTimeLong ?? $result->compileTimeLong;
             $this->noteDateTimeZoneLocal($resultOp, $value);
-            $this->noteDateTimeLocal($resultOp, $value);
+            // Prefer $result after sync — New Temporary may differ from construct $this (#33781).
+            $dtStamp = null !== $result->compileTimeDateTimeTimestamp ? $result : $value;
+            $this->noteDateTimeLocal($resultOp, $dtStamp);
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {
@@ -18678,7 +18690,9 @@ class JIT {
                 $this->syncCompileTimeDomTagName($result, $value, $force);
                 $this->syncCompileTimeDatePeriod($result, $value, $force);
                 $this->noteDateTimeZoneLocal($resultOp, $value);
-                $this->noteDateTimeLocal($resultOp, $value);
+                // Prefer $result after sync (#33781).
+                $dtStamp = null !== $result->compileTimeDateTimeTimestamp ? $result : $value;
+                $this->noteDateTimeLocal($resultOp, $dtStamp);
 
                 return;
             }
@@ -18754,7 +18768,9 @@ class JIT {
                     $this->syncCompileTimeDomTagName($result, $value, $force);
                     $this->syncCompileTimeDatePeriod($result, $value, $force);
                     $this->noteDateTimeZoneLocal($resultOp, $value);
-                    $this->noteDateTimeLocal($resultOp, $value);
+                    // Prefer $result after sync — New Temporary may differ from construct $this (#33781).
+                    $dtStamp = null !== $result->compileTimeDateTimeTimestamp ? $result : $value;
+                    $this->noteDateTimeLocal($resultOp, $dtStamp);
 
                     return;
                 }
@@ -18777,7 +18793,9 @@ class JIT {
             $this->syncCompileTimeDomTagName($result, $value, $force);
             $this->syncCompileTimeDatePeriod($result, $value, $force);
             $this->noteDateTimeZoneLocal($resultOp, $value);
-            $this->noteDateTimeLocal($resultOp, $value);
+            // Prefer $result after sync — New Temporary may differ from construct $this (#33781).
+            $dtStamp = null !== $result->compileTimeDateTimeTimestamp ? $result : $value;
+            $this->noteDateTimeLocal($resultOp, $dtStamp);
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             if ($value->isJitGenerator) {
                 $resolved = JIT\OperandName::resolve($resultOp);
@@ -20344,6 +20362,70 @@ class JIT {
     }
 
     /**
+     * Restore DateInterval stamp on DateTime{,Immutable}::add/sub `$interval` (#33781).
+     *
+     * `$this` already gets {@see applyDateTimeLocalInstantToReceiver} in
+     * {@see initJitMethodCall}. User ARG_SEND operands do **not** include `$this`, so
+     * `callOperands[0]` is the interval when `callArgs` is `[$this, $interval]`.
+     *
+     * @param list<JIT\Variable|array{unpack: JIT\Variable}|array{named: string, value: JIT\Variable}> $callArgs
+     * @param list<Operand|null> $callOperands
+     */
+    private function applyDateMetaToDateTimeAddSubArgs(?JIT\Call $toCall, array $callArgs, array $callOperands): void
+    {
+        if (
+            !$toCall instanceof JIT\Call\DateTimeAdd
+            && !$toCall instanceof JIT\Call\DateTimeSub
+        ) {
+            return;
+        }
+        if (!isset($callArgs[0], $callArgs[1])) {
+            return;
+        }
+        $thisArg = $callArgs[0];
+        $intervalArg = $callArgs[1];
+        if (is_array($thisArg)) {
+            $thisArg = $thisArg['value'] ?? $thisArg['unpack'] ?? null;
+        }
+        if (is_array($intervalArg)) {
+            $intervalArg = $intervalArg['value'] ?? $intervalArg['unpack'] ?? null;
+        }
+        if (!$thisArg instanceof JIT\Variable || !$intervalArg instanceof JIT\Variable) {
+            return;
+        }
+
+        $intervalOp = null;
+        $thisOp = null;
+        if (\count($callOperands) === \count($callArgs)) {
+            $thisOp = $callOperands[0] ?? null;
+            $intervalOp = $callOperands[1] ?? null;
+        } elseif (\count($callOperands) === \count($callArgs) - 1) {
+            // METHODCALL: args include $this; ARG_SEND operands are user args only.
+            $intervalOp = $callOperands[0] ?? null;
+        } elseif (\count($callOperands) >= 1) {
+            $intervalOp = $callOperands[\count($callOperands) - 1] ?? null;
+        }
+
+        if ($thisOp instanceof \PHPCfg\Operand) {
+            $this->applyDateTimeLocalInstantToReceiver($thisOp, $thisArg);
+        }
+        if ($intervalOp instanceof \PHPCfg\Operand) {
+            $this->applyDateIntervalStateToReceiver($intervalOp, $intervalArg);
+        }
+
+        // Last resort when the Temporary lost its name: sole/local DateInterval stamp.
+        if (!\is_array($intervalArg->compileTimeDateInterval) && [] !== $this->context->dateIntervalLocalStates) {
+            $states = \array_values($this->context->dateIntervalLocalStates);
+            if (1 === \count($states) && \is_array($states[0])) {
+                $intervalArg->compileTimeDateInterval = $states[0];
+                if (null === $intervalArg->classUserType || '' === $intervalArg->classUserType) {
+                    $intervalArg->classUserType = 'DateInterval';
+                }
+            }
+        }
+    }
+
+    /**
      * Restore DateTime/DateInterval stamps on DatePeriod::__construct args by local name (#33744).
      *
      * @param list<JIT\Variable|array{unpack: JIT\Variable}|array{named: string, value: JIT\Variable}> $callArgs
@@ -20417,7 +20499,7 @@ class JIT {
         $this->context->lastDatePeriodNewResultVar = null;
     }
 
-    /** Copy compile-time instant onto `$dt->format()` / getTimestamp receivers (#32691). */
+    /** Copy compile-time instant onto `$dt->format()` / getTimestamp / add receivers (#32691, #33781). */
     private function applyDateTimeLocalInstantToReceiver(Operand $receiverOp, JIT\Variable $receiverVar): void
     {
         $recvName = JIT\OperandName::resolve($receiverOp);
@@ -20427,6 +20509,21 @@ class JIT {
         $resolved = $this->context->resolveRefAliasName($recvName);
         $instant = $this->context->dateTimeLocalInstants[$resolved] ?? null;
         if (null === $instant) {
+            $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+            if ($bound instanceof JIT\Variable && null !== $bound->compileTimeDateTimeTimestamp) {
+                $receiverVar->compileTimeDateTimeTimestamp = $bound->compileTimeDateTimeTimestamp;
+                $receiverVar->compileTimeTimezoneName = $bound->compileTimeTimezoneName;
+                $this->context->dateTimeLocalInstants[$resolved] = [
+                    'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
+                    'timezone' => $bound->compileTimeTimezoneName,
+                ];
+                if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
+                    $receiverVar->classUserType = $bound->classUserType ?? 'DateTime';
+                }
+
+                return;
+            }
+
             return;
         }
         $receiverVar->compileTimeDateTimeTimestamp = $instant['timestamp'];

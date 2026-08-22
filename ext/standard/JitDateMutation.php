@@ -454,15 +454,29 @@ final class JitDateMutation
     }
 
     /**
-     * Recover construct-time instant from a DateTime receiver / arg (#27309).
+     * Recover construct-time instant from a DateTime receiver / arg (#27309, #33781).
      *
      * Method `$this` is often TYPE_OBJECT without {@see JITVariable::$compileTimeLong};
-     * the time literal may still sit on {@see JITVariable::$compileTimeString}.
+     * after #32691 the construct stamp lives on {@see JITVariable::$compileTimeDateTimeTimestamp}
+     * (restored via {@see \PHPCompiler\JIT::applyDateTimeLocalInstantToReceiver}).
      *
      * @return array{timestamp: int, microsecond: int, timezone: string}|null
      */
     private static function resolveCompileTimeInstant(Context $context, JITVariable $arg): ?array
     {
+        if (null !== $arg->compileTimeDateTimeTimestamp) {
+            $tz = $arg->compileTimeTimezoneName ?? $arg->compileTimeString;
+            if (null === $tz || '' === $tz || 1 === preg_match('/^\d{4}-\d{2}-\d{2}/', $tz)) {
+                $tz = 'UTC';
+            }
+
+            return [
+                'timestamp' => (int) $arg->compileTimeDateTimeTimestamp,
+                'microsecond' => 0,
+                'timezone' => $tz,
+            ];
+        }
+
         if (null !== $arg->compileTimeLong) {
             $tz = $arg->compileTimeString;
             // Timezone from construct; ignore leftover date-string stamps on receivers.
@@ -499,6 +513,120 @@ final class JitDateMutation
         ];
     }
 
+    /**
+     * Method `$this` may be a fresh Variable without stamps; recover from named bindings (#33781).
+     *
+     * @return array{timestamp: int, microsecond: int, timezone: string}|null
+     */
+    private static function recoverCompileTimeInstantFromBindings(
+        Context $context,
+        JITVariable $arg,
+        string $layout = ''
+    ): ?array
+    {
+        $pick = static function (JITVariable $bound): array {
+            $tz = $bound->compileTimeTimezoneName ?? $bound->compileTimeString;
+            if (null === $tz || '' === $tz || 1 === preg_match('/^\d{4}-\d{2}-\d{2}/', $tz)) {
+                $tz = 'UTC';
+            }
+
+            return [
+                'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
+                'microsecond' => 0,
+                'timezone' => $tz,
+            ];
+        };
+
+        foreach ($context->namedVariableBindings as $bound) {
+            if (!$bound instanceof JITVariable || null === $bound->compileTimeDateTimeTimestamp) {
+                continue;
+            }
+            if ($bound === $arg) {
+                return $pick($bound);
+            }
+            if (null !== $arg->value && $bound->value === $arg->value) {
+                return $pick($bound);
+            }
+        }
+
+        foreach ($context->dateTimeLocalInstants as $instant) {
+            if (!\is_array($instant) || !isset($instant['timestamp'])) {
+                continue;
+            }
+            $tz = $instant['timezone'] ?? 'UTC';
+            if (null === $tz || '' === $tz) {
+                $tz = 'UTC';
+            }
+
+            // Ambiguous when multiple locals exist — only safe with a single instant map entry.
+            if (1 === \count($context->dateTimeLocalInstants)) {
+                return [
+                    'timestamp' => (int) $instant['timestamp'],
+                    'microsecond' => 0,
+                    'timezone' => (string) $tz,
+                ];
+            }
+            break;
+        }
+
+        $candidates = [];
+        $wantClass = strtolower(ltrim(
+            '' !== $layout ? $layout : (string) ($arg->classUserType ?? ''),
+            '\\'
+        ));
+        if ('' === $wantClass) {
+            return null;
+        }
+        // Only recover by layout when exactly one named local has that class — otherwise
+        // `$imm2->sub` can steal `$imm`'s instant (#33781 / DateTimeAddSubAotTest).
+        foreach ($context->namedVariableBindings as $bound) {
+            if (!$bound instanceof JITVariable) {
+                continue;
+            }
+            $haveClass = strtolower(ltrim((string) ($bound->classUserType ?? ''), '\\'));
+            if ($haveClass === $wantClass) {
+                $candidates[] = $bound;
+            }
+        }
+        if (
+            1 === \count($candidates)
+            && null !== $candidates[0]->compileTimeDateTimeTimestamp
+        ) {
+            return $pick($candidates[0]);
+        }
+
+        return null;
+    }
+
+    /**
+     * After mutable DateTime::add/sub compile-time fold, keep local stamps coherent (#33781).
+     */
+    private static function refreshCompileTimeInstantBindings(
+        Context $context,
+        JITVariable $arg,
+        string $layout,
+        int $timestamp,
+        string $timezone
+    ): void {
+        $arg->compileTimeDateTimeTimestamp = $timestamp;
+        $arg->compileTimeTimezoneName = $timezone;
+        $wantClass = strtolower(ltrim($layout, '\\'));
+        foreach ($context->namedVariableBindings as $name => $bound) {
+            if (!$bound instanceof JITVariable) {
+                continue;
+            }
+            $haveClass = strtolower(ltrim((string) ($bound->classUserType ?? ''), '\\'));
+            if ($bound === $arg || $haveClass === $wantClass) {
+                $bound->compileTimeDateTimeTimestamp = $timestamp;
+                $bound->compileTimeTimezoneName = $timezone;
+                $context->dateTimeLocalInstants[$name] = [
+                    'timestamp' => $timestamp,
+                    'timezone' => $timezone,
+                ];
+            }
+        }
+    }
+
     private static function invokeIntervalMutation(
         Context $context,
         string $function,
@@ -522,14 +650,14 @@ final class JitDateMutation
     }
 
     /**
-     * OOP DateTime{,Immutable}::add/sub (#30760).
+     * OOP DateTime{,Immutable}::add/sub (#30760, #33781).
      *
-     * Thin user-script AOT cannot NestedJIT {@see DateMutationRuntime}
-     * (`__nativearray__boundscheck` missing, peer #27159 / modify()). Prefer
-     * compile-time {@see VmDateTimeNative::applyIntervalState} when both the
+     * Prefer compile-time {@see VmDateTimeNative::applyIntervalState} when both the
      * receiver instant and DateInterval spec are known; otherwise LLVM-add a
      * fixed-length (no year/month) compile-time interval. Full JIT/MCJIT still
-     * falls back to {@see __phpc_date_apply_interval}.
+     * falls back to {@see __phpc_date_apply_interval}. Thin AOT restores interval
+     * arg stamps via {@see \PHPCompiler\JIT::applyDateMetaToDateTimeAddSubArgs} and
+     * recovers a unique same-layout local instant (#33781).
      */
     private static function invokeObjectIntervalMutation(
         Context $context,
@@ -561,7 +689,26 @@ final class JitDateMutation
         $object = $context->type->object;
         $receiver = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $intervalState = $args[1]->compileTimeDateInterval;
+        if (!\is_array($intervalState) && [] !== $context->dateIntervalLocalStates) {
+            $states = \array_values($context->dateIntervalLocalStates);
+            if (1 === \count($states) && \is_array($states[0])) {
+                $intervalState = $states[0];
+                $args[1]->compileTimeDateInterval = $intervalState;
+            }
+        }
         $instant = self::resolveCompileTimeInstant($context, $args[0]);
+        if (null === $instant) {
+            // Immutable chains (`$imm2 = $imm->add(...); $imm2->sub(...)`) must not
+            // steal `$imm`'s stamp via class-unique recover when several Instant
+            // locals exist — fall through to fixed-length / runtime (#33781).
+            if (!$immutable || 1 === \count($context->dateTimeLocalInstants)) {
+                $instant = self::recoverCompileTimeInstantFromBindings(
+                    $context,
+                    $args[0],
+                    $layout
+                );
+            }
+        }
 
         if (null !== $instant && null !== $intervalState) {
             $updated = VmDateTimeNative::applyIntervalState(
@@ -597,6 +744,15 @@ final class JitDateMutation
                     $layout,
                     DateTimeSupport::MICROSECOND_PROPERTY,
                     $i64->constInt($updated['microsecond'], true)
+                );
+                // Mutable in-place: refresh named-local stamps so a later add/sub
+                // does not fold against the pre-mutation instant (#33781).
+                self::refreshCompileTimeInstantBindings(
+                    $context,
+                    $args[0],
+                    $layout,
+                    $updated['timestamp'],
+                    $instant['timezone']
                 );
             }
 
@@ -663,7 +819,7 @@ final class JitDateMutation
 
         if ($context->isUserScriptAot()) {
             throw new \LogicException(
-                $function.'() requires a compile-time DateInterval in this compiler build (#30760)'
+                $function.'() requires a compile-time DateInterval in this compiler build (#30760/#33781)'
             );
         }
 
