@@ -917,6 +917,14 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['num1', 'num2'], BuiltinParamNames::forFunction('fmod'));
     }
 
+    /** php-src basic_functions.stub.php — get/set_include_path string|false (#27796). */
+    public function testIncludePathReflectionStubReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_include_path'));
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('set_include_path'));
+        $this->assertSame(['include_path'], BuiltinParamNames::forFunction('set_include_path'));
+    }
+
     /** php-src ext/standard/image.stub.php — InternalArgInfo return string (missing |false) (#28314). */
     public function testImageTypeToExtensionReflectionReturnUnion(): void
     {
