@@ -1864,6 +1864,9 @@ class Context {
         // Thin AOT: unbound isPublic/isStatic → NULL (#34216); VM #7116 / peer kind tables #34067.
         $this->functionProxies['reflectionmethod::ispublic'] = new Call\ReflectionMethodVisibilityQuery('isPublic');
         $this->functionProxies['reflectionmethod::isstatic'] = new Call\ReflectionMethodVisibilityQuery('isStatic');
+        // Thin AOT: unbound getNumberOfParameters/getNumberOfRequiredParameters → NULL (#34216).
+        $this->functionProxies['reflectionmethod::getnumberofparameters'] = new Call\ReflectionMethodGetNumberOfParameters();
+        $this->functionProxies['reflectionmethod::getnumberofrequiredparameters'] = new Call\ReflectionMethodGetNumberOfRequiredParameters();
         $this->functionProxies['reflectionclassconstant::__construct'] = new Call\ReflectionClassConstantConstruct();
         $this->functionProxies['reflectionclassconstant::getname'] = new Call\ReflectionClassConstantGetName();
         if (CompilerVersion::supportsReflectionPropertyGetMangledName()) {
@@ -2688,6 +2691,7 @@ class Context {
         Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
         Builtin\ReflectionFunctionVariadicLowering::implementLookupFunctions($this);
         Builtin\ReflectionFunctionParamCountLowering::implementLookupFunctions($this);
+        Builtin\ReflectionMethodQueryLowering::implementLookupFunctions($this);
         VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
         $initSuffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
