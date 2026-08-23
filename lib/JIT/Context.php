@@ -1765,10 +1765,22 @@ class Context {
         $this->functionProxies['reflectionproperty::setaccessible'] = new Call\ReflectionSetAccessible('ReflectionProperty');
         $this->functionProxies['reflectionproperty::getvalue'] = new Call\ReflectionPropertyGetValue();
         $this->functionProxies['reflectionproperty::setvalue'] = new Call\ReflectionPropertySetValue();
+        // Thin AOT: getDeclaringClass without proxy → ReflectionClass $name unset → SIGSEGV (#34020).
+        $this->functionProxies['reflectionproperty::getdeclaringclass'] = new Call\ReflectionGetDeclaringClass(
+            'ReflectionProperty',
+            \PHPCompiler\VM\ReflectionSupport::PROP_DECLARING_CLASS_NAME,
+            'ReflectionProperty::getDeclaringClass'
+        );
         // Thin AOT: unset $class/$name → SIGSEGV on property read / getAttributes (#33990).
         $this->functionProxies['reflectionmethod::__construct'] = new Call\ReflectionMethodConstruct();
         // getName was still unbound after #33994 — silent empty string (#33990 done-when).
         $this->functionProxies['reflectionmethod::getname'] = new Call\ReflectionMethodGetName();
+        // Thin AOT: getDeclaringClass without proxy → ReflectionClass $name unset → SIGSEGV (#34020).
+        $this->functionProxies['reflectionmethod::getdeclaringclass'] = new Call\ReflectionGetDeclaringClass(
+            'ReflectionMethod',
+            \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_METHOD_CLASS,
+            'ReflectionMethod::getDeclaringClass'
+        );
         $this->functionProxies['reflectionmethod::setaccessible'] = new Call\ReflectionSetAccessible('ReflectionMethod');
         $this->functionProxies['reflectionmethod::invoke'] = new Call\ReflectionMethodInvoke();
         $this->functionProxies['reflectionclassconstant::__construct'] = new Call\ReflectionClassConstantConstruct();
