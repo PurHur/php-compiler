@@ -7977,4 +7977,13 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionMethodQueryLookupRunti
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionMethodQueryLowering.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionMethodVisibilityRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionMethodVisibilityQuery.php';
+require_once __DIR__.'/../../../ext/mbstring/JitMbCase.php';
+require_once __DIR__.'/../../../ext/mbstring/JitMbSubstrCount.php';
+require_once __DIR__.'/../../../ext/mbstring/MbCaseJitHelper.php';
+require_once __DIR__.'/../../../ext/mbstring/MbChrOrdJitHelper.php';
+require_once __DIR__.'/../../../ext/mbstring/MbSubstrCountJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MbCaseRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MbChrOrdRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MbSubstrCountRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ForeachIndexedClosureCall.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
