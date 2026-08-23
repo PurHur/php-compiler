@@ -5515,6 +5515,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/GcToggleRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetBrowserRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetClassRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetClassVarsRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetConstantsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetHeadersRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetcwdJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGethostname.php';
@@ -6362,6 +6363,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewInstanceWithoutCo
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewInstance.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewInstanceArgs.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetDefaultProperties.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetConstants.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassHasMember.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetConstructor.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassRelationQuery.php';
