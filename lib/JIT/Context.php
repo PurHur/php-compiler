@@ -1795,6 +1795,8 @@ class Context {
         $this->functionProxies['reflectionclass::newinstanceargs'] = new Call\ReflectionClassNewInstanceArgs();
         // Thin AOT: unbound getDefaultProperties → NULL (#34091); VM #11441 / peer get_class_vars #27229.
         $this->functionProxies['reflectionclass::getdefaultproperties'] = new Call\ReflectionClassGetDefaultProperties();
+        // Thin AOT: unbound getMethods → NULL (#34107); VM #3815.
+        $this->functionProxies['reflectionclass::getmethods'] = new Call\ReflectionClassGetMethods();
         if (CompilerVersion::supportsLazyObjectFactories()) {
             $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
             $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();

@@ -6362,6 +6362,8 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewInstanceWithoutCo
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewInstance.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewInstanceArgs.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetDefaultProperties.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetMethods.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetMethodsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassHasMember.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetConstructor.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassRelationQuery.php';
