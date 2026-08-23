@@ -14,6 +14,8 @@ use PHPLLVM\Value;
 /**
  * mb_convert_kana() — Japanese kana width conversion (php-src ext/mbstring/mbstring.c; #13099).
  *
+ * JIT/AOT: compile-time fold + runtime NestedJIT via {@see JitMbConvertKana} (#34294).
+ *
  * Zend Z_PARAM_STR soft-null + DEP on $string/$mode (not TypeError) under PROFILE=8.4 — #24209,
  * peer #24176 (mb_trim / mb_ucfirst family).
  */
@@ -56,8 +58,6 @@ final class mb_convert_kana extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_convert_kana() JIT is not supported in this compiler build'
-        );
+        return JitMbConvertKana::invoke($context, $args);
     }
 }
