@@ -47,6 +47,11 @@ final class JitDomCreateElement
         }
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            // New element is not a loadXML child-edge — drop stale firstChild attr stamps
+            // so setIdAttribute cannot register a prior sibling's id (#34050 / #29257).
+            JitDomNodeChildProperty::$lastFetchedAttributes = null;
+            JitDomNodeChildProperty::$lastFetchedTagName = null;
+            JitDomNodeChildProperty::$lastFetchedChildIndex = null;
             $nameLit = self::compileTimeStringArg($args[1]);
             // Invalid literal must not silently materialize (#24804 / #20594 AOT gap).
             if (null !== $nameLit && !self::isValidXmlNameLit($nameLit)) {

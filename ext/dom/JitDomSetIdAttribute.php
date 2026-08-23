@@ -65,9 +65,17 @@ final class JitDomSetIdAttribute
         );
         if (JitDomDocumentMethodKernel::shouldUse($context) && $isIdTrue) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_post');
-            // Live Attr cache value — NestedJIT getAttribute is empty after loadXML (#33957).
+            // Prefer per-element compile-time attrs (firstChild/nextSibling stamps) over the
+            // global name→value Attr cache — that cache returns the last id= in the doc (#34050).
             $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-            self::storeCacheFromRuntimeGetAttribute($context, $element, $nameLlvm, $nameLit);
+            $elemAttrVal = self::compileTimeReceiverAttrValue($args[0], $nameLit);
+            if (null !== $elemAttrVal && '' !== $elemAttrVal) {
+                $idStr = $context->builder->load($context->constantStringFromString($elemAttrVal));
+                self::storeCacheFromRuntimeIdString($context, $element, $idStr);
+            } else {
+                // Live Attr cache value — NestedJIT getAttribute is empty after loadXML (#33957).
+                self::storeCacheFromRuntimeGetAttribute($context, $element, $nameLlvm, $nameLit);
+            }
             if (null !== $nameLit && '' !== $nameLit) {
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', $nameLit, true);
             }
@@ -108,9 +116,15 @@ final class JitDomSetIdAttribute
         );
         if (JitDomDocumentMethodKernel::shouldUse($context) && $isIdTrue) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_ns_post');
-            // getAttribute(localName) live cache — DomRegistry empty after loadXML (#33957).
             $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
-            self::storeCacheFromRuntimeGetAttribute($context, $element, $localLlvm, $localLit);
+            $elemAttrVal = self::compileTimeReceiverAttrValue($args[0], $localLit);
+            if (null !== $elemAttrVal && '' !== $elemAttrVal) {
+                $idStr = $context->builder->load($context->constantStringFromString($elemAttrVal));
+                self::storeCacheFromRuntimeIdString($context, $element, $idStr);
+            } else {
+                // getAttribute(localName) live cache — DomRegistry empty after loadXML (#33957).
+                self::storeCacheFromRuntimeGetAttribute($context, $element, $localLlvm, $localLit);
+            }
             $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString ?? '';
             if (null !== $localLit && '' !== $localLit) {
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral((string) $nsLit, $localLit, true);
@@ -175,9 +189,9 @@ final class JitDomSetIdAttribute
     /**
      * Thin-AOT getElementById cache from the live Attr value (#33957).
      *
-     * Prefer compile-time {@see DomUserScriptAttributeCacheLlvm::literalValue} seeded when
-     * NodeList::item materializes attrs — runtime Attr slot fetch can miss on live-walk
-     * getElementsByTagName temps. NestedJIT DomRegistry getAttribute is empty after loadXML.
+     * Prefer NestedJIT / live Attr object over {@see DomUserScriptAttributeCacheLlvm::literalValue}:
+     * that map is keyed only by attribute name, so multiple id= values collapse to the last
+     * seed and firstChild setIdAttribute registers the wrong id (#34050).
      */
     private static function storeCacheFromRuntimeGetAttribute(
         Context $context,
@@ -186,13 +200,6 @@ final class JitDomSetIdAttribute
         ?string $nameLit = null
     ): void {
         if (null !== $nameLit && '' !== $nameLit) {
-            $ctVal = DomUserScriptAttributeCacheLlvm::literalValue('', $nameLit);
-            if (null !== $ctVal && '' !== $ctVal) {
-                $idStr = $context->builder->load($context->constantStringFromString($ctVal));
-                DomUserScriptElementCacheLlvm::store($context, $element, $idStr, $element);
-
-                return;
-            }
             $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit);
             $objPtr = $context->getTypeFromString('__object__*');
             $isNull = $context->builder->icmp(Builder::INT_EQ, $attr, $objPtr->constNull());
@@ -270,10 +277,48 @@ final class JitDomSetIdAttribute
         $context->builder->branchIf($nonEmpty, $storeBlock, $cont);
 
         $context->builder->positionAtEnd($storeBlock);
-        // Overwrite single-slot cache — this element now owns the registered id.
-        DomUserScriptElementCacheLlvm::store($context, $element, $idStr, $element);
+        // xmlAddID first-wins for loadXML child-edge setIdAttribute (#34050).
+        // createElement/setAttribute path must overwrite the single-slot cache (issue_29257).
+        if (null !== JitDomNodeChildProperty::$lastFetchedAttributes) {
+            DomUserScriptElementCacheLlvm::storeFirstWins($context, $element, $idStr, $element);
+        } else {
+            DomUserScriptElementCacheLlvm::store($context, $element, $idStr, $element);
+        }
         $context->builder->branch($cont);
         $context->builder->positionAtEnd($cont);
+    }
+
+    /**
+     * Attribute value from the receiver's loadXML open-tag stamp (#34050).
+     *
+     * ARG_SEND / method temps often drop {@see JITVariable::$compileTimeDomAttributes};
+     * fall back to {@see JitDomNodeChildProperty::$lastFetchedAttributes} (cleared on
+     * createElement / documentElement so it cannot leak across documents).
+     */
+    private static function compileTimeReceiverAttrValue(JITVariable $receiver, ?string $nameLit): ?string
+    {
+        if (null === $nameLit || '' === $nameLit) {
+            return null;
+        }
+        $attrs = $receiver->compileTimeDomAttributes;
+        if (null === $attrs || [] === $attrs) {
+            $attrs = JitDomNodeChildProperty::$lastFetchedAttributes;
+        }
+        if (null === $attrs || [] === $attrs) {
+            return null;
+        }
+        if (isset($attrs[$nameLit]) && '' !== $attrs[$nameLit]) {
+            return $attrs[$nameLit];
+        }
+        $pos = strpos($nameLit, ':');
+        if (false !== $pos) {
+            $local = substr($nameLit, $pos + 1);
+            if (isset($attrs[$local]) && '' !== $attrs[$local]) {
+                return $attrs[$local];
+            }
+        }
+
+        return null;
     }
 
     /** NestedJIT bool load is unsafe — only constant false selects the false ABI (#29257). */

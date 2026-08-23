@@ -47,6 +47,49 @@ final class DomUserScriptElementCacheLlvm
         $context->builder->store($document, $context->module->getNamedGlobal(self::GLOBAL_DOC));
     }
 
+    /**
+     * xmlAddID first-wins: do not replace an existing cache entry for the same id (#34050 / #25275).
+     *
+     * Same element re-register is a no-op overwrite; a different element loses.
+     */
+    public static function storeFirstWins(
+        Context $context,
+        Value $document,
+        Value $idStr,
+        Value $element
+    ): void {
+        self::ensureGlobals($context);
+        $i1 = $context->getTypeFromString('int1');
+
+        $storedOk = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_OK));
+        $hasStore = $context->builder->icmp(Builder::INT_EQ, $storedOk, $i1->constInt(1, false));
+        $cachedId = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ID));
+        $hasCachedId = $context->builder->icmp(
+            Builder::INT_NE,
+            $cachedId,
+            $cachedId->typeOf()->constNull()
+        );
+        $precheck = $context->builder->and($hasStore, $hasCachedId);
+
+        $cmpBlock = BasicBlockHelper::append($context, 'dom_us_fw_cmp');
+        $storeBlock = BasicBlockHelper::append($context, 'dom_us_fw_store');
+        $doneBlock = BasicBlockHelper::append($context, 'dom_us_fw_done');
+        $context->builder->branchIf($precheck, $cmpBlock, $storeBlock);
+
+        $context->builder->positionAtEnd($cmpBlock);
+        $cmp = JitStringCompare::strcmp($context, $idStr, $cachedId);
+        $i64 = $context->getTypeFromString('int64');
+        $idMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+        // Id already taken — keep the first registrant (xmlAddID).
+        $context->builder->branchIf($idMatch, $doneBlock, $storeBlock);
+
+        $context->builder->positionAtEnd($storeBlock);
+        self::store($context, $document, $idStr, $element);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
     /** Rekey cache after setAttribute('id', …) (#19870). */
     public static function rebindId(Context $context, string $newIdLit): void
     {

@@ -71,6 +71,7 @@ final class JitDomGetNodePath
         // does not borrow a prior child index (#32949).
         JitDomNodeChildProperty::$lastFetchedChildIndex = null;
         JitDomNodeChildProperty::$lastFetchedTagName = null;
+        JitDomNodeChildProperty::$lastFetchedAttributes = null;
         self::$lastParentPath = $path;
         self::$lastParentInner = $inner;
         self::$lastChildFetchWasFirstChild = false;
@@ -120,6 +121,22 @@ final class JitDomGetNodePath
             // Keep lastFetched* in sync when annotateCompileTimeChild early-returned
             // on the destination (empty) last loadXML — importNode ARG_SEND recovery.
             JitDomNodeChildProperty::$lastFetchedTagName = $siblings[$index]['data'];
+            // Same for attrs — ARG_SEND often drops compileTimeDomAttributes (#34050).
+            $open = $siblings[$index]['open'] ?? null;
+            if (null !== $open && '' !== $open) {
+                $attrs = [];
+                foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open) as $pair) {
+                    $attrs[$pair['qname']] = $pair['value'];
+                    $pos = strpos($pair['qname'], ':');
+                    if (false !== $pos) {
+                        $attrs[substr($pair['qname'], $pos + 1)] = $pair['value'];
+                    }
+                }
+                if ([] !== $attrs) {
+                    $result->compileTimeDomAttributes = $attrs;
+                    JitDomNodeChildProperty::$lastFetchedAttributes = $attrs;
+                }
+            }
         }
         $result->compileTimeDomChildIndex = $index;
         JitDomNodeChildProperty::$lastFetchedChildIndex = $index;
