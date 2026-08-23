@@ -13,6 +13,7 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmPregMatches;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Builtin\StringStrpos;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -3339,19 +3340,15 @@ final class VmMbstring
             throw new \ValueError('mb_ord(): Argument #1 ($string) must not be empty');
         }
         $encoding = MbstringEncodingRegistry::assertValid($encoding, 'mb_ord', 1);
-        if ('UTF-8' === $encoding) {
-            if (!VmString::isValidUtf8($string)) {
-                return false;
-            }
-            $charLen = VmString::utf8CharLength($string);
-            if (0 === $charLen) {
+        // php-src php_mb_ord: enc->to_wchar decodes the first character only — trailing junk
+        // after a valid lead still yields the codepoint (#34243 VM/AOT parity).
+        if ('UTF-8' === $encoding || 'ASCII' === $encoding || '8BIT' === $encoding) {
+            $cp = MbChrOrdJitHelper::ordArgv($string, $encoding);
+            if (StringStrpos::NOT_FOUND === $cp) {
                 return false;
             }
 
-            return self::utf8CharToCodepoint(VmString::utf8CharSubstr($string, 0, 1));
-        }
-        if ('ASCII' === $encoding || '8BIT' === $encoding) {
-            return \ord($string[0]);
+            return $cp;
         }
         $utf8 = CharsetEngine::convert($encoding, 'UTF-8', $string[0]);
         if (false === $utf8 || !VmString::isValidUtf8($utf8)) {
