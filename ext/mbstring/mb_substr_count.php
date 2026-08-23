@@ -14,6 +14,8 @@ use PHPLLVM\Value;
 /**
  * mb_substr_count() — multibyte non-overlapping substring count (php-src ext/mbstring/mbstring.c; #4637).
  *
+ * JIT/AOT: compile-time fold + NestedJIT runtime via {@see JitMbSubstrCount::invoke} (#4637 AOT leftover).
+ *
  * Excess argc → Zend `expects at most` ArgumentCountError (#30786).
  */
 final class mb_substr_count extends Internal
@@ -53,21 +55,7 @@ final class mb_substr_count extends Internal
         if (!$this->requireArgCountRangeJit($context, $args, 'mb_substr_count', 2, 3)) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
-        $argc = \count($args);
-        if (
-            2 === $argc
-            && JITVariable::TYPE_STRING === $args[0]->type
-            && JITVariable::TYPE_STRING === $args[1]->type
-            && null !== ($args[0]->compileTimeString ?? null)
-            && null !== ($args[1]->compileTimeString ?? null)
-            && '' !== $args[1]->compileTimeString
-        ) {
-            return $context->constantFromInteger(
-                VmString::substr_count($args[0]->compileTimeString, $args[1]->compileTimeString),
-                'int64'
-            );
-        }
 
-        throw new \LogicException('mb_substr_count() is not lowered for JIT/AOT in this compiler build');
+        return JitMbSubstrCount::invoke($context, $args);
     }
 }
