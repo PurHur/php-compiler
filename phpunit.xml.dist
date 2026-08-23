@@ -911,6 +911,8 @@
             <file>./test/compliance/DomResidualExcessArgc31251JITTest.php</file>
             <file>./test/compliance/DomChildNodeAfterAotSegfaultVMTest.php</file>
             <file>./test/compliance/DomChildNodeAfterAotSegfaultJITTest.php</file>
+            <file>./test/compliance/DomChildNodeAfterAppendTailSavexmlAotVMTest.php</file>
+            <file>./test/compliance/DomChildNodeAfterAppendTailSavexmlAotJITTest.php</file>
             <file>./test/compliance/DomRemoveAttributeNodeAotVMTest.php</file>
             <file>./test/compliance/DomRemoveAttributeNodeAotJITTest.php</file>
             <file>./test/compliance/XsltHasExsltSupportExcessArgc30993VMTest.php</file>

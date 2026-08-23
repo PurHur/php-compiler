@@ -96,6 +96,25 @@ final class JitDomChildNodeSiblingInsert
         JitDomParentChildLinkLayout::storeParentNode($context, $newChild, $parentJit);
 
         JitDomInsertBefore::bumpChildNodesLengthPublic($context, $parent, $anchor, $newChild);
+        // Append-tail (anchor.next was null) previously only bumped LiveSlots length.
+        // saveXML still reads PROP_USER_SCRIPT_INNER_XML — without a rebuild the new
+        // sibling is dropped from markup while childNodes->item() sees it (peer
+        // insertBefore LiveSlots #33450 / #32940). Middle after() already rebuilds
+        // via syncUserScriptInsertBeforeSlotsPublic.
+        // Document parents: skip Element INNER_XML rebuild (#33584 / #32611) — Element
+        // GEPs on Document layout SIGSEGV.
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, 'dom_cn_after_parent');
+        $bbSkipRebuild = BasicBlockHelper::append($context, 'dom_cn_after_skip_rebuild');
+        $bbRebuild = BasicBlockHelper::append($context, 'dom_cn_after_rebuild');
+        $bbDone = BasicBlockHelper::append($context, 'dom_cn_after_rebuild_done');
+        $context->builder->branchIf($isDoc, $bbSkipRebuild, $bbRebuild);
+        $context->builder->positionAtEnd($bbRebuild);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbSkipRebuild);
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbDone);
     }
 
     private static function nullValueVar(Context $context): JITVariable
