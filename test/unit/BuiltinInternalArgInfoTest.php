@@ -2814,6 +2814,7 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $predicates = [
             'is_numeric', 'is_string', 'is_int', 'is_integer', 'is_long', 'is_float', 'is_double',
             'is_bool', 'is_null', 'is_array', 'is_object', 'is_resource', 'is_scalar',
+            'is_iterable', 'is_countable',
         ];
         foreach ($predicates as $f) {
             $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
