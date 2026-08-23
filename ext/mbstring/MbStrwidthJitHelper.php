@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * NestedJIT helpers for mb_strwidth() / mb_strimwidth() / mb_str_pad() (#3495 / #34264 / #34269).
+ * NestedJIT helpers for mb_strwidth() / mb_strimwidth() / mb_str_pad() (#3495 / #34264 / #34269 / #34270).
  *
  * NestedJIT zeros int locals copied from params (width-minus-marker temporary) and
  * charLen-minus-from. Compare `$charIndex == $from` /
  * `$charIndex == ($from + ($width - $markerLen))` directly — peer MbSubstrJitHelper / #34256.
+ *
+ * NestedJIT must not call VmMbstring::strPad / strlen when length is a runtime int —
+ * strlen silent-returns 0 and VmMbstring SIGSEGVs under thin AOT (#34270). Pad peel uses
+ * isset-index length + utf8 substr (peer MbSearchJitHelper / #34264).
  *
  * NestedJIT display width = 1 per UTF-8 character. Compile-time fold uses VmMbstring (full EAW).
  * Subject length via isset-index (strlen silent-0 under NestedJIT, #34264).
@@ -211,21 +215,142 @@ final class MbStrwidthJitHelper
         int $padType,
         string $encoding
     ): string {
-        unset($padType, $encoding);
-        $inputLen = 0;
-        while (isset($input[$inputLen])) {
-            $inputLen = $inputLen + 1;
-            if ($inputLen > 1048576) {
-                break;
-            }
-        }
-        if ($padLength <= $inputLen) {
+        // NestedJIT-safe peel — VmMbstring::strPad / strlen misbehave under thin AOT (#34270).
+        // Character-oriented for UTF-8/ASCII/8BIT (same as strimwidth peel).
+        unset($encoding);
+        $inputLength = self::utf8CharLength($input);
+        if ($padLength < 0 || $padLength <= $inputLength) {
             return $input;
         }
         if ('' === $padString) {
             return $input;
         }
+        $padUnitLength = self::utf8CharLength($padString);
+        if (0 === $padUnitLength) {
+            return $input;
+        }
+        if ($padType < 0 || $padType > 2) {
+            return $input;
+        }
+        $numPadUnits = $padLength - $inputLength;
+        if (1 === $padType) {
+            $leftPad = 0;
+            $rightPad = $numPadUnits;
+        } elseif (0 === $padType) {
+            $leftPad = $numPadUnits;
+            $rightPad = 0;
+        } else {
+            $leftPad = \intdiv($numPadUnits, 2);
+            $rightPad = $numPadUnits - $leftPad;
+        }
 
-        return $input.$padString;
+        return self::repeatUtf8Pad($padString, $padUnitLength, $leftPad)
+            .$input
+            .self::repeatUtf8Pad($padString, $padUnitLength, $rightPad);
+    }
+
+    private static function repeatUtf8Pad(string $padString, int $padCharLength, int $charLength): string
+    {
+        if ($charLength <= 0) {
+            return '';
+        }
+        $fullCopies = \intdiv($charLength, $padCharLength);
+        $remainder = $charLength % $padCharLength;
+        $result = '';
+        $i = 0;
+        while ($i < $fullCopies) {
+            $result .= $padString;
+            ++$i;
+        }
+        if ($remainder > 0) {
+            $result .= self::utf8Substr($padString, 0, $remainder);
+        }
+
+        return $result;
+    }
+
+    /** NestedJIT-safe length: strlen silent-0 here (#34264). */
+    private static function byteLength(string $string): int
+    {
+        $n = 0;
+        while (isset($string[$n])) {
+            ++$n;
+            if ($n > 1048576) {
+                break;
+            }
+        }
+
+        return $n;
+    }
+
+    private static function utf8CharLength(string $string): int
+    {
+        $n = 0;
+        $i = 0;
+        $len = self::byteLength($string);
+        while ($i < $len) {
+            $b = \ord($string[$i]);
+            if ($b < 0x80) {
+                $step = 1;
+            } elseif ($b < 0xE0) {
+                $step = 2;
+            } elseif ($b < 0xF0) {
+                $step = 3;
+            } else {
+                $step = 4;
+            }
+            $i += $step;
+            ++$n;
+            if ($n > $len) {
+                break;
+            }
+        }
+
+        return $n;
+    }
+
+    private static function utf8Substr(string $string, int $charFrom, int $charCount): string
+    {
+        if ($charCount <= 0) {
+            return '';
+        }
+        $i = 0;
+        $len = self::byteLength($string);
+        $seen = 0;
+        while ($i < $len && $seen < $charFrom) {
+            $b = \ord($string[$i]);
+            if ($b < 0x80) {
+                $step = 1;
+            } elseif ($b < 0xE0) {
+                $step = 2;
+            } elseif ($b < 0xF0) {
+                $step = 3;
+            } else {
+                $step = 4;
+            }
+            $i += $step;
+            ++$seen;
+        }
+        if ($i >= $len) {
+            return '';
+        }
+        $start = $i;
+        $taken = 0;
+        while ($i < $len && $taken < $charCount) {
+            $b = \ord($string[$i]);
+            if ($b < 0x80) {
+                $step = 1;
+            } elseif ($b < 0xE0) {
+                $step = 2;
+            } elseif ($b < 0xF0) {
+                $step = 3;
+            } else {
+                $step = 4;
+            }
+            $i += $step;
+            ++$taken;
+        }
+
+        return \substr($string, $start, $i - $start);
     }
 }
