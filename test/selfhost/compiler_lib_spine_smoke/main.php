@@ -5708,6 +5708,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionPropertyIsVirtualRunti
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionPropertyRawValueRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassIsInstantiableRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassIsIterateableRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetParentClassRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassKindNameTableRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionEnumJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionNamedArgumentsLookupRuntime.php';
@@ -6346,6 +6347,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassIsCloneable.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassIsFinal.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassIsInstantiable.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassIsIterateable.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetParentClass.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassKindQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewLazyGhost.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewLazyProxy.php';

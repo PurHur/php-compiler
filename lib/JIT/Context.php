@@ -1760,6 +1760,8 @@ class Context {
         // Thin AOT: isIterable looked up unlinked NestedJIT ABI → compile abort (#34062).
         $this->functionProxies['reflectionclass::isiterateable'] = new Call\ReflectionClassIsIterateable();
         $this->functionProxies['reflectionclass::isiterable'] = new Call\ReflectionClassIsIterateable();
+        // Thin AOT: getParentClass without proxy → SIGSEGV on result use (#34069).
+        $this->functionProxies['reflectionclass::getparentclass'] = new Call\ReflectionClassGetParentClass();
         if (CompilerVersion::supportsLazyObjectFactories()) {
             $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
             $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
