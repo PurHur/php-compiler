@@ -245,6 +245,10 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\statpathjithelper::isfile' => true,
         'phpcompiler\\ext\\standard\\statpathjithelper::isdir' => true,
         'phpcompiler\\ext\\standard\\statpathjithelper::islink' => true,
+        // #34278 — prelinked MbStrSplitJitHelper unit.o returns HashTable and SIGSEGVs under
+        // thin AOT (NestedJIT cannot construct HashTable — peer explode #27660). Force NestedJIT
+        // of the string-joined peel into the user module; JitMbStrSplit rebuilds HT via JitExplode.
+        'phpcompiler\\ext\\mbstring\\mbstrsplitjithelper::strsplitargv' => true,
     ];
 
     private static bool $loggedHit = false;

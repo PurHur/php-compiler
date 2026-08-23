@@ -9,10 +9,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link hook for mb_str_split() — compiles MbStrSplitJitHelper into the module (#26870).
+ * JIT/AOT link hook for mb_str_split() — compiles MbStrSplitJitHelper into the module (#26870 / #34278).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MbStrcut #26598).
- * Direct helper call from {@see \PHPCompiler\ext\mbstring\JitMbStrSplit} (no thin ABI bridge).
+ * Helper returns a joined string (thin AOT cannot NestedJIT HashTable — peer explode #27660);
+ * {@see \PHPCompiler\ext\mbstring\JitMbStrSplit} rebuilds the HT via JitExplode.
+ * Forced user-script NestedJIT via HelperRuntimeCache USER_SCRIPT_INLINE_ONLY (#34278).
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_str_split)
  */
 final class MbStrSplitRuntime

@@ -4,21 +4,24 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
-use PHPCompiler\ext\standard\JitIntdiv;
+use PHPCompiler\ext\standard\JitExplode;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbStrSplitRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for mb_str_split() via MbStrSplitJitHelper NestedJIT (#26870).
+ * LLVM lowering for mb_str_split() (#26870 / #34278).
  *
  * Compile-time fold: {@see VmMbstring::strSplit} → packed HT.
- * Runtime: direct helper call (peer {@see JitMbStrcut} / #4573).
+ * Runtime: NestedJIT string peel (no HashTable under thin AOT — peer explode #27660)
+ * then {@see JitExplode} in the user module.
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_str_split)
  */
 final class JitMbStrSplit
@@ -74,15 +77,10 @@ final class JitMbStrSplit
         $i64 = $context->getTypeFromString('int64');
         $length = $i64->constInt(1, false);
         if ($argc >= 2) {
-            $length = JitIntdiv::lowerIntBuiltinArgForCaller(
-                $context,
-                $args[1],
-                'mb_str_split',
-                2,
-                'length'
-            );
+            $length = JitStrictIntArg::lower($context, $args[1], 'mb_str_split', 2, 'length');
         }
 
+        // NestedJIT helper compile can clear insert; restore before arg coerce/call (#34270).
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbStrSplitRuntime::ensureLinked($context);
         if (null !== $savedInsert) {
@@ -90,13 +88,52 @@ final class JitMbStrSplit
         }
 
         $encPtr = $context->builder->load($context->constantStringFromString($encoding));
-        $htRaw = JitNestedHelperCoerce::callHelper(
+        $raw = JitNestedHelperCoerce::callHelper(
             $context,
             MbStrSplitRuntime::helperFunction($context),
             [$str, $length, $encPtr]
         );
+        $joined = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
-        return JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+        return self::hashtableFromJoined($context, $joined);
+    }
+
+    /** Empty joined → []; otherwise explode on {@see MbStrSplitJitHelper::JOIN_DELIM}. */
+    private static function hashtableFromJoined(Context $context, Value $joined): Value
+    {
+        $tag = 'mbss';
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $slen = $context->builder->call($context->lookupFunction('__string__strlen'), $joined);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $slen, $zero);
+
+        $emptyBlock = BasicBlockHelper::append($context, 'mb_str_split_empty_'.$tag);
+        $explodeBlock = BasicBlockHelper::append($context, 'mb_str_split_explode_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'mb_str_split_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $explodeBlock);
+
+        $htTy = $context->getTypeFromString('__hashtable__*');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $htTy);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->store(HashTableHelper::alloc($context), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($explodeBlock);
+        $delim = $context->builder->load(
+            $context->constantStringFromString(MbStrSplitJitHelper::JOIN_DELIM)
+        );
+        $ownedJoined = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $joined
+        );
+        $ht = JitExplode::explode($context, $delim, $ownedJoined);
+        $context->builder->store($ht, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
     }
 
     private static function foldLiteral(
