@@ -18,7 +18,7 @@ use PHPLLVM\Value;
  * openssl_csr_sign() — sign CSR into X.509 certificate (php-src ext/openssl/openssl.c; #6421 VM, JIT/AOT #33517).
  *
  * JIT/AOT leftover #33517: catchable argc/TypeError paths (peer openssl_csr_get_public_key #33514).
- * Happy-path CSR/key → certificate still needs object AOT (#6421 follow-up).
+ * JIT/AOT: argc/TypeError (#33517); happy-path CSR PEM + key → OpenSSLCertificate (#34060).
  */
 final class openssl_csr_sign extends Internal
 {
@@ -50,7 +50,7 @@ final class openssl_csr_sign extends Internal
                     Variable::TYPE_STRING => 'string',
                     Variable::TYPE_ARRAY => 'array',
                     Variable::TYPE_OBJECT => 'object',
-                    default => 'mixed',
+                    default => null,
                 }
             ));
         }
@@ -98,6 +98,7 @@ final class openssl_csr_sign extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        file_put_contents("/tmp/call_probe.txt", "enter\n", FILE_APPEND);
         $argc = \count($args);
         if ($argc < 4 || $argc > 6) {
             ExceptionBridge::emitArgumentCountErrorAndAbort(
@@ -121,10 +122,18 @@ final class openssl_csr_sign extends Internal
             return self::jitReturnFalse($context);
         }
 
-        // CSR/key/cert objects stay VM-shaped (#6421). Clear LogicException on TypeError/argc
-        // gates first (#33517); happy-path bake is a follow-up.
-        throw new \LogicException(
-            'openssl_csr_sign() is not implemented for JIT in this compiler build (issue #6421/#33517)'
+        // Happy-path CSR PEM + key PEM + days → OpenSSLCertificate (#34060 leftover of #33517).
+        $options = $argc >= 5 ? $args[4] : null;
+        $serial = $argc >= 6 ? $args[5] : null;
+
+        return JitOpensslCsrSign::invoke(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3],
+            $options,
+            $serial
         );
     }
 
@@ -146,7 +155,8 @@ final class openssl_csr_sign extends Internal
             JITVariable::TYPE_HASHTABLE => 'array',
             JITVariable::TYPE_STRING => null,
             JITVariable::TYPE_OBJECT => self::objectTypeErrorLabel($arg),
-            default => 'mixed',
+            // Value-box / unknown may still be CSR PEM string at runtime (#34060 peer #34054).
+            default => null,
         };
     }
 
