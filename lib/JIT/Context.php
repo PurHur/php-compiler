@@ -1669,12 +1669,22 @@ class Context {
         ] as $dllLc => $dllClass) {
             $this->type->object->lookup($dllClass);
             // isEmpty: without proxy, thin AOT silent-nulls (#579) — always falsy (#33973).
-            $dllMethods = ['__construct', 'push', 'pop', 'shift', 'unshift', 'top', 'bottom', 'count', 'isempty'];
+            // offset* / setIteratorMode / getIteratorMode: same silent-null without proxy (#33987).
+            $dllMethods = [
+                '__construct', 'push', 'pop', 'shift', 'unshift', 'top', 'bottom', 'count', 'isempty',
+                'offsetGet', 'offsetExists', 'offsetSet', 'offsetUnset',
+                'setIteratorMode', 'getIteratorMode',
+            ];
             if ('splqueue' === $dllLc) {
                 $dllMethods = array_merge($dllMethods, ['enqueue', 'dequeue']);
             }
             foreach ($dllMethods as $dllMethod) {
-                $this->functionProxies[$dllLc.'::'.$dllMethod] = new Call\SplDllistMethod($dllMethod, $dllClass);
+                // Lookup keys are lowercase (peer splfixedarray::strtolower); mixed-case
+                // offsetGet/setIteratorMode keys missed the table → silent null (#33987).
+                $this->functionProxies[$dllLc.'::'.strtolower($dllMethod)] = new Call\SplDllistMethod(
+                    $dllMethod,
+                    $dllClass
+                );
             }
         }
         // SplFixedArray — `__spl_ht` + fromArray / count / setSize / toArray / ArrayAccess / foreach
