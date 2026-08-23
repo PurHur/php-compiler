@@ -1757,6 +1757,10 @@ class Context {
         $this->functionProxies['reflectionclass::isabstract'] = new Call\ReflectionClassKindQuery('isAbstract');
         $this->functionProxies['reflectionclass::istrait'] = new Call\ReflectionClassKindQuery('isTrait');
         $this->functionProxies['reflectionclass::isenum'] = new Call\ReflectionClassKindQuery('isEnum');
+        // Thin AOT: unbound isInternal/isUserDefined/isReadOnly → NULL (#34067); peer #34032 tables.
+        $this->functionProxies['reflectionclass::isinternal'] = new Call\ReflectionClassKindQuery('isInternal');
+        $this->functionProxies['reflectionclass::isuserdefined'] = new Call\ReflectionClassKindQuery('isUserDefined');
+        $this->functionProxies['reflectionclass::isreadonly'] = new Call\ReflectionClassKindQuery('isReadOnly');
         // Thin AOT: isIterable looked up unlinked NestedJIT ABI → compile abort (#34062).
         $this->functionProxies['reflectionclass::isiterateable'] = new Call\ReflectionClassIsIterateable();
         $this->functionProxies['reflectionclass::isiterable'] = new Call\ReflectionClassIsIterateable();
