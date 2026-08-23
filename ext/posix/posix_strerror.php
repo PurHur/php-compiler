@@ -29,11 +29,12 @@ final class posix_strerror extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        // php-src ext/posix/posix.stub.php — int $error_code (#27905)
         $errno = VmMath::parseIntBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'posix_strerror',
             1,
-            'errno'
+            'error_code'
         );
         if ($errno < 0) {
             if (null !== $frame->vmContext) {

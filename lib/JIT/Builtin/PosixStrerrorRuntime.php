@@ -35,7 +35,7 @@ final class PosixStrerrorRuntime
     public static function strerror(Context $context, JITVariable $errnoArg): Value
     {
         self::ensureLinked($context);
-        $errno = JitLongArg::lower($context, $errnoArg, 'posix_strerror() errno');
+        $errno = JitLongArg::lower($context, $errnoArg, 'posix_strerror(): Argument #1 ($error_code)');
         $i32 = $context->getTypeFromString('int32');
         $zeroI32 = $i32->constInt(0, false);
         $errnoI32 = $errno->typeOf() === $i32
