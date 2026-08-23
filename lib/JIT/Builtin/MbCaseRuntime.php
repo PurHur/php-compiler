@@ -9,7 +9,7 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link hook for mb_strtoupper/tolower/ucfirst/lcfirst — MbCaseJitHelper (#3495 / #34259).
+ * JIT/AOT link hook for mb_strtoupper/tolower/ucfirst/lcfirst — MbCaseJitHelper (#3495 / #34259 / #34280).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strtoupper|mb_strtolower|mb_ucfirst|mb_lcfirst)
  */

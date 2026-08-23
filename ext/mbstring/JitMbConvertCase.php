@@ -7,12 +7,17 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\ext\standard\lcfirst;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helpers for mb_convert_case() (issue #7014).
+ * LLVM JIT/AOT helpers for mb_convert_case() (issue #7014, NestedJIT Unicode #34280).
+ *
+ * UPPER/LOWER/FOLD runtime delegates to {@see JitMbCase} — ASCII-only transformAllAscii
+ * left ü uncased (#34280). TITLE keeps the historic ASCII peel (same as pre-#34280 AOT).
+ * Compile-time folds use {@see VmMbstring::convertCase}.
  */
 final class JitMbConvertCase
 {
@@ -36,7 +41,10 @@ final class JitMbConvertCase
         VmMbstring::validateMode($mode, 'mb_convert_case', 1);
         $result = VmMbstring::convertCase($args[0]->compileTimeString, $mode, $encoding);
 
-        return $context->builder->load($context->constantStringFromString($result));
+        return self::materializeOwnedString(
+            $context,
+            $context->builder->load($context->constantStringFromString($result))
+        );
     }
 
     /**
@@ -52,52 +60,60 @@ final class JitMbConvertCase
         }
         VmMbstring::validateMode($mode, 'mb_convert_case', 1);
 
-        $encoding = self::compileTimeEncoding($args, 2);
-        if (null === $encoding || ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding)) {
-            throw new \LogicException(
-                'mb_convert_case() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
-            );
-        }
-
-        // Z_PARAM_STR $string — non-strict null is E_DEPRECATED + '' on 8.4 (#21313).
-        $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_convert_case', 0, 'string');
-        $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        $caseArgs = self::caseArgsForJitMbCase($args);
 
         return match ($mode) {
             MbstringConstants::MB_CASE_UPPER,
-            MbstringConstants::MB_CASE_UPPER_SIMPLE => self::lowerToUpper($context, $copy),
+            MbstringConstants::MB_CASE_UPPER_SIMPLE => JitMbCase::invokeStrtoupper($context, $caseArgs),
             MbstringConstants::MB_CASE_LOWER,
             MbstringConstants::MB_CASE_LOWER_SIMPLE,
             MbstringConstants::MB_CASE_FOLD,
-            MbstringConstants::MB_CASE_FOLD_SIMPLE => self::upperToLower($context, $copy),
+            MbstringConstants::MB_CASE_FOLD_SIMPLE => JitMbCase::invokeStrtolower($context, $caseArgs),
             MbstringConstants::MB_CASE_TITLE,
-            MbstringConstants::MB_CASE_TITLE_SIMPLE => self::asciiTitle($context, $copy),
+            MbstringConstants::MB_CASE_TITLE_SIMPLE => self::asciiTitleRuntime($context, $args[0]),
             default => throw new \ValueError(
                 'mb_convert_case(): Argument #2 ($mode) must be one of the MB_CASE_* constants'
             ),
         };
     }
 
-    private static function lowerToUpper(Context $context, Value $copy): Value
+    /**
+     * Rebuild (string[, encoding]) args for {@see JitMbCase} — drop mode at index 1.
+     *
+     * @param JITVariable[] $args
+     *
+     * @return list<JITVariable>
+     */
+    private static function caseArgsForJitMbCase(array $args): array
     {
-        lcfirst::transformAllAscii($context, $copy, ord('a'), ord('z'), -32);
+        if (isset($args[2])) {
+            return [$args[0], $args[2]];
+        }
 
-        return $copy;
+        return [$args[0]];
     }
 
-    private static function upperToLower(Context $context, Value $copy): Value
+    /**
+     * Pre-#34280 TITLE peel (ASCII only). Full Unicode titlecase remains on the fold/VM path.
+     */
+    private static function asciiTitleRuntime(Context $context, JITVariable $stringArg): Value
     {
-        lcfirst::transformAllAscii($context, $copy, ord('A'), ord('Z'), 32);
-
-        return $copy;
-    }
-
-    private static function asciiTitle(Context $context, Value $copy): Value
-    {
+        $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $stringArg, 'mb_convert_case', 0, 'string');
+        $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         lcfirst::transformAllAscii($context, $copy, ord('A'), ord('Z'), 32);
         lcfirst::transformFirstAscii($context, $copy, ord('a'), ord('z'), -32);
 
-        return $copy;
+        return self::materializeOwnedString($context, $copy);
+    }
+
+    private static function materializeOwnedString(Context $context, Value $resultStr): Value
+    {
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $resultStr);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
+
+        return $ptr;
     }
 
     private static function compileTimeMode(Context $context, JITVariable $arg): ?int

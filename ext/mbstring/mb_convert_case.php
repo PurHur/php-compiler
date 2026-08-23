@@ -52,7 +52,18 @@ final class mb_convert_case extends Internal
     {
         // Catchable ArgumentCountError under AOT try/catch (#30786).
         if (!$this->requireArgCountRangeJit($context, $args, 'mb_convert_case', 2, 3)) {
-            return $context->builder->load($context->constantStringFromString(''));
+            $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $context->builder->load($context->constantStringFromString(''))
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                $owned
+            );
+
+            return \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
         }
 
         $folded = JitMbConvertCase::tryCompileTimeFold($context, $args);

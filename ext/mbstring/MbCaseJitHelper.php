@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\mbstring;
 
 /**
  * mb_strtoupper() / mb_strtolower() / mb_ucfirst() / mb_lcfirst() NestedJIT runtime
- * (peer MbStrwidthJitHelper #3495; ucfirst/lcfirst #34259).
+ * (peer MbStrwidthJitHelper #3495; ucfirst/lcfirst #34259; convert_case #34280 via these helpers).
  *
  * SSOT: {@see VmMbstring::strtoupper()} / {@see VmMbstring::strtolower()} /
  * {@see VmMbstring::ucfirst()} / {@see VmMbstring::lcfirst()}
