@@ -90,6 +90,18 @@ final class BuiltinInternalArgInfo
             return 'true';
         }
 
+        // ext/standard/http.stub.php — PHP 8.4+ only (#26212)
+        if (CompilerVersion::supportsHttpLastResponseHeaders()) {
+            $httpHdrReturn = match ($callableLc) {
+                'http_get_last_response_headers' => '?array',
+                'http_clear_last_response_headers' => 'void',
+                default => null,
+            };
+            if (null !== $httpHdrReturn) {
+                return $httpHdrReturn;
+            }
+        }
+
         return match ($callableLc) {
             // ext/date/php_date.stub.php — absent from php-types InternalArgInfo (#25392)
             'date_create' => 'DateTime|false',
