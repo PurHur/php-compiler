@@ -15,7 +15,7 @@ use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** ReflectionProperty::isFinal() — JIT/AOT (#23845, #27315, ext/reflection/php_reflection.c). */
+/** ReflectionProperty::isFinal() — JIT/AOT (#34047, #23845, #27315, ext/reflection/php_reflection.c). */
 final class ReflectionPropertyIsFinal implements Call
 {
     public function call(Context $context, Variable ...$args): Value

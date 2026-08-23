@@ -1767,6 +1767,7 @@ class Context {
         $this->functionProxies['reflectionparameter::__construct'] = new Call\ReflectionParameterConstruct();
         $this->functionProxies['reflectionparameter::getname'] = new Call\ReflectionParameterGetName();
         $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
+        // Thin AOT: isFinal used broken strcasecmp → true for every prop when table non-empty (#34047).
         $this->functionProxies['reflectionproperty::isfinal'] = new Call\ReflectionPropertyIsFinal();
         $this->functionProxies['reflectionproperty::isvirtual'] = new Call\ReflectionPropertyIsVirtual();
         $this->functionProxies['reflectionproperty::getrawvalue'] = new Call\ReflectionPropertyGetRawValue();
