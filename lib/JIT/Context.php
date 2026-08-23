@@ -1887,6 +1887,8 @@ class Context {
         $this->functionProxies['reflectionextension::getclassnames'] = new Call\ReflectionExtensionGetClassNames();
         // Thin AOT: unbound getClasses → NULL (#34169); VM #18326 / peer getClassNames #34150.
         $this->functionProxies['reflectionextension::getclasses'] = new Call\ReflectionExtensionGetClasses();
+        // Thin AOT: unbound getFunctions → NULL (#34177); VM #18326 / peer getClasses #34169.
+        $this->functionProxies['reflectionextension::getfunctions'] = new Call\ReflectionExtensionGetFunctions();
         // Thin AOT: unbound isPersistent/isTemporary → NULL (#34154); VM #22247.
         $this->functionProxies['reflectionextension::ispersistent'] = new Call\ReflectionExtensionIsPersistent();
         $this->functionProxies['reflectionextension::istemporary'] = new Call\ReflectionExtensionIsTemporary();
