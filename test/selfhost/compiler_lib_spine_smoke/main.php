@@ -6343,6 +6343,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassCreateLazyGhost.php'
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassCreateLazyProxy.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetAttributes.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetMethod.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetMethods.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetNamespaceName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetProperty.php';

@@ -1742,6 +1742,8 @@ class Context {
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
 
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
+        // Thin AOT: unbound getMethods → NULL (#34107); VM ReflectionClassGetMethods (#3815).
+        $this->functionProxies['reflectionclass::getmethods'] = new Call\ReflectionClassGetMethods();
         // Thin AOT: unbound getConstructor → unseeded ReflectionMethod → SIGSEGV (#34073).
         $this->functionProxies['reflectionclass::getconstructor'] = new Call\ReflectionClassGetConstructor();
         $this->functionProxies['reflectionclass::getproperty'] = new Call\ReflectionClassGetProperty();

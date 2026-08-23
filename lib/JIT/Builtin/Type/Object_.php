@@ -5380,6 +5380,22 @@ class Object_ extends Type {
         return array_keys($this->methodVisibility[$classId] ?? []);
     }
 
+    /** Display name from defineMethodVisibility, or null when only an inherited visibility copy. */
+    public function methodDisplayName(int $classId, string $methodLc): ?string
+    {
+        return $this->methodDisplayNames[$classId][strtolower($methodLc)] ?? null;
+    }
+
+    /**
+     * Interface + parent-interface lc chain (own first) for Reflection getMethods (#34107).
+     *
+     * @return list<string>
+     */
+    public function interfaceHierarchyLc(string $ifaceLc): array
+    {
+        return $this->expandInterfaceLc(strtolower(ltrim($ifaceLc, '\\')));
+    }
+
     /**
      * Walk parent chain and copy parent method visibility slots missing on $childId (#101).
      */
