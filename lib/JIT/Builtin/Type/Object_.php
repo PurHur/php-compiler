@@ -3564,7 +3564,17 @@ class Object_ extends Type {
             $this->defineProperty($id, 'args', Variable::TYPE_HASHTABLE);
         }
         if ('reflectionclass' === $lcname) {
-            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #34001).
+            $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
+            // Thin user-script AOT must call __construct (not allocate-only) (#34001).
+            $this->markHasConstructor($id);
+        }
+        if ('reflectionobject' === $lcname) {
+            $this->setClassParentName('ReflectionObject', 'ReflectionClass');
+            // Zend public `$name` (inherited surface) + wrapped instance (#20098 / #34001).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_OBJECT_TARGET, Variable::TYPE_VALUE);
+            $this->markHasConstructor($id);
         }
         if ('reflectionmethod' === $lcname) {
             $this->setClassParentName('ReflectionMethod', 'ReflectionFunctionAbstract');
