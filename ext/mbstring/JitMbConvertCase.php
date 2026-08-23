@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
-use PHPCompiler\ext\standard\lcfirst;
+use PHPCompiler\JIT\Builtin\MbConvertCaseRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -13,10 +13,11 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helpers for mb_convert_case() (issue #7014, NestedJIT Unicode #34280).
+ * LLVM JIT/AOT helpers for mb_convert_case() (issue #7014, NestedJIT Unicode #34280 / #34284).
  *
- * UPPER/LOWER/FOLD runtime delegates to {@see JitMbCase} — ASCII-only transformAllAscii
- * left ü uncased (#34280). TITLE keeps the historic ASCII peel (same as pre-#34280 AOT).
+ * UPPER/LOWER/FOLD runtime delegates to {@see JitMbCase}. TITLE/TITLE_SIMPLE use a
+ * separate NestedJIT TU ({@see MbConvertCaseJitHelper}) so mb_case helper-runtime
+ * cache hits do not skip title lowering (#34284).
  * Compile-time folds use {@see VmMbstring::convertCase}.
  */
 final class JitMbConvertCase
@@ -69,8 +70,8 @@ final class JitMbConvertCase
             MbstringConstants::MB_CASE_LOWER_SIMPLE,
             MbstringConstants::MB_CASE_FOLD,
             MbstringConstants::MB_CASE_FOLD_SIMPLE => JitMbCase::invokeStrtolower($context, $caseArgs),
-            MbstringConstants::MB_CASE_TITLE,
-            MbstringConstants::MB_CASE_TITLE_SIMPLE => self::asciiTitleRuntime($context, $args[0]),
+            MbstringConstants::MB_CASE_TITLE => self::invokeTitle($context, $caseArgs, false),
+            MbstringConstants::MB_CASE_TITLE_SIMPLE => self::invokeTitle($context, $caseArgs, true),
             default => throw new \ValueError(
                 'mb_convert_case(): Argument #2 ($mode) must be one of the MB_CASE_* constants'
             ),
@@ -94,16 +95,93 @@ final class JitMbConvertCase
     }
 
     /**
-     * Pre-#34280 TITLE peel (ASCII only). Full Unicode titlecase remains on the fold/VM path.
+     * Runtime TITLE / TITLE_SIMPLE via NestedJIT {@see MbConvertCaseJitHelper} (#34284).
+     *
+     * @param list<JITVariable> $args string[, encoding] (mode already resolved)
      */
-    private static function asciiTitleRuntime(Context $context, JITVariable $stringArg): Value
+    private static function invokeTitle(Context $context, array $args, bool $simple): Value
     {
-        $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $stringArg, 'mb_convert_case', 0, 'string');
-        $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
-        lcfirst::transformAllAscii($context, $copy, ord('A'), ord('Z'), 32);
-        lcfirst::transformFirstAscii($context, $copy, ord('a'), ord('z'), -32);
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('mb_convert_case() TITLE requires one or two string args after mode');
+        }
 
-        return self::materializeOwnedString($context, $copy);
+        $strLit = $args[0]->compileTimeString ?? null;
+        $encLit = self::compileTimeEncodingForTitle($args, $argc);
+        if (null !== $strLit && null !== $encLit) {
+            $folded = VmMbstring::convertCase(
+                $strLit,
+                $simple ? MbstringConstants::MB_CASE_TITLE_SIMPLE : MbstringConstants::MB_CASE_TITLE,
+                $encLit
+            );
+
+            return self::materializeOwnedString(
+                $context,
+                $context->builder->load($context->constantStringFromString($folded))
+            );
+        }
+
+        $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_convert_case', 0, 'string');
+        $encoding = self::runtimeEncodingLiteralForTitle($args, $argc, $context);
+        self::assertSupportedEncoding($encoding);
+
+        MbConvertCaseRuntime::ensureLinked($context);
+        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $helper = $simple
+            ? MbConvertCaseRuntime::titleSimpleHelper($context)
+            : MbConvertCaseRuntime::titleHelper($context);
+        $resultStr = $context->builder->call($helper, $str, $encPtr);
+
+        return self::materializeOwnedString($context, $resultStr);
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function compileTimeEncodingForTitle(array $args, int $argc): ?string
+    {
+        if ($argc < 2) {
+            return MbstringState::internalEncoding();
+        }
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            return MbstringState::internalEncoding();
+        }
+        if (JITVariable::TYPE_STRING !== $args[1]->type) {
+            return null;
+        }
+
+        return $args[1]->compileTimeString ?? null;
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function runtimeEncodingLiteralForTitle(array $args, int $argc, Context $context): string
+    {
+        if ($argc < 2) {
+            return MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
+        }
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            return MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
+        }
+        if (JITVariable::TYPE_STRING !== $args[1]->type) {
+            throw new \LogicException('mb_convert_case() JIT encoding must be a string literal in this compiler build');
+        }
+        $encoding = $args[1]->compileTimeString ?? null;
+        if (null === $encoding) {
+            throw new \LogicException('mb_convert_case() JIT encoding must be a string literal in this compiler build');
+        }
+
+        return $encoding;
+    }
+
+    private static function assertSupportedEncoding(string $encoding): void
+    {
+        if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
+            throw new \LogicException(
+                'mb_convert_case() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
+            );
+        }
     }
 
     private static function materializeOwnedString(Context $context, Value $resultStr): Value
