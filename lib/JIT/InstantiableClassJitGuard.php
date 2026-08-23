@@ -72,6 +72,10 @@ final class InstantiableClassJitGuard
         if ($objectType->isTraitClass($lc)) {
             return 'Cannot instantiate trait '.$className;
         }
+        // ReflectionClass::newInstanceWithoutConstructor / allocateForRuntimeClassId (#34078).
+        if ($objectType->isAbstractClassLc($lc)) {
+            return 'Cannot instantiate abstract class '.$className;
+        }
 
         return null;
     }

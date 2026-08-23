@@ -30,13 +30,13 @@ use PHPCompiler\JIT\EnumFromHelper;
 use PHPCompiler\JIT\FiberHelper;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
-use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\CloneWithReinitRuntime;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\JitStringCompare;
@@ -636,17 +636,13 @@ class Object_ extends Type {
      * `new static()` / runtime class operand — dispatch allocate by class_id (#4792).
      */
     /**
-     * Link `__compiler_strncasecmp` after LibcExtern always-on drop (#31682).
+     * Resolve declared class id from runtime class name cstring (#4940, #34078).
      *
-     * User-script strncasecmp() stays on CaseCompareJitHelper / VmString (#15225);
-     * classIdFromRuntimeName must not look up libc strncasecmp(3).
+     * Thin AOT: {@see StringCaseCompare} strncasecmp always "matched", so the
+     * first registered class won (e.g. ErrorLastJitHelper). ASCII-fold the
+     * needle and length-checked {@see memcmp} against each compile-unit name
+     * (peer {@see ReflectionClassGetParentClassRuntime}).
      */
-    private static function ensureStrNcasecmp(Context $context): void
-    {
-        StringCaseCompare::ensureStrncasecmpLinked($context);
-    }
-
-    /** Resolve declared class id from runtime class name cstring (#4940). */
     public function classIdFromRuntimeName(PHPLLVM\Value $namePtr, PHPLLVM\Value $nameLen): PHPLLVM\Value
     {
         $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
@@ -661,27 +657,92 @@ class Object_ extends Type {
             $this->context->constantFromInteger(-1, 'int64'),
             $resultSlot
         );
+
+        LibcExtern::ensureMemcmpDecl($this->context);
+
         $i8p = $this->context->getTypeFromString('int8*');
-        $check = $entry;
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $i32 = $this->context->getTypeFromString('int32');
+        $i64 = $this->context->getTypeFromString('int64');
+        $i8 = $this->context->getTypeFromString('int8');
+
+        $maxLen = 512;
+        $this->context->builder->positionAtEnd($entry);
+        $buf = $this->context->builder->alloca($i8->arrayType($maxLen));
+        $bufPtr = $this->context->builder->pointerCast($buf, $i8p);
+        $tooLong = $this->context->builder->icmp(
+            PHPLLVM\Builder::INT_UGT,
+            $nameLen,
+            $sizeT->constInt($maxLen, false)
+        );
+        $fold = $fn->appendBasicBlock('class_name_id_fold');
+        $this->context->builder->branchIf($tooLong, $fail, $fold);
+
+        $this->context->builder->positionAtEnd($fold);
+        $idxAlloca = $this->context->builder->alloca($sizeT);
+        $this->context->builder->store($sizeT->constInt(0, false), $idxAlloca);
+        $loop = $fn->appendBasicBlock('class_name_id_fold_loop');
+        $afterFold = $fn->appendBasicBlock('class_name_id_after_fold');
+        $this->context->builder->branch($loop);
+
+        $this->context->builder->positionAtEnd($loop);
+        $idx = $this->context->builder->load($idxAlloca);
+        $foldDone = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $idx, $nameLen);
+        $body = $fn->appendBasicBlock('class_name_id_fold_body');
+        $this->context->builder->branchIf($foldDone, $afterFold, $body);
+
+        $this->context->builder->positionAtEnd($body);
+        $srcPtr = $this->context->builder->gep($namePtr, $idx);
+        $ch = $this->context->builder->load($srcPtr);
+        $geA = $this->context->builder->icmp(PHPLLVM\Builder::INT_SGE, $ch, $i8->constInt(ord('A'), true));
+        $leZ = $this->context->builder->icmp(PHPLLVM\Builder::INT_SLE, $ch, $i8->constInt(ord('Z'), true));
+        $isUpper = $this->context->builder->and($geA, $leZ);
+        $lowered = $this->context->builder->add($ch, $i8->constInt(32, true));
+        $folded = $this->context->builder->select($isUpper, $lowered, $ch);
+        $dstPtr = $this->context->builder->gep($bufPtr, $idx);
+        $this->context->builder->store($folded, $dstPtr);
+        $this->context->builder->store(
+            $this->context->builder->add($idx, $sizeT->constInt(1, false)),
+            $idxAlloca
+        );
+        $this->context->builder->branch($loop);
+
+        $check = $afterFold;
         $hasCase = false;
-        foreach ($this->allClassNamesById() as $id => $className) {
+        $names = $this->allClassNamesById();
+        $n = \count($names);
+        $i = 0;
+        foreach ($names as $id => $className) {
             $hasCase = true;
-            $case = $fn->appendBasicBlock('class_name_id_'.$id);
-            $next = $fn->appendBasicBlock('class_name_id_try_'.$id);
             $this->context->builder->positionAtEnd($check);
-            $expected = $this->context->builder->pointerCast(
-                $this->context->constantFromString(strtolower(ltrim($className, '\\'))),
+            $lcName = strtolower(ltrim($className, '\\'));
+            $wantLenInt = \strlen($lcName);
+            $wantLen = $sizeT->constInt($wantLenInt, false);
+            $wantGlobal = $this->context->constantStringFromString($lcName);
+            $wantStr = $this->context->builder->load($wantGlobal);
+            $strMap = $this->context->structFieldMap['__string__'];
+            $wantCstr = $this->context->builder->pointerCast(
+                $this->context->builder->structGep($wantStr, $strMap['value']),
                 $i8p
             );
-            self::ensureStrNcasecmp($this->context);
+            $lenEq = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $nameLen, $wantLen);
             $cmp = $this->context->builder->call(
-                $this->context->lookupFunction(StringCaseCompare::ABI_STRNCASECMP),
-                $namePtr,
-                $expected,
-                $this->context->builder->zExt($nameLen, $this->context->getTypeFromString('size_t'))
+                $this->context->lookupFunction('memcmp'),
+                $bufPtr,
+                $wantCstr,
+                $this->context->builder->zExt($wantLen, $i64)
             );
-            $isMatch = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
-            $this->context->builder->branchIf($isMatch, $case, $next);
+            $nameEq = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $cmp,
+                $i32->constInt(0, false)
+            );
+            $match = $this->context->builder->and($lenEq, $nameEq);
+            $case = $fn->appendBasicBlock('class_name_id_'.$id);
+            $next = ($i === $n - 1)
+                ? $fail
+                : $fn->appendBasicBlock('class_name_id_try_'.$id);
+            $this->context->builder->branchIf($match, $case, $next);
             $this->context->builder->positionAtEnd($case);
             $this->context->builder->store(
                 $this->context->constantFromInteger($id, 'int64'),
@@ -689,11 +750,10 @@ class Object_ extends Type {
             );
             $this->context->builder->branch($done);
             $check = $next;
+            ++$i;
         }
         if (!$hasCase) {
-            $this->context->builder->branch($fail);
-        } else {
-            $this->context->builder->positionAtEnd($check);
+            $this->context->builder->positionAtEnd($afterFold);
             $this->context->builder->branch($fail);
         }
         $this->context->builder->positionAtEnd($fail);
