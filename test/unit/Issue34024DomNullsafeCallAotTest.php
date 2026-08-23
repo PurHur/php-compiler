@@ -9,45 +9,52 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * AOT: inline getElementById(...)?->prop must short-circuit on miss (#34019).
+ * AOT: inline DOM method()?->prop must match Zend (#34024).
  *
- * @see php-src ext/dom/php_dom.c dom_document_get_element_by_id
- * @see \PHPCompiler\JIT\Call\DomDocumentGetElementById
+ * @see php-src ext/dom/node.c dom_node_clone_node / dom_node_append_child
+ * @see php-src ext/dom/document.c dom_document_create_element / dom_document_import_node
  *
  * @group llvm
  * @group aot
  */
-final class Issue34019GetElementByIdNullsafeAotTest extends TestCase
+final class Issue34024DomNullsafeCallAotTest extends TestCase
 {
-    public function testAssignCallResultForcesValueStorage(): void
+    public function testAssignCallResultForcesValueForCfgObject(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
         $this->assertStringContainsString('callResultCfgWantsObject', $source);
-        $this->assertStringContainsString('#34019', $source);
+        $this->assertStringContainsString('#34024', $source);
         $this->assertStringContainsString('call_value_box_object_post_assign', $source);
     }
 
-    public function testVmInlineAndAssignedNullsafe(): void
+    public function testCloneNodeBoxesObjectResult(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/ext/dom/JitDomCloneNode.php');
+        $this->assertStringContainsString('boxObjectResult', $source);
+        $this->assertStringContainsString('#34024', $source);
+    }
+
+    public function testVmInlineNullsafeMatchesZend(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = $root.'/test/repro/issue_34019_getelementbyid_nullsafe_aot.php';
+        $src = $root.'/test/repro/issue_34024_dom_nullsafe_call_aot.php';
         $cmd = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/vm.php').' '
             .escapeshellarg($src).' 2>&1';
         exec($cmd, $out, $rc);
         $joined = implode("\n", $out);
         $this->assertSame(0, $rc, $joined);
-        $this->assertSame("null\nnull", trim($joined));
+        $this->assertSame("r\nx\nx\nr\nr\ne", trim($joined));
     }
 
-    public function testAotInlineAndAssignedNullsafe(): void
+    public function testAotInlineNullsafeMatchesZend(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
         $root = dirname(__DIR__, 2);
-        $src = $root.'/test/repro/issue_34019_getelementbyid_nullsafe_aot.php';
-        $bin = sys_get_temp_dir().'/phpc_34019_gei_'.getmypid().'.bin';
+        $src = $root.'/test/repro/issue_34024_dom_nullsafe_call_aot.php';
+        $bin = sys_get_temp_dir().'/phpc_34024_dom_'.getmypid().'.bin';
         $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
             .escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
@@ -59,7 +66,7 @@ final class Issue34019GetElementByIdNullsafeAotTest extends TestCase
             exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
             $joined = implode("\n", $runOut);
             $this->assertSame(0, $runRc, $joined);
-            $this->assertSame("null\nnull", trim($joined));
+            $this->assertSame("r\nx\nx\nr\nr\ne", trim($joined));
         } finally {
             @unlink($bin);
         }

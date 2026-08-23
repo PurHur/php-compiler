@@ -8617,7 +8617,10 @@ class JIT {
                                 $this->context->lookupFunction('__value__writeNull'),
                                 JIT\JitValueBox::pointer($this->context, $mergeDest->value)
                             );
-                            $mergeDest->isNullConstant = true;
+                            // Do not set isNullConstant on shared ?-> / ?? merge slots — the
+                            // fetch arm is compiled later against the same Variable and would
+                            // see a stale null constant after writing a real value (#34024).
+
                             break;
                         }
                     }
@@ -14211,6 +14214,8 @@ class JIT {
                             $bound->objectPropertyName = null;
                             $bound->objectPropertyClassName = null;
                             $bound->objectPropertyDnfArms = null;
+                            // Null arm may have stamped isNullConstant on this shared merge slot (#34024).
+                            $bound->isNullConstant = false;
                         }
                         $this->applyExternalPropertyResultType($result, $declaringClass, $name->value);
                     } else {
@@ -16011,6 +16016,56 @@ class JIT {
     }
 
     /**
+     * CFG typed a call result as object (or object|null / object|false) while the LLVM
+     * ABI may still return a boxed __value__* (#34019, #34024).
+     *
+     * @param-out string $className
+     */
+    private function callResultCfgWantsObject(Operand $result, ?string &$className = null): bool
+    {
+        $className = 'object';
+        if ($this->context->hasVariableOp($result)) {
+            $prior = $this->context->getVariableFromOp($result);
+            if (Variable::TYPE_OBJECT === $prior->type) {
+                $tagged = $prior->classUserType ?? null;
+                if (is_string($tagged) && '' !== $tagged) {
+                    $className = $tagged;
+                } elseif (null !== $result->type && is_string($result->type->userType ?? null) && '' !== $result->type->userType) {
+                    $className = $result->type->userType;
+                }
+
+                return true;
+            }
+        }
+        $type = $result->type;
+        if (null === $type) {
+            return false;
+        }
+        if (Type::TYPE_OBJECT === $type->type) {
+            if (is_string($type->userType ?? null) && '' !== $type->userType) {
+                $className = $type->userType;
+            }
+
+            return true;
+        }
+        if (Type::TYPE_UNION !== $type->type || [] === ($type->subTypes ?? [])) {
+            return false;
+        }
+        foreach ($type->subTypes as $sub) {
+            if (Type::TYPE_OBJECT !== $sub->type) {
+                continue;
+            }
+            if (is_string($sub->userType ?? null) && '' !== $sub->userType) {
+                $className = $sub->userType;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Pin call SSA results in the open insert block after callee CFG splits (#18052).
      *
      * Bool-return instance methods (e.g. DOMDocument::loadHTML) branch to fresh
@@ -16268,14 +16323,16 @@ class JIT {
 
                 return;
             }
-            // Boxed __value__* call results for nullable DOM object returns must stay TYPE_VALUE
-            // so inline ?-> uses the value-box nullsafe path (#34019 getElementById; #34024 cloneNode).
+            // Call ABI returns __value__* / __value__ while CFG typed the result as an
+            // object (or object|null / object|false union). Inline `$call()?->prop` then
+            // kept TYPE_OBJECT storage, so nullsafe skipped the value-box short-circuit and
+            // property-fetch GEPed the box (empty / SIGSEGV). Force TYPE_VALUE + classUserType
+            // for all such calls — not a per-Call whitelist (#34019 getElementById; #34024
+            // cloneNode / createElement / importNode / appendChild; peer #32707).
+            $objectClassName = null;
             if (
                 ('__value__*' === $llvmTy || '__value__' === $llvmTy)
-                && (
-                    $this->context->scope->toCall instanceof JIT\Call\DomDocumentGetElementById
-                    || $this->context->scope->toCall instanceof JIT\Call\DomNodeCloneNode
-                )
+                && $this->callResultCfgWantsObject($result, $objectClassName)
             ) {
                 $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
                 if ($this->context->hasVariableOp($result)) {
@@ -16289,17 +16346,15 @@ class JIT {
                     Variable::KIND_VARIABLE,
                     $slot
                 );
-                $resultVar->classUserType = 'DOMElement';
+                $resultVar->classUserType = $objectClassName ?? 'object';
                 $this->context->setVariableOp($result, $resultVar);
-                $result->type = new Type(Type::TYPE_OBJECT, [], 'DOMElement');
+                $result->type = new Type(Type::TYPE_OBJECT, [], $objectClassName ?? 'object');
                 $name = JIT\OperandName::resolve($result);
                 if (null !== $name && '' !== $name) {
                     $resolved = $this->context->resolveRefAliasName($name);
                     $this->context->bindVariableByName($resolved, $resultVar);
                 }
-                if ($this->context->scope->toCall instanceof JIT\Call\DomDocumentGetElementById) {
-                    JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'dom_gei_post_assign');
-                }
+                JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'call_value_box_object_post_assign');
 
                 return;
             }
@@ -19246,6 +19301,10 @@ class JIT {
                         $owned
                     );
                     $this->syncCompileTimeString($result, $value, $force);
+                    // Nullsafe/?? null arms set isNullConstant on the shared merge Variable at
+                    // compile time; a later fetch-arm string write must clear it or echo/?? see
+                    // an empty null constant despite the IR string (#34024).
+                    $result->isNullConstant = false;
 
                     return;
                 case Variable::TYPE_HASHTABLE:
