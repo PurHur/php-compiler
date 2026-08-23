@@ -2349,6 +2349,7 @@ final class VmReflection
      * ReflectionClass::getDefaultProperties() — declared defaults along inheritance chain (#11441).
      *
      * php-src: ext/reflection/php_reflection.c — reflection_class_get_default_properties()
+     * Skip parent private properties (instance + static) — matches Zend (#34091).
      */
     public static function getDefaultPropertiesArray(ClassEntry $entry, Context $ctx): Variable
     {
@@ -2364,8 +2365,16 @@ final class VmReflection
             }
             $current = $ctx->classes[$current->parentLc];
         }
+        $entryLc = strtolower(ltrim($entry->name, '\\'));
         foreach ($chain as $classEntry) {
             foreach ($classEntry->properties as $prop) {
+                $vis = MethodVisibility::mask($prop->visibility);
+                $declLc = strtolower(ltrim($prop->declaringClassLc, '\\'));
+                // Parent private props are copied onto child ClassEntry storage but Zend
+                // omits them from getDefaultProperties (#34091 / php_reflection.c).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $declLc !== $entryLc) {
+                    continue;
+                }
                 if (!self::propertyHasDefaultValue($prop)) {
                     continue;
                 }
@@ -2374,6 +2383,16 @@ final class VmReflection
                 $ht->add($prop->name, $copy);
             }
             foreach ($classEntry->staticProperties as $propLc => $storage) {
+                $visibility = MethodVisibility::mask(
+                    $classEntry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC
+                );
+                $declLc = strtolower(ltrim(
+                    $classEntry->staticPropertyDeclaringClassLc[$propLc] ?? $classEntry->name,
+                    '\\'
+                ));
+                if (($visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $declLc !== $entryLc) {
+                    continue;
+                }
                 if (!self::staticPropertyHasDefaultValue($storage)) {
                     continue;
                 }

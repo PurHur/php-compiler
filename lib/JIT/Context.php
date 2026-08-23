@@ -1777,6 +1777,8 @@ class Context {
         $this->functionProxies['reflectionclass::getparentclass'] = new Call\ReflectionClassGetParentClass();
         // Thin AOT: unbound getModifiers → NULL (#34077); VM has ReflectionClassGetModifiers (#18335).
         $this->functionProxies['reflectionclass::getmodifiers'] = new Call\ReflectionClassGetModifiers();
+        // Thin AOT: unbound getDefaultProperties → NULL (#34091); VM #11441.
+        $this->functionProxies['reflectionclass::getdefaultproperties'] = new Call\ReflectionClassGetDefaultProperties();
         // Thin AOT: unbound newInstanceWithoutConstructor → abort rc=134 (#34078); VM #5443.
         $this->functionProxies['reflectionclass::newinstancewithoutconstructor'] = new Call\ReflectionClassNewInstanceWithoutConstructor();
         // Thin AOT: unbound newInstance → abort rc=134 (#34083); VM #22086.

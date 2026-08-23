@@ -3250,6 +3250,59 @@ class Object_ extends Type {
     }
 
     /**
+     * Static property compile-time defaults for ReflectionClass::getDefaultProperties() (#34091).
+     *
+     * php-src reflection_class_get_default_properties: public/protected from the hierarchy,
+     * private only when declared on the reflected class (skip parent privates).
+     *
+     * @return array<string, array{type: int, value: int|float|bool|string|null}>
+     */
+    public function reflectionDefaultStaticPropertyEntries(int $classId): array
+    {
+        $entries = [];
+        foreach ($this->orderedPublicStaticPropertyNames($classId) as $name) {
+            $entry = $this->staticPropertyGlobals[$classId][$name] ?? null;
+            if (null === $entry) {
+                continue;
+            }
+            $vis = $this->staticPropertyVisibility[$classId][$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $declId = $this->staticPropertyDeclaringClassId[$classId][$name] ?? $classId;
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $declId !== $classId) {
+                continue;
+            }
+            if (!empty($entry['typedWithoutDefault']) && null === ($entry['default'] ?? null)) {
+                continue;
+            }
+            $default = $entry['default'] ?? null;
+            if (null === $default) {
+                continue;
+            }
+            // Non-scalar defaults (arrays/objects) are omitted from thin AOT GDP (#34091);
+            // compileTimeValueFromVm only accepts scalars / null.
+            if (!($default instanceof \PHPCompiler\VM\Variable)) {
+                continue;
+            }
+            $vmType = $default->type;
+            if (
+                \PHPCompiler\VM\Variable::TYPE_NULL !== $vmType
+                && \PHPCompiler\VM\Variable::TYPE_INTEGER !== $vmType
+                && \PHPCompiler\VM\Variable::TYPE_FLOAT !== $vmType
+                && \PHPCompiler\VM\Variable::TYPE_BOOLEAN !== $vmType
+                && \PHPCompiler\VM\Variable::TYPE_STRING !== $vmType
+            ) {
+                continue;
+            }
+            $display = $entry['displayName'] ?? $name;
+            $entries[$display] = [
+                'type' => $entry['type'],
+                'value' => $this->compileTimeValueFromVm($default),
+            ];
+        }
+
+        return $entries;
+    }
+
+    /**
      * php-src add_class_vars: class-declared statics before trait/parent (#7417).
      *
      * @return list<string>

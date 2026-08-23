@@ -5715,6 +5715,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassHasMemberRuntime.
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetConstructorRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassRelationQueryRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetModifiersRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetDefaultPropertiesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassKindNameTableRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionEnumJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionNamedArgumentsLookupRuntime.php';
@@ -6362,6 +6363,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassHasMember.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetConstructor.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassRelationQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetModifiers.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetDefaultProperties.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassKindQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewLazyGhost.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewLazyProxy.php';
