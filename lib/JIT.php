@@ -25393,6 +25393,15 @@ class JIT {
         if ($toCall instanceof JIT\Call\Native) {
             $result = $toCall->callWithArgMap($this->context, $callArgs);
         } else {
+            // Named optional middle params (DOMDocument::saveXML options:) stay sparse until
+            // here; array_values alone would drop the omitted $node slot (#31396 / #32018).
+            if (isset($toCall->paramNames) && \is_array($toCall->paramNames) && [] !== $toCall->paramNames) {
+                $callArgs = JIT\NamedOptionalCallArgs::densifyForSpread(
+                    $this->context,
+                    $callArgs,
+                    1 + \count($toCall->paramNames)
+                );
+            }
             $result = $toCall->call($this->context, ...array_values($callArgs));
         }
         // Enum::from() (and other callees) set throw-pending then return; catch here (#24219).

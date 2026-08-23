@@ -30,12 +30,9 @@ final class JitDomSaveSerializationArgs
         if ($hasNodeSlot && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             if (self::isDomNodeArgType($args[1])) {
                 $node = $args[1];
-                if ($hasOptSlot && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
-                    $options = $args[2];
-                }
-            } else {
-                // `saveXML(options: …)` without densified omitted $node (#32018).
-                $options = $args[1];
+            }
+            if ($hasOptSlot && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+                $options = $args[2];
             }
         } elseif ($hasOptSlot && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $options = $args[2];
