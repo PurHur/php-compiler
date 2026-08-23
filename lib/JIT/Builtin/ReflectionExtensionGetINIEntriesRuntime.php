@@ -8,8 +8,10 @@ use PHPCompiler\ext\standard\VmIniIntrospection;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Builder;
@@ -154,8 +156,10 @@ final class ReflectionExtensionGetINIEntriesRuntime
 
         /** @var array<string, array<string, ?string>> $out */
         $out = [];
-        // Bounded module list — baking core/standard (100+ keys) seals __init__ (#34165).
-        foreach (['date', 'pcre', 'json', 'reflection', 'spl', 'tokenizer'] as $lc) {
+        // Bounded module list — skip core (~93 keys) which seals __init__ when baked
+        // wholesale (#34165). `standard` is only ~14 directives and must be included
+        // (#34188 leftover); Zend lists null locals as NULL, not omitted.
+        foreach (['date', 'pcre', 'json', 'reflection', 'spl', 'tokenizer', 'standard'] as $lc) {
             $keys = VmIniIntrospection::registryKeysForExtension($lc);
             if (null === $keys || [] === $keys || \count($keys) > 32) {
                 continue;
@@ -167,13 +171,9 @@ final class ReflectionExtensionGetINIEntriesRuntime
                     continue;
                 }
                 $entry = VmIniIntrospection::registryEntry($key);
+                // Keep null locals — php-src walks EG(ini_directives) and returns NULL
+                // for unset values (ext/reflection/php_reflection.c).
                 $local = null !== $entry ? ($entry['local_value'] ?? null) : null;
-                // Skip null locals — constantArrayFromVmHashTable + null slots have
-                // sealed __init__ in practice; Zend still lists the key with NULL, but
-                // date/pcre defaults are always strings in the pinned image.
-                if (null === $local) {
-                    continue;
-                }
                 $map[$key] = $local;
             }
             if ([] !== $map) {
@@ -197,23 +197,71 @@ final class ReflectionExtensionGetINIEntriesRuntime
 
             return;
         }
+        foreach ($entries as $local) {
+            if (null === $local) {
+                self::storeIniEntriesMapRuntime($context, $resultSlot, $entries);
+
+                return;
+            }
+        }
         $ht = new HashTable();
         $parts = [];
         foreach ($entries as $name => $local) {
             $slot = new VMVariable();
-            if (null === $local) {
-                $slot->null();
-                $parts[] = $name.'=null';
-            } else {
-                $slot->string($local);
-                $parts[] = $name.'=s:'.$local;
-            }
+            $slot->string((string) $local);
+            $parts[] = $name.'=s:'.$local;
             $ht->add((string) $name, $slot);
         }
         sort($parts, \SORT_STRING);
         $cacheKey = 'refl_ext_gini_'.md5($lcExt.'|'.implode("\0", $parts));
         $global = $context->constantArrayFromVmHashTable($cacheKey, $ht);
         JitValueBox::copyFromPointer($context, $resultSlot, $context->builder->load($global));
+    }
+
+    /** @param array<string, ?string> $entries */
+    private static function storeIniEntriesMapRuntime(
+        Context $context,
+        Value $resultSlot,
+        array $entries
+    ): void {
+        $ht = HashTableHelper::alloc($context);
+        $n = \count($entries);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__grow'),
+            $ht,
+            $context->constantFromInteger($n, 'size_t')
+        );
+        foreach ($entries as $name => $local) {
+            $name = (string) $name;
+            if ('' === $name) {
+                continue;
+            }
+            $keyStr = $context->builder->load($context->constantStringFromString($name));
+            if (null === $local) {
+                $nullVar = new Variable(
+                    $context,
+                    Variable::TYPE_NULL,
+                    Variable::KIND_VALUE,
+                    $context->getTypeFromString('__value__*')->constNull()
+                );
+                $nullVar->isNullConstant = true;
+                HashTableHelper::setAtStringKey($context, $ht, $keyStr, $nullVar);
+
+                continue;
+            }
+            $valVar = new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $context->builder->load($context->constantStringFromString($local))
+            );
+            HashTableHelper::setAtStringKey($context, $ht, $keyStr, $valVar);
+        }
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $resultSlot),
+            $ht
+        );
     }
 
     private static function storeEmptyArray(Context $context, Value $resultSlot): void
