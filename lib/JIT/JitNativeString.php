@@ -72,6 +72,75 @@ final class JitNativeString
             if (null !== $magic) {
                 return $magic;
             }
+            // Locals often lack a class hint after assignment — probe ReflectionClass then
+            // Throwable (peer BcMath class_id cast probe) (#34135 / #26796).
+            if ($context->functionIsRegistered('reflectionclass::__tostring')) {
+                $rcId = $context->type->object->lookup('reflectionclass');
+                $objPtr = $context->helper->loadValue($var);
+                $objMap = $context->structFieldMap['__object__'];
+                $isRc = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->builder->load($context->builder->structGep($objPtr, $objMap['class_id'])),
+                    $context->getTypeFromString('int64')->constInt($rcId, false)
+                );
+                $yesRc = BasicBlockHelper::append($context, 'cast_obj_reflclass_yes');
+                $tryOther = BasicBlockHelper::append($context, 'cast_obj_reflclass_other');
+                $joinRc = BasicBlockHelper::append($context, 'cast_obj_reflclass_join');
+                $context->builder->branchIf($isRc, $yesRc, $tryOther);
+
+                $context->builder->positionAtEnd($yesRc);
+                $toCall = $context->resolveFunctionProxy('reflectionclass::__tostring');
+                $raw = $toCall->call($context, $var);
+                $rcStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                    $context,
+                    JitValueBox::coerceToValuePtrForStore($context, $raw)
+                );
+                $yesEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($joinRc);
+
+                $context->builder->positionAtEnd($tryOther);
+                $isThrowable = ReflectionBuiltinHelper::emitInstanceOf($context, $var, 'Throwable');
+                $isBool = Variable::TYPE_NATIVE_BOOL === $isThrowable->type
+                    ? $isThrowable->value
+                    : $context->helper->loadValue($isThrowable);
+                $yesThr = BasicBlockHelper::append($context, 'cast_obj_thr_yes');
+                $noThr = BasicBlockHelper::append($context, 'cast_obj_thr_no');
+                $context->builder->branchIf($isBool, $yesThr, $noThr);
+                $context->builder->positionAtEnd($yesThr);
+                $thrCall = $context->resolveFunctionProxy('exception::__tostring');
+                $thrRaw = $thrCall->call($context, $var);
+                $thrStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                    $context,
+                    JitValueBox::coerceToValuePtrForStore($context, $thrRaw)
+                );
+                $thrYesEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($joinRc);
+                $context->builder->positionAtEnd($noThr);
+                $hint = $classHint ?? '';
+                if ('' !== $hint && 'object' !== strtolower($hint)) {
+                    Builtin\ErrorRaise::ensureLinked($context);
+                    Builtin\ErrorRaise::emitRaise(
+                        $context,
+                        \PHPCompiler\VM\ValueEchoSupport::objectToStringErrorMessage($hint)
+                    );
+                }
+                $empty = $context->builder->load($context->constantStringFromString(''));
+                $thrNoEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($joinRc);
+
+                $context->builder->positionAtEnd($joinRc);
+                $phi = $context->builder->phi($rcStr->typeOf());
+                $phi->addIncoming($rcStr, $yesEnd);
+                $phi->addIncoming($thrStr, $thrYesEnd);
+                $phi->addIncoming($empty, $thrNoEnd);
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $phi
+                );
+            }
             // Catch temps often lack a compile-time class hint — try Throwable::__toString (#26796).
             $isThrowable = ReflectionBuiltinHelper::emitInstanceOf($context, $var, 'Throwable');
             $isBool = Variable::TYPE_NATIVE_BOOL === $isThrowable->type
@@ -165,6 +234,26 @@ final class JitNativeString
                 if (null !== $magic) {
                     return $magic;
                 }
+                // Hint may be lowercase reflectionclass without a resolvable instance
+                // method table entry — still dispatch the thin AOT proxy (#34135).
+                if (
+                    'reflectionclass' === strtolower($classHint)
+                    && $context->functionIsRegistered('reflectionclass::__tostring')
+                ) {
+                    $toCall = $context->resolveFunctionProxy('reflectionclass::__tostring');
+                    $raw = $toCall->call($context, $objVar);
+                    $rcStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                        $context,
+                        JitValueBox::coerceToValuePtrForStore($context, $raw)
+                    );
+
+                    return new Variable(
+                        $context,
+                        Variable::TYPE_STRING,
+                        Variable::KIND_VALUE,
+                        $rcStr
+                    );
+                }
                 Builtin\ErrorRaise::ensureLinked($context);
                 Builtin\ErrorRaise::emitRaise(
                     $context,
@@ -176,6 +265,74 @@ final class JitNativeString
                     Variable::TYPE_STRING,
                     Variable::KIND_VALUE,
                     $context->builder->load($context->constantStringFromString(''))
+                );
+            }
+
+            // Value-boxed ReflectionClass without a class hint — class_id probe (#34135).
+            if ($context->functionIsRegistered('reflectionclass::__tostring')) {
+                $rcId = $context->type->object->lookup('reflectionclass');
+                $rcProxy = 'reflectionclass::__tostring';
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
+                $map = $context->structFieldMap['__value__'];
+                $kindRaw = $context->builder->load($context->builder->structGep($valuePtr, $map['type']));
+                $i8 = $context->getTypeFromString('int8');
+                $isObj = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->builder->and($kindRaw, $i8->constInt(0x7f, false)),
+                    $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+                );
+                $yesKind = BasicBlockHelper::append($context, 'cast_reflclass_kind_yes');
+                $noKind = BasicBlockHelper::append($context, 'cast_reflclass_kind_no');
+                $join = BasicBlockHelper::append($context, 'cast_reflclass_join');
+                $context->builder->branchIf($isObj, $yesKind, $noKind);
+
+                $context->builder->positionAtEnd($yesKind);
+                $objPtr = $context->builder->call(
+                    $context->lookupFunction('__value__readObject'),
+                    $valuePtr
+                );
+                $objMap = $context->structFieldMap['__object__'];
+                $isRc = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->builder->load($context->builder->structGep($objPtr, $objMap['class_id'])),
+                    $context->getTypeFromString('int64')->constInt($rcId, false)
+                );
+                $yesRc = BasicBlockHelper::append($context, 'cast_reflclass_yes');
+                $context->builder->branchIf($isRc, $yesRc, $noKind);
+                $context->builder->positionAtEnd($yesRc);
+                $objVar = new Variable(
+                    $context,
+                    Variable::TYPE_OBJECT,
+                    Variable::KIND_VALUE,
+                    $objPtr
+                );
+                $toCall = $context->resolveFunctionProxy($rcProxy);
+                $raw = $toCall->call($context, $objVar);
+                $rcStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                    $context,
+                    JitValueBox::coerceToValuePtrForStore($context, $raw)
+                );
+                $yesEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($join);
+
+                $context->builder->positionAtEnd($noKind);
+                $fallbackStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                    $context,
+                    $valuePtr
+                );
+                $noEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($join);
+
+                $context->builder->positionAtEnd($join);
+                $phi = $context->builder->phi($rcStr->typeOf());
+                $phi->addIncoming($rcStr, $yesEnd);
+                $phi->addIncoming($fallbackStr, $noEnd);
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $phi
                 );
             }
 
