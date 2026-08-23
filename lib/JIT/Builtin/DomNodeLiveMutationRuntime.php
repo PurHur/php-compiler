@@ -1258,14 +1258,15 @@ final class DomNodeLiveMutationRuntime
     private static int $treeMutAssertSeq = 0;
 
     /**
-     * Thin-AOT LiveSlots preflight (#30274 / #33937): reject Document-class children and
-     * foreign-document Element/Text/… children before slot sync.
+     * Thin-AOT LiveSlots preflight (#30274 / #33937 / #34063): reject Document-class children,
+     * foreign-document Element/Text/… children, and ancestor/self children before slot sync.
      *
      * LiveSlots objects use thin {@see __object__} layout (class_id only) — NestedJIT
      * {@see ObjectEntry::$class} access segfaults. Compare class_id / ownerDocument /
      * parentNode walks in LLVM and throw catchable {@see \DOMException}.
      *
-     * Peer: {@see VmDom::assertCanReceiveTreeMutationChild} / {@see VmDom::assertSameDocument}.
+     * Peer: {@see VmDom::assertCanReceiveTreeMutationChild} / {@see VmDom::assertSameDocument}
+     * / {@see VmDom::assertNotAncestorOfParent}.
      */
     public static function assertTreeMutationChildBeforeLiveSlots(
         Context $context,
@@ -1273,16 +1274,15 @@ final class DomNodeLiveMutationRuntime
         Value $child
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_assert_tree_mut');
+        $seq = (string) (self::$treeMutAssertSeq++);
         $objectType = $context->type->object;
         $map = $context->structFieldMap['__object__'];
-        $i64 = $context->getTypeFromString('int64');
-        $i1 = $context->getTypeFromString('int1');
         $classId = $context->builder->load($context->builder->structGep($child, $map['class_id']));
         $isDoc = self::icmpIsDocumentClass($context, $classId);
 
-        $bbDoc = BasicBlockHelper::append($context, 'dom_assert_tree_mut_doc');
-        $bbNode = BasicBlockHelper::append($context, 'dom_assert_tree_mut_node');
-        $bbOk = BasicBlockHelper::append($context, 'dom_assert_tree_mut_ok');
+        $bbDoc = BasicBlockHelper::append($context, 'dom_assert_tree_mut_doc_'.$seq);
+        $bbNode = BasicBlockHelper::append($context, 'dom_assert_tree_mut_node_'.$seq);
+        $bbOk = BasicBlockHelper::append($context, 'dom_assert_tree_mut_ok_'.$seq);
         $context->builder->branchIf($isDoc, $bbDoc, $bbNode);
 
         $context->builder->positionAtEnd($bbDoc);
@@ -1295,9 +1295,9 @@ final class DomNodeLiveMutationRuntime
         $parentNodePtr = $context->builder->load($parentNodeSlot);
         $voidPtr = $context->getTypeFromString('void*');
         $slotNull = $context->builder->icmp(Builder::INT_EQ, $parentNodePtr, $voidPtr->constNull());
-        $bbHierarchy = BasicBlockHelper::append($context, 'dom_assert_tree_mut_hier');
-        $bbWrong = BasicBlockHelper::append($context, 'dom_assert_tree_mut_wrong');
-        $bbCompare = BasicBlockHelper::append($context, 'dom_assert_tree_mut_cmp');
+        $bbHierarchy = BasicBlockHelper::append($context, 'dom_assert_tree_mut_hier_'.$seq);
+        $bbWrong = BasicBlockHelper::append($context, 'dom_assert_tree_mut_wrong_'.$seq);
+        $bbCompare = BasicBlockHelper::append($context, 'dom_assert_tree_mut_cmp_'.$seq);
         $context->builder->branchIf($slotNull, $bbWrong, $bbCompare);
 
         $context->builder->positionAtEnd($bbCompare);
@@ -1331,12 +1331,108 @@ final class DomNodeLiveMutationRuntime
             DomExceptionConstants::WRONG_DOCUMENT_ERR
         );
 
-        // Non-Document child: Wrong Document when both sides resolve to distinct docs (#33937).
+        // Non-Document child: Wrong Document, then ancestor/self (#33937 / #34063).
         $context->builder->positionAtEnd($bbNode);
-        self::assertSameOwnerDocumentBeforeLiveSlots($context, $parent, $child, $bbOk);
-        // assertSameOwnerDocumentBeforeLiveSlots branches to $bbOk or throws.
+        $bbAfterDoc = BasicBlockHelper::append($context, 'dom_assert_tree_mut_after_doc_'.$seq);
+        self::assertSameOwnerDocumentBeforeLiveSlots($context, $parent, $child, $bbAfterDoc);
+        $context->builder->positionAtEnd($bbAfterDoc);
+        self::assertChildNotAncestorOfParentBeforeLiveSlots($context, $parent, $child, $bbOk);
 
         $context->builder->positionAtEnd($bbOk);
+    }
+
+    /**
+     * php-src hierarchy: newChild must not be parent or an ancestor of parent (#34063 / re-#19753).
+     *
+     * Peer {@see VmDom::assertNotAncestorOfParent} / {@see VmDom::contains} — walk parentNode
+     * from {@code $parent} looking for {@code $child}. Without this, LiveSlots links a cycle
+     * and thin AOT SIGSEGVs.
+     */
+    private static function assertChildNotAncestorOfParentBeforeLiveSlots(
+        Context $context,
+        Value $parent,
+        Value $child,
+        \PHPLLVM\BasicBlock $bbOk
+    ): void {
+        $tag = (string) (self::$treeMutAssertSeq++);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $bbWalk = BasicBlockHelper::append($context, 'dom_assert_anc_walk_'.$tag);
+        $bbHier = BasicBlockHelper::append($context, 'dom_assert_anc_hier_'.$tag);
+        $same = $context->builder->icmp(Builder::INT_EQ, $parent, $child);
+        $context->builder->branchIf($same, $bbHier, $bbWalk);
+
+        $context->builder->positionAtEnd($bbWalk);
+        // Appending under Document: no Element parentNode chain to walk (#34063).
+        $map = $context->structFieldMap['__object__'];
+        $parentClassId0 = $context->builder->load(
+            $context->builder->structGep($parent, $map['class_id'])
+        );
+        $bbParentDoc0 = BasicBlockHelper::append($context, 'dom_assert_anc_pdoc0_'.$tag);
+        $bbWalkBody = BasicBlockHelper::append($context, 'dom_assert_anc_body_'.$tag);
+        $context->builder->branchIf(
+            self::icmpIsDocumentClass($context, $parentClassId0),
+            $bbParentDoc0,
+            $bbWalkBody
+        );
+        $context->builder->positionAtEnd($bbParentDoc0);
+        $context->builder->branch($bbOk);
+
+        $context->builder->positionAtEnd($bbWalkBody);
+        $cur = $parent;
+        for ($hop = 0; $hop < 32; ++$hop) {
+            $hopTag = $tag.'_'.$hop;
+            $parentObj = self::loadNullableObjectProp(
+                $context,
+                $cur,
+                'DOMElement',
+                VmDom::PROP_PARENT_NODE
+            );
+            $bbHasParent = BasicBlockHelper::append($context, 'dom_assert_anc_pn_'.$hopTag);
+            $bbNoParent = BasicBlockHelper::append($context, 'dom_assert_anc_nopn_'.$hopTag);
+            $parentNull = $context->builder->icmp(Builder::INT_EQ, $parentObj, $objPtr->constNull());
+            $context->builder->branchIf($parentNull, $bbNoParent, $bbHasParent);
+
+            $context->builder->positionAtEnd($bbNoParent);
+            $context->builder->branch($bbOk);
+
+            $context->builder->positionAtEnd($bbHasParent);
+            $hit = $context->builder->icmp(Builder::INT_EQ, $parentObj, $child);
+            $bbCont = BasicBlockHelper::append($context, 'dom_assert_anc_cont_'.$hopTag);
+            $context->builder->branchIf($hit, $bbHier, $bbCont);
+
+            $context->builder->positionAtEnd($bbCont);
+            // Document has no Element parentNode layout — stop (php-src root) (#34063).
+            $map = $context->structFieldMap['__object__'];
+            $parentClassId = $context->builder->load(
+                $context->builder->structGep($parentObj, $map['class_id'])
+            );
+            $bbParentIsDoc = BasicBlockHelper::append($context, 'dom_assert_anc_doc_'.$hopTag);
+            $bbParentCont = BasicBlockHelper::append($context, 'dom_assert_anc_pcont_'.$hopTag);
+            $context->builder->branchIf(
+                self::icmpIsDocumentClass($context, $parentClassId),
+                $bbParentIsDoc,
+                $bbParentCont
+            );
+
+            $context->builder->positionAtEnd($bbParentIsDoc);
+            $context->builder->branch($bbOk);
+
+            $context->builder->positionAtEnd($bbParentCont);
+            $cur = $parentObj;
+        }
+        // Depth exceeded without hitting child — allow (same as VmDom walk ending).
+        $context->builder->branch($bbOk);
+
+        $context->builder->positionAtEnd($bbHier);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Hierarchy Request Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::HIERARCHY_REQUEST_ERR
+        );
     }
 
     /**
