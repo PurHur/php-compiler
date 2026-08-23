@@ -411,20 +411,33 @@ final class JitHashContext
         return self::copyLowering($context, $args[0]);
     }
 
-    /** Shared hash_copy() body (#3357). */
+    /** Shared hash_copy() body (#3357, #34293). */
     public static function copyLowering(Context $context, JITVariable $ctxArg): Value
     {
         HashContextEmbedBridge::ensureLinked($context);
         $src = self::readContextObject($context, $ctxArg);
-        $handle = self::loadHandle($context, $src);
-        $newHandle = self::callHelper($context, self::COPY_HELPER, $handle);
 
         $objectType = $context->type->object;
         $className = HashContextJitSupport::CLASS_NAME;
         $classId = $objectType->lookup($className);
         $dst = $objectType->allocate($classId);
         $objectType->markObjectConstructed($dst);
-        self::storeHandle($context, $dst, $newHandle);
+
+        // Thin standalone AOT: NestedJIT HashContextJitHelper::copy segfaults at execute
+        // (peer update/finalize #3357 / #16075 / #20200). Clone mirrored props only;
+        // finalLoweringStandaloneAot hashes __hcBuf (#34293 leftover of #27264).
+        if ($context->isThinStandaloneAotMain()) {
+            self::storeHandle(
+                $context,
+                $dst,
+                $context->getTypeFromString('int64')->constInt(0, false)
+            );
+        } else {
+            $handle = self::loadHandle($context, $src);
+            $newHandle = self::callHelper($context, self::COPY_HELPER, $handle);
+            self::storeHandle($context, $dst, $newHandle);
+        }
+
         self::storeStringProperty(
             $context,
             $dst,
