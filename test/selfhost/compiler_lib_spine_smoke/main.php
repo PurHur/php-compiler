@@ -6377,6 +6377,8 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassClassMapQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassClassMapRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetTraitAliases.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassTraitAliasesRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassToString.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassToStringRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassHasMember.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetConstructor.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassRelationQuery.php';
