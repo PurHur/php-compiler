@@ -1904,6 +1904,10 @@ class Context {
         $this->functionProxies['reflectionextension::info'] = new Call\ReflectionExtensionInfo();
 
         $this->functionProxies['reflectionfunction::isvariadic'] = new Call\ReflectionFunctionIsVariadic();
+        // Thin AOT: unbound getNumberOfParameters / isUserDefined / isInternal → NULL (#34218).
+        $this->functionProxies['reflectionfunction::getnumberofparameters'] = new Call\ReflectionFunctionGetNumberOfParameters();
+        $this->functionProxies['reflectionfunction::isuserdefined'] = new Call\ReflectionFunctionIsUserDefined();
+        $this->functionProxies['reflectionfunction::isinternal'] = new Call\ReflectionFunctionIsInternal();
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
             $this->functionProxies['reflectionparameter::issensitiveparameter'] = new Call\ReflectionParameterIsSensitiveParameter();
         }
@@ -2680,6 +2684,7 @@ class Context {
         Builtin\ParamSensitiveLowering::implementLookupFunctions($this);
         Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
         Builtin\ReflectionFunctionVariadicLowering::implementLookupFunctions($this);
+        Builtin\ReflectionFunctionParamCountLowering::implementLookupFunctions($this);
         VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
         $initSuffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
