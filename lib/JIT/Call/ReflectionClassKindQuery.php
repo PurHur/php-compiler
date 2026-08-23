@@ -16,13 +16,16 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * ReflectionClass kind queries under thin AOT (#34032, ext/reflection/php_reflection.c).
+ * ReflectionClass kind queries under thin AOT (#34032 / #34067, ext/reflection/php_reflection.c).
  *
- * Covers isInterface / isAbstract / isTrait / isEnum — previously unbound → NULL.
+ * Covers isInterface / isAbstract / isTrait / isEnum / isInternal / isReadOnly —
+ * previously unbound → NULL. isUserDefined is !isInternal (same name table).
  */
 final class ReflectionClassKindQuery implements Call
 {
-    /** @param 'isInterface'|'isAbstract'|'isTrait'|'isEnum' $method */
+    /**
+     * @param 'isInterface'|'isAbstract'|'isTrait'|'isEnum'|'isInternal'|'isUserDefined'|'isReadOnly' $method
+     */
     public function __construct(private readonly string $method)
     {
     }
@@ -46,12 +49,17 @@ final class ReflectionClassKindQuery implements Call
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         [$cstr, $len] = ReflectionSetup::reflectionClassNameAsCstr($context, $obj);
+        $tableKind = 'isUserDefined' === $this->method ? 'isInternal' : $this->method;
         $flag = ReflectionClassKindNameTableRuntime::invoke(
             $context,
-            strtolower($this->method),
+            strtolower($tableKind),
             $cstr,
             $len
         );
+        if ('isUserDefined' === $this->method) {
+            // php-src: zim_ReflectionClass_isUserDefined ≡ !ZEND_INTERNAL_CLASS
+            $flag = $context->builder->not($flag);
+        }
         $resultSlot = JitValueBox::alloc($context);
         JitValueBox::writeBool($context, $resultSlot, $flag);
 

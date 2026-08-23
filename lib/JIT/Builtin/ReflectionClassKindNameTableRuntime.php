@@ -12,11 +12,13 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT name tables for ReflectionClass kind queries (#34032).
+ * Thin-AOT name tables for ReflectionClass kind queries (#34032 / #34067).
  *
  * NestedJIT bool bridges ({@see ReflectionSetup::emitKindQuery}) fail module verify
  * under thin AOT; compile-unit lowercase {@see memcmp} tables match Zend for
- * isInterface / isAbstract / isTrait / isEnum (peer of #34027 isInstantiable).
+ * isInterface / isAbstract / isTrait / isEnum / isInternal / isReadOnly
+ * (peer of #34027 isInstantiable). isUserDefined is the invert of isInternal
+ * at the Call site (#34067).
  *
  * php-src: ext/reflection/php_reflection.c zim_ReflectionClass_is*
  */
@@ -28,6 +30,8 @@ final class ReflectionClassKindNameTableRuntime
         'isabstract' => '__phpc_refl_class_is_abstract',
         'istrait' => '__phpc_refl_class_is_trait',
         'isenum' => '__phpc_refl_class_is_enum',
+        'isinternal' => '__phpc_refl_class_is_internal',
+        'isreadonly' => '__phpc_refl_class_is_readonly',
     ];
 
     public static function invoke(Context $context, string $kindLc, Value $nameCstr, Value $nameLen): Value
@@ -238,6 +242,9 @@ final class ReflectionClassKindNameTableRuntime
             'istrait' => $object->isTraitClass($lc),
             'isenum' => $object->isEnumClassLc($lc),
             'isabstract' => self::objectIsAbstract($object, $lc, $classId),
+            // Object_ has no isInternal bit — internals come from VM ClassEntry (#34067).
+            'isinternal' => false,
+            'isreadonly' => $object->isReadonlyClass($classId),
             default => false,
         };
     }
@@ -273,6 +280,8 @@ final class ReflectionClassKindNameTableRuntime
             // php-src: interfaces report isAbstract=false via ce_flags; skip interface/trait/enum.
             'isabstract' => !$entry->isInterface && !$entry->isTrait && !$entry->isEnum
                 && ($entry->isAbstract || [] !== $entry->abstractMethods),
+            'isinternal' => $entry->isInternal,
+            'isreadonly' => $entry->readonly,
             default => false,
         };
     }
