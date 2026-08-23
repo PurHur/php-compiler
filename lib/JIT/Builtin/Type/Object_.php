@@ -70,7 +70,8 @@ class Object_ extends Type {
     /** @var array<int, string> class id => canonical name */
     private array $classIdToName = [];
     /**
-     * DECLARE_* source sites for ReflectionClass::getFileName / getStartLine / getEndLine (#34096).
+     * DECLARE_* source sites for ReflectionClass::getFileName / getStartLine /
+     * getEndLine / getDocComment (#34096, #34106).
      *
      * MODE_AOT does not run VM DECLARE_CLASS, so ClassEntry::sourceLocation is unset unless recorded here.
      *
