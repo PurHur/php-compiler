@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\JIT\Builtin\StringStrpos;
 
 /**
- * mb_strpos() / mb_stripos() / mb_strrpos() for compiled JIT/AOT modules
+ * mb_strpos() / mb_stripos() / mb_strrpos() / mb_strripos() for compiled JIT/AOT modules
  * (#34146 / #34158 / #34166 leftover of #27187, php-in-PHP).
  *
  * Returns {@see StringStrpos::NOT_FOUND} (-1) on miss so callers can box int|false.
@@ -16,8 +16,8 @@ use PHPCompiler\JIT\Builtin\StringStrpos;
  * — those methods silent-return 0 under thin AOT NestedJIT. Search is inlined with strlen/ord/substr
  * only; UTF-8 width uses range compares (NestedJIT bitwise `&` loops hang on multibyte lead bytes).
  *
- * SSOT (VM / compile-time fold): {@see VmMbstring::strpos()} / stripos / strrpos
- * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strpos), mb_stripos, mb_strrpos
+ * SSOT (VM / compile-time fold): {@see VmMbstring::strpos()} / stripos / strrpos / strripos
+ * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strpos), mb_stripos, mb_strrpos, mb_strripos
  */
 final class MbSearchJitHelper
 {
@@ -66,6 +66,26 @@ final class MbSearchJitHelper
         int $offset,
         string $encoding
     ): int {
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            return self::byteStrrpos($haystack, $needle, $offset);
+        }
+
+        return self::utf8Strrpos($haystack, $needle, $offset);
+    }
+
+    /**
+     * mb_strripos() — case-insensitive reverse search (peer of #34158 / #34166).
+     *
+     * NestedJIT-safe fold: ASCII A–Z → a–z only; offset semantics match {@see VmMbstring::strripos}.
+     */
+    public static function strriposArgv(
+        string $haystack,
+        string $needle,
+        int $offset,
+        string $encoding
+    ): int {
+        $haystack = self::asciiLower($haystack);
+        $needle = self::asciiLower($needle);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             return self::byteStrrpos($haystack, $needle, $offset);
         }
