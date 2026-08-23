@@ -7,16 +7,17 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\JIT\Builtin\StringStrpos;
 
 /**
- * mb_ord() for compiled JIT/AOT modules (#34243 leftover of #33547 / #30759).
+ * mb_chr() / mb_ord() for compiled JIT/AOT modules (#34243 / #34250 leftover of #33547 / #33536).
  *
- * Returns {@see StringStrpos::NOT_FOUND} (-1) on invalid first character so callers can box int|false.
+ * {@see ordArgv} returns {@see StringStrpos::NOT_FOUND} (-1) on invalid first character.
+ * {@see chrArgv} returns string|false (nullish false → NestedJIT null).
  *
- * NestedJIT must not call {@see VmMbstring::ord} / {@see \PHPCompiler\ext\standard\VmString::isValidUtf8}
- * — those silent-return / misbehave under thin AOT NestedJIT. Decode is inlined with strlen/ord/substr
- * and range compares (peer {@see MbSearchJitHelper}).
+ * NestedJIT must not call {@see VmMbstring::ord} / {@see VmMbstring::chr} /
+ * {@see \PHPCompiler\ext\standard\VmString::isValidUtf8} — those silent-return / misbehave under
+ * thin AOT NestedJIT. Encode/decode is inlined with ord/substr/range compares (peer {@see MbSearchJitHelper}).
  *
- * SSOT (VM / compile-time fold): {@see VmMbstring::ord()}
- * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_ord)
+ * SSOT (VM / compile-time fold): {@see VmMbstring::chr()} / {@see VmMbstring::ord()}
+ * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_chr), PHP_FUNCTION(mb_ord)
  *
  * Zend looks at the first character only (trailing invalid bytes after a valid lead still yield the
  * codepoint); match that here rather than whole-string isValidUtf8.
@@ -111,5 +112,58 @@ final class MbChrOrdJitHelper
         }
 
         return StringStrpos::NOT_FOUND;
+    }
+
+    /**
+     * mb_chr() — codepoint to character, or false when invalid (#34250 leftover of #33536).
+     *
+     * @return string|false
+     */
+    public static function chrArgv(int $codepoint, string $encoding)
+    {
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            if ($codepoint < 0 || $codepoint > 255) {
+                return false;
+            }
+
+            return \chr($codepoint);
+        }
+        if (!self::isValidUnicodeCodepoint($codepoint)) {
+            return false;
+        }
+
+        return self::encodeUtf8Codepoint($codepoint);
+    }
+
+    private static function isValidUnicodeCodepoint(int $cp): bool
+    {
+        if ($cp < 0 || $cp >= 0x110000) {
+            return false;
+        }
+        if ($cp >= 0xD800 && $cp <= 0xDFFF) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function encodeUtf8Codepoint(int $cp): string
+    {
+        if ($cp < 0x80) {
+            return \chr($cp);
+        }
+        if ($cp < 0x800) {
+            return \chr(0xC0 | ($cp >> 6)).\chr(0x80 | ($cp & 0x3F));
+        }
+        if ($cp < 0x10000) {
+            return \chr(0xE0 | ($cp >> 12))
+                .\chr(0x80 | (($cp >> 6) & 0x3F))
+                .\chr(0x80 | ($cp & 0x3F));
+        }
+
+        return \chr(0xF0 | ($cp >> 18))
+            .\chr(0x80 | (($cp >> 12) & 0x3F))
+            .\chr(0x80 | (($cp >> 6) & 0x3F))
+            .\chr(0x80 | ($cp & 0x3F));
     }
 }
