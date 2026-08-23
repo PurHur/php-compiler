@@ -526,6 +526,12 @@ final class SplDllistJitHelper
         return $slot;
     }
 
+    /** Load `__spl_flags` for foreach LIFO reset (#33987 / #28705). */
+    public static function loadFlags(Context $context, Value $obj, string $className): Value
+    {
+        return self::loadLongProperty($context, $obj, $className, self::PROP_FLAGS);
+    }
+
     /**
      * php-src SplDoublyLinkedList serialize — flags + dllist HT + empty members (#33966).
      *
