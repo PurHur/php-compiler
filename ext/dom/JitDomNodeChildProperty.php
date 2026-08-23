@@ -26,6 +26,9 @@ final class JitDomNodeChildProperty
 
     public static ?int $lastFetchedChildIndex = null;
 
+    /** @var array<string, string>|null */
+    public static ?array $lastFetchedAttributes = null;
+
     public static function isDomNodeChildProperty(string $classLc, string $propLc): bool
     {
         if (!\in_array(
@@ -171,6 +174,25 @@ final class JitDomNodeChildProperty
             $inner = $nodes[$index]['inner'] ?? null;
             if (null !== $inner) {
                 $result->compileTimeDomInnerXml = $inner;
+            }
+            // Per-element attrs from the open tag — global DomUserScriptAttributeCacheLlvm
+            // is keyed only by attr name so last id= wins for every element (#34050).
+            $open = $nodes[$index]['open'] ?? null;
+            if (\is_string($open) && '' !== $open) {
+                $attrs = [];
+                foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open) as $pair) {
+                    $qname = $pair['qname'];
+                    $pos = strpos($qname, ':');
+                    $local = false === $pos ? $qname : substr($qname, $pos + 1);
+                    $attrs[$local] = $pair['value'];
+                    if ($local !== $qname) {
+                        $attrs[$qname] = $pair['value'];
+                    }
+                }
+                if ([] !== $attrs) {
+                    $result->compileTimeDomAttributes = $attrs;
+                    self::$lastFetchedAttributes = $attrs;
+                }
             }
         }
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\ext\dom\DomUserScriptAttributeCacheLlvm;
+use PHPCompiler\ext\dom\JitDomNodeChildProperty;
 use PHPCompiler\ext\dom\JitDomAttributeNodeNS;
 use PHPCompiler\ext\dom\JitDomImportNode;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -26,7 +27,25 @@ final class DomElementGetAttribute implements Call
             $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         }
 
-        // Live Attr::$value first — setAttribute stores presentByKey without valueByKey, and
+        // Per-element open-tag attrs (firstChild/nextSibling) beat both the live Attr
+        // cache and the global name-keyed literal table — those are last-wins across
+        // siblings so firstChild would otherwise see the later sibling's value (#34050).
+        if (null !== $nameLit) {
+            $perElem = $args[0]->compileTimeDomAttributes[$nameLit]
+                ?? JitDomNodeChildProperty::$lastFetchedAttributes[$nameLit]
+                ?? null;
+            if (null !== $perElem) {
+                if (null === $args[0]->compileTimeDomAttributes
+                    && null !== JitDomNodeChildProperty::$lastFetchedAttributes
+                ) {
+                    $args[0]->compileTimeDomAttributes = JitDomNodeChildProperty::$lastFetchedAttributes;
+                }
+
+                return self::boxConstantString($context, (string) $perElem);
+            }
+        }
+
+        // Live Attr::$value next — setAttribute stores presentByKey without valueByKey, and
         // Attr::$value writes must update getAttribute (php-src attr.c; #19281 / #29642).
         // The compile-time valueByKey shortcut below is only for parse-time Attrs that never
         // got an object slot (or as fallback when the live cache miss returns empty).

@@ -35,7 +35,31 @@ final class DomUserScriptElementCacheLlvm
     ): void {
         self::ensureGlobals($context);
         $i1 = $context->getTypeFromString('int1');
+        $strPtr = $context->getTypeFromString('__string__*');
 
+        // xmlAddID first-wins: keep the first element registered for a given id (#25275 / #34050).
+        $storedOk = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_OK));
+        $hasStore = $context->builder->icmp(Builder::INT_EQ, $storedOk, $i1->constInt(1, false));
+        $cachedId = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ID));
+        $hasCachedId = $context->builder->icmp(Builder::INT_NE, $cachedId, $strPtr->constNull());
+        $maybeFirst = $context->builder->and($hasStore, $hasCachedId);
+
+        $checkBlock = BasicBlockHelper::append($context, 'dom_us_store_check_id');
+        $writeBlock = BasicBlockHelper::append($context, 'dom_us_store_write');
+        $skipBlock = BasicBlockHelper::append($context, 'dom_us_store_first_wins');
+        $doneBlock = BasicBlockHelper::append($context, 'dom_us_store_done');
+        $context->builder->branchIf($maybeFirst, $checkBlock, $writeBlock);
+
+        $context->builder->positionAtEnd($checkBlock);
+        $cmp = JitStringCompare::strcmp($context, $idStr, $cachedId);
+        $i64 = $context->getTypeFromString('int64');
+        $idMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+        $context->builder->branchIf($idMatch, $skipBlock, $writeBlock);
+
+        $context->builder->positionAtEnd($skipBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($writeBlock);
         $context->builder->store($i1->constInt(1, false), $context->module->getNamedGlobal(self::GLOBAL_OK));
 
         $ownedId = $context->builder->call(
@@ -45,6 +69,9 @@ final class DomUserScriptElementCacheLlvm
         $context->builder->store($ownedId, $context->module->getNamedGlobal(self::GLOBAL_ID));
         $context->builder->store($element, $context->module->getNamedGlobal(self::GLOBAL_ELEM));
         $context->builder->store($document, $context->module->getNamedGlobal(self::GLOBAL_DOC));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
     }
 
     /** Rekey cache after setAttribute('id', …) (#19870). */

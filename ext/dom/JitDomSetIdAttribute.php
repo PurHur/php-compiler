@@ -67,7 +67,7 @@ final class JitDomSetIdAttribute
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_post');
             // Live Attr cache value — NestedJIT getAttribute is empty after loadXML (#33957).
             $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-            self::storeCacheFromRuntimeGetAttribute($context, $element, $nameLlvm, $nameLit);
+            self::storeCacheFromRuntimeGetAttribute($context, $element, $nameLlvm, $nameLit, $args[0]);
             if (null !== $nameLit && '' !== $nameLit) {
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', $nameLit, true);
             }
@@ -110,7 +110,7 @@ final class JitDomSetIdAttribute
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_ns_post');
             // getAttribute(localName) live cache — DomRegistry empty after loadXML (#33957).
             $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
-            self::storeCacheFromRuntimeGetAttribute($context, $element, $localLlvm, $localLit);
+            self::storeCacheFromRuntimeGetAttribute($context, $element, $localLlvm, $localLit, $args[0]);
             $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString ?? '';
             if (null !== $localLit && '' !== $localLit) {
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral((string) $nsLit, $localLit, true);
@@ -173,20 +173,35 @@ final class JitDomSetIdAttribute
     }
 
     /**
-     * Thin-AOT getElementById cache from the live Attr value (#33957).
+     * Thin-AOT getElementById cache from the live Attr value (#33957 / #34050).
      *
-     * Prefer compile-time {@see DomUserScriptAttributeCacheLlvm::literalValue} seeded when
-     * NodeList::item materializes attrs — runtime Attr slot fetch can miss on live-walk
-     * getElementsByTagName temps. NestedJIT DomRegistry getAttribute is empty after loadXML.
+     * Prefer the receiver's {@see JITVariable::$compileTimeDomAttributes} (stamped from the
+     * open tag on firstChild/nextSibling) over the global name-keyed
+     * {@see DomUserScriptAttributeCacheLlvm::literalValue} — that table last-wins across
+     * siblings so firstChild setIdAttribute would register the wrong id (#34050).
+     * Fall back to the global literal / live Attr slot / NestedJIT getAttribute.
      */
     private static function storeCacheFromRuntimeGetAttribute(
         Context $context,
         Value $element,
         Value $nameLlvm,
-        ?string $nameLit = null
+        ?string $nameLit = null,
+        ?JITVariable $receiver = null
     ): void {
         if (null !== $nameLit && '' !== $nameLit) {
-            $ctVal = DomUserScriptAttributeCacheLlvm::literalValue('', $nameLit);
+            $perElem = $receiver?->compileTimeDomAttributes[$nameLit] ?? null;
+            if (!\is_string($perElem) || '' === $perElem) {
+                $fallback = JitDomNodeChildProperty::$lastFetchedAttributes[$nameLit] ?? null;
+                if (\is_string($fallback) && '' !== $fallback) {
+                    $perElem = $fallback;
+                    if (null !== $receiver && null === $receiver->compileTimeDomAttributes) {
+                        $receiver->compileTimeDomAttributes = JitDomNodeChildProperty::$lastFetchedAttributes;
+                    }
+                }
+            }
+            $ctVal = (\is_string($perElem) && '' !== $perElem)
+                ? $perElem
+                : DomUserScriptAttributeCacheLlvm::literalValue('', $nameLit);
             if (null !== $ctVal && '' !== $ctVal) {
                 $idStr = $context->builder->load($context->constantStringFromString($ctVal));
                 DomUserScriptElementCacheLlvm::store($context, $element, $idStr, $element);

@@ -18372,6 +18372,11 @@ class JIT {
                     $slot
                 );
                 $var->addref();
+                // firstChild/nextSibling stamp compileTimeDom* on the FETCH temp; first-bind
+                // must keep them on the CV or setIdAttribute/getAttribute see null (#34050).
+                $this->syncCompileTimeDomTagName($var, $value, true);
+                if (null !== $value->compileTimeDomAttributes) { @file_put_contents('/tmp/phpc_34050_debug.log', 'firstbind attrs='.json_encode($value->compileTimeDomAttributes).' ->var='.json_encode($var->compileTimeDomAttributes)."\n", FILE_APPEND); }
+                $this->syncCompileTimeString($var, $value, true);
                 $this->context->setVariableOp($resultOp, $var);
                 $resolved = JIT\OperandName::resolve($resultOp);
                 if (null !== $resolved && '' !== $resolved) {
@@ -22715,6 +22720,9 @@ class JIT {
             $objVal
         );
         $objVar->addref();
+        // TYPE_VALUE temps from property reseat carry compileTimeDom*; keep them on the
+        // OBJECT receiver used for setIdAttribute/getAttribute (#34050).
+        $this->syncCompileTimeDomTagName($objVar, $receiverVar, true);
 
         return $objVar;
     }
@@ -27107,6 +27115,9 @@ class JIT {
         $boxed->compileTimeLong = $fetched->compileTimeLong;
         $boxed->compileTimeFloat = $fetched->compileTimeFloat;
         $boxed->isNullConstant = $fetched->isNullConstant;
+        // firstChild/nextSibling stamp compileTimeDom* on the slot Variable; reseating
+        // into a value box must keep them or setIdAttribute/getAttribute see null (#34050).
+        $this->syncCompileTimeDomTagName($boxed, $fetched, true);
         // Keep typed-prop identity for BP_VAR_R guards (echo/loadValue). Stripping these
         // made unset string props echo garbage instead of Error (#33886 / re-#33007);
         // isset/?? use loadValueQuietForIsset and stay silent (#29688).
