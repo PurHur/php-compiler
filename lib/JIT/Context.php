@@ -1883,6 +1883,8 @@ class Context {
         $this->functionProxies['reflectionextension::getname'] = new Call\ReflectionExtensionGetName();
         // Thin AOT: unbound getVersion → NULL (#34016); VM uses VmReflection::reflectionExtensionVersion.
         $this->functionProxies['reflectionextension::getversion'] = new Call\ReflectionExtensionGetVersion();
+        // Thin AOT: unbound getClassNames → NULL (#34150); VM #22247 / peer name-list #34110.
+        $this->functionProxies['reflectionextension::getclassnames'] = new Call\ReflectionExtensionGetClassNames();
 
         $this->functionProxies['reflectionfunction::isvariadic'] = new Call\ReflectionFunctionIsVariadic();
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
