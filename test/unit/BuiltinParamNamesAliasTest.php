@@ -1137,6 +1137,48 @@ PHP;
         );
     }
 
+    /** @covers issue #25045 */
+    public function testStrPadReflectionDefaults(): void
+    {
+        $cases = [
+            [2, 'pad_string', 'string', ' '],
+            [3, 'pad_type', 'int', 1], // STR_PAD_RIGHT
+        ];
+        foreach ($cases as [$idx, $name, $type, $expected]) {
+            $info = ['name' => $name, 'type' => $type, 'isOptional' => true];
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable('str_pad', $idx, $info, false), 'str_pad#'.$idx);
+            $dest = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'str_pad', $idx, $info), 'str_pad#'.$idx);
+            if (\is_int($expected)) {
+                self::assertSame($expected, $dest->toInt(), 'str_pad#'.$idx);
+            } else {
+                self::assertSame($expected, $dest->toString(), 'str_pad#'.$idx);
+            }
+        }
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$r = new ReflectionFunction('str_pad');
+foreach ($r->getParameters() as $p) {
+    echo $p->getName();
+    if ($p->isOptional()) {
+        echo '=';
+        echo json_encode($p->getDefaultValue());
+    }
+    echo "\n";
+}
+echo str_pad('a', 5), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'str_pad_reflection_25045.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "string\nlength\npad_string=\" \"\npad_type=1\na    \n",
+            ob_get_clean()
+        );
+    }
+
     /** @covers issue #24856 */
     public function testNl2brReflectionUseXhtmlDefaultTrue(): void
     {
