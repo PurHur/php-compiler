@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: appendChild/insertBefore/replaceChild foreign Element → Wrong Document (#33937).
+ * AOT: appendChild/insertBefore/replaceChild foreign Element → Wrong Document (#33937 / #34089).
  *
  * @see php-src ext/dom/node.c WRONG_DOCUMENT_ERR
  *
@@ -54,10 +54,13 @@ final class DomMutationForeignElementWrongDocument33937AotTest extends TestCase
         $this->assertSame(0, $compileRc, implode("\n", $compileOut));
         $this->assertFileExists($bin);
         try {
-            $runOut = [];
-            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
-            $this->assertSame(0, $runRc, implode("\n", $runOut));
-            $this->assertSame($zend, implode("\n", $runOut)."\n");
+            // Intermittent SIGSEGV was ~20–30% before #34089 — one run is a cheap green (#23842).
+            for ($i = 0; $i < 20; ++$i) {
+                $runOut = [];
+                exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+                $this->assertSame(0, $runRc, 'run '.($i + 1).': '.implode("\n", $runOut));
+                $this->assertSame($zend, implode("\n", $runOut)."\n", 'run '.($i + 1));
+            }
         } finally {
             @unlink($bin);
         }

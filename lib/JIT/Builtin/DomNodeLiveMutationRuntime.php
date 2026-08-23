@@ -1347,6 +1347,10 @@ final class DomNodeLiveMutationRuntime
      * Peer {@see VmDom::assertNotAncestorOfParent} / {@see VmDom::contains} — walk parentNode
      * from {@code $parent} looking for {@code $child}. Without this, LiveSlots links a cycle
      * and thin AOT SIGSEGVs.
+     *
+     * Runtime alloca loop (not PHP-unrolled hops): foreach + three mutation lowerings used to
+     * inline ~32 hops × loadNullableObjectProp BBs per call site and intermittently SIGSEGV
+     * under thin AOT (#34089 / re-#33937; peer CFG pressure #33335).
      */
     private static function assertChildNotAncestorOfParentBeforeLiveSlots(
         Context $context,
@@ -1378,50 +1382,52 @@ final class DomNodeLiveMutationRuntime
         $context->builder->branch($bbOk);
 
         $context->builder->positionAtEnd($bbWalkBody);
-        $cur = $parent;
-        for ($hop = 0; $hop < 32; ++$hop) {
-            $hopTag = $tag.'_'.$hop;
-            $parentObj = self::loadNullableObjectProp(
-                $context,
-                $cur,
-                'DOMElement',
-                VmDom::PROP_PARENT_NODE
-            );
-            $bbHasParent = BasicBlockHelper::append($context, 'dom_assert_anc_pn_'.$hopTag);
-            $bbNoParent = BasicBlockHelper::append($context, 'dom_assert_anc_nopn_'.$hopTag);
-            $parentNull = $context->builder->icmp(Builder::INT_EQ, $parentObj, $objPtr->constNull());
-            $context->builder->branchIf($parentNull, $bbNoParent, $bbHasParent);
+        // Peer JitDomAppendChildUserScript curAlloca sibling walk — one BB set, not N unrolls.
+        $curAlloca = BasicBlockHelper::entryAlloca($context, $objPtr);
+        $context->builder->store($parent, $curAlloca);
+        $bbLoop = BasicBlockHelper::append($context, 'dom_assert_anc_loop_'.$tag);
+        $context->builder->branch($bbLoop);
 
-            $context->builder->positionAtEnd($bbNoParent);
-            $context->builder->branch($bbOk);
+        $context->builder->positionAtEnd($bbLoop);
+        $cur = $context->builder->load($curAlloca);
+        $parentObj = self::loadNullableObjectProp(
+            $context,
+            $cur,
+            'DOMElement',
+            VmDom::PROP_PARENT_NODE
+        );
+        $bbHasParent = BasicBlockHelper::append($context, 'dom_assert_anc_pn_'.$tag);
+        $bbNoParent = BasicBlockHelper::append($context, 'dom_assert_anc_nopn_'.$tag);
+        $parentNull = $context->builder->icmp(Builder::INT_EQ, $parentObj, $objPtr->constNull());
+        $context->builder->branchIf($parentNull, $bbNoParent, $bbHasParent);
 
-            $context->builder->positionAtEnd($bbHasParent);
-            $hit = $context->builder->icmp(Builder::INT_EQ, $parentObj, $child);
-            $bbCont = BasicBlockHelper::append($context, 'dom_assert_anc_cont_'.$hopTag);
-            $context->builder->branchIf($hit, $bbHier, $bbCont);
-
-            $context->builder->positionAtEnd($bbCont);
-            // Document has no Element parentNode layout — stop (php-src root) (#34063).
-            $map = $context->structFieldMap['__object__'];
-            $parentClassId = $context->builder->load(
-                $context->builder->structGep($parentObj, $map['class_id'])
-            );
-            $bbParentIsDoc = BasicBlockHelper::append($context, 'dom_assert_anc_doc_'.$hopTag);
-            $bbParentCont = BasicBlockHelper::append($context, 'dom_assert_anc_pcont_'.$hopTag);
-            $context->builder->branchIf(
-                self::icmpIsDocumentClass($context, $parentClassId),
-                $bbParentIsDoc,
-                $bbParentCont
-            );
-
-            $context->builder->positionAtEnd($bbParentIsDoc);
-            $context->builder->branch($bbOk);
-
-            $context->builder->positionAtEnd($bbParentCont);
-            $cur = $parentObj;
-        }
-        // Depth exceeded without hitting child — allow (same as VmDom walk ending).
+        $context->builder->positionAtEnd($bbNoParent);
         $context->builder->branch($bbOk);
+
+        $context->builder->positionAtEnd($bbHasParent);
+        $hit = $context->builder->icmp(Builder::INT_EQ, $parentObj, $child);
+        $bbCont = BasicBlockHelper::append($context, 'dom_assert_anc_cont_'.$tag);
+        $context->builder->branchIf($hit, $bbHier, $bbCont);
+
+        $context->builder->positionAtEnd($bbCont);
+        // Document has no Element parentNode layout — stop (php-src root) (#34063).
+        $parentClassId = $context->builder->load(
+            $context->builder->structGep($parentObj, $map['class_id'])
+        );
+        $bbParentIsDoc = BasicBlockHelper::append($context, 'dom_assert_anc_doc_'.$tag);
+        $bbParentCont = BasicBlockHelper::append($context, 'dom_assert_anc_pcont_'.$tag);
+        $context->builder->branchIf(
+            self::icmpIsDocumentClass($context, $parentClassId),
+            $bbParentIsDoc,
+            $bbParentCont
+        );
+
+        $context->builder->positionAtEnd($bbParentIsDoc);
+        $context->builder->branch($bbOk);
+
+        $context->builder->positionAtEnd($bbParentCont);
+        $context->builder->store($parentObj, $curAlloca);
+        $context->builder->branch($bbLoop);
 
         $context->builder->positionAtEnd($bbHier);
         TryCatchHelper::emitCatchableClassError(
@@ -1477,6 +1483,8 @@ final class DomNodeLiveMutationRuntime
     /**
      * Thin-AOT owner document: Document self, else ownerDocument slot, else parentNode walk.
      *
+     * Runtime alloca loop (not PHP-unrolled hops) — peer ancestor walk (#34089 / #33335).
+     *
      * @return Value __object__* (nullable)
      */
     private static function resolveOwnerDocumentObject(Context $context, Value $node): Value
@@ -1498,62 +1506,63 @@ final class DomNodeLiveMutationRuntime
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbWalk);
-        // Unrolled walk: ownerDocument slot, then parentNode hops (loadXML trees are shallow).
-        $cur = $node;
-        for ($hop = 0; $hop < 8; ++$hop) {
-            $hopTag = $tag.'_'.$hop;
-            $ownerSlot = self::loadNullableObjectProp(
-                $context,
-                $cur,
-                'DOMElement',
-                VmDom::PROP_OWNER_DOCUMENT
-            );
-            $bbHasOwner = BasicBlockHelper::append($context, 'dom_resolve_doc_owner_'.$hopTag);
-            $bbNoOwner = BasicBlockHelper::append($context, 'dom_resolve_doc_no_owner_'.$hopTag);
-            $ownerNull = $context->builder->icmp(Builder::INT_EQ, $ownerSlot, $objPtr->constNull());
-            $context->builder->branchIf($ownerNull, $bbNoOwner, $bbHasOwner);
+        $curAlloca = BasicBlockHelper::entryAlloca($context, $objPtr);
+        $context->builder->store($node, $curAlloca);
+        $bbLoop = BasicBlockHelper::append($context, 'dom_resolve_doc_loop_'.$tag);
+        $context->builder->branch($bbLoop);
 
-            $context->builder->positionAtEnd($bbHasOwner);
-            $context->builder->store($ownerSlot, $resultSlot);
-            $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbLoop);
+        $cur = $context->builder->load($curAlloca);
+        $ownerSlot = self::loadNullableObjectProp(
+            $context,
+            $cur,
+            'DOMElement',
+            VmDom::PROP_OWNER_DOCUMENT
+        );
+        $bbHasOwner = BasicBlockHelper::append($context, 'dom_resolve_doc_owner_'.$tag);
+        $bbNoOwner = BasicBlockHelper::append($context, 'dom_resolve_doc_no_owner_'.$tag);
+        $ownerNull = $context->builder->icmp(Builder::INT_EQ, $ownerSlot, $objPtr->constNull());
+        $context->builder->branchIf($ownerNull, $bbNoOwner, $bbHasOwner);
 
-            $context->builder->positionAtEnd($bbNoOwner);
-            $parentObj = self::loadNullableObjectProp(
-                $context,
-                $cur,
-                'DOMElement',
-                VmDom::PROP_PARENT_NODE
-            );
-            $bbHasParent = BasicBlockHelper::append($context, 'dom_resolve_doc_pn_'.$hopTag);
-            $bbNoParent = BasicBlockHelper::append($context, 'dom_resolve_doc_no_pn_'.$hopTag);
-            $parentNull = $context->builder->icmp(Builder::INT_EQ, $parentObj, $objPtr->constNull());
-            $context->builder->branchIf($parentNull, $bbNoParent, $bbHasParent);
+        $context->builder->positionAtEnd($bbHasOwner);
+        $context->builder->store($ownerSlot, $resultSlot);
+        $context->builder->branch($bbDone);
 
-            $context->builder->positionAtEnd($bbNoParent);
-            $context->builder->store($objPtr->constNull(), $resultSlot);
-            $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbNoOwner);
+        $parentObj = self::loadNullableObjectProp(
+            $context,
+            $cur,
+            'DOMElement',
+            VmDom::PROP_PARENT_NODE
+        );
+        $bbHasParent = BasicBlockHelper::append($context, 'dom_resolve_doc_pn_'.$tag);
+        $bbNoParent = BasicBlockHelper::append($context, 'dom_resolve_doc_no_pn_'.$tag);
+        $parentNull = $context->builder->icmp(Builder::INT_EQ, $parentObj, $objPtr->constNull());
+        $context->builder->branchIf($parentNull, $bbNoParent, $bbHasParent);
 
-            $context->builder->positionAtEnd($bbHasParent);
-            $parentClassId = $context->builder->load(
-                $context->builder->structGep($parentObj, $map['class_id'])
-            );
-            $bbParentIsDoc = BasicBlockHelper::append($context, 'dom_resolve_doc_pn_doc_'.$hopTag);
-            $bbParentCont = BasicBlockHelper::append($context, 'dom_resolve_doc_pn_cont_'.$hopTag);
-            $context->builder->branchIf(
-                self::icmpIsDocumentClass($context, $parentClassId),
-                $bbParentIsDoc,
-                $bbParentCont
-            );
-
-            $context->builder->positionAtEnd($bbParentIsDoc);
-            $context->builder->store($parentObj, $resultSlot);
-            $context->builder->branch($bbDone);
-
-            $context->builder->positionAtEnd($bbParentCont);
-            $cur = $parentObj;
-        }
+        $context->builder->positionAtEnd($bbNoParent);
         $context->builder->store($objPtr->constNull(), $resultSlot);
         $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbHasParent);
+        $parentClassId = $context->builder->load(
+            $context->builder->structGep($parentObj, $map['class_id'])
+        );
+        $bbParentIsDoc = BasicBlockHelper::append($context, 'dom_resolve_doc_pn_doc_'.$tag);
+        $bbParentCont = BasicBlockHelper::append($context, 'dom_resolve_doc_pn_cont_'.$tag);
+        $context->builder->branchIf(
+            self::icmpIsDocumentClass($context, $parentClassId),
+            $bbParentIsDoc,
+            $bbParentCont
+        );
+
+        $context->builder->positionAtEnd($bbParentIsDoc);
+        $context->builder->store($parentObj, $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbParentCont);
+        $context->builder->store($parentObj, $curAlloca);
+        $context->builder->branch($bbLoop);
 
         $context->builder->positionAtEnd($bbDone);
 
