@@ -83,6 +83,8 @@ class Object_ extends Type {
     private array $interfaceClassLcs = [];
     /** @var array<string, true> trait lc => registered (#3789) */
     private array $traitClassLcs = [];
+    /** @var array<string, true> abstract class lc => registered (#34027) */
+    private array $abstractClassLcs = [];
     /** @var array<string, true> user attribute class lc => registered (#6450) */
     private array $attributeClassLcs = [];
     /** @var array<int, array<string, string>> class id => method lc => trait lc (#3789) */
@@ -6306,6 +6308,11 @@ class Object_ extends Type {
         $this->traitClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
     }
 
+    public function markAbstractClass(string $classLc): void
+    {
+        $this->abstractClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
+    }
+
     public function markAttributeClass(string $classLc): void
     {
         $this->attributeClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
@@ -6316,6 +6323,11 @@ class Object_ extends Type {
         $this->ensureLazyGhostBuiltinTrait();
 
         return isset($this->traitClassLcs[strtolower(ltrim($classLc, '\\'))]);
+    }
+
+    public function isAbstractClassLc(string $classLc): bool
+    {
+        return isset($this->abstractClassLcs[strtolower(ltrim($classLc, '\\'))]);
     }
 
     /**

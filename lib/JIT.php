@@ -13198,6 +13198,9 @@ class JIT {
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
+                    if ($op->classIsAbstract) {
+                        $this->context->type->object->markAbstractClass($nameOp->value);
+                    }
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
                         $this->context->scope->classIsReadonly = VM\ClassFlags::isReadonly(
                             $block->constants[$op->arg3]->toInt()

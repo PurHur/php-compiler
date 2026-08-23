@@ -1745,6 +1745,8 @@ class Context {
         $this->functionProxies['reflectionclass::getproperty'] = new Call\ReflectionClassGetProperty();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
         $this->functionProxies['reflectionclass::isfinal'] = new Call\ReflectionClassIsFinal();
+        // Thin AOT: unbound isInstantiable → NULL (#34027); VM has ReflectionClassIsInstantiable.
+        $this->functionProxies['reflectionclass::isinstantiable'] = new Call\ReflectionClassIsInstantiable();
         $this->functionProxies['reflectionclass::isiterateable'] = new Call\ReflectionClassIsIterateable();
         $this->functionProxies['reflectionclass::isiterable'] = new Call\ReflectionClassIsIterateable();
         if (CompilerVersion::supportsLazyObjectFactories()) {
