@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7762 |
-| Phase A inventory files (M2 ratio SSOT) | 7762 |
+| PHP files on vm.php path | 7763 |
+| Phase A inventory files (M2 ratio SSOT) | 7763 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24831 |
+| Source constructs flagged (warnings) | 24833 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1784,6 +1784,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherKernel.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCsrGetPublicKey.php` | 0 | 2 |
+| `ext/openssl/JitOpensslCsrSign.php` | 0 | 2 |
 | `ext/openssl/JitOpensslDigest.php` | 0 | 1 |
 | `ext/openssl/JitOpensslEncrypt.php` | 0 | 1 |
 | `ext/openssl/JitOpensslError.php` | 0 | 1 |
@@ -21797,6 +21798,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 61)
 - 3 class method(s)
 
+### `ext/openssl/JitOpensslCsrSign.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 144)
+- 5 class method(s)
+
 ### `ext/openssl/JitOpensslDigest.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22192,8 +22199,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_csr_sign.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 34)
-- 5 class method(s)
+- new ArgumentCountError (line 33)
+- 6 class method(s)
 
 ### `ext/openssl/openssl_decrypt.php`
 

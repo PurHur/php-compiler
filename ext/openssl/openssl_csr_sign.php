@@ -17,8 +17,7 @@ use PHPLLVM\Value;
 /**
  * openssl_csr_sign() — sign CSR into X.509 certificate (php-src ext/openssl/openssl.c; #6421 VM, JIT/AOT #33517).
  *
- * JIT/AOT leftover #33517: catchable argc/TypeError paths (peer openssl_csr_get_public_key #33514).
- * Happy-path CSR/key → certificate still needs object AOT (#6421 follow-up).
+ * JIT/AOT: argc/TypeError (#33517); happy-path CSR/key PEM → OpenSSLCertificate (#34060).
  */
 final class openssl_csr_sign extends Internal
 {
@@ -121,10 +120,38 @@ final class openssl_csr_sign extends Internal
             return self::jitReturnFalse($context);
         }
 
-        // CSR/key/cert objects stay VM-shaped (#6421). Clear LogicException on TypeError/argc
-        // gates first (#33517); happy-path bake is a follow-up.
-        throw new \LogicException(
-            'openssl_csr_sign() is not implemented for JIT in this compiler build (issue #6421/#33517)'
+        $badDays = self::compileTimeNonIntLabel($args[3]);
+        if (null !== $badDays) {
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                'openssl_csr_sign(): Argument #4 ($days) must be of type int, '.$badDays.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'openssl_csr_sign_days_te_cont');
+
+            return self::jitReturnFalse($context);
+        }
+
+        if ($argc >= 6) {
+            $badSerial = self::compileTimeNonIntLabel($args[5]);
+            if (null !== $badSerial) {
+                ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'openssl_csr_sign(): Argument #6 ($serial) must be of type int, '.$badSerial.' given'
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'openssl_csr_sign_serial_te_cont');
+
+                return self::jitReturnFalse($context);
+            }
+        }
+
+        return JitOpensslCsrSign::invoke(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3],
+            $argc >= 5 ? $args[4] : null,
+            $argc >= 6 ? $args[5] : null
         );
     }
 
@@ -146,7 +173,8 @@ final class openssl_csr_sign extends Internal
             JITVariable::TYPE_HASHTABLE => 'array',
             JITVariable::TYPE_STRING => null,
             JITVariable::TYPE_OBJECT => self::objectTypeErrorLabel($arg),
-            default => 'mixed',
+            // Value-box / unknown may still be CSR PEM string at runtime (#34060 peer #34054).
+            default => null,
         };
     }
 
@@ -161,6 +189,27 @@ final class openssl_csr_sign extends Internal
         }
 
         return $class;
+    }
+
+    /**
+     * @return non-empty-string|null
+     */
+    private static function compileTimeNonIntLabel(JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return 'null';
+        }
+
+        return match ($arg->type) {
+            JITVariable::TYPE_NATIVE_LONG => null,
+            JITVariable::TYPE_NATIVE_BOOL => 'bool',
+            JITVariable::TYPE_NATIVE_DOUBLE => 'float',
+            JITVariable::TYPE_STRING => 'string',
+            JITVariable::TYPE_HASHTABLE => 'array',
+            JITVariable::TYPE_OBJECT => 'object',
+            // Value-box / unknown may still be int at runtime.
+            default => null,
+        };
     }
 
     private static function jitReturnFalse(Context $context): Value
