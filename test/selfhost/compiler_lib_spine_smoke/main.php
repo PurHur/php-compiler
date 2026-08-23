@@ -6420,6 +6420,10 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionGetConstants.php
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionGetINIEntries.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionIsPersistent.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionIsTemporary.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionInfo.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionExtensionInfoRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionToString.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionExtensionToStringRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionIsVariadic.php';
