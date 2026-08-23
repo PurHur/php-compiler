@@ -13205,13 +13205,16 @@ class JIT {
                         $this->context->type->object->markAbstractClass($nameOp->value);
                     }
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
-                        $this->context->scope->classIsReadonly = VM\ClassFlags::isReadonly(
-                            $block->constants[$op->arg3]->toInt()
-                        );
+                        $packedFlags = $block->constants[$op->arg3]->toInt();
+                        $this->context->scope->classIsReadonly = VM\ClassFlags::isReadonly($packedFlags);
                         $this->context->type->object->setClassReadonly(
                             $this->context->scope->classId,
                             $this->context->scope->classIsReadonly
                         );
+                        // Thin AOT isFinal name table (#34043) — ZEND_ACC_FINAL from packed flags.
+                        if (VM\ClassFlags::isFinal($packedFlags)) {
+                            $this->context->type->object->markFinalClass($nameOp->value);
+                        }
                     } else {
                         $this->context->scope->classIsReadonly = false;
                     }
