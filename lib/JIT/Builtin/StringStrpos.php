@@ -77,6 +77,14 @@ final class StringStrpos
         return $ptr;
     }
 
+    /**
+     * Box an i64 search offset where {@see NOT_FOUND} means boolean false (#34146 / mb_strpos).
+     */
+    public static function boxFoundOffset(Context $context, Value $found): Value
+    {
+        return self::boxFoundI64($context, $found);
+    }
+
     private static function boxFoundI64(Context $context, Value $found): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'strpos_box_found');
