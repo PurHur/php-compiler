@@ -1770,6 +1770,8 @@ class Context {
         $this->functionProxies['reflectionclass::gettraits'] = new Call\ReflectionClassClassMapQuery('traits');
         // Thin AOT: unbound getTraitAliases → NULL (#34129); VM #6661.
         $this->functionProxies['reflectionclass::gettraitaliases'] = new Call\ReflectionClassGetTraitAliases();
+        // Thin AOT: unbound __toString → convert-to-string fatal (#34135); VM #22379.
+        $this->functionProxies['reflectionclass::__tostring'] = new Call\ReflectionClassToString();
         // Thin AOT: unbound implementsInterface/isSubclassOf → NULL → false (#34080); VM #6302.
         $this->functionProxies['reflectionclass::implementsinterface'] = new Call\ReflectionClassRelationQuery('implementsInterface');
         $this->functionProxies['reflectionclass::issubclassof'] = new Call\ReflectionClassRelationQuery('isSubclassOf');

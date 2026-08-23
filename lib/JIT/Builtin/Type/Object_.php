@@ -3762,6 +3762,8 @@ class Object_ extends Type {
             $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
             // Thin user-script AOT must call __construct (not allocate-only) (#34001).
             $this->markHasConstructor($id);
+            // Cast/(string) uses hasInstanceMethod(__tostring) (#34135).
+            $this->defineMethodVisibility($id, '__tostring', \PHPCfg\Func::FLAG_PUBLIC, '__toString');
         }
         if ('reflectionobject' === $lcname) {
             $this->setClassParentName('ReflectionObject', 'ReflectionClass');
