@@ -15,7 +15,8 @@ use PHPLLVM\Value;
 /**
  * Session save-handler module name in module globals. LLVM entry `__phpc_session_module_apply` (#5749).
  *
- * Thin AOT: {@see ensureLinked} — Type::register early-returns on STANDALONE (#32989).
+ * Thin AOT + full load: {@see ensureLinked} — Type::initialize no longer eagerly
+ * implements (#33980 / peer #32989 STANDALONE early-return).
  */
 final class SessionModuleName
 {
