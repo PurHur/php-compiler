@@ -132,6 +132,8 @@ class Object_ extends Type {
     private array $propertyDeclaredTypeLabels = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
     private array $methodDisplayNames = [];
+    /** @var array<int, array<string, true>> classId => methodLc => declared here (not inheritMethodVisibility) (#34107) */
+    private array $methodDeclaredOn = [];
     /** @var array<int, Block> class id => __destruct CFG block (#4013) */
     private array $destructorBlocks = [];
 
@@ -5243,6 +5245,7 @@ class Object_ extends Type {
     {
         $methodLc = strtolower($methodLc);
         $this->methodVisibility[$classId][$methodLc] = $visibilityFlags;
+        $this->methodDeclaredOn[$classId][$methodLc] = true;
         if (null !== $displayName) {
             $this->methodDisplayNames[$classId][$methodLc] = $displayName;
         }
@@ -5287,6 +5290,84 @@ class Object_ extends Type {
         }
 
         return array_values($seen);
+    }
+
+    /**
+     * ReflectionClass::getMethods() specs — declared methods only, skip parent privates (#34107).
+     *
+     * @return list<array{display: string, declaringClass: string}>
+     */
+    public function allMethodsForReflection(int $classId, int $filter = 0): array
+    {
+        $classLc = $this->classLcForId($classId);
+        if (null === $classLc) {
+            return [];
+        }
+
+        if ($this->isInterfaceClassLc($classLc)) {
+            $chain = $this->expandInterfaceLc($classLc);
+        } else {
+            $chain = [];
+            $currentLc = $classLc;
+            while (null !== $currentLc) {
+                array_unshift($chain, $currentLc);
+                $currentLc = $this->classParentLc[$currentLc] ?? null;
+            }
+        }
+
+        /** @var array<string, array{display: string, declaringClass: string}> $seen */
+        $seen = [];
+        foreach ($chain as $lc) {
+            if (!isset($this->classes[$lc])) {
+                continue;
+            }
+            $id = $this->classes[$lc];
+            foreach ($this->methodVisibility[$id] ?? [] as $methodLc => $vis) {
+                // inheritMethodVisibilityFromParent copies slots — only real declarations (#34107).
+                if (!($this->methodDeclaredOn[$id][$methodLc] ?? false)) {
+                    continue;
+                }
+                // php-src add_reflection_method_sub: parent-private methods hidden on child (#7191).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $id !== $classId) {
+                    continue;
+                }
+                if (!$this->methodMatchesReflectionFilterBits($vis, $filter)) {
+                    continue;
+                }
+                $seen[$methodLc] = [
+                    'display' => $this->methodDisplayNames[$id][$methodLc] ?? $methodLc,
+                    'declaringClass' => $this->classNameForId($id),
+                ];
+            }
+        }
+
+        return array_values($seen);
+    }
+
+    /** Mirror VmReflection::methodMatchesReflectionFilter for CFG flags (#34107 / #4480). */
+    private function methodMatchesReflectionFilterBits(int $cfgFlags, int $filter): bool
+    {
+        if (0 === $filter) {
+            return true;
+        }
+        if (($cfgFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            $modifiers = 4; // ReflectionMethod::IS_PRIVATE
+        } elseif (($cfgFlags & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            $modifiers = 2; // IS_PROTECTED
+        } else {
+            $modifiers = 1; // IS_PUBLIC
+        }
+        if (($cfgFlags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            $modifiers |= 16;
+        }
+        if (($cfgFlags & \PHPCfg\Func::FLAG_FINAL) !== 0) {
+            $modifiers |= 32;
+        }
+        if (($cfgFlags & \PHPCfg\Func::FLAG_ABSTRACT) !== 0) {
+            $modifiers |= 64;
+        }
+
+        return ($modifiers & $filter) !== 0;
     }
 
     public function definePropertyVisibility(int $classId, string $name, int $visibilityFlags): void
