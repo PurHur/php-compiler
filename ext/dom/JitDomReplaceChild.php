@@ -181,7 +181,7 @@ final class JitDomReplaceChild
         );
 
         self::clearDetachedLinkSlots($context, $oldChild);
-        DomUserScriptElementCacheLlvm::invalidateIfElement($context, $oldChild);
+        DomUserScriptElementCacheLlvm::clearId($context);
         DomUserScriptPinnedRootLlvm::pin($context, $newChild);
 
         // Do NOT call refreshCompileTimeXmlReplaceRoot here: dual-path emit lowers this
@@ -291,8 +291,9 @@ final class JitDomReplaceChild
         }
 
         JitDomReplaceChildLiveSlots::sync($context, $parent, $newChild, $oldChild, $childCount);
-        // Drop thin-AOT getElementById cache when the cached element is detached (#29694).
-        DomUserScriptElementCacheLlvm::invalidateIfElement($context, $oldChild);
+        // Drop thin-AOT getElementById cache after detach — single-slot cache may still
+        // hold a sibling while xmlAddID keeps the detached node's ID (#29694).
+        DomUserScriptElementCacheLlvm::clearId($context);
 
         // Element nav slots — only-child replace collapses to newChild (#27216).
         $objectType = $context->type->object;

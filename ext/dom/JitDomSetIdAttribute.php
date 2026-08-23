@@ -31,6 +31,9 @@ final class JitDomSetIdAttribute
     /** @var list<string> Compile-time id attribute values from setAttribute('id', …). */
     private static array $setAttributeIdValues = [];
 
+    /** @var array<string, true> Id values that successfully called setIdAttribute(true) this compile. */
+    private static array $registeredIdLiterals = [];
+
     public static function rememberSetAttributeIdValue(string $value): void
     {
         self::$setAttributeIdValues[] = $value;
@@ -39,6 +42,7 @@ final class JitDomSetIdAttribute
     public static function resetCompileTimeState(): void
     {
         self::$setAttributeIdValues = [];
+        self::$registeredIdLiterals = [];
     }
 
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -69,12 +73,30 @@ final class JitDomSetIdAttribute
             // global name→value Attr cache — that cache returns the last id= in the doc (#34050).
             $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
             $elemAttrVal = self::compileTimeReceiverAttrValue($args[0], $nameLit);
-            if (null !== $elemAttrVal && '' !== $elemAttrVal) {
-                $idStr = $context->builder->load($context->constantStringFromString($elemAttrVal));
-                self::storeCacheFromRuntimeIdString($context, $element, $idStr);
-            } else {
-                // Live Attr cache value — NestedJIT getAttribute is empty after loadXML (#33957).
-                self::storeCacheFromRuntimeGetAttribute($context, $element, $nameLlvm, $nameLit);
+            $idLitForSkip = $elemAttrVal;
+            if (null === $idLitForSkip || '' === $idLitForSkip) {
+                $idLitForSkip = self::$setAttributeIdValues !== []
+                    ? self::$setAttributeIdValues[\count(self::$setAttributeIdValues) - 1]
+                    : null;
+            }
+            // After replaceChild, xmlAddID fails when this id is still owned by a detached
+            // node — do not seed the LLVM cache (#29694 / re-#25274).
+            $skipCache = JitDomLoadXMLUserScript::treeMutatedSinceLoad()
+                && null !== $idLitForSkip
+                && '' !== $idLitForSkip
+                && isset(self::$registeredIdLiterals[$idLitForSkip]);
+            if (!$skipCache) {
+                if (null !== $elemAttrVal && '' !== $elemAttrVal) {
+                    $idStr = $context->builder->load($context->constantStringFromString($elemAttrVal));
+                    self::storeCacheFromRuntimeIdString($context, $element, $idStr);
+                    self::$registeredIdLiterals[$elemAttrVal] = true;
+                } else {
+                    // Live Attr cache value — NestedJIT getAttribute is empty after loadXML (#33957).
+                    self::storeCacheFromRuntimeGetAttribute($context, $element, $nameLlvm, $nameLit);
+                    if (null !== $idLitForSkip && '' !== $idLitForSkip) {
+                        self::$registeredIdLiterals[$idLitForSkip] = true;
+                    }
+                }
             }
             if (null !== $nameLit && '' !== $nameLit) {
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', $nameLit, true);
@@ -277,15 +299,35 @@ final class JitDomSetIdAttribute
         $context->builder->branchIf($nonEmpty, $storeBlock, $cont);
 
         $context->builder->positionAtEnd($storeBlock);
+        $document = self::loadOwnerDocumentObject($context, $element);
         // xmlAddID first-wins for loadXML child-edge setIdAttribute (#34050).
         // createElement/setAttribute path must overwrite the single-slot cache (issue_29257).
         if (null !== JitDomNodeChildProperty::$lastFetchedAttributes) {
-            DomUserScriptElementCacheLlvm::storeFirstWins($context, $element, $idStr, $element);
+            DomUserScriptElementCacheLlvm::storeFirstWins($context, $document, $idStr, $element);
         } else {
-            DomUserScriptElementCacheLlvm::store($context, $element, $idStr, $element);
+            DomUserScriptElementCacheLlvm::store($context, $document, $idStr, $element);
         }
         $context->builder->branch($cont);
         $context->builder->positionAtEnd($cont);
+    }
+
+    private static function loadOwnerDocumentObject(Context $context, Value $element): Value
+    {
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT)) {
+            return $element;
+        }
+        $ownerVar = $objectType->propertyFetch(
+            $element,
+            'DOMElement',
+            VmDom::PROP_OWNER_DOCUMENT
+        );
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $ownerVar)
+        );
     }
 
     /**
