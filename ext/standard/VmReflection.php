@@ -4190,6 +4190,13 @@ final class VmReflection
     ): Variable {
         $staticKey = self::findStaticPropertyKey($entry, $propertyName, $ctx);
         if (null === $staticKey) {
+            // php-src: optional $default when property is undeclared (#34125).
+            if (null !== $default) {
+                $copy = new Variable();
+                $copy->copyFrom($default);
+
+                return $copy;
+            }
             ReflectionSupport::throwReflectionException(sprintf(
                 'Property %s::$%s does not exist',
                 $entry->name,
