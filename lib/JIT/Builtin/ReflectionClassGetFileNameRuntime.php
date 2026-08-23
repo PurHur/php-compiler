@@ -29,6 +29,8 @@ final class ReflectionClassGetFileNameRuntime
 {
     private const MAX_NAME_LEN = 512;
 
+    private static int $emitSeq = 0;
+
     /**
      * @return Value __value__* result slot (string|false)
      */
@@ -40,10 +42,12 @@ final class ReflectionClassGetFileNameRuntime
         $resultSlot = JitValueBox::alloc($context);
         $resultPtr = JitValueBox::pointer($context, $resultSlot);
         $fn = BasicBlockHelper::parentFunction($context);
+        // Unique BB prefixes per emit — peer {@see ReflectionClassSourceLocationRuntime} (#34186).
+        $prefix = 'refl_getfilename_'.(++self::$emitSeq);
         $entry = $context->builder->getInsertBlock();
-        $merge = $fn->appendBasicBlock('refl_getfilename_merge');
-        $miss = $fn->appendBasicBlock('refl_getfilename_miss');
-        $fold = $fn->appendBasicBlock('refl_getfilename_fold');
+        $merge = $fn->appendBasicBlock($prefix.'_merge');
+        $miss = $fn->appendBasicBlock($prefix.'_miss');
+        $fold = $fn->appendBasicBlock($prefix.'_fold');
 
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
@@ -53,7 +57,11 @@ final class ReflectionClassGetFileNameRuntime
         $charPtr = $context->getTypeFromString('char*');
 
         $context->builder->positionAtEnd($entry);
-        $buf = $context->builder->alloca($i8->arrayType(self::MAX_NAME_LEN));
+        $buf = BasicBlockHelper::entryAllocaForFunction(
+            $context,
+            $fn,
+            $i8->arrayType(self::MAX_NAME_LEN)
+        );
         $bufPtr = $context->builder->pointerCast($buf, $i8p);
         $tooLong = $context->builder->icmp(
             Builder::INT_UGT,
@@ -65,14 +73,14 @@ final class ReflectionClassGetFileNameRuntime
         $context->builder->positionAtEnd($fold);
         $idxAlloca = $context->builder->alloca($sizeT);
         $context->builder->store($sizeT->constInt(0, false), $idxAlloca);
-        $loop = $fn->appendBasicBlock('refl_getfilename_fold_loop');
-        $afterFold = $fn->appendBasicBlock('refl_getfilename_after_fold');
+        $loop = $fn->appendBasicBlock($prefix.'_fold_loop');
+        $afterFold = $fn->appendBasicBlock($prefix.'_after_fold');
         $context->builder->branch($loop);
 
         $context->builder->positionAtEnd($loop);
         $idx = $context->builder->load($idxAlloca);
         $foldDone = $context->builder->icmp(Builder::INT_EQ, $idx, $nameLen);
-        $body = $fn->appendBasicBlock('refl_getfilename_fold_body');
+        $body = $fn->appendBasicBlock($prefix.'_fold_body');
         $context->builder->branchIf($foldDone, $afterFold, $body);
 
         $context->builder->positionAtEnd($body);
@@ -109,8 +117,8 @@ final class ReflectionClassGetFileNameRuntime
                 continue;
             }
 
-            $matchBlock = $fn->appendBasicBlock('refl_getfilename_hit_'.$hitIdx);
-            $nextCheck = $fn->appendBasicBlock('refl_getfilename_try_'.$hitIdx);
+            $matchBlock = $fn->appendBasicBlock($prefix.'_hit_'.$hitIdx);
+            $nextCheck = $fn->appendBasicBlock($prefix.'_try_'.$hitIdx);
             $context->builder->positionAtEnd($checkBlock);
 
             $wantLen = $sizeT->constInt($wantLenInt, false);

@@ -8,11 +8,12 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT ReflectionClass::{getStartLine,getEndLine,getDocComment} (#34106).
+ * Thin-AOT ReflectionClass::{getStartLine,getEndLine,getDocComment} (#34106, #34186).
  *
  * Name (from ReflectionClass) → DECLARE_* {@see Type\Object_::classSourceLocation}
  * via lowercase memcmp (same pattern as {@see ReflectionClassGetFileNameRuntime}).
@@ -20,10 +21,16 @@ use PHPLLVM\Value;
  *
  * Must not use {@see Type\Object_::classIdFromRuntimeName} — aborts on names
  * absent from the JIT class table (e.g. stdClass).
+ *
+ * Each emit gets a unique BB prefix (#34186): thrice-inlined getStartLine through a
+ * typed is_array/is_object helper on trait classes must not reuse fixed labels or a
+ * single stack result slot. Heap result + seq prefixes match peer NestedJIT helpers.
  */
 final class ReflectionClassSourceLocationRuntime
 {
     private const MAX_NAME_LEN = 512;
+
+    private static int $emitSeq = 0;
 
     /**
      * @param 'startLine'|'endLine'|'docComment' $field
@@ -41,10 +48,22 @@ final class ReflectionClassSourceLocationRuntime
         LibcExtern::ensureMemcmpDecl($context);
 
         $object = $context->type->object;
-        $resultSlot = JitValueBox::alloc($context);
-        $resultPtr = JitValueBox::pointer($context, $resultSlot);
         $fn = BasicBlockHelper::parentFunction($context);
-        $prefix = 'refl_src_'.$field;
+        // Heap result slot + unique BB prefixes per emit (#34186).
+        $valueType = $context->getTypeFromString('__value__');
+        $heapVal = $context->memory->malloc($valueType);
+        $resultSlot = $context->builder->pointerCast(
+            $heapVal,
+            $context->getTypeFromString('__value__*')
+        );
+        $resultPtr = $resultSlot;
+        $map = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($resultSlot, $map['type'])
+        );
+
+        $prefix = 'refl_src_'.$field.'_'.(++self::$emitSeq);
         $entry = $context->builder->getInsertBlock();
         $merge = $fn->appendBasicBlock($prefix.'_merge');
         $miss = $fn->appendBasicBlock($prefix.'_miss');
@@ -58,7 +77,12 @@ final class ReflectionClassSourceLocationRuntime
         $charPtr = $context->getTypeFromString('char*');
 
         $context->builder->positionAtEnd($entry);
-        $buf = $context->builder->alloca($i8->arrayType(self::MAX_NAME_LEN));
+        // Fold buffer in function entry — not mid-CFG alloca (#34186).
+        $buf = BasicBlockHelper::entryAllocaForFunction(
+            $context,
+            $fn,
+            $i8->arrayType(self::MAX_NAME_LEN)
+        );
         $bufPtr = $context->builder->pointerCast($buf, $i8p);
         $tooLong = $context->builder->icmp(
             Builder::INT_UGT,
