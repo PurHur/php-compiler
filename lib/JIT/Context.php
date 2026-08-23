@@ -491,6 +491,13 @@ class Context {
     public array $foreachReverseHtSlots = [];
 
     /**
+     * SplDoublyLinkedList foreach — runtime `__spl_flags` IT_MODE_LIFO alloca (i1) (#33987).
+     *
+     * @var array<string, \PHPLLVM\Value>
+     */
+    public array $foreachRuntimeReverseSlots = [];
+
+    /**
      * Map key for foreach alloca tables — include activeFunction so NestedJIT of a
      * multi-method helper cannot reuse a sibling method's entry alloca when
      * spl_object_id values collide after GC (#28053 / #27228).
@@ -1669,7 +1676,11 @@ class Context {
         ] as $dllLc => $dllClass) {
             $this->type->object->lookup($dllClass);
             // isEmpty: without proxy, thin AOT silent-nulls (#579) — always falsy (#33973).
-            $dllMethods = ['__construct', 'push', 'pop', 'shift', 'unshift', 'top', 'bottom', 'count', 'isempty'];
+            // offset*/setIteratorMode/getIteratorMode: without proxy silent-null (#33987).
+            $dllMethods = [
+                '__construct', 'push', 'pop', 'shift', 'unshift', 'top', 'bottom', 'count', 'isempty',
+                'offsetget', 'offsetexists', 'setiteratormode', 'getiteratormode',
+            ];
             if ('splqueue' === $dllLc) {
                 $dllMethods = array_merge($dllMethods, ['enqueue', 'dequeue']);
             }

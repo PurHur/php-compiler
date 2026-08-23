@@ -4420,6 +4420,7 @@ class Object_ extends Type {
             || 'splstack' === $lcname
         ) {
             // Thin AOT: `__spl_ht` packed deque + FIFO/LIFO foreach (#26790, #27311, #28705).
+            // `__spl_flags` for setIteratorMode / LIFO foreach (#33987).
             // SplQueue/DDL: forward nextFree walk; SplStack: descending (#28705).
             // Zend rematerializes Serializable-first subclass interfaces (#25797).
             $this->ensureTraversableBuiltinInterfaces();
@@ -4431,11 +4432,14 @@ class Object_ extends Type {
                 'Iterator',
             ]);
             $this->defineProperty($id, \PHPCompiler\VM\SplDllistJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\SplDllistJitHelper::PROP_FLAGS, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             $methods = [
                 '__construct', 'push', 'pop', 'shift', 'unshift',
                 'top', 'bottom', 'count', 'isempty',
+                'offsetget', 'offsetexists', 'offsetset', 'offsetunset',
+                'setiteratormode', 'getiteratormode',
                 'rewind', 'valid', 'current', 'key', 'next',
             ];
             if ('splqueue' === $lcname) {

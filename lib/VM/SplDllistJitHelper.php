@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\spl\SplDoublyLinkedListBuiltin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -17,11 +20,14 @@ use PHPLLVM\Value;
  * Thin-AOT SplDoublyLinkedList / SplQueue / SplStack — object `__spl_ht` deque (#26790).
  *
  * php-src: ext/spl/spl_dllist.c — push/pop/shift/unshift/top/bottom; SplQueue enqueue/dequeue; SplStack push/pop/top.
+ * ArrayAccess + setIteratorMode/getIteratorMode on `__spl_flags` (#33987).
  * Serialize bag: flags + dllist + members (#33966; peer #33625 / #33876).
  */
 final class SplDllistJitHelper
 {
     public const PROP_HT = '__spl_ht';
+
+    public const PROP_FLAGS = '__spl_flags';
 
     public static function compileConstruct(Context $context, JITVariable $receiver, string $className): Value
     {
@@ -31,6 +37,13 @@ final class SplDllistJitHelper
         $htVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht);
         $slot = $objectType->propertySlotFor($obj, $className, self::PROP_HT);
         $objectType->propertyStore($slot, $htVar, JITVariable::TYPE_HASHTABLE);
+        // php-src SplQueue/SplStack constructors set IT_MODE_FIX (+ LIFO for Stack).
+        $flags = match (strtolower($className)) {
+            'splqueue' => SplDoublyLinkedListBuiltin::IT_MODE_FIX,
+            'splstack' => SplDoublyLinkedListBuiltin::IT_MODE_LIFO | SplDoublyLinkedListBuiltin::IT_MODE_FIX,
+            default => 0,
+        };
+        self::storeLongProperty($context, $obj, $className, self::PROP_FLAGS, $flags);
         $objectType->markObjectConstructed($obj);
 
         return self::voidResult($context);
@@ -333,6 +346,116 @@ final class SplDllistJitHelper
     }
 
     /**
+     * php-src zim_SplDoublyLinkedList_offsetGet — packed index into `__spl_ht` (#33987).
+     * OOB: OutOfRangeException (php-src spl_dllist.c).
+     */
+    public static function compileOffsetGet(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $index,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $idx = self::coerceIndex($context, $index, $className.'::offsetGet');
+        self::assertIndexInRange($context, $ht, $idx);
+
+        return HashTableHelper::readIndexedToValueBox($context, $ht, $idx)->value;
+    }
+
+    /**
+     * php-src zim_SplDoublyLinkedList_offsetExists — in-range index (#33987).
+     * Unlike SplFixedArray, null elements still "exist".
+     */
+    public static function compileOffsetExists(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $index,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $idx = self::coerceIndex($context, $index, $className.'::offsetExists');
+        $inRange = $context->builder->icmp(Builder::INT_ULT, $idx, $n);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $inRange);
+
+        return $slot;
+    }
+
+    /**
+     * php-src zim_SplDoublyLinkedList_setIteratorMode — store mode & MASK | FIX (#33987).
+     * LIFO/FIFO frozen when IT_MODE_FIX is set (SplQueue / SplStack).
+     */
+    public static function compileSetIteratorMode(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $modeArg,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $mode = JitLongArg::lower($context, $modeArg, $className.'::setIteratorMode() mode');
+        $current = self::loadLongProperty($context, $obj, $className, self::PROP_FLAGS);
+        $fix = $i64->constInt(SplDoublyLinkedListBuiltin::IT_MODE_FIX, false);
+        $lifo = $i64->constInt(SplDoublyLinkedListBuiltin::IT_MODE_LIFO, false);
+        $mask = $i64->constInt(3, false); // IT_MODE_MASK
+        $hasFix = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($current, $fix),
+            $i64->constInt(0, false)
+        );
+        $curLifo = $context->builder->and($current, $lifo);
+        $newLifo = $context->builder->and($mode, $lifo);
+        $lifoChanged = $context->builder->icmp(Builder::INT_NE, $curLifo, $newLifo);
+        $frozen = $context->builder->and($hasFix, $lifoChanged);
+        $badBb = BasicBlockHelper::append($context, 'spldllist_mode_frozen');
+        $okBb = BasicBlockHelper::append($context, 'spldllist_mode_ok');
+        $context->builder->branchIf($frozen, $badBb, $okBb);
+
+        $context->builder->positionAtEnd($badBb);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'RuntimeException',
+            "Iterators' LIFO/FIFO modes for SplStack/SplQueue objects are frozen"
+        );
+        $context->builder->branch($okBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $stored = $context->builder->or(
+            $context->builder->and($mode, $mask),
+            $context->builder->and($current, $fix)
+        );
+        self::storeLongPropertyValue($context, $obj, $className, self::PROP_FLAGS, $stored);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $stored);
+
+        return $slot;
+    }
+
+    /** php-src zim_SplDoublyLinkedList_getIteratorMode (#33987). */
+    public static function compileGetIteratorMode(
+        Context $context,
+        JITVariable $receiver,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $flags = self::loadLongProperty($context, $obj, $className, self::PROP_FLAGS);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $flags);
+
+        return $slot;
+    }
+
+    /** Load `__spl_flags` for foreach LIFO reset (#33987 / #28705). */
+    public static function loadFlags(Context $context, Value $obj, string $className): Value
+    {
+        return self::loadLongProperty($context, $obj, $className, self::PROP_FLAGS);
+    }
+
+    /**
      * php-src SplDoublyLinkedList serialize — flags + dllist HT + empty members (#33966).
      *
      * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33876.
@@ -510,6 +633,79 @@ final class SplDllistJitHelper
         $context->refcount->disableRefcount($copy);
 
         return $copy;
+    }
+
+    private static function coerceIndex(Context $context, JITVariable $index, string $fn): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        if (null !== $index->compileTimeLong) {
+            $lit = (int) $index->compileTimeLong;
+            if ($lit < 0) {
+                return $sizeT->constInt(0x7fffffffffffffff, false);
+            }
+
+            return $sizeT->constInt($lit, false);
+        }
+        $i64 = JitLongArg::lower($context, $index, $fn.'() index');
+
+        return $context->builder->truncOrBitCast($i64, $sizeT);
+    }
+
+    private static function assertIndexInRange(Context $context, Value $ht, Value $idx): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $ok = $context->builder->icmp(Builder::INT_ULT, $idx, $n);
+        $badBb = BasicBlockHelper::append($context, 'spldllist_oob');
+        $okBb = BasicBlockHelper::append($context, 'spldllist_oob_ok');
+        $context->builder->branchIf($ok, $okBb, $badBb);
+        $context->builder->positionAtEnd($badBb);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'OutOfRangeException',
+            'Offset invalid or out of range'
+        );
+        $context->builder->branch($okBb);
+        $context->builder->positionAtEnd($okBb);
+    }
+
+    private static function storeLongProperty(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $prop,
+        int $value
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        self::storeLongPropertyValue($context, $obj, $className, $prop, $i64->constInt($value, true));
+    }
+
+    private static function storeLongPropertyValue(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $prop,
+        Value $value
+    ): void {
+        $slot = $context->type->object->propertySlotFor($obj, $className, $prop);
+        $var = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $value
+        );
+        $context->type->object->propertyStore($slot, $var, JITVariable::TYPE_NATIVE_LONG);
+    }
+
+    private static function loadLongProperty(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $prop
+    ): Value {
+        $slot = $context->type->object->propertyFetch($obj, $className, $prop);
+
+        return $context->helper->loadValue($slot);
     }
 
     private static function htVar(Context $context, Value $obj): JITVariable
