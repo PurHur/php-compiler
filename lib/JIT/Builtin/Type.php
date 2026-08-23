@@ -806,7 +806,7 @@ class Type extends Builtin {
             // (#12910, #21109).
             return;
         }
-        // PowInt / network / date / inet always-on ensureLinked removed (#34243):
+        // PowInt / network / date / inet always-on ensureLinked removed (#34241):
         // JitPow / JitGethost* / JitCheckdnsrr / JitCheckdate / JitDate /
         // JitDateIntervalFormat / JitDeployPath / JitStrptime / JitInet /
         // JitGettimeofday / JitIdate / JitMktime / JitLocaltime / JitGetdate

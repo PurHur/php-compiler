@@ -50,11 +50,11 @@ final class TypeDeadStrftimeAbiRuntimeShrinkTest extends TestCase
     public function testTypeInitializeLazyLinksStringStrftime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('#34243', $type);
+        $this->assertStringContainsString('#34241', $type);
         $this->assertStringNotContainsString(
             'StringStrftime::ensureLinked($this->context)',
             $type,
-            'Builtin\\Type::initialize must not eagerly StringStrftime::ensureLinked (#34243)'
+            'Builtin\\Type::initialize must not eagerly StringStrftime::ensureLinked (#34241)'
         );
     }
 

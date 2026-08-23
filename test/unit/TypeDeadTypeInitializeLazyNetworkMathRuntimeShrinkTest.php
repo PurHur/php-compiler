@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop Type::initialize always-on PowInt/network/date/inet ensureLinked (#34243 / peer #33980).
+ * Drop Type::initialize always-on PowInt/network/date/inet ensureLinked (#34241 / peer #33980).
  *
  * Call-site Jit* / ext/standard owners link lazily (getNamedFunction first) so
  * hello-world and other scripts that never touch these builtins skip NestedJIT
@@ -18,7 +18,7 @@ final class TypeDeadTypeInitializeLazyNetworkMathRuntimeShrinkTest extends TestC
     public function testTypeInitializeDropsEagerPowIntNetworkDateInetEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('#34243', $type);
+        $this->assertStringContainsString('#34241', $type);
         foreach ([
             'PowIntRuntime::ensureLinked($this->context)',
             'GethostbynamelRuntime::ensureLinked($this->context)',
@@ -37,7 +37,7 @@ final class TypeDeadTypeInitializeLazyNetworkMathRuntimeShrinkTest extends TestC
             $this->assertStringNotContainsString(
                 $call,
                 $type,
-                'Builtin\\Type::initialize must not eagerly '.$call.' (#34243)'
+                'Builtin\\Type::initialize must not eagerly '.$call.' (#34241)'
             );
         }
     }
@@ -60,7 +60,7 @@ final class TypeDeadTypeInitializeLazyNetworkMathRuntimeShrinkTest extends TestC
             $path = __DIR__.'/../../'.$rel;
             $this->assertFileExists($path, $rel);
             $source = (string) file_get_contents($path);
-            $this->assertStringContainsString($needle, $source, $rel.' must ensureLinked before lookup (#34243)');
+            $this->assertStringContainsString($needle, $source, $rel.' must ensureLinked before lookup (#34241)');
         }
     }
 
@@ -68,7 +68,7 @@ final class TypeDeadTypeInitializeLazyNetworkMathRuntimeShrinkTest extends TestC
     {
         $runtimeDir = dirname(__DIR__, 2).'/lib/AOT/runtime';
         foreach (['phpc_pow.c', 'network.c', 'inet.c'] as $basename) {
-            $this->assertFileDoesNotExist($runtimeDir.'/'.$basename, $basename.' must stay absent (#34243)');
+            $this->assertFileDoesNotExist($runtimeDir.'/'.$basename, $basename.' must stay absent (#34241)');
         }
     }
 }
