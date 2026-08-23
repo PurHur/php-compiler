@@ -490,6 +490,10 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'null'],
             2 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/standard/array.stub.php — ?string|int|null $index_key = null (#24844)
+        'array_column' => [
+            2 => ['kind' => 'null'],
+        ],
         // php-src ext/standard/array.stub.php — length=null, replacement=[] (#24824)
         // InternalArgInfo int length → 0; replacement typed array (ok) but length must be null.
         'array_splice' => [
