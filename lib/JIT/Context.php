@@ -1747,6 +1747,8 @@ class Context {
         $this->functionProxies['reflectionclass::isfinal'] = new Call\ReflectionClassIsFinal();
         // Thin AOT: unbound isInstantiable → NULL (#34027); VM has ReflectionClassIsInstantiable.
         $this->functionProxies['reflectionclass::isinstantiable'] = new Call\ReflectionClassIsInstantiable();
+        // Thin AOT: unbound isCloneable → NULL (#34040); VM has ReflectionClassIsCloneable (#22109).
+        $this->functionProxies['reflectionclass::iscloneable'] = new Call\ReflectionClassIsCloneable();
         // Thin AOT: unbound kind queries → NULL (#34032); NestedJIT emitKindQuery fails verify.
         $this->functionProxies['reflectionclass::isinterface'] = new Call\ReflectionClassKindQuery('isInterface');
         $this->functionProxies['reflectionclass::isabstract'] = new Call\ReflectionClassKindQuery('isAbstract');
