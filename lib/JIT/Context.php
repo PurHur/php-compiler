@@ -1742,6 +1742,8 @@ class Context {
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
 
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
+        // Thin AOT: unbound getConstructor → unseeded ReflectionMethod → SIGSEGV (#34073).
+        $this->functionProxies['reflectionclass::getconstructor'] = new Call\ReflectionClassGetConstructor();
         $this->functionProxies['reflectionclass::getproperty'] = new Call\ReflectionClassGetProperty();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
         // Thin AOT: isFinal used broken strcasecmp → always true (#34043); memcmp+fold table.
