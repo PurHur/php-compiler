@@ -16265,6 +16265,34 @@ class JIT {
 
                 return;
             }
+            // DOMDocument::getElementById() returns __value__* (?DOMElement). Inline
+            // `$d->getElementById(...)?->prop` typed the temp as TYPE_OBJECT, so nullsafe
+            // skipped the value-box short-circuit and property-fetch GEPed the box (#34019).
+            if ($this->context->scope->toCall instanceof JIT\Call\DomDocumentGetElementById) {
+                $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
+                if ($this->context->hasVariableOp($result)) {
+                    $this->context->getVariableFromOp($result)->free();
+                }
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer($this->context, $slot, $ptr);
+                $resultVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $resultVar->classUserType = 'DOMElement';
+                $this->context->setVariableOp($result, $resultVar);
+                $result->type = new Type(Type::TYPE_OBJECT, [], 'DOMElement');
+                $name = JIT\OperandName::resolve($result);
+                if (null !== $name && '' !== $name) {
+                    $resolved = $this->context->resolveRefAliasName($name);
+                    $this->context->bindVariableByName($resolved, $resultVar);
+                }
+                JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'dom_gei_post_assign');
+
+                return;
+            }
             if (
                 $this->context->hasVariableOp($result)
                 && ('__value__*' === $llvmTy || '__value__' === $llvmTy)
@@ -16290,9 +16318,6 @@ class JIT {
                 }
             }
             $this->assignOperandValue($result, $llvmResult, true);
-            if ($this->context->scope->toCall instanceof JIT\Call\DomDocumentGetElementById) {
-                JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'dom_gei_post_assign');
-            }
 
             return;
         }
