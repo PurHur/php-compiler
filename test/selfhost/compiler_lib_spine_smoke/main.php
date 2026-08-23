@@ -7959,4 +7959,6 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetFileName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNameListQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionExtensionGetFunctionsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionGetFunctions.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionMethodVisibilityRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionMethodVisibilityQuery.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
