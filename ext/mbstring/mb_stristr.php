@@ -15,6 +15,8 @@ use PHPLLVM\Value;
 
 /**
  * mb_stristr() — case-insensitive multibyte strstr (php-src ext/mbstring/mbstring.c; #20006).
+ *
+ * JIT/AOT: compile-time fold via {@see JitMbSearch}; runtime NestedJIT {@see MbSearchJitHelper}.
  */
 final class mb_stristr extends Internal
 {
@@ -62,15 +64,6 @@ final class mb_stristr extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('mb_stristr() requires two to four arguments');
-        }
-        $folded = JitMbSearch::tryStristrFold($context, $args);
-        if (null !== $folded) {
-            return $folded;
-        }
-
-        throw new \LogicException('mb_stristr() is not lowered for JIT/AOT in this compiler build');
+        return JitMbSearch::invokeStristr($context, $args);
     }
 }

@@ -295,6 +295,59 @@ final class JitMbSearch
     }
 
     /**
+     * mb_stristr() — fold literals, else NestedJIT {@see MbSearchJitHelper::stristrArgv}.
+     *
+     * @param list<JITVariable> $args
+     */
+    public static function invokeStristr(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 4) {
+            throw new \LogicException('mb_stristr() requires two to four arguments');
+        }
+        $folded = self::tryStristrFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        $hay = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_stristr', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'mb_stristr', 1, 'needle');
+        $beforeNeedle = $argc >= 3
+            ? JitBoolArg::lowerZParamBool($context, $args[2], 'mb_stristr', 'before_needle', 3)
+            : $context->constantFromBool(false);
+        if ($argc >= 4) {
+            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
+                $encoding = 'UTF-8';
+            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
+                throw new \LogicException('mb_stristr() encoding must be a string literal in this compiler build');
+            } else {
+                $encoding = $args[3]->compileTimeString ?? null;
+                if (null === $encoding) {
+                    throw new \LogicException('mb_stristr() encoding must be a string literal in this compiler build');
+                }
+            }
+        } else {
+            $encoding = 'UTF-8';
+        }
+        self::assertSupportedEncoding($encoding);
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbSearchRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            MbSearchRuntime::stristrHelper($context),
+            [$hay, $needle, $beforeNeedle, $encPtr]
+        );
+
+        return self::boxStringOrFalse($context, $raw);
+    }
+
+    /**
      * NestedJIT string|false → `__value__*` (peer StringHex2bin / #34211).
      */
     private static function boxStringOrFalse(Context $context, Value $raw): Value
