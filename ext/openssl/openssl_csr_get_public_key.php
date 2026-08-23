@@ -14,10 +14,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_csr_get_public_key() — public key from CSR (php-src ext/openssl/openssl.c; #6421 VM, JIT/AOT #33514).
+ * openssl_csr_get_public_key() — public key from CSR (php-src ext/openssl/xp.c; #6421 VM, JIT/AOT #33514).
  *
- * JIT/AOT leftover #33514: catchable argc/TypeError paths (peer openssl_pkey_get_public #33499).
- * Happy-path CSR→key still needs CSR-object AOT (#6421 follow-up).
+ * JIT/AOT: argc/TypeError (#33514); happy-path CSR PEM → OpenSSLAsymmetricKey (#34054).
  */
 final class openssl_csr_get_public_key extends Internal
 {
@@ -73,11 +72,7 @@ final class openssl_csr_get_public_key extends Internal
             return self::jitReturnFalse($context);
         }
 
-        // CSR objects stay VM-shaped (#6421). Clear LogicException on TypeError/argc
-        // gates first (#33514); happy-path bake is a follow-up.
-        throw new \LogicException(
-            'openssl_csr_get_public_key() is not implemented for JIT in this compiler build (issue #6421/#33514)'
-        );
+        return JitOpensslCsrGetPublicKey::invoke($context, $args[0]);
     }
 
     /**
@@ -98,7 +93,8 @@ final class openssl_csr_get_public_key extends Internal
             JITVariable::TYPE_HASHTABLE => 'array',
             JITVariable::TYPE_STRING => null,
             JITVariable::TYPE_OBJECT => self::objectTypeErrorLabel($arg),
-            default => 'mixed',
+            // Value-box / unknown may still be CSR PEM string at runtime (#34054 peer #34038).
+            default => null,
         };
     }
 
