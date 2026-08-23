@@ -1761,6 +1761,8 @@ class Context {
         $this->functionProxies['reflectionclass::isfinal'] = new Call\ReflectionClassIsFinal();
         // Thin AOT: unbound isInstantiable → NULL (#34027); VM has ReflectionClassIsInstantiable.
         $this->functionProxies['reflectionclass::isinstantiable'] = new Call\ReflectionClassIsInstantiable();
+        // Thin AOT: unbound isInstance → NULL (#34098); VM #6302 / peer instanceof tables.
+        $this->functionProxies['reflectionclass::isinstance'] = new Call\ReflectionClassIsInstance();
         // Thin AOT: unbound isCloneable → NULL (#34040); VM has ReflectionClassIsCloneable (#22109).
         $this->functionProxies['reflectionclass::iscloneable'] = new Call\ReflectionClassIsCloneable();
         // Thin AOT: unbound isAnonymous → NULL (#34057); VM has ReflectionClassIsAnonymous (#5105).
