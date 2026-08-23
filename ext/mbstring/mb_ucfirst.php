@@ -15,6 +15,8 @@ use PHPLLVM\Value;
 
 /**
  * mb_ucfirst() — multibyte upper-case first character (php-src ext/mbstring/mbstring.c; PHP 8.4+, #17609, #22794).
+ *
+ * JIT/AOT: compile-time fold + NestedJIT runtime via {@see JitMbUcfirstLcfirst} (#34259 peer #34236).
  */
 final class mb_ucfirst extends Internal
 {
