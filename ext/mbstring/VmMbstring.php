@@ -3308,19 +3308,9 @@ final class VmMbstring
     public static function chr(int $codepoint, string $encoding): string|false
     {
         $encoding = MbstringEncodingRegistry::assertValid($encoding, 'mb_chr', 1);
-        if ('UTF-8' === $encoding) {
-            if (!self::isValidUnicodeCodepoint($codepoint)) {
-                return false;
-            }
-
-            return self::encodeUtf8Codepoint($codepoint);
-        }
-        if ('ASCII' === $encoding || '8BIT' === $encoding) {
-            if ($codepoint < 0 || $codepoint > 255) {
-                return false;
-            }
-
-            return \chr($codepoint);
+        // UTF-8 / ASCII / 8BIT — NestedJIT helper is SSOT with AOT runtime (#34250).
+        if ('UTF-8' === $encoding || 'ASCII' === $encoding || '8BIT' === $encoding) {
+            return MbChrOrdJitHelper::chrArgv($codepoint, $encoding);
         }
         if (!self::isValidUnicodeCodepoint($codepoint)) {
             return false;

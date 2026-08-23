@@ -18,9 +18,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_chr() — codepoint to multibyte character (php-src ext/mbstring/mbstring.c; #4559, #29778, #30759).
+ * mb_chr() — codepoint to multibyte character (php-src ext/mbstring/mbstring.c; #4559, #29778, #30759, #34250).
  *
- * JIT/AOT: compile-time fold via {@see JitMbChrOrd} (peer mb_strtolower / JitMbSearch).
+ * JIT/AOT: compile-time fold + NestedJIT runtime via {@see JitMbChrOrd::invokeChr}.
  * Leftover #33536: catchable argc/TypeError (array) paths (peer openssl_pkey_new #33530).
  */
 final class mb_chr extends Internal
@@ -107,13 +107,7 @@ final class mb_chr extends Internal
             return self::foldFalse($context);
         }
 
-        $folded = JitMbChrOrd::tryChrFold($context, $args);
-        if (null !== $folded) {
-            return $folded;
-        }
-
-        // Non-foldable happy-path still needs runtime lowering (#30759 follow-up / #33536).
-        throw new \LogicException('mb_chr() is not lowered for JIT/AOT in this compiler build');
+        return JitMbChrOrd::invokeChr($context, $args);
     }
 
     /**
