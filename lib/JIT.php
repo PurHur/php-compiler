@@ -20383,6 +20383,7 @@ class JIT {
         if ($toCall instanceof JIT\Call\ReflectionClassConstruct
             || $toCall instanceof JIT\Call\ReflectionObjectConstruct
             || $toCall instanceof JIT\Call\ReflectionFunctionConstruct
+            || $toCall instanceof JIT\Call\ReflectionExtensionConstruct
             || $toCall instanceof JIT\Call\ReflectionParameterConstruct
             || $toCall instanceof JIT\Call\ReflectionPropertyConstruct
             || $toCall instanceof JIT\Call\ReflectionMethodConstruct
