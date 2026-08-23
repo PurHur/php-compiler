@@ -2062,8 +2062,9 @@ final class BuiltinParamNames
                 return ['iterator', 'callback', 'args='];
             case 'generator_to_array':
                 return ['generator', 'preserve_keys'];
+            // php-src ext/standard/basic_functions.stub.php — bool $as_number = false (#25146)
             case 'hrtime':
-                return ['as_number'];
+                return ['as_number='];
             case 'memory_get_usage':
             case 'memory_get_peak_usage':
                 return ['real_usage'];

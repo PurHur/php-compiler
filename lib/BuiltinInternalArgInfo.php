@@ -909,6 +909,8 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
             'date', 'gmdate' => 1 === $index ? '?int' : null,
             'strtotime' => 1 === $index ? '?int' : null,
+            // ext/standard/basic_functions.stub.php — bool $as_number = false; absent from InternalArgInfo (#25146)
+            'hrtime' => 0 === $index ? 'bool' : null,
             // ext/standard/math.stub.php — int|float $num; RoundingMode|int $mode (#24825, #28535)
             'round' => match ($index) {
                 0 => 'int|float',
