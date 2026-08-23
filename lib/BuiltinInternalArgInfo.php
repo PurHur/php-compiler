@@ -198,6 +198,9 @@ final class BuiltinInternalArgInfo
             'preg_replace_callback_array' => 'array|string|null',
             // Zend/zend_builtin_functions.stub.php — absent from InternalArgInfo (#25513)
             'gc_status' => 'array',
+            // ext/standard/array.stub.php — InternalArgInfo empty return (#26113)
+            'current', 'end', 'reset', 'next', 'prev' => 'mixed',
+            'key' => 'string|int|null',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#26104)
             'memory_reset_peak_usage' => 'void',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#25751)
@@ -1173,6 +1176,8 @@ final class BuiltinInternalArgInfo
             'array_first', 'array_last' => 0 === $index ? 'array' : null,
             // ext/standard/array.stub.php — array $array; absent from InternalArgInfo (#26111, #26182)
             'array_key_first', 'array_key_last', 'array_is_list' => 0 === $index ? 'array' : null,
+            // ext/standard/array.stub.php — object|array $array (InternalArgInfo array only) (#26113)
+            'current', 'end', 'reset', 'next', 'prev', 'key' => 0 === $index ? 'object|array' : null,
             // ext/standard/array.stub.php — ?int $length = null, mixed $replacement = [] (#24824)
             'array_splice' => match ($index) {
                 2 => '?int',
