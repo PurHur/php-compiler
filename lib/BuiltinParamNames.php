@@ -71,6 +71,7 @@ final class BuiltinParamNames
             'reflectionmethod::getclosure' => ['object='],
             // php-src ext/reflection/php_reflection.stub.php — ctor names vs InternalArgInfo (#28939)
             'reflectionfunction::__construct' => ['function'],
+            'reflectionparameter::__construct' => ['function', 'parameter'],
             'reflectionclass::__construct' => ['objectOrClass'],
             'reflectionmethod::__construct' => ['objectOrMethod', 'method='],
             'reflectionproperty::__construct' => ['class', 'property'],
