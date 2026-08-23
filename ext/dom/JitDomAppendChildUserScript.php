@@ -255,11 +255,15 @@ final class JitDomAppendChildUserScript
         $tailPhi->addIncoming($firstObj, $useFirst);
         $tailPhi->addIncoming($existingRoot, $useRoot);
         $tailPhi->addIncoming($lastObj, $useLast);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($tailPhi, 'DOMNode', VmDom::PROP_NEXT_SIBLING),
-            $childJit,
-            JITVariable::TYPE_VALUE
-        );
+        // createComment/createElement stand-ins are DOMElement allocations —
+        // saveXML walks PROP_NEXT_SIBLING via Element layout (#34219). Storing on
+        // DOMNode left LiveSlots length/first/last correct but the sibling walk
+        // stopped after the prior child (comment-then-element dropped <root/>).
+        $nullSib = self::nullValueVar($context);
+        $tailJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $tailPhi);
+        JitDomParentChildLinkLayout::storeSibling($context, $tailPhi, VmDom::PROP_NEXT_SIBLING, $childJit);
+        JitDomParentChildLinkLayout::storeSibling($context, $child, VmDom::PROP_PREVIOUS_SIBLING, $tailJit);
+        JitDomParentChildLinkLayout::storeSibling($context, $child, VmDom::PROP_NEXT_SIBLING, $nullSib);
         $objectType->propertyStore(
             $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_LAST_CHILD),
             $childJit,
@@ -462,10 +466,15 @@ final class JitDomAppendChildUserScript
     {
         $objectType = $context->type->object;
         $nodeClassId = $objectType->lookup('DOMNode');
+        $elementClassId = $objectType->lookup('DOMElement');
         $listClassId = $objectType->lookup('DOMNodeList');
-        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD, VmDom::PROP_NEXT_SIBLING, VmDom::PROP_CHILD_NODES] as $prop) {
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD, VmDom::PROP_NEXT_SIBLING, VmDom::PROP_PREVIOUS_SIBLING, VmDom::PROP_CHILD_NODES] as $prop) {
             if (!$objectType->hasProperty($nodeClassId, $prop)) {
                 $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+            // createComment/createElement stand-ins — saveXML sibling walk (#34219).
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
         if (!$objectType->hasProperty($listClassId, 'length')) {
@@ -561,6 +570,20 @@ final class JitDomAppendChildUserScript
         }
 
         throw new \LogicException('DOMDocument::appendChild() expects object nodes');
+    }
+
+    private static function nullValueVar(Context $context): JITVariable
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $ptr)
+        );
     }
 
     private static function boxObjectResult(Context $context, Value $object): Value
