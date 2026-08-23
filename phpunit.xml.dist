@@ -240,6 +240,7 @@
             <file>./test/compliance/SettypeReflection27766VMTest.php</file>
             <file>./test/compliance/StrchrReflection25758VMTest.php</file>
             <file>./test/compliance/StrchrReflection25758JITTest.php</file>
+            <file>./test/compliance/StrstrReflection25759VMTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437VMTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437JITTest.php</file>
             <file>./test/compliance/LinkinfoReadlinkNamed23944VMTest.php</file>
