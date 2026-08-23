@@ -15,6 +15,8 @@ use PHPLLVM\Value;
 
 /**
  * mb_strripos() — case-insensitive reverse multibyte search (php-src ext/mbstring/mbstring.c; #20006).
+ *
+ * JIT/AOT: compile-time fold via {@see JitMbSearch}; runtime NestedJIT {@see MbSearchJitHelper}.
  */
 final class mb_strripos extends Internal
 {
@@ -61,15 +63,6 @@ final class mb_strripos extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('mb_strripos() requires two to four arguments');
-        }
-        $folded = JitMbSearch::tryStrriposFold($context, $args);
-        if (null !== $folded) {
-            return $folded;
-        }
-
-        throw new \LogicException('mb_strripos() is not lowered for JIT/AOT in this compiler build');
+        return JitMbSearch::invokeStrripos($context, $args);
     }
 }
