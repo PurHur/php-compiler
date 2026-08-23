@@ -4834,7 +4834,8 @@ final class VmReflection
             return 'core';
         }
         if (str_starts_with($lc, 'reflection')) {
-            return 'core';
+            // php-src module name is "Reflection" (not Core) — zim_ReflectionClass_getExtensionName (#34139 / #22098).
+            return 'Reflection';
         }
         if (str_starts_with($lc, 'fiber')) {
             return 'core';
