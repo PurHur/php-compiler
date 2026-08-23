@@ -9,19 +9,23 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link hook for mb_strcut() — compiles MbStrcutJitHelper into the module (#4573, #26598).
+ * JIT/AOT link hook for mb_strcut() / mb_substr() NestedJIT helpers (#4573 / #27028 / #34256).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringZstd #26596 / MetaTags #26568).
+ * Both *Argv symbols are listed in COMPILED_HELPERS (peer MbSearchRuntime) so NestedJIT
+ * emits private utf8Step helpers for either entrypoint.
  */
 final class MbStrcut
 {
     private const HELPER_PATH = '/ext/mbstring/MbStrcutJitHelper.php';
 
-    private const HELPER_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbStrcutJitHelper::strcut';
+    private const STRCUT_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbStrcutJitHelper::strcutArgv';
+
+    private const SUBSTR_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSubstrJitHelper::substrArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::HELPER_LOGICAL,
+        self::STRCUT_LOGICAL,
+        self::SUBSTR_LOGICAL,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -37,7 +41,7 @@ final class MbStrcut
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, self::HELPER_LOGICAL, '#26598');
+        return JitVmHelperLink::lookupCompiled($context, self::STRCUT_LOGICAL, '#34256');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -46,25 +50,24 @@ final class MbStrcut
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#26598'
+            '#34256',
+            true
         );
     }
 }
 
-/**
- * JIT/AOT link hook for mb_substr() — compiles MbSubstrJitHelper (#27028).
- *
- * Helper lives in MbStrcutJitHelper.php (shared NestedJIT unit; no new inventory file).
- */
 final class MbSubstr
 {
     private const HELPER_PATH = '/ext/mbstring/MbStrcutJitHelper.php';
 
-    private const HELPER_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSubstrJitHelper::substr';
+    private const STRCUT_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbStrcutJitHelper::strcutArgv';
+
+    private const SUBSTR_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSubstrJitHelper::substrArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::HELPER_LOGICAL,
+        self::STRCUT_LOGICAL,
+        self::SUBSTR_LOGICAL,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -80,7 +83,7 @@ final class MbSubstr
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, self::HELPER_LOGICAL, '#27028');
+        return JitVmHelperLink::lookupCompiled($context, self::SUBSTR_LOGICAL, '#34256');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -89,7 +92,8 @@ final class MbSubstr
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27028'
+            '#34256',
+            true
         );
     }
 }

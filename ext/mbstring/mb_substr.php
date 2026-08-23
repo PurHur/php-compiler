@@ -7,9 +7,11 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbStrcut;
 use PHPCompiler\JIT\Builtin\MbSubstr;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -22,7 +24,7 @@ use PHPLLVM\Value;
  * mb_substr() — multibyte substring (php-src ext/mbstring/mbstring.c; #3239, #27028).
  *
  * php-src mbstring.stub.php arity 4 — no user-facing $truncate (#23603).
- * JIT/AOT: {@see JitMbSubstr} → NestedJIT {@see MbSubstrJitHelper} (#27028).
+ * JIT/AOT: {@see JitMbSubstr} → NestedJIT {@see MbSubstrJitHelper} (#27028 / #34256).
  */
 final class mb_substr extends Internal
 {
@@ -75,9 +77,10 @@ final class mb_substr extends Internal
 }
 
 /**
- * LLVM lowering for mb_substr() — MbSubstrJitHelper NestedJIT (#27028).
+ * LLVM lowering for mb_substr() — MbSubstrJitHelper NestedJIT (#27028 / #34256).
  *
  * Co-located with {@see mb_substr} so composer autoload does not invent a new inventory unit.
+ * Runtime int offsets must go through {@see JitNestedHelperCoerce::callHelper} (raw call SIGSEGVs).
  */
 final class JitMbSubstr
 {
@@ -106,17 +109,15 @@ final class JitMbSubstr
         $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_substr', 0, 'string');
         $start = JitStrictIntArg::lower($context, $args[1], 'mb_substr', 2, 'start');
         $i64 = $context->getTypeFromString('int64');
+        // 4-arg ABI: length=-1 omitted. Extra hasLength int breaks NestedJIT length ABI (#34256).
         if ($argc >= 3) {
             if (JITVariable::TYPE_NULL === $args[2]->type) {
-                $length = $i64->constInt(0, true);
-                $hasLength = $i64->constInt(0, false);
+                $length = $i64->constInt(-1, true);
             } else {
                 $length = JitStrictIntArg::lower($context, $args[2], 'mb_substr', 3, 'length');
-                $hasLength = $i64->constInt(1, false);
             }
         } else {
-            $length = $i64->constInt(0, true);
-            $hasLength = $i64->constInt(0, false);
+            $length = $i64->constInt(-1, true);
         }
         if ($argc >= 4) {
             if (JITVariable::TYPE_STRING !== $args[3]->type) {
@@ -132,16 +133,18 @@ final class JitMbSubstr
             );
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbSubstr::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
         $encPtr = $context->builder->load($context->constantStringFromString($encoding));
-        $resultStr = $context->builder->call(
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbSubstr::helperFunction($context),
-            $str,
-            $start,
-            $length,
-            $hasLength,
-            $encPtr
+            [$str, $start, $length, $encPtr]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $resultStr);
 
         $slot = JitValueBox::alloc($context);

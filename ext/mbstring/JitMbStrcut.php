@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbStrcut;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for mb_strcut() — MbStrcutJitHelper in-module (#4573). */
+/**
+ * LLVM lowering for mb_strcut() — MbStrcutJitHelper in-module (#4573 / #34256).
+ *
+ * Runtime int offsets must go through {@see JitNestedHelperCoerce::callHelper} (raw call SIGSEGVs).
+ */
 final class JitMbStrcut
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -60,15 +66,18 @@ final class JitMbStrcut
             );
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbStrcut::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
         $encPtr = $context->builder->load($context->constantStringFromString($encoding));
-        $resultStr = $context->builder->call(
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbStrcut::helperFunction($context),
-            $str,
-            $from,
-            $length,
-            $encPtr
+            [$str, $from, $length, $encPtr]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $resultStr);
 
         $slot = JitValueBox::alloc($context);
