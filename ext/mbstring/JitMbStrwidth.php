@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbStrwidth;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for mb_strwidth() — MbStrwidthJitHelper in-module (#3495). */
+/**
+ * LLVM lowering for mb_strwidth() / mb_strimwidth() — MbStrwidthJitHelper in-module (#3495, #34264).
+ */
 final class JitMbStrwidth
 {
     public static function strwidth(Context $context, JITVariable ...$args): Value
@@ -90,16 +94,21 @@ final class JitMbStrwidth
         }
         self::assertSupportedEncoding($encoding);
 
+        // NestedJIT helper compile can clear insert; restore before arg coerce/call (#34264 peer #34256).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbStrwidth::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
         $encPtr = $context->builder->load($context->constantStringFromString($encoding));
-        $resultStr = $context->builder->call(
+        // Runtime int ABI + boxed string return — direct call SIGSEGVs (#34264 / #3495 leftover).
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbStrwidth::strimwidthFunction($context),
-            $str,
-            $from,
-            $width,
-            $marker,
-            $encPtr
+            [$str, $from, $width, $marker, $encPtr]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::materializeOwnedString($context, $resultStr);
     }
