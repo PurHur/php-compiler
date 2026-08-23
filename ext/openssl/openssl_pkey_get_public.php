@@ -16,8 +16,7 @@ use PHPLLVM\Value;
 /**
  * openssl_pkey_get_public() — load public key (php-src ext/openssl/openssl.c; #20240 VM, JIT/AOT #33499).
  *
- * JIT/AOT leftover #33499: catchable argc/TypeError paths (peer openssl_pkey_get_details #33496).
- * Happy-path key/cert/PEM → OpenSSLAsymmetricKey still needs key-object AOT (#6295 follow-up).
+ * JIT/AOT: argc/TypeError paths (#33499); happy-path PEM/key → OpenSSLAsymmetricKey (#34038).
  */
 final class openssl_pkey_get_public extends Internal
 {
@@ -72,17 +71,15 @@ final class openssl_pkey_get_public extends Internal
             return self::jitReturnFalse($context);
         }
 
-        // Key/cert/PEM objects stay VM-shaped (#7268 / #6295). Clear LogicException on
-        // TypeError/argc gates first (#33499); happy-path bake is a follow-up.
-        throw new \LogicException(
-            'openssl_pkey_get_public() is not implemented for JIT in this compiler build (issue #20240/#33499)'
-        );
+        // Hashtable / value-box PEMs from openssl_pkey_get_details()['key'] stay TYPE_UNKNOWN
+        // until runtime — accept them (peer #34030); wrong scalars already rejected above.
+        return JitOpensslPkeyGetPublic::fromArg($context, $arg);
     }
 
     /**
      * Zend stub union: OpenSSLAsymmetricKey|OpenSSLCertificate|array|string.
      * Compile-time null/bool/int/float (and wrong named objects) → TypeError.
-     * Opaque objects / string / array / accepted classes fall through to happy-path follow-up.
+     * Opaque objects / string / array / value-box fall through to happy-path (#34038).
      *
      * @return non-empty-string|null
      */
@@ -98,7 +95,8 @@ final class openssl_pkey_get_public extends Internal
             JITVariable::TYPE_NATIVE_DOUBLE => 'float',
             JITVariable::TYPE_STRING, JITVariable::TYPE_HASHTABLE => null,
             JITVariable::TYPE_OBJECT => self::objectTypeErrorLabel($arg),
-            default => 'mixed',
+            // Unknown / value-box may still be string|key at runtime (#34038).
+            default => null,
         };
     }
 

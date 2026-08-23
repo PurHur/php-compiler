@@ -16,8 +16,7 @@ use PHPLLVM\Value;
 /**
  * openssl_get_publickey() — alias of openssl_pkey_get_public (php-src; #20240 VM, JIT/AOT #33503).
  *
- * JIT/AOT leftover #33503: catchable argc/TypeError paths (peer openssl_pkey_get_public #33499).
- * Happy-path key/cert/PEM → OpenSSLAsymmetricKey still needs key-object AOT (#6295 follow-up).
+ * JIT/AOT: argc/TypeError paths (#33503); happy-path shares #34038 with openssl_pkey_get_public.
  */
 final class openssl_get_publickey extends Internal
 {
@@ -72,17 +71,13 @@ final class openssl_get_publickey extends Internal
             return self::jitReturnFalse($context);
         }
 
-        // Key/cert/PEM objects stay VM-shaped (#7268 / #6295). Clear LogicException on
-        // TypeError/argc gates first (#33503); happy-path bake is a follow-up.
-        throw new \LogicException(
-            'openssl_get_publickey() is not implemented for JIT in this compiler build (issue #20240/#33503)'
-        );
+        return JitOpensslPkeyGetPublic::fromArg($context, $arg);
     }
 
     /**
      * Zend stub union: OpenSSLAsymmetricKey|OpenSSLCertificate|array|string.
      * Compile-time null/bool/int/float (and wrong named objects) → TypeError.
-     * Opaque objects / string / array / accepted classes fall through to happy-path follow-up.
+     * Opaque objects / string / array / value-box fall through to happy-path (#34038).
      *
      * @return non-empty-string|null
      */
@@ -98,7 +93,7 @@ final class openssl_get_publickey extends Internal
             JITVariable::TYPE_NATIVE_DOUBLE => 'float',
             JITVariable::TYPE_STRING, JITVariable::TYPE_HASHTABLE => null,
             JITVariable::TYPE_OBJECT => self::objectTypeErrorLabel($arg),
-            default => 'mixed',
+            default => null,
         };
     }
 
