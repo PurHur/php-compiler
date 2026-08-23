@@ -19,9 +19,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class Issue33987DllistOffsetModeAotTest extends TestCase
 {
-    private const EXPECTED = "b|y|3\nb|y\nmode=2\na,b,c,\nstack_mode=6\nqueue_mode=4\n";
+    private const EXPECTED = "b|y|3\nb|y\nmode=2\nc,b,a,\nstack_mode=6\nqueue_mode=4\n";
 
-    public function testAotOffsetAndIteratorModeMatchPartialZend(): void
+    public function testAotOffsetAndIteratorModeMatchZend(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
@@ -40,8 +40,6 @@ final class Issue33987DllistOffsetModeAotTest extends TestCase
             $runOut = [];
             exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
             $this->assertSame(0, $runRc, implode("\n", $runOut));
-            // LIFO foreach order after setIteratorMode remains HT-FIFO under thin AOT
-            // (follow-up: runtime reverse walk); offset*/mode/defaults must match Zend.
             $this->assertSame(self::EXPECTED, implode("\n", $runOut)."\n");
         } finally {
             @unlink($bin);

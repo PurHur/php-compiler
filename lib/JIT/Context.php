@@ -491,6 +491,13 @@ class Context {
     public array $foreachReverseHtSlots = [];
 
     /**
+     * SplDoublyLinkedList foreach — runtime `__spl_flags` IT_MODE_LIFO alloca (i1) (#33987).
+     *
+     * @var array<string, \PHPLLVM\Value>
+     */
+    public array $foreachRuntimeReverseSlots = [];
+
+    /**
      * Map key for foreach alloca tables — include activeFunction so NestedJIT of a
      * multi-method helper cannot reuse a sibling method's entry alloca when
      * spl_object_id values collide after GC (#28053 / #27228).

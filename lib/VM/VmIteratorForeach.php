@@ -134,6 +134,63 @@ final class VmIteratorForeach
         $context->builder->store($nextFree, self::indexSlot($context, $slotKey));
     }
 
+    /** SplDoublyLinkedList only — Queue/Stack LIFO/FIFO are IT_MODE_FIX (#33987). */
+    private static function isDllistRuntimeLifoCandidate(?string $containerUserType): bool
+    {
+        if (null === $containerUserType || '' === $containerUserType) {
+            return false;
+        }
+
+        return 'spldoublylinkedlist' === strtolower(ltrim($containerUserType, '\\'));
+    }
+
+    /**
+     * Reset packed walk direction from `__spl_flags` & IT_MODE_LIFO (#33987).
+     * Stores a runtime i1 so valid() can dual-path without compile-time mode knowledge.
+     */
+    private static function initHashtableIndexMaybeReverseFromFlags(
+        Context $context,
+        JitVariable $htVar,
+        JitVariable $slotKey,
+        string $containerUserType
+    ): void {
+        $mapKey = $context->foreachSlotMapKey($slotKey);
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        if (!isset($context->foreachRuntimeReverseSlots[$mapKey])) {
+            $context->foreachRuntimeReverseSlots[$mapKey] = BasicBlockHelper::entryAlloca($context, $i1);
+        }
+        $revSlot = $context->foreachRuntimeReverseSlots[$mapKey];
+        $receiver = JitVariable::TYPE_OBJECT === $slotKey->type
+            ? $slotKey
+            : VmIteratorProtocol::normalizeObjectReceiver($context, $slotKey);
+        $obj = $context->helper->loadValue($receiver);
+        $className = ltrim($containerUserType, '\\');
+        $flags = SplDllistJitHelper::loadFlags($context, $obj, $className);
+        $lifoBit = $context->builder->and(
+            $flags,
+            $i64->constInt(SplDllistJitHelper::IT_MODE_LIFO, false)
+        );
+        $isLifo = $context->builder->icmp(Builder::INT_NE, $lifoBit, $i64->constInt(0, false));
+        $context->builder->store($isLifo, $revSlot);
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $lifoBb = $fn->appendBasicBlock('foreach_dll_lifo_init');
+        $fifoBb = $fn->appendBasicBlock('foreach_dll_fifo_init');
+        $doneBb = $fn->appendBasicBlock('foreach_dll_mode_done');
+        $context->builder->branchIf($isLifo, $lifoBb, $fifoBb);
+
+        $context->builder->positionAtEnd($lifoBb);
+        self::initHashtableIndexReverse($context, $htVar, $slotKey);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($fifoBb);
+        self::initHashtableIndex($context, $slotKey);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+    }
+
     private static function usesWeakMapHashtable(?string $containerUserType): bool
     {
         return null !== $containerUserType
@@ -467,6 +524,12 @@ final class VmIteratorForeach
 
             return;
         }
+        // SplDoublyLinkedList: honour `__spl_flags` IT_MODE_LIFO at reset (#33987 / #28705).
+        if (null !== $containerUserType && self::isDllistRuntimeLifoCandidate($containerUserType)) {
+            self::initHashtableIndexMaybeReverseFromFlags($context, $array, $slotKey, $containerUserType);
+
+            return;
+        }
         if (SplOuterIteratorHt::isReverseHtWalk($containerUserType)) {
             $context->foreachReverseHtSlots[$context->foreachSlotMapKey($slotKey)] = true;
             self::initHashtableIndexReverse($context, $array, $slotKey);
@@ -580,9 +643,52 @@ final class VmIteratorForeach
 
     private static function compileValidHashtable(Context $context, JitVariable $array, JitVariable $slotKey): \PHPLLVM\Value
     {
-        if (isset($context->foreachReverseHtSlots[$context->foreachSlotMapKey($slotKey)])) {
+        $mapKey = $context->foreachSlotMapKey($slotKey);
+        if (isset($context->foreachRuntimeReverseSlots[$mapKey])) {
+            return self::compileValidHashtableMaybeReverse($context, $array, $slotKey);
+        }
+        if (isset($context->foreachReverseHtSlots[$mapKey])) {
             return self::compileValidHashtableReverse($context, $array, $slotKey);
         }
+
+        return self::compileValidHashtableForward($context, $array, $slotKey);
+    }
+
+    /** Dual-path valid for ddl when `__spl_flags` LIFO is only known at runtime (#33987). */
+    private static function compileValidHashtableMaybeReverse(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey
+    ): \PHPLLVM\Value {
+        $mapKey = $context->foreachSlotMapKey($slotKey);
+        $revFlag = $context->builder->load($context->foreachRuntimeReverseSlots[$mapKey]);
+        $fn = BasicBlockHelper::parentFunction($context);
+        $revBb = $fn->appendBasicBlock('foreach_valid_runtime_rev');
+        $fwdBb = $fn->appendBasicBlock('foreach_valid_runtime_fwd');
+        $merge = $fn->appendBasicBlock('foreach_valid_runtime_merge');
+        $context->builder->branchIf($revFlag, $revBb, $fwdBb);
+
+        $context->builder->positionAtEnd($revBb);
+        $rev = self::compileValidHashtableReverse($context, $array, $slotKey);
+        $revEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($fwdBb);
+        $fwd = self::compileValidHashtableForward($context, $array, $slotKey);
+        $fwdEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $i1 = $context->getTypeFromString('int1');
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($rev, $revEnd);
+        $phi->addIncoming($fwd, $fwdEnd);
+
+        return $phi;
+    }
+
+    private static function compileValidHashtableForward(Context $context, JitVariable $array, JitVariable $slotKey): \PHPLLVM\Value
+    {
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
