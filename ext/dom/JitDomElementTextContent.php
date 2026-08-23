@@ -177,18 +177,10 @@ final class JitDomElementTextContent
             if (null !== $textLit) {
                 self::syncParentInnerXmlAfterTextContentWrite($context, $receiver, $textLit, $lvalue);
             }
-            if (null !== $lvalue->objectPropertySlot) {
-                $context->type->object->propertyStore(
-                    $lvalue->objectPropertySlot,
-                    new JITVariable(
-                        $context,
-                        JITVariable::TYPE_STRING,
-                        JITVariable::KIND_VALUE,
-                        $str
-                    ),
-                    JITVariable::TYPE_STRING
-                );
-            }
+            // fetchUserScriptTextContentMaybeAttr returns KIND_VALUE without objectPropertySlot
+            // (#33904) — always store onto the Element STRING slots so reads/saveXML see the
+            // write (regression of #33293 / #33983).
+            self::emitElementTextContentSlotSync($context, $receiver, $str);
             $context->builder->branch($bbDone);
 
             $context->builder->positionAtEnd($bbDone);
@@ -276,9 +268,14 @@ final class JitDomElementTextContent
         $var->objectPropertyType = JITVariable::TYPE_STRING;
         if (null !== $receiverVar?->compileTimeDomChildIndex) {
             $var->compileTimeDomChildIndex = $receiverVar->compileTimeDomChildIndex;
+        } elseif (null !== JitDomNodeChildProperty::$lastFetchedChildIndex) {
+            // Assign temps often drop compileTimeDomChildIndex (#33983 / peer #32947).
+            $var->compileTimeDomChildIndex = JitDomNodeChildProperty::$lastFetchedChildIndex;
         }
         if (null !== $receiverVar?->compileTimeDomTagName) {
             $var->compileTimeDomTagName = $receiverVar->compileTimeDomTagName;
+        } elseif (null !== JitDomNodeChildProperty::$lastFetchedTagName) {
+            $var->compileTimeDomTagName = JitDomNodeChildProperty::$lastFetchedTagName;
         }
 
         return $var;
@@ -316,6 +313,42 @@ final class JitDomElementTextContent
             if (null !== $local) {
                 DomUserScriptAttributeCacheLlvm::setLiteralValue($ns, $local, $valueLit);
             }
+        }
+    }
+
+    /**
+     * Sync DOMElement textContent/nodeValue STRING slots after a user-script write (#33983).
+     *
+     * Thin-AOT fetch reads these seeded slots; #33904's Attr/Element fetch no longer
+     * exposes objectPropertySlot, so stores must target propertySlotFor directly.
+     */
+    private static function emitElementTextContentSlotSync(
+        Context $context,
+        Value $receiver,
+        Value $str
+    ): void {
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $jitStr = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $owned
+        );
+        // Keep aliases in sync — Element nodeValue mirrors textContent under php-src.
+        foreach ([self::PROP_TEXT_CONTENT, self::PROP_NODE_VALUE] as $syncProp) {
+            if (!$objectType->hasProperty($elementClassId, $syncProp)) {
+                $objectType->defineProperty($elementClassId, $syncProp, JITVariable::TYPE_STRING);
+            }
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($receiver, self::CLASS_ELEMENT, $syncProp),
+                $jitStr,
+                JITVariable::TYPE_STRING
+            );
         }
     }
 
@@ -460,9 +493,14 @@ final class JitDomElementTextContent
         $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
         // Prefer the element Variable's stamped index (survives nextSibling) over
         // lastFetched* statics — documentElement writes leave index null (#33293).
+        // Prefer the element Variable's stamped index (survives nextSibling) over
+        // lastFetched* statics — documentElement writes leave lastFetched null
+        // ({@see JitDomGetNodePath}). Fall back when assign/temps drop the stamp (#33983).
         $index = $lvalue->compileTimeDomChildIndex
+            ?? JitDomNodeChildProperty::$lastFetchedChildIndex
             ?? null;
         $tag = $lvalue->compileTimeDomTagName
+            ?? JitDomNodeChildProperty::$lastFetchedTagName
             ?? null;
         if (null === $index) {
             // No child-index on the receiver: this is documentElement (or unknown).
