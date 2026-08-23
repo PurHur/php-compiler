@@ -556,6 +556,8 @@ final class BuiltinInternalArgInfo
             'php_sapi_name' => 'string|false',
             // ext/standard/info.stub.php — InternalArgInfo empty return; Zend : bool (#24508)
             'phpcredits' => 'bool',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend : true (#27728, re-#24550)
+            'phpinfo' => 'true',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend array|float (#27906)
             'gettimeofday' => 'array|float',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend string|float (#25967)

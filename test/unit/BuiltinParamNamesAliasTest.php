@@ -3012,6 +3012,12 @@ PHP;
         self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('phpcredits'));
     }
 
+    /** @covers issue #27728 (re-#24550) — phpinfo(): true */
+    public function testPhpinfoStubReturnTrue(): void
+    {
+        self::assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('phpinfo'));
+    }
+
     /** @covers issue #23275 / #25147 */
     public function testMktimeGmmktimeZendStubNamedParams(): void
     {
