@@ -14,6 +14,9 @@ use PHPLLVM\Value;
 /** DOMDocument::saveXML() — user-script AOT (#18268). */
 final class DomDocumentSaveXML implements Call
 {
+    /** @var list<string> */
+    public array $paramNames = ['node=', 'options='];
+
     public function call(Context $context, Variable ...$args): Value
     {
         DomSaveXMLRuntime::ensureLinked($context);

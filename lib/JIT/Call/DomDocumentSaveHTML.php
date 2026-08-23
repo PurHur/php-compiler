@@ -14,6 +14,9 @@ use PHPLLVM\Value;
 /** DOMDocument::saveHTML() — user-script AOT (#18268). */
 final class DomDocumentSaveHTML implements Call
 {
+    /** @var list<string> */
+    public array $paramNames = ['node=', 'options='];
+
     public function call(Context $context, Variable ...$args): Value
     {
         DomSaveHTMLRuntime::ensureLinked($context);
