@@ -1821,6 +1821,8 @@ class Context {
         $this->functionProxies['reflectionclass::setstaticpropertyvalue'] = new Call\ReflectionClassSetStaticPropertyValue();
         // Thin AOT: unbound getExtensionName → NULL (#34139); VM #7358 / peer getFileName #34096.
         $this->functionProxies['reflectionclass::getextensionname'] = new Call\ReflectionClassGetExtensionName();
+        // Thin AOT: unbound getExtension → NULL (#34145); VM #11462 / peer getExtensionName #34139.
+        $this->functionProxies['reflectionclass::getextension'] = new Call\ReflectionClassGetExtension();
         if (CompilerVersion::supportsLazyObjectFactories()) {
             $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
             $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();

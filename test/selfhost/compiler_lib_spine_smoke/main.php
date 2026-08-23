@@ -5720,6 +5720,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetModifiersRunti
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassSourceLocationRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassKindNameTableRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetExtensionNameRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetExtensionRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionEnumJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionNamedArgumentsLookupRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionNamedArgumentsLowering.php';
@@ -6375,6 +6376,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetStaticProperties.
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetStaticPropertyValue.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassSetStaticPropertyValue.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetExtensionName.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetExtension.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassClassMapQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassClassMapRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetTraitAliases.php';

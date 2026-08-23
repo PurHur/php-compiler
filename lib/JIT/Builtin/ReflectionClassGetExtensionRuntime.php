@@ -4,30 +4,31 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\LibcExtern;
-use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT ReflectionClass::getExtensionName() (#34139).
+ * Thin-AOT ReflectionClass::getExtension() (#34145).
  *
- * Name (from ReflectionClass) → extension string for internal classes, or
- * bool false for user-defined / unknown (php-src zim_ReflectionClass_getExtensionName /
- * {@see \PHPCompiler\VM\ReflectionSupport::returnExtensionName}).
+ * Name (from ReflectionClass) → constructed ReflectionExtension for internal
+ * classes, or null for user-defined / unknown (php-src zim_ReflectionClass_getExtension /
+ * {@see \PHPCompiler\VM\ReflectionSupport::returnExtension}).
  *
- * Peer memcmp name tables: {@see ReflectionClassGetFileNameRuntime} (#34096).
+ * Reuses the lowercase name→extension table from
+ * {@see ReflectionClassGetExtensionNameRuntime} (#34139). Object allocation
+ * mirrors {@see \PHPCompiler\JIT\Call\ReflectionClassGetParentClass} (#34069).
  */
-final class ReflectionClassGetExtensionNameRuntime
+final class ReflectionClassGetExtensionRuntime
 {
     private const MAX_NAME_LEN = 512;
 
     /**
-     * @return Value __value__* result slot (string|false)
+     * @return Value __value__* result slot (ReflectionExtension|null)
      */
     public static function emit(Context $context, Value $nameCstr, Value $nameLen): Value
     {
@@ -37,17 +38,15 @@ final class ReflectionClassGetExtensionNameRuntime
         $resultPtr = JitValueBox::pointer($context, $resultSlot);
         $fn = BasicBlockHelper::parentFunction($context);
         $entry = $context->builder->getInsertBlock();
-        $merge = $fn->appendBasicBlock('refl_getextensionname_merge');
-        $miss = $fn->appendBasicBlock('refl_getextensionname_miss');
-        $fold = $fn->appendBasicBlock('refl_getextensionname_fold');
+        $merge = $fn->appendBasicBlock('refl_getextension_merge');
+        $miss = $fn->appendBasicBlock('refl_getextension_miss');
+        $fold = $fn->appendBasicBlock('refl_getextension_fold');
 
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
-        $charPtr = $context->getTypeFromString('char*');
-        $i1 = $context->getTypeFromString('int1');
 
         $context->builder->positionAtEnd($entry);
         $buf = $context->builder->alloca($i8->arrayType(self::MAX_NAME_LEN));
@@ -62,14 +61,14 @@ final class ReflectionClassGetExtensionNameRuntime
         $context->builder->positionAtEnd($fold);
         $idxAlloca = $context->builder->alloca($sizeT);
         $context->builder->store($sizeT->constInt(0, false), $idxAlloca);
-        $loop = $fn->appendBasicBlock('refl_getextensionname_fold_loop');
-        $afterFold = $fn->appendBasicBlock('refl_getextensionname_after_fold');
+        $loop = $fn->appendBasicBlock('refl_getextension_fold_loop');
+        $afterFold = $fn->appendBasicBlock('refl_getextension_after_fold');
         $context->builder->branch($loop);
 
         $context->builder->positionAtEnd($loop);
         $idx = $context->builder->load($idxAlloca);
         $foldDone = $context->builder->icmp(Builder::INT_EQ, $idx, $nameLen);
-        $body = $fn->appendBasicBlock('refl_getextensionname_fold_body');
+        $body = $fn->appendBasicBlock('refl_getextension_fold_body');
         $context->builder->branchIf($foldDone, $afterFold, $body);
 
         $context->builder->positionAtEnd($body);
@@ -88,7 +87,7 @@ final class ReflectionClassGetExtensionNameRuntime
         );
         $context->builder->branch($loop);
 
-        $pairs = self::internalExtensionPairs($context);
+        $pairs = ReflectionClassGetExtensionNameRuntime::internalExtensionPairs($context);
         $checkBlock = $afterFold;
         $hitIdx = 0;
         foreach ($pairs as [$lcName, $extName]) {
@@ -97,8 +96,8 @@ final class ReflectionClassGetExtensionNameRuntime
                 continue;
             }
 
-            $matchBlock = $fn->appendBasicBlock('refl_getextensionname_hit_'.$hitIdx);
-            $nextCheck = $fn->appendBasicBlock('refl_getextensionname_try_'.$hitIdx);
+            $matchBlock = $fn->appendBasicBlock('refl_getextension_hit_'.$hitIdx);
+            $nextCheck = $fn->appendBasicBlock('refl_getextension_try_'.$hitIdx);
             $context->builder->positionAtEnd($checkBlock);
 
             $wantLen = $sizeT->constInt($wantLenInt, false);
@@ -125,18 +124,26 @@ final class ReflectionClassGetExtensionNameRuntime
             $context->builder->branchIf($match, $matchBlock, $nextCheck);
 
             $context->builder->positionAtEnd($matchBlock);
-            $str = $context->builder->call(
-                $context->lookupFunction('__string__init'),
-                $i64->constInt(\strlen($extName), false),
-                $context->builder->pointerCast(
-                    $context->constantFromString($extName),
-                    $charPtr
-                )
+            $reClassId = $context->type->object->lookup('ReflectionExtension');
+            $reObj = $context->type->object->allocate($reClassId);
+            $extLen = \strlen($extName);
+            $extCstr = $context->builder->pointerCast(
+                $context->constantFromString($extName),
+                $i8p
             );
+            ReflectionSetup::emitSetStringPropertyFromCstr(
+                $context,
+                $reObj,
+                'ReflectionExtension',
+                ReflectionSupport::PROP_EXTENSION_NAME,
+                $extCstr,
+                $sizeT->constInt($extLen, false)
+            );
+            ReflectionSetup::markConstructed($context, $reObj);
             $context->builder->call(
-                $context->lookupFunction('__value__writeString'),
+                $context->lookupFunction('__value__writeObject'),
                 $resultPtr,
-                $str
+                $reObj
             );
             $context->builder->branch($merge);
 
@@ -148,41 +155,14 @@ final class ReflectionClassGetExtensionNameRuntime
         $context->builder->branch($miss);
 
         $context->builder->positionAtEnd($miss);
-        JitValueBox::writeBool($context, $resultSlot, $i1->constInt(0, false));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $resultPtr
+        );
         $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($merge);
 
         return $resultSlot;
-    }
-
-    /**
-     * @return list<array{0: string, 1: string}> lowercase class name → extension name
-     */
-    public static function internalExtensionPairs(Context $context): array
-    {
-        /** @var array<string, string> $byLc */
-        $byLc = [];
-        $vmCtx = $context->runtime->vmContext ?? null;
-        if (null !== $vmCtx && \is_array($vmCtx->classes ?? null)) {
-            foreach ($vmCtx->classes as $entry) {
-                if (!$entry instanceof ClassEntry || !$entry->isInternal) {
-                    continue;
-                }
-                $lc = strtolower(ltrim((string) $entry->name, '\\'));
-                if ('' === $lc) {
-                    continue;
-                }
-                $byLc[$lc] = VmReflection::extensionNameForInternalClass($entry->name);
-            }
-        }
-        $pairs = [];
-        foreach ($byLc as $lc => $ext) {
-            $pairs[] = [$lc, $ext];
-        }
-        // Stable order for deterministic IR.
-        usort($pairs, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
-
-        return $pairs;
     }
 }
