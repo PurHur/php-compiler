@@ -5,18 +5,20 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * Lowered into JIT/AOT modules that call mb_strcut() / mb_substr() at runtime (#4573 / #27028 / #34256).
+ * NestedJIT helpers for mb_strcut() / mb_substr() (#4573 / #27028 / #34256).
  *
- * NestedJIT must not call {@see VmMbstring::strcut}/{@see VmMbstring::substr}.
- * Do not reference {@see PHP_INT_MIN} in NestedJIT bodies — it yields empty results (#34256).
- * No ternaries (NestedJIT assign-type errors). Peel with strlen/ord/substr + if/while only.
+ * Constraints (thin AOT NestedJIT):
+ * - No VmMbstring / VmString (silent-return / SIGSEGV).
+ * - No private methods (omitted when only one COMPILED_HELPERS symbol is linked).
+ * - No ternaries (NestedJIT assign-type errors).
+ * - No PHP_INT_MIN in helper bodies (yields empty under NestedJIT).
+ * - *Argv names bypass stale helper-runtime cache.
  *
- * SSOT (VM / compile-time fold): {@see VmMbstring::strcut()} / {@see VmMbstring::substr()}
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strcut), PHP_FUNCTION(mb_substr)
  */
 final class MbStrcutJitHelper
 {
-    /** @param int $length negative means omitted/null (cut to end) — NestedJIT ABI */
+    /** @param int $length negative → omitted (to end) */
     public static function strcutArgv(string $string, int $from, int $length, string $encoding): string
     {
         $byteLen = \strlen($string);
@@ -104,14 +106,11 @@ final class MbStrcutJitHelper
     }
 }
 
-/**
- * Lowered into JIT/AOT modules that call mb_substr() at runtime (#27028 / #34256).
- *
- * 5-arg ABI: $hasLength 0 = omitted length (to end). Avoid PHP_INT_MIN sentinel (#34256).
- * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_substr).
- */
 final class MbSubstrJitHelper
 {
+    /**
+     * @param int $hasLength 0 = omitted/null length (to end); 1 = use $length
+     */
     public static function substrArgv(
         string $string,
         int $start,
@@ -120,20 +119,22 @@ final class MbSubstrJitHelper
         string $encoding
     ): string {
         $byteLen = \strlen($string);
+
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            $charLen = $byteLen;
             if ($start < 0) {
-                $start = $start + $byteLen;
+                $start = $start + $charLen;
             }
             if ($start < 0) {
                 $start = 0;
             }
-            if ($start >= $byteLen) {
+            if ($start >= $charLen) {
                 return '';
             }
             if (0 === $hasLength) {
-                $length = $byteLen - $start;
+                $length = $charLen - $start;
             } elseif ($length < 0) {
-                $length = $byteLen - $start + $length;
+                $length = $charLen - $start + $length;
                 if ($length < 0) {
                     return '';
                 }

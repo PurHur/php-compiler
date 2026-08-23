@@ -109,15 +109,18 @@ final class JitMbSubstr
         $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_substr', 0, 'string');
         $start = JitStrictIntArg::lower($context, $args[1], 'mb_substr', 2, 'start');
         $i64 = $context->getTypeFromString('int64');
-        // 4-arg ABI: PHP_INT_MIN length = omitted. Separate hasLength mis-binds under NestedJIT (#34256).
+        // hasLength flag (not PHP_INT_MIN / -1 sentinel) — NestedJIT ABI (#34256).
         if ($argc >= 3) {
             if (JITVariable::TYPE_NULL === $args[2]->type) {
-                $length = $i64->constInt(\PHP_INT_MIN, true);
+                $length = $i64->constInt(0, true);
+                $hasLength = $i64->constInt(0, false);
             } else {
                 $length = JitStrictIntArg::lower($context, $args[2], 'mb_substr', 3, 'length');
+                $hasLength = $i64->constInt(1, false);
             }
         } else {
-            $length = $i64->constInt(\PHP_INT_MIN, true);
+            $length = $i64->constInt(0, true);
+            $hasLength = $i64->constInt(0, false);
         }
         if ($argc >= 4) {
             if (JITVariable::TYPE_STRING !== $args[3]->type) {
@@ -142,7 +145,7 @@ final class JitMbSubstr
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             MbSubstr::helperFunction($context),
-            [$str, $start, $length, $encPtr]
+            [$str, $start, $length, $hasLength, $encPtr]
         );
         $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $resultStr);
