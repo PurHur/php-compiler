@@ -1,5 +1,6 @@
 <?php
-// #33937 / re-#22710 / #30274 — foreign Element mutation must be Wrong Document Error (code 4).
+// #33937 / #34089 / re-#22710 / #30274 — foreign Element mutation must be Wrong Document Error (code 4).
+// #34089: foreach + three mutation lowerings must not intermittent-SIGSEGV under thin AOT.
 $d1 = new DOMDocument();
 $d1->loadXML('<r><a/></r>');
 $d2 = new DOMDocument();
