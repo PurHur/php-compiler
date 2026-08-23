@@ -806,20 +806,13 @@ class Type extends Builtin {
             // (#12910, #21109).
             return;
         }
-        PowIntRuntime::ensureLinked($this->context);
-        GethostbynamelRuntime::ensureLinked($this->context);
-        GethostbyaddrRuntime::ensureLinked($this->context);
-        CheckdnsrrRuntime::ensureLinked($this->context);
-        CheckdateRuntime::ensureLinked($this->context);
-        DateIntervalFormatRuntime::ensureLinked($this->context);
-        StringDateTime::ensureLinked($this->context);
-        StringDeployPath::ensureLinked($this->context);
-        StringSuperglobalName::ensureLinked($this->context);
-        StringStrftime::ensureLinked($this->context);
-        StringStrptime::ensureLinked($this->context);
-        DefaultTimezoneRuntime::ensureLinked($this->context);
-        DefaultTimezoneCivilRuntime::ensureLinked($this->context);
-        InetRuntime::ensureLinked($this->context);
+        // PowInt / network / date / inet always-on ensureLinked removed (#34243):
+        // JitPow / JitGethost* / JitCheckdnsrr / JitCheckdate / JitDate /
+        // JitDateIntervalFormat / JitDeployPath / JitStrptime / JitInet /
+        // JitGettimeofday / JitIdate / JitMktime / JitLocaltime / JitGetdate
+        // already ensureLinked before lookup (peer #33980 SessionId). Eager
+        // NestedJIT on every full load vs Runtime ABI drift mints *.1 (#31894 /
+        // #32122). StringSuperglobalName still ensureLinked from JIT.php.
         TimeSleepRuntime::ensureLinked($this->context);
         ProcessRuntime::ensureLinked($this->context);
         ProcessOpen::ensureLinked($this->context);

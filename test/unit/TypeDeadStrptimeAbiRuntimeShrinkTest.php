@@ -47,10 +47,15 @@ final class TypeDeadStrptimeAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringStrptime::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringStrptime(): void
+    public function testTypeInitializeLazyLinksStringStrptime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringStrptime::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34243', $type);
+        $this->assertStringNotContainsString(
+            'StringStrptime::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringStrptime::ensureLinked (#34243)'
+        );
     }
 
     public function testNoNewRuntimeCForStrptimeAbi(): void
