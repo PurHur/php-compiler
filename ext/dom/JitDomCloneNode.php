@@ -169,10 +169,10 @@ final class JitDomCloneNode
     {
         self::$lastResultTagName = $spec['tag'];
         if ('comment' === $spec['kind']) {
-            return JitDomCreateComment::materialize($context, $spec['text']);
+            return self::boxObjectResult($context, JitDomCreateComment::materialize($context, $spec['text']));
         }
         if ('text' === $spec['kind']) {
-            return JitDomCreateTextNode::materialize($context, $spec['text']);
+            return self::boxObjectResult($context, JitDomCreateTextNode::materialize($context, $spec['text']));
         }
 
         $obj = JitDomCreateElement::materializeElementWithTextContent(
@@ -190,7 +190,22 @@ final class JitDomCloneNode
         $outer = '<'.$spec['tag'].$openAttrs.'>'.$spec['inner'].'</'.$spec['tag'].'>';
         JitDomDocumentElement::syncChildrenFromXmlPublic($context, $obj, $outer);
 
-        return $obj;
+        // Box like createElement/importNode/appendChild — raw __object__* left inline
+        // ?-> typed as TYPE_OBJECT so property fetch GEPed the wrong layout (#34024).
+        return self::boxObjectResult($context, $obj);
+    }
+
+    private static function boxObjectResult(Context $context, Value $object): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $object
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 
     private static function compileTimeDeep(?JITVariable $arg): bool
