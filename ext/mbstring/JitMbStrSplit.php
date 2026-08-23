@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
-use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbStrSplitRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for mb_str_split() via MbStrSplitJitHelper NestedJIT (#26870).
+ * LLVM lowering for mb_str_split() via MbStrSplitJitHelper NestedJIT (#26870 / #34278).
  *
  * Compile-time fold: {@see VmMbstring::strSplit} → packed HT.
- * Runtime: direct helper call (peer {@see JitMbStrcut} / #4573).
+ * Runtime: {@see JitNestedHelperCoerce::callHelper} (peer {@see JitMbStrcut} / #34256).
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_str_split)
  */
 final class JitMbStrSplit
@@ -71,16 +71,12 @@ final class JitMbStrSplit
             0,
             'string'
         );
+        // Runtime ints must use JitStrictIntArg (peer mb_substr / #34256).
+        // Helper returns array (not HashTable) — NestedJIT HashTable ABI SIGSEGVs (#34278).
         $i64 = $context->getTypeFromString('int64');
         $length = $i64->constInt(1, false);
         if ($argc >= 2) {
-            $length = JitIntdiv::lowerIntBuiltinArgForCaller(
-                $context,
-                $args[1],
-                'mb_str_split',
-                2,
-                'length'
-            );
+            $length = JitStrictIntArg::lower($context, $args[1], 'mb_str_split', 2, 'length');
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
@@ -89,11 +85,10 @@ final class JitMbStrSplit
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         }
 
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
         $htRaw = JitNestedHelperCoerce::callHelper(
             $context,
             MbStrSplitRuntime::helperFunction($context),
-            [$str, $length, $encPtr]
+            [$str, $length]
         );
 
         return JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
