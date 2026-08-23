@@ -18,9 +18,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT ReflectionExtension::getFunctions() (#34177).
+ * Thin-AOT ReflectionExtension::getFunctions() (#34177, #34197).
  *
  * Extension name → name-indexed ReflectionFunction map, or empty array when unknown.
+ * Names are bucketed by {@see ModuleRegistry::reflectionOwningExtension} so core-registered
+ * `is_*` / `strptime` land under `standard` like Zend (#34197).
  *
  * Peer memcmp tables: {@see ReflectionExtensionGetClassNamesRuntime} (#34150);
  * object alloc peer getClasses (#34169); VM functions table.
@@ -162,50 +164,20 @@ final class ReflectionExtensionGetFunctionsRuntime
                 continue;
             }
             $seenExt[$lcExt] = true;
-            foreach ($funcs as $name) {
-                $name = (string) $name;
-                if ('' === $name) {
-                    continue;
-                }
-                if (!VmReflection::functionIsVisibleInReflection($name, $lcExt)) {
-                    continue;
-                }
-                if (strtolower(ModuleRegistry::reflectionOwningExtension(strtolower($name))) !== $lcExt) {
-                    continue;
-                }
-                $byExt[$lcExt][] = $name;
-            }
+            self::collectFunctionsByOwner($byExt, $funcs);
         }
         foreach (array_keys($seenExt) as $lcExt) {
-            foreach (ModuleRegistry::getExtensionFunctions($lcExt) ?? [] as $name) {
-                $name = (string) $name;
-                if ('' === $name) {
-                    continue;
-                }
-                if (!VmReflection::functionIsVisibleInReflection($name, $lcExt)) {
-                    continue;
-                }
-                if (strtolower(ModuleRegistry::reflectionOwningExtension(strtolower($name))) !== $lcExt) {
-                    continue;
-                }
-                $byExt[$lcExt][] = $name;
-            }
+            self::collectFunctionsByOwner(
+                $byExt,
+                ModuleRegistry::getExtensionFunctions($lcExt) ?? []
+            );
         }
-        // Ensure date/standard appear even if map keys differ.
+        // Ensure date/standard/core appear even if map keys differ.
         foreach (['date', 'standard', 'core'] as $lcExt) {
-            foreach (ModuleRegistry::getExtensionFunctions($lcExt) ?? [] as $name) {
-                $name = (string) $name;
-                if ('' === $name) {
-                    continue;
-                }
-                if (!VmReflection::functionIsVisibleInReflection($name, $lcExt)) {
-                    continue;
-                }
-                if (strtolower(ModuleRegistry::reflectionOwningExtension(strtolower($name))) !== $lcExt) {
-                    continue;
-                }
-                $byExt[$lcExt][] = $name;
-            }
+            self::collectFunctionsByOwner(
+                $byExt,
+                ModuleRegistry::getExtensionFunctions($lcExt) ?? []
+            );
         }
         foreach ($byExt as $lcExt => $names) {
             $byExt[$lcExt] = array_values(array_unique($names));
@@ -214,6 +186,32 @@ final class ReflectionExtensionGetFunctionsRuntime
         ksort($byExt);
 
         return $byExt;
+    }
+
+    /**
+     * Bucket by {@see ModuleRegistry::reflectionOwningExtension}, not registration map key.
+     * Type predicates (`is_*`) and `strptime` live in the core registration bucket but Zend
+     * attributes them to `standard` (#34197 / #18357).
+     *
+     * @param array<string, list<string>> $byExt
+     * @param list<mixed>|array<mixed>    $funcs
+     */
+    private static function collectFunctionsByOwner(array &$byExt, array $funcs): void
+    {
+        foreach ($funcs as $name) {
+            $name = (string) $name;
+            if ('' === $name) {
+                continue;
+            }
+            $owner = strtolower(ModuleRegistry::reflectionOwningExtension(strtolower($name)));
+            if ('' === $owner) {
+                continue;
+            }
+            if (!VmReflection::functionIsVisibleInReflection($name, $owner)) {
+                continue;
+            }
+            $byExt[$owner][] = $name;
+        }
     }
 
     private static function storeFunctionMap(Context $context, Value $resultSlot, array $names): void
