@@ -1732,6 +1732,8 @@ class Context {
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
         $this->functionProxies['reflectionobject::__construct'] = new Call\ReflectionObjectConstruct();
         $this->functionProxies['reflectionclass::getname'] = new Call\ReflectionClassGetName();
+        // ReflectionObject extends ReflectionClass — same getName lowering (#34001).
+        $this->functionProxies['reflectionobject::getname'] = new Call\ReflectionClassGetName();
         $this->functionProxies['reflectionclass::getshortname'] = new Call\ReflectionClassGetShortName();
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();

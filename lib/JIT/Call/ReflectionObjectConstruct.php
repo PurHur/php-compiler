@@ -14,7 +14,10 @@ use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Value;
 
 /**
- * ReflectionObject::__construct(object $object) — JIT (#20098).
+ * ReflectionObject::__construct(object $object) — JIT/AOT (#20098 / #34001).
+ *
+ * Seeds inherited ReflectionClass::$name (TYPE_VALUE heap box) and the wrapped
+ * instance slot so thin AOT property reads / getName() match Zend.
  *
  * php-src: ext/reflection/php_reflection.c — zim_ReflectionObject___construct
  */
@@ -33,9 +36,11 @@ final class ReflectionObjectConstruct implements Call
         $target = ReflectionSetup::loadObjectFromArg($context, $args[1]);
         $classNameStr = ReflectionBuiltinHelper::getClassName($context, $args[1]);
 
+        // Write inherited ReflectionClass::$name so getName / $name property fetch align (#34001).
         self::writeStringProp(
             $context,
             $obj,
+            'ReflectionClass',
             ReflectionSupport::PROP_CLASS_NAME,
             $classNameStr
         );
@@ -59,10 +64,11 @@ final class ReflectionObjectConstruct implements Call
     private static function writeStringProp(
         Context $context,
         Value $obj,
+        string $className,
         string $propName,
         Value $strPtr
     ): void {
-        $slot = $context->type->object->propertySlotFor($obj, 'ReflectionObject', $propName);
+        $slot = $context->type->object->propertySlotFor($obj, $className, $propName);
         $valueType = $context->getTypeFromString('__value__');
         $heapVal = $context->memory->malloc($valueType);
         $heapPtr = $context->builder->pointerCast(
