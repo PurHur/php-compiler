@@ -158,7 +158,8 @@ final class ReflectionSupport
     /** Delayed #[\DelayedTargetValidation] error text from compile (#26241). */
     public const PROP_ATTR_VALIDATION_ERROR = 'validationError';
 
-    public const PROP_EXTENSION_NAME = 'extension';
+    /** Zend ReflectionExtension::$name — extension name string (#34008; was internal `extension`). */
+    public const PROP_EXTENSION_NAME = 'name';
 
     /** Public `$name` on ReflectionZendExtension (php-src, #22248). */
     public const PROP_ZEND_EXTENSION_NAME = 'name';

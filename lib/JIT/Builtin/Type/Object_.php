@@ -3593,7 +3593,7 @@ class Object_ extends Type {
             $this->markHasConstructor($id);
         }
         if ('reflectionextension' === $lcname) {
-            // Engine storage key `extension` (PROP_EXTENSION_NAME); getName reads it (#34003 / #11462).
+            // Zend public `$name` (PROP_EXTENSION_NAME); construct + getName (#34008 / #34003 / #11462).
             // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551).
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_EXTENSION_NAME, Variable::TYPE_VALUE);
             // Thin user-script AOT must call __construct (not allocate-only) (#34003).
