@@ -1208,6 +1208,51 @@ OUT,
         );
     }
 
+    /** @covers issue #27597 — php-src ext/standard/array.stub.php (PHP 8.5) */
+    public function testArrayFirstLastReflectionMatchesZendStub(): void
+    {
+        foreach (['array_first', 'array_last'] as $fn) {
+            self::assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+            self::assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+            $param = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            self::assertNotNull($param, $fn.'#0');
+            self::assertSame('array', $param['type'], $fn.'#0');
+        }
+
+        if (!CompilerVersion::supportsPhp85ArrayFirstLast()) {
+            putenv('PHP_COMPILER_PROFILE=8.5');
+            $_ENV['PHP_COMPILER_PROFILE'] = '8.5';
+        }
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+foreach (['array_first', 'array_last'] as $fn) {
+    $r = new ReflectionFunction($fn);
+    foreach ($r->getParameters() as $p) {
+        echo $fn, ' ', $p->getName(), ' type=', $p->hasType() ? (string) $p->getType() : 'NONE', "\n";
+    }
+    echo $fn, ' ret=', $r->hasReturnType() ? (string) $r->getReturnType() : 'NONE', "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'array_first_last_reflection_27597.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        self::assertSame(
+            <<<'OUT'
+array_first array type=array
+array_first ret=mixed
+array_last array type=array
+array_last ret=mixed
+
+OUT,
+            $out
+        );
+    }
+
     /** @covers issue #9647 / #24845 */
     public function testDateNamedParameters(): void
     {

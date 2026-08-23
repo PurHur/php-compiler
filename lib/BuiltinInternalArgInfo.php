@@ -625,6 +625,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/array.stub.php — PHP 8.4; absent from InternalArgInfo (#25452)
             'array_find', 'array_find_key' => 'mixed',
             'array_any', 'array_all' => 'bool',
+            // ext/standard/array.stub.php — PHP 8.5; absent from InternalArgInfo (#27597)
+            'array_first', 'array_last' => 'mixed',
             // ext/standard/array.stub.php — absent from InternalArgInfo (#26111, #26182)
             'array_key_first', 'array_key_last' => 'string|int|null',
             'array_is_list' => 'bool',
@@ -1161,6 +1163,8 @@ final class BuiltinInternalArgInfo
                 1 => 'callable',
                 default => null,
             },
+            // ext/standard/array.stub.php — PHP 8.5 array $array; absent from InternalArgInfo (#27597)
+            'array_first', 'array_last' => 0 === $index ? 'array' : null,
             // ext/standard/array.stub.php — array $array; absent from InternalArgInfo (#26111, #26182)
             'array_key_first', 'array_key_last', 'array_is_list' => 0 === $index ? 'array' : null,
             // ext/standard/array.stub.php — ?int $length = null, mixed $replacement = [] (#24824)
