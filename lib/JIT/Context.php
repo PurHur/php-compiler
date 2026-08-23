@@ -1781,6 +1781,8 @@ class Context {
         $this->functionProxies['reflectionclass::newinstancewithoutconstructor'] = new Call\ReflectionClassNewInstanceWithoutConstructor();
         // Thin AOT: unbound newInstance → abort rc=134 (#34083); VM #22086.
         $this->functionProxies['reflectionclass::newinstance'] = new Call\ReflectionClassNewInstance();
+        // Thin AOT: unbound newInstanceArgs → NULL (#34090); VM #22086.
+        $this->functionProxies['reflectionclass::newinstanceargs'] = new Call\ReflectionClassNewInstanceArgs();
         if (CompilerVersion::supportsLazyObjectFactories()) {
             $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
             $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
