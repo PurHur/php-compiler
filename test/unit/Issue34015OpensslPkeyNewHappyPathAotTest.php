@@ -48,7 +48,8 @@ final class Issue34015OpensslPkeyNewHappyPathAotTest extends TestCase
         $this->assertSame(self::EXPECTED, $vmOut);
 
         $bin = sys_get_temp_dir().'/phpc_ossl_pkey_new_hp_'.getmypid().'.bin';
-        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=1 '.escapeshellarg(PHP_BINARY).' '
+        // Thin standalone AOT (HELPER_RUNTIME_O=0) — must not bake compile-time PEMs.
+        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $compileOut, $compileRc);
@@ -59,6 +60,19 @@ final class Issue34015OpensslPkeyNewHappyPathAotTest extends TestCase
             exec(escapeshellarg($bin).' 2>/dev/null', $runOut, $runRc);
             $this->assertSame(0, $runRc, implode("\n", $runOut));
             $this->assertSame($vmOut, implode("\n", $runOut)."\n");
+
+            // Runtime keygen leaf linked; no compile-time PEM constants in the binary.
+            $nmOut = [];
+            exec('nm '.escapeshellarg($bin).' 2>/dev/null', $nmOut);
+            $nmText = implode("\n", $nmOut);
+            $this->assertStringContainsString('__phpc_ossl_pkey_generate_rsa', $nmText);
+            $this->assertStringContainsString('EVP_PKEY_keygen', $nmText);
+            $pemCount = 0;
+            exec('strings '.escapeshellarg($bin).' 2>/dev/null | grep -c "BEGIN PRIVATE KEY" || true', $pemLines);
+            if (isset($pemLines[0]) && is_numeric($pemLines[0])) {
+                $pemCount = (int) $pemLines[0];
+            }
+            $this->assertSame(0, $pemCount, 'thin AOT must not bake BEGIN PRIVATE KEY constants');
         } finally {
             @unlink($bin);
         }
@@ -72,6 +86,10 @@ final class Issue34015OpensslPkeyNewHappyPathAotTest extends TestCase
             'openssl_pkey_new() is not implemented for JIT in this compiler build',
             $src
         );
+        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/ext/openssl/JitOpensslPkeyNew.php');
+        $this->assertStringContainsString('generateThinAotRuntime', $jit);
+        $this->assertStringNotContainsString('generateThinAotBaked', $jit);
         $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/openssl_pkey_new.c');
+        $this->assertFileExists(dirname(__DIR__, 2).'/ext/openssl/JitOpensslPkeyKernel.php');
     }
 }
