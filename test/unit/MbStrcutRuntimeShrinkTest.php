@@ -16,7 +16,7 @@ final class MbStrcutRuntimeShrinkTest extends TestCase
     public function testMbStrcutCompilesMbStrcutJitHelper(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MbStrcut.php');
-        $this->assertStringContainsString('MbStrcutJitHelper::strcut', $source);
+        $this->assertStringContainsString('MbStrcutJitHelper::strcutArgv', $source);
         $this->assertStringContainsString('/ext/mbstring/MbStrcutJitHelper.php', $source);
     }
 

@@ -17,7 +17,7 @@ final class MbStrcut
 {
     private const HELPER_PATH = '/ext/mbstring/MbStrcutJitHelper.php';
 
-    private const HELPER_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbStrcutJitHelper::strcut';
+    private const HELPER_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbStrcutJitHelper::strcutArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -46,21 +46,23 @@ final class MbStrcut
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#26598'
+            '#34256',
+            true // skip stale helper-runtime cache (#34256)
         );
     }
 }
 
 /**
- * JIT/AOT link hook for mb_substr() — compiles MbSubstrJitHelper (#27028).
+ * JIT/AOT link hook for mb_substr() — compiles MbSubstrJitHelper (#27028 / #34256).
  *
  * Helper lives in MbStrcutJitHelper.php (shared NestedJIT unit; no new inventory file).
+ * Logical name substrArgv bypasses stale helper-runtime cache of 5-arg substr (#34256).
  */
 final class MbSubstr
 {
     private const HELPER_PATH = '/ext/mbstring/MbStrcutJitHelper.php';
 
-    private const HELPER_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSubstrJitHelper::substr';
+    private const HELPER_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSubstrJitHelper::substrArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -80,7 +82,7 @@ final class MbSubstr
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, self::HELPER_LOGICAL, '#27028');
+        return JitVmHelperLink::lookupCompiled($context, self::HELPER_LOGICAL, '#34256');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -89,7 +91,8 @@ final class MbSubstr
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27028'
+            '#34256',
+            true // skip stale helper-runtime cache of co-located MbStrcut unit (#34256)
         );
     }
 }
