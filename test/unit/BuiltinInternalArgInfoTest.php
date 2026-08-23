@@ -870,6 +870,29 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getcwd'));
     }
 
+    /** php-src ext/posix/posix.stub.php — InternalArgInfo omits |false; strerror still errno (#27905). */
+    public function testPosixGetcwdUnameStrerrorReflectionStubTypes(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_getcwd'));
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_uname'));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_strerror'));
+        $this->assertSame(['error_code'], BuiltinParamNames::forFunction('posix_strerror'));
+        $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('posix_strerror'),
+            'error_code',
+            'posix_strerror'
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('posix_strerror'),
+            'errno',
+            'posix_strerror'
+        ));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('posix_strerror', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('int', $info['type']);
+        $this->assertFalse($info['isOptional']);
+    }
+
     /** php-src ext/standard/string.stub.php / uuencode.c — InternalArgInfo return string (missing |false) (#25536). */
     public function testConvertUudecodeReflectionReturnUnion(): void
     {
