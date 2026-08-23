@@ -357,6 +357,10 @@ final class BuiltinInternalArgInfo
             'uuid_generate_md5', 'uuid_generate_sha1' => 'string',
             // ext/bcmath/bcmath.stub.php — PHP 8.4; absent from php-types InternalArgInfo (#26096)
             'bcceil', 'bcfloor', 'bcround' => 'string',
+            // ext/bcmath/bcmath.stub.php — PHP 8.4; absent from php-types InternalArgInfo (#27600)
+            'bcdivmod' => 'array',
+            // ext/standard/math.stub.php — PHP 8.4; absent from php-types InternalArgInfo (#27600)
+            'fpow' => 'float',
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
             'hash_equals' => 'bool',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits / untyped (#25469)
@@ -973,12 +977,23 @@ final class BuiltinInternalArgInfo
             'get_resources' => 0 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?callable $callback = null (InternalArgInfo string|array) (#23359)
             'ob_start' => 0 === $index ? '?callable' : null,
+            // ext/standard/math.stub.php — float $num, float $exponent (#27600, re-#24578)
+            'fpow' => match ($index) {
+                0, 1 => 'float',
+                default => null,
+            },
             // ext/bcmath/bcmath.stub.php — PHP 8.4; absent from php-types InternalArgInfo (#26096, #28566)
             'bcceil', 'bcfloor' => 0 === $index ? 'string' : null,
             'bcround' => match ($index) {
                 0 => 'string',
                 1 => 'int',
                 2 => CompilerVersion::supportsRoundingModeEnum() ? 'RoundingMode' : null,
+                default => null,
+            },
+            // ext/bcmath/bcmath.stub.php — string $num1, string $num2, ?int $scale = null (#27600)
+            'bcdivmod' => match ($index) {
+                0, 1 => 'string',
+                2 => '?int',
                 default => null,
             },
             // ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int) (#25440)

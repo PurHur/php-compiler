@@ -2499,6 +2499,29 @@ PHP;
         }
     }
 
+    /** @covers issue #27600 — fpow/bcdivmod Reflection types (re-#24578) */
+    public function testFpowBcdivmodReflectionTypes(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertSame('float', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('fpow'));
+            self::assertSame('float', BuiltinInternalArgInfo::stubParamTypeOverride('fpow', 0));
+            self::assertSame('float', BuiltinInternalArgInfo::stubParamTypeOverride('fpow', 1));
+
+            self::assertSame('array', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('bcdivmod'));
+            self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('bcdivmod', 0));
+            self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('bcdivmod', 1));
+            self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('bcdivmod', 2));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #9990 */
     public function testFpowRoundingModeNamedParameters(): void
     {
