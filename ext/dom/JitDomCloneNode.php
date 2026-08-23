@@ -56,7 +56,9 @@ final class JitDomCloneNode
             );
         }
 
-        return self::materialize($context, $spec);
+        // Box as __value__* — raw __object__* temps make inline ?->tagName print empty
+        // while non-nullsafe -> still works via compile-time tag (#34024 / peer #34019).
+        return self::boxObjectResult($context, self::materialize($context, $spec));
     }
 
     /**
@@ -206,6 +208,19 @@ final class JitDomCloneNode
         }
 
         return false;
+    }
+
+    private static function boxObjectResult(Context $context, Value $object): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $object
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 
     private static function boxNullResult(Context $context): Value

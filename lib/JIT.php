@@ -16265,10 +16265,15 @@ class JIT {
 
                 return;
             }
-            // DOMDocument::getElementById() returns __value__* (?DOMElement). Inline
-            // `$d->getElementById(...)?->prop` typed the temp as TYPE_OBJECT, so nullsafe
-            // skipped the value-box short-circuit and property-fetch GEPed the box (#34019).
-            if ($this->context->scope->toCall instanceof JIT\Call\DomDocumentGetElementById) {
+            // Boxed __value__* call results for nullable DOM object returns must stay TYPE_VALUE
+            // so inline ?-> uses the value-box nullsafe path (#34019 getElementById; #34024 cloneNode).
+            if (
+                ('__value__*' === $llvmTy || '__value__' === $llvmTy)
+                && (
+                    $this->context->scope->toCall instanceof JIT\Call\DomDocumentGetElementById
+                    || $this->context->scope->toCall instanceof JIT\Call\DomNodeCloneNode
+                )
+            ) {
                 $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
                 if ($this->context->hasVariableOp($result)) {
                     $this->context->getVariableFromOp($result)->free();
@@ -16289,7 +16294,9 @@ class JIT {
                     $resolved = $this->context->resolveRefAliasName($name);
                     $this->context->bindVariableByName($resolved, $resultVar);
                 }
-                JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'dom_gei_post_assign');
+                if ($this->context->scope->toCall instanceof JIT\Call\DomDocumentGetElementById) {
+                    JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'dom_gei_post_assign');
+                }
 
                 return;
             }
