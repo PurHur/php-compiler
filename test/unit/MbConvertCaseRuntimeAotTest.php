@@ -34,6 +34,15 @@ final class MbConvertCaseRuntimeAotTest extends TestCase
         $this->assertSame($this->runVm($src), $this->runAot($src));
     }
 
+    public function testAotRuntimeTitleUnicodeMatchVm(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $src = __DIR__.'/../repro/mb_convert_case_title_unicode_runtime_aot.php';
+        $this->assertSame($this->runVm($src), $this->runAot($src));
+    }
+
     public function testLoweringUsesTitleArgvNotAsciiTitlePeel(): void
     {
         $root = dirname(__DIR__, 2);
@@ -43,6 +52,8 @@ final class MbConvertCaseRuntimeAotTest extends TestCase
         $this->assertStringContainsString('JitMbCase::invokeStrtoupper', $jit);
         $this->assertStringContainsString('MbConvertCaseRuntime::titleHelper', $jit);
         $this->assertStringContainsString('titleArgv', $helper);
+        $this->assertStringContainsString('0x430', $helper);
+        $this->assertStringContainsString('0x3B1', $helper);
         $this->assertStringContainsString('TITLE_LOGICAL', $runtime);
         $this->assertStringNotContainsString('transformAllAscii', $jit);
         $this->assertStringNotContainsString('asciiTitleRuntime', $jit);

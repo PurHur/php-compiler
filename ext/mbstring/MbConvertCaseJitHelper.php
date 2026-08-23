@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * mb_convert_case(TITLE|TITLE_SIMPLE) NestedJIT runtime (#34284 leftover of #34280).
+ * mb_convert_case(TITLE|TITLE_SIMPLE) NestedJIT runtime (#34284 / #34290 leftover of #34280).
  *
- * Separate from {@see MbCaseJitHelper}: calling {@see VmMbstring} from a titleArgv entry
- * SIGSEGVs under thin AOT NestedJIT, while strtolowerArgv→VmMbstring works. This unit uses only
- * strlen/ord/substr + Latin-1 upper/lower maps (peer MbChrOrdJitHelper — no PHP chr()).
+ * Separate from {@see MbCaseJitHelper}: calling {@see VmMbstring} / {@see Utf8CaseMap} from a
+ * titleArgv entry SIGSEGVs/aborts under thin AOT NestedJIT. This unit uses only strlen/ord/substr
+ * + NestedJIT-safe upper/lower maps (Latin-1 + Cyrillic + Greek; peer MbChrOrdJitHelper — no
+ * PHP chr()).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_convert_case)
  */
@@ -82,6 +83,20 @@ final class MbConvertCaseJitHelper
         if (0xFF === $cp) {
             return 0x178;
         }
+        // Greek small → capital (php_unicode / UnicodeData; final sigma → Sigma).
+        if (0x3C2 === $cp || 0x3C3 === $cp) {
+            return 0x3A3;
+        }
+        if ($cp >= 0x3B1 && $cp <= 0x3C9) {
+            return $cp - 0x20;
+        }
+        // Cyrillic small → capital (а-я / ё).
+        if (0x451 === $cp) {
+            return 0x401;
+        }
+        if ($cp >= 0x430 && $cp <= 0x44F) {
+            return $cp - 0x20;
+        }
 
         return $cp;
     }
@@ -96,6 +111,20 @@ final class MbConvertCaseJitHelper
         }
         if (0x178 === $cp) {
             return 0xFF;
+        }
+        // Greek capital → small.
+        if (0x3A3 === $cp) {
+            return 0x3C3;
+        }
+        if ($cp >= 0x391 && $cp <= 0x3A9) {
+            return $cp + 0x20;
+        }
+        // Cyrillic capital → small (А-Я / Ё).
+        if (0x401 === $cp) {
+            return 0x451;
+        }
+        if ($cp >= 0x410 && $cp <= 0x42F) {
+            return $cp + 0x20;
         }
 
         return $cp;
