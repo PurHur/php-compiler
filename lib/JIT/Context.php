@@ -1817,6 +1817,8 @@ class Context {
         $this->functionProxies['reflectionclass::getstaticpropertyvalue'] = new Call\ReflectionClassGetStaticPropertyValue();
         // Thin AOT: unbound setStaticPropertyValue → silent no-op (#34130); VM #6948.
         $this->functionProxies['reflectionclass::setstaticpropertyvalue'] = new Call\ReflectionClassSetStaticPropertyValue();
+        // Thin AOT: unbound __toString → fatal convert-to-string (#34135); VM #22379.
+        $this->functionProxies['reflectionclass::__tostring'] = new Call\ReflectionClassToString();
         if (CompilerVersion::supportsLazyObjectFactories()) {
             $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
             $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
