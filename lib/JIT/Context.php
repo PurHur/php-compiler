@@ -1754,6 +1754,10 @@ class Context {
         $this->functionProxies['reflectionclass::getconstant'] = new Call\ReflectionClassGetConstant();
         // Thin AOT: unbound getFileName → NULL/SIGSEGV (#34096); VM ReflectionClassGetFileName (#7358).
         $this->functionProxies['reflectionclass::getfilename'] = new Call\ReflectionClassGetFileName();
+        // Thin AOT: unbound getStartLine/getEndLine/getDocComment → NULL (#34106); peer #34096 / VM #7358.
+        $this->functionProxies['reflectionclass::getstartline'] = new Call\ReflectionClassSourceLocationQuery('getStartLine');
+        $this->functionProxies['reflectionclass::getendline'] = new Call\ReflectionClassSourceLocationQuery('getEndLine');
+        $this->functionProxies['reflectionclass::getdoccomment'] = new Call\ReflectionClassSourceLocationQuery('getDocComment');
         // Thin AOT: unbound implementsInterface/isSubclassOf → NULL → false (#34080); VM #6302.
         $this->functionProxies['reflectionclass::implementsinterface'] = new Call\ReflectionClassRelationQuery('implementsInterface');
         $this->functionProxies['reflectionclass::issubclassof'] = new Call\ReflectionClassRelationQuery('isSubclassOf');
