@@ -910,6 +910,45 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertFalse($info['isOptional']);
     }
 
+    /** php-src ext/posix/posix.stub.php — InternalArgInfo still uid/pid,sig; getpwuid missing |false (#24374). */
+    public function testPosixGetpwuidKillReflectionStubNames(): void
+    {
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_getpwuid'));
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('posix_kill'));
+        $this->assertSame(['user_id'], BuiltinParamNames::forFunction('posix_getpwuid'));
+        $this->assertSame(['process_id', 'signal'], BuiltinParamNames::forFunction('posix_kill'));
+        $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('posix_getpwuid'),
+            'user_id',
+            'posix_getpwuid'
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('posix_getpwuid'),
+            'uid',
+            'posix_getpwuid'
+        ));
+        $this->assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('posix_kill'),
+            'process_id',
+            'posix_kill'
+        ));
+        $this->assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('posix_kill'),
+            'signal',
+            'posix_kill'
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('posix_kill'),
+            'pid',
+            'posix_kill'
+        ));
+        $this->assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('posix_kill'),
+            'sig',
+            'posix_kill'
+        ));
+    }
+
     /** php-src ext/standard/string.stub.php / uuencode.c — InternalArgInfo return string (missing |false) (#25536). */
     public function testConvertUudecodeReflectionReturnUnion(): void
     {
