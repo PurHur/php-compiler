@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * AOT: ReflectionClass::getDefaultProperties matches Zend (#34091).
+ * AOT/VM: ReflectionClass::getDefaultProperties matches Zend (#34091, #34104).
  *
  * @see php-src ext/reflection/php_reflection.c zim_ReflectionClass_getDefaultProperties
  * @see \PHPCompiler\JIT\Call\ReflectionClassGetDefaultProperties
@@ -81,7 +81,7 @@ final class Issue34091ReflectionClassGetDefaultPropertiesAotTest extends TestCas
         $this->assertSame(self::EXPECT_CHILD."\n".self::EXPECT_SIMPLE, $joined);
     }
 
-    public function testVmGetDefaultPropertiesRuns(): void
+    public function testVmGetDefaultPropertiesMatchesZend(): void
     {
         $root = dirname(__DIR__, 2);
         $src = $root.'/test/repro/issue_34091_reflection_get_default_properties_aot.php';
@@ -89,11 +89,10 @@ final class Issue34091ReflectionClassGetDefaultPropertiesAotTest extends TestCas
             .escapeshellarg($root.'/bin/vm.php').' '
             .escapeshellarg($src).' 2>&1';
         exec($cmd, $out, $rc);
-        $joined = implode("\n", $out);
+        $joined = trim(implode("\n", $out));
         $this->assertSame(0, $rc, $joined);
-        // VM may still include parent private $p (#34091 AOT matches Zend omitting it).
-        $this->assertStringContainsString('"q":2', $joined);
-        $this->assertStringContainsString('"t":5', $joined);
-        $this->assertStringContainsString('"a":1', $joined);
+        // #34104: omit parent-private $p (same as Zend / AOT #34091).
+        $this->assertSame(self::EXPECT_CHILD."\n".self::EXPECT_SIMPLE, $joined);
+        $this->assertStringNotContainsString('"p":', $joined);
     }
 }
