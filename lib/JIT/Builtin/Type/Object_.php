@@ -3794,6 +3794,8 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_EXTENSION_NAME, Variable::TYPE_VALUE);
             // Thin user-script AOT must call __construct (not allocate-only) (#34003).
             $this->markHasConstructor($id);
+            // Cast/(string) uses hasInstanceMethod(__tostring) (#34181).
+            $this->defineMethodVisibility($id, '__tostring', \PHPCfg\Func::FLAG_PUBLIC, '__toString');
         }
         if ('reflectionparameter' === $lcname) {
             // Public Zend surface: `$name` only; other slots are engine storage (#22528).
