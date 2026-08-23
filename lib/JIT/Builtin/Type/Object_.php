@@ -4431,11 +4431,15 @@ class Object_ extends Type {
                 'Iterator',
             ]);
             $this->defineProperty($id, \PHPCompiler\VM\SplDllistJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
+            // Iterator mode for setIteratorMode/getIteratorMode / serialize bag (#33987).
+            $this->defineProperty($id, \PHPCompiler\VM\SplDllistJitHelper::PROP_FLAGS, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             $methods = [
                 '__construct', 'push', 'pop', 'shift', 'unshift',
                 'top', 'bottom', 'count', 'isempty',
+                'offsetget', 'offsetexists', 'offsetset', 'offsetunset',
+                'setiteratormode', 'getiteratormode',
                 'rewind', 'valid', 'current', 'key', 'next',
             ];
             if ('splqueue' === $lcname) {

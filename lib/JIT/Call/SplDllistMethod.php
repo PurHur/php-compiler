@@ -107,6 +107,75 @@ final class SplDllistMethod implements Call
                 0,
                 static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileIsEmpty($ctx, $self)
             ),
+            // php-src ArrayAccess + iterator mode (#33987) — thin AOT silent-nulled without proxy (#579)
+            'offsetget' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::offsetGet',
+                1,
+                static fn (Context $ctx, Variable $self, Variable $index): Value => SplDllistJitHelper::compileOffsetGet(
+                    $ctx,
+                    $self,
+                    $index
+                )
+            ),
+            'offsetexists' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::offsetExists',
+                1,
+                static fn (Context $ctx, Variable $self, Variable $index): Value => SplDllistJitHelper::compileOffsetExists(
+                    $ctx,
+                    $self,
+                    $index
+                )
+            ),
+            'offsetset' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::offsetSet',
+                2,
+                static fn (Context $ctx, Variable $self, Variable $index, Variable $value): Value => SplDllistJitHelper::compileOffsetSet(
+                    $ctx,
+                    $self,
+                    $index,
+                    $value
+                )
+            ),
+            'offsetunset' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::offsetUnset',
+                1,
+                static fn (Context $ctx, Variable $self, Variable $index): Value => SplDllistJitHelper::compileOffsetUnset(
+                    $ctx,
+                    $self,
+                    $index
+                )
+            ),
+            'setiteratormode' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::setIteratorMode',
+                1,
+                fn (Context $ctx, Variable $self, Variable $mode): Value => SplDllistJitHelper::compileSetIteratorMode(
+                    $ctx,
+                    $self,
+                    $mode,
+                    $this->className
+                )
+            ),
+            'getiteratormode' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::getIteratorMode',
+                0,
+                fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileGetIteratorMode(
+                    $ctx,
+                    $self,
+                    $this->className
+                )
+            ),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),
