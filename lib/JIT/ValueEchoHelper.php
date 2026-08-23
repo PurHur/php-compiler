@@ -190,8 +190,12 @@ final class ValueEchoHelper
         );
     }
 
-    public static function echo(Context $context, Value $valuePtr): void
+    /**
+     * @param string|null $classHint Operand userType when the value box holds a known class (#33986).
+     *                               Empty / "object" keeps runtime fallback behaviour.
+     */
+    public static function echo(Context $context, Value $valuePtr, ?string $classHint = null): void
     {
-        ValueEchoRuntime::emitValue($context, $valuePtr);
+        ValueEchoRuntime::emitValue($context, $valuePtr, $classHint);
     }
 }

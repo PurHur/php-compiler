@@ -136,7 +136,10 @@ final class ValueEchoRuntime
         }
     }
 
-    public static function emitValue(Context $context, Value $valuePtr): void
+    /**
+     * @param string|null $classHint Compile-time class for value-boxed objects (echo/print, #33986).
+     */
+    public static function emitValue(Context $context, Value $valuePtr, ?string $classHint = null): void
     {
         $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureLinked($context);
@@ -145,6 +148,13 @@ final class ValueEchoRuntime
             BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
         } else {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'echo_value_emit_cont');
+        }
+
+        if (null !== $classHint) {
+            $classHint = ltrim($classHint, '\\');
+            if ('' === $classHint || 'object' === strtolower($classHint)) {
+                $classHint = null;
+            }
         }
 
         $tag = 'ev'.(string) ++self::$seq;
@@ -251,7 +261,8 @@ final class ValueEchoRuntime
             Variable::KIND_VALUE,
             $objPtr
         );
-        ValueEchoHelper::echoObjectVariable($context, $objVar);
+        // Thread Operand userType so assigned locals call __toString (#33986).
+        ValueEchoHelper::echoObjectVariable($context, $objVar, $classHint);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterObject);
