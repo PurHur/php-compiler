@@ -807,6 +807,25 @@ final class TryCatchHelper
 
                 return;
             }
+            // Uncaught path must reject non-Throwable before UncaughtThrowPrinter
+            // assumes Exception/Error layout (SIGSEGV under thin AOT; #33975 /
+            // zend_exceptions.c). Same instanceof guard as the try-handler path.
+            $isThrowable = ReflectionBuiltinHelper::emitInstanceOf($context, $thrown, 'Throwable');
+            $isBool = Variable::TYPE_NATIVE_BOOL === $isThrowable->type
+                ? $isThrowable->value
+                : $context->helper->loadValue($isThrowable);
+            $validThrow = self::appendBlock($func, 'throw_uncaught_valid');
+            $invalidThrow = self::appendBlock($func, 'throw_uncaught_non_throwable');
+            $builder->branchIf($isBool, $validThrow, $invalidThrow);
+            $builder->positionAtEnd($invalidThrow);
+            self::emitCatchableClassError(
+                $context,
+                \PHPCompiler\VM\ExceptionSupport::CLASS_ERROR,
+                \PHPCompiler\VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
+                $jit
+            );
+            $builder->positionAtEnd($validThrow);
+
             $obj = self::loadThrownObject($context, $thrown);
             ExceptionThrowToStringSeed::seed($context, $obj, $block);
             if (self::isNonMainUserFunction($block)) {
