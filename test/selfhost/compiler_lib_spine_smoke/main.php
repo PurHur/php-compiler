@@ -1457,6 +1457,7 @@ require_once __DIR__.'/../../../ext/openssl/OpensslPkeyNewJitSupport.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslPkeyNew.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslPkeyGetDetails.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslPkeyGetDetailsKernel.php';
+require_once __DIR__.'/../../../ext/openssl/JitOpensslPkeyGetPrivate.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslX509.php';
 require_once __DIR__.'/../../../ext/openssl/Module.php';
 require_once __DIR__.'/../../../ext/openssl/OpensslCipherRegistry.php';

@@ -17,9 +17,7 @@ use PHPLLVM\Value;
 /**
  * openssl_pkey_get_private() — load private key (php-src ext/openssl/xp.c; #6295 VM, JIT/AOT #33508).
  *
- * JIT/AOT leftover #33508: catchable argc/TypeError paths (peer openssl_pkey_get_public #33499).
- * Happy-path key/PEM → OpenSSLAsymmetricKey still needs key-object AOT (#6295 follow-up).
- * Alias openssl_get_privatekey is #33507.
+ * JIT/AOT: argc/TypeError (#33508); happy-path PEM/key → OpenSSLAsymmetricKey (#34037).
  */
 final class openssl_pkey_get_private extends Internal
 {
@@ -109,17 +107,17 @@ final class openssl_pkey_get_private extends Internal
             }
         }
 
-        // Key/PEM objects stay VM-shaped (#6295). Clear LogicException on TypeError/argc
-        // gates first (#33508); happy-path bake is a follow-up.
-        throw new \LogicException(
-            'openssl_pkey_get_private() is not implemented for JIT in this compiler build (issue #6295/#33508)'
+        return JitOpensslPkeyGetPrivate::invoke(
+            $context,
+            $args[0],
+            2 === $argc ? $args[1] : null
         );
     }
 
     /**
      * Zend stub: OpenSSLAsymmetricKey|string.
      * Compile-time null/bool/int/float/array (and wrong named objects) → TypeError.
-     * Opaque objects / string / accepted class fall through to happy-path follow-up.
+     * Opaque objects / string / accepted class fall through to happy-path (#34037).
      *
      * @return non-empty-string|null
      */
@@ -136,7 +134,8 @@ final class openssl_pkey_get_private extends Internal
             JITVariable::TYPE_HASHTABLE => 'array',
             JITVariable::TYPE_STRING => null,
             JITVariable::TYPE_OBJECT => self::objectTypeErrorLabel($arg),
-            default => 'mixed',
+            // Value-box / unknown — accept for happy path (peer #34030).
+            default => null,
         };
     }
 

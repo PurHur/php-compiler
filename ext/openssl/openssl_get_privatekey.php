@@ -17,8 +17,7 @@ use PHPLLVM\Value;
 /**
  * openssl_get_privatekey() — alias of openssl_pkey_get_private (php-src; #20306 VM, JIT/AOT #33507).
  *
- * JIT/AOT leftover #33507: catchable argc/TypeError paths (peer openssl_get_publickey #33503).
- * Happy-path PEM/key → OpenSSLAsymmetricKey still needs key-object AOT (#6295 follow-up).
+ * JIT/AOT: argc/TypeError (#33507); happy-path via {@see JitOpensslPkeyGetPrivate} (#34037).
  */
 final class openssl_get_privatekey extends Internal
 {
@@ -113,10 +112,10 @@ final class openssl_get_privatekey extends Internal
             }
         }
 
-        // PEM/key objects stay VM-shaped (#6295). Clear LogicException on TypeError/argc gates
-        // first (#33507); happy-path bake is a follow-up.
-        throw new \LogicException(
-            'openssl_get_privatekey() is not implemented for JIT in this compiler build (issue #20306/#33507)'
+        return JitOpensslPkeyGetPrivate::invoke(
+            $context,
+            $args[0],
+            2 === $argc ? $args[1] : null
         );
     }
 
@@ -138,7 +137,7 @@ final class openssl_get_privatekey extends Internal
             JITVariable::TYPE_HASHTABLE => 'array',
             JITVariable::TYPE_STRING => null,
             JITVariable::TYPE_OBJECT => self::objectTypeErrorLabel($arg),
-            default => 'mixed',
+            default => null,
         };
     }
 
