@@ -1750,6 +1750,7 @@ class Context {
             // ReflectionClass::createLazyGhost/Proxy are phantoms vs php-src (#28516).
         }
         $this->functionProxies['reflectionproperty::__construct'] = new Call\ReflectionPropertyConstruct();
+        $this->functionProxies['reflectionproperty::getname'] = new Call\ReflectionPropertyGetName();
         $this->functionProxies['reflectionparameter::__construct'] = new Call\ReflectionParameterConstruct();
         $this->functionProxies['reflectionparameter::getname'] = new Call\ReflectionParameterGetName();
         $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
