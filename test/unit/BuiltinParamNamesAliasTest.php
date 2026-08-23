@@ -220,6 +220,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'as_float', 'microtime'));
     }
 
+    /** @covers issue #25146 */
+    public function testHrtimeAsNumberOptionalZendStub(): void
+    {
+        $names = BuiltinParamNames::forFunction('hrtime');
+        self::assertSame(['as_number='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'as_number', 'hrtime'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('hrtime'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('hrtime'));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('hrtime', 0);
+        self::assertNotNull($info);
+        self::assertSame('as_number', $info['name']);
+        self::assertSame('bool', $info['type']);
+        self::assertTrue($info['isOptional']);
+    }
+
     /** @covers issue #11578 */
     public function testMemoryGetUsageNamedRealUsageParamResolves(): void
     {
