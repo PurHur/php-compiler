@@ -33,6 +33,48 @@ final class MbSearchJitHelper
         return self::utf8Strpos($haystack, $needle, $offset);
     }
 
+    /**
+     * mb_stripos() — case-insensitive (#34158 leftover of #34146).
+     *
+     * NestedJIT-safe fold: ASCII A–Z → a–z only (UTF-8 lead bytes are ≥128 so untouched).
+     * Full Unicode case maps remain on the VM / compile-time fold path via {@see VmMbstring::stripos}.
+     */
+    public static function striposArgv(
+        string $haystack,
+        string $needle,
+        int $offset,
+        string $encoding
+    ): int {
+        $haystack = self::asciiLower($haystack);
+        $needle = self::asciiLower($needle);
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            return self::byteStrpos($haystack, $needle, $offset);
+        }
+
+        return self::utf8Strpos($haystack, $needle, $offset);
+    }
+
+    /** ASCII A–Z → a–z; leaves UTF-8 multibyte sequences unchanged. */
+    private static function asciiLower(string $string): string
+    {
+        $byteLen = \strlen($string);
+        $out = '';
+        $i = 0;
+        while ($i < $byteLen) {
+            $ch = \substr($string, $i, 1);
+            $byte = \ord($ch);
+            if ($byte >= 65 && $byte <= 90) {
+                // Avoid chr() under NestedJIT (typed as mixed → TypeError).
+                $out = $out.\substr('abcdefghijklmnopqrstuvwxyz', $byte - 65, 1);
+            } else {
+                $out = $out.$ch;
+            }
+            $i = $i + 1;
+        }
+
+        return $out;
+    }
+
     private static function byteStrpos(string $haystack, string $needle, int $offset): int
     {
         $hayLen = \strlen($haystack);
