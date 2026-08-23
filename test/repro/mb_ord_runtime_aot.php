@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 /**
  * mb_ord() runtime (non-literal) args under AOT / NestedJIT.
- * php-src: ext/mbstring/mbstring.c PHP_FUNCTION(mb_ord)
+ * php-src: ext/mbstring/mbstring.c PHP_FUNCTION(mb_ord) — php_mb_ord decodes first char only;
+ * trailing bytes after a valid ASCII lead still yield ord('A') (65), not false.
  */
 $a = 'A'.'';
 $jp = '日'.'';
