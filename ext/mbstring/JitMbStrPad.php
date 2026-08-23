@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbStrwidth;
 use PHPCompiler\JIT\Builtin\PadTypeJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitIntdiv;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for mb_str_pad() — MbStrwidthJitHelper in-module (#6081). */
+/**
+ * LLVM lowering for mb_str_pad() — MbStrwidthJitHelper in-module (#6081, #34270).
+ *
+ * Runtime int length must go through {@see JitNestedHelperCoerce::callHelper} (raw call SIGSEGVs).
+ */
 final class JitMbStrPad
 {
     public static function pad(Context $context, JITVariable ...$args): Value
@@ -69,16 +75,21 @@ final class JitMbStrPad
         }
         self::assertSupportedEncoding($encoding);
 
+        // NestedJIT helper compile can clear insert; restore before arg coerce/call (#34270 peer #34264).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbStrwidth::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
         $encPtr = $context->builder->load($context->constantStringFromString($encoding));
-        $resultStr = $context->builder->call(
+        // Runtime int ABI + boxed string return — direct call SIGSEGVs (#34270 / #6081 leftover).
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbStrwidth::strPadFunction($context),
-            $input,
-            $length,
-            $padString,
-            $padType,
-            $encPtr
+            [$input, $length, $padString, $padType, $encPtr]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::materializeOwnedString($context, $resultStr);
     }
