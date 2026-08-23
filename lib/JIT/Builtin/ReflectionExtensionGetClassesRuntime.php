@@ -4,54 +4,43 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\LibcExtern;
-use PHPCompiler\JIT\Variable;
-use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\VM\ClassEntry;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT ReflectionClass::{getInterfaces,getTraits} (#34121).
+ * Thin-AOT ReflectionExtension::getClasses() (#34169).
  *
- * Name → ReflectionClass map from {@see Type\Object_} interface/trait tables
- * (peer {@see ReflectionClassNameListRuntime} #34110). Unknown / internal → empty array.
+ * Extension name (from ReflectionExtension::$name) → name => ReflectionClass map
+ * for internal classes in that module, or empty array when unknown.
  *
- * php-src: zim_ReflectionClass_getInterfaces / getTraits
+ * Peer memcmp tables: {@see ReflectionExtensionGetClassNamesRuntime} (#34150).
+ * Class-map alloc: {@see ReflectionClassClassMapRuntime} (#34121).
+ * VM: {@see \PHPCompiler\VM\Builtin\ReflectionExtensionGetClasses} /
+ * {@see VmReflection::reflectionExtensionClassesTable} (#18326).
+ *
+ * php-src: zim_ReflectionExtension_getClasses
  */
-final class ReflectionClassClassMapRuntime
+final class ReflectionExtensionGetClassesRuntime
 {
     private const MAX_NAME_LEN = 512;
-
-    /** @var array<string, true> */
-    private const KINDS = [
-        'interfaces' => true,
-        'traits' => true,
-    ];
 
     /**
      * @return Value __value__* result slot (array of ReflectionClass)
      */
-    public static function emit(
-        Context $context,
-        string $kindLc,
-        Value $nameCstr,
-        Value $nameLen
-    ): Value {
-        $kindLc = strtolower($kindLc);
-        if (!isset(self::KINDS[$kindLc])) {
-            throw new \InvalidArgumentException('Unknown ReflectionClass class-map kind: '.$kindLc);
-        }
-
+    public static function emit(Context $context, Value $nameCstr, Value $nameLen): Value
+    {
         LibcExtern::ensureMemcmpDecl($context);
 
         $resultSlot = JitValueBox::alloc($context);
         $fn = BasicBlockHelper::parentFunction($context);
-        $tag = 'refl_cm_'.$kindLc;
+        $tag = 'refl_ext_gcl';
         $entry = $context->builder->getInsertBlock();
         $merge = $fn->appendBasicBlock($tag.'_merge');
         $miss = $fn->appendBasicBlock($tag.'_miss');
@@ -104,8 +93,8 @@ final class ReflectionClassClassMapRuntime
 
         $checkBlock = $afterFold;
         $hitIdx = 0;
-        foreach (self::classLcToNames($context, $kindLc) as $lcName => $names) {
-            $wantLenInt = \strlen($lcName);
+        foreach (self::extensionLcToClassNames($context) as $lcExt => $names) {
+            $wantLenInt = \strlen($lcExt);
             if (0 === $wantLenInt) {
                 continue;
             }
@@ -115,7 +104,7 @@ final class ReflectionClassClassMapRuntime
             $context->builder->positionAtEnd($checkBlock);
 
             $wantLen = $sizeT->constInt($wantLenInt, false);
-            $wantGlobal = $context->constantStringFromString($lcName);
+            $wantGlobal = $context->constantStringFromString($lcExt);
             $wantStr = $context->builder->load($wantGlobal);
             $strMap = $context->structFieldMap['__string__'];
             $wantCstr = $context->builder->pointerCast(
@@ -138,7 +127,7 @@ final class ReflectionClassClassMapRuntime
             $context->builder->branchIf($match, $matchBlock, $nextCheck);
 
             $context->builder->positionAtEnd($matchBlock);
-            self::storeClassMap($context, $resultSlot, $names);
+            ReflectionClassClassMapRuntime::storeReflectionClassMap($context, $resultSlot, $names);
             $context->builder->branch($merge);
 
             $checkBlock = $nextCheck;
@@ -158,104 +147,37 @@ final class ReflectionClassClassMapRuntime
     }
 
     /**
-     * @return array<string, list<string>> lowercase class → display names
+     * @return array<string, list<string>> lowercase extension → display class names
      */
-    private static function classLcToNames(Context $context, string $kindLc): array
+    private static function extensionLcToClassNames(Context $context): array
     {
-        $pairs = [];
-        $object = $context->type->object;
-        foreach ($object->allClassNamesById() as $id => $className) {
-            $id = (int) $id;
-            $display = $object->classNameForId($id);
-            if (!\is_string($display) || '' === $display) {
-                $display = \is_string($className) ? $className : '';
-            }
-            $lc = strtolower(ltrim($display, '\\'));
-            if ('' === $lc) {
-                continue;
-            }
-            if ('interfaces' === $kindLc) {
-                $names = [];
-                foreach ($object->interfacesForClassImplementsLc($lc) as $ifaceLc) {
-                    $ifaceLc = strtolower(ltrim((string) $ifaceLc, '\\'));
-                    if ('' === $ifaceLc) {
-                        continue;
-                    }
-                    $ifaceDisplay = $ifaceLc;
-                    foreach ($object->allClassNamesById() as $iid => $iname) {
-                        $iid = (int) $iid;
-                        $idisp = $object->classNameForId($iid);
-                        if (!\is_string($idisp) || '' === $idisp) {
-                            $idisp = \is_string($iname) ? $iname : '';
-                        }
-                        if (strtolower(ltrim($idisp, '\\')) === $ifaceLc) {
-                            $ifaceDisplay = $idisp;
-                            break;
-                        }
-                    }
-                    $names[] = $ifaceDisplay;
+        /** @var array<string, list<string>> $byExt */
+        $byExt = [];
+        $vmCtx = $context->runtime->vmContext ?? null;
+        if (null !== $vmCtx && \is_array($vmCtx->classes ?? null)) {
+            foreach ($vmCtx->classes as $entry) {
+                if (!$entry instanceof ClassEntry || !$entry->isInternal) {
+                    continue;
                 }
-                $pairs[$lc] = $names;
-            } else {
-                $pairs[$lc] = array_values($object->usedTraitNamesForClassLc($lc));
+                $logical = VmReflection::logicalExtensionForInternalClass($entry->name);
+                if (null === $logical || '' === $logical) {
+                    continue;
+                }
+                $lcExt = strtolower($logical);
+                $display = (string) $entry->name;
+                if ('' === $display) {
+                    continue;
+                }
+                $byExt[$lcExt][] = $display;
             }
         }
-        ksort($pairs);
-
-        return $pairs;
-    }
-
-    /** @param list<string> $names */
-    public static function storeReflectionClassMap(Context $context, Value $resultSlot, array $names): void
-    {
-        self::storeClassMap($context, $resultSlot, $names);
-    }
-
-    /** @param list<string> $names */
-    private static function storeClassMap(Context $context, Value $resultSlot, array $names): void
-    {
-        if ([] === $names) {
-            self::storeEmptyArray($context, $resultSlot);
-
-            return;
+        foreach ($byExt as $lcExt => $names) {
+            $byExt[$lcExt] = array_values(array_unique($names));
+            sort($byExt[$lcExt], \SORT_STRING);
         }
-        $object = $context->type->object;
-        $ht = HashTableHelper::alloc($context);
-        $n = \count($names);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__grow'),
-            $ht,
-            $context->constantFromInteger($n, 'size_t')
-        );
-        $rcClassId = $object->lookup('ReflectionClass');
-        foreach ($names as $name) {
-            $name = (string) $name;
-            if ('' === $name) {
-                continue;
-            }
-            $rcObj = $object->allocate($rcClassId);
-            ReflectionSetup::markConstructed($context, $rcObj);
-            $nameStr = $context->builder->load($context->constantStringFromString($name));
-            ReflectionSetup::emitSetStringPropertyFromVar(
-                $context,
-                $rcObj,
-                'ReflectionClass',
-                ReflectionSupport::PROP_CLASS_NAME,
-                new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $nameStr)
-            );
-            $keyStr = $context->builder->load($context->constantStringFromString($name));
-            HashTableHelper::setAtStringKey(
-                $context,
-                $ht,
-                $keyStr,
-                new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $rcObj)
-            );
-        }
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            JitValueBox::pointer($context, $resultSlot),
-            $ht
-        );
+        ksort($byExt);
+
+        return $byExt;
     }
 
     private static function storeEmptyArray(Context $context, Value $resultSlot): void
