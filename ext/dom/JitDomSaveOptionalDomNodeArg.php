@@ -41,8 +41,8 @@ final class JitDomSaveOptionalDomNodeArg
         }
 
         if (JITVariable::TYPE_OBJECT === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
-            if (JITVariable::TYPE_VALUE === $arg->type) {
-                self::emitRuntimeTypeErrorUnlessNullOrObject(
+            if (JITVariable::TYPE_VALUE === $arg->type && !self::isDomNodeTempOperand($context, $arg)) {
+                self::emitRuntimeTypeErrorIfInvalidScalar(
                     $context,
                     $arg,
                     $function,
@@ -63,7 +63,31 @@ final class JitDomSaveOptionalDomNodeArg
         return true;
     }
 
-    private static function emitRuntimeTypeErrorUnlessNullOrObject(
+    /**
+     * Thin-AOT DOM temps are often TYPE_VALUE wrapping __object__* or boxed nodes whose
+     * tag is not exactly TYPE_OBJECT — still valid ?DOMNode (peer #33716 readObject).
+     */
+    private static function isDomNodeTempOperand(Context $context, JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            return true;
+        }
+        if (JITVariable::KIND_VALUE === $arg->kind) {
+            $llvmName = $context->getStringFromType($arg->value->typeOf());
+            if ('__object__*' === $llvmName) {
+                return true;
+            }
+        }
+        $class = $arg->classUserType ?? null;
+        if (null !== $class && (str_starts_with($class, 'DOM') || str_contains($class, 'Dom\\'))) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** Reject runtime int/string/bool/float/array — not "must be exactly object tag" (#34225). */
+    private static function emitRuntimeTypeErrorIfInvalidScalar(
         Context $context,
         JITVariable $arg,
         string $function,
@@ -72,9 +96,7 @@ final class JitDomSaveOptionalDomNodeArg
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_save_opt_node_rt');
         $tag = (string) (self::$seq++);
-        $nullBlock = BasicBlockHelper::append($context, 'dom_save_opt_node_rt_null_'.$tag);
-        $objBlock = BasicBlockHelper::append($context, 'dom_save_opt_node_rt_obj_'.$tag);
-        $badBlock = BasicBlockHelper::append($context, 'dom_save_opt_node_rt_bad_'.$tag);
+        $okBlock = BasicBlockHelper::append($context, 'dom_save_opt_node_rt_ok_'.$tag);
 
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $map = $context->structFieldMap['__value__'];
@@ -83,28 +105,33 @@ final class JitDomSaveOptionalDomNodeArg
         );
         $i8 = $context->getTypeFromString('int8');
         $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $isNull = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(JITVariable::TYPE_NULL, false)
-        );
-        $isObject = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(JITVariable::TYPE_OBJECT, false)
-        );
-        $isNullOrObj = $context->builder->or($isNull, $isObject);
-        $context->builder->branchIf($isNullOrObj, $nullBlock, $badBlock);
 
-        $context->builder->positionAtEnd($badBlock);
-        ExceptionBridge::emitTypeErrorAndAbort(
-            $context,
-            self::message($function, $userArgIndex, $paramName, 'mixed')
-        );
+        $checks = [
+            [JITVariable::TYPE_NATIVE_LONG, 'int'],
+            [JITVariable::TYPE_NATIVE_DOUBLE, 'float'],
+            [JITVariable::TYPE_NATIVE_BOOL, 'bool'],
+            [JITVariable::TYPE_STRING, 'string'],
+            [JITVariable::TYPE_HASHTABLE, 'array'],
+        ];
+        foreach ($checks as [$typeConst, $label]) {
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt($typeConst, false)
+            );
+            $labelBlock = BasicBlockHelper::append($context, 'dom_save_opt_node_rt_'.$label.'_'.$tag);
+            $nextProbe = BasicBlockHelper::append($context, 'dom_save_opt_node_rt_next_'.$label.'_'.$tag);
+            $context->builder->branchIf($match, $labelBlock, $nextProbe);
+            $context->builder->positionAtEnd($labelBlock);
+            ExceptionBridge::emitTypeErrorAndAbort(
+                $context,
+                self::message($function, $userArgIndex, $paramName, $label)
+            );
+            $context->builder->positionAtEnd($nextProbe);
+        }
 
-        $context->builder->positionAtEnd($nullBlock);
-        $context->builder->branch($objBlock);
-        $context->builder->positionAtEnd($objBlock);
+        $context->builder->branch($okBlock);
+        $context->builder->positionAtEnd($okBlock);
     }
 
     private static function message(
