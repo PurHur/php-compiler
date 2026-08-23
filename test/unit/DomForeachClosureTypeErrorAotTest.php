@@ -21,6 +21,10 @@ final class DomForeachClosureTypeErrorAotTest extends TestCase
 {
     private const SAVEXML_INT = "saveXML_int=TypeError:DOMDocument::saveXML(): Argument #1 (\$node) must be of type ?DOMNode, int given\n";
 
+    private const SAVEHTML_INT = "saveHTML_int=TypeError:DOMDocument::saveHTML(): Argument #1 (\$node) must be of type ?DOMNode, int given\n";
+
+    private const SAVEXML_STRING = "saveXML_string=TypeError:DOMDocument::saveXML(): Argument #1 (\$node) must be of type ?DOMNode, string given\n";
+
     public function testVmForeachClosureOuterCatch(): void
     {
         $runtime = new Runtime();
@@ -32,6 +36,8 @@ final class DomForeachClosureTypeErrorAotTest extends TestCase
         $runtime->run($runtime->parseAndCompile($code, 'issue_dom_savexml_savehtml_node_typeerror.php'));
         $out = (string) ob_get_clean();
         $this->assertStringContainsString(self::SAVEXML_INT, $out);
+        $this->assertStringContainsString(self::SAVEHTML_INT, $out);
+        $this->assertStringContainsString(self::SAVEXML_STRING, $out);
         $this->assertStringContainsString('null_options=ok', $out);
     }
 
@@ -55,8 +61,8 @@ final class DomForeachClosureTypeErrorAotTest extends TestCase
             $this->assertSame(0, $runRc, implode("\n", $runOut));
             $joined = implode("\n", $runOut)."\n";
             $this->assertStringContainsString(self::SAVEXML_INT, $joined);
-            $this->assertStringContainsString('saveHTML_int=TypeError:', $joined);
-            $this->assertStringContainsString('saveXML_string=TypeError:', $joined);
+            $this->assertStringContainsString(self::SAVEHTML_INT, $joined);
+            $this->assertStringContainsString(self::SAVEXML_STRING, $joined);
             // saveXML(null, LIBXML_NOEMPTYTAG) formatting is a separate gap (#34225 not covered).
         } finally {
             @unlink($bin);

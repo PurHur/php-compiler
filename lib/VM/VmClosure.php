@@ -34,6 +34,11 @@ final class VmClosure
 
     public static function resolveCall(Context $context, JitVariable $receiver): ?Call
     {
+        $table = $receiver->foreachClosureProxyTable ?? null;
+        $slotKey = $receiver->foreachContainerSlotKey ?? null;
+        if (null !== $table && [] !== $table && is_string($slotKey) && '' !== $slotKey) {
+            return new \PHPCompiler\JIT\Call\ForeachIndexedClosureCall($receiver, $table, $slotKey);
+        }
         if (null !== $receiver->closureCall) {
             return $receiver->closureCall;
         }

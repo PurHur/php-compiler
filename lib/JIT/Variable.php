@@ -319,6 +319,16 @@ final class Variable {
     /** fromCallable / FCC method wrapper — unbind uses method warning (#23421). */
     public bool $closureIsMethodFake = false;
 
+    /**
+     * Foreach iter value: ClosureWithCaptures table selected by runtime index (#34240 peer).
+     *
+     * @var list<Call>|null
+     */
+    public ?array $foreachClosureProxyTable = null;
+
+    /** {@see Context::foreachSlotMapKey()} for the foreach container. */
+    public ?string $foreachContainerSlotKey = null;
+
     /** Heap {@see __generator_state__*} for JIT Generator objects (#3074). */
     public ?\PHPLLVM\Value $generatorStatePtr = null;
 
