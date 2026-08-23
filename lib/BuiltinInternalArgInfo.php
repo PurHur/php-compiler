@@ -620,9 +620,13 @@ final class BuiltinInternalArgInfo
             'array_sum', 'array_product' => 'int|float',
             // ext/standard/array.stub.php — absent from InternalArgInfo (#24844)
             'array_column' => 'array',
+            // ext/standard/array.stub.php — absent from InternalArgInfo (#25499)
+            'array_rand' => 'array|string|int',
             // ext/standard/array.stub.php — PHP 8.4; absent from InternalArgInfo (#25452)
             'array_find', 'array_find_key' => 'mixed',
             'array_any', 'array_all' => 'bool',
+            // ext/standard/array.stub.php — PHP 8.5; absent from InternalArgInfo (#27597)
+            'array_first', 'array_last' => 'mixed',
             // ext/standard/array.stub.php — absent from InternalArgInfo (#26111, #26182)
             'array_key_first', 'array_key_last' => 'string|int|null',
             'array_is_list' => 'bool',
@@ -1141,10 +1145,18 @@ final class BuiltinInternalArgInfo
                 2 => 'int',
                 default => null,
             },
+            // ext/standard/array.stub.php — ?callable $callback (InternalArgInfo non-nullable callable) (#25396)
+            'array_map' => 0 === $index ? '?callable' : null,
             // ext/standard/array.stub.php — absent from InternalArgInfo (#24844)
             'array_column' => match ($index) {
                 0 => 'array',
                 1, 2 => 'string|int|null',
+                default => null,
+            },
+            // ext/standard/array.stub.php — array $array, int $num = 1 (#25499)
+            'array_rand' => match ($index) {
+                0 => 'array',
+                1 => 'int',
                 default => null,
             },
             // ext/standard/array.stub.php — PHP 8.4; absent from InternalArgInfo (#25452)
@@ -1153,6 +1165,8 @@ final class BuiltinInternalArgInfo
                 1 => 'callable',
                 default => null,
             },
+            // ext/standard/array.stub.php — PHP 8.5 array $array; absent from InternalArgInfo (#27597)
+            'array_first', 'array_last' => 0 === $index ? 'array' : null,
             // ext/standard/array.stub.php — array $array; absent from InternalArgInfo (#26111, #26182)
             'array_key_first', 'array_key_last', 'array_is_list' => 0 === $index ? 'array' : null,
             // ext/standard/array.stub.php — ?int $length = null, mixed $replacement = [] (#24824)
@@ -1622,8 +1636,13 @@ final class BuiltinInternalArgInfo
             'getimagesize', 'getimagesizefromstring' => 1 === $index ? '' : null,
             // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068, #23507)
             'hash', 'hash_file' => 3 === $index ? 'array' : null,
-            // ext/standard/string.stub.php — bool $before_needle = false; InternalArgInfo omits 3rd (#25758)
-            'strchr' => 2 === $index ? 'bool' : null,
+            // ext/standard/string.stub.php — string $needle; InternalArgInfo empty on strstr only (#25759)
+            // bool $before_needle = false; InternalArgInfo omits 3rd on strchr (#25758)
+            'strstr', 'strchr' => match ($index) {
+                1 => 'string',
+                2 => 'bool',
+                default => null,
+            },
             // ext/standard/string.stub.php — array|string unions; &$count = null untyped (#23588 / #24886)
             // InternalArgInfo: str_replace has string|array; str_ireplace params empty + count int.
             'str_replace', 'str_ireplace' => match ($index) {

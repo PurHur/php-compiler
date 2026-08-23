@@ -11,6 +11,7 @@ use PHPCompiler\JIT\HashTableKeyFilterLlvm;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\CachingIteratorJitHelper;
 use PHPCompiler\VM\SplOuterIteratorHt;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -62,6 +63,7 @@ final class CachingIteratorConstruct implements Call
         $flags = isset($args[2])
             ? self::toI64($context, $args[2])
             : $context->getTypeFromString('int64')->constInt(0, false);
+        CachingIteratorJitHelper::storeFlags($context, $objPtr, $flags);
         $i64 = $context->getTypeFromString('int64');
         $isFull = $context->builder->icmp(
             Builder::INT_NE,

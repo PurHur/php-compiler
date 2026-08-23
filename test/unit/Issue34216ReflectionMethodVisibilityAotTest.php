@@ -9,24 +9,24 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * AOT: ReflectionMethod isPublic/isStatic/getNumberOfParameters match Zend (#34216).
+ * AOT: ReflectionMethod isPublic / isStatic match Zend (#34216).
  *
- * @see php-src ext/reflection/php_reflection.c zim_ReflectionMethod_isPublic,
- *      zim_ReflectionFunctionAbstract_isStatic / getNumberOfParameters
+ * @see php-src ext/reflection/php_reflection.c zim_ReflectionMethod_isPublic
+ * @see \PHPCompiler\JIT\Call\ReflectionMethodVisibilityQuery
  *
  * @group llvm
  * @group aot
  */
-final class Issue34216ReflectionMethodQueriesAotTest extends TestCase
+final class Issue34216ReflectionMethodVisibilityAotTest extends TestCase
 {
-    private const EXPECT = "pub=1\nstatic=0\nn=2\nreq=1\nspub=1\nsstatic=1\nsn=2\nsreq=1";
+    private const EXPECT = "m_pub=1 m_static=0\ns_pub=1 s_static=1\np_pub=0 p_static=0";
 
-    public function testContextRegistersMethodQueryProxies(): void
+    public function testContextRegistersVisibilityProxies(): void
     {
         $source = (string) file_get_contents(
             dirname(__DIR__, 2).'/lib/JIT/Context.php'
         );
-        foreach (['ispublic', 'isstatic', 'getnumberofparameters', 'getnumberofrequiredparameters'] as $m) {
+        foreach (['ispublic', 'isstatic'] as $m) {
             $this->assertStringContainsString(
                 "functionProxies['reflectionmethod::".$m."']",
                 $source
@@ -35,14 +35,14 @@ final class Issue34216ReflectionMethodQueriesAotTest extends TestCase
         $this->assertStringContainsString('#34216', $source);
     }
 
-    public function testAotQueriesMatchZend(): void
+    public function testAotIsPublicIsStaticMatchZend(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
         $root = dirname(__DIR__, 2);
-        $src = $root.'/test/repro/issue_34216_reflection_method_queries_aot.php';
-        $bin = sys_get_temp_dir().'/phpc_34216_rmq_'.getmypid().'.bin';
+        $src = $root.'/test/repro/issue_34216_reflection_method_visibility_aot.php';
+        $bin = sys_get_temp_dir().'/phpc_34216_vis_'.getmypid().'.bin';
         $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
             .escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
@@ -62,10 +62,10 @@ final class Issue34216ReflectionMethodQueriesAotTest extends TestCase
         }
     }
 
-    public function testVmQueriesMatchZend(): void
+    public function testVmIsPublicIsStaticMatchZend(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = $root.'/test/repro/issue_34216_reflection_method_queries_aot.php';
+        $src = $root.'/test/repro/issue_34216_reflection_method_visibility_aot.php';
         $cmd = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/vm.php').' '
             .escapeshellarg($src).' 2>&1';

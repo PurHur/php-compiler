@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\VM\ParamArgumentCountError;
+use PHPCompiler\VM\ReflectionSupport;
 
 /**
  * Record compile-time user class method metadata for thin AOT
@@ -18,20 +20,35 @@ final class ReflectionMethodQueryLowering
     private static array $userMethods = [];
 
     public static function recordUserMethod(
-        string $classLc,
-        string $methodLc,
+        string $className,
+        string $methodName,
         int $paramCount,
         int $requiredCount
     ): void {
-        $classLc = strtolower(ltrim($classLc, '\\'));
-        $methodLc = strtolower($methodLc);
+        $classLc = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($methodName);
         if ('' === $classLc || '' === $methodLc || !self::isUserScriptClassLc($classLc)) {
             return;
         }
         self::$userMethods[$classLc][$methodLc] = [
             'total' => max(0, $paramCount),
-            'required' => max(0, $requiredCount),
+            'required' => max(0, min($requiredCount, max(0, $paramCount))),
         ];
+    }
+
+    public static function recordUserMethodFromBlock(string $className, string $methodName, \PHPCompiler\Block $block): void
+    {
+        $paramNames = array_values($block->paramNames);
+        $required = 0;
+        for ($i = 0, $n = \count($paramNames); $i < $n; ++$i) {
+            if (ReflectionSupport::parameterIsVariadic($block, $i)
+                || ParamArgumentCountError::parameterHasDefault($block, $i)
+            ) {
+                break;
+            }
+            ++$required;
+        }
+        self::recordUserMethod($className, $methodName, \count($paramNames), $required);
     }
 
     public static function implementLookupFunctions(Context $context): void

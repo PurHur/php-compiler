@@ -240,6 +240,7 @@
             <file>./test/compliance/SettypeReflection27766VMTest.php</file>
             <file>./test/compliance/StrchrReflection25758VMTest.php</file>
             <file>./test/compliance/StrchrReflection25758JITTest.php</file>
+            <file>./test/compliance/StrstrReflection25759VMTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437VMTest.php</file>
             <file>./test/compliance/MetaphoneSoundexCountCharsNamed23437JITTest.php</file>
             <file>./test/compliance/LinkinfoReadlinkNamed23944VMTest.php</file>
@@ -1214,6 +1215,8 @@
             <file>./test/compliance/ArraySpliceFloatStringOffsetDepJITTest.php</file>
             <file>./test/compliance/ArrayFindFamilyReflection25452VMTest.php</file>
             <file>./test/compliance/ArrayFindFamilyReflection25452JITTest.php</file>
+            <file>./test/compliance/ArrayFirstLastReflection27597VMTest.php</file>
+            <file>./test/compliance/ArrayFirstLastReflection27597JITTest.php</file>
             <file>./test/compliance/AbstractParentMethodCiteEval30022VMTest.php</file>
             <file>./test/compliance/AbstractParentMethodCiteEval30022JITTest.php</file>
             <file>./test/compliance/ClosureTypeerrorLocation84VMTest.php</file>

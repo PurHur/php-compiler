@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\JIT\Builtin\DomSaveXMLRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -17,6 +18,15 @@ final class JitDomSaveXML
     {
         if (\count($args) < 1) {
             throw new \LogicException('DOMDocument::saveXML() expects receiver');
+        }
+
+        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])
+            && JitDomSaveOptionalDomNodeArg::guardOrAbort(
+            $context,
+            $args[1],
+            'DOMDocument::saveXML'
+        )) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
         }
 
         if (JitDomSaveXMLUserScript::shouldUse($context)) {

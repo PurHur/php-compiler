@@ -1483,6 +1483,11 @@ class Context {
         $this->type->object->lookup('CachingIterator');
         $this->functionProxies['cachingiterator::__construct'] = new Call\CachingIteratorConstruct();
         $this->functionProxies['cachingiterator::getcache'] = new Call\CachingIteratorGetCache();
+        foreach (['getFlags', 'setFlags'] as $citMethod) {
+            $this->functionProxies['cachingiterator::'.strtolower($citMethod)] = new Call\CachingIteratorMethod(
+                $citMethod
+            );
+        }
         // NoRewindIterator / InfiniteIterator — HT snapshot + Iterator protocol (#27583 / #27568).
         $this->type->object->lookup('NoRewindIterator');
         $this->type->object->lookup('InfiniteIterator');

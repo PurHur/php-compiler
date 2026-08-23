@@ -2303,16 +2303,11 @@ class JIT {
         }
         // Thin AOT ReflectionMethod::{getNumberOfParameters,getNumberOfRequiredParameters} (#34216).
         if (null !== $block->func && null !== $block->func->class) {
-            $className = (string) $block->func->class->value;
-            if (!str_starts_with(strtolower(ltrim($className, '\\')), 'phpcompiler\\')) {
-                $paramNames = array_values($block->paramNames);
-                JIT\Builtin\ReflectionMethodQueryLowering::recordUserMethod(
-                    $className,
-                    strtolower($block->func->name),
-                    \count($paramNames),
-                    self::requiredParameterCountFromBlock($block)
-                );
-            }
+            JIT\Builtin\ReflectionMethodQueryLowering::recordUserMethodFromBlock(
+                (string) $block->func->class->value,
+                $block->func->name,
+                $block
+            );
         }
         $skipName = $this->jitFunctionSkipName($logicalName, $block);
         if (!is_null($funcName)) {
@@ -17022,11 +17017,10 @@ class JIT {
                             break;
                         }
                         if (!str_starts_with(strtolower(ltrim($displayClass, '\\')), 'phpcompiler\\')) {
-                            JIT\Builtin\ReflectionMethodQueryLowering::recordUserMethod(
+                            JIT\Builtin\ReflectionMethodQueryLowering::recordUserMethodFromBlock(
                                 $displayClass,
                                 $methodLc,
-                                \count(array_values($methodBlock->paramNames)),
-                                self::requiredParameterCountFromBlock($methodBlock)
+                                $methodBlock
                             );
                         }
                         $this->compileBlock($methodBlock, $funcName);
@@ -25426,6 +25420,15 @@ class JIT {
         if ($toCall instanceof JIT\Call\Native) {
             $result = $toCall->callWithArgMap($this->context, $callArgs);
         } else {
+            // Named optional middle params (DOMDocument::saveXML options:) stay sparse until
+            // here; array_values alone would drop the omitted $node slot (#31396 / #32018).
+            if (isset($toCall->paramNames) && \is_array($toCall->paramNames) && [] !== $toCall->paramNames) {
+                $callArgs = JIT\NamedOptionalCallArgs::densifyForSpread(
+                    $this->context,
+                    $callArgs,
+                    1 + \count($toCall->paramNames)
+                );
+            }
             $result = $toCall->call($this->context, ...array_values($callArgs));
         }
         // Enum::from() (and other callees) set throw-pending then return; catch here (#24219).
