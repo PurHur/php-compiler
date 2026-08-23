@@ -12,11 +12,15 @@ use PHPLLVM\Value;
 
 /**
  * Pure LLVM for array_map(null|compile-time-string-builtin|Closure) under thin standalone AOT
- * (#23974 / #24156 / #33705).
+ * (#23974 / #24156 / #33705 / #33977).
  *
  * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayMapJitHelper} still segfaults / returns
  * null on foreach + PHP-array collect for Closures (#24156). Peer of {@see HashTableSliceLlvm}.
  * Packed walks skip TYPE_UNDEFINED only — TYPE_NULL is kept (#33705 / #33699).
+ *
+ * Typed allowlist (`strtoupper`, `strlen`, …) keeps native set*At stores. Other registered
+ * string builtins (abs, unlink, …) call the Internal and box via
+ * {@see JitValueBox::coerceToValuePtrForStore} (#33977; php-src php_array_map).
  *
  * php-src: ext/standard/array.c — php_array_map()
  */
@@ -44,13 +48,30 @@ final class ArrayMapLlvm
         return self::mapPacked($context, $src, null, Variable::TYPE_VALUE, 'array_map_null');
     }
 
-    /** Map each packed element through a compile-time string builtin (strtoupper, strval, …). */
+    /** Map each packed element through a compile-time string builtin (strtoupper, strval, abs, …). */
     public static function mapBuiltin(Context $context, Value $src, string $builtinName): Value
     {
         $handler = VmInternalCall::resolveStringCallback($builtinName);
-        $resultType = self::mapCallbackResultType($handler);
+        $resultType = self::MAP_CALLBACK_RESULT_TYPE[$handler::class] ?? null;
+        if (null !== $resultType) {
+            return self::mapPacked($context, $src, $handler, $resultType, 'array_map');
+        }
 
-        return self::mapPacked($context, $src, $handler, $resultType, 'array_map');
+        // Generic unary Internal — box native / value-box returns (#33977).
+        return self::mapPacked(
+            $context,
+            $src,
+            static function (Context $ctx, Variable $elem) use ($handler): Variable {
+                $raw = $handler->call($ctx, $elem);
+                $ptr = JitValueBox::coerceToValuePtrForStore($ctx, $raw);
+                $slot = JitValueBox::alloc($ctx);
+                JitValueBox::copyFromPointer($ctx, $slot, $ptr);
+
+                return new Variable($ctx, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+            },
+            Variable::TYPE_VALUE,
+            'array_map_generic'
+        );
     }
 
     /**
@@ -72,18 +93,6 @@ final class ArrayMapLlvm
             Variable::TYPE_VALUE,
             'array_map_closure'
         );
-    }
-
-    private static function mapCallbackResultType(Internal $handler): int
-    {
-        $type = self::MAP_CALLBACK_RESULT_TYPE[$handler::class] ?? null;
-        if (null === $type) {
-            throw new \LogicException(
-                'array_map() callback is not supported by the JIT compiler in this build'
-            );
-        }
-
-        return $type;
     }
 
     /**
