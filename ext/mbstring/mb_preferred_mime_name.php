@@ -10,7 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** mb_preferred_mime_name() — MIME charset label (php-src ext/mbstring/mbstring.c; #13100). */
+/**
+ * mb_preferred_mime_name() — MIME charset label (php-src ext/mbstring/mbstring.c; #13100).
+ *
+ * JIT/AOT: compile-time fold + NestedJIT via {@see JitMbPreferredMimeName} (#34298).
+ */
 final class mb_preferred_mime_name extends Internal
 {
     public function __construct()
@@ -49,8 +53,6 @@ final class mb_preferred_mime_name extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_preferred_mime_name() JIT is not supported in this compiler build'
-        );
+        return JitMbPreferredMimeName::invoke($context, $args);
     }
 }
