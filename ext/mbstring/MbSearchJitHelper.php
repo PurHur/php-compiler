@@ -7,17 +7,18 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\JIT\Builtin\StringStrpos;
 
 /**
- * mb_strpos() / mb_stripos() / mb_strrpos() / mb_strripos() for compiled JIT/AOT modules
- * (#34146 / #34158 / #34166 leftover of #27187, php-in-PHP).
+ * mb_strpos() / mb_stripos() / mb_strrpos() / mb_strripos() / mb_strstr() for compiled JIT/AOT
+ * modules (#34146 / #34158 / #34166 / #34211 leftover of #27187, php-in-PHP).
  *
- * Returns {@see StringStrpos::NOT_FOUND} (-1) on miss so callers can box int|false.
+ * Offset helpers return {@see StringStrpos::NOT_FOUND} (-1) on miss so callers can box int|false.
+ * {@see strstrArgv} returns string|false (nullish false → NestedJIT null).
  *
  * NestedJIT must not call {@see VmMbstring::strpos} / {@see \PHPCompiler\ext\standard\VmString::utf8CharLength}
  * — those methods silent-return 0 under thin AOT NestedJIT. Search is inlined with strlen/ord/substr
  * only; UTF-8 width uses range compares (NestedJIT bitwise `&` loops hang on multibyte lead bytes).
  *
- * SSOT (VM / compile-time fold): {@see VmMbstring::strpos()} / stripos / strrpos / strripos
- * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strpos), mb_stripos, mb_strrpos, mb_strripos
+ * SSOT (VM / compile-time fold): {@see VmMbstring::strpos()} / stripos / strrpos / strripos / strstr
+ * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strpos), mb_stripos, mb_strrpos, mb_strripos, mb_strstr
  */
 final class MbSearchJitHelper
 {
@@ -91,6 +92,41 @@ final class MbSearchJitHelper
         }
 
         return self::utf8Strrpos($haystack, $needle, $offset);
+    }
+
+    /**
+     * mb_strstr() — first occurrence → string|false (#34211 leftover of #34172).
+     *
+     * @return string|false
+     */
+    public static function strstrArgv(
+        string $haystack,
+        string $needle,
+        bool $beforeNeedle,
+        string $encoding
+    ) {
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            $pos = self::byteStrpos($haystack, $needle, 0);
+            if (StringStrpos::NOT_FOUND === $pos) {
+                return false;
+            }
+            if ($beforeNeedle) {
+                return \substr($haystack, 0, $pos);
+            }
+
+            return \substr($haystack, $pos);
+        }
+
+        $pos = self::utf8Strpos($haystack, $needle, 0);
+        if (StringStrpos::NOT_FOUND === $pos) {
+            return false;
+        }
+        if ($beforeNeedle) {
+            return self::utf8Substr($haystack, 0, $pos);
+        }
+        $hayLen = self::utf8Length($haystack);
+
+        return self::utf8Substr($haystack, $pos, $hayLen - $pos);
     }
 
     /** ASCII A–Z → a–z; leaves UTF-8 multibyte sequences unchanged. */

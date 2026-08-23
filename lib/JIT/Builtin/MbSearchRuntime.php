@@ -9,10 +9,10 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link hook for mb_strpos() / mb_stripos() / mb_strrpos() / mb_strripos() — compiles MbSearchJitHelper
- * (#34146 / #34158 / #34166 leftover of #27187).
+ * JIT/AOT link hook for mb_strpos() / mb_stripos() / mb_strrpos() / mb_strripos() / mb_strstr()
+ * — compiles MbSearchJitHelper (#34146 / #34158 / #34166 / #34211 leftover of #27187).
  *
- * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strpos), mb_stripos, mb_strrpos, mb_strripos
+ * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strpos), mb_stripos, mb_strrpos, mb_strripos, mb_strstr
  */
 final class MbSearchRuntime
 {
@@ -26,12 +26,15 @@ final class MbSearchRuntime
 
     private const STRRIPOS_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSearchJitHelper::strriposArgv';
 
+    private const STRSTR_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSearchJitHelper::strstrArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::STRPOS_LOGICAL,
         self::STRIPOS_LOGICAL,
         self::STRRPOS_LOGICAL,
         self::STRRIPOS_LOGICAL,
+        self::STRSTR_LOGICAL,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -67,13 +70,20 @@ final class MbSearchRuntime
         return JitVmHelperLink::lookupCompiled($context, self::STRRIPOS_LOGICAL, 'mb_strripos');
     }
 
+    public static function strstrHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::STRSTR_LOGICAL, '#34211');
+    }
+
     private static function ensureJitHelperCompiled(Context $context): void
     {
         JitVmHelperLink::ensureCompiled(
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#34166'
+            '#34211'
         );
     }
 }

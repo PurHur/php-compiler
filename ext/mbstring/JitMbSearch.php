@@ -8,16 +8,19 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbSearchRuntime;
 use PHPCompiler\JIT\Builtin\StringStrpos;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * LLVM JIT/AOT for mbstring search builtins (#7015).
  *
- * Compile-time fold via {@see VmMbstring}; mb_strpos() runtime via NestedJIT (#34146 leftover of #27187).
+ * Compile-time fold via {@see VmMbstring}; mb_strpos()/mb_strstr() runtime via NestedJIT
+ * (#34146 leftover of #27187; #34211).
  */
 final class JitMbSearch
 {
@@ -236,6 +239,97 @@ final class JitMbSearch
         );
 
         return StringStrpos::boxFoundOffset($context, $found);
+    }
+
+    /**
+     * mb_strstr() — fold literals, else NestedJIT {@see MbSearchJitHelper::strstrArgv} (#34211).
+     *
+     * @param list<JITVariable> $args
+     */
+    public static function invokeStrstr(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 4) {
+            throw new \LogicException('mb_strstr() requires two to four arguments');
+        }
+        $folded = self::tryStrstrFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        $hay = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_strstr', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'mb_strstr', 1, 'needle');
+        $beforeNeedle = $argc >= 3
+            ? JitBoolArg::lowerZParamBool($context, $args[2], 'mb_strstr', 'before_needle', 3)
+            : $context->constantFromBool(false);
+        if ($argc >= 4) {
+            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
+                $encoding = 'UTF-8';
+            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
+                throw new \LogicException('mb_strstr() encoding must be a string literal in this compiler build');
+            } else {
+                $encoding = $args[3]->compileTimeString ?? null;
+                if (null === $encoding) {
+                    throw new \LogicException('mb_strstr() encoding must be a string literal in this compiler build');
+                }
+            }
+        } else {
+            $encoding = 'UTF-8';
+        }
+        self::assertSupportedEncoding($encoding);
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbSearchRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            MbSearchRuntime::strstrHelper($context),
+            [$hay, $needle, $beforeNeedle, $encPtr]
+        );
+
+        return self::boxStringOrFalse($context, $raw);
+    }
+
+    /**
+     * NestedJIT string|false → `__value__*` (peer StringHex2bin / #34211).
+     */
+    private static function boxStringOrFalse(Context $context, Value $raw): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_strstr_box');
+        $i32 = $context->getTypeFromString('int32');
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $isMiss = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
+        $missBb = BasicBlockHelper::append($context, 'mb_strstr_miss');
+        $hitBb = BasicBlockHelper::append($context, 'mb_strstr_hit');
+        $doneBb = BasicBlockHelper::append($context, 'mb_strstr_done');
+        $context->builder->branchIf($isMiss, $missBb, $hitBb);
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $ptr,
+            $i32->constInt(0, false)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($hitBb);
+        $strPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $strPtr);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $ptr;
     }
 
     /**
