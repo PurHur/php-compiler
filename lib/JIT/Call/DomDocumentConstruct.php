@@ -39,6 +39,22 @@ final class DomDocumentConstruct implements Call
             DomConstants::XML_DOCUMENT_NODE
         );
 
+        // Empty document: documentElement is null (php-src ext/dom/document.c; #32736).
+        if (!$objectType->hasProperty($classId, VmDom::PROP_DOCUMENT_ELEMENT)) {
+            $objectType->defineProperty($classId, VmDom::PROP_DOCUMENT_ELEMENT, Variable::TYPE_OBJECT);
+        }
+        $nullEl = new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $context->getTypeFromString('__object__*')->constNull()
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_DOCUMENT_ELEMENT),
+            $nullEl,
+            Variable::TYPE_OBJECT
+        );
+
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),

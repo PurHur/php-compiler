@@ -33,8 +33,12 @@ final class JitDomDocumentElement
             && 'documentelement' === $propLc;
     }
 
-    public static function fetch(Object_ $objectType, Value $obj, ?JITVariable $documentVar = null): JITVariable
-    {
+    public static function fetch(
+        Object_ $objectType,
+        Value $obj,
+        ?JITVariable $documentVar = null,
+        string $className = self::CLASS_DOCUMENT
+    ): JITVariable {
         $context = $objectType->jitContext();
         if (!JitDomDocumentMethodKernel::shouldUse($context)) {
             return $objectType->propertyFetchOrdinary(
@@ -44,11 +48,12 @@ final class JitDomDocumentElement
             );
         }
 
-        // Always read the TYPE_OBJECT slot (loadXML / loadHTML / appendChild setRoot).
+        // Always read the TYPE_OBJECT slot on the *receiver* document class (loadXML /
+        // loadHTML / appendChild setRoot). lastDocumentClass is process-global compile
+        // state — using it for an unrelated/new document read firstChild as object (#32736).
         // An empty document stores a null pointer — {@see JitUnlikeCompare} treats
-        // TYPE_OBJECT+nullptr as PHP null for === / == (#32736). Do not host-fold
-        // via !lastLoadWasPureUserScript() (defaults true and skipped the slot).
-        $docClass = JitDomLoadXMLUserScript::lastDocumentClass() ?? self::CLASS_DOCUMENT;
+        // TYPE_OBJECT+nullptr as PHP null for === / !== (#32736).
+        $docClass = $className;
         $docClassId = $objectType->lookup($docClass);
         if (!$objectType->hasProperty($docClassId, self::PROP_DOCUMENT_ELEMENT)) {
             $objectType->defineProperty($docClassId, self::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
@@ -62,7 +67,25 @@ final class JitDomDocumentElement
             $docClassId
         );
         // So `$doc->documentElement->attributes` / `->childNodes` resolve DOMElement (#33082 / #33099).
-        $result->classUserType = self::CLASS_ELEMENT;
+        if (JITVariable::TYPE_OBJECT === $result->type) {
+            $ptr = JITVariable::KIND_VALUE === $result->kind
+                ? $result->value
+                : $context->builder->load($result->value);
+            $isNull = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $ptr,
+                $context->getTypeFromString('__object__*')->constNull()
+            );
+            $fn = $context->builder->getInsertBlock()->getParent();
+            assert($fn instanceof \PHPLLVM\Value\Function_);
+            $setEl = $fn->appendBasicBlock('dom_de_set_el_type');
+            $done = $fn->appendBasicBlock('dom_de_done_type');
+            $context->builder->branchIf($isNull, $done, $setEl);
+            $context->builder->positionAtEnd($setEl);
+            $result->classUserType = self::CLASS_ELEMENT;
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($done);
+        }
         if (null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
             || null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
             || (null !== $documentVar && null !== $documentVar->compileTimeDomLoadXml)
