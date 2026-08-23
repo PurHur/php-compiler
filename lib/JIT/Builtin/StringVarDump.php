@@ -14,17 +14,19 @@ use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
+use PHPCompiler\VM\EnumCasePropertyJitHelper;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_var_dump via VarDumpJitHelper PHP (#9195, #13241, #16565, #23143, #23540, #32941).
+ * JIT/AOT link for __compiler_var_dump via VarDumpJitHelper PHP (#9195, #13241, #16565, #23143, #23540, #32941, #34207).
  *
  * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Embed: NestedJIT {@see VarDumpJitHelper} (php-in-PHP).
- * Thin standalone AOT: scalar LLVM bridge (int/float) — NestedJIT of the helper
- * segfaults on `$ctx->runtime->vm` class-id layout (#23540 / #16075). Non-scalar
- * thin AOT aborts with a stderr diagnostic (not silent SIGABRT).
+ * Thin standalone AOT: scalar + enum-case LLVM bridge — NestedJIT of the helper
+ * segfaults on `$ctx->runtime->vm` class-id layout (#23540 / #16075). Other non-scalars
+ * thin AOT abort with a stderr diagnostic (not silent SIGABRT).
+ * Thin body is deferred to {@see ensureLinkedAtCallSite()} so DECLARE_ENUM has run (#34207).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringVarExport #20589).
  * php-src: ext/standard/var.c — php_var_dump_ex / PHP_FUNCTION(var_dump)
  */
@@ -46,15 +48,25 @@ final class StringVarDump
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        // Type::initialize / early ensureLinked: declare only under thin AOT so enum
+        // class ids from DECLARE_ENUM are visible when the body is emitted (#34207).
+        self::implement($context, false);
+    }
+
+    /**
+     * Emit thin scalar/enum body at the var_dump() call site (after enum declare pass).
+     */
+    public static function ensureLinkedAtCallSite(Context $context): void
+    {
+        self::implement($context, true);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
+        self::implement($context, true);
     }
 
-    public static function implement(Context $context): void
+    public static function implement(Context $context, bool $emitThinBody = false): void
     {
         if (NestedJitCompileScope::isActive()) {
             return;
@@ -69,9 +81,13 @@ final class StringVarDump
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
-        // Thin user-script AOT: scalar IR bridge — skip NestedJIT helper (#23540).
+        // Thin user-script AOT: scalar+enum IR bridge — skip NestedJIT helper (#23540 / #34207).
         if ($context->isThinStandaloneAotMain()) {
-            self::implementThinScalarBridge($context);
+            if (!$emitThinBody) {
+                self::ensureThinDeclaration($context);
+            } else {
+                self::implementThinScalarBridge($context);
+            }
             self::registerLinkedRuntime($context);
             if (null !== $savedInsert) {
                 BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
@@ -98,10 +114,28 @@ final class StringVarDump
         }
     }
 
+    /** Declare `__compiler_var_dump` without a body — filled at the call site (#34207). */
+    private static function ensureThinDeclaration(Context $context): void
+    {
+        $abiName = '__compiler_var_dump';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $voidTy = $context->getTypeFromString('void');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $ft = $context->context->functionType($voidTy, false, $valuePtr);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+    }
+
     /**
-     * Thin standalone AOT: dump int/float like Zend without NestedJIT (#23540 done-when).
+     * Thin standalone AOT: dump scalars + enum cases like Zend without NestedJIT (#23540 / #34207).
      *
      * Uses {@see ValueEchoHelper} / ob echo ABI already linked for `echo` in the same binary.
+     * Enum arm: php-src `php_var_dump` prints `enum(Class::Case)` for enum case objects.
      */
     private static function implementThinScalarBridge(Context $context): void
     {
@@ -131,6 +165,7 @@ final class StringVarDump
         $doubleBlock = $fn->appendBasicBlock('var_dump_thin_double');
         $nullBlock = $fn->appendBasicBlock('var_dump_thin_null');
         $stringBlock = $fn->appendBasicBlock('var_dump_thin_string');
+        $objectBlock = $fn->appendBasicBlock('var_dump_thin_object');
         $fallback = $fn->appendBasicBlock('var_dump_thin_fallback');
         $done = $fn->appendBasicBlock('var_dump_thin_done');
 
@@ -259,7 +294,8 @@ final class StringVarDump
             $kind,
             $i8->constInt(JitVariable::TYPE_STRING & 0x7f, false)
         );
-        $context->builder->branchIf($isString, $stringBlock, $fallback);
+        $afterString = $fn->appendBasicBlock('var_dump_thin_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
         $strPtr = $context->builder->call(
@@ -287,6 +323,18 @@ final class StringVarDump
         ValueEchoHelper::echoLiteral($context, "\"\n");
         $context->builder->branch($done);
 
+        $context->builder->positionAtEnd($afterString);
+        // TYPE_OBJECT carries IS_REFCOUNTED; enum cases are immortal singletons (#4445 / #34207).
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_OBJECT & 0x7f, false)
+        );
+        $context->builder->branchIf($isObject, $objectBlock, $fallback);
+
+        $context->builder->positionAtEnd($objectBlock);
+        self::emitThinEnumObjectDump($context, $fn, $arg, $done, $fallback);
+
         $context->builder->positionAtEnd($fallback);
         self::emitThinUnsupportedAbort($context);
         $context->builder->returnVoid();
@@ -294,6 +342,75 @@ final class StringVarDump
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * php-src php_var_dump: enum case object → `enum(%s::%s)\n` (ext/standard/var.c).
+     *
+     * Matches class_id against {@see Type\Object_::knownEnumClassIdsToNames()}; reads
+     * SLOT_NAME like {@see Type\ObjectEnumCasePropertyLlvm}. Non-enum objects fall through.
+     */
+    private static function emitThinEnumObjectDump(
+        Context $context,
+        LlvmFunction $fn,
+        \PHPLLVM\Value $arg,
+        \PHPLLVM\BasicBlock $done,
+        \PHPLLVM\BasicBlock $fallback
+    ): void {
+        $objectType = $context->type->object;
+        $enumEntries = $objectType->knownEnumClassIdsToNames();
+        if ([] === $enumEntries) {
+            $context->builder->branch($fallback);
+
+            return;
+        }
+
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $arg
+        );
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $objMap['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $strTy = $context->getTypeFromString('__string__*');
+        $ids = array_keys($enumEntries);
+        $lastIdx = count($ids) - 1;
+        foreach ($ids as $idx => $id) {
+            $matchBlock = $fn->appendBasicBlock('var_dump_thin_enum_'.$id);
+            $nextBlock = $idx === $lastIdx
+                ? $fallback
+                : $fn->appendBasicBlock('var_dump_thin_enum_next_'.$id);
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $classId,
+                    $i64->constInt($id, false)
+                ),
+                $matchBlock,
+                $nextBlock
+            );
+            $context->builder->positionAtEnd($matchBlock);
+            $className = $enumEntries[$id];
+            ValueEchoHelper::echoLiteral($context, 'enum('.$className.'::');
+            $nameSlot = $objectType->propertySlotPtr($objPtr, EnumCasePropertyJitHelper::SLOT_NAME);
+            $nameLoaded = $context->builder->load($nameSlot);
+            $nameStr = $context->builder->pointerCast($nameLoaded, $strTy);
+            $lenOffset = $context->structFieldIndex($nameStr, 'length');
+            $strLen = $context->builder->load(
+                $context->builder->structGep($nameStr, $lenOffset)
+            );
+            $valOffset = $context->structFieldIndex($nameStr, 'value');
+            $context->builder->call(
+                $context->lookupFunction('__phpc_ob_echo_substr'),
+                $context->builder->structGep($nameStr, $valOffset),
+                $context->builder->zExt($strLen, $context->getTypeFromString('size_t'))
+            );
+            ValueEchoHelper::echoLiteral($context, ")\n");
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($nextBlock);
+        }
     }
 
     /** Loud abort for non-scalar thin AOT — replaces silent SIGABRT (#23540). */

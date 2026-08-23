@@ -29,7 +29,7 @@ final class JitVarDump
             return $nullPtr;
         }
 
-        StringVarDump::ensureLinked($context);
+        StringVarDump::ensureLinkedAtCallSite($context);
         foreach ($args as $arg) {
             $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
             $context->builder->call(
