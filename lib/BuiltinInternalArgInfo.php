@@ -624,6 +624,8 @@ final class BuiltinInternalArgInfo
             'xml_set_unparsed_entity_decl_handler' => 'true',
             // ext/standard/array.stub.php — InternalArgInfo return empty (#25441)
             'array_sum', 'array_product' => 'int|float',
+            // ext/standard/array.stub.php — InternalArgInfo array|false; Zend array since 8.0 ValueError (#25395)
+            'array_combine' => 'array',
             // ext/standard/array.stub.php — absent from InternalArgInfo (#24844)
             'array_column' => 'array',
             // ext/standard/array.stub.php — absent from InternalArgInfo (#25499)

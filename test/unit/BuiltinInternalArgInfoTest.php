@@ -491,6 +491,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src array.stub.php — InternalArgInfo array|false; Zend array (#25395). */
+    public function testArrayCombineReturnTypeIsArray(): void
+    {
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('array_combine'));
+    }
+
     /** php-src array.stub.php — absent from InternalArgInfo; Zend array→string|int|null (#26111). */
     public function testArrayKeyFirstLastReflectionStubTypes(): void
     {
