@@ -16,9 +16,7 @@ use PHPLLVM\Value;
 /**
  * openssl_x509_read() — parse PEM into OpenSSLCertificate (php-src ext/openssl/xp.c; #7268, #6274).
  *
- * JIT/AOT leftover #33497: catchable argc/TypeError for non-(OpenSSLCertificate|string) args
- * (peer openssl_pkey_free #33487 / openssl_x509_free #33492). Happy-path string/object → certificate
- * still needs object emission (VM-only today).
+ * JIT/AOT: argc/TypeError (#33497); happy-path PEM/cert → OpenSSLCertificate (#34048).
  */
 final class openssl_x509_read extends Internal
 {
@@ -60,10 +58,7 @@ final class openssl_x509_read extends Internal
             return self::jitReturnNull($context);
         }
 
-        // String / OpenSSLCertificate object emission remains VM-only for thin AOT (#33497).
-        throw new \LogicException(
-            'openssl_x509_read() is not implemented for JIT in this compiler build (issue #7268)'
-        );
+        return JitOpensslX509Read::invoke($context, $args[0]);
     }
 
     /** @return non-empty-string|null Zend type label when the arg cannot be OpenSSLCertificate|string */

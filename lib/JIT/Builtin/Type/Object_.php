@@ -3695,6 +3695,14 @@ class Object_ extends Type {
                 Variable::TYPE_STRING
             );
         }
+        // OpenSSLCertificate PEM for thin AOT openssl_x509_read (#34048).
+        if ('opensslcertificate' === $lcname) {
+            $this->defineProperty(
+                $id,
+                \PHPCompiler\ext\openssl\OpensslCertificateJitSupport::PROP_PEM,
+                Variable::TYPE_STRING
+            );
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
