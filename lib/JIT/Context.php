@@ -1744,6 +1744,7 @@ class Context {
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
         $this->functionProxies['reflectionclass::getproperty'] = new Call\ReflectionClassGetProperty();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
+        // Thin AOT: broken strcasecmp always matched → isFinal always true (#34043).
         $this->functionProxies['reflectionclass::isfinal'] = new Call\ReflectionClassIsFinal();
         // Thin AOT: unbound isInstantiable → NULL (#34027); VM has ReflectionClassIsInstantiable.
         $this->functionProxies['reflectionclass::isinstantiable'] = new Call\ReflectionClassIsInstantiable();

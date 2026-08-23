@@ -85,8 +85,11 @@ class Object_ extends Type {
     private array $traitClassLcs = [];
     /** @var array<string, true> abstract class lc => registered (#34027) */
     private array $abstractClassLcs = [];
+    /** @var array<string, true> final class lc => registered (#34043) */
+    private array $finalClassLcs = [];
     /** @var array<string, true> user attribute class lc => registered (#6450) */
     private array $attributeClassLcs = [];
+
     /** @var array<int, array<string, string>> class id => method lc => trait lc (#3789) */
     private array $classTraitMethodSources = [];
     /** @var array<int, array<string, Block>> trait id => method lc => CFG block (#3789) */
@@ -2255,12 +2258,19 @@ class Object_ extends Type {
         if (isset($this->traitClassLcs[$canonicalOriginalLc])) {
             $this->traitClassLcs[$aliasLc] = true;
         }
+        if (isset($this->abstractClassLcs[$canonicalOriginalLc])) {
+            $this->abstractClassLcs[$aliasLc] = true;
+        }
+        if (isset($this->finalClassLcs[$canonicalOriginalLc])) {
+            $this->finalClassLcs[$aliasLc] = true;
+        }
         if (isset($this->classUsedTraitNames[$canonicalOriginalLc])) {
             $this->classUsedTraitNames[$aliasLc] = $this->classUsedTraitNames[$canonicalOriginalLc];
         }
         if (isset($this->enums[$canonicalOriginalLc])) {
             $this->enums[$aliasLc] = true;
         }
+
 
         return true;
     }
@@ -6313,6 +6323,11 @@ class Object_ extends Type {
         $this->abstractClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
     }
 
+    public function markFinalClass(string $classLc): void
+    {
+        $this->finalClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
+    }
+
     public function markAttributeClass(string $classLc): void
     {
         $this->attributeClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
@@ -6329,6 +6344,12 @@ class Object_ extends Type {
     {
         return isset($this->abstractClassLcs[strtolower(ltrim($classLc, '\\'))]);
     }
+
+    public function isFinalClassLc(string $classLc): bool
+    {
+        return isset($this->finalClassLcs[strtolower(ltrim($classLc, '\\'))]);
+    }
+
 
     /**
      * Lowercase trait names from DECLARE_TRAIT (trait_exists() JIT, #2312).
