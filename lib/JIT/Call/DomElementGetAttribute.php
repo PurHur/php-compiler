@@ -26,6 +26,27 @@ final class DomElementGetAttribute implements Call
             $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         }
 
+        // Per-element open-tag stamp from firstChild/nextSibling (#34050) — before the
+        // global name→value Attr cache, which collapses multiple id= to the last seed.
+        // ARG_SEND temps drop compileTimeDomAttributes; lastFetchedAttributes is cleared
+        // on createElement / documentElement so it cannot leak across documents.
+        if (null !== $nameLit) {
+            $attrs = (isset($args[0]) ? $args[0]->compileTimeDomAttributes : null)
+                ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedAttributes;
+            if (null !== $attrs && [] !== $attrs) {
+                $val = $attrs[$nameLit] ?? null;
+                if (null === $val || '' === $val) {
+                    $pos = strpos($nameLit, ':');
+                    if (false !== $pos) {
+                        $val = $attrs[substr($nameLit, $pos + 1)] ?? null;
+                    }
+                }
+                if (null !== $val && '' !== $val) {
+                    return self::boxConstantString($context, $val);
+                }
+            }
+        }
+
         // Live Attr::$value first — setAttribute stores presentByKey without valueByKey, and
         // Attr::$value writes must update getAttribute (php-src attr.c; #19281 / #29642).
         // The compile-time valueByKey shortcut below is only for parse-time Attrs that never
