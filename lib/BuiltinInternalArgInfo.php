@@ -1622,8 +1622,13 @@ final class BuiltinInternalArgInfo
             'getimagesize', 'getimagesizefromstring' => 1 === $index ? '' : null,
             // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068, #23507)
             'hash', 'hash_file' => 3 === $index ? 'array' : null,
-            // ext/standard/string.stub.php — bool $before_needle = false; InternalArgInfo omits 3rd (#25758)
-            'strchr' => 2 === $index ? 'bool' : null,
+            // ext/standard/string.stub.php — string $needle; InternalArgInfo empty on strstr only (#25759)
+            // bool $before_needle = false; InternalArgInfo omits 3rd on strchr (#25758)
+            'strstr', 'strchr' => match ($index) {
+                1 => 'string',
+                2 => 'bool',
+                default => null,
+            },
             // ext/standard/string.stub.php — array|string unions; &$count = null untyped (#23588 / #24886)
             // InternalArgInfo: str_replace has string|array; str_ireplace params empty + count int.
             'str_replace', 'str_ireplace' => match ($index) {

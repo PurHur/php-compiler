@@ -311,6 +311,17 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src string.stub.php — strstr needle string; InternalArgInfo empty type (#25759). */
+    public function testStrstrNeedleStubParamType(): void
+    {
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('strstr', 1));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('strstr', 1);
+        $this->assertNotNull($info);
+        $this->assertSame('needle', $info['name']);
+        $this->assertSame('string', $info['type']);
+        $this->assertFalse($info['isOptional']);
+    }
+
     /** php-src string.stub.php — strchr before_needle bool optional; InternalArgInfo omits 3rd (#25758). */
     public function testStrchrBeforeNeedleStubParamAndOptional(): void
     {
