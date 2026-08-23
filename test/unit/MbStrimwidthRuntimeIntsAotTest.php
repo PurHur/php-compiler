@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: mb_strimwidth() runtime start/width via JitNestedHelperCoerce (#34264 leftover of #3495).
+ * AOT: mb_strimwidth() runtime start/width via JitNestedHelperCoerce (#34264 / #34269).
  *
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_strimwidth)
  *
@@ -16,13 +16,20 @@ use PHPUnit\Framework\TestCase;
  */
 final class MbStrimwidthRuntimeIntsAotTest extends TestCase
 {
-    public function testAotRuntimeIntsMatchVm(): void
+    public function testAotRuntimeIntsMatchVmAndZendStrings(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
         $src = __DIR__.'/../repro/mb_strimwidth_runtime_ints_aot.php';
-        $this->assertSame($this->runVm($src), $this->runAot($src));
+        $vm = $this->runVm($src);
+        $aot = $this->runAot($src);
+        $this->assertSame($vm, $aot);
+        // Exact Zend strings — #34266 passed non-SIGSEGV while ints_var was ".." (#34269).
+        $this->assertStringContainsString('ints_var=üb..', $aot);
+        $this->assertStringContainsString('ü_w3=ü..', $aot);
+        $this->assertStringContainsString('from1=ber', $aot);
+        $this->assertStringNotContainsString("ints_var=..\n", $aot);
     }
 
     public function testLoweringUsesNestedHelperCoerce(): void
@@ -32,6 +39,10 @@ final class MbStrimwidthRuntimeIntsAotTest extends TestCase
         $this->assertStringContainsString('JitNestedHelperCoerce::callHelper', $jit);
         $this->assertStringContainsString('extractStringPtrFromHelperResult', $jit);
         $this->assertStringContainsString('strimwidthFunction', $jit);
+        $helper = (string) file_get_contents($root.'/ext/mbstring/MbStrwidthJitHelper.php');
+        $this->assertDoesNotMatchRegularExpression('/\$content\s*=\s*\$width\s*-/', $helper);
+        $this->assertDoesNotMatchRegularExpression('/\$charLen\s*-\s*\$from/', $helper);
+        $this->assertStringContainsString('from + ($width - $markerLen)', $helper);
         $this->assertFileDoesNotExist($root.'/lib/AOT/runtime/mb_strimwidth.c');
     }
 

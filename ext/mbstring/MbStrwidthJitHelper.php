@@ -5,21 +5,54 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * Lowered into JIT/AOT modules that call mb_strwidth() / mb_strimwidth() / mb_str_pad() at runtime
- * (#3495, #34264, php-in-PHP).
+ * NestedJIT helpers for mb_strwidth() / mb_strimwidth() / mb_str_pad() (#3495 / #34264 / #34269).
  *
- * NestedJIT must not call {@see VmMbstring::strimwidth} / {@see strlen} here when start/width are
- * runtime ints — strlen silent-returns 0 and VmMbstring SIGSEGVs under thin AOT (#34264). Peel uses
- * isset-index length + substr (peer {@see MbSearchJitHelper} / MbSubstrCountJitHelper).
+ * NestedJIT zeros int locals copied from params (width-minus-marker temporary) and
+ * charLen-minus-from. Compare `$charIndex == $from` /
+ * `$charIndex == ($from + ($width - $markerLen))` directly — peer MbSubstrJitHelper / #34256.
  *
- * SSOT (VM / compile-time fold): {@see VmMbstring::strwidth()} / strimwidth / strPad
- * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strwidth), mb_strimwidth, mb_str_pad
+ * NestedJIT display width = 1 per UTF-8 character. Compile-time fold uses VmMbstring (full EAW).
+ * Subject length via isset-index (strlen silent-0 under NestedJIT, #34264).
+ *
+ * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strwidth / mb_strimwidth / mb_str_pad).
  */
 final class MbStrwidthJitHelper
 {
     public static function strwidth(string $string, string $encoding): int
     {
-        return VmMbstring::strwidth($string, $encoding);
+        unset($encoding);
+        $n = 0;
+        $byteLen = 0;
+        while (isset($string[$byteLen])) {
+            $byteLen = $byteLen + 1;
+            if ($byteLen > 1048576) {
+                break;
+            }
+        }
+        $bytePos = 0;
+        $g = $byteLen + 1;
+        while ($bytePos < $byteLen && $g > 0) {
+            $g = $g - 1;
+            $b = \ord(\substr($string, $bytePos, 1));
+            $w = 1;
+            if ($b >= 192 && $b < 224) {
+                if ($bytePos + 1 < $byteLen) {
+                    $w = 2;
+                }
+            } elseif ($b >= 224 && $b < 240) {
+                if ($bytePos + 2 < $byteLen) {
+                    $w = 3;
+                }
+            } elseif ($b >= 240 && $b < 248) {
+                if ($bytePos + 3 < $byteLen) {
+                    $w = 4;
+                }
+            }
+            $bytePos = $bytePos + $w;
+            $n = $n + 1;
+        }
+
+        return $n;
     }
 
     public static function strimwidth(
@@ -29,42 +62,146 @@ final class MbStrwidthJitHelper
         string $trimmarker,
         string $encoding
     ): string {
-        // Character-oriented peel for UTF-8/ASCII/8BIT. Display width ≈ 1 per codepoint for the
-        // latin/ü repro; wide East-Asian stays accurate on VM / literal-fold via VmMbstring.
         unset($encoding);
-        $charLen = self::utf8CharLength($string);
-        if (0 !== $from) {
-            if ($from < 0) {
-                $from += $charLen;
+
+        $byteLen = 0;
+        while (isset($string[$byteLen])) {
+            $byteLen = $byteLen + 1;
+            if ($byteLen > 1048576) {
+                break;
             }
-            if ($from < 0 || $from > $charLen) {
+        }
+        $charLen = 0;
+        $bytePos = 0;
+        $g = $byteLen + 1;
+        while ($bytePos < $byteLen && $g > 0) {
+            $g = $g - 1;
+            $b = \ord(\substr($string, $bytePos, 1));
+            $w = 1;
+            if ($b >= 192 && $b < 224) {
+                if ($bytePos + 1 < $byteLen) {
+                    $w = 2;
+                }
+            } elseif ($b >= 224 && $b < 240) {
+                if ($bytePos + 2 < $byteLen) {
+                    $w = 3;
+                }
+            } elseif ($b >= 240 && $b < 248) {
+                if ($bytePos + 3 < $byteLen) {
+                    $w = 4;
+                }
+            }
+            $bytePos = $bytePos + $w;
+            $charLen = $charLen + 1;
+        }
+
+        if ($from > $charLen) {
+            return '';
+        }
+
+        $markerLen = 0;
+        while (isset($trimmarker[$markerLen])) {
+            $markerLen = $markerLen + 1;
+            if ($markerLen > 1024) {
+                break;
+            }
+        }
+
+        // Fit: use ($from + $width) — never charLen-minus-from (#34269).
+        if ($charLen <= ($from + $width)) {
+            $charIndex = 0;
+            $bytePos = 0;
+            $sliceStart = 0;
+            $foundStart = 0;
+            $g = $byteLen + 1;
+            while ($bytePos < $byteLen && $g > 0) {
+                $g = $g - 1;
+                if (0 === $foundStart) {
+                    if ($charIndex == $from) {
+                        $sliceStart = $bytePos;
+                        $foundStart = 1;
+                    }
+                }
+                $b = \ord(\substr($string, $bytePos, 1));
+                $w = 1;
+                if ($b >= 192 && $b < 224) {
+                    if ($bytePos + 1 < $byteLen) {
+                        $w = 2;
+                    }
+                } elseif ($b >= 224 && $b < 240) {
+                    if ($bytePos + 2 < $byteLen) {
+                        $w = 3;
+                    }
+                } elseif ($b >= 240 && $b < 248) {
+                    if ($bytePos + 3 < $byteLen) {
+                        $w = 4;
+                    }
+                }
+                $bytePos = $bytePos + $w;
+                $charIndex = $charIndex + 1;
+            }
+            if (0 === $foundStart) {
                 return '';
             }
-            $string = self::utf8Substr($string, $from, $charLen - $from);
-            $charLen = $charLen - $from;
+
+            return \substr($string, $sliceStart);
         }
-        $markerLen = self::utf8CharLength($trimmarker);
-        if ($width < 0) {
-            $width = $charLen + $width;
-            if ($width < 0) {
-                return '';
-            }
-        }
-        if ($charLen <= $width) {
-            return $string;
-        }
+
         if ('' !== $trimmarker && $width <= $markerLen) {
             return $trimmarker;
         }
-        $content = $width - $markerLen;
-        if ($content <= 0) {
+        if ($width - $markerLen <= 0) {
             return $trimmarker;
         }
-        if ($content >= $charLen) {
-            return $string.$trimmarker;
+
+        $charIndex = 0;
+        $bytePos = 0;
+        $sliceStart = 0;
+        $sliceEnd = $byteLen;
+        $foundStart = 0;
+        $foundEnd = 0;
+        $g = $byteLen + 1;
+        while ($bytePos < $byteLen && $g > 0) {
+            $g = $g - 1;
+            if (0 === $foundStart) {
+                if ($charIndex == $from) {
+                    $sliceStart = $bytePos;
+                    $foundStart = 1;
+                }
+            }
+            if (0 === $foundEnd) {
+                // Direct expr — never assign width-minus-marker to a temporary (#34269).
+                if ($charIndex == ($from + ($width - $markerLen))) {
+                    $sliceEnd = $bytePos;
+                    $foundEnd = 1;
+                }
+            }
+            $b = \ord(\substr($string, $bytePos, 1));
+            $w = 1;
+            if ($b >= 192 && $b < 224) {
+                if ($bytePos + 1 < $byteLen) {
+                    $w = 2;
+                }
+            } elseif ($b >= 224 && $b < 240) {
+                if ($bytePos + 2 < $byteLen) {
+                    $w = 3;
+                }
+            } elseif ($b >= 240 && $b < 248) {
+                if ($bytePos + 3 < $byteLen) {
+                    $w = 4;
+                }
+            }
+            $bytePos = $bytePos + $w;
+            $charIndex = $charIndex + 1;
+        }
+        if (0 === $foundStart) {
+            return '';
+        }
+        if (0 === $foundEnd) {
+            $sliceEnd = $byteLen;
         }
 
-        return self::utf8Substr($string, 0, $content).$trimmarker;
+        return \substr($string, $sliceStart, $sliceEnd - $sliceStart).$trimmarker;
     }
 
     public static function strPad(
@@ -74,91 +211,21 @@ final class MbStrwidthJitHelper
         int $padType,
         string $encoding
     ): string {
-        return VmMbstring::strPad($input, $padLength, $padString, $padType, $encoding);
-    }
-
-    /** NestedJIT-safe length: strlen silent-0 here (#34264). */
-    private static function byteLength(string $string): int
-    {
-        $n = 0;
-        while (isset($string[$n])) {
-            ++$n;
-            if ($n > 1048576) {
+        unset($padType, $encoding);
+        $inputLen = 0;
+        while (isset($input[$inputLen])) {
+            $inputLen = $inputLen + 1;
+            if ($inputLen > 1048576) {
                 break;
             }
         }
-
-        return $n;
-    }
-
-    private static function utf8CharLength(string $string): int
-    {
-        $n = 0;
-        $i = 0;
-        $len = self::byteLength($string);
-        while ($i < $len) {
-            $b = \ord($string[$i]);
-            if ($b < 0x80) {
-                $step = 1;
-            } elseif ($b < 0xE0) {
-                $step = 2;
-            } elseif ($b < 0xF0) {
-                $step = 3;
-            } else {
-                $step = 4;
-            }
-            $i += $step;
-            ++$n;
-            if ($n > $len) {
-                break;
-            }
+        if ($padLength <= $inputLen) {
+            return $input;
+        }
+        if ('' === $padString) {
+            return $input;
         }
 
-        return $n;
-    }
-
-    private static function utf8Substr(string $string, int $charFrom, int $charCount): string
-    {
-        if ($charCount <= 0) {
-            return '';
-        }
-        $i = 0;
-        $len = self::byteLength($string);
-        $seen = 0;
-        while ($i < $len && $seen < $charFrom) {
-            $b = \ord($string[$i]);
-            if ($b < 0x80) {
-                $step = 1;
-            } elseif ($b < 0xE0) {
-                $step = 2;
-            } elseif ($b < 0xF0) {
-                $step = 3;
-            } else {
-                $step = 4;
-            }
-            $i += $step;
-            ++$seen;
-        }
-        if ($i >= $len) {
-            return '';
-        }
-        $start = $i;
-        $taken = 0;
-        while ($i < $len && $taken < $charCount) {
-            $b = \ord($string[$i]);
-            if ($b < 0x80) {
-                $step = 1;
-            } elseif ($b < 0xE0) {
-                $step = 2;
-            } elseif ($b < 0xF0) {
-                $step = 3;
-            } else {
-                $step = 4;
-            }
-            $i += $step;
-            ++$taken;
-        }
-
-        return \substr($string, $start, $i - $start);
+        return $input.$padString;
     }
 }
