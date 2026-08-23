@@ -13399,6 +13399,12 @@ class JIT {
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionclass::__construct');
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
                             } elseif ($classOp instanceof Operand\Literal
+                                && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionObject')
+                            ) {
+                                // Thin AOT: wire __construct like ReflectionClass (#34001 / #20098).
+                                $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionobject::__construct');
+                                $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                            } elseif ($classOp instanceof Operand\Literal
                                 && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionEnum')
                             ) {
                                 // Thin AOT: wire __construct like ReflectionClass (#27314).
@@ -22995,6 +23001,12 @@ class JIT {
                 ) {
                     $className = 'ReflectionClass';
                     $declaringClassLc = 'reflectionclass';
+                } elseif (
+                    'reflectionobject' === $receiverHintLc
+                    && $this->context->functionIsRegistered('reflectionobject::getname')
+                ) {
+                    $className = 'ReflectionObject';
+                    $declaringClassLc = 'reflectionobject';
                 } elseif (
                     'reflectionfunction' === $receiverHintLc
                     && $this->context->functionIsRegistered('reflectionfunction::getname')
