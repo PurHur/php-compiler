@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbStrwidth;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for mb_strwidth() — MbStrwidthJitHelper in-module (#3495). */
+/**
+ * LLVM lowering for mb_strwidth() / mb_strimwidth() — MbStrwidthJitHelper NestedJIT (#3495 / #34262).
+ *
+ * Runtime int start/width must go through {@see JitNestedHelperCoerce::callHelper} (raw call SIGSEGVs).
+ */
 final class JitMbStrwidth
 {
     public static function strwidth(Context $context, JITVariable ...$args): Value
@@ -42,13 +49,22 @@ final class JitMbStrwidth
         }
         self::assertSupportedEncoding($encoding);
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbStrwidth::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
         $encPtr = $context->builder->load($context->constantStringFromString($encoding));
-
-        return $context->builder->call(
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbStrwidth::strwidthFunction($context),
-            $str,
-            $encPtr
+            [$str, $encPtr]
+        );
+
+        return JitNestedHelperCoerce::extractLongFromHelperResult(
+            $context,
+            $raw,
+            $context->getTypeFromString('int64')
         );
     }
 
@@ -90,16 +106,18 @@ final class JitMbStrwidth
         }
         self::assertSupportedEncoding($encoding);
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbStrwidth::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
         $encPtr = $context->builder->load($context->constantStringFromString($encoding));
-        $resultStr = $context->builder->call(
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbStrwidth::strimwidthFunction($context),
-            $str,
-            $from,
-            $width,
-            $marker,
-            $encPtr
+            [$str, $from, $width, $marker, $encPtr]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::materializeOwnedString($context, $resultStr);
     }
@@ -124,8 +142,8 @@ final class JitMbStrwidth
     private static function materializeOwnedString(Context $context, Value $resultStr): Value
     {
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $resultStr);
-        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
-        $ptr = \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
 
         return $ptr;
