@@ -400,9 +400,20 @@ final class JitDomReplaceChild
         }
         // createElement($name, $value) stamps escaped text on compileTimeDomInnerXml (#32903).
         $newInner = $newChildVar->compileTimeDomInnerXml ?? '';
+        // Include setAttribute / importNode open-tag attrs — bare <tag/> overwrote LiveSlots
+        // rebuild and dropped attrs from saveXML after loadXML replaceChild (#34291 / peer
+        // #33509 / DomNodeLiveMutationRuntime::compileTimeChildElementMarkup).
+        $attrs = $newChildVar->compileTimeDomAttributes;
+        if (null === $attrs || [] === $attrs) {
+            $id = $newChildVar->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+            if (null !== $id) {
+                $attrs = JitDomCreateElementAttrs::get($id);
+            }
+        }
+        $attrSuffix = JitDomCreateElementAttrs::formatSuffix($attrs ?? []);
         $replacement = '' === $newInner
-            ? '<'.$newTag.'/>'
-            : '<'.$newTag.'>'.$newInner.'</'.$newTag.'>';
+            ? '<'.$newTag.$attrSuffix.'/>'
+            : '<'.$newTag.$attrSuffix.'>'.$newInner.'</'.$newTag.'>';
 
         $xml ??= $parentVar->compileTimeDomLoadXml;
         if (null !== $xml && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
