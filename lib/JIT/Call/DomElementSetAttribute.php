@@ -27,7 +27,12 @@ final class DomElementSetAttribute implements Call
             $id = $args[0]->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
             if (null !== $name && null !== $value && 'xmlns' !== $name && null !== $id) {
                 JitDomCreateElementAttrs::set($id, $name, $value);
+                // Merge side-table first — local stamp alone would wipe NS attrs from
+                // a prior setAttributeNS on the same element (#34257 / peer #33526).
                 $attrs = $args[0]->compileTimeDomAttributes ?? [];
+                if ([] === $attrs) {
+                    $attrs = JitDomCreateElementAttrs::get($id);
+                }
                 $attrs[$name] = $value;
                 $args[0]->compileTimeDomAttributes = $attrs;
                 if (null === $args[0]->compileTimeDomElementId) {

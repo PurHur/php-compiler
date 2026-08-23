@@ -20,7 +20,9 @@ final class DomElementRemoveAttribute implements Call
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattr_invoke_cont');
         $id = null;
-        // Keep createElement attr bag + loadXML C14N fold in sync (#32981).
+        $hadLoadXml = null !== JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $didRefreshRootXml = false;
+        // Keep createElement attr bag + loadXML C14N fold in sync (#32981 / #34257).
         if (\count($args) >= 2) {
             $name = $args[1]->compileTimeString;
             if (null !== $name && 'xmlns' !== $name) {
@@ -40,22 +42,27 @@ final class DomElementRemoveAttribute implements Call
                     JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
                 } else {
                     JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeRemove($name);
+                    $didRefreshRootXml = $hadLoadXml;
                 }
             }
         }
 
         $result = JitDomAttributeNodeNS::invokeRemoveAttribute($context, ...$args);
 
-        // Drop attr from saveXML open-tag suffix (#33509).
+        // Drop attr from saveXML open-tag suffix (#33509 / loadXML #34257).
         if (\count($args) >= 2) {
             $name = $args[1]->compileTimeString;
             if (null !== $name && 'xmlns' !== $name) {
-                $attrs = $args[0]->compileTimeDomAttributes;
-                if (null === $attrs && null !== $id) {
-                    $attrs = JitDomCreateElementAttrs::get($id);
-                }
-                if (null !== $attrs) {
-                    JitDomAttributeNodeNS::syncSaveXmlAttrSuffix($context, $args[0], $attrs);
+                if ($didRefreshRootXml) {
+                    JitDomLoadXMLUserScript::syncElementXmlnsAttrFromCompileTimeXml($context, $args[0]);
+                } else {
+                    $attrs = $args[0]->compileTimeDomAttributes;
+                    if (null === $attrs && null !== $id) {
+                        $attrs = JitDomCreateElementAttrs::get($id);
+                    }
+                    if (null !== $attrs) {
+                        JitDomAttributeNodeNS::syncSaveXmlAttrSuffix($context, $args[0], $attrs);
+                    }
                 }
             }
         }

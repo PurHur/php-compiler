@@ -333,6 +333,48 @@ final class JitDomLoadXMLUserScript
     }
 
     /**
+     * Apply removeAttributeNS on the document element of the compile-time XML (#34257).
+     *
+     * loadXML seeds {@see VmDom::PROP_USER_SCRIPT_XMLNS_ATTR} from the open tag; the
+     * createElement attr bag is empty, so bag-only remove never updates saveXML.
+     */
+    public static function refreshCompileTimeXmlRootAttributeRemoveNS(?string $namespace, string $localName): void
+    {
+        self::mutateCompileTimeXmlRootAttribute(static function (\DOMElement $root) use ($namespace, $localName): void {
+            @$root->removeAttributeNS($namespace, $localName);
+        });
+    }
+
+    /**
+     * Push refreshed root open-tag attrs onto the element so node-scoped saveXML
+     * matches Zend after removeAttribute / removeAttributeNS (#34257 / peer #33509).
+     */
+    public static function syncElementXmlnsAttrFromCompileTimeXml(
+        Context $context,
+        JITVariable $elementArg
+    ): void {
+        $xml = self::$lastCompileTimeXml;
+        if (null === $xml || '' === trim($xml)) {
+            return;
+        }
+        $stripped = preg_replace('/^\s*<\?xml[^?]*\?>\s*/i', '', trim($xml)) ?? trim($xml);
+        $rootMarkup = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($stripped);
+        if (null === $rootMarkup) {
+            return;
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_loadxml_sync_xmlns_after_rmattr');
+        $element = self::loadObjectArg($context, $elementArg);
+        // parseElementMarkupArgv attrs may omit the leading space; storeUserScriptXmlnsAttr
+        // expects the same shape loadXML seeded (leading space when non-empty).
+        $attrs = $rootMarkup['attrs'];
+        if ('' !== $attrs && !str_starts_with($attrs, ' ')) {
+            $attrs = ' '.$attrs;
+        }
+        JitDomCreateElement::storeUserScriptXmlnsAttr($context, $element, $attrs);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $element);
+    }
+
+    /**
      * @param callable(\DOMElement):void $mutate
      */
     private static function mutateCompileTimeXmlRootAttribute(callable $mutate): void
