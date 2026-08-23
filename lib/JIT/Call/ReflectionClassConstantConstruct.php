@@ -11,10 +11,16 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Value;
 
-/** ReflectionProperty::__construct($class, $name) — JIT (#4136). */
-final class ReflectionPropertyConstruct implements Call
+/**
+ * ReflectionClassConstant::__construct($class, $name) — thin AOT (#33990).
+ *
+ * Seeds Zend public `$class` / `$name` (#22503). Distinct from ReflectionConstant's
+ * `$name`+`$constant` layout (#25963).
+ */
+final class ReflectionClassConstantConstruct implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
@@ -22,26 +28,25 @@ final class ReflectionPropertyConstruct implements Call
         ReflectionNative::registerDeclarations($context);
         if (\count($args) < 3) {
             \PHPCompiler\VM\ReflectionSupport::throwConstructArgumentCountError(
-                'ReflectionProperty',
+                'ReflectionClassConstant',
                 2,
                 max(0, \max(0, count($args) - 1))
             );
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        // Zend ReflectionProperty::$name = property name; $class = class arg (declaring when same) (#22504).
         ReflectionSetup::emitSetStringPropertyFromVar(
             $context,
             $obj,
-            'ReflectionProperty',
-            \PHPCompiler\VM\ReflectionSupport::PROP_PROPERTY_NAME,
-            $args[2]
+            'ReflectionClassConstant',
+            ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS,
+            $args[1]
         );
         ReflectionSetup::emitSetStringPropertyFromVar(
             $context,
             $obj,
-            'ReflectionProperty',
-            \PHPCompiler\VM\ReflectionSupport::PROP_DECLARING_CLASS_NAME,
-            $args[1]
+            'ReflectionClassConstant',
+            ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME,
+            $args[2]
         );
         ReflectionSetup::markConstructed($context, $obj);
 

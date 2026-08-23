@@ -26,8 +26,19 @@ final class ReflectionPropertyGetAttributes implements Call
         ReflectionRuntime::ensureLinked($context);
         ReflectionNative::registerDeclarations($context);
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        [$classSafe, $classLen] = ReflectionSetup::stringPropertyAsCstr($context, $obj, 'ReflectionProperty', 'name');
-        [$propSafe, $propLen] = ReflectionSetup::stringPropertyAsCstr($context, $obj, 'ReflectionProperty', 'property');
+        // Construct seeds Zend `$class` / `$name` (#22504) — not obsolete `name`/`property` keys (#33990).
+        [$classSafe, $classLen] = ReflectionSetup::stringPropertyAsCstr(
+            $context,
+            $obj,
+            'ReflectionProperty',
+            ReflectionSupport::PROP_DECLARING_CLASS_NAME
+        );
+        [$propSafe, $propLen] = ReflectionSetup::stringPropertyAsCstr(
+            $context,
+            $obj,
+            'ReflectionProperty',
+            ReflectionSupport::PROP_PROPERTY_NAME
+        );
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
         $count = $context->builder->call(

@@ -11,10 +11,16 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Value;
 
-/** ReflectionProperty::__construct($class, $name) — JIT (#4136). */
-final class ReflectionPropertyConstruct implements Call
+/**
+ * ReflectionMethod::__construct($objectOrMethod, $method) — thin AOT (#33990).
+ *
+ * Seeds Zend public `$class` / `$name` so property reads and getAttributes() do not SIGSEGV.
+ * Two-arg form only (class name + method); mirrors ReflectionPropertyConstruct (#4136).
+ */
+final class ReflectionMethodConstruct implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
@@ -22,26 +28,26 @@ final class ReflectionPropertyConstruct implements Call
         ReflectionNative::registerDeclarations($context);
         if (\count($args) < 3) {
             \PHPCompiler\VM\ReflectionSupport::throwConstructArgumentCountError(
-                'ReflectionProperty',
+                'ReflectionMethod',
                 2,
                 max(0, \max(0, count($args) - 1))
             );
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        // Zend ReflectionProperty::$name = property name; $class = class arg (declaring when same) (#22504).
+        // php-src zim_ReflectionMethod___construct — $class = declaring class, $name = method.
         ReflectionSetup::emitSetStringPropertyFromVar(
             $context,
             $obj,
-            'ReflectionProperty',
-            \PHPCompiler\VM\ReflectionSupport::PROP_PROPERTY_NAME,
-            $args[2]
+            'ReflectionMethod',
+            ReflectionSupport::PROP_REFLECTION_METHOD_CLASS,
+            $args[1]
         );
         ReflectionSetup::emitSetStringPropertyFromVar(
             $context,
             $obj,
-            'ReflectionProperty',
-            \PHPCompiler\VM\ReflectionSupport::PROP_DECLARING_CLASS_NAME,
-            $args[1]
+            'ReflectionMethod',
+            ReflectionSupport::PROP_REFLECTION_METHOD_FUNC,
+            $args[2]
         );
         ReflectionSetup::markConstructed($context, $obj);
 

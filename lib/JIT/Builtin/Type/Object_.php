@@ -3568,8 +3568,11 @@ class Object_ extends Type {
         }
         if ('reflectionmethod' === $lcname) {
             $this->setClassParentName('ReflectionMethod', 'ReflectionFunctionAbstract');
-            $this->defineProperty($id, 'class', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #33990).
+            $this->defineProperty($id, 'class', Variable::TYPE_VALUE);
+            $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
+            // Thin user-script AOT must call __construct (not allocate-only) (#33990 / #27315).
+            $this->markHasConstructor($id);
         }
         if ('reflectionfunction' === $lcname) {
             $this->setClassParentName('ReflectionFunction', 'ReflectionFunctionAbstract');
@@ -3595,8 +3598,11 @@ class Object_ extends Type {
         }
         if ('reflectionclassconstant' === $lcname) {
             // Zend public surface: $name then $class (#22503).
-            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS, Variable::TYPE_STRING);
+            // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #33990).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS, Variable::TYPE_VALUE);
+            // Thin user-script AOT must call __construct (not allocate-only) (#33990 / #27315).
+            $this->markHasConstructor($id);
         }
         if ('reflectionconstant' === $lcname) {
             // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #27303).

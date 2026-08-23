@@ -1738,6 +1738,9 @@ class Context {
         $this->functionProxies['reflectionproperty::setaccessible'] = new Call\ReflectionSetAccessible('ReflectionProperty');
         $this->functionProxies['reflectionproperty::getvalue'] = new Call\ReflectionPropertyGetValue();
         $this->functionProxies['reflectionproperty::setvalue'] = new Call\ReflectionPropertySetValue();
+        // Thin AOT: seed $class/$name — unbound construct left slots null → property-read SIGSEGV (#33990).
+        $this->functionProxies['reflectionmethod::__construct'] = new Call\ReflectionMethodConstruct();
+        $this->functionProxies['reflectionmethod::getname'] = new Call\ReflectionMethodGetName();
         $this->functionProxies['reflectionmethod::setaccessible'] = new Call\ReflectionSetAccessible('ReflectionMethod');
         $this->functionProxies['reflectionmethod::invoke'] = new Call\ReflectionMethodInvoke();
         if (CompilerVersion::supportsReflectionPropertyGetMangledName()) {
@@ -1751,7 +1754,9 @@ class Context {
         if (CompilerVersion::advertisesReflectionConstantGetAttributes()) {
             $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
         }
-        // ReflectionClassConstant::$class+$name layout — not ReflectionConstant::$name+$constant (#25963).
+        // ReflectionClassConstant::$class+$name layout — not ReflectionConstant::$name+$constant (#25963, #33990).
+        $this->functionProxies['reflectionclassconstant::__construct'] = new Call\ReflectionClassConstantConstruct();
+        $this->functionProxies['reflectionclassconstant::getname'] = new Call\ReflectionClassConstantGetName();
         $this->functionProxies['reflectionclassconstant::getattributes'] = new Call\ReflectionClassConstantGetAttributes();
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
         $this->functionProxies['reflectionfunction::__construct'] = new Call\ReflectionFunctionConstruct();
