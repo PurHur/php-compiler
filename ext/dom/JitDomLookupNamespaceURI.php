@@ -69,6 +69,22 @@ final class JitDomLookupNamespaceURI
         }
 
         $namespaceArg = $args[1];
+        // Stub is string $namespace — strict TypeError; else null coerces to "" → false (#34099).
+        $isNull = JITVariable::TYPE_NULL === $namespaceArg->type
+            || ($namespaceArg->isNullConstant ?? false);
+        if ($isNull) {
+            if ($context->callerStrictTypes) {
+                \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+                \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'DOMNode::isDefaultNamespace(): Argument #1 ($namespace) must be of type string, null given'
+                );
+
+                return self::boxBoolResult($context, false);
+            }
+
+            return self::boxBoolResult($context, false);
+        }
         $namespace = JitStringBuiltinArg::compileTimeLiteral($namespaceArg)
             ?? $namespaceArg->compileTimeString;
         if (null === $namespace) {

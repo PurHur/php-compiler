@@ -38,6 +38,23 @@ final class JitDomLookupPrefix
         }
 
         $namespaceArg = $args[1];
+        // Prefer isNullConstant over stale compileTimeString (peer #33534).
+        $isNull = JITVariable::TYPE_NULL === $namespaceArg->type
+            || ($namespaceArg->isNullConstant ?? false);
+        if ($isNull) {
+            // Stub is string $namespace — strict_types TypeError; else coerce → null (#34099).
+            if ($context->callerStrictTypes) {
+                \PHPCompiler\JIT\JitNativeString::ensureInsertBlock($context);
+                \PHPCompiler\JIT\ExceptionBridge::emitTypeErrorAndAbort(
+                    $context,
+                    'DOMNode::lookupPrefix(): Argument #1 ($namespace) must be of type string, null given'
+                );
+
+                return self::boxNullableString($context, null);
+            }
+
+            return self::boxNullableString($context, null);
+        }
         $namespace = JitStringBuiltinArg::compileTimeLiteral($namespaceArg)
             ?? $namespaceArg->compileTimeString;
         if (null === $namespace) {
