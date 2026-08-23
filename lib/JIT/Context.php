@@ -1410,6 +1410,8 @@ class Context {
         foreach ([
             'count',
             'append',
+            // php-src zim_ArrayIterator_getArrayCopy — was missing → silent null (#34002).
+            'getArrayCopy',
             'offsetGet',
             'offsetSet',
             'offsetExists',

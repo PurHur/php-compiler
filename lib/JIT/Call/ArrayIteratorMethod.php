@@ -58,6 +58,17 @@ final class ArrayIteratorMethod implements Call
                     $args[1]
                 )
             ),
+            // php-src zim_ArrayIterator_getArrayCopy — thin AOT was silent null (#34002).
+            'getarraycopy' => $this->compileExact(
+                $context,
+                $args,
+                $qualified,
+                0,
+                static fn () => ArrayObjectJitHelper::compileGetArrayCopy(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this')
+                )
+            ),
             'offsetget' => $this->compileExact(
                 $context,
                 $args,

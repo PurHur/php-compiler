@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPCompiler\JIT\Builtin\KeySortRuntime;
 use PHPCompiler\JIT\Builtin\NaturalSortRuntime;
 use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
@@ -475,23 +476,15 @@ final class ArrayObjectJitHelper
 
     public static function compileGetArrayCopy(Context $context, JITVariable $receiver): Value
     {
+        // php-src zim_ArrayObject_getArrayCopy / zend_array_dup — preserve keys/holes (#34002).
+        // spreadInto rebuilds a packed 0..n-1 list and silently reindexes after unset().
         $ht = self::htPtr($context, self::loadObject($context, $receiver));
-        $copy = new JITVariable(
-            $context,
-            JITVariable::TYPE_HASHTABLE,
-            JITVariable::KIND_VALUE,
-            HashTableHelper::alloc($context)
-        );
-        HashTableHelper::spreadInto(
-            $context,
-            $copy,
-            new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht)
-        );
+        $dup = HashTableDuplicateRuntime::duplicate($context, $ht);
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             JitValueBox::pointer($context, $slot),
-            $context->helper->loadValue($copy)
+            $dup
         );
 
         return $slot;
@@ -512,16 +505,12 @@ final class ArrayObjectJitHelper
         $obj = self::loadObject($context, $receiver);
         $objectType = $context->type->object;
         $oldHt = self::htPtr($context, $obj);
+        // Return previous storage with keys intact (zend_array_dup), not spreadInto (#34002).
         $oldCopy = new JITVariable(
             $context,
             JITVariable::TYPE_HASHTABLE,
             JITVariable::KIND_VALUE,
-            HashTableHelper::alloc($context)
-        );
-        HashTableHelper::spreadInto(
-            $context,
-            $oldCopy,
-            new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $oldHt)
+            HashTableDuplicateRuntime::duplicate($context, $oldHt)
         );
 
         $src = HashTableHelper::coerceToPackedHashtable($context, $input);
@@ -1097,16 +1086,12 @@ final class ArrayObjectJitHelper
             );
         $iterObj = $objectType->allocateForRuntimeClassId($classId);
         $srcHt = self::htPtr($context, $obj);
+        // Key-preserving dup — spreadInto would reindex holes into 0..n-1 (#34002).
         $copy = new JITVariable(
             $context,
             JITVariable::TYPE_HASHTABLE,
             JITVariable::KIND_VALUE,
-            HashTableHelper::alloc($context)
-        );
-        HashTableHelper::spreadInto(
-            $context,
-            $copy,
-            new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $srcHt)
+            HashTableDuplicateRuntime::duplicate($context, $srcHt)
         );
         // Slot 0 is `__spl_ht` for ArrayIterator family (#26783); subclasses inherit layout.
         $objectType->propertyStore(
