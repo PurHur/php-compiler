@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\JIT\Call;
+
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ReflectionSetup;
+use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\ReflectionSupport;
+use PHPLLVM\Value;
+
+/** ReflectionExtension::getName() — JIT/AOT (#34003, #11462). */
+final class ReflectionExtensionGetName implements Call
+{
+    public function call(Context $context, Variable ...$args): Value
+    {
+        // php-src: zim_ReflectionExtension_getName — 0 user args
+        $userArgCount = \count($args) - 1;
+        if (0 !== $userArgCount) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                VmClassMethod::exactUserArgCountMessage(
+                    'ReflectionExtension::getName',
+                    0,
+                    $userArgCount
+                )
+            );
+            $unreachable = BasicBlockHelper::append($context, 'refl_ext_getname_argc_unreach');
+            $context->builder->positionAtEnd($unreachable);
+
+            return JitValueBox::alloc($context);
+        }
+        $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+        $i64 = $context->getTypeFromString('int64');
+        [$cstr, $len] = ReflectionSetup::stringPropertyAsCstr(
+            $context,
+            $obj,
+            'ReflectionExtension',
+            ReflectionSupport::PROP_EXTENSION_NAME
+        );
+        $len64 = $context->builder->zExt($len, $i64);
+
+        return $context->builder->call($context->lookupFunction('__string__init'), $len64, $cstr);
+    }
+}

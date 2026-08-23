@@ -1785,6 +1785,10 @@ class Context {
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
         $this->functionProxies['reflectionfunction::__construct'] = new Call\ReflectionFunctionConstruct();
         $this->functionProxies['reflectionfunction::getname'] = new Call\ReflectionFunctionGetName();
+        // Thin AOT: unset extension name → empty getName() (#34003).
+        $this->functionProxies['reflectionextension::__construct'] = new Call\ReflectionExtensionConstruct();
+        $this->functionProxies['reflectionextension::getname'] = new Call\ReflectionExtensionGetName();
+
         $this->functionProxies['reflectionfunction::isvariadic'] = new Call\ReflectionFunctionIsVariadic();
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
             $this->functionProxies['reflectionparameter::issensitiveparameter'] = new Call\ReflectionParameterIsSensitiveParameter();
