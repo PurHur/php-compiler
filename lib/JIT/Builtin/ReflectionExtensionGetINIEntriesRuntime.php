@@ -157,9 +157,12 @@ final class ReflectionExtensionGetINIEntriesRuntime
         /** @var array<string, array<string, ?string>> $out */
         $out = [];
         // Bounded module list — skip core (~93 keys) which seals __init__ when baked
-        // wholesale (#34165). `standard` is only ~14 directives and must be included
-        // (#34188 leftover); Zend lists null locals as NULL, not omitted.
-        foreach (['date', 'pcre', 'json', 'reflection', 'spl', 'tokenizer', 'standard'] as $lc) {
+        // wholesale (#34165). Small modules (≤32 keys) are baked; Zend lists null locals
+        // as NULL, not omitted (#34188, #34193).
+        foreach ([
+            'date', 'filter', 'json', 'mbstring', 'openssl', 'pcre',
+            'reflection', 'session', 'spl', 'standard', 'tokenizer',
+        ] as $lc) {
             $keys = VmIniIntrospection::registryKeysForExtension($lc);
             if (null === $keys || [] === $keys || \count($keys) > 32) {
                 continue;
