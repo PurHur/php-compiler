@@ -16,8 +16,7 @@ use PHPLLVM\Value;
 /**
  * openssl_csr_new() — create certificate signing request (php-src ext/openssl/xp.c; #6421).
  *
- * JIT/AOT leftover #33527: catchable argc/TypeError paths (peer openssl_csr_sign #33517).
- * Happy-path DN/key → CSR still needs object AOT (#6421 follow-up).
+ * JIT/AOT: argc/TypeError (#33527); happy-path DN + key PEM → OpenSSLCertificateSigningRequest (#34061).
  */
 final class openssl_csr_new extends Internal
 {
@@ -94,11 +93,9 @@ final class openssl_csr_new extends Internal
             }
         }
 
-        // CSR/key objects stay VM-shaped (#6421). Clear LogicException on TypeError/argc
-        // gates first (#33527); happy-path bake is a follow-up.
-        throw new \LogicException(
-            'openssl_csr_new() is not implemented for JIT in this compiler build (issue #6421/#33527)'
-        );
+        $options = $argc >= 3 ? $args[2] : null;
+
+        return JitOpensslCsrNew::invoke($context, $args[0], $args[1], $options);
     }
 
     /**
@@ -123,7 +120,8 @@ final class openssl_csr_new extends Internal
             JITVariable::TYPE_OBJECT => (null !== $arg->classUserType && '' !== $arg->classUserType)
                 ? $arg->classUserType
                 : 'object',
-            default => 'mixed',
+            // Value-box / unknown may still be a DN array at compile time (#34061 peer #34015).
+            default => null,
         };
     }
 
@@ -149,7 +147,8 @@ final class openssl_csr_new extends Internal
             JITVariable::TYPE_OBJECT => (null !== $arg->classUserType && '' !== $arg->classUserType)
                 ? $arg->classUserType
                 : 'object',
-            default => 'mixed',
+            // Unknown / value-box may still be a runtime array — defer to happy-path fold (#34061).
+            default => null,
         };
     }
 
