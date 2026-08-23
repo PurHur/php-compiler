@@ -2215,6 +2215,26 @@ class JIT {
     }
 
     /**
+     * Required parameter count for ReflectionMethod AOT metadata (#34216).
+     */
+    private static function requiredParameterCountFromBlock(Block $block): int
+    {
+        $required = 0;
+        $paramNames = array_values($block->paramNames);
+        for ($i = 0, $n = \count($paramNames); $i < $n; ++$i) {
+            if (null !== $block->variadicParamIndex && (int) $block->variadicParamIndex === $i) {
+                break;
+            }
+            if (VM\ParamArgumentCountError::parameterHasDefault($block, $i)) {
+                break;
+            }
+            ++$required;
+        }
+
+        return $required;
+    }
+
+    /**
      * FUNCDEF/DECLARE_METHOD use short names; self-host skip/M3 gates need scoped names (#1402).
      */
     private function jitFunctionSkipName(?string $name, Block $block): string
@@ -2280,6 +2300,19 @@ class JIT {
                 strtolower($funcName),
                 \count(array_values($block->paramNames))
             );
+        }
+        // Thin AOT ReflectionMethod::{getNumberOfParameters,getNumberOfRequiredParameters} (#34216).
+        if (null !== $block->func && null !== $block->func->class) {
+            $className = (string) $block->func->class->value;
+            if (!str_starts_with(strtolower(ltrim($className, '\\')), 'phpcompiler\\')) {
+                $paramNames = array_values($block->paramNames);
+                JIT\Builtin\ReflectionMethodQueryLowering::recordUserMethod(
+                    $className,
+                    strtolower($block->func->name),
+                    \count($paramNames),
+                    self::requiredParameterCountFromBlock($block)
+                );
+            }
         }
         $skipName = $this->jitFunctionSkipName($logicalName, $block);
         if (!is_null($funcName)) {
@@ -16987,6 +17020,14 @@ class JIT {
                                 $methodBlock
                             );
                             break;
+                        }
+                        if (!str_starts_with(strtolower(ltrim($displayClass, '\\')), 'phpcompiler\\')) {
+                            JIT\Builtin\ReflectionMethodQueryLowering::recordUserMethod(
+                                $displayClass,
+                                $methodLc,
+                                \count(array_values($methodBlock->paramNames)),
+                                self::requiredParameterCountFromBlock($methodBlock)
+                            );
                         }
                         $this->compileBlock($methodBlock, $funcName);
                     }

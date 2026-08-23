@@ -105,5 +105,33 @@ final class ReflectionNative
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
         }
+
+        // Thin AOT ReflectionMethod visibility + arity queries (#34216).
+        $i32 = $context->getTypeFromString('int32');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        foreach (
+            [
+                ['__compiler_refl_method_flags', $i32, [$i8p, $i8p]],
+                ['__compiler_refl_method_param_count', $sizeT, [$i8p, $i8p]],
+                ['__compiler_refl_method_required_param_count', $sizeT, [$i8p, $i8p]],
+                ['__compiler_refl_method_flags_obj', $i32, [$objPtrTy]],
+                ['__compiler_refl_method_param_count_obj', $sizeT, [$objPtrTy]],
+                ['__compiler_refl_method_required_param_count_obj', $sizeT, [$objPtrTy]],
+                ['__compiler_refl_method_flags_method_str', $i32, [$i8p, $strPtrTy]],
+                ['__compiler_refl_method_param_count_method_str', $sizeT, [$i8p, $strPtrTy]],
+                ['__compiler_refl_method_required_param_count_method_str', $sizeT, [$i8p, $strPtrTy]],
+            ] as [$name, $ret, $params]
+        ) {
+            $existing = $context->module->getNamedFunction($name);
+            if (null !== $existing) {
+                $context->registerFunction($name, $existing);
+
+                continue;
+            }
+            $ft = $context->context->functionType($ret, false, ...$params);
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
     }
 }

@@ -1861,6 +1861,11 @@ class Context {
         );
         $this->functionProxies['reflectionmethod::setaccessible'] = new Call\ReflectionSetAccessible('ReflectionMethod');
         $this->functionProxies['reflectionmethod::invoke'] = new Call\ReflectionMethodInvoke();
+        // Thin AOT: unbound isPublic/isStatic/param counts → NULL (#34216).
+        $this->functionProxies['reflectionmethod::ispublic'] = new Call\ReflectionMethodIsPublic();
+        $this->functionProxies['reflectionmethod::isstatic'] = new Call\ReflectionMethodIsStatic();
+        $this->functionProxies['reflectionmethod::getnumberofparameters'] = new Call\ReflectionMethodGetNumberOfParameters();
+        $this->functionProxies['reflectionmethod::getnumberofrequiredparameters'] = new Call\ReflectionMethodGetNumberOfRequiredParameters();
         $this->functionProxies['reflectionclassconstant::__construct'] = new Call\ReflectionClassConstantConstruct();
         $this->functionProxies['reflectionclassconstant::getname'] = new Call\ReflectionClassConstantGetName();
         if (CompilerVersion::supportsReflectionPropertyGetMangledName()) {
@@ -2685,6 +2690,7 @@ class Context {
         Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
         Builtin\ReflectionFunctionVariadicLowering::implementLookupFunctions($this);
         Builtin\ReflectionFunctionParamCountLowering::implementLookupFunctions($this);
+        Builtin\ReflectionMethodQueryLowering::implementLookupFunctions($this);
         VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
         $initSuffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
