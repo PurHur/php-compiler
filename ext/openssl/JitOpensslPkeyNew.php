@@ -14,7 +14,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for openssl_pkey_new() — NestedJIT keygen + OpenSSLAsymmetricKey (#34015).
+ * LLVM lowering for openssl_pkey_new() — NestedJIT (JIT) / runtime EVP leaf (thin AOT) (#34015).
  *
  * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkey_new)
  */
@@ -29,31 +29,83 @@ final class JitOpensslPkeyNew
      */
     public static function generate(Context $context, int $bits, int $type, string $curve = ''): Value
     {
-        // Thin standalone AOT cannot NestedJIT FFI libcrypto (returns false). Bake PEM at
-        // compile time into the object — peer openssl_digest const fold / #34015.
+        // Thin standalone AOT cannot NestedJIT FFI libcrypto. Runtime EVP keygen leaf
+        // (not compile-time PEM bake) so keys differ across process runs (#34015 Done-when).
         if ($context->isThinStandaloneAotMain()) {
-            return self::generateThinAotBaked($context, $bits, $type, $curve);
+            return self::generateThinAotRuntime($context, $bits, $type, $curve);
         }
 
         return self::generateViaNestedJit($context, $bits, $type, $curve);
     }
 
-    private static function generateThinAotBaked(
+    /**
+     * Thin AOT: call {@see JitOpensslPkeyKernel} at process runtime (RSA default).
+     * Non-RSA types return false until dedicated leaves exist — never bake PEM constants.
+     */
+    private static function generateThinAotRuntime(
         Context $context,
         int $bits,
         int $type,
         string $curve
     ): Value {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'ossl_pkey_new_aot');
-        $pem = OpensslPkeyNewJitHelper::generatePem($bits, $type, $curve);
-        if ('' === $pem) {
+        if (OpensslConstants::OPENSSL_KEYTYPE_RSA !== $type || '' !== $curve) {
             $slot = JitValueBox::alloc($context);
             JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
 
             return JitValueBox::pointer($context, $slot);
         }
 
-        return self::boxKeyObject($context, $context->builder->load($context->constantStringFromString($pem)));
+        JitOpensslPkeyKernel::ensureKeygenLeaf($context);
+        $i64 = $context->getTypeFromString('int64');
+        $pemStr = $context->builder->call(
+            $context->lookupFunction(JitOpensslPkeyKernel::EVP_RSA_KEYGEN),
+            $i64->constInt($bits, false)
+        );
+
+        $id = (string) (++self::$blockSerial);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $failBlock = BasicBlockHelper::append($context, 'ossl_pkey_new_aot_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'ossl_pkey_new_aot_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_pkey_new_aot_done_'.$id);
+
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $pemStr, $strPtrTy->constNull());
+        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $objectType = $context->type->object;
+        $className = OpensslPkeyNewJitSupport::CLASS_NAME;
+        $classId = $objectType->lookup($className);
+        $obj = $objectType->allocate($classId);
+        $objectType->markObjectConstructed($obj);
+        $pemVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $pemStr
+        );
+        $objectType->storeInstanceProperty(
+            $obj,
+            $className,
+            OpensslPkeyNewJitSupport::PROP_PEM,
+            $pemVar
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $obj
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
     }
 
     private static function generateViaNestedJit(
@@ -129,36 +181,6 @@ final class JitOpensslPkeyNew
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
-
-        return $ptr;
-    }
-
-    private static function boxKeyObject(Context $context, Value $pemStr): Value
-    {
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $objectType = $context->type->object;
-        $className = OpensslPkeyNewJitSupport::CLASS_NAME;
-        $classId = $objectType->lookup($className);
-        $obj = $objectType->allocate($classId);
-        $objectType->markObjectConstructed($obj);
-        $pemVar = new JITVariable(
-            $context,
-            JITVariable::TYPE_STRING,
-            JITVariable::KIND_VALUE,
-            $pemStr
-        );
-        $objectType->storeInstanceProperty(
-            $obj,
-            $className,
-            OpensslPkeyNewJitSupport::PROP_PEM,
-            $pemVar
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            $ptr,
-            $obj
-        );
 
         return $ptr;
     }
