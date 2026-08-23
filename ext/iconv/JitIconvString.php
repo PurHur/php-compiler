@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\iconv;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringIconvSubstr;
+use PHPCompiler\JIT\Builtin\StringStrpos;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -15,7 +16,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for iconv_strlen/strpos/substr/strrpos (#6247, #20208, #27197, #34272). */
+/** LLVM lowering for iconv_strlen/strpos/substr/strrpos (#6247, #20208, #27197, #34272, #34277). */
 final class JitIconvString
 {
     public static function dispatch(Context $context, string $function, JITVariable ...$args): Value
@@ -41,7 +42,8 @@ final class JitIconvString
 
     private static function strlen(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
             throw new \LogicException('iconv_strlen() requires one or two arguments');
         }
         // Soft-null $string on 8.4 (#21197); strict_types still TypeErrors.
@@ -59,7 +61,39 @@ final class JitIconvString
             return $context->constantFromInteger($result, 'int64');
         }
 
-        throw new \LogicException('iconv_strlen() JIT requires compile-time string and encoding literals in this compiler build');
+        $input = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv_strlen', 0, 'string')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'iconv_strlen', 0, 'string');
+        $defaultEncoding = IconvEncodingState::getInternalEncoding();
+        if ($argc >= 2) {
+            $encodingIsNull = JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant;
+            $encodingLitRt = JitStringBuiltinArg::compileTimeLiteral($args[1]);
+            if ($encodingIsNull || (null !== $encodingLitRt && '' === $encodingLitRt)) {
+                $encoding = $context->builder->load($context->constantStringFromString($defaultEncoding));
+            } elseif (null !== $encodingLitRt) {
+                $encoding = $context->builder->load($context->constantStringFromString(
+                    VmIconv::resolveOptionalEncoding($encodingLitRt)
+                ));
+            } else {
+                $encoding = $context->callerStrictTypes
+                    ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'iconv_strlen', 1, 'encoding')
+                    : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'iconv_strlen', 1, 'encoding');
+            }
+        } else {
+            $encoding = $context->builder->load($context->constantStringFromString($defaultEncoding));
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringIconvSubstr::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        return JitNestedHelperCoerce::callHelper(
+            $context,
+            StringIconvSubstr::strlenHelper($context),
+            [$input, $encoding]
+        );
     }
 
     private static function strpos(Context $context, JITVariable ...$args): Value
@@ -85,7 +119,48 @@ final class JitIconvString
             return $context->constantFromInteger($result, 'int64');
         }
 
-        throw new \LogicException('iconv_strpos() JIT requires compile-time string arguments in this compiler build');
+        $hay = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv_strpos', 0, 'haystack')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'iconv_strpos', 0, 'haystack');
+        $needle = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'iconv_strpos', 1, 'needle')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'iconv_strpos', 1, 'needle');
+        $i64 = $context->getTypeFromString('int64');
+        $offset = $argc >= 3
+            ? JitLongArg::lower($context, $args[2], 'iconv_strpos() offset')
+            : $i64->constInt(0, false);
+        $defaultEncoding = IconvEncodingState::getInternalEncoding();
+        if ($argc >= 4) {
+            $encodingIsNull = JITVariable::TYPE_NULL === $args[3]->type || $args[3]->isNullConstant;
+            $encodingLitRt = JitStringBuiltinArg::compileTimeLiteral($args[3]);
+            if ($encodingIsNull || (null !== $encodingLitRt && '' === $encodingLitRt)) {
+                $encoding = $context->builder->load($context->constantStringFromString($defaultEncoding));
+            } elseif (null !== $encodingLitRt) {
+                $encoding = $context->builder->load($context->constantStringFromString(
+                    VmIconv::resolveOptionalEncoding($encodingLitRt)
+                ));
+            } else {
+                $encoding = $context->callerStrictTypes
+                    ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[3], 'iconv_strpos', 3, 'encoding')
+                    : JitStringBuiltinArg::lowerZparamStr($context, $args[3], 'iconv_strpos', 3, 'encoding');
+            }
+        } else {
+            $encoding = $context->builder->load($context->constantStringFromString($defaultEncoding));
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringIconvSubstr::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $found = JitNestedHelperCoerce::callHelper(
+            $context,
+            StringIconvSubstr::strposHelper($context),
+            [$hay, $needle, $offset, $encoding]
+        );
+
+        return StringStrpos::boxFoundOffset($context, $found);
     }
 
     private static function substr(Context $context, JITVariable ...$args): Value
@@ -261,7 +336,8 @@ final class JitIconvString
 
     private static function strrpos(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2 || \count($args) > 3) {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
             throw new \LogicException('iconv_strrpos() requires two or three arguments');
         }
         if (self::abortOnStrictNull($context, $args[0], 'iconv_strrpos', 0, 'haystack')
@@ -280,7 +356,44 @@ final class JitIconvString
             return $context->constantFromInteger($result, 'int64');
         }
 
-        throw new \LogicException('iconv_strrpos() JIT requires compile-time string arguments in this compiler build');
+        $hay = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv_strrpos', 0, 'haystack')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'iconv_strrpos', 0, 'haystack');
+        $needle = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'iconv_strrpos', 1, 'needle')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'iconv_strrpos', 1, 'needle');
+        $defaultEncoding = IconvEncodingState::getInternalEncoding();
+        if ($argc >= 3) {
+            $encodingIsNull = JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant;
+            $encodingLitRt = JitStringBuiltinArg::compileTimeLiteral($args[2]);
+            if ($encodingIsNull || (null !== $encodingLitRt && '' === $encodingLitRt)) {
+                $encoding = $context->builder->load($context->constantStringFromString($defaultEncoding));
+            } elseif (null !== $encodingLitRt) {
+                $encoding = $context->builder->load($context->constantStringFromString(
+                    VmIconv::resolveOptionalEncoding($encodingLitRt)
+                ));
+            } else {
+                $encoding = $context->callerStrictTypes
+                    ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'iconv_strrpos', 2, 'encoding')
+                    : JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'iconv_strrpos', 2, 'encoding');
+            }
+        } else {
+            $encoding = $context->builder->load($context->constantStringFromString($defaultEncoding));
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringIconvSubstr::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $found = JitNestedHelperCoerce::callHelper(
+            $context,
+            StringIconvSubstr::strrposHelper($context),
+            [$hay, $needle, $encoding]
+        );
+
+        return StringStrpos::boxFoundOffset($context, $found);
     }
 
     /**
