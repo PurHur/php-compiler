@@ -1800,6 +1800,8 @@ class Context {
         $this->functionProxies['reflectionclass::newinstanceargs'] = new Call\ReflectionClassNewInstanceArgs();
         // Thin AOT: unbound getDefaultProperties → NULL (#34091); VM #11441 / peer get_class_vars #27229.
         $this->functionProxies['reflectionclass::getdefaultproperties'] = new Call\ReflectionClassGetDefaultProperties();
+        // Thin AOT: unbound getStaticProperties → NULL (#34118); VM #6948 / peer getDefaultProperties #34091.
+        $this->functionProxies['reflectionclass::getstaticproperties'] = new Call\ReflectionClassGetStaticProperties();
         // Thin AOT: unbound getMethods → NULL (#34107); VM #3815.
         $this->functionProxies['reflectionclass::getmethods'] = new Call\ReflectionClassGetMethods();
         // Thin AOT: unbound getProperties → NULL (#34113); VM #3815.

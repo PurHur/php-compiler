@@ -48,6 +48,20 @@ final class GetClassVarsRuntime
         );
     }
 
+    /**
+     * ReflectionClass::getStaticProperties() — statics only; skip parent privates (#34118).
+     *
+     * Thin AOT materializes compile-unit defaults (peer getDefaultProperties static path).
+     * php-src: zim_ReflectionClass_getStaticProperties
+     */
+    public static function emitStaticPropertiesForClassId(Context $context, int $classId): Value
+    {
+        return self::wrapHashTable(
+            $context,
+            self::emitStaticPropertiesHashTable($context, $classId)
+        );
+    }
+
     /** Empty array box when ReflectionClass name does not match a compile-unit class. */
     public static function emitEmptyDefaultProperties(Context $context): Value
     {
@@ -155,6 +169,19 @@ final class GetClassVarsRuntime
             $keyStr = $context->builder->load($context->constantStringFromString($propName));
             self::storeStaticPropertyDefault($context, $ht, $keyStr, $entry);
             $seen[$propName] = true;
+        }
+
+        return $ht;
+    }
+
+    /** Static-only map for ReflectionClass::getStaticProperties() (#34118). */
+    private static function emitStaticPropertiesHashTable(Context $context, int $classId): Value
+    {
+        $object = $context->type->object;
+        $ht = HashTableHelper::alloc($context);
+        foreach ($object->reflectionDefaultStaticPropertyEntries($classId) as $propName => $entry) {
+            $keyStr = $context->builder->load($context->constantStringFromString($propName));
+            self::storeStaticPropertyDefault($context, $ht, $keyStr, $entry);
         }
 
         return $ht;
