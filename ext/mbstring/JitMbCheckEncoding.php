@@ -46,7 +46,7 @@ final class JitMbCheckEncoding
         if (0 === \count($args)) {
             return $context->constantFromBool(true);
         }
-        if (isset($args[0]) && JITVariable::TYPE_ARRAY === $args[0]->type) {
+        if (isset($args[0]) && self::isArrayArg($args[0])) {
             throw new \LogicException(
                 'mb_check_encoding() array argument is not lowered for JIT/AOT in this compiler build'
             );
@@ -92,7 +92,7 @@ final class JitMbCheckEncoding
         if (JITVariable::TYPE_STRING === $args[0]->type && null !== ($args[0]->compileTimeString ?? null)) {
             return ['var' => $args[0]->compileTimeString];
         }
-        if (JITVariable::TYPE_ARRAY === $args[0]->type && null !== ($args[0]->compileTimeArray ?? null)) {
+        if (self::isArrayArg($args[0]) && null !== ($args[0]->compileTimeArray ?? null)) {
             $items = [];
             foreach ($args[0]->compileTimeArray as $elem) {
                 if (JITVariable::TYPE_STRING !== $elem->type || null === ($elem->compileTimeString ?? null)) {
@@ -105,6 +105,14 @@ final class JitMbCheckEncoding
         }
 
         return [];
+    }
+
+    private static function isArrayArg(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_HASHTABLE === $arg->type
+            || (($arg->type & JITVariable::IS_NATIVE_ARRAY) !== 0)
+            || ($arg->compileTimeEmptyArrayLiteral ?? false)
+            || null !== ($arg->compileTimeArray ?? null);
     }
 
     /**
