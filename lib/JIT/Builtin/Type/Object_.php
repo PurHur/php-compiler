@@ -1260,6 +1260,20 @@ class Object_ extends Type {
     }
 
     /**
+     * Declared class-constant names on $classId (exact spelling) — Reflection hasConstant (#34072).
+     *
+     * @return list<string>
+     */
+    public function classConstantNamesForId(int $classId): array
+    {
+        if (!isset($this->classConstants[$classId])) {
+            return [];
+        }
+
+        return array_keys($this->classConstants[$classId]);
+    }
+
+    /**
      * Prefer the slot declared by $classId when multiple same-name (private shadow) slots exist (#33439).
      *
      * @return array{0: int, 1: string, 2: int, 3: int}|null

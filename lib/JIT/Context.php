@@ -1746,6 +1746,10 @@ class Context {
         $this->functionProxies['reflectionclass::getconstructor'] = new Call\ReflectionClassGetConstructor();
         $this->functionProxies['reflectionclass::getproperty'] = new Call\ReflectionClassGetProperty();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
+        // Thin AOT: unbound hasMethod/hasProperty/hasConstant → NULL (#34072); VM #6301.
+        $this->functionProxies['reflectionclass::hasmethod'] = new Call\ReflectionClassHasMember('hasMethod');
+        $this->functionProxies['reflectionclass::hasproperty'] = new Call\ReflectionClassHasMember('hasProperty');
+        $this->functionProxies['reflectionclass::hasconstant'] = new Call\ReflectionClassHasMember('hasConstant');
         // Thin AOT: isFinal used broken strcasecmp → always true (#34043); memcmp+fold table.
         $this->functionProxies['reflectionclass::isfinal'] = new Call\ReflectionClassIsFinal();
         // Thin AOT: unbound isInstantiable → NULL (#34027); VM has ReflectionClassIsInstantiable.
