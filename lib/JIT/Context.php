@@ -1789,6 +1789,8 @@ class Context {
         // Thin AOT: unset extension name → empty getName() (#34003).
         $this->functionProxies['reflectionextension::__construct'] = new Call\ReflectionExtensionConstruct();
         $this->functionProxies['reflectionextension::getname'] = new Call\ReflectionExtensionGetName();
+        // Thin AOT: unbound getVersion → NULL (#34016); VM uses VmReflection::reflectionExtensionVersion.
+        $this->functionProxies['reflectionextension::getversion'] = new Call\ReflectionExtensionGetVersion();
 
         $this->functionProxies['reflectionfunction::isvariadic'] = new Call\ReflectionFunctionIsVariadic();
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
