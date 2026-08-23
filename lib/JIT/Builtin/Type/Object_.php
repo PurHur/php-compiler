@@ -3574,16 +3574,22 @@ class Object_ extends Type {
         if ('reflectionfunction' === $lcname) {
             $this->setClassParentName('ReflectionFunction', 'ReflectionFunctionAbstract');
             // Zend public `$name` (#22488).
-            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME, Variable::TYPE_STRING);
+            // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #33993).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME, Variable::TYPE_VALUE);
+            // Thin user-script AOT must call __construct (not allocate-only) (#33993 / #27315).
+            $this->markHasConstructor($id);
         }
         if ('reflectionparameter' === $lcname) {
             // Public Zend surface: `$name` only; other slots are engine storage (#22528).
-            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_NAME, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_CLASS, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_METHOD_NAME, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_FUNC_NAME, Variable::TYPE_STRING);
+            // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #33993).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_NAME, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_CLASS, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_METHOD_NAME, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_FUNC_NAME, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_INDEX, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_POSITION, Variable::TYPE_NATIVE_LONG);
+            // Thin user-script AOT must call __construct (not allocate-only) (#33993 / #27315).
+            $this->markHasConstructor($id);
         }
         if ('reflectionproperty' === $lcname) {
             // Zend public surface: $name then $class (#22504).
