@@ -61,7 +61,7 @@ final class ObjectInstancePropertyLlvm
             return \PHPCompiler\ext\dom\JitDomNamedNodeMap::fetchAttributes($object, $obj, $class);
         }
         if (\PHPCompiler\ext\dom\JitDomDocumentElement::isDomDocumentElement($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomDocumentElement::fetch($object, $obj, $receiverVar);
+            return \PHPCompiler\ext\dom\JitDomDocumentElement::fetch($object, $obj, $receiverVar, $class);
         }
         if (\PHPCompiler\ext\dom\JitDomDocumentDoctype::isDomDocumentDoctype($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomDocumentDoctype::fetch($object, $obj, $class);
@@ -510,11 +510,33 @@ final class ObjectInstancePropertyLlvm
             return;
         }
         if (Variable::TYPE_OBJECT === $propertyType) {
+            $objPtr = $context->helper->loadValue($fetched);
+            $objPtrTy = $context->getTypeFromString('__object__*');
+            $isNullObj = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $objPtr,
+                $objPtrTy->constNull()
+            );
+            $fn = $context->builder->getInsertBlock()->getParent();
+            assert($fn instanceof \PHPLLVM\Value\Function_);
+            $writeNullBb = $fn->appendBasicBlock('box_fetch_obj_null_'.spl_object_id($context));
+            $writeObjBb = $fn->appendBasicBlock('box_fetch_obj_val_'.spl_object_id($context));
+            $doneBb = $fn->appendBasicBlock('box_fetch_obj_done_'.spl_object_id($context));
+            $context->builder->branchIf($isNullObj, $writeNullBb, $writeObjBb);
+            $context->builder->positionAtEnd($writeNullBb);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                $destPtr
+            );
+            $context->builder->branch($doneBb);
+            $context->builder->positionAtEnd($writeObjBb);
             $context->builder->call(
                 $context->lookupFunction('__value__writeObject'),
                 $destPtr,
-                $context->helper->loadValue($fetched)
+                $objPtr
             );
+            $context->builder->branch($doneBb);
+            $context->builder->positionAtEnd($doneBb);
 
             return;
         }

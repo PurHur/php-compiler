@@ -27157,6 +27157,12 @@ class JIT {
         // made unset string props echo garbage instead of Error (#33886 / re-#33007);
         // isset/?? use loadValueQuietForIsset and stay silent (#29688).
         $this->copyObjectPropertyBacking($boxed, $fetched);
+        // documentElement/firstChild temps lose loadXML stamps when boxed — C14N fold and
+        // appendChild refreshCompileTimeXmlWithRootInner need compileTimeDomLoadXml (#32978).
+        $this->syncCompileTimeDomTagName($boxed, $fetched, true);
+        if (null !== $fetched->classUserType) {
+            $boxed->classUserType = $fetched->classUserType;
+        }
 
         return $boxed;
     }
