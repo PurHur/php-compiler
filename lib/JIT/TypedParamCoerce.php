@@ -151,6 +151,7 @@ final class TypedParamCoerce
             'int',
             'string'
         );
+        $failEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
@@ -161,7 +162,7 @@ final class TypedParamCoerce
         $context->builder->positionAtEnd($doneBlock);
         $i64 = $context->getTypeFromString('int64');
         $phi = $context->builder->phi($i64, 'typed_param_int_str_phi');
-        $phi->addIncoming($i64->constInt(0, false), $failBlock);
+        $phi->addIncoming($i64->constInt(0, false), $failEnd);
         $phi->addIncoming($longVal, $okEnd);
 
         return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $phi);
@@ -198,6 +199,7 @@ final class TypedParamCoerce
         );
         $context->builder->positionAtEnd($nullBlock);
         $nullLong = $i64->constInt(0, false);
+        $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterNull);
@@ -233,11 +235,15 @@ final class TypedParamCoerce
         );
         $context->builder->positionAtEnd($doubleBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
-        $doubleLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+        \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
             $context,
             $doubleVal
         );
         $doubleEnd = $context->builder->getInsertBlock();
+        // floatToLongWithPrecisionWarning ends in intdiv_float_prec_after; fptosi lives in
+        // typed_param_int_vbox_double — re-materialize here so the outer PHI incoming is
+        // defined in the block that branches to done (#27989 / e27 module verify).
+        $doubleLong = $context->builder->fptosi($doubleVal, $i64);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterDouble);
@@ -263,6 +269,7 @@ final class TypedParamCoerce
             'int',
             'string'
         );
+        $strFailEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($strOkBlock);
         $stringLong = JitLongArg::lowerStringValue($context, $strPtr);
@@ -280,17 +287,18 @@ final class TypedParamCoerce
             'int',
             JitOperandTypeLabel::givenLabel($context, $arg)
         );
+        $badEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64, 'typed_param_int_vbox_phi');
-        $phi->addIncoming($nullLong, $nullBlock);
+        $phi->addIncoming($nullLong, $nullEnd);
         $phi->addIncoming($longVal, $longEnd);
         $phi->addIncoming($boolLong, $boolEnd);
         $phi->addIncoming($doubleLong, $doubleEnd);
-        $phi->addIncoming($i64->constInt(0, false), $strFailBlock);
+        $phi->addIncoming($i64->constInt(0, false), $strFailEnd);
         $phi->addIncoming($stringLong, $stringEnd);
-        $phi->addIncoming($i64->constInt(0, false), $badBlock);
+        $phi->addIncoming($i64->constInt(0, false), $badEnd);
 
         return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $phi);
     }
