@@ -22,6 +22,7 @@ final class DomChildTextContentParentSaveXml33293AotTest extends TestCase
     {
         $src = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomElementTextContent.php');
         $this->assertStringContainsString('syncParentInnerXmlAfterTextContentWrite', $src);
+        $this->assertStringContainsString('emitElementTextContentSlotSync', $src);
         $this->assertStringContainsString('rootInnerXmlReplaceChildAt', $src);
         $this->assertStringContainsString('PROP_PARENT_NODE', $src);
     }
