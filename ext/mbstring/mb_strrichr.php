@@ -72,15 +72,6 @@ final class mb_strrichr extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('mb_strrichr() requires two to four arguments');
-        }
-        $folded = JitMbSearch::tryStrrichrFold($context, $args);
-        if (null !== $folded) {
-            return $folded;
-        }
-
-        throw new \LogicException('mb_strrichr() is not lowered for JIT/AOT in this compiler build');
+        return JitMbSearch::invokeStrrichr($context, $args);
     }
 }
