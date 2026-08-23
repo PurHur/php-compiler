@@ -17528,6 +17528,12 @@ class JIT {
             $data['methodLc'] = $newNameLc;
             // Zend zend_traits.c: `as` aliases — original method stays callable (#22718).
             $merged[$newNameLc] = $data;
+            // ReflectionClass::getTraitAliases() map (#34129 / VM #6661).
+            $object->recordClassTraitAlias(
+                $classLc,
+                (string) $newName,
+                $data['traitName'].'::'.(string) $adaptation['method']
+            );
         }
 
         foreach ($merged as $methodLc => $data) {

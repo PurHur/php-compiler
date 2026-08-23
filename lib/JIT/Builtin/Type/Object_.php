@@ -86,6 +86,8 @@ class Object_ extends Type {
     private array $classInterfacesLc = [];
     /** @var array<string, list<string>> class lc => trait FQCNs from USE TRAIT (#3119) */
     private array $classUsedTraitNames = [];
+    /** @var array<string, array<string, string>> class lc => alias => Trait::method (#34129) */
+    private array $classTraitAliases = [];
     /** @var array<string, list<string>> interface lc => parent interface lc names */
     private array $interfaceExtendsLc = [];
     /** @var array<string, true> interface lc => registered */
@@ -1845,6 +1847,24 @@ class Object_ extends Type {
     }
 
     /**
+     * Record ReflectionClass::getTraitAliases() entry (php-src zim_ReflectionClass_getTraitAliases).
+     */
+    public function recordClassTraitAlias(string $classLc, string $alias, string $traitMethod): void
+    {
+        $lc = strtolower(ltrim($classLc, '\\'));
+        $this->classTraitAliases[$lc] ??= [];
+        $this->classTraitAliases[$lc][$alias] = $traitMethod;
+    }
+
+    /**
+     * @return array<string, string> alias => Trait::method
+     */
+    public function traitAliasesForClassLc(string $classLc): array
+    {
+        return $this->classTraitAliases[strtolower(ltrim($classLc, '\\'))] ?? [];
+    }
+
+    /**
      * @param list<string> $extendsLcs lowercase parent interface names
      */
     public function setInterfaceExtends(string $interfaceName, array $extendsLcs): void
@@ -2364,6 +2384,9 @@ class Object_ extends Type {
         }
         if (isset($this->classUsedTraitNames[$canonicalOriginalLc])) {
             $this->classUsedTraitNames[$aliasLc] = $this->classUsedTraitNames[$canonicalOriginalLc];
+        }
+        if (isset($this->classTraitAliases[$canonicalOriginalLc])) {
+            $this->classTraitAliases[$aliasLc] = $this->classTraitAliases[$canonicalOriginalLc];
         }
         if (isset($this->enums[$canonicalOriginalLc])) {
             $this->enums[$aliasLc] = true;
