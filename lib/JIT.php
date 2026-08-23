@@ -13517,8 +13517,32 @@ class JIT {
                 case OpCode::TYPE_METHODCALL_INIT:
                     $receiverOp = $block->getOperand($op->arg1);
                     $nameOp = $block->getOperand($op->arg2);
-                    assert($nameOp instanceof Operand\Literal);
-                    $this->initJitMethodCall($block, $receiverOp, $nameOp->value, $op->objectCallInvoke);
+                    // `$obj->$m()` — name may be a Temporary; VM uses scope[arg2]->toString()
+                    // (#34084). Fold compile-time string like FUNCCALL_INIT (#1997); #8407 was
+                    // variable *receiver*, not variable *name*.
+                    $nameSlot = $op->arg2;
+                    if (!$nameOp instanceof Operand\Literal && isset($block->constants[$nameSlot])) {
+                        $nameOp = new Operand\Literal($block->constants[$nameSlot]->toString());
+                    }
+                    $methodName = null;
+                    if ($nameOp instanceof Operand\Literal) {
+                        $methodName = is_string($nameOp->value) ? $nameOp->value : (string) $nameOp->value;
+                    } else {
+                        $nameVar = $this->context->getVariableFromOp($nameOp);
+                        $slot = $block->slotForOperand($nameOp);
+                        if (null !== $slot) {
+                            $this->foldCompileTimeStringFromSlot($block, $slot, $nameVar);
+                        }
+                        if (null !== $nameVar->compileTimeString) {
+                            $methodName = $nameVar->compileTimeString;
+                        }
+                    }
+                    if (null === $methodName || '' === $methodName) {
+                        throw new \LogicException(
+                            'Instance method call name must be a compile-time string (dynamic $obj->$name() without a folded literal is not lowered yet; #34084)'
+                        );
+                    }
+                    $this->initJitMethodCall($block, $receiverOp, $methodName, $op->objectCallInvoke);
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                 case OpCode::TYPE_PROPERTY_FETCH_WRITE:
