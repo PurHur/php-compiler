@@ -35,6 +35,25 @@ final class GetClassVarsRuntime
         return self::wrapHashTable($context, self::emitFromObjectRegistry($context, $className));
     }
 
+    /**
+     * ReflectionClass::getDefaultProperties() — all visibilities; skip parent privates (#34091).
+     *
+     * php-src: zim_ReflectionClass_getDefaultProperties / reflection_class_get_default_properties
+     */
+    public static function emitDefaultPropertiesForClassId(Context $context, int $classId): Value
+    {
+        return self::wrapHashTable(
+            $context,
+            self::emitDefaultPropertiesHashTable($context, $classId)
+        );
+    }
+
+    /** Empty array box when ReflectionClass name does not match a compile-unit class. */
+    public static function emitEmptyDefaultProperties(Context $context): Value
+    {
+        return self::wrapHashTable($context, HashTableHelper::alloc($context));
+    }
+
     private static function emitFromObjectRegistry(Context $context, string $className): Value
     {
         $object = $context->type->object;
@@ -81,6 +100,66 @@ final class GetClassVarsRuntime
         return $ht;
     }
 
+    private static function emitDefaultPropertiesHashTable(Context $context, int $classId): Value
+    {
+        $object = $context->type->object;
+        $ht = HashTableHelper::alloc($context);
+        /** @var array<string, true> $seen */
+        $seen = [];
+        $reflectedName = strtolower(ltrim($object->classNameForId($classId), '\\'));
+        $currentId = $classId;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            $defaults = $object->propertyDefaultEntries($currentId);
+            foreach ($object->instancePropertySets($currentId) as $propset) {
+                $propName = $propset[1];
+                if (isset($seen[$propName])) {
+                    continue;
+                }
+                $vis = $object->propertyVisibility($currentId, $propName);
+                // php-src default_properties_table: parent privates are not visible (#34091).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                    $declName = strtolower(ltrim(
+                        $object->instancePropertyDeclaringClassName($currentId, $propName),
+                        '\\'
+                    ));
+                    if ($declName !== $reflectedName) {
+                        $seen[$propName] = true;
+                        continue;
+                    }
+                }
+                $slotIndex = $propset[3];
+                $keyStr = $context->builder->load($context->constantStringFromString($propName));
+                if (!isset($defaults[$slotIndex])) {
+                    // Typed without default omitted; untyped without default → null (Zend).
+                    if ($object->propertySlotRequiresTypedInitGuard($currentId, $slotIndex)) {
+                        $seen[$propName] = true;
+                        continue;
+                    }
+                    self::storeNullDefault($context, $ht, $keyStr);
+                    $seen[$propName] = true;
+                    continue;
+                }
+                self::storeCompileTimeDefault($context, $ht, $keyStr, $defaults[$slotIndex]);
+                $seen[$propName] = true;
+            }
+            $parentName = $object->parentClassDisplayName($object->classNameForId($currentId));
+            if (null === $parentName) {
+                break;
+            }
+            $currentId = $object->lookup($parentName);
+        }
+        foreach ($object->reflectionDefaultStaticPropertyEntries($classId) as $propName => $entry) {
+            if (isset($seen[$propName])) {
+                continue;
+            }
+            $keyStr = $context->builder->load($context->constantStringFromString($propName));
+            self::storeStaticPropertyDefault($context, $ht, $keyStr, $entry);
+            $seen[$propName] = true;
+        }
+
+        return $ht;
+    }
+
     /**
      * @param array{type: int, value: int|float|bool|string|null} $entry
      */
@@ -107,7 +186,7 @@ final class GetClassVarsRuntime
         array $entry
     ): void {
         $type = $entry['type'];
-        $value = $entry['value'];
+        $value = $entry['value'] ?? null;
         // Untyped statics are TYPE_VALUE slots; materialize from the scalar default (#27229).
         if (JITVariable::TYPE_VALUE === $type) {
             if (\is_int($value)) {
@@ -119,12 +198,30 @@ final class GetClassVarsRuntime
             } elseif (\is_string($value)) {
                 $type = JITVariable::TYPE_STRING;
             } elseif (null === $value) {
+                self::storeNullDefault($context, $ht, $keyStr);
+
                 return;
             } else {
                 return;
             }
         }
+        if (null === $value && JITVariable::TYPE_NULL !== $type) {
+            // Explicit null default on a typed/nullable slot (#34091).
+            if (JITVariable::TYPE_NATIVE_LONG === $type
+                || JITVariable::TYPE_NATIVE_DOUBLE === $type
+                || JITVariable::TYPE_NATIVE_BOOL === $type
+                || JITVariable::TYPE_STRING === $type) {
+                // fall through only when value is set; null scalar → store null
+                self::storeNullDefault($context, $ht, $keyStr);
+
+                return;
+            }
+        }
         switch ($type) {
+            case JITVariable::TYPE_NULL:
+                self::storeNullDefault($context, $ht, $keyStr);
+
+                return;
             case JITVariable::TYPE_NATIVE_LONG:
                 $jit = new JITVariable(
                     $context,
@@ -168,6 +265,18 @@ final class GetClassVarsRuntime
             default:
                 return;
         }
+    }
+
+    private static function storeNullDefault(Context $context, Value $ht, Value $keyStr): void
+    {
+        $nullVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NULL,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('__value__*')->constNull()
+        );
+        $nullVar->isNullConstant = true;
+        HashTableHelper::setAtStringKey($context, $ht, $keyStr, $nullVar);
     }
 
     private static function wrapHashTable(Context $context, Value $ht): Value
