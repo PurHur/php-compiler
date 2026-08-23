@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -18,10 +19,16 @@ use PHPLLVM\Value;
  * — same layout as firstChild/siblings (#27476). Using DOMNode indices on a DOMElement
  * object is out-of-bounds / corrupts tagName (#24973) and SIGSEGVs on ->length.
  *
+ * Document receivers must use {@see CLASS_DOCUMENT} — LiveSlots / appendChild write
+ * that layout (#34160). Always fetching Element slots left Document lists invisible
+ * (length 0 / item SIGSEGV after ChildNode::before/after on documentElement).
+ *
  * Lazily attach an empty NodeList when unset (createElement before any child sync).
  */
 final class JitDomChildNodesProperty
 {
+    private const CLASS_DOCUMENT = 'DOMDocument';
+
     private const CLASS_ELEMENT = 'DOMElement';
 
     private const CLASS_NODELIST = 'DOMNodeList';
@@ -47,32 +54,65 @@ final class JitDomChildNodesProperty
         // Stamp for thin-AOT foreach snapshot (#33082) — CFG userType is often unset.
         JitDomNodeListForeachSnapshot::markChildNodesFetch();
 
-        $slotClass = self::slotClass();
-        $slotClassId = $objectType->lookup($slotClass);
-        if (!$objectType->hasProperty($slotClassId, VmDom::PROP_CHILD_NODES)) {
-            $objectType->defineProperty($slotClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        $elClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_CHILD_NODES)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
+        }
+        if (!$objectType->hasProperty($elClassId, VmDom::PROP_CHILD_NODES)) {
+            $objectType->defineProperty($elClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
         }
 
-        self::ensureEmptyListIfMissing($objectType, $obj, $slotClass);
+        $resultSlot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__value__*')
+        );
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $obj, 'dom_cn_fetch');
+        $bbDoc = BasicBlockHelper::append($context, 'dom_cn_fetch_doc');
+        $bbEl = BasicBlockHelper::append($context, 'dom_cn_fetch_el');
+        $bbDone = BasicBlockHelper::append($context, 'dom_cn_fetch_done');
+        $context->builder->branchIf($isDoc, $bbDoc, $bbEl);
 
-        $result = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+        $context->builder->positionAtEnd($bbDoc);
+        self::ensureEmptyListIfMissing($objectType, $obj, self::CLASS_DOCUMENT);
+        $docList = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $obj,
-            $slotClass,
+            self::CLASS_DOCUMENT,
             VmDom::PROP_CHILD_NODES,
-            $slotClassId
+            $docClassId
+        );
+        $context->builder->store(
+            JitValueBox::valuePtrFromVariable($context, $docList),
+            $resultSlot
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbEl);
+        self::ensureEmptyListIfMissing($objectType, $obj, self::CLASS_ELEMENT);
+        $elList = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $obj,
+            self::CLASS_ELEMENT,
+            VmDom::PROP_CHILD_NODES,
+            $elClassId
+        );
+        $context->builder->store(
+            JitValueBox::valuePtrFromVariable($context, $elList),
+            $resultSlot
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+        $result = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $context->builder->load($resultSlot))
         );
         $result->classUserType = self::CLASS_NODELIST;
 
         return $result;
-    }
-
-    /** Elements use DOMElement layout; documents keep DOMNode/DOMDocument slots. */
-    private static function slotClass(): string
-    {
-        // Fetch receivers are almost always DOMElement (documentElement / createElement).
-        // Document::$childNodes is rare in user scripts; LiveSlots parents are elements.
-        return self::CLASS_ELEMENT;
     }
 
     /**
@@ -101,7 +141,7 @@ final class JitDomChildNodesProperty
         $context->builder->branchIf($objNull, $bbSeed, $bbDone);
 
         $context->builder->positionAtEnd($bbSeed);
-        JitDomDocumentElement::storeChildNodesLength($context, $obj, 0);
+        JitDomDocumentElement::storeChildNodesLength($context, $obj, 0, null, null, $slotClass);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);

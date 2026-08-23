@@ -146,6 +146,12 @@ final class JitDomNodeListItemUserScript
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return null;
         }
+        // Pinned-root firstChild is Element::$childNodes item(0). Document::$childNodes
+        // item(0) is the documentElement / first top-level node — after Document
+        // mutations fall through to owner-aware pins (#34160).
+        if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()) {
+            return null;
+        }
         $pinned = DomUserScriptPinnedRootLlvm::load($context);
         if (null === $pinned) {
             return null;

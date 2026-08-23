@@ -149,6 +149,10 @@ final class JitDomSaveXMLUserScript
      *
      * Prefer the receiver's documentElement over the process-global pin so a second
      * empty document after importNode does not dump another document's tree (#33697).
+     *
+     * Walk Document firstChild→nextSibling so comments/PIs around the root are
+     * included (php-src xmlDocDumpMemory; #34160). Fall back to documentElement
+     * alone when firstChild is unset.
      */
     private static function trySerializeDocumentFromSlots(Context $context, ?JITVariable $documentVar = null): Value
     {
@@ -178,12 +182,27 @@ final class JitDomSaveXMLUserScript
         $bbDump = BasicBlockHelper::append($context, 'dom_savexml_doc_dump');
         $bbDone = BasicBlockHelper::append($context, 'dom_savexml_doc_done');
         $objPtrTy = $context->getTypeFromString('__object__*');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+
+        $document = null !== $documentVar ? self::loadObjectArg($context, $documentVar) : null;
         $pinned = self::loadReceiverDocumentElement($context, $documentVar)
             ?? DomUserScriptPinnedRootLlvm::load($context);
-        if (null === $pinned) {
+        if (null === $pinned && null === $document) {
             return self::boxStringValue($context, $decl);
         }
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $pinned, $objPtrTy->constNull());
+
+        $head = $objPtrTy->constNull();
+        if (null !== $document) {
+            JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
+            $first = JitDomParentChildLinkLayout::loadFirstChild($context, $document, 'dom_savexml_doc');
+            $firstNull = $context->builder->icmp(Builder::INT_EQ, $first, $objPtrTy->constNull());
+            $fallback = $pinned ?? $objPtrTy->constNull();
+            $head = $context->builder->select($firstNull, $fallback, $first);
+        } elseif (null !== $pinned) {
+            $head = $pinned;
+        }
+
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $head, $objPtrTy->constNull());
         $context->builder->branchIf($isNull, $bbEmpty, $bbDump);
 
         $context->builder->positionAtEnd($bbEmpty);
@@ -191,16 +210,45 @@ final class JitDomSaveXMLUserScript
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDump);
-        $bodyStr = self::serializeElementMarkup(
-            $context,
-            $objectType,
-            $pinned,
-            $elementClassId,
-            false,
-            null
+        // Accumulate child dumps: piece + "\n" for each top-level node (#34160).
+        $bodySlot = BasicBlockHelper::entryAlloca($context, $strPtrTy);
+        $curSlot = BasicBlockHelper::entryAlloca($context, $objPtrTy);
+        $emptyStr = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->store($emptyStr, $bodySlot);
+        $context->builder->store($head, $curSlot);
+
+        $loopHdr = BasicBlockHelper::append($context, 'dom_savexml_doc_walk_hdr');
+        $loopBody = BasicBlockHelper::append($context, 'dom_savexml_doc_walk_body');
+        $loopDone = BasicBlockHelper::append($context, 'dom_savexml_doc_walk_done');
+        $context->builder->branch($loopHdr);
+
+        $context->builder->positionAtEnd($loopHdr);
+        $cur = $context->builder->load($curSlot);
+        $curNull = $context->builder->icmp(Builder::INT_EQ, $cur, $objPtrTy->constNull());
+        $context->builder->branchIf($curNull, $loopDone, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $pieceVal = self::serializeUserScriptNode($context, $objectType, $cur, $elementClassId);
+        // serializeUserScriptNode returns boxed __value__*; load string for concat.
+        $pieceStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $pieceVal
         );
-        $withDecl = JitStringConcat::concat($context, $decl, $bodyStr);
-        $full = JitStringConcat::concat($context, $withDecl, $nl);
+        $withPiece = JitStringConcat::concat($context, $context->builder->load($bodySlot), $pieceStr);
+        $withNl = JitStringConcat::concat($context, $withPiece, $nl);
+        $context->builder->store($withNl, $bodySlot);
+        $next = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $cur,
+            VmDom::PROP_NEXT_SIBLING,
+            'dom_savexml_doc_next'
+        );
+        $context->builder->store($next, $curSlot);
+        $context->builder->branch($loopHdr);
+
+        $context->builder->positionAtEnd($loopDone);
+        $bodyStr = $context->builder->load($bodySlot);
+        $full = JitStringConcat::concat($context, $decl, $bodyStr);
         $context->builder->store(self::boxStringValue($context, $full), $resultSlot);
         $context->builder->branch($bbDone);
 
