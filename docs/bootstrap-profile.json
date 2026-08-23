@@ -6019,6 +6019,7 @@
         "lib/JIT/Builtin/ReflectionClassTraitAliasesRuntime.php",
         "lib/JIT/Builtin/ReflectionEnumJitHelper.php",
         "lib/JIT/Builtin/ReflectionExtensionGetClassNamesRuntime.php",
+        "lib/JIT/Builtin/ReflectionExtensionGetConstantsRuntime.php",
         "lib/JIT/Builtin/ReflectionExtensionGetDependenciesRuntime.php",
         "lib/JIT/Builtin/ReflectionExtensionIsPersistentRuntime.php",
         "lib/JIT/Builtin/ReflectionFunctionVariadicLookupRuntime.php",
@@ -6739,6 +6740,7 @@
         "lib/JIT/Call/ReflectionEnumUnitCaseGetValue.php",
         "lib/JIT/Call/ReflectionExtensionConstruct.php",
         "lib/JIT/Call/ReflectionExtensionGetClassNames.php",
+        "lib/JIT/Call/ReflectionExtensionGetConstants.php",
         "lib/JIT/Call/ReflectionExtensionGetDependencies.php",
         "lib/JIT/Call/ReflectionExtensionGetName.php",
         "lib/JIT/Call/ReflectionExtensionGetVersion.php",
@@ -8053,9 +8055,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7819,
+        "inventory_files": 7821,
         "excluded": 0,
-        "eligible": 7819,
+        "eligible": 7821,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
