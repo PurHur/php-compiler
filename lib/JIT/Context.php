@@ -1890,6 +1890,8 @@ class Context {
         $this->functionProxies['reflectionextension::istemporary'] = new Call\ReflectionExtensionIsTemporary();
         // Thin AOT: unbound getDependencies → NULL (#34155); VM #22247 / peer getClassNames #34150.
         $this->functionProxies['reflectionextension::getdependencies'] = new Call\ReflectionExtensionGetDependencies();
+        // Thin AOT: unbound getConstants → NULL (#34162); VM #18326 / peer getDependencies #34155.
+        $this->functionProxies['reflectionextension::getconstants'] = new Call\ReflectionExtensionGetConstants();
 
         $this->functionProxies['reflectionfunction::isvariadic'] = new Call\ReflectionFunctionIsVariadic();
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
