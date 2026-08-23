@@ -398,6 +398,18 @@ final class DomUserScriptLiveTagListLlvm
         );
     }
 
+    /** Drop queued pre-query appends after compile-time XML fold absorbed them (#33918). */
+    public static function clearPending(Context $context): void
+    {
+        self::ensureGlobals($context);
+        $pendingGlobal = $context->module->getNamedGlobal(self::GLOBAL_PENDING);
+        if (null === $pendingGlobal) {
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $context->builder->store($i64->constInt(0, false), $pendingGlobal);
+    }
+
     private static function ensureGlobals(Context $context): void
     {
         $strPtr = $context->getTypeFromString('__string__*');

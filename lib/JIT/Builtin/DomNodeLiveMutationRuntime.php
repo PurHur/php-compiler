@@ -324,11 +324,11 @@ final class DomNodeLiveMutationRuntime
                     $parentObj
                 );
                 JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
-                // LiveSlots path skipped syncUserScriptInnerXmlFromArgs — refresh the
-                // destination document's loadXML literal so C14N fold sees appendChild
-                // (peer non-bridge append #32972 / importNode #32987). markTreeMutated alone
-                // disables fold and runtime C14N has no DomRegistry (#32978).
-                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
+                // LiveSlots rebuild already wrote PROP_USER_SCRIPT_INNER_XML from the live
+                // child chain — only refresh the loadXML literal for C14N fold (#32972 /
+                // importNode #32987). Merging compile-time delta onto the slot again
+                // duplicated deep importNode subtrees in saveXML (#33918 regression).
+                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind, true);
 
                 return self::nullValuePtr($context);
             }
@@ -1111,7 +1111,8 @@ final class DomNodeLiveMutationRuntime
         Context $context,
         Variable $receiver,
         array $extraArgs,
-        string $kind = 'append'
+        string $kind = 'append',
+        bool $skipInnerXmlSlotMerge = false
     ): void {
         if ([] === $extraArgs) {
             return;
@@ -1181,36 +1182,44 @@ final class DomNodeLiveMutationRuntime
 
             return;
         }
-        $deltaStr = $context->builder->load(
-            $context->constantStringFromString($delta)
-        );
-        $existingVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
-            $objectType,
-            $receiverObj,
-            'DOMElement',
-            VmDom::PROP_USER_SCRIPT_INNER_XML,
-            $classId
-        );
-        $existingStr = $context->helper->loadValue($existingVar);
-        $merged = 'prepend' === $kind
-            ? JitStringConcat::concat($context, $deltaStr, $existingStr)
-            : JitStringConcat::concat($context, $existingStr, $deltaStr);
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $merged
-        );
-        $propVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $owned);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_USER_SCRIPT_INNER_XML),
-            $propVar,
-            Variable::TYPE_STRING
-        );
+        if (!$skipInnerXmlSlotMerge) {
+            $deltaStr = $context->builder->load(
+                $context->constantStringFromString($delta)
+            );
+            $existingVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $receiverObj,
+                'DOMElement',
+                VmDom::PROP_USER_SCRIPT_INNER_XML,
+                $classId
+            );
+            $existingStr = $context->helper->loadValue($existingVar);
+            $merged = 'prepend' === $kind
+                ? JitStringConcat::concat($context, $deltaStr, $existingStr)
+                : JitStringConcat::concat($context, $existingStr, $deltaStr);
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $merged
+            );
+            $propVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $owned);
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_USER_SCRIPT_INNER_XML),
+                $propVar,
+                Variable::TYPE_STRING
+            );
+        }
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }
         $oldInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $newInner = 'prepend' === $kind ? $delta.$oldInner : $oldInner.$delta;
         JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($newInner, $receiver);
+        if ($skipInnerXmlSlotMerge) {
+            // LiveSlots rebuild + C14N refresh already baked $delta into compile-time XML.
+            // incrementForChildArg may have queued the same subtree on GLOBAL_PENDING before
+            // the first getElementsByTagName — initCount would add base+pending twice (#33918).
+            DomUserScriptLiveTagListLlvm::clearPending($context);
+        }
     }
 
     private static function ensureStringMutationBridge(Context $context, string $kind): void
