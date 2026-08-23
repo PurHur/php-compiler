@@ -118,6 +118,9 @@ final class VmOpensslObjects
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         self::$certStore[$entry->id] = $pem;
+        // Mirror PEM on the object for thin AOT consumers (#34048 peer OpenSSLAsymmetricKey).
+        $pemVar = $entry->allocateProperty(OpensslCertificateJitSupport::PROP_PEM);
+        $pemVar->string($pem);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
 
@@ -250,7 +253,18 @@ final class VmOpensslObjects
 
     public static function certificatePem(ObjectEntry $entry): string
     {
-        return self::$certStore[$entry->id] ?? '';
+        if (isset(self::$certStore[$entry->id])) {
+            return self::$certStore[$entry->id];
+        }
+        // AOT-allocated certs store PEM on __osslPem (#34048).
+        if ($entry->hasProperty(OpensslCertificateJitSupport::PROP_PEM)) {
+            $prop = $entry->getProperty(OpensslCertificateJitSupport::PROP_PEM)->resolveIndirect();
+            if (Variable::TYPE_STRING === $prop->type) {
+                return $prop->toString();
+            }
+        }
+
+        return '';
     }
 
     /**
