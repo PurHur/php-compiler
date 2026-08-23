@@ -785,11 +785,12 @@ final class TryCatchHelper
             $context->freeDeadVariables($func, $throwBlock, $block);
             $thrown = $context->getVariableFromOp($block->getOperand($op->arg1));
             if (VMVariable::TYPE_ENUM_CASE === $thrown->type) {
-                self::emitCatchableClassError(
+                // AOT standalone: ErrorRaise has no body — allocate Error + UncaughtThrowPrinter (#33975).
+                self::emitUncaughtErrorObject(
                     $context,
-                    \PHPCompiler\VM\ExceptionSupport::CLASS_ERROR,
-                    \PHPCompiler\VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
-                    $jit
+                    $func,
+                    $block,
+                    ExceptionSupport::THROW_NON_THROWABLE_MESSAGE
                 );
 
                 return;
@@ -798,15 +799,34 @@ final class TryCatchHelper
                 Variable::TYPE_OBJECT !== $thrown->type
                 && Variable::TYPE_VALUE !== $thrown->type
             ) {
-                self::emitCatchableClassError(
+                self::emitUncaughtErrorObject(
                     $context,
-                    \PHPCompiler\VM\ExceptionSupport::CLASS_ERROR,
-                    \PHPCompiler\VM\ExceptionSupport::THROW_ONLY_OBJECTS_MESSAGE,
-                    $jit
+                    $func,
+                    $block,
+                    ExceptionSupport::THROW_ONLY_OBJECTS_MESSAGE
                 );
 
                 return;
             }
+            // Seed Throwable/Error before instanceof — uncaught main has no catch-arm seed (#33975).
+            GetClassRuntime::ensureLinked($context);
+            $context->type->object->lookup('Throwable');
+            $context->type->object->lookup('Error');
+            $isThrowable = ReflectionBuiltinHelper::emitInstanceOf($context, $thrown, 'Throwable');
+            $isBool = Variable::TYPE_NATIVE_BOOL === $isThrowable->type
+                ? $isThrowable->value
+                : $context->helper->loadValue($isThrowable);
+            $validThrow = self::appendBlock($func, 'throw_uncaught_valid');
+            $invalidThrow = self::appendBlock($func, 'throw_uncaught_non_throwable');
+            $builder->branchIf($isBool, $validThrow, $invalidThrow);
+            $builder->positionAtEnd($invalidThrow);
+            self::emitUncaughtErrorObject(
+                $context,
+                $func,
+                $block,
+                ExceptionSupport::THROW_NON_THROWABLE_MESSAGE
+            );
+            $builder->positionAtEnd($validThrow);
             $obj = self::loadThrownObject($context, $thrown);
             ExceptionThrowToStringSeed::seed($context, $obj, $block);
             if (self::isNonMainUserFunction($block)) {
@@ -845,6 +865,10 @@ final class TryCatchHelper
             $builder->positionAtEnd($throwBlock);
         }
 
+        // Seed Throwable/Error before instanceof when catch arms omitted them (#33975).
+        GetClassRuntime::ensureLinked($context);
+        $context->type->object->lookup('Throwable');
+        $context->type->object->lookup('Error');
         $isThrowable = ReflectionBuiltinHelper::emitInstanceOf($context, $thrown, 'Throwable');
         $isBool = Variable::TYPE_NATIVE_BOOL === $isThrowable->type
             ? $isThrowable->value
@@ -1143,6 +1167,74 @@ final class TryCatchHelper
         }
 
         return $obj;
+    }
+
+    /**
+     * Uncaught non-Throwable / non-object throw → Zend-shaped Error fatal (#33975).
+     *
+     * php-src: Zend/zend_exceptions.c — zend_throw_exception_internal rejects non-Throwable.
+     * AOT standalone must not use {@see ErrorRaise::emitRaise} alone (no raise body → SIGSEGV).
+     */
+    private static function emitUncaughtErrorObject(
+        Context $context,
+        Function_ $func,
+        Block $block,
+        string $message
+    ): void {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            JitThrow::ensureStandaloneBodies($context);
+        }
+        GetClassRuntime::ensureLinked($context);
+        $object = $context->type->object;
+        $object->lookup(ExceptionSupport::CLASS_ERROR);
+        $classId = $object->lookup(ExceptionSupport::CLASS_ERROR);
+        $errObj = $object->allocate($classId);
+        $object->markObjectConstructed($errObj);
+        $msgStr = $context->builder->load($context->constantStringFromString($message));
+        $msgVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $msgStr);
+        $object->storeInstanceProperty(
+            $errObj,
+            ExceptionSupport::CLASS_ERROR,
+            ExceptionSupport::PROP_MESSAGE,
+            $msgVar
+        );
+        $file = $context->jitAotEntryScriptPath;
+        if ('' === $file) {
+            $file = 'Unknown';
+        }
+        $line = max(0, $context->callSiteLine);
+        if ($context->evalInlineDepth > 0 && $line > 0) {
+            $line = VmEval::unwrapEvalLine($line);
+        }
+        $fileStr = $context->builder->load($context->constantStringFromString($file));
+        $fileVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $fileStr);
+        $object->storeInstanceProperty(
+            $errObj,
+            ExceptionSupport::CLASS_ERROR,
+            ExceptionSupport::PROP_FILE,
+            $fileVar
+        );
+        $lineVar = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $context->constantFromInteger($line)
+        );
+        $object->storeInstanceProperty(
+            $errObj,
+            ExceptionSupport::CLASS_ERROR,
+            ExceptionSupport::PROP_LINE,
+            $lineVar
+        );
+        ExceptionThrowToStringSeed::seed($context, $errObj, $block);
+        if (self::isNonMainUserFunction($block)) {
+            $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $errObj);
+            self::emitPropagateReturn($context, $func);
+        } else {
+            self::emitUncaughtUserHandlerOrAbort($context, $errObj);
+        }
     }
 
     private static function emitUncaughtUserHandlerOrAbort(Context $context, Value $exceptionObj): void
