@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: mb_convert_case() runtime UTF-8 via NestedJIT (#34280 leftover of #11146 / #7014).
+ * AOT: mb_convert_case() runtime UTF-8 via NestedJIT convertCaseArgv (#34280 / #34284).
  *
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_convert_case)
  *
@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class MbConvertCaseRuntimeAotTest extends TestCase
 {
-    public function testAotRuntimeMatchMatchesVm(): void
+    public function testAotRuntimeUpperLowerMatchVm(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
@@ -25,17 +25,27 @@ final class MbConvertCaseRuntimeAotTest extends TestCase
         $this->assertSame($this->runVm($src), $this->runAot($src));
     }
 
-    public function testLoweringDelegatesToJitMbCase(): void
+    public function testAotRuntimeTitleMatchVm(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $src = __DIR__.'/../repro/mb_convert_case_title_runtime_aot.php';
+        $this->assertSame($this->runVm($src), $this->runAot($src));
+    }
+
+    public function testLoweringUsesTitleArgvNotAsciiTitlePeel(): void
     {
         $root = dirname(__DIR__, 2);
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbConvertCase.php');
+        $helper = (string) file_get_contents($root.'/ext/mbstring/MbConvertCaseJitHelper.php');
+        $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbConvertCaseRuntime.php');
         $this->assertStringContainsString('JitMbCase::invokeStrtoupper', $jit);
-        $this->assertStringContainsString('JitMbCase::invokeStrtolower', $jit);
-        // UPPER/LOWER must not use the ASCII-only peel; TITLE still may.
-        $this->assertMatchesRegularExpression(
-            '/MB_CASE_UPPER[\s\S]*?JitMbCase::invokeStrtoupper/',
-            $jit
-        );
+        $this->assertStringContainsString('MbConvertCaseRuntime::titleHelper', $jit);
+        $this->assertStringContainsString('titleArgv', $helper);
+        $this->assertStringContainsString('TITLE_LOGICAL', $runtime);
+        $this->assertStringNotContainsString('transformAllAscii', $jit);
+        $this->assertStringNotContainsString('asciiTitleRuntime', $jit);
         $this->assertFileDoesNotExist($root.'/lib/AOT/runtime/mb_convert_case.c');
     }
 
