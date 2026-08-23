@@ -18,9 +18,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_ord() — multibyte character to codepoint (php-src ext/mbstring/mbstring.c; #4559, #29778, #30759).
+ * mb_ord() — multibyte character to codepoint (php-src ext/mbstring/mbstring.c; #4559, #29778, #30759, #34243).
  *
- * JIT/AOT: compile-time fold via {@see JitMbChrOrd} (peer mb_strtolower / JitMbSearch).
+ * JIT/AOT: compile-time fold + NestedJIT runtime via {@see JitMbChrOrd::invokeOrd}.
  * Leftover #33547: catchable argc/TypeError (array) paths (peer mb_chr #33536).
  */
 final class mb_ord extends Internal
@@ -101,13 +101,7 @@ final class mb_ord extends Internal
             return self::foldFalse($context);
         }
 
-        $folded = JitMbChrOrd::tryOrdFold($context, $args);
-        if (null !== $folded) {
-            return $folded;
-        }
-
-        // Non-foldable happy-path still needs runtime lowering (#30759 follow-up / #33547).
-        throw new \LogicException('mb_ord() is not lowered for JIT/AOT in this compiler build');
+        return JitMbChrOrd::invokeOrd($context, $args);
     }
 
     /**
