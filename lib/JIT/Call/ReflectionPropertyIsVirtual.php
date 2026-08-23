@@ -15,7 +15,12 @@ use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** ReflectionProperty::isVirtual() — JIT/AOT (#27516, ext/reflection/php_reflection.c). */
+/**
+ * ReflectionProperty::isVirtual() — JIT/AOT (#27516, #34049, ext/reflection/php_reflection.c).
+ *
+ * Thin AOT previously used a broken strcasecmp table → always true when any
+ * virtual existed in the CU (#34049); peer of #34043 / #34047.
+ */
 final class ReflectionPropertyIsVirtual implements Call
 {
     public function call(Context $context, Variable ...$args): Value
