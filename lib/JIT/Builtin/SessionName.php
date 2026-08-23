@@ -6,7 +6,8 @@ declare(strict_types=1);
  * Session cookie name stored in module globals. LLVM entry `__phpc_session_name_apply`
  * fills a caller {@see __value__} out-slot (#1184).
  *
- * Thin AOT: {@see ensureLinked} — Type::register early-returns on STANDALONE (#32989).
+ * Thin AOT + full load: {@see ensureLinked} — Type::initialize no longer eagerly
+ * implements (#33980 / peer #32989 STANDALONE early-return).
  */
 
 namespace PHPCompiler\JIT\Builtin;

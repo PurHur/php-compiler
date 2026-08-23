@@ -938,17 +938,17 @@ class Type extends Builtin {
         SessionLifecycleRuntime::ensureLinked($this->context);
         SessionCreateIdRuntime::ensureLinked($this->context);
         SessionGcRuntime::ensureLinked($this->context);
-        SessionStart::implement($this->context);
-        SessionWriteClose::implement($this->context);
-        SessionRegenerateId::implement($this->context);
-        SessionDestroy::implement($this->context);
-        SessionAbort::implement($this->context);
-        SessionUnset::implement($this->context);
+        // SessionStart/WriteClose/RegenerateId/Destroy/Abort/Unset::implement always-on
+        // removed (#33980): those implement() methods are no-ops since #21564 — bodies live
+        // in JitSessionLifecycleKernel via SessionLifecycleRuntime::ensureLinked above.
+        // SessionId/Name/ModuleName::implement always-on removed (#33980): owners NestedJIT
+        // __phpc_session_{id,name,module}_apply via ensureLinked (getNamedFunction first).
+        // Call sites JitSessionId / JitSessionName / JitSessionModuleName already
+        // ensureLinked before lookup (#32989). Leftover Type NestedJIT on every full load
+        // path vs Runtime ABI drift mints session_id_apply.1 (#31894 / #32122). User-script
+        // session_id()/session_name()/session_module_name() stay ext/session/session.c.
         SessionStorageGlobals::ensureGlobals($this->context);
         SessionStorageRuntime::ensureLinked($this->context);
-        SessionId::implement($this->context);
-        SessionName::implement($this->context);
-        SessionModuleName::implement($this->context);
         SessionEncodeRuntime::ensureLinked($this->context);
         DefineRuntime::ensureLinked($this->context);
         RewriteVarsRuntime::ensureLinked($this->context);
