@@ -1892,6 +1892,8 @@ class Context {
         $this->functionProxies['reflectionextension::getdependencies'] = new Call\ReflectionExtensionGetDependencies();
         // Thin AOT: unbound getConstants → NULL (#34162); VM #18326 / peer getDependencies #34155.
         $this->functionProxies['reflectionextension::getconstants'] = new Call\ReflectionExtensionGetConstants();
+        // Thin AOT: unbound getINIEntries → NULL (#34165); VM #22247 / peer getConstants #34162.
+        $this->functionProxies['reflectionextension::getinientries'] = new Call\ReflectionExtensionGetINIEntries();
 
         $this->functionProxies['reflectionfunction::isvariadic'] = new Call\ReflectionFunctionIsVariadic();
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
