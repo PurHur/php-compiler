@@ -1748,8 +1748,11 @@ class Context {
         $this->functionProxies['reflectionproperty::setaccessible'] = new Call\ReflectionSetAccessible('ReflectionProperty');
         $this->functionProxies['reflectionproperty::getvalue'] = new Call\ReflectionPropertyGetValue();
         $this->functionProxies['reflectionproperty::setvalue'] = new Call\ReflectionPropertySetValue();
+        // Thin AOT: unset $class/$name → SIGSEGV on property read / getAttributes (#33990).
+        $this->functionProxies['reflectionmethod::__construct'] = new Call\ReflectionMethodConstruct();
         $this->functionProxies['reflectionmethod::setaccessible'] = new Call\ReflectionSetAccessible('ReflectionMethod');
         $this->functionProxies['reflectionmethod::invoke'] = new Call\ReflectionMethodInvoke();
+        $this->functionProxies['reflectionclassconstant::__construct'] = new Call\ReflectionClassConstantConstruct();
         if (CompilerVersion::supportsReflectionPropertyGetMangledName()) {
             $this->functionProxies['reflectionproperty::getmangledname'] = new Call\ReflectionPropertyGetMangledName();
         }
