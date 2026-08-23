@@ -5371,6 +5371,103 @@ class Object_ extends Type {
         return ($modifiers & $filter) !== 0;
     }
 
+    /**
+     * ReflectionClass::getProperties() specs — skip parent privates (#34113).
+     *
+     * @return list<array{display: string, declaringClass: string}>
+     */
+    public function allPropertiesForReflection(int $classId, int $filter = 0): array
+    {
+        $reflectedLc = strtolower(ltrim($this->classNameForId($classId), '\\'));
+        if ('' === $reflectedLc) {
+            return [];
+        }
+
+        /** @var list<int> $chain child → root */
+        $chain = [];
+        $currentId = $classId;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            $chain[] = $currentId;
+            $parentName = $this->parentClassDisplayName($this->classNameForId($currentId));
+            if (null === $parentName) {
+                break;
+            }
+            $currentId = $this->lookup($parentName);
+        }
+
+        /** @var array<string, array{display: string, declaringClass: string}> $seen */
+        $seen = [];
+        foreach ($chain as $id) {
+            foreach ($this->instancePropertySets($id) as $propset) {
+                $propName = $propset[1];
+                if (\PHPCompiler\VM\DateTimeSupport::isInternalStorageProperty($propName)) {
+                    continue;
+                }
+                $lc = strtolower($propName);
+                if (isset($seen[$lc])) {
+                    continue;
+                }
+                $vis = $this->propertyVisibility($id, $propName);
+                $declDisplay = $this->instancePropertyDeclaringClassName($id, $propName);
+                $declLc = strtolower(ltrim($declDisplay, '\\'));
+                // php-src: parent-private properties are not visible on the child (#34113 / #4470).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $declLc !== $reflectedLc) {
+                    continue;
+                }
+                if (!$this->propertyMatchesReflectionFilterBits($vis, false, $filter)) {
+                    continue;
+                }
+                $seen[$lc] = [
+                    'display' => $propName,
+                    'declaringClass' => $declDisplay,
+                ];
+            }
+        }
+
+        foreach (array_keys($this->staticPropertyGlobals[$classId] ?? []) as $name) {
+            $lc = strtolower((string) $name);
+            if (isset($seen[$lc])) {
+                continue;
+            }
+            $vis = $this->staticPropertyVisibility[$classId][$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $declId = (int) ($this->staticPropertyDeclaringClassId[$classId][$name] ?? $classId);
+            $declDisplay = $this->classNameForId($declId);
+            $declLc = strtolower(ltrim($declDisplay, '\\'));
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $declLc !== $reflectedLc) {
+                continue;
+            }
+            if (!$this->propertyMatchesReflectionFilterBits($vis, true, $filter)) {
+                continue;
+            }
+            $seen[$lc] = [
+                'display' => (string) $name,
+                'declaringClass' => $declDisplay,
+            ];
+        }
+
+        return array_values($seen);
+    }
+
+    /** Mirror VmReflection::propertyMatchesReflectionFilter (#34113 / #4470). */
+    private function propertyMatchesReflectionFilterBits(int $cfgVisibility, bool $isStatic, int $filter): bool
+    {
+        if (0 === $filter) {
+            return true;
+        }
+        if (($cfgVisibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            $flags = 4; // ReflectionProperty::IS_PRIVATE
+        } elseif (($cfgVisibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            $flags = 2; // IS_PROTECTED
+        } else {
+            $flags = 1; // IS_PUBLIC
+        }
+        if ($isStatic) {
+            $flags |= 16; // IS_STATIC
+        }
+
+        return ($flags & $filter) !== 0;
+    }
+
     public function definePropertyVisibility(int $classId, string $name, int $visibilityFlags): void
     {
         $this->propertyVisibility[$classId][strtolower($name)] = $visibilityFlags;
