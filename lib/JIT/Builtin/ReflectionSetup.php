@@ -312,6 +312,38 @@ final class ReflectionSetup
     }
 
     /**
+     * Namespace prefix from a native cstr (ReflectionClass::getNamespaceName).
+     * php-src: prefix before last backslash; empty string when unqualified (#34014).
+     *
+     * @return array{cstr: Value, len: Value}
+     */
+    public static function namespaceNameFromCstr(Context $context, Value $cstr, Value $len): array
+    {
+        self::ensureLibcStrrchr($context);
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $backslash = $i32->constInt(ord('\\'), false);
+        $slashPtr = $context->builder->call($context->lookupFunction('strrchr'), $cstr, $backslash);
+        $nullPtr = $i8p->constNull();
+        $hasSlash = $context->builder->icmp(Builder::INT_NE, $slashPtr, $nullPtr);
+        $slashOffset = $context->builder->ptrToInt($slashPtr, $i64);
+        $baseOffset = $context->builder->ptrToInt($cstr, $i64);
+        $nsLen64 = $context->builder->sub($slashOffset, $baseOffset);
+        $nsLen = $context->builder->zExt($nsLen64, $sizeT);
+        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $nsCstr = $context->builder->select($hasSlash, $cstr, $empty);
+        $nsLenSel = $context->builder->select(
+            $hasSlash,
+            $nsLen,
+            $sizeT->constInt(0, false)
+        );
+
+        return ['cstr' => $nsCstr, 'len' => $nsLenSel];
+    }
+
+    /**
      * ReflectionClass 0-arg kind/query — JIT/AOT (#31126, php_reflection.c).
      *
      * $args[0] is $this. Caller must already have checked user argc.

@@ -1737,7 +1737,10 @@ class Context {
         // Thin AOT: ReflectionObject::$name / getName empty without construct + TYPE_VALUE (#34001).
         $this->functionProxies['reflectionobject::getname'] = new Call\ReflectionObjectGetName();
         $this->functionProxies['reflectionclass::getshortname'] = new Call\ReflectionClassGetShortName();
+        $this->functionProxies['reflectionclass::getnamespacename'] = new Call\ReflectionClassGetNamespaceName();
+        $this->functionProxies['reflectionclass::innamespace'] = new Call\ReflectionClassInNamespace();
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
+
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
         $this->functionProxies['reflectionclass::getproperty'] = new Call\ReflectionClassGetProperty();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
