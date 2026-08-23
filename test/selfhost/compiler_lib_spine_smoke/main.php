@@ -1322,6 +1322,8 @@ require_once __DIR__.'/../../../ext/ds/VmDsDepth.php';
 require_once __DIR__.'/../../../ext/ds/VmDsStorage.php';
 require_once __DIR__.'/../../../ext/mbstring/EastAsianWidthTable.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbChrOrd.php';
+require_once __DIR__.'/../../../ext/mbstring/MbChrOrdJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MbChrOrdRuntime.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbEncodingRegistry.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbCheckEncoding.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbConvertCase.php';
