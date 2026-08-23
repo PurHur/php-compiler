@@ -592,13 +592,68 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testArrayColumnNamedParamsResolve(): void
     {
         $names = BuiltinParamNames::forFunction('array_column');
-        self::assertSame(['array', 'column_key', 'index_key'], $names);
+        self::assertSame(['array', 'column_key', 'index_key='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', 'array_column'));
         // Zend stubs use array; input is Unknown named parameter (#25592)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'input', 'array_column'));
         self::assertSame([], BuiltinParamNames::aliasesForFunction('array_column'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'column_key', 'array_column'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'index_key', 'array_column'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('array_column'));
+    }
+
+    /** @covers issue #24844 */
+    public function testArrayColumnReflectionMatchesZendStub(): void
+    {
+        $info = ['name' => 'index_key', 'type' => 'string|int|null', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('array_column', 2, $info, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'array_column', 2, $info));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+
+        self::assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('array_column'));
+        foreach ([0 => 'array', 1 => 'string|int|null', 2 => 'string|int|null'] as $index => $type) {
+            $param = BuiltinInternalArgInfo::paramInfoForFunction('array_column', $index);
+            self::assertNotNull($param, 'array_column#'.$index);
+            self::assertSame($type, $param['type'], 'array_column#'.$index);
+        }
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$rows = [['id' => 1, 'n' => 'a'], ['id' => 2, 'n' => 'b']];
+var_export(array_column(array: $rows, column_key: 'n'));
+echo "\n";
+$r = new ReflectionFunction('array_column');
+foreach ($r->getParameters() as $p) {
+    echo $p->getName(), ' opt=', (int) $p->isOptional();
+    if ($p->isDefaultValueAvailable()) {
+        echo ' def=', var_export($p->getDefaultValue(), true);
+    }
+    if ($p->hasType()) {
+        echo ' type=', $p->getType();
+    }
+    echo "\n";
+}
+echo 'ret=', $r->hasReturnType() ? $r->getReturnType() : 'NONE', "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'array_column_reflection_24844.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            <<<'OUT'
+array (
+  0 => 'a',
+  1 => 'b',
+)
+array opt=0 type=array
+column_key opt=0 type=string|int|null
+index_key opt=1 def=NULL type=string|int|null
+ret=array
+
+OUT,
+            ob_get_clean()
+        );
     }
 
     /** @covers issue #24569 */

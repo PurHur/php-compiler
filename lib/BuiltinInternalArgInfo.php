@@ -618,6 +618,8 @@ final class BuiltinInternalArgInfo
             'xml_set_unparsed_entity_decl_handler' => 'true',
             // ext/standard/array.stub.php — InternalArgInfo return empty (#25441)
             'array_sum', 'array_product' => 'int|float',
+            // ext/standard/array.stub.php — absent from InternalArgInfo (#24844)
+            'array_column' => 'array',
             // ext/standard/array.stub.php — absent from InternalArgInfo (#26111, #26182)
             'array_key_first', 'array_key_last' => 'string|int|null',
             'array_is_list' => 'bool',
@@ -1134,6 +1136,12 @@ final class BuiltinInternalArgInfo
             'array_filter' => match ($index) {
                 1 => '?callable',
                 2 => 'int',
+                default => null,
+            },
+            // ext/standard/array.stub.php — absent from InternalArgInfo (#24844)
+            'array_column' => match ($index) {
+                0 => 'array',
+                1, 2 => 'string|int|null',
                 default => null,
             },
             // ext/standard/array.stub.php — array $array; absent from InternalArgInfo (#26111, #26182)

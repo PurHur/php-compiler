@@ -2191,7 +2191,8 @@ final class BuiltinParamNames
             case 'array_rand':
                 return ['array', 'num'];
             case 'array_column':
-                return ['array', 'column_key', 'index_key'];
+                // php-src ext/standard/array.stub.php — ?string|int|null $index_key = null (#24844)
+                return ['array', 'column_key', 'index_key='];
             case 'debug_backtrace':
             case 'get_debug_backtrace':
                 return ['options', 'limit'];
