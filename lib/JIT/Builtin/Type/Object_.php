@@ -69,6 +69,14 @@ class Object_ extends Type {
 
     /** @var array<int, string> class id => canonical name */
     private array $classIdToName = [];
+    /**
+     * DECLARE_* source sites for ReflectionClass::getFileName / getStartLine / getEndLine (#34096).
+     *
+     * MODE_AOT does not run VM DECLARE_CLASS, so ClassEntry::sourceLocation is unset unless recorded here.
+     *
+     * @var array<int, \PHPCompiler\Compiler\SourceLocation>
+     */
+    private array $classSourceLocations = [];
     /** @var array<string, string> alias lc => canonical class lc (#3178) */
     private array $classAliasToOriginalLc = [];
     /** @var array<string, string> declaring class lc => parent class lc (#1858) */
@@ -1384,6 +1392,26 @@ class Object_ extends Type {
         $this->classIdToName[$id] = $name->value;
 
         return $this->classes[strtolower($name->value)] = $id;
+    }
+
+    /**
+     * Record DECLARE_CLASS/INTERFACE/TRAIT/ENUM source site for thin-AOT reflection (#34096).
+     */
+    public function setClassSourceLocation(
+        int $classId,
+        ?\PHPCompiler\Compiler\SourceLocation $loc
+    ): void {
+        if (null === $loc) {
+            unset($this->classSourceLocations[$classId]);
+
+            return;
+        }
+        $this->classSourceLocations[$classId] = $loc;
+    }
+
+    public function classSourceLocation(int $classId): ?\PHPCompiler\Compiler\SourceLocation
+    {
+        return $this->classSourceLocations[$classId] ?? null;
     }
 
     /**
