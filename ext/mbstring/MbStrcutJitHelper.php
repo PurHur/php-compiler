@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\mbstring;
 /**
  * NestedJIT helpers (#34256). php-src: ext/mbstring/mbstring.c
  *
- * Bare \substr with runtime ints works. Avoid negative sentinels / PHP_INT_MIN /
- * hasLength (NestedJIT ABI traps). length==-1 means omitted for substr.
+ * Do not copy int params into locals before compare — NestedJIT has dropped
+ * `$wantStart = $start` (treated as 0). Compare `$charIndex == $start` directly.
  */
 final class MbStrcutJitHelper
 {
@@ -51,43 +51,10 @@ final class MbSubstrJitHelper
         }
 
         $byteLen = \strlen($string);
-        $wantStart = $start;
-        if ($wantStart < 0) {
-            // Count chars first for negative start.
-            $n = 0;
-            $p = 0;
-            $g = $byteLen + 1;
-            while ($p < $byteLen && $g > 0) {
-                $g = $g - 1;
-                $b = \ord(\substr($string, $p, 1));
-                $w = 1;
-                if ($b >= 192 && $b < 224) {
-                    if ($p + 1 < $byteLen) {
-                        $w = 2;
-                    }
-                } elseif ($b >= 224 && $b < 240) {
-                    if ($p + 2 < $byteLen) {
-                        $w = 3;
-                    }
-                } elseif ($b >= 240 && $b < 248) {
-                    if ($p + 3 < $byteLen) {
-                        $w = 4;
-                    }
-                }
-                $p = $p + $w;
-                $n = $n + 1;
-            }
-            $wantStart = $n + $start;
-            if ($wantStart < 0) {
-                $wantStart = 0;
-            }
-        }
-
         $omit = 0;
         if (-1 === $length) {
             $omit = 1;
         }
-        $wantEnd = $wantStart + $length;
 
         $charIndex = 0;
         $bytePos = 0;
@@ -98,15 +65,16 @@ final class MbSubstrJitHelper
         $g = $byteLen + 1;
         while ($bytePos < $byteLen && $g > 0) {
             $g = $g - 1;
+            // Compare params directly — do not copy $start/$length into locals first.
             if (0 === $foundStart) {
-                if ($charIndex == $wantStart) {
+                if ($charIndex == $start) {
                     $sliceStart = $bytePos;
                     $foundStart = 1;
                 }
             }
             if (0 === $omit) {
                 if (0 === $foundEnd) {
-                    if ($charIndex == $wantEnd) {
+                    if ($charIndex == ($start + $length)) {
                         $sliceEnd = $bytePos;
                         $foundEnd = 1;
                     }
