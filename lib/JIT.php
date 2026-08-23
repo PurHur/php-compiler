@@ -18304,6 +18304,9 @@ class JIT {
     /**
      * Restore ClosureWithCaptures on foreach value locals when the container was a literal (#24106).
      */
+    /**
+     * Foreach iter closures: runtime index dispatch into literal build-order table (#34240).
+     */
     private function reattachForeachIterClosureInvokeMetadata(
         Block $block,
         Operand $arrayOp,
@@ -18312,43 +18315,39 @@ class JIT {
     ): void {
         $result = $this->context->getVariableFromOp($destOp);
         $this->preserveClosureInvokeMetadata($destOp, $result, $value);
-        if (null !== $result->closureCall) {
-            $destSlot = $block->slotForOperand($destOp);
-            if (null !== $destSlot) {
-                $this->context->fccClosureCallByResultSlot[$destSlot] = $result->closureCall;
-            }
-
-            return;
+        $result->closureCall = null;
+        $result->closureIsStatic = false;
+        $result->closureIsMethodFake = false;
+        $destSlot = $block->slotForOperand($destOp);
+        if (null !== $destSlot) {
+            unset($this->context->fccClosureCallByResultSlot[$destSlot]);
         }
         $arraySlot = $block->slotForOperand($arrayOp);
         if (null === $arraySlot) {
+            $result->foreachClosureProxyTable = null;
+            $result->foreachContainerSlotKey = null;
+
             return;
         }
-        $visitKey = spl_object_id($block).':'.$arraySlot;
-        $ordinal = $this->context->foreachIterClosureOrdinalByArraySlot[$visitKey] ?? 0;
-        $this->context->foreachIterClosureOrdinalByArraySlot[$visitKey] = $ordinal + 1;
-        $ordered = $this->context->closureCallOrderedByArrayResultSlot[$arraySlot] ?? [];
-        $proxy = $ordered[$ordinal] ?? null;
-        $key = $this->context->foreachPendingKeyByArraySlot[$arraySlot] ?? null;
-        unset($this->context->foreachPendingKeyByArraySlot[$arraySlot]);
-        if (null === $proxy) {
-            $map = $this->context->closureCallByArrayResultSlot[$arraySlot] ?? [];
-            $keyLabel = $this->normalizeArrayElementKeyLabel($key);
-            if (null !== $keyLabel) {
-                $proxy = $map[$keyLabel] ?? null;
-            }
-            if (null === $proxy && 1 === \count($map)) {
-                $proxy = reset($map);
-            }
-        }
-        if (null === $proxy) {
+        $table = $this->context->closureCallOrderedByArrayResultSlot[$arraySlot] ?? [];
+        if ([] === $table) {
+            $result->foreachClosureProxyTable = null;
+            $result->foreachContainerSlotKey = null;
+
             return;
         }
-        $result->closureCall = $proxy;
-        $this->preserveClosureInvokeMetadata($destOp, $result, $result);
-        $destSlot = $block->slotForOperand($destOp);
-        if (null !== $destSlot) {
-            $this->context->fccClosureCallByResultSlot[$destSlot] = $proxy;
+        $arrayVar = $this->context->getVariableFromOp($arrayOp);
+        $containerKey = $this->context->foreachSlotMapKey($arrayVar);
+        if (!isset($this->context->foreachIndexSlots[$containerKey])) {
+            throw new \LogicException(
+                'foreach closure dispatch: missing index slot for container key '.$containerKey
+            );
+        }
+        $result->foreachClosureProxyTable = $table;
+        $result->foreachContainerSlotKey = $containerKey;
+        $resolved = JIT\OperandName::resolve($destOp);
+        if (null !== $resolved && '' !== $resolved) {
+            $this->context->bindVariableByName($resolved, $result);
         }
     }
 
@@ -18399,7 +18398,18 @@ class JIT {
     /** Keep Closure invoke proxy across assigns into locals / value boxes (#24106, #23973). */
     private function preserveClosureInvokeMetadata(Operand $resultOp, Variable $result, Variable $value): void
     {
+        if (null !== $value->foreachClosureProxyTable && [] !== $value->foreachClosureProxyTable) {
+            $result->foreachClosureProxyTable = $value->foreachClosureProxyTable;
+            $result->foreachContainerSlotKey = $value->foreachContainerSlotKey;
+        }
         if (null === $value->closureCall) {
+            if (null !== $value->foreachClosureProxyTable && [] !== $value->foreachClosureProxyTable) {
+                $resolved = JIT\OperandName::resolve($resultOp);
+                if (null !== $resolved && '' !== $resolved) {
+                    $this->context->bindVariableByName($resolved, $result);
+                }
+            }
+
             return;
         }
         // FCC `$b = $obj->m(...)` is CFG-typed as array, so `$b` starts as a hashtable.
@@ -18474,6 +18484,11 @@ class JIT {
                         $var = $this->context->getVariableFromOp($destOp);
                         if (null !== $var->closureCall) {
                             return $var->closureCall;
+                        }
+                        $table = $var->foreachClosureProxyTable ?? null;
+                        $slotKey = $var->foreachContainerSlotKey ?? null;
+                        if (null !== $table && [] !== $table && is_string($slotKey) && '' !== $slotKey) {
+                            return new JIT\Call\ForeachIndexedClosureCall($var, $table, $slotKey);
                         }
                     }
                 }
@@ -20517,6 +20532,10 @@ class JIT {
         if (null !== $src->closureCall) {
             $dest->closureCall = $src->closureCall;
         }
+        if (null !== $src->foreachClosureProxyTable) {
+            $dest->foreachClosureProxyTable = $src->foreachClosureProxyTable;
+            $dest->foreachContainerSlotKey = $src->foreachContainerSlotKey;
+        }
         if ($src->closureIsStatic) {
             $dest->closureIsStatic = true;
         }
@@ -20541,6 +20560,10 @@ class JIT {
         $dest->closureCall = $src->closureCall;
         $dest->closureIsStatic = $src->closureIsStatic;
         $dest->closureIsMethodFake = $src->closureIsMethodFake;
+        if (null !== $src->foreachClosureProxyTable) {
+            $dest->foreachClosureProxyTable = $src->foreachClosureProxyTable;
+            $dest->foreachContainerSlotKey = $src->foreachContainerSlotKey;
+        }
         $dest->generatorStatePtr = $src->generatorStatePtr;
         $dest->generatorResumeName = $src->generatorResumeName;
         $dest->isJitGenerator = $src->isJitGenerator;
