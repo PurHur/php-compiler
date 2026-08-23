@@ -110,17 +110,17 @@ final class ReflectionSetup
      */
     public static function reflectionMethodClassAndMethodAsCstr(Context $context, Value $obj): array
     {
-        [$classCstr, $classLen] = self::stringPropertyAsCstr(
-            $context,
-            $obj,
-            'ReflectionMethod',
-            ReflectionSupport::PROP_REFLECTION_METHOD_CLASS
-        );
         [$methodCstr, $methodLen] = self::stringPropertyAsCstr(
             $context,
             $obj,
             'ReflectionMethod',
             ReflectionSupport::PROP_REFLECTION_METHOD_FUNC
+        );
+        [$classCstr, $classLen] = self::stringPropertyAsCstr(
+            $context,
+            $obj,
+            'ReflectionMethod',
+            ReflectionSupport::PROP_REFLECTION_METHOD_CLASS
         );
 
         return [$classCstr, $classLen, $methodCstr, $methodLen];
@@ -166,6 +166,27 @@ final class ReflectionSetup
             Variable::TYPE_NATIVE_LONG,
             Variable::KIND_VALUE,
             $context->constantFromInteger($value)
+        );
+        $slot = $context->type->object->propertySlotFor($obj, $className, $propName);
+        $context->type->object->propertyStore($slot, $longVar, Variable::TYPE_NATIVE_LONG);
+    }
+
+    public static function emitSetLongPropertyFromValue(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $propName,
+        Value $longVal
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $coerced = 'int64' === $context->getStringFromType($longVal->typeOf())
+            ? $longVal
+            : $context->builder->zExt($longVal, $i64);
+        $longVar = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $coerced
         );
         $slot = $context->type->object->propertySlotFor($obj, $className, $propName);
         $context->type->object->propertyStore($slot, $longVar, Variable::TYPE_NATIVE_LONG);
@@ -256,6 +277,52 @@ final class ReflectionSetup
         $lenSafe = $context->builder->select($isNull, $sizeT->constInt(0, false), $context->builder->zExt($len, $sizeT));
 
         return [$safe, $lenSafe];
+    }
+
+    /**
+     * @return array{0: Value, 1: Value} cstr pointer and byte length (size_t)
+     */
+    public static function stringObjectAsCstr(Context $context, Value $strPtr): array
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $raw = $context->builder->pointerCast($strPtr, $i8p);
+        $lenPtr = $context->builder->pointerCast(
+            $context->builder->gep($raw, $context->constantFromInteger(8, 'size_t')),
+            $context->getTypeFromString('int64*')
+        );
+        $len = $context->builder->load($lenPtr);
+        $data = $context->builder->gep($raw, $context->constantFromInteger(16, 'size_t'));
+        $sizeT = $context->getTypeFromString('size_t');
+        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $data, $data->typeOf()->constNull());
+        $safe = $context->builder->select($isNull, $empty, $context->builder->pointerCast($data, $i8p));
+        $lenSafe = $context->builder->select($isNull, $sizeT->constInt(0, false), $context->builder->zExt($len, $sizeT));
+
+        return [$safe, $lenSafe];
+    }
+
+    public static function lookupReflectionMethodFlags(Context $context, Value $obj): Value
+    {
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_refl_method_flags_obj'),
+            $obj
+        );
+    }
+
+    public static function lookupReflectionMethodParamCount(Context $context, Value $obj): Value
+    {
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_refl_method_param_count_obj'),
+            $obj
+        );
+    }
+
+    public static function lookupReflectionMethodRequiredParamCount(Context $context, Value $obj): Value
+    {
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_refl_method_required_param_count_obj'),
+            $obj
+        );
     }
 
     /**

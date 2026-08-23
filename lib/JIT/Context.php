@@ -1866,10 +1866,9 @@ class Context {
         );
         $this->functionProxies['reflectionmethod::setaccessible'] = new Call\ReflectionSetAccessible('ReflectionMethod');
         $this->functionProxies['reflectionmethod::invoke'] = new Call\ReflectionMethodInvoke();
-        // Thin AOT: unbound isPublic/isStatic → NULL (#34216); VM #7116 / peer kind tables #34067.
-        $this->functionProxies['reflectionmethod::ispublic'] = new Call\ReflectionMethodVisibilityQuery('isPublic');
-        $this->functionProxies['reflectionmethod::isstatic'] = new Call\ReflectionMethodVisibilityQuery('isStatic');
-        // Thin AOT: unbound getNumberOfParameters/getNumberOfRequiredParameters → NULL (#34216).
+        // Thin AOT: unbound isPublic/isStatic/param counts → NULL (#34216).
+        $this->functionProxies['reflectionmethod::ispublic'] = new Call\ReflectionMethodIsPublic();
+        $this->functionProxies['reflectionmethod::isstatic'] = new Call\ReflectionMethodIsStatic();
         $this->functionProxies['reflectionmethod::getnumberofparameters'] = new Call\ReflectionMethodGetNumberOfParameters();
         $this->functionProxies['reflectionmethod::getnumberofrequiredparameters'] = new Call\ReflectionMethodGetNumberOfRequiredParameters();
         $this->functionProxies['reflectionclassconstant::__construct'] = new Call\ReflectionClassConstantConstruct();

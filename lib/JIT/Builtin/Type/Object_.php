@@ -30,6 +30,7 @@ use PHPCompiler\JIT\EnumFromHelper;
 use PHPCompiler\JIT\FiberHelper;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
+use PHPCompiler\JIT\Builtin\ReflectionMethodQueryConstructHelper;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNativeString;
@@ -3777,6 +3778,14 @@ class Object_ extends Type {
             // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #33990).
             $this->defineProperty($id, 'class', Variable::TYPE_VALUE);
             $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
+            // Stamped at __construct for thin AOT query proxies (#34216).
+            $this->defineProperty($id, ReflectionMethodQueryConstructHelper::PROP_COMPILER_METHOD_FLAGS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, ReflectionMethodQueryConstructHelper::PROP_COMPILER_METHOD_PARAM_COUNT, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty(
+                $id,
+                ReflectionMethodQueryConstructHelper::PROP_COMPILER_METHOD_REQUIRED_PARAM_COUNT,
+                Variable::TYPE_NATIVE_LONG
+            );
             // Thin user-script AOT must call __construct (not allocate-only) (#33990).
             $this->markHasConstructor($id);
         }

@@ -2215,6 +2215,26 @@ class JIT {
     }
 
     /**
+     * Required parameter count for ReflectionMethod AOT metadata (#34216).
+     */
+    private static function requiredParameterCountFromBlock(Block $block): int
+    {
+        $required = 0;
+        $paramNames = array_values($block->paramNames);
+        for ($i = 0, $n = \count($paramNames); $i < $n; ++$i) {
+            if (null !== $block->variadicParamIndex && (int) $block->variadicParamIndex === $i) {
+                break;
+            }
+            if (VM\ParamArgumentCountError::parameterHasDefault($block, $i)) {
+                break;
+            }
+            ++$required;
+        }
+
+        return $required;
+    }
+
+    /**
      * FUNCDEF/DECLARE_METHOD use short names; self-host skip/M3 gates need scoped names (#1402).
      */
     private function jitFunctionSkipName(?string $name, Block $block): string
@@ -16995,6 +17015,13 @@ class JIT {
                                 $methodBlock
                             );
                             break;
+                        }
+                        if (!str_starts_with(strtolower(ltrim($displayClass, '\\')), 'phpcompiler\\')) {
+                            JIT\Builtin\ReflectionMethodQueryLowering::recordUserMethodFromBlock(
+                                $displayClass,
+                                $methodLc,
+                                $methodBlock
+                            );
                         }
                         $this->compileBlock($methodBlock, $funcName);
                     }

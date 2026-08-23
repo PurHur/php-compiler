@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\Builtin\ReflectionMethodQueryConstructHelper;
 use PHPCompiler\JIT\Builtin\ReflectionNative;
 use PHPCompiler\JIT\Builtin\ReflectionRuntime;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
@@ -50,6 +51,7 @@ final class ReflectionMethodConstruct implements Call
             ReflectionSupport::PROP_REFLECTION_METHOD_FUNC,
             $args[2]
         );
+        ReflectionMethodQueryConstructHelper::emitStoreQueryMetadata($context, $obj, $args[1], $args[2]);
         ReflectionSetup::markConstructed($context, $obj);
 
         $slot = JitValueBox::alloc($context);
