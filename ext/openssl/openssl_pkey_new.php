@@ -18,8 +18,7 @@ use PHPLLVM\Value;
  *
  * Reflection / named-arg param is Zend stub `options` (not InternalArgInfo `configargs`; #24491).
  *
- * JIT/AOT leftover #33530: catchable argc/TypeError paths (peer openssl_csr_new #33527).
- * Happy-path key generation still needs object AOT (#6295 follow-up).
+ * JIT/AOT: argc/TypeError paths (#33530); happy-path NestedJIT + OpenSSLAsymmetricKey (#34015).
  */
 final class openssl_pkey_new extends Internal
 {
@@ -77,11 +76,17 @@ final class openssl_pkey_new extends Internal
             }
         }
 
-        // Key objects stay VM-shaped (#6295). Clear LogicException on TypeError/argc
-        // gates first (#33530); happy-path bake is a follow-up.
-        throw new \LogicException(
-            'openssl_pkey_new() is not implemented for JIT in this compiler build (issue #6295/#22335/#33530)'
-        );
+        $options = 1 === $argc ? $args[0] : null;
+        $folded = JitOpensslPkeyNew::foldCompileTimeOptions($options);
+        if (null === $folded) {
+            // Runtime/non-foldable options arrays still need full Hashtable lowering (#34015 follow-up).
+            throw new \LogicException(
+                'openssl_pkey_new() options must be compile-time null/?array for JIT/AOT in this '
+                .'compiler build (issue #34015)'
+            );
+        }
+
+        return JitOpensslPkeyNew::generate($context, $folded[0], $folded[1], $folded[2]);
     }
 
     /**
@@ -106,7 +111,8 @@ final class openssl_pkey_new extends Internal
             JITVariable::TYPE_OBJECT => (null !== $arg->classUserType && '' !== $arg->classUserType)
                 ? $arg->classUserType
                 : 'object',
-            default => 'mixed',
+            // Unknown / value-box may still be a runtime array — defer to happy-path fold (#34015).
+            default => null,
         };
     }
 

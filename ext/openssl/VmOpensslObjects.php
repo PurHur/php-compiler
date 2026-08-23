@@ -133,6 +133,9 @@ final class VmOpensslObjects
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         self::$keyStore[$entry->id] = $pem;
+        // Mirror PEM on the object for thin AOT consumers (#34015 peer HashContext props).
+        $pemVar = $entry->allocateProperty(OpensslPkeyNewJitSupport::PROP_PEM);
+        $pemVar->string($pem);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
 
@@ -156,7 +159,18 @@ final class VmOpensslObjects
 
     public static function keyPem(\PHPCompiler\VM\ObjectEntry $entry): string
     {
-        return self::$keyStore[$entry->id] ?? '';
+        if (isset(self::$keyStore[$entry->id])) {
+            return self::$keyStore[$entry->id];
+        }
+        // AOT-allocated keys store PEM on __osslPem (#34015).
+        if ($entry->hasProperty(OpensslPkeyNewJitSupport::PROP_PEM)) {
+            $prop = $entry->getProperty(OpensslPkeyNewJitSupport::PROP_PEM)->resolveIndirect();
+            if (Variable::TYPE_STRING === $prop->type) {
+                return $prop->toString();
+            }
+        }
+
+        return '';
     }
 
     public static function csrPem(ObjectEntry $entry): string
