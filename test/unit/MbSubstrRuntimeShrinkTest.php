@@ -19,7 +19,8 @@ final class MbSubstrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('function substrArgv', $helper);
         $this->assertStringContainsString('function strcutArgv', $helper);
         $this->assertStringNotContainsString('VmMbstring::', $helper);
-        // NestedJIT: length must be a temp, not `$sliceEnd - $sliceStart` inline (#34256).
+        $this->assertStringNotContainsString('PHP_INT_MIN', $helper);
+        $this->assertStringNotContainsString('private static function', $helper);
         $this->assertStringContainsString('$n = $sliceEnd - $sliceStart', $helper);
         $this->assertStringContainsString('$endAt = $start + $length', $helper);
     }
@@ -30,7 +31,6 @@ final class MbSubstrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('strcutArgv', $source);
         $this->assertStringContainsString('substrArgv', $source);
-        // Both *Argv symbols listed so NestedJIT emits private utf8Width (#34256).
         $this->assertStringContainsString('STRCUT_LOGICAL', $source);
         $this->assertStringContainsString('SUBSTR_LOGICAL', $source);
     }
