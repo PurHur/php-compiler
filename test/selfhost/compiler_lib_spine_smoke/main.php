@@ -6368,6 +6368,8 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetMethods.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetMethodsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetProperties.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetPropertiesRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetStaticProperties.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetStaticPropertiesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassHasMember.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassGetConstructor.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassRelationQuery.php';
