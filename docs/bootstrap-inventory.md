@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7766 |
-| Phase A inventory files (M2 ratio SSOT) | 7766 |
+| PHP files on vm.php path | 7777 |
+| Phase A inventory files (M2 ratio SSOT) | 7777 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 24838 |
+| Source constructs flagged (warnings) | 24864 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5910,11 +5910,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/RecursiveLeavesFlattenRuntime.php` | 0 | 7 |
 | `lib/JIT/Builtin/RecursiveTreeIteratorBuildRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
+| `lib/JIT/Builtin/ReflectionClassGetConstructorRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/ReflectionClassGetModifiersRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ReflectionClassGetParentClassRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ReflectionClassHasMemberRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ReflectionClassIsCloneableRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ReflectionClassIsFinalRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ReflectionClassIsInstantiableRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ReflectionClassIsIterateableRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ReflectionClassKindNameTableRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/ReflectionClassRelationQueryRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ReflectionEnumJitHelper.php` | 0 | 7 |
 | `lib/JIT/Builtin/ReflectionFunctionVariadicLookupRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ReflectionFunctionVariadicLowering.php` | 0 | 1 |
@@ -6578,12 +6583,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ReflectionClassCreateLazyGhost.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassCreateLazyProxy.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassGetAttributes.php` | 0 | 3 |
+| `lib/JIT/Call/ReflectionClassGetConstructor.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassGetMethod.php` | 0 | 1 |
+| `lib/JIT/Call/ReflectionClassGetModifiers.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassGetName.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassGetNamespaceName.php` | 0 | 1 |
+| `lib/JIT/Call/ReflectionClassGetParentClass.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassGetProperty.php` | 0 | 2 |
 | `lib/JIT/Call/ReflectionClassGetReflectionConstant.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassGetShortName.php` | 0 | 1 |
+| `lib/JIT/Call/ReflectionClassHasMember.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassInNamespace.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassIsAnonymous.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassIsCloneable.php` | 0 | 1 |
@@ -6591,8 +6600,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ReflectionClassIsInstantiable.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassIsIterateable.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassKindQuery.php` | 0 | 1 |
+| `lib/JIT/Call/ReflectionClassNewInstanceWithoutConstructor.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassNewLazyGhost.php` | 0 | 2 |
 | `lib/JIT/Call/ReflectionClassNewLazyProxy.php` | 0 | 2 |
+| `lib/JIT/Call/ReflectionClassRelationQuery.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionConstantConstruct.php` | 0 | 3 |
 | `lib/JIT/Call/ReflectionConstantGetAttributes.php` | 0 | 2 |
 | `lib/JIT/Call/ReflectionConstantGetName.php` | 0 | 1 |
@@ -6704,7 +6715,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 273 |
+| `lib/JIT/Context.php` | 0 | 285 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -51112,6 +51123,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 11 class method(s)
 
+### `lib/JIT/Builtin/ReflectionClassGetConstructorRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+- 2 closure(s)
+
+### `lib/JIT/Builtin/ReflectionClassGetModifiersRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
+### `lib/JIT/Builtin/ReflectionClassGetParentClassRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/ReflectionClassHasMemberRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+- 2 closure(s)
+
 ### `lib/JIT/Builtin/ReflectionClassIsCloneableRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -51141,6 +51174,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/ReflectionClassRelationQueryRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+- 2 closure(s)
 
 ### `lib/JIT/Builtin/ReflectionEnumJitHelper.php`
 
@@ -53125,36 +53164,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 606)
-- new Variable (line 1033)
-- new Variable (line 1072)
-- new Variable (line 1106)
-- new Variable (line 2170)
-- new Variable (line 2616)
-- new Variable (line 2681)
-- new Variable (line 2702)
-- new Variable (line 2714)
-- new Variable (line 2727)
-- new Variable (line 2937)
-- new VMVariable (line 4760)
-- new VMVariable (line 4780)
-- new VMVariable (line 4790)
-- new VMVariable (line 4810)
-- new VMVariable (line 6064)
-- new ReflectionClassConstant (line 6797)
-- new Variable (line 7220)
-- new Variable (line 7246)
-- new Variable (line 7254)
-- new Variable (line 7277)
-- new Variable (line 7303)
-- new Variable (line 7311)
+- new Variable (line 1093)
+- new Variable (line 1132)
+- new Variable (line 1166)
+- new Variable (line 2244)
+- new Variable (line 2690)
+- new Variable (line 2755)
+- new Variable (line 2776)
+- new Variable (line 2788)
+- new Variable (line 2801)
+- new Variable (line 3011)
+- new VMVariable (line 4834)
+- new VMVariable (line 4854)
+- new VMVariable (line 4864)
+- new VMVariable (line 4884)
+- new VMVariable (line 6138)
+- new ReflectionClassConstant (line 6871)
+- new Variable (line 7294)
+- new Variable (line 7320)
+- new Variable (line 7328)
+- new Variable (line 7351)
+- new Variable (line 7377)
 - new Variable (line 7385)
-- new Literal (line 7402)
-- new Literal (line 7407)
-- new Literal (line 7412)
-- new Variable (line 7423)
-- new Variable (line 7456)
-- new Variable (line 7479)
-- new Variable (line 8005)
+- new Variable (line 7459)
+- new Literal (line 7476)
+- new Literal (line 7481)
+- new Literal (line 7486)
+- new Variable (line 7497)
+- new Variable (line 7530)
+- new Variable (line 7553)
+- new Variable (line 8079)
 - 317 class method(s)
 - 8 closure(s)
 
@@ -54641,7 +54680,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 101)
 - 1 class method(s)
 
+### `lib/JIT/Call/ReflectionClassGetConstructor.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/ReflectionClassGetMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/ReflectionClassGetModifiers.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -54652,6 +54701,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Call/ReflectionClassGetNamespaceName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/ReflectionClassGetParentClass.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -54668,6 +54722,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Call/ReflectionClassGetShortName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/ReflectionClassHasMember.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -54707,6 +54766,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/ReflectionClassNewInstanceWithoutConstructor.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/ReflectionClassNewLazyGhost.php`
 
 **Warnings** (review for bootstrap subset):
@@ -54718,6 +54782,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
 - 4 class method(s)
+
+### `lib/JIT/Call/ReflectionClassRelationQuery.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Call/ReflectionConstantConstruct.php`
 
@@ -55458,181 +55527,193 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionClassInNamespace (line 1741)
 - new Call\ReflectionClassGetAttributes (line 1742)
 - new Call\ReflectionClassGetMethod (line 1744)
-- new Call\ReflectionClassGetProperty (line 1745)
-- new Call\ReflectionClassGetReflectionConstant (line 1746)
-- new Call\ReflectionClassIsFinal (line 1748)
-- new Call\ReflectionClassIsInstantiable (line 1750)
-- new Call\ReflectionClassIsCloneable (line 1752)
-- new Call\ReflectionClassIsAnonymous (line 1754)
-- new Call\ReflectionClassKindQuery (line 1756)
-- new Call\ReflectionClassKindQuery (line 1757)
-- new Call\ReflectionClassKindQuery (line 1758)
-- new Call\ReflectionClassKindQuery (line 1759)
-- new Call\ReflectionClassIsIterateable (line 1761)
-- new Call\ReflectionClassIsIterateable (line 1762)
-- new Call\ReflectionClassNewLazyProxy (line 1764)
-- new Call\ReflectionClassNewLazyGhost (line 1765)
-- new Call\ReflectionPropertyConstruct (line 1768)
-- new Call\ReflectionPropertyGetName (line 1769)
-- new Call\ReflectionParameterConstruct (line 1770)
-- new Call\ReflectionParameterGetName (line 1771)
-- new Call\ReflectionPropertyGetAttributes (line 1772)
-- new Call\ReflectionPropertyIsFinal (line 1774)
-- new Call\ReflectionPropertyIsVirtual (line 1775)
-- new Call\ReflectionPropertyGetRawValue (line 1776)
-- new Call\ReflectionPropertySetRawValue (line 1777)
-- new Call\ReflectionSetAccessible (line 1779)
-- new Call\ReflectionPropertyGetValue (line 1780)
-- new Call\ReflectionPropertySetValue (line 1781)
-- new Call\ReflectionGetDeclaringClass (line 1783)
-- new Call\ReflectionMethodConstruct (line 1789)
-- new Call\ReflectionMethodGetName (line 1791)
-- new Call\ReflectionGetDeclaringClass (line 1793)
+- new Call\ReflectionClassGetConstructor (line 1746)
+- new Call\ReflectionClassGetProperty (line 1747)
+- new Call\ReflectionClassGetReflectionConstant (line 1748)
+- new Call\ReflectionClassHasMember (line 1750)
+- new Call\ReflectionClassHasMember (line 1751)
+- new Call\ReflectionClassHasMember (line 1752)
+- new Call\ReflectionClassRelationQuery (line 1754)
+- new Call\ReflectionClassRelationQuery (line 1755)
+- new Call\ReflectionClassIsFinal (line 1757)
+- new Call\ReflectionClassIsInstantiable (line 1759)
+- new Call\ReflectionClassIsCloneable (line 1761)
+- new Call\ReflectionClassIsAnonymous (line 1763)
+- new Call\ReflectionClassKindQuery (line 1765)
+- new Call\ReflectionClassKindQuery (line 1766)
+- new Call\ReflectionClassKindQuery (line 1767)
+- new Call\ReflectionClassKindQuery (line 1768)
+- new Call\ReflectionClassKindQuery (line 1770)
+- new Call\ReflectionClassKindQuery (line 1771)
+- new Call\ReflectionClassKindQuery (line 1772)
+- new Call\ReflectionClassIsIterateable (line 1774)
+- new Call\ReflectionClassIsIterateable (line 1775)
+- new Call\ReflectionClassGetParentClass (line 1777)
+- new Call\ReflectionClassGetModifiers (line 1779)
+- new Call\ReflectionClassNewInstanceWithoutConstructor (line 1781)
+- new Call\ReflectionClassNewLazyProxy (line 1783)
+- new Call\ReflectionClassNewLazyGhost (line 1784)
+- new Call\ReflectionPropertyConstruct (line 1787)
+- new Call\ReflectionPropertyGetName (line 1788)
+- new Call\ReflectionParameterConstruct (line 1789)
+- new Call\ReflectionParameterGetName (line 1790)
+- new Call\ReflectionPropertyGetAttributes (line 1791)
+- new Call\ReflectionPropertyIsFinal (line 1793)
+- new Call\ReflectionPropertyIsVirtual (line 1794)
+- new Call\ReflectionPropertyGetRawValue (line 1795)
+- new Call\ReflectionPropertySetRawValue (line 1796)
 - new Call\ReflectionSetAccessible (line 1798)
-- new Call\ReflectionMethodInvoke (line 1799)
-- new Call\ReflectionClassConstantConstruct (line 1800)
-- new Call\ReflectionClassConstantGetName (line 1801)
-- new Call\ReflectionPropertyGetMangledName (line 1803)
-- new Call\ReflectionConstantConstruct (line 1806)
-- new Call\ReflectionConstantGetName (line 1807)
-- new Call\ReflectionConstantGetValue (line 1808)
-- new Call\ReflectionConstantGetAttributes (line 1811)
-- new Call\ReflectionClassConstantGetAttributes (line 1814)
-- new Call\ReflectionMethodGetAttributes (line 1815)
-- new Call\ReflectionFunctionConstruct (line 1816)
-- new Call\ReflectionFunctionGetName (line 1817)
-- new Call\ReflectionExtensionConstruct (line 1819)
-- new Call\ReflectionExtensionGetName (line 1820)
-- new Call\ReflectionExtensionGetVersion (line 1822)
-- new Call\ReflectionFunctionIsVariadic (line 1824)
-- new Call\ReflectionParameterIsSensitiveParameter (line 1826)
-- new Call\ReflectionFunctionGetNamedArguments (line 1829)
-- new Call\ReflectionMethodGetNamedArguments (line 1830)
-- new Call\ReflectionAttributeGetName (line 1832)
-- new Call\ReflectionAttributeGetTarget (line 1833)
-- new Call\ReflectionAttributeNewInstance (line 1834)
-- new Call\ReflectionEnumConstruct (line 1835)
-- new Call\ReflectionEnumGetName (line 1836)
-- new Call\ReflectionEnumHasCase (line 1837)
-- new Call\ReflectionEnumGetCase (line 1838)
-- new Call\ReflectionEnumGetCases (line 1839)
-- new Call\ReflectionEnumIsBacked (line 1840)
-- new Call\ReflectionEnumGetBackingType (line 1841)
-- new Call\ReflectionEnumUnitCaseGetName (line 1842)
-- new Call\ReflectionEnumUnitCaseGetName (line 1843)
-- new Call\ReflectionEnumUnitCaseGetValue (line 1844)
-- new Call\ReflectionNamedTypeGetName (line 1847)
-- new Call\ExceptionGetMessage (line 1848)
-- new Call\ExceptionGetCode (line 1849)
-- new Call\ExceptionToString (line 1850)
-- new Call\ExceptionGetTrace (line 1851)
-- new Call\ExceptionGetTraceAsString (line 1852)
-- new Call\ExceptionGetFile (line 1853)
-- new Call\ExceptionGetLine (line 1854)
-- new Call\ExceptionGetPrevious (line 1855)
-- new Call\ExceptionConstruct (line 1879)
-- new Call\ExceptionGetTrace (line 1891)
-- new Call\ExceptionGetTraceAsString (line 1894)
-- new Call\ExceptionGetMessage (line 1897)
-- new Call\ExceptionGetCode (line 1900)
-- new Call\ExceptionGetFile (line 1903)
-- new Call\ExceptionGetLine (line 1906)
-- new Call\ExceptionGetPrevious (line 1909)
-- new Call\ExceptionGetMessage (line 1913)
-- new Call\ExceptionGetCode (line 1914)
-- new Call\ExceptionGetTrace (line 1916)
-- new Call\ExceptionGetTraceAsString (line 1917)
-- new Call\ExceptionGetFile (line 1918)
-- new Call\ExceptionGetLine (line 1919)
-- new Call\ExceptionGetPrevious (line 1920)
-- new Call\DateTimeConstruct (line 1926)
-- new Call\DateTimeImmutableConstruct (line 1927)
-- new Call\DomDocumentConstruct (line 1929)
-- new Call\DateTimeZoneConstruct (line 1930)
-- new Call\DateIntervalConstruct (line 1931)
-- new Call\DateIntervalFormat (line 1932)
-- new Call\DatePeriodConstruct (line 1933)
-- new Call\DatePeriodCreateFromISO8601String (line 1935)
-- new Call\DatePeriodIteratorMethod (line 1937)
-- new Call\DatePeriodAccessorMethod (line 1942)
-- new Call\DateTimeFormat (line 1944)
-- new Call\DateTimeFormat (line 1945)
-- new Call\DateTimeCreateFromFormat (line 1947)
-- new Call\DateTimeCreateFromFormat (line 1948)
-- new Call\DateTimeCreateFromInterface (line 1950)
-- new Call\DateTimeCreateFromInterface (line 1951)
-- new Call\DateTimeCreateFromImmutable (line 1952)
-- new Call\DateTimeImmutableCreateFromMutable (line 1953)
-- new Call\DateTimeCreateFromTimestamp (line 1956)
-- new Call\DateTimeCreateFromTimestamp (line 1957)
-- new Call\DateTimeGetMicrosecond (line 1961)
-- new Call\DateTimeGetMicrosecond (line 1962)
-- new Call\DateTimeSetMicrosecond (line 1963)
-- new Call\DateTimeSetMicrosecond (line 1964)
-- new Call\DateIntervalCreateFromDateString (line 1967)
-- new Call\DateTimeSetTimezone (line 1969)
-- new Call\DateTimeGetTimezone (line 1970)
-- new Call\DateTimeGetTimezone (line 1971)
-- new Call\DateTimeGetOffset (line 1974)
-- new Call\DateTimeGetOffset (line 1975)
-- new Call\DateTimeSetTimezone (line 1981)
-- new Call\DateTimeGetTimestamp (line 1985)
-- new Call\DateTimeGetTimestamp (line 1986)
-- new Call\DateTimeSetTimestamp (line 1987)
-- new Call\DateTimeSetTimestamp (line 1989)
-- new Call\DateTimeSetDate (line 1992)
-- new Call\DateTimeSetDate (line 1993)
-- new Call\DateTimeSetTime (line 1994)
-- new Call\DateTimeSetTime (line 1995)
-- new Call\DateTimeSetISODate (line 1996)
-- new Call\DateTimeSetISODate (line 1997)
-- new Call\DateTimeGetLastErrors (line 1999)
-- new Call\DateTimeGetLastErrors (line 2000)
-- new Call\DateTimeModify (line 2003)
-- new Call\DateTimeModify (line 2004)
-- new Call\DateTimeAdd (line 2007)
-- new Call\DateTimeAdd (line 2008)
-- new Call\DateTimeSub (line 2009)
-- new Call\DateTimeSub (line 2010)
-- new Call\DateTimeDiff (line 2012)
-- new Call\DateTimeDiff (line 2013)
-- new Call\DateTimeZoneGetTransitions (line 2015)
-- new Call\DateTimeZoneGetName (line 2017)
-- new Call\DateTimeZoneGetLocation (line 2019)
-- new Call\DateTimeZoneGetOffset (line 2021)
-- new Call\DateTimeZoneListIdentifiers (line 2023)
-- new Call\DateTimeZoneListAbbreviations (line 2025)
-- new Call\NumberFormatterCreate (line 2037)
-- new Call\NumberFormatterFormat (line 2038)
-- new Call\IntlDateFormatterCreate (line 2040)
-- new Call\IntlDateFormatterFormat (line 2041)
-- new Call\CollatorCompare (line 2043)
-- new Call\NormalizerNormalize (line 2045)
-- new Call\MessageFormatterConstruct (line 2047)
-- new Call\MessageFormatterFormat (line 2048)
-- new Call\TransliteratorCreate (line 2050)
-- new Call\TransliteratorTransliterate (line 2051)
-- new Call\FinfoConstruct (line 2053)
-- new Call\FinfoFile (line 2054)
-- new Call\FinfoBuffer (line 2055)
-- new Call\PdoConstruct (line 2057)
-- new Call\PdoGetAvailableDrivers (line 2058)
-- new Call\PdoQuote (line 2059)
-- new Call\DomXmlDocumentCreateFromString (line 2062)
-- new Call\DomHtmlDocumentCreateFromString (line 2063)
-- new Result (line 2451)
-- new Result (line 2473)
-- new Variable (line 3197)
-- new Variable (line 3435)
-- new Variable (line 3719)
-- new Variable (line 3802)
-- new VMVariable (line 3964)
-- new VMVariable (line 3980)
-- new VMVariable (line 3986)
-- new VMVariable (line 3992)
-- new VMVariable (line 4003)
-- new Variable (line 4033)
-- new Variable (line 4078)
+- new Call\ReflectionPropertyGetValue (line 1799)
+- new Call\ReflectionPropertySetValue (line 1800)
+- new Call\ReflectionGetDeclaringClass (line 1802)
+- new Call\ReflectionMethodConstruct (line 1808)
+- new Call\ReflectionMethodGetName (line 1810)
+- new Call\ReflectionGetDeclaringClass (line 1812)
+- new Call\ReflectionSetAccessible (line 1817)
+- new Call\ReflectionMethodInvoke (line 1818)
+- new Call\ReflectionClassConstantConstruct (line 1819)
+- new Call\ReflectionClassConstantGetName (line 1820)
+- new Call\ReflectionPropertyGetMangledName (line 1822)
+- new Call\ReflectionConstantConstruct (line 1825)
+- new Call\ReflectionConstantGetName (line 1826)
+- new Call\ReflectionConstantGetValue (line 1827)
+- new Call\ReflectionConstantGetAttributes (line 1830)
+- new Call\ReflectionClassConstantGetAttributes (line 1833)
+- new Call\ReflectionMethodGetAttributes (line 1834)
+- new Call\ReflectionFunctionConstruct (line 1835)
+- new Call\ReflectionFunctionGetName (line 1836)
+- new Call\ReflectionExtensionConstruct (line 1838)
+- new Call\ReflectionExtensionGetName (line 1839)
+- new Call\ReflectionExtensionGetVersion (line 1841)
+- new Call\ReflectionFunctionIsVariadic (line 1843)
+- new Call\ReflectionParameterIsSensitiveParameter (line 1845)
+- new Call\ReflectionFunctionGetNamedArguments (line 1848)
+- new Call\ReflectionMethodGetNamedArguments (line 1849)
+- new Call\ReflectionAttributeGetName (line 1851)
+- new Call\ReflectionAttributeGetTarget (line 1852)
+- new Call\ReflectionAttributeNewInstance (line 1853)
+- new Call\ReflectionEnumConstruct (line 1854)
+- new Call\ReflectionEnumGetName (line 1855)
+- new Call\ReflectionEnumHasCase (line 1856)
+- new Call\ReflectionEnumGetCase (line 1857)
+- new Call\ReflectionEnumGetCases (line 1858)
+- new Call\ReflectionEnumIsBacked (line 1859)
+- new Call\ReflectionEnumGetBackingType (line 1860)
+- new Call\ReflectionEnumUnitCaseGetName (line 1861)
+- new Call\ReflectionEnumUnitCaseGetName (line 1862)
+- new Call\ReflectionEnumUnitCaseGetValue (line 1863)
+- new Call\ReflectionNamedTypeGetName (line 1866)
+- new Call\ExceptionGetMessage (line 1867)
+- new Call\ExceptionGetCode (line 1868)
+- new Call\ExceptionToString (line 1869)
+- new Call\ExceptionGetTrace (line 1870)
+- new Call\ExceptionGetTraceAsString (line 1871)
+- new Call\ExceptionGetFile (line 1872)
+- new Call\ExceptionGetLine (line 1873)
+- new Call\ExceptionGetPrevious (line 1874)
+- new Call\ExceptionConstruct (line 1898)
+- new Call\ExceptionGetTrace (line 1910)
+- new Call\ExceptionGetTraceAsString (line 1913)
+- new Call\ExceptionGetMessage (line 1916)
+- new Call\ExceptionGetCode (line 1919)
+- new Call\ExceptionGetFile (line 1922)
+- new Call\ExceptionGetLine (line 1925)
+- new Call\ExceptionGetPrevious (line 1928)
+- new Call\ExceptionGetMessage (line 1932)
+- new Call\ExceptionGetCode (line 1933)
+- new Call\ExceptionGetTrace (line 1935)
+- new Call\ExceptionGetTraceAsString (line 1936)
+- new Call\ExceptionGetFile (line 1937)
+- new Call\ExceptionGetLine (line 1938)
+- new Call\ExceptionGetPrevious (line 1939)
+- new Call\DateTimeConstruct (line 1945)
+- new Call\DateTimeImmutableConstruct (line 1946)
+- new Call\DomDocumentConstruct (line 1948)
+- new Call\DateTimeZoneConstruct (line 1949)
+- new Call\DateIntervalConstruct (line 1950)
+- new Call\DateIntervalFormat (line 1951)
+- new Call\DatePeriodConstruct (line 1952)
+- new Call\DatePeriodCreateFromISO8601String (line 1954)
+- new Call\DatePeriodIteratorMethod (line 1956)
+- new Call\DatePeriodAccessorMethod (line 1961)
+- new Call\DateTimeFormat (line 1963)
+- new Call\DateTimeFormat (line 1964)
+- new Call\DateTimeCreateFromFormat (line 1966)
+- new Call\DateTimeCreateFromFormat (line 1967)
+- new Call\DateTimeCreateFromInterface (line 1969)
+- new Call\DateTimeCreateFromInterface (line 1970)
+- new Call\DateTimeCreateFromImmutable (line 1971)
+- new Call\DateTimeImmutableCreateFromMutable (line 1972)
+- new Call\DateTimeCreateFromTimestamp (line 1975)
+- new Call\DateTimeCreateFromTimestamp (line 1976)
+- new Call\DateTimeGetMicrosecond (line 1980)
+- new Call\DateTimeGetMicrosecond (line 1981)
+- new Call\DateTimeSetMicrosecond (line 1982)
+- new Call\DateTimeSetMicrosecond (line 1983)
+- new Call\DateIntervalCreateFromDateString (line 1986)
+- new Call\DateTimeSetTimezone (line 1988)
+- new Call\DateTimeGetTimezone (line 1989)
+- new Call\DateTimeGetTimezone (line 1990)
+- new Call\DateTimeGetOffset (line 1993)
+- new Call\DateTimeGetOffset (line 1994)
+- new Call\DateTimeSetTimezone (line 2000)
+- new Call\DateTimeGetTimestamp (line 2004)
+- new Call\DateTimeGetTimestamp (line 2005)
+- new Call\DateTimeSetTimestamp (line 2006)
+- new Call\DateTimeSetTimestamp (line 2008)
+- new Call\DateTimeSetDate (line 2011)
+- new Call\DateTimeSetDate (line 2012)
+- new Call\DateTimeSetTime (line 2013)
+- new Call\DateTimeSetTime (line 2014)
+- new Call\DateTimeSetISODate (line 2015)
+- new Call\DateTimeSetISODate (line 2016)
+- new Call\DateTimeGetLastErrors (line 2018)
+- new Call\DateTimeGetLastErrors (line 2019)
+- new Call\DateTimeModify (line 2022)
+- new Call\DateTimeModify (line 2023)
+- new Call\DateTimeAdd (line 2026)
+- new Call\DateTimeAdd (line 2027)
+- new Call\DateTimeSub (line 2028)
+- new Call\DateTimeSub (line 2029)
+- new Call\DateTimeDiff (line 2031)
+- new Call\DateTimeDiff (line 2032)
+- new Call\DateTimeZoneGetTransitions (line 2034)
+- new Call\DateTimeZoneGetName (line 2036)
+- new Call\DateTimeZoneGetLocation (line 2038)
+- new Call\DateTimeZoneGetOffset (line 2040)
+- new Call\DateTimeZoneListIdentifiers (line 2042)
+- new Call\DateTimeZoneListAbbreviations (line 2044)
+- new Call\NumberFormatterCreate (line 2056)
+- new Call\NumberFormatterFormat (line 2057)
+- new Call\IntlDateFormatterCreate (line 2059)
+- new Call\IntlDateFormatterFormat (line 2060)
+- new Call\CollatorCompare (line 2062)
+- new Call\NormalizerNormalize (line 2064)
+- new Call\MessageFormatterConstruct (line 2066)
+- new Call\MessageFormatterFormat (line 2067)
+- new Call\TransliteratorCreate (line 2069)
+- new Call\TransliteratorTransliterate (line 2070)
+- new Call\FinfoConstruct (line 2072)
+- new Call\FinfoFile (line 2073)
+- new Call\FinfoBuffer (line 2074)
+- new Call\PdoConstruct (line 2076)
+- new Call\PdoGetAvailableDrivers (line 2077)
+- new Call\PdoQuote (line 2078)
+- new Call\DomXmlDocumentCreateFromString (line 2081)
+- new Call\DomHtmlDocumentCreateFromString (line 2082)
+- new Result (line 2470)
+- new Result (line 2492)
+- new Variable (line 3216)
+- new Variable (line 3454)
+- new Variable (line 3738)
+- new Variable (line 3821)
+- new VMVariable (line 3983)
+- new VMVariable (line 3999)
+- new VMVariable (line 4005)
+- new VMVariable (line 4011)
+- new VMVariable (line 4022)
+- new Variable (line 4052)
+- new Variable (line 4097)
 - 112 class method(s)
 - 33 closure(s)
 
