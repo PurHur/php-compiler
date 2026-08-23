@@ -3250,6 +3250,63 @@ class Object_ extends Type {
     }
 
     /**
+     * Static defaults for ReflectionClass::getDefaultProperties() (#34091).
+     *
+     * Includes private/protected; skips parent-private (declaring class ≠ $classId).
+     *
+     * @return array<string, array{type: int, value: int|float|bool|string|null}>
+     */
+    public function reflectionDefaultStaticPropertyEntries(int $classId): array
+    {
+        $entries = [];
+        $globals = $this->staticPropertyGlobals[$classId] ?? [];
+        if ([] === $globals) {
+            return $entries;
+        }
+        foreach (array_keys($globals) as $name) {
+            $entry = $globals[$name] ?? null;
+            if (null === $entry) {
+                continue;
+            }
+            $vis = $this->staticPropertyVisibility[$classId][$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $declId = $this->staticPropertyDeclaringClassId[$classId][$name] ?? $classId;
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $declId !== $classId) {
+                continue;
+            }
+            if (!empty($entry['typedWithoutDefault']) && null === ($entry['default'] ?? null)) {
+                continue;
+            }
+            $default = $entry['default'] ?? null;
+            if (null === $default) {
+                // Untyped static without initializer → null in Zend getDefaultProperties.
+                if (!empty($entry['typedWithoutDefault'])) {
+                    continue;
+                }
+                $entries[$name] = [
+                    'type' => Variable::TYPE_NULL,
+                    'value' => null,
+                ];
+                continue;
+            }
+            if (!$default instanceof \PHPCompiler\VM\Variable) {
+                continue;
+            }
+            try {
+                $scalar = $this->compileTimeValueFromVm($default);
+            } catch (\LogicException) {
+                // Non-scalar static defaults (array/object) — omit from thin AOT map (#34091).
+                continue;
+            }
+            $entries[$name] = [
+                'type' => $entry['type'],
+                'value' => $scalar,
+            ];
+        }
+
+        return $entries;
+    }
+
+    /**
      * php-src add_class_vars: class-declared statics before trait/parent (#7417).
      *
      * @return list<string>
