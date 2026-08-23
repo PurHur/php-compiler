@@ -7,7 +7,8 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\JIT\Builtin\StringStrpos;
 
 /**
- * mb_strpos() for compiled JIT/AOT modules (#34146 leftover of #27187, php-in-PHP).
+ * mb_strpos() / mb_stripos() / mb_strrpos() for compiled JIT/AOT modules
+ * (#34146 / #34158 / #34166 leftover of #27187, php-in-PHP).
  *
  * Returns {@see StringStrpos::NOT_FOUND} (-1) on miss so callers can box int|false.
  *
@@ -15,8 +16,8 @@ use PHPCompiler\JIT\Builtin\StringStrpos;
  * — those methods silent-return 0 under thin AOT NestedJIT. Search is inlined with strlen/ord/substr
  * only; UTF-8 width uses range compares (NestedJIT bitwise `&` loops hang on multibyte lead bytes).
  *
- * SSOT (VM / compile-time fold): {@see VmMbstring::strpos()}
- * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strpos)
+ * SSOT (VM / compile-time fold): {@see VmMbstring::strpos()} / stripos / strrpos
+ * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strpos), mb_stripos, mb_strrpos
  */
 final class MbSearchJitHelper
 {
@@ -52,6 +53,24 @@ final class MbSearchJitHelper
         }
 
         return self::utf8Strpos($haystack, $needle, $offset);
+    }
+
+    /**
+     * mb_strrpos() — reverse search (#34166 leftover of #34146).
+     *
+     * Offset semantics match {@see VmMbstring::strrpos} / php-src mb_strrpos.
+     */
+    public static function strrposArgv(
+        string $haystack,
+        string $needle,
+        int $offset,
+        string $encoding
+    ): int {
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            return self::byteStrrpos($haystack, $needle, $offset);
+        }
+
+        return self::utf8Strrpos($haystack, $needle, $offset);
     }
 
     /** ASCII A–Z → a–z; leaves UTF-8 multibyte sequences unchanged. */
@@ -114,6 +133,80 @@ final class MbSearchJitHelper
                 return $pos;
             }
             $pos = $pos + 1;
+        }
+
+        return StringStrpos::NOT_FOUND;
+    }
+
+    private static function byteStrrpos(string $haystack, string $needle, int $offset): int
+    {
+        $hayLen = \strlen($haystack);
+        $needleLen = \strlen($needle);
+        $minStart = 0;
+        $maxStart = $hayLen - $needleLen;
+        if ($offset < 0) {
+            $maxStart = $hayLen + $offset;
+            if ($maxStart < 0) {
+                throw new \ValueError(
+                    'mb_strrpos(): Argument #3 ($offset) must be contained in argument #1 ($haystack)'
+                );
+            }
+            if (0 === $needleLen) {
+                return $maxStart;
+            }
+            $maxStart = $maxStart - $needleLen;
+        } else {
+            $minStart = $offset;
+        }
+        if (0 === $needleLen) {
+            return $hayLen;
+        }
+        if ($minStart > $maxStart) {
+            return StringStrpos::NOT_FOUND;
+        }
+        $pos = $maxStart;
+        while ($pos >= $minStart) {
+            if (\substr($haystack, $pos, $needleLen) === $needle) {
+                return $pos;
+            }
+            $pos = $pos - 1;
+        }
+
+        return StringStrpos::NOT_FOUND;
+    }
+
+    private static function utf8Strrpos(string $haystack, string $needle, int $offset): int
+    {
+        $hayLen = self::utf8Length($haystack);
+        $needleLen = self::utf8Length($needle);
+        $minStart = 0;
+        $maxStart = $hayLen - $needleLen;
+        if ($offset < 0) {
+            $maxStart = $hayLen + $offset;
+            if ($maxStart < 0) {
+                throw new \ValueError(
+                    'mb_strrpos(): Argument #3 ($offset) must be contained in argument #1 ($haystack)'
+                );
+            }
+            if (0 === $needleLen) {
+                return $maxStart;
+            }
+            $maxStart = $maxStart - $needleLen;
+        } else {
+            $minStart = $offset;
+        }
+        if (0 === $needleLen) {
+            return $hayLen;
+        }
+        if ($minStart > $maxStart) {
+            return StringStrpos::NOT_FOUND;
+        }
+        $pos = $maxStart;
+        while ($pos >= $minStart) {
+            if (self::utf8Substr($haystack, $pos, $needleLen) === $needle) {
+                return $pos;
+            }
+            $pos = $pos - 1;
         }
 
         return StringStrpos::NOT_FOUND;
