@@ -10,7 +10,7 @@ namespace PHPCompiler\ext\mbstring;
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strcut) / PHP_FUNCTION(mb_substr).
  *
  * NestedJIT constraints proven on #34256:
- * - No VmMbstring / VmString; no PHP_INT_MIN (omit length = -1 from call site).
+ * - No VmMbstring / VmString; omit length uses call-site sentinel -1 (not int-min).
  * - No private helpers in this unit.
  * - Precompute `$endAt = $start + $length` before the char walk.
  * - Use `$n = $sliceEnd - $sliceStart` then `\substr($string, $sliceStart, $n)`.
