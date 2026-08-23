@@ -154,6 +154,9 @@ final class VmOpensslObjects
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         self::$csrStore[$entry->id] = $pem;
+        // Mirror PEM on the object for thin AOT consumers (#34061 peer OpenSSLCertificate).
+        $pemVar = $entry->allocateProperty(OpensslCsrJitSupport::PROP_PEM);
+        $pemVar->string($pem);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
 
@@ -178,7 +181,18 @@ final class VmOpensslObjects
 
     public static function csrPem(ObjectEntry $entry): string
     {
-        return self::$csrStore[$entry->id] ?? '';
+        if (isset(self::$csrStore[$entry->id])) {
+            return self::$csrStore[$entry->id];
+        }
+        // AOT-allocated CSRs store PEM on __osslPem (#34061).
+        if ($entry->hasProperty(OpensslCsrJitSupport::PROP_PEM)) {
+            $prop = $entry->getProperty(OpensslCsrJitSupport::PROP_PEM)->resolveIndirect();
+            if (Variable::TYPE_STRING === $prop->type) {
+                return $prop->toString();
+            }
+        }
+
+        return '';
     }
 
     public static function isCsr(Variable $var): bool

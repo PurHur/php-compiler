@@ -3703,6 +3703,14 @@ class Object_ extends Type {
                 Variable::TYPE_STRING
             );
         }
+        // OpenSSLCertificateSigningRequest PEM for thin AOT openssl_csr_new (#34061).
+        if ('opensslcertificatesigningrequest' === $lcname) {
+            $this->defineProperty(
+                $id,
+                \PHPCompiler\ext\openssl\OpensslCsrJitSupport::PROP_PEM,
+                Variable::TYPE_STRING
+            );
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
@@ -5060,6 +5068,12 @@ class Object_ extends Type {
             return Variable::TYPE_STRING;
         }
         if ('opensslasymmetrickey' === $lcClass && '__osslpem' === $lcName) {
+            return Variable::TYPE_STRING;
+        }
+        if (
+            ('opensslcertificate' === $lcClass || 'opensslcertificatesigningrequest' === $lcClass)
+            && '__osslpem' === $lcName
+        ) {
             return Variable::TYPE_STRING;
         }
 
