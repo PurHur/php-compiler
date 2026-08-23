@@ -43,6 +43,63 @@ final class Issue31694CachingIteratorSetFlagsNullTest extends TestCase
         );
     }
 
+    /**
+     * @group llvm
+     * @group aot
+     */
+    public function testAotSetFlagsNullDeprecationThenZero(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/maintainer_gap_cachingiterator_setflags_null.php';
+        $bin = sys_get_temp_dir().'/phpc_31694_aot_'.getmypid().'.bin';
+        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        try {
+            $runOut = [];
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $joined = implode("\n", $runOut);
+            $this->assertStringContainsString('flags=0', $joined);
+        } finally {
+            @unlink($bin);
+        }
+    }
+
+    public function testAotStrictTypesSetFlagsNullTypeError(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_31694_aot_strict_');
+        $this->assertNotFalse($tmp);
+        file_put_contents($tmp, $this->strictProbeCode());
+        $bin = sys_get_temp_dir().'/phpc_31694_aot_strict_'.getmypid().'.bin';
+        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($tmp).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        @unlink($tmp);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        try {
+            $runOut = [];
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertStringContainsString(
+                'TypeError: CachingIterator::setFlags(): Argument #1 ($flags) must be of type int, null given',
+                implode("\n", $runOut)
+            );
+        } finally {
+            @unlink($bin);
+        }
+    }
+
     private function expectedSoftOutput(): string
     {
         return "DEP:CachingIterator::setFlags(): Passing null to parameter #1 (\$flags) of type int is deprecated\n"

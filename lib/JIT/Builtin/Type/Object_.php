@@ -4284,6 +4284,7 @@ class Object_ extends Type {
             }
             if ('cachingiterator' === $lcname) {
                 $this->defineProperty($id, \PHPCompiler\JIT\Call\CachingIteratorConstruct::PROP_CACHE, Variable::TYPE_HASHTABLE);
+                $this->defineProperty($id, \PHPCompiler\VM\CachingIteratorJitHelper::PROP_FLAGS, Variable::TYPE_NATIVE_LONG);
                 $this->seedExternalClassConstants($id, [
                     'CALL_TOSTRING' => 1,
                     'TOSTRING_USE_KEY' => 2,
@@ -4318,6 +4319,8 @@ class Object_ extends Type {
                 $methods[] = 'getarrayiterator';
             } elseif ('cachingiterator' === $lcname) {
                 $methods[] = 'getcache';
+                $methods[] = 'getflags';
+                $methods[] = 'setflags';
                 $methods[] = 'count';
                 $methods[] = 'hasnext';
             } elseif ('regexiterator' === $lcname || 'callbackfilteriterator' === $lcname) {
