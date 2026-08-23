@@ -234,7 +234,11 @@ final class Linker
     private static function runtimeLinkLibs(): string
     {
         $libs = self::RUNTIME_LINK_LIBS;
-        if (OpensslSignRuntime::opensslEvRuntimeAvailable()) {
+        // Sign (#3324) and pkey_new keygen (#34015) both need libcrypto at link time.
+        if (
+            OpensslSignRuntime::opensslEvRuntimeAvailable()
+            || \PHPCompiler\ext\openssl\VmOpensslPkeyNative::available()
+        ) {
             $libs .= ' '.self::OPENSSL_LINK_LIB;
         }
         if (self::argon2RuntimeAvailable()) {

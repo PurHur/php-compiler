@@ -3683,6 +3683,10 @@ class Object_ extends Type {
             $this->defineProperty($id, '__hcKey', Variable::TYPE_STRING);
             $this->defineProperty($id, '__hcHmac', Variable::TYPE_NATIVE_LONG);
         }
+        // OpenSSLAsymmetricKey PEM for thin AOT openssl_pkey_new (#34015).
+        if ('opensslasymmetrickey' === $lcname) {
+            $this->defineProperty($id, \PHPCompiler\ext\openssl\OpensslAsymmetricKeyJitSupport::PROP_PEM, Variable::TYPE_STRING);
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
@@ -5036,6 +5040,13 @@ class Object_ extends Type {
         if (
             'hashcontext' === $lcClass
             && ('__hcalgo' === $lcName || '__hcbuf' === $lcName || '__hckey' === $lcName)
+        ) {
+            return Variable::TYPE_STRING;
+        }
+        // OpenSSLAsymmetricKey PEM (ext/openssl/JitOpensslPkeyNew.php, #34015).
+        if (
+            'opensslasymmetrickey' === $lcClass
+            && '__osslpem' === $lcName
         ) {
             return Variable::TYPE_STRING;
         }

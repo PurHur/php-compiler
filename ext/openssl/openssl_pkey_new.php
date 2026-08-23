@@ -19,7 +19,7 @@ use PHPLLVM\Value;
  * Reflection / named-arg param is Zend stub `options` (not InternalArgInfo `configargs`; #24491).
  *
  * JIT/AOT leftover #33530: catchable argc/TypeError paths (peer openssl_csr_new #33527).
- * Happy-path key generation still needs object AOT (#6295 follow-up).
+ * Happy-path RSA default / null options → OpenSSLAsymmetricKey AOT (#34015).
  */
 final class openssl_pkey_new extends Internal
 {
@@ -77,11 +77,21 @@ final class openssl_pkey_new extends Internal
             }
         }
 
-        // Key objects stay VM-shaped (#6295). Clear LogicException on TypeError/argc
-        // gates first (#33530); happy-path bake is a follow-up.
+        // Default RSA 2048 when options omitted / null. Non-null arrays (bits/type/curve)
+        // still need full options lowering (#22335 follow-up).
+        if (0 === $argc || self::isNullOptions($args[0])) {
+            return JitOpensslPkeyNew::emitRsaKeyObject($context);
+        }
+
         throw new \LogicException(
-            'openssl_pkey_new() is not implemented for JIT in this compiler build (issue #6295/#22335/#33530)'
+            'openssl_pkey_new() options array is not implemented for JIT in this compiler build '
+            .'(issue #34015/#22335) — use null / no-arg for RSA default'
         );
+    }
+
+    private static function isNullOptions(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
     }
 
     /**
