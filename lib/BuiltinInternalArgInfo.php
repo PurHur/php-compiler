@@ -194,6 +194,10 @@ final class BuiltinInternalArgInfo
             'preg_match', 'preg_match_all' => 'int|false',
             // ext/pcre/php_pcre.stub.php — InternalArgInfo omits return (#27813, #28897; re-#23587)
             'preg_replace', 'preg_filter', 'preg_replace_callback' => 'array|string|null',
+            // ext/pcre/php_pcre.stub.php — absent from InternalArgInfo (#25513)
+            'preg_replace_callback_array' => 'array|string|null',
+            // Zend/zend_builtin_functions.stub.php — absent from InternalArgInfo (#25513)
+            'gc_status' => 'array',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#26104)
             'memory_reset_peak_usage' => 'void',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#25751)
@@ -1173,6 +1177,8 @@ final class BuiltinInternalArgInfo
                 3 => 'mixed',
                 default => null,
             },
+            // ext/standard/array.stub.php — ?int $length = null (InternalArgInfo int) (#25513)
+            'array_slice' => 2 === $index ? '?int' : null,
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25018)
             'hash_hkdf' => match ($index) {
                 0, 1, 3, 4 => 'string',
@@ -1724,6 +1730,13 @@ final class BuiltinInternalArgInfo
                 1 => 'callable',
                 4 => '',
                 5 => 'int',
+                default => null,
+            },
+            // ext/pcre/php_pcre.stub.php — array|string $subject; &$count untyped; int $flags (#25513)
+            'preg_replace_callback_array' => match ($index) {
+                1 => 'array|string',
+                3 => '',
+                4 => 'int',
                 default => null,
             },
             // ext/tokenizer/tokenizer.stub.php — int $flags = 0; InternalArgInfo omits flags (#26258)

@@ -2491,6 +2491,23 @@ PHP;
         self::assertSame(0, $dest->toArray()->getNumElements());
     }
 
+    /** @covers issue #25513 — ext/standard/array.stub.php + Zend gc_status + ext/pcre php_pcre.stub.php */
+    public function testArraySliceGcStatusPregReplaceCallbackArrayReflection25513(): void
+    {
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('array_slice', 2));
+        self::assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('gc_status'));
+        self::assertSame(
+            'array|string|null',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('preg_replace_callback_array')
+        );
+        self::assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride('preg_replace_callback_array', 1));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('preg_replace_callback_array', 3));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('preg_replace_callback_array', 4));
+        $length = BuiltinInternalArgInfo::paramInfoForFunction('array_slice', 2);
+        self::assertNotNull($length);
+        self::assertSame('?int', $length['type'] ?? null);
+    }
+
     /** @covers issue #10047 */
     public function testArrayMapFilterReduceNamedParameters(): void
     {
