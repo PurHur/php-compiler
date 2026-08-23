@@ -96,6 +96,9 @@ final class DomNodeChildNodeMutationRuntime
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_childnode_'.$kind);
+            // Document-wide saveXML must not replay the loadXML literal after a
+            // sibling insert that adds comments/PIs around the root (#34160).
+            JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
             $parent = self::loadParentObject($context, $receiver);
             if ('before' === $kind || 'after' === $kind) {
                 // InnerXml splice is best-effort for saveXML (#26752). It must not

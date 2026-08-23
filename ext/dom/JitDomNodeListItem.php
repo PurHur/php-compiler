@@ -263,26 +263,19 @@ final class JitDomNodeListItem
         $context->builder->branch($exit);
 
         $context->builder->positionAtEnd($fallback);
-        $childRaw = $context->builder->load(
-            $objectType->propertySlotFor($owner, 'DOMElement', $ownerChildProp)
-        );
-        $childSlotNull = $context->builder->icmp(Builder::INT_EQ, $childRaw, $voidPtr->constNull());
+        // Document owners store firstChild on DOMDocument layout (#34160 / peer #32743).
+        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
+        $childObj = VmDom::PROP_FIRST_CHILD === $ownerChildProp
+            ? JitDomParentChildLinkLayout::loadFirstChild($context, $owner, 'dom_nli_'.$pinProp.'_fb')
+            : JitDomParentChildLinkLayout::loadLastChild($context, $owner, 'dom_nli_'.$pinProp.'_fb');
         $writeNull = BasicBlockHelper::append($context, 'dom_nli_'.$pinProp.'_null');
-        $readChild = BasicBlockHelper::append($context, 'dom_nli_'.$pinProp.'_child');
         $writeChild = BasicBlockHelper::append($context, 'dom_nli_'.$pinProp.'_write');
-        $context->builder->branchIf($childSlotNull, $writeNull, $readChild);
+        $childObjNull = $context->builder->icmp(Builder::INT_EQ, $childObj, $objPtrTy->constNull());
+        $context->builder->branchIf($childObjNull, $writeNull, $writeChild);
 
         $context->builder->positionAtEnd($writeNull);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $resultPtr);
         $context->builder->branch($exit);
-
-        $context->builder->positionAtEnd($readChild);
-        $childObj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $context->builder->pointerCast($childRaw, $valuePtrTy)
-        );
-        $childObjNull = $context->builder->icmp(Builder::INT_EQ, $childObj, $objPtrTy->constNull());
-        $context->builder->branchIf($childObjNull, $writeNull, $writeChild);
 
         $context->builder->positionAtEnd($writeChild);
         $context->builder->call(
@@ -327,7 +320,6 @@ final class JitDomNodeListItem
         $readPin = BasicBlockHelper::append($context, 'dom_nli_item1_read');
         $fallback = BasicBlockHelper::append($context, 'dom_nli_item1_fb');
         $usePin = BasicBlockHelper::append($context, 'dom_nli_item1_use');
-        $readFirst = BasicBlockHelper::append($context, 'dom_nli_item1_first');
         $readNext = BasicBlockHelper::append($context, 'dom_nli_item1_next');
         $storeNext = BasicBlockHelper::append($context, 'dom_nli_item1_store');
 
@@ -354,37 +346,24 @@ final class JitDomNodeListItem
         $context->builder->branch($exit);
 
         // Fallback: owner.firstChild->nextSibling (second child, not lastChild).
+        // Document firstChild lives on DOMDocument layout (#34160).
         $context->builder->positionAtEnd($fallback);
-        $firstRaw = $context->builder->load(
-            $objectType->propertySlotFor($owner, 'DOMElement', VmDom::PROP_FIRST_CHILD)
-        );
-        $firstSlotNull = $context->builder->icmp(Builder::INT_EQ, $firstRaw, $voidPtr->constNull());
-        $context->builder->branchIf($firstSlotNull, $writeNull, $readFirst);
-
-        $context->builder->positionAtEnd($readFirst);
-        $firstObj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $context->builder->pointerCast($firstRaw, $valuePtrTy)
-        );
+        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
+        $firstObj = JitDomParentChildLinkLayout::loadFirstChild($context, $owner, 'dom_nli_item1_fb');
         $firstObjNull = $context->builder->icmp(Builder::INT_EQ, $firstObj, $objPtrTy->constNull());
         $context->builder->branchIf($firstObjNull, $writeNull, $readNext);
 
         $context->builder->positionAtEnd($readNext);
-        $nextRaw = $context->builder->load(
-            $objectType->propertySlotFor($firstObj, 'DOMElement', VmDom::PROP_NEXT_SIBLING)
-        );
-        $nextSlotNull = $context->builder->icmp(Builder::INT_EQ, $nextRaw, $voidPtr->constNull());
-        $context->builder->branchIf($nextSlotNull, $writeNull, $storeNext);
-
-        $context->builder->positionAtEnd($storeNext);
-        $nextObj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $context->builder->pointerCast($nextRaw, $valuePtrTy)
+        $nextObj = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $firstObj,
+            VmDom::PROP_NEXT_SIBLING,
+            'dom_nli_item1_next'
         );
         $nextObjNull = $context->builder->icmp(Builder::INT_EQ, $nextObj, $objPtrTy->constNull());
-        $doStore = BasicBlockHelper::append($context, 'dom_nli_item1_write_obj');
-        $context->builder->branchIf($nextObjNull, $writeNull, $doStore);
-        $context->builder->positionAtEnd($doStore);
+        $context->builder->branchIf($nextObjNull, $writeNull, $storeNext);
+
+        $context->builder->positionAtEnd($storeNext);
         $context->builder->call(
             $context->lookupFunction('__value__writeObject'),
             $resultPtr,
@@ -426,22 +405,13 @@ final class JitDomNodeListItem
         $resultPtr = JitValueBox::pointer($context, $resultSlot);
         $exit = BasicBlockHelper::append($context, 'dom_nli_walk_done');
         $writeNull = BasicBlockHelper::append($context, 'dom_nli_walk_null');
-        $readFirst = BasicBlockHelper::append($context, 'dom_nli_walk_read_first');
         $loopHeader = BasicBlockHelper::append($context, 'dom_nli_walk_hdr');
         $advance = BasicBlockHelper::append($context, 'dom_nli_walk_adv');
         $found = BasicBlockHelper::append($context, 'dom_nli_walk_found');
 
-        $firstRaw = $context->builder->load(
-            $objectType->propertySlotFor($owner, 'DOMElement', VmDom::PROP_FIRST_CHILD)
-        );
-        $firstSlotNull = $context->builder->icmp(Builder::INT_EQ, $firstRaw, $voidPtr->constNull());
-        $context->builder->branchIf($firstSlotNull, $writeNull, $readFirst);
-
-        $context->builder->positionAtEnd($readFirst);
-        $firstObj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $context->builder->pointerCast($firstRaw, $valuePtrTy)
-        );
+        // Document firstChild on DOMDocument layout (#34160).
+        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
+        $firstObj = JitDomParentChildLinkLayout::loadFirstChild($context, $owner, 'dom_nli_walk');
         $firstObjNull = $context->builder->icmp(Builder::INT_EQ, $firstObj, $objPtrTy->constNull());
         $enter = BasicBlockHelper::append($context, 'dom_nli_walk_enter');
         $context->builder->branchIf($firstObjNull, $writeNull, $enter);
@@ -456,17 +426,11 @@ final class JitDomNodeListItem
         $context->builder->branchIf($atIndex, $found, $advance);
 
         $context->builder->positionAtEnd($advance);
-        $nextRaw = $context->builder->load(
-            $objectType->propertySlotFor($curPhi, 'DOMElement', VmDom::PROP_NEXT_SIBLING)
-        );
-        $nextSlotNull = $context->builder->icmp(Builder::INT_EQ, $nextRaw, $voidPtr->constNull());
-        $readNext = BasicBlockHelper::append($context, 'dom_nli_walk_read_next');
-        $context->builder->branchIf($nextSlotNull, $writeNull, $readNext);
-
-        $context->builder->positionAtEnd($readNext);
-        $nextObj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $context->builder->pointerCast($nextRaw, $valuePtrTy)
+        $nextObj = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $curPhi,
+            VmDom::PROP_NEXT_SIBLING,
+            'dom_nli_walk_next'
         );
         $nextObjNull = $context->builder->icmp(Builder::INT_EQ, $nextObj, $objPtrTy->constNull());
         $back = BasicBlockHelper::append($context, 'dom_nli_walk_back');

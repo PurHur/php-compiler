@@ -261,20 +261,29 @@ final class JitDomDocumentElement
         Value $element,
         int $length,
         ?Value $item0 = null,
-        ?Value $item1 = null
+        ?Value $item1 = null,
+        ?string $slotClass = null
     ): void {
         $objectType = $context->type->object;
         $nodeClassId = $objectType->lookup('DOMNode');
         $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        $docClassId = $objectType->lookup('DOMDocument');
         $listClassId = $objectType->lookup('DOMNodeList');
         // VALUE on DOMElement — peer first/last/sibling LiveSlots layout (#27476 / #28672).
         // Writing DOMNode::childNodes indices into a DOMElement allocation is OOB (#24973).
+        // Document parents use DOMDocument layout (#34160).
         if (!$objectType->hasProperty($elementClassId, VmDom::PROP_CHILD_NODES)) {
             $objectType->defineProperty($elementClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
+        }
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_CHILD_NODES)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
         }
         // Keep DOMNode declared for Document / Fragment receivers.
         if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
             $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
+        }
+        if (null === $slotClass) {
+            $slotClass = self::CLASS_ELEMENT;
         }
         if (!$objectType->hasProperty($listClassId, 'length')) {
             $objectType->defineProperty($listClassId, 'length', JITVariable::TYPE_NATIVE_LONG);
@@ -334,7 +343,7 @@ final class JitDomDocumentElement
             $list
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_CHILD_NODES),
+            $objectType->propertySlotFor($element, $slotClass, VmDom::PROP_CHILD_NODES),
             $listJit,
             JITVariable::TYPE_VALUE
         );

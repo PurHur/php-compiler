@@ -712,6 +712,30 @@ final class JitDomLoadXMLUserScript
             $elemJit,
             JITVariable::TYPE_OBJECT
         );
+        // Seed Document first/last/childNodes so ChildNode::before/after and
+        // insertBefore see the root in the sibling chain (#34160 / peer #32743).
+        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_CHILD_NODES)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
+        }
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_FIRST_CHILD),
+            $elemJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_LAST_CHILD),
+            $elemJit,
+            JITVariable::TYPE_VALUE
+        );
+        JitDomDocumentElement::storeChildNodesLength(
+            $context,
+            $document,
+            1,
+            $element,
+            null,
+            self::CLASS_DOCUMENT
+        );
         // Same DOMElement parentNode layout as appendChild-to-document (#21687 / #29434).
         $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
         if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
