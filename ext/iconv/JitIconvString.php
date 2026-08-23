@@ -8,13 +8,14 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringIconvSubstr;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for iconv_strlen/strpos/substr/strrpos (#6247, #20208, #27197; php-src ext/iconv/iconv.c). */
+/** LLVM lowering for iconv_strlen/strpos/substr/strrpos (#6247, #20208, #27197, #34272). */
 final class JitIconvString
 {
     public static function dispatch(Context $context, string $function, JITVariable ...$args): Value
@@ -109,7 +110,8 @@ final class JitIconvString
         $i64 = $context->getTypeFromString('int64');
         $offset = JitLongArg::lower($context, $args[1], 'iconv_substr() offset');
 
-        $lengthOrOmitted = $i64->constInt(IconvStringJitHelper::LENGTH_OMITTED, true);
+        // 4-arg ABI: length=-1 omitted (peer mb_substr #34256). Extreme omit tokens broke NestedJIT.
+        $lengthOrOmitted = $i64->constInt(-1, true);
         if ($argc >= 3) {
             $lengthIsNull = JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant;
             if (!$lengthIsNull) {
@@ -133,16 +135,51 @@ final class JitIconvString
             $encoding = $context->builder->load($context->constantStringFromString($defaultEncoding));
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         StringIconvSubstr::ensureLinked($context);
-        $result = $context->builder->call(
-            $context->lookupFunction('__compiler_iconv_substr'),
-            $input,
-            $offset,
-            $lengthOrOmitted,
-            $encoding
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            StringIconvSubstr::helperFunction($context),
+            [$input, $offset, $lengthOrOmitted, $encoding]
         );
 
-        return self::materializeStringOrFalse($context, $result);
+        return self::materializeHelperStringOrFalse($context, $raw);
+    }
+
+    /** NestedJIT string|null → `__value__*` string|false (peer JitMbChrOrd / #34272). */
+    private static function materializeHelperStringOrFalse(Context $context, Value $raw): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'iconv_substr_box');
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $isMiss = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
+        $failBlock = BasicBlockHelper::append($context, 'iconv_substr_fail');
+        $okBlock = BasicBlockHelper::append($context, 'iconv_substr_ok');
+        $doneBlock = BasicBlockHelper::append($context, 'iconv_substr_done');
+        $context->builder->branchIf($isMiss, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $strPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $strPtr);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
     }
 
     /**

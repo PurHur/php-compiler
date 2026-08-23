@@ -6,64 +6,48 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_iconv_substr via IconvStringJitHelper PHP (#27197).
+ * JIT/AOT link for iconv_substr NestedJIT helper (#27197 / #34272).
  *
- * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringIconvMime #27424).
- * ABI (string, int64 offset, int64 lengthOrOmitted, string) matches ScopeBuiltin extract shape.
+ * Peer {@see MbSubstr}: ensureCompiled + lookupCompiled; call sites use callHelper.
  */
 final class StringIconvSubstr
 {
-    private const ABI = '__compiler_iconv_substr';
-
     private const HELPER_PATH = '/ext/iconv/IconvStringJitHelper.php';
 
-    private const SUBSTR_HELPER = 'PHPCompiler\\ext\\iconv\\IconvStringJitHelper::substrArgv';
+    private const SUBSTR_LOGICAL = 'PHPCompiler\\ext\\iconv\\IconvStringJitHelper::substrArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::SUBSTR_HELPER,
+        self::SUBSTR_LOGICAL,
     ];
-
-    private const BRIDGE_ENTRY = 'iconv_substr_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::ensureJitHelperCompiled($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::ensureLinked($context);
     }
 
-    private static function implement(Context $context): void
+    public static function helperFunction(Context $context): LlvmFunction
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
+        self::ensureJitHelperCompiled($context);
 
-        $probe = $context->module->getNamedFunction(self::ABI);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
-            $context->registerFunction(self::ABI, $probe);
+        return JitVmHelperLink::lookupCompiled($context, self::SUBSTR_LOGICAL, '#34272');
+    }
 
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
             $context,
-            self::ABI,
-            self::BRIDGE_ENTRY,
-            [$strPtr, $i64, $i64, $strPtr],
-            $strPtr,
-            self::SUBSTR_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27197'
+            '#34272',
+            true
         );
     }
 }
