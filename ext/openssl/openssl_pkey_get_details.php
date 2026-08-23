@@ -16,8 +16,7 @@ use PHPLLVM\Value;
 /**
  * openssl_pkey_get_details() — key parameter array (php-src ext/openssl/openssl.c; #20240 VM, JIT/AOT #33496).
  *
- * JIT/AOT leftover #33496: catchable argc/TypeError paths (peer openssl_pkey_free #33487).
- * Happy-path OpenSSLAsymmetricKey → array still needs key-object / PEM AOT (#6295 follow-up).
+ * JIT/AOT: argc/TypeError paths (#33496); happy-path NestedJIT from OpenSSLAsymmetricKey (#34030).
  */
 final class openssl_pkey_get_details extends Internal
 {
@@ -55,12 +54,15 @@ final class openssl_pkey_get_details extends Internal
         }
 
         $arg = $args[0];
-        if (!self::jitArgIsAsymmetricKey($arg)) {
+        // Reject only compile-time known-wrong types. Value-box / mixed results from
+        // openssl_pkey_new() stay TYPE_UNKNOWN until runtime (#34030 leftover of #33496).
+        $bad = self::compileTimeNonKeyLabel($arg);
+        if (null !== $bad) {
             ExceptionBridge::emitTypeErrorAndAbort(
                 $context,
                 \sprintf(
                     'openssl_pkey_get_details(): Argument #1 ($key) must be of type OpenSSLAsymmetricKey, %s given',
-                    self::jitTypeLabel($arg)
+                    $bad
                 )
             );
             BasicBlockHelper::ensureOpenInsertBlock($context, 'openssl_pkey_get_details_te_cont');
@@ -68,36 +70,25 @@ final class openssl_pkey_get_details extends Internal
             return self::jitReturnFalse($context);
         }
 
-        // Key objects stay VM-shaped for details arrays (#7268 / #6295). Clear LogicException on
-        // TypeError/argc gates first (#33496); happy-path bake is a follow-up.
-        throw new \LogicException(
-            'openssl_pkey_get_details() is not implemented for JIT in this compiler build (issue #20240/#33496)'
-        );
+        return JitOpensslPkeyGetDetails::details($context, $arg);
     }
 
-    private static function jitArgIsAsymmetricKey(JITVariable $arg): bool
+    /**
+     * @return non-empty-string|null type label when definitely not OpenSSLAsymmetricKey
+     */
+    private static function compileTimeNonKeyLabel(JITVariable $arg): ?string
     {
-        if (JITVariable::TYPE_OBJECT !== $arg->type) {
-            return false;
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            $class = $arg->classUserType;
+            if (null === $class || '' === $class) {
+                return null;
+            }
+            if (0 === \strcasecmp($class, 'OpenSSLAsymmetricKey')) {
+                return null;
+            }
+
+            return $class;
         }
-        $class = $arg->classUserType;
-        if (null === $class || '' === $class) {
-            return true;
-        }
-
-        return 0 === \strcasecmp($class, 'OpenSSLAsymmetricKey');
-    }
-
-    private static function jitReturnFalse(Context $context): Value
-    {
-        $slot = JitValueBox::alloc($context);
-        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
-
-        return JitValueBox::pointer($context, $slot);
-    }
-
-    private static function jitTypeLabel(JITVariable $arg): string
-    {
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
             return 'null';
         }
@@ -108,10 +99,17 @@ final class openssl_pkey_get_details extends Internal
             JITVariable::TYPE_NATIVE_DOUBLE => 'float',
             JITVariable::TYPE_STRING => 'string',
             JITVariable::TYPE_HASHTABLE => 'array',
-            JITVariable::TYPE_OBJECT => (null !== $arg->classUserType && '' !== $arg->classUserType)
-                ? $arg->classUserType
-                : 'object',
-            default => 'mixed',
+            // Unknown / value-box may still be OpenSSLAsymmetricKey at runtime (#34030).
+            default => null,
         };
     }
+
+    private static function jitReturnFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
 }
