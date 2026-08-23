@@ -48,8 +48,29 @@ final class GetClassVarsRuntime
         );
     }
 
+    /**
+     * ReflectionClass::getStaticProperties() — static slot defaults/values (#34118).
+     *
+     * Thin AOT has no live static stores in the name→value map; emit compile-time
+     * defaults (same source as getDefaultProperties statics). Skip parent-privates.
+     *
+     * php-src: zim_ReflectionClass_getStaticProperties
+     */
+    public static function emitStaticPropertiesForClassId(Context $context, int $classId): Value
+    {
+        return self::wrapHashTable(
+            $context,
+            self::emitStaticPropertiesHashTable($context, $classId)
+        );
+    }
+
     /** Empty array box when ReflectionClass name does not match a compile-unit class. */
     public static function emitEmptyDefaultProperties(Context $context): Value
+    {
+        return self::wrapHashTable($context, HashTableHelper::alloc($context));
+    }
+
+    public static function emitEmptyStaticProperties(Context $context): Value
     {
         return self::wrapHashTable($context, HashTableHelper::alloc($context));
     }
@@ -155,6 +176,18 @@ final class GetClassVarsRuntime
             $keyStr = $context->builder->load($context->constantStringFromString($propName));
             self::storeStaticPropertyDefault($context, $ht, $keyStr, $entry);
             $seen[$propName] = true;
+        }
+
+        return $ht;
+    }
+
+    private static function emitStaticPropertiesHashTable(Context $context, int $classId): Value
+    {
+        $object = $context->type->object;
+        $ht = HashTableHelper::alloc($context);
+        foreach ($object->reflectionDefaultStaticPropertyEntries($classId) as $propName => $entry) {
+            $keyStr = $context->builder->load($context->constantStringFromString($propName));
+            self::storeStaticPropertyDefault($context, $ht, $keyStr, $entry);
         }
 
         return $ht;
