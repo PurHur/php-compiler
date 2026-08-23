@@ -74,6 +74,12 @@ final class JitMbEncodingRegistry
         return self::buildHtFromStringParts($context, MbstringEncodingRegistry::aliases($canonical));
     }
 
+    /** Public wrapper for mb_preferred_mime_name() compile-time ValueError (#34298). */
+    public static function emitPreferredMimeValueError(Context $context, string $message): Value
+    {
+        return self::emitEncodingValueError($context, $message);
+    }
+
     /** Catchable ValueError for compile-time-invalid $encoding (peer php_uname #28136). */
     private static function emitEncodingValueError(Context $context, string $message): Value
     {
