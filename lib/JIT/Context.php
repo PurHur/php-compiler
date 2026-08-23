@@ -1747,6 +1747,11 @@ class Context {
         $this->functionProxies['reflectionclass::isfinal'] = new Call\ReflectionClassIsFinal();
         // Thin AOT: unbound isInstantiable → NULL (#34027); VM has ReflectionClassIsInstantiable.
         $this->functionProxies['reflectionclass::isinstantiable'] = new Call\ReflectionClassIsInstantiable();
+        // Thin AOT: unbound kind queries → NULL (#34032); NestedJIT emitKindQuery fails verify.
+        $this->functionProxies['reflectionclass::isinterface'] = new Call\ReflectionClassKindQuery('isInterface');
+        $this->functionProxies['reflectionclass::isabstract'] = new Call\ReflectionClassKindQuery('isAbstract');
+        $this->functionProxies['reflectionclass::istrait'] = new Call\ReflectionClassKindQuery('isTrait');
+        $this->functionProxies['reflectionclass::isenum'] = new Call\ReflectionClassKindQuery('isEnum');
         $this->functionProxies['reflectionclass::isiterateable'] = new Call\ReflectionClassIsIterateable();
         $this->functionProxies['reflectionclass::isiterable'] = new Call\ReflectionClassIsIterateable();
         if (CompilerVersion::supportsLazyObjectFactories()) {
