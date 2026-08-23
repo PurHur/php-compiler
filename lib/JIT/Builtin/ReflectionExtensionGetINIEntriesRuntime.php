@@ -18,7 +18,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT ReflectionExtension::getINIEntries() (#34165).
+ * Thin-AOT ReflectionExtension::getINIEntries() (#34165, #34188, #34194).
  *
  * Extension name → assoc ini directive map (string|null local values),
  * or empty array when unknown. Bakes host Zend ini_get_all() tables via
@@ -157,12 +157,22 @@ final class ReflectionExtensionGetINIEntriesRuntime
         /** @var array<string, array<string, ?string>> $out */
         $out = [];
         // Bounded module list — skip core (~93 keys) which seals __init__ when baked
-        // wholesale (#34165). `standard` is only ~14 directives and must be included
-        // (#34188 leftover); filter/openssl/mbstring/session are ≤32 keys (#34193).
+        // wholesale (#34165). Include host extensions with ≤32 keys (#34188, #34193, #34194).
         // Zend lists null locals as NULL, not omitted.
         foreach ([
-            'date', 'pcre', 'json', 'reflection', 'spl', 'tokenizer', 'standard',
-            'filter', 'openssl', 'mbstring', 'session',
+            'date',
+            'pcre',
+            'json',
+            'reflection',
+            'spl',
+            'tokenizer',
+            'standard',
+            'filter',
+            'openssl',
+            'mbstring',
+            'session',
+            'zlib',
+            'iconv',
         ] as $lc) {
             $keys = VmIniIntrospection::registryKeysForExtension($lc);
             if (null === $keys || [] === $keys || \count($keys) > 32) {
