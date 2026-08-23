@@ -19,7 +19,7 @@ use PHPLLVM\Value;
 /**
  * LLVM JIT/AOT for mbstring search builtins (#7015).
  *
- * Compile-time fold via {@see VmMbstring}; mb_strpos()/mb_strstr() runtime via NestedJIT
+ * Compile-time fold via {@see VmMbstring}; mb_strpos()/mb_strstr()/mb_strrchr() runtime via NestedJIT
  * (#34146 leftover of #27187; #34211).
  */
 final class JitMbSearch
@@ -341,6 +341,112 @@ final class JitMbSearch
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             MbSearchRuntime::stristrHelper($context),
+            [$hay, $needle, $beforeNeedle, $encPtr]
+        );
+
+        return self::boxStringOrFalse($context, $raw);
+    }
+
+    /**
+     * mb_strrchr() — fold literals, else NestedJIT {@see MbSearchJitHelper::strrchrArgv} (#20006 leftover).
+     *
+     * @param list<JITVariable> $args
+     */
+    public static function invokeStrrchr(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 4) {
+            throw new \LogicException('mb_strrchr() requires two to four arguments');
+        }
+        $folded = self::tryStrrchrFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        $hay = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_strrchr', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'mb_strrchr', 1, 'needle');
+        $beforeNeedle = $argc >= 3
+            ? JitBoolArg::lowerZParamBool($context, $args[2], 'mb_strrchr', 'before_needle', 3)
+            : $context->constantFromBool(false);
+        if ($argc >= 4) {
+            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
+                $encoding = 'UTF-8';
+            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
+                throw new \LogicException('mb_strrchr() encoding must be a string literal in this compiler build');
+            } else {
+                $encoding = $args[3]->compileTimeString ?? null;
+                if (null === $encoding) {
+                    throw new \LogicException('mb_strrchr() encoding must be a string literal in this compiler build');
+                }
+            }
+        } else {
+            $encoding = 'UTF-8';
+        }
+        self::assertSupportedEncoding($encoding);
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbSearchRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            MbSearchRuntime::strrchrHelper($context),
+            [$hay, $needle, $beforeNeedle, $encPtr]
+        );
+
+        return self::boxStringOrFalse($context, $raw);
+    }
+
+    /**
+     * mb_strrichr() — fold literals, else NestedJIT {@see MbSearchJitHelper::strrichrArgv} (#7015 leftover).
+     *
+     * @param list<JITVariable> $args
+     */
+    public static function invokeStrrichr(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 4) {
+            throw new \LogicException('mb_strrichr() requires two to four arguments');
+        }
+        $folded = self::tryStrrichrFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        $hay = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_strrichr', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'mb_strrichr', 1, 'needle');
+        $beforeNeedle = $argc >= 3
+            ? JitBoolArg::lowerZParamBool($context, $args[2], 'mb_strrichr', 'before_needle', 3)
+            : $context->constantFromBool(false);
+        if ($argc >= 4) {
+            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
+                $encoding = 'UTF-8';
+            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
+                throw new \LogicException('mb_strrichr() encoding must be a string literal in this compiler build');
+            } else {
+                $encoding = $args[3]->compileTimeString ?? null;
+                if (null === $encoding) {
+                    throw new \LogicException('mb_strrichr() encoding must be a string literal in this compiler build');
+                }
+            }
+        } else {
+            $encoding = 'UTF-8';
+        }
+        self::assertSupportedEncoding($encoding);
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbSearchRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            MbSearchRuntime::strrichrHelper($context),
             [$hay, $needle, $beforeNeedle, $encPtr]
         );
 

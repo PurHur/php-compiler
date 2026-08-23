@@ -9,10 +9,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link hook for mb_strpos() / mb_stripos() / mb_strrpos() / mb_strripos() / mb_strstr() / mb_stristr()
- * — compiles MbSearchJitHelper (#34146 / #34158 / #34166 / #34211 / mb_stristr leftover of #27187).
+ * JIT/AOT link hook for mb_strpos() / mb_stripos() / mb_strrpos() / mb_strripos() / mb_strstr() / mb_stristr() /
+ * mb_strrchr() / mb_strrichr() — compiles MbSearchJitHelper (#34146 / #34158 / #34166 / #34211 / #20006).
  *
- * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strpos), mb_stripos, mb_strrpos, mb_strripos, mb_strstr, mb_stristr
+ * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strpos), mb_stripos, mb_strrpos, mb_strripos, mb_strstr,
+ * mb_stristr, mb_strrchr, mb_strrichr
  */
 final class MbSearchRuntime
 {
@@ -30,6 +31,10 @@ final class MbSearchRuntime
 
     private const STRISTR_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSearchJitHelper::stristrArgv';
 
+    private const STRRCHR_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSearchJitHelper::strrchrArgv';
+
+    private const STRRICHR_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSearchJitHelper::strrichrArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::STRPOS_LOGICAL,
@@ -38,6 +43,8 @@ final class MbSearchRuntime
         self::STRRIPOS_LOGICAL,
         self::STRSTR_LOGICAL,
         self::STRISTR_LOGICAL,
+        self::STRRCHR_LOGICAL,
+        self::STRRICHR_LOGICAL,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -87,13 +94,27 @@ final class MbSearchRuntime
         return JitVmHelperLink::lookupCompiled($context, self::STRISTR_LOGICAL, 'mb_stristr');
     }
 
+    public static function strrchrHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::STRRCHR_LOGICAL, 'mb_strrchr');
+    }
+
+    public static function strrichrHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::STRRICHR_LOGICAL, 'mb_strrichr');
+    }
+
     private static function ensureJitHelperCompiled(Context $context): void
     {
         JitVmHelperLink::ensureCompiled(
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#34211'
+            'mb_strrchr'
         );
     }
 }
