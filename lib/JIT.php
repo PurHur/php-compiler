@@ -9601,6 +9601,7 @@ class JIT {
                             $element = $this->context->getVariableFromOp($elementOp);
                             $key = $this->jitArrayElementKeyVariable($block, $op->arg3);
                             JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
+                            $this->registerArrayElementClosureCallProxy($block, $block->getOperand($op->arg1), $op->arg3, $element);
                             $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
                         }
                     }
@@ -9616,6 +9617,7 @@ class JIT {
                     $element = $this->context->getVariableFromOp($elementOp);
                     $key = $this->jitArrayElementKeyVariable($block, $op->arg3);
                     JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
+                    $this->registerArrayElementClosureCallProxy($block, $resultOp, $op->arg3, $element);
                     $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
                     break;
                 case OpCode::TYPE_ARRAY_SPREAD:
@@ -9848,6 +9850,10 @@ class JIT {
                         self::foreachContainerUserType($arrayOp, $array)
                     );
                     $this->assignOperand($block->getOperand($op->arg1), $key);
+                    $arraySlot = $block->slotForOperand($arrayOp);
+                    if (null !== $arraySlot) {
+                        $this->context->foreachPendingKeyByArraySlot[$arraySlot] = $key;
+                    }
                     break;
                 case OpCode::TYPE_ITER_VALUE:
                     $arrayOp = $block->getOperand($op->arg2);
@@ -9888,7 +9894,9 @@ class JIT {
                         $array,
                         self::foreachContainerUserType($arrayOp, $array)
                     );
-                    $this->assignOperand($block->getOperand($op->arg1), $value);
+                    $destOp = $block->getOperand($op->arg1);
+                    $this->assignOperand($destOp, $value);
+                    $this->reattachForeachIterClosureInvokeMetadata($block, $arrayOp, $destOp, $value);
                     break;
                 case OpCode::TYPE_SCRIPT_MAGIC:
                     if (OpCode::SCRIPT_MAGIC_HALT_OFFSET === (int) $op->arg3) {
@@ -18265,6 +18273,129 @@ class JIT {
         JIT\JitValueBox::publishAfterWrite($this->context, $orphanPtr);
     }
 
+    /**
+     * Record Closure invoke proxy for a compile-time array literal element (#24106 peer).
+     *
+     * foreach ($arr as $k => $fn) loses Variable::closureCall on $fn when the value is
+     * loaded from a hashtable slot — RuntimeIndirectClosureCall then skips pending-throw
+     * catch wiring and TypeError inside the closure SIGABRTs under AOT (#33971 peer).
+     */
+    private function registerArrayElementClosureCallProxy(
+        Block $block,
+        Operand $arrayResultOp,
+        ?int $keyArg,
+        Variable $element
+    ): void {
+        if (null === $element->closureCall) {
+            return;
+        }
+        $arraySlot = $block->slotForOperand($arrayResultOp);
+        if (null === $arraySlot) {
+            return;
+        }
+        $keyLabel = $this->compileTimeArrayElementKeyLabel($block, $keyArg);
+        if (null === $keyLabel) {
+            return;
+        }
+        $this->context->closureCallByArrayResultSlot[$arraySlot][$keyLabel] = $element->closureCall;
+        $this->context->closureCallOrderedByArrayResultSlot[$arraySlot][] = $element->closureCall;
+    }
+
+    /**
+     * Restore ClosureWithCaptures on foreach value locals when the container was a literal (#24106).
+     */
+    private function reattachForeachIterClosureInvokeMetadata(
+        Block $block,
+        Operand $arrayOp,
+        Operand $destOp,
+        Variable $value
+    ): void {
+        $result = $this->context->getVariableFromOp($destOp);
+        $this->preserveClosureInvokeMetadata($destOp, $result, $value);
+        if (null !== $result->closureCall) {
+            $destSlot = $block->slotForOperand($destOp);
+            if (null !== $destSlot) {
+                $this->context->fccClosureCallByResultSlot[$destSlot] = $result->closureCall;
+            }
+
+            return;
+        }
+        $arraySlot = $block->slotForOperand($arrayOp);
+        if (null === $arraySlot) {
+            return;
+        }
+        $visitKey = spl_object_id($block).':'.$arraySlot;
+        $ordinal = $this->context->foreachIterClosureOrdinalByArraySlot[$visitKey] ?? 0;
+        $this->context->foreachIterClosureOrdinalByArraySlot[$visitKey] = $ordinal + 1;
+        $ordered = $this->context->closureCallOrderedByArrayResultSlot[$arraySlot] ?? [];
+        $proxy = $ordered[$ordinal] ?? null;
+        $key = $this->context->foreachPendingKeyByArraySlot[$arraySlot] ?? null;
+        unset($this->context->foreachPendingKeyByArraySlot[$arraySlot]);
+        if (null === $proxy) {
+            $map = $this->context->closureCallByArrayResultSlot[$arraySlot] ?? [];
+            $keyLabel = $this->normalizeArrayElementKeyLabel($key);
+            if (null !== $keyLabel) {
+                $proxy = $map[$keyLabel] ?? null;
+            }
+            if (null === $proxy && 1 === \count($map)) {
+                $proxy = reset($map);
+            }
+        }
+        if (null === $proxy) {
+            return;
+        }
+        $result->closureCall = $proxy;
+        $this->preserveClosureInvokeMetadata($destOp, $result, $result);
+        $destSlot = $block->slotForOperand($destOp);
+        if (null !== $destSlot) {
+            $this->context->fccClosureCallByResultSlot[$destSlot] = $proxy;
+        }
+    }
+
+    private function compileTimeArrayElementKeyLabel(Block $block, ?int $keyArg): ?string
+    {
+        if (null === $keyArg) {
+            return null;
+        }
+        $intKey = $this->tryCompileTimeArrayLiteralIntKey($block, $keyArg);
+        if (null !== $intKey) {
+            return (string) $intKey;
+        }
+        $op = $block->getOperand($keyArg);
+        if ($op instanceof Operand\Literal) {
+            if (is_string($op->value)) {
+                return $op->value;
+            }
+            if (is_int($op->value)) {
+                return (string) $op->value;
+            }
+        }
+        if (isset($block->constants[$keyArg])) {
+            $const = $block->constants[$keyArg];
+            if (VM\Variable::TYPE_STRING === $const->type) {
+                return $const->toString();
+            }
+            if (VM\Variable::TYPE_INTEGER === $const->type) {
+                return (string) $const->toInt();
+            }
+        }
+        $keyVar = $this->jitArrayElementKeyVariable($block, $keyArg);
+
+        return $this->normalizeArrayElementKeyLabel($keyVar);
+    }
+
+    private function normalizeArrayElementKeyLabel(?Variable $key): ?string
+    {
+        if (null === $key) {
+            return null;
+        }
+        if (null !== $key->compileTimeString) {
+            return $key->compileTimeString;
+        }
+
+        return null;
+    }
+
     /** Keep Closure invoke proxy across assigns into locals / value boxes (#24106, #23973). */
     private function preserveClosureInvokeMetadata(Operand $resultOp, Variable $result, Variable $value): void
     {
@@ -18337,6 +18468,15 @@ class JIT {
         }
         foreach ($block->opCodes as $prior) {
             if (OpCode::TYPE_ASSIGN !== $prior->type || (int) $prior->arg2 !== $nameSlot) {
+                if (OpCode::TYPE_ITER_VALUE === $prior->type && (int) $prior->arg1 === $nameSlot) {
+                    $destOp = $block->getOperand($prior->arg1);
+                    if (null !== $destOp && $this->context->hasVariableOp($destOp)) {
+                        $var = $this->context->getVariableFromOp($destOp);
+                        if (null !== $var->closureCall) {
+                            return $var->closureCall;
+                        }
+                    }
+                }
                 continue;
             }
             $resolved = $this->resolveFccClosureCallForCalleeSlot($block, (int) $prior->arg3, $visited);

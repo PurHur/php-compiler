@@ -250,6 +250,37 @@ class Context {
      */
     public array $fccClosureCallByResultSlot = [];
 
+    /**
+     * Array result operand slot => normalized element key => Closure invoke proxy.
+     *
+     * Populated at array literal build; consumed when foreach iter value assigns into a
+     * local so `$fn()` keeps ClosureWithCaptures instead of RuntimeIndirect (#24106 peer).
+     *
+     * @var array<int, array<string, JIT\Call>>
+     */
+    public array $closureCallByArrayResultSlot = [];
+
+    /**
+     * Array result operand slot => ordered Closure invoke proxies (literal build order).
+     *
+     * @var array<int, list<JIT\Call>>
+     */
+    public array $closureCallOrderedByArrayResultSlot = [];
+
+    /**
+     * Foreach container operand slot => key Variable from the latest TYPE_ITER_KEY.
+     *
+     * @var array<int, Variable>
+     */
+    public array $foreachPendingKeyByArraySlot = [];
+
+    /**
+     * Compile-time foreach visit ordinal per CFG block + array slot (literal build order).
+     *
+     * @var array<string, int>
+     */
+    public array $foreachIterClosureOrdinalByArraySlot = [];
+
     /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
     public bool $callerStrictTypes = false;
 
