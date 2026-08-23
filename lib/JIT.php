@@ -2281,6 +2281,14 @@ class JIT {
                 \count(array_values($block->paramNames))
             );
         }
+        // Thin AOT ReflectionMethod::{getNumberOfParameters,getNumberOfRequiredParameters} (#34216).
+        if (null !== $block->func && null !== $block->func->class) {
+            JIT\Builtin\ReflectionMethodQueryLowering::recordUserMethodFromBlock(
+                (string) $block->func->class->value,
+                $block->func->name,
+                $block
+            );
+        }
         $skipName = $this->jitFunctionSkipName($logicalName, $block);
         if (!is_null($funcName)) {
             $internalName = $this->llvmInternalName($funcName);

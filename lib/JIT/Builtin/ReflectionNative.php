@@ -93,6 +93,9 @@ final class ReflectionNative
             [
                 ['__compiler_refl_func_param_count', $sizeT, [$i8p]],
                 ['__compiler_refl_func_is_user_defined', $i1, [$i8p]],
+                // Thin AOT ReflectionMethod param counts (#34216).
+                ['__compiler_refl_method_param_count', $sizeT, [$i8p, $i8p]],
+                ['__compiler_refl_method_required_param_count', $sizeT, [$i8p, $i8p]],
             ] as [$name, $ret, $params]
         ) {
             $existing = $context->module->getNamedFunction($name);
