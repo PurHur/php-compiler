@@ -10893,6 +10893,16 @@ class JIT {
                         }
                     }
                     JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
+                    // Value-boxed assigned locals keep Operand userType (inferred:C) but lose
+                    // Variable::TYPE_OBJECT — thread the hint into ValueEchoRuntime (#33986).
+                    $echoClassHint = null;
+                    $echoUserType = $echoOp->type?->userType ?? null;
+                    if (\is_string($echoUserType) && '' !== $echoUserType) {
+                        $echoUserType = ltrim($echoUserType, '\\');
+                        if ('' !== $echoUserType && 'object' !== strtolower($echoUserType)) {
+                            $echoClassHint = $echoUserType;
+                        }
+                    }
                     // After ZEND_SEND_REF, namedVariableBindings holds the live boxed lvalue.
                     // Coalesce/ternary echo-phi maps are keyed by SSA slot and can still name the
                     // pre-call constant on the same slot — prefer the by-ref binding (#24162).
@@ -10916,7 +10926,8 @@ class JIT {
                             JIT\TypedPropertyUninitGuard::emitBeforeRead($this->context, $arg);
                             JIT\ValueEchoHelper::echo(
                                 $this->context,
-                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg),
+                                $echoClassHint
                             );
                             break;
                         }
@@ -10944,7 +10955,8 @@ class JIT {
                             // __value__** and a bare bitcast reads the wrong type byte (#24009).
                             JIT\ValueEchoHelper::echo(
                                 $this->context,
-                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg),
+                                $echoClassHint
                             );
                             break;
                         }
@@ -10967,7 +10979,8 @@ class JIT {
                                 if (Variable::TYPE_VALUE === $arg->type) {
                                     JIT\ValueEchoHelper::echo(
                                         $this->context,
-                                        JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                                        JIT\JitValueBox::valuePtrFromVariable($this->context, $arg),
+                                        $echoClassHint
                                     );
                                     break;
                                 }
@@ -10993,14 +11006,16 @@ class JIT {
                             if (null !== $arg->valueBoxAliasPtr || Variable::TYPE_VALUE === $arg->type) {
                                 JIT\ValueEchoHelper::echo(
                                     $this->context,
-                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $arg),
+                                    $echoClassHint
                                 );
                             } else {
                                 JIT\ValueEchoHelper::echo(
                                     $this->context,
                                     '__value__*' === $slotType
                                         ? $arg->value
-                                        : JIT\JitValueBox::pointer($this->context, $arg->value)
+                                        : JIT\JitValueBox::pointer($this->context, $arg->value),
+                                    $echoClassHint
                                 );
                             }
                             break;
@@ -11024,7 +11039,8 @@ class JIT {
                         );
                         JIT\ValueEchoHelper::echo(
                             $this->context,
-                            JIT\JitValueBox::pointer($this->context, $echoSlot)
+                            JIT\JitValueBox::pointer($this->context, $echoSlot),
+                            $echoClassHint
                         );
                         break;
                     }
@@ -11038,7 +11054,8 @@ class JIT {
                             );
                             JIT\ValueEchoHelper::echo(
                                 $this->context,
-                                JIT\JitValueBox::pointer($this->context, $echoSlot)
+                                JIT\JitValueBox::pointer($this->context, $echoSlot),
+                                $echoClassHint
                             );
                             break;
                         case Variable::TYPE_STRING:
@@ -11135,14 +11152,15 @@ class JIT {
                             ) {
                                 JIT\ValueEchoHelper::echo(
                                     $this->context,
-                                    JIT\JitValueBox::pointer($this->context, $arg->value)
+                                    JIT\JitValueBox::pointer($this->context, $arg->value),
+                                    $echoClassHint
                                 );
                                 break;
                             }
                             if (Variable::KIND_VALUE === $arg->kind
                                 && '__value__*' === $this->context->getStringFromType($arg->value->typeOf())
                             ) {
-                                JIT\ValueEchoHelper::echo($this->context, $arg->value);
+                                JIT\ValueEchoHelper::echo($this->context, $arg->value, $echoClassHint);
                                 break;
                             }
                             if (
@@ -11155,7 +11173,8 @@ class JIT {
                                 // AOT script-global locals: load __value__** before echo (#24009).
                                 JIT\ValueEchoHelper::echo(
                                     $this->context,
-                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $arg),
+                                    $echoClassHint
                                 );
                                 break;
                             }
