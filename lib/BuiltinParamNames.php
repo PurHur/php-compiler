@@ -2189,7 +2189,8 @@ final class BuiltinParamNames
             case 'array_search':
                 return ['needle', 'haystack', 'strict'];
             case 'array_rand':
-                return ['array', 'num'];
+                // php-src ext/standard/array.stub.php — int $num = 1 (#25499)
+                return ['array', 'num='];
             case 'array_column':
                 // php-src ext/standard/array.stub.php — ?string|int|null $index_key = null (#24844)
                 return ['array', 'column_key', 'index_key='];
