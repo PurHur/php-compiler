@@ -221,6 +221,12 @@ final class BuiltinInternalDefaultValues
             3 => ['kind' => 'int', 'value' => 1],
             4 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/string.stub.php — pad_string=" ", pad_type=STR_PAD_RIGHT (#25045)
+        // string does not infer; int infer → 0 (wrong vs STR_PAD_RIGHT=1).
+        'str_pad' => [
+            2 => ['kind' => 'string', 'value' => ' '],
+            3 => ['kind' => 'int', 'value' => 1],
+        ],
         'json_encode' => [
             1 => ['kind' => 'int', 'value' => 0],
             2 => ['kind' => 'int', 'value' => 512],
