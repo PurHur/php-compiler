@@ -16,6 +16,8 @@ use PHPLLVM\Value;
  *
  * Zend Z_PARAM_STR soft-null + DEP on $string/$mode (not TypeError) under PROFILE=8.4 — #24209,
  * peer #24176 (mb_trim / mb_ucfirst family).
+ *
+ * JIT/AOT: compile-time fold + NestedJIT via {@see JitMbConvertKana} (#34294).
  */
 final class mb_convert_kana extends Internal
 {
@@ -56,8 +58,6 @@ final class mb_convert_kana extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_convert_kana() JIT is not supported in this compiler build'
-        );
+        return JitMbConvertKana::invoke($context, $args);
     }
 }
