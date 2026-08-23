@@ -25,6 +25,18 @@ final class DefaultTimezoneCivilRuntime
 
     private const TZ_HELPER_PATH = '/ext/standard/DefaultTimezoneJitHelper.php';
 
+    /**
+     * Civil NestedJIT reads DefaultTimezoneJitHelper statics — emit-helper --unit=
+     * must NestedJIT both PHP files in one TU or assertCompiledHelpersPresent fails
+     * (#24302 stale refresh / peer PackJitHelper HELPER_BUNDLE).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::TZ_HELPER_PATH,
+        self::HELPER_PATH,
+    ];
+
     private const CIVIL_HELPER = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::localCivilTimestamp';
 
     private const IS_DST_HELPER = 'PHPCompiler\\ext\\standard\\DefaultTimezoneCivilJitHelper::localIsDst';
