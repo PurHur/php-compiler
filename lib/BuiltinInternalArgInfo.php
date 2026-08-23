@@ -620,6 +620,9 @@ final class BuiltinInternalArgInfo
             'array_sum', 'array_product' => 'int|float',
             // ext/standard/array.stub.php — absent from InternalArgInfo (#24844)
             'array_column' => 'array',
+            // ext/standard/array.stub.php — PHP 8.4; absent from InternalArgInfo (#25452)
+            'array_find', 'array_find_key' => 'mixed',
+            'array_any', 'array_all' => 'bool',
             // ext/standard/array.stub.php — absent from InternalArgInfo (#26111, #26182)
             'array_key_first', 'array_key_last' => 'string|int|null',
             'array_is_list' => 'bool',
@@ -1142,6 +1145,12 @@ final class BuiltinInternalArgInfo
             'array_column' => match ($index) {
                 0 => 'array',
                 1, 2 => 'string|int|null',
+                default => null,
+            },
+            // ext/standard/array.stub.php — PHP 8.4; absent from InternalArgInfo (#25452)
+            'array_find', 'array_find_key', 'array_any', 'array_all' => match ($index) {
+                0 => 'array',
+                1 => 'callable',
                 default => null,
             },
             // ext/standard/array.stub.php — array $array; absent from InternalArgInfo (#26111, #26182)

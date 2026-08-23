@@ -8,6 +8,7 @@ use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinInternalArgInfo;
 use PHPCompiler\BuiltinInternalDefaultValues;
 use PHPCompiler\BuiltinParamNames;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
@@ -1139,6 +1140,72 @@ OUT,
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', $fn));
         }
+    }
+
+    /** @covers issue #25452 — php-src ext/standard/array.stub.php (PHP 8.4) */
+    public function testArrayFindFamilyReflectionMatchesZendStub(): void
+    {
+        foreach (['array_find', 'array_find_key'] as $fn) {
+            self::assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+            self::assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+            self::assertSame('callable', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1), $fn);
+            foreach ([0 => 'array', 1 => 'callable'] as $index => $type) {
+                $param = BuiltinInternalArgInfo::paramInfoForFunction($fn, $index);
+                self::assertNotNull($param, $fn.'#'.$index);
+                self::assertSame($type, $param['type'], $fn.'#'.$index);
+            }
+        }
+        foreach (['array_any', 'array_all'] as $fn) {
+            self::assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+            self::assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+            self::assertSame('callable', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1), $fn);
+            foreach ([0 => 'array', 1 => 'callable'] as $index => $type) {
+                $param = BuiltinInternalArgInfo::paramInfoForFunction($fn, $index);
+                self::assertNotNull($param, $fn.'#'.$index);
+                self::assertSame($type, $param['type'], $fn.'#'.$index);
+            }
+        }
+
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            putenv('PHP_COMPILER_PROFILE=8.4');
+            $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        }
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+foreach (['array_find', 'array_find_key', 'array_any', 'array_all'] as $fn) {
+    $r = new ReflectionFunction($fn);
+    foreach ($r->getParameters() as $p) {
+        echo $fn, ' ', $p->getName(), ' type=', $p->hasType() ? (string) $p->getType() : 'NONE', "\n";
+    }
+    echo $fn, ' ret=', $r->hasReturnType() ? (string) $r->getReturnType() : 'NONE', "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'array_find_family_reflection_25452.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        self::assertSame(
+            <<<'OUT'
+array_find array type=array
+array_find callback type=callable
+array_find ret=mixed
+array_find_key array type=array
+array_find_key callback type=callable
+array_find_key ret=mixed
+array_any array type=array
+array_any callback type=callable
+array_any ret=bool
+array_all array type=array
+array_all callback type=callable
+array_all ret=bool
+
+OUT,
+            $out
+        );
     }
 
     /** @covers issue #9647 / #24845 */
