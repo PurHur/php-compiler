@@ -54,6 +54,25 @@ final class MbSearchJitHelper
         return self::utf8Strpos($haystack, $needle, $offset);
     }
 
+    /**
+     * mb_strrpos() — reverse search (#34166 leftover of #34146).
+     *
+     * SSOT (VM / compile-time fold): {@see VmMbstring::strrpos()}
+     * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strrpos)
+     */
+    public static function strrposArgv(
+        string $haystack,
+        string $needle,
+        int $offset,
+        string $encoding
+    ): int {
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            return self::byteStrrpos($haystack, $needle, $offset);
+        }
+
+        return self::utf8Strrpos($haystack, $needle, $offset);
+    }
+
     /** ASCII A–Z → a–z; leaves UTF-8 multibyte sequences unchanged. */
     private static function asciiLower(string $string): string
     {
@@ -114,6 +133,80 @@ final class MbSearchJitHelper
                 return $pos;
             }
             $pos = $pos + 1;
+        }
+
+        return StringStrpos::NOT_FOUND;
+    }
+
+    private static function byteStrrpos(string $haystack, string $needle, int $offset): int
+    {
+        $hayLen = \strlen($haystack);
+        $needleLen = \strlen($needle);
+        $minStart = 0;
+        $maxStart = $hayLen - $needleLen;
+        if ($offset < 0) {
+            $maxStart = $hayLen + $offset;
+            if ($maxStart < 0) {
+                throw new \ValueError(
+                    'mb_strrpos(): Argument #3 ($offset) must be contained in argument #1 ($haystack)'
+                );
+            }
+            if (0 === $needleLen) {
+                return $maxStart;
+            }
+            $maxStart = $maxStart - $needleLen;
+        } else {
+            $minStart = $offset;
+        }
+        if (0 === $needleLen) {
+            return $hayLen;
+        }
+        if ($minStart > $maxStart) {
+            return StringStrpos::NOT_FOUND;
+        }
+        $pos = $maxStart;
+        while ($pos >= $minStart) {
+            if (\substr($haystack, $pos, $needleLen) === $needle) {
+                return $pos;
+            }
+            $pos = $pos - 1;
+        }
+
+        return StringStrpos::NOT_FOUND;
+    }
+
+    private static function utf8Strrpos(string $haystack, string $needle, int $offset): int
+    {
+        $hayLen = self::utf8Length($haystack);
+        $needleLen = self::utf8Length($needle);
+        $minStart = 0;
+        $maxStart = $hayLen - $needleLen;
+        if ($offset < 0) {
+            $maxStart = $hayLen + $offset;
+            if ($maxStart < 0) {
+                throw new \ValueError(
+                    'mb_strrpos(): Argument #3 ($offset) must be contained in argument #1 ($haystack)'
+                );
+            }
+            if (0 === $needleLen) {
+                return $maxStart;
+            }
+            $maxStart = $maxStart - $needleLen;
+        } else {
+            $minStart = $offset;
+        }
+        if (0 === $needleLen) {
+            return $hayLen;
+        }
+        if ($minStart > $maxStart) {
+            return StringStrpos::NOT_FOUND;
+        }
+        $pos = $maxStart;
+        while ($pos >= $minStart) {
+            if (self::utf8Substr($haystack, $pos, $needleLen) === $needle) {
+                return $pos;
+            }
+            $pos = $pos - 1;
         }
 
         return StringStrpos::NOT_FOUND;
