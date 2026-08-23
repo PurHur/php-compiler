@@ -7,14 +7,15 @@ namespace PHPCompiler\ext\mbstring;
 /**
  * NestedJIT helpers for mb_strcut() / mb_substr() (#4573 / #27028 / #34256).
  *
- * Constraints (thin AOT NestedJIT):
- * - No VmMbstring / VmString (silent-return / SIGSEGV).
- * - No private methods (omitted when only one COMPILED_HELPERS symbol is linked).
- * - No ternaries (NestedJIT assign-type errors).
- * - No PHP_INT_MIN in helper bodies (yields empty under NestedJIT).
- * - *Argv names bypass stale helper-runtime cache.
+ * Proven NestedJIT constraints:
+ * - No VmMbstring (SIGSEGV / silent empty).
+ * - No private methods (omitted when only one COMPILED_HELPERS symbol).
+ * - No ternaries (assign-type errors).
+ * - No PHP_INT_MIN in bodies (empty results).
+ * - No extra hasLength int between length and encoding (breaks length ABI).
+ * - length === -1 means omitted for substrArgv (Zend-negative length=-1 is rare; prefer hasLength elsewhere).
  *
- * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strcut), PHP_FUNCTION(mb_substr)
+ * php-src: ext/mbstring/mbstring.c
  */
 final class MbStrcutJitHelper
 {
@@ -108,16 +109,17 @@ final class MbStrcutJitHelper
 
 final class MbSubstrJitHelper
 {
-    /**
-     * @param int $hasLength 0 = omitted/null length (to end); 1 = use $length
-     */
+    /** @param int $length -1 means omitted (to end) */
     public static function substrArgv(
         string $string,
         int $start,
         int $length,
-        int $hasLength,
         string $encoding
     ): string {
+        $omitLength = 0;
+        if (-1 === $length) {
+            $omitLength = 1;
+        }
         $byteLen = \strlen($string);
 
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
@@ -131,7 +133,7 @@ final class MbSubstrJitHelper
             if ($start >= $charLen) {
                 return '';
             }
-            if (0 === $hasLength) {
+            if (1 === $omitLength) {
                 $length = $charLen - $start;
             } elseif ($length < 0) {
                 $length = $charLen - $start + $length;
@@ -178,7 +180,7 @@ final class MbSubstrJitHelper
         if ($start >= $charLen) {
             return '';
         }
-        if (0 === $hasLength) {
+        if (1 === $omitLength) {
             $length = $charLen - $start;
         } elseif ($length < 0) {
             $length = $charLen - $start + $length;
