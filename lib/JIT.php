@@ -20359,6 +20359,8 @@ class JIT {
             || $toCall instanceof JIT\Call\ReflectionObjectConstruct
             || $toCall instanceof JIT\Call\ReflectionFunctionConstruct
             || $toCall instanceof JIT\Call\ReflectionPropertyConstruct
+            || $toCall instanceof JIT\Call\ReflectionMethodConstruct
+            || $toCall instanceof JIT\Call\ReflectionClassConstantConstruct
             || $toCall instanceof JIT\Call\ReflectionConstantConstruct
             || $toCall instanceof JIT\Call\ReflectionEnumConstruct
             || $toCall instanceof JIT\Call\RandomizerConstruct
