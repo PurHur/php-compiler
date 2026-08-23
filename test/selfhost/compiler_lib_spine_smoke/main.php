@@ -5723,6 +5723,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassGetExtensionNameR
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionExtensionGetClassNamesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionExtensionGetDependenciesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionExtensionGetConstantsRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionExtensionGetINIEntriesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionExtensionIsPersistentRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionEnumJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionNamedArgumentsLookupRuntime.php';
@@ -6414,6 +6415,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionGetVersion.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionGetClassNames.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionGetDependencies.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionGetConstants.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionGetINIEntries.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionIsPersistent.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionExtensionIsTemporary.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionConstruct.php';
