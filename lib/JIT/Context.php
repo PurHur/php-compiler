@@ -1772,6 +1772,8 @@ class Context {
         $this->functionProxies['reflectionclass::isiterable'] = new Call\ReflectionClassIsIterateable();
         // Thin AOT: getParentClass without proxy → SIGSEGV on result use (#34069).
         $this->functionProxies['reflectionclass::getparentclass'] = new Call\ReflectionClassGetParentClass();
+        // Thin AOT: unbound getModifiers → NULL (#34077); VM has ReflectionClassGetModifiers (#18335).
+        $this->functionProxies['reflectionclass::getmodifiers'] = new Call\ReflectionClassGetModifiers();
         if (CompilerVersion::supportsLazyObjectFactories()) {
             $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
             $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
