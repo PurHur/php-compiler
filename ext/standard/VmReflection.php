@@ -4834,7 +4834,7 @@ final class VmReflection
             return 'core';
         }
         if (str_starts_with($lc, 'reflection')) {
-            return 'core';
+            return 'reflection';
         }
         if (str_starts_with($lc, 'fiber')) {
             return 'core';
@@ -4857,6 +4857,10 @@ final class VmReflection
         $logical = self::logicalExtensionForInternalClass($className);
         if (null === $logical || 'core' === $logical) {
             return 'Core';
+        }
+        // php-src module name is "Reflection" (capital R); logical key stays lowercase (#34139).
+        if ('reflection' === $logical) {
+            return 'Reflection';
         }
 
         return $logical;
