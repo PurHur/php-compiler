@@ -912,6 +912,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('array|string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('getenv'));
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend string|float (#25967). */
+    public function testMicrotimeReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|float', BuiltinInternalArgInfo::returnTypeLabelForFunction('microtime'));
+    }
+
     /** php-src ext/standard/basic_functions.stub.php — array|false + $iptc_block (#27782). */
     public function testIptcparseReflectionStubTypes(): void
     {

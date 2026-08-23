@@ -542,6 +542,8 @@ final class BuiltinInternalArgInfo
             'phpcredits' => 'bool',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend array|float (#27906)
             'gettimeofday' => 'array|float',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return; Zend string|float (#25967)
+            'microtime' => 'string|float',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend : mixed (#28023)
             'func_get_arg' => 'mixed',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty / absent; Zend void / int (#28022)
