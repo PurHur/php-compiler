@@ -13112,6 +13112,10 @@ class JIT {
                     }
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+                    $this->context->type->object->setClassSourceLocation(
+                        $this->context->scope->classId,
+                        $op->sourceLocation
+                    );
                     $this->context->scope->className = strtolower($nameOp->value);
                     $this->context->type->object->markInterfaceClass($nameOp->value);
                     if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
@@ -13145,6 +13149,10 @@ class JIT {
                     }
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+                    $this->context->type->object->setClassSourceLocation(
+                        $this->context->scope->classId,
+                        $op->sourceLocation
+                    );
                     $this->context->scope->className = strtolower($nameOp->value);
                     $this->context->type->object->markTraitClass($this->context->scope->className);
                     if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
@@ -13200,6 +13208,10 @@ class JIT {
                     }
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+                    $this->context->type->object->setClassSourceLocation(
+                        $this->context->scope->classId,
+                        $op->sourceLocation
+                    );
                     $this->context->scope->className = strtolower($nameOp->value);
                     if ($op->classIsAbstract) {
                         $this->context->type->object->markAbstractClass($nameOp->value);
@@ -26903,6 +26915,10 @@ class JIT {
         }
         $this->context->pushScope();
         $this->context->scope->classId = $this->context->type->object->declareEnum($nameOp);
+        $this->context->type->object->setClassSourceLocation(
+            $this->context->scope->classId,
+            $op->sourceLocation
+        );
         $this->context->scope->className = strtolower($nameOp->value);
         if (AttributeClassRegistry::isRegisteredAttributeClass($op->attributeEntries)) {
             $this->context->type->object->markAttributeClass($nameOp->value);
