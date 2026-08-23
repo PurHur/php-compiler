@@ -22,7 +22,14 @@ final class NodeLookupPrefix extends DomClassMethod
     {
         $this->requireExactUserArgCount($frame, 'DOMNode::lookupPrefix', 1);
         $node = $this->domRegistryNodeReceiver($frame, 'DOMNode::lookupPrefix()');
-        $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMNode::lookupPrefix()', 0);
+        // php-src stub: string $namespace — null TypeErrors under strict_types; else "" (#34099).
+        $namespace = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMNode::lookupPrefix()',
+            0,
+            $frame,
+            'namespace'
+        );
         if (null === $frame->returnVar) {
             return;
         }
