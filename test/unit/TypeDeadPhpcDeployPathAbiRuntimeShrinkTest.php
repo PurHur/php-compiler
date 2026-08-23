@@ -55,10 +55,15 @@ final class TypeDeadPhpcDeployPathAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringDeployPath::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringDeployPath(): void
+    public function testTypeInitializeLazyLinksStringDeployPath(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringDeployPath::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34241', $type);
+        $this->assertStringNotContainsString(
+            'StringDeployPath::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringDeployPath::ensureLinked (#34241)'
+        );
     }
 
     public function testNoNewRuntimeCForPhpcDeployPathAbi(): void

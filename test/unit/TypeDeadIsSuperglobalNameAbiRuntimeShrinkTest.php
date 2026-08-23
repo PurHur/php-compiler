@@ -50,10 +50,17 @@ final class TypeDeadIsSuperglobalNameAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#33235', $hook);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringSuperglobalName(): void
+    public function testTypeInitializeLazyLinksStringSuperglobalName(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringSuperglobalName::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34241', $type);
+        $this->assertStringNotContainsString(
+            'StringSuperglobalName::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringSuperglobalName::ensureLinked (#34241)'
+        );
+        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+        $this->assertStringContainsString('StringSuperglobalName::ensureLinked', $jit);
     }
 
     public function testNoNewRuntimeCForIsSuperglobalNameAbi(): void

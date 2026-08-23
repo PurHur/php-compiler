@@ -47,10 +47,15 @@ final class TypeDeadDateIntervalFormatAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('DateIntervalFormatRuntime::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksDateIntervalFormatRuntime(): void
+    public function testTypeInitializeLazyLinksDateIntervalFormatRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('DateIntervalFormatRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34241', $type);
+        $this->assertStringNotContainsString(
+            'DateIntervalFormatRuntime::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly DateIntervalFormatRuntime::ensureLinked (#34241)'
+        );
     }
 
     public function testNoNewRuntimeCForDateIntervalFormatAbi(): void

@@ -47,10 +47,15 @@ final class TypeDeadFormatDatetimeAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringDateTime::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringDateTime(): void
+    public function testTypeInitializeLazyLinksStringDateTime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringDateTime::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34241', $type);
+        $this->assertStringNotContainsString(
+            'StringDateTime::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringDateTime::ensureLinked (#34241)'
+        );
     }
 
     public function testNoNewRuntimeCForFormatDatetimeAbi(): void
