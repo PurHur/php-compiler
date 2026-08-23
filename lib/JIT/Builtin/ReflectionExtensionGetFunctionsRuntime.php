@@ -153,59 +153,45 @@ final class ReflectionExtensionGetFunctionsRuntime
      */
     private static function extensionLcToFunctionNames(Context $context): array
     {
-        /** @var array<string, list<string>> $byExt */
-        $byExt = [];
-        $seenExt = [];
-        foreach (ModuleRegistry::extensionFunctionMap() as $ext => $funcs) {
-            $lcExt = strtolower((string) $ext);
-            if ('' === $lcExt || !is_array($funcs)) {
+        /** @var array<string, true> $allNames */
+        $allNames = [];
+        foreach (ModuleRegistry::extensionFunctionMap() as $funcs) {
+            if (!is_array($funcs)) {
                 continue;
             }
-            $seenExt[$lcExt] = true;
             foreach ($funcs as $name) {
                 $name = (string) $name;
-                if ('' === $name) {
-                    continue;
+                if ('' !== $name) {
+                    $allNames[$name] = true;
                 }
-                if (!VmReflection::functionIsVisibleInReflection($name, $lcExt)) {
-                    continue;
-                }
-                if (strtolower(ModuleRegistry::reflectionOwningExtension(strtolower($name))) !== $lcExt) {
-                    continue;
-                }
-                $byExt[$lcExt][] = $name;
             }
         }
-        foreach (array_keys($seenExt) as $lcExt) {
+        foreach (array_keys(ModuleRegistry::extensionFunctionMap()) as $ext) {
+            $lcExt = strtolower((string) $ext);
             foreach (ModuleRegistry::getExtensionFunctions($lcExt) ?? [] as $name) {
                 $name = (string) $name;
-                if ('' === $name) {
-                    continue;
+                if ('' !== $name) {
+                    $allNames[$name] = true;
                 }
-                if (!VmReflection::functionIsVisibleInReflection($name, $lcExt)) {
-                    continue;
-                }
-                if (strtolower(ModuleRegistry::reflectionOwningExtension(strtolower($name))) !== $lcExt) {
-                    continue;
-                }
-                $byExt[$lcExt][] = $name;
             }
         }
-        // Ensure date/standard appear even if map keys differ.
         foreach (['date', 'standard', 'core'] as $lcExt) {
             foreach (ModuleRegistry::getExtensionFunctions($lcExt) ?? [] as $name) {
                 $name = (string) $name;
-                if ('' === $name) {
-                    continue;
+                if ('' !== $name) {
+                    $allNames[$name] = true;
                 }
-                if (!VmReflection::functionIsVisibleInReflection($name, $lcExt)) {
-                    continue;
-                }
-                if (strtolower(ModuleRegistry::reflectionOwningExtension(strtolower($name))) !== $lcExt) {
-                    continue;
-                }
-                $byExt[$lcExt][] = $name;
             }
+        }
+
+        /** @var array<string, list<string>> $byExt */
+        $byExt = [];
+        foreach (array_keys($allNames) as $name) {
+            $ownerLc = strtolower(ModuleRegistry::reflectionOwningExtension(strtolower($name)));
+            if (!VmReflection::functionIsVisibleInReflection($name, $ownerLc)) {
+                continue;
+            }
+            $byExt[$ownerLc][] = $name;
         }
         foreach ($byExt as $lcExt => $names) {
             $byExt[$lcExt] = array_values(array_unique($names));
