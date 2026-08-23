@@ -1145,6 +1145,8 @@ final class BuiltinInternalArgInfo
                 2 => 'int',
                 default => null,
             },
+            // ext/standard/array.stub.php — ?callable $callback (InternalArgInfo non-nullable callable) (#25396)
+            'array_map' => 0 === $index ? '?callable' : null,
             // ext/standard/array.stub.php — absent from InternalArgInfo (#24844)
             'array_column' => match ($index) {
                 0 => 'array',
