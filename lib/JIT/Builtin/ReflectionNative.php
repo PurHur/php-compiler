@@ -87,5 +87,23 @@ final class ReflectionNative
             $fn = $context->module->addFunction($variadicAbi, $ft);
             $context->registerFunction($variadicAbi, $fn);
         }
+
+        // Thin AOT ReflectionFunction param count / isUserDefined (#34218).
+        foreach (
+            [
+                ['__compiler_refl_func_param_count', $sizeT, [$i8p]],
+                ['__compiler_refl_func_is_user_defined', $i1, [$i8p]],
+            ] as [$name, $ret, $params]
+        ) {
+            $existing = $context->module->getNamedFunction($name);
+            if (null !== $existing) {
+                $context->registerFunction($name, $existing);
+
+                continue;
+            }
+            $ft = $context->context->functionType($ret, false, ...$params);
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
     }
 }

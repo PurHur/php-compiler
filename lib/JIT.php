@@ -2270,6 +2270,17 @@ class JIT {
         ) {
             JIT\Builtin\ReflectionFunctionVariadicLowering::recordFunction(strtolower($funcName));
         }
+        // Thin AOT ReflectionFunction::{getNumberOfParameters,isUserDefined,isInternal} (#34218).
+        if (
+            null !== $funcName
+            && '' !== $funcName
+            && (null === $block->func || null === $block->func->class)
+        ) {
+            JIT\Builtin\ReflectionFunctionParamCountLowering::recordUserFunction(
+                strtolower($funcName),
+                \count(array_values($block->paramNames))
+            );
+        }
         $skipName = $this->jitFunctionSkipName($logicalName, $block);
         if (!is_null($funcName)) {
             $internalName = $this->llvmInternalName($funcName);
