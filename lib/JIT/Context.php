@@ -1754,6 +1754,8 @@ class Context {
         $this->functionProxies['reflectionclass::getconstant'] = new Call\ReflectionClassGetConstant();
         // Thin AOT: unbound getConstants → NULL (#34109); VM ReflectionClassGetConstants (#6950).
         $this->functionProxies['reflectionclass::getconstants'] = new Call\ReflectionClassGetConstants();
+        // Thin AOT: unbound getReflectionConstants → NULL (#34119); VM #6662.
+        $this->functionProxies['reflectionclass::getreflectionconstants'] = new Call\ReflectionClassGetReflectionConstants();
         // Thin AOT: unbound getFileName → NULL/SIGSEGV (#34096); VM ReflectionClassGetFileName (#7358).
         $this->functionProxies['reflectionclass::getfilename'] = new Call\ReflectionClassGetFileName();
         // Thin AOT: unbound getStartLine/getEndLine/getDocComment → NULL (#34106); peer #34096 / VM #7358.
