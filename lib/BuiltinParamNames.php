@@ -439,6 +439,11 @@ final class BuiltinParamNames
             // php-src ext/posix/posix.stub.php — InternalArgInfo still errno (#27905)
             case 'posix_strerror':
                 return ['error_code'];
+            // php-src ext/posix/posix.stub.php — InternalArgInfo still uid / pid,sig (#24374)
+            case 'posix_getpwuid':
+                return ['user_id'];
+            case 'posix_kill':
+                return ['process_id', 'signal'];
             // php-src ext/posix/posix.stub.php — PHP 8.3+; absent from InternalArgInfo (#27918)
             case 'posix_sysconf':
                 return ['conf_id'];
