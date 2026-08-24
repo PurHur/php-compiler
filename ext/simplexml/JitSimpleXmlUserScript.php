@@ -121,6 +121,50 @@ final class JitSimpleXmlUserScript
         return self::materializeElement($context, $tree, true);
     }
 
+    /**
+     * simplexml_import_dom($node) from a compile-time loadXML document (#34419).
+     *
+     * php-src ext/simplexml/simplexml.c PHP_FUNCTION(simplexml_import_dom) —
+     * libxml node of a DOMDocument is the document element; host simplexml_load_string
+     * on the remembered loadXML literal matches Zend for the user-script path.
+     */
+    public static function tryImportDom(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!UserScriptAotEnv::isActive() || \count($args) < 1 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
+            $classLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $classLit || ('' !== $classLit && 0 !== strcasecmp($classLit, 'SimpleXMLElement'))) {
+                return null;
+            }
+        }
+        $xml = \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::compileTimeXmlFor($args[0])
+            ?? \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === trim($xml)) {
+            return null;
+        }
+        $prevInternal = null;
+        if (\function_exists('libxml_use_internal_errors')) {
+            $prevInternal = \libxml_use_internal_errors(true);
+            \libxml_clear_errors();
+        }
+        try {
+            $tree = \simplexml_load_string($xml);
+        } catch (\Throwable) {
+            $tree = false;
+        } finally {
+            if (null !== $prevInternal && \function_exists('libxml_use_internal_errors')) {
+                \libxml_use_internal_errors($prevInternal);
+            }
+        }
+        if (false === $tree || !($tree instanceof \SimpleXMLElement)) {
+            return null;
+        }
+
+        return self::materializeElement($context, $tree, true);
+    }
+
     public static function tryConstruct(Context $context, JITVariable ...$args): ?Value
     {
         self::$lastConstructParseFailed = false;

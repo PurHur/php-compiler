@@ -10,6 +10,8 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -86,6 +88,19 @@ final class simplexml_import_dom extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // php-src simplexml.stub.php: simplexml_import_dom(object $node, ?string $class = SimpleXMLElement::class)
+        if (!$this->requireArgCountRangeJit($context, $args, 'simplexml_import_dom', 1, 2)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+        if (UserScriptAotEnv::isActive()) {
+            $result = JitSimpleXmlUserScript::tryImportDom($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'simplexml_import_dom() user-script AOT requires a compile-time loadXML document (#34419)'
+            );
+        }
         throw new \LogicException('simplexml_import_dom() is not JIT-lowered in this compiler build');
     }
 
