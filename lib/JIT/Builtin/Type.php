@@ -446,13 +446,13 @@ class Type extends Builtin {
         // shells removed (#32839): user-script phpversion()/php_sapi_name()/zend_version()/
         // php_uname()/extension_loaded()/get_loaded_extensions()/get_extension_funcs()
         // stay JitInfo / InfoJitHelper (php-src ext/standard/info.c). NestedJIT/AOT
-        // bridge is StringInfo (getNamedFunction first; Type::initialize still
-        // ensureLinked). Leftover Type empty decls vs Runtime ABI drift mints
+        // bridge is StringInfo (getNamedFunction first; call-site ensureLinked
+        // #34337). Leftover Type empty decls vs Runtime ABI drift mints
         // phpversion.1 (#31894 / #32122).
         // __compiler_version_compare always-on shell removed (#32843): user-script
         // version_compare() stays JitInfo / VersionCompareJitHelper (php-src
         // ext/standard/versioning.c). NestedJIT/AOT bridge is StringVersionCompare
-        // (getNamedFunction first; Type::initialize still ensureLinked). Leftover
+        // (getNamedFunction first; call-site ensureLinked #34337). Leftover
         // Type empty decls vs Runtime ABI drift mints version_compare.1 (#31894 / #32122).
         // __compiler_gettimeofday_array / __compiler_gettimeofday_float always-on
         // shells removed (#32683): user-script gettimeofday() stays JitGettimeofday /
@@ -829,10 +829,11 @@ class Type extends Builtin {
         // JitStreamSocketAccept / FtokRuntime::invoke / Posix*Jit::invoke
         // already ensureLinked before lookup (peer #34327). StringTime still
         // eager below (TimeRuntimeShrinkTest::testTypeLinksStringTime).
-        // Crypto/json/password/random_bytes batch is peer #34332.
+        // StringInfo / StringVersionCompare always-on ensureLinked removed
+        // (#34337): JitInfo / ReflectionExtensionGetVersion already
+        // ensureLinked before lookup (peer #34333). Crypto/json/password/
+        // random_bytes batch is peer #34332.
         StringTime::ensureLinked($this->context);
-        StringInfo::ensureLinked($this->context);
-        StringVersionCompare::ensureLinked($this->context);
         // openssl / hash / json / libcrypt / password / random_bytes always-on
         // ensureLinked removed (#34332): JitOpenssl* / OpensslEncryptCrypto /
         // JitHash / JitJson* / JitLibcrypt / JitPassword* / JitRandomBytes /

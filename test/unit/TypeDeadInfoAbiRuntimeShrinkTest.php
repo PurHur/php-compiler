@@ -52,8 +52,10 @@ final class TypeDeadInfoAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StringInfo::ensureLinked', $type);
-        $this->assertStringContainsString('StringVersionCompare::ensureLinked', $type);
+        // StringInfo / StringVersionCompare ensureLinked moved to call-site (#34337).
+        $this->assertStringContainsString('#34337', $type);
+        $this->assertStringNotContainsString('StringInfo::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringVersionCompare::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresInfoAbisModuleLocally(): void
@@ -67,10 +69,14 @@ final class TypeDeadInfoAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('module->addFunction(', $info);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringInfo(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkStringInfo(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringInfo::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringInfo::ensureLinked($this->context)', $type);
+        $jitInfo = (string) file_get_contents(__DIR__.'/../../ext/standard/JitInfo.php');
+        $this->assertStringContainsString('StringInfo::ensureLinked', $jitInfo);
+        $reflection = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/ReflectionExtensionGetVersion.php');
+        $this->assertStringContainsString('StringInfo::ensureLinked', $reflection);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void
