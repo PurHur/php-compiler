@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\iconv;
 
+use PHPCompiler\ext\standard\JitJsonDecode;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringIconvMime;
 use PHPCompiler\JIT\Context;
@@ -16,7 +17,8 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for iconv_mime_decode/encode (#27424, #31310; php-src ext/iconv/iconv.c).
+ * LLVM lowering for iconv_mime_decode/encode/decode_headers
+ * (#27424, #31310, #34441; php-src ext/iconv/iconv.c).
  */
 final class JitIconvMime
 {
@@ -62,6 +64,50 @@ final class JitIconvMime
         );
 
         return self::materializeStringOrFalse($context, $result);
+    }
+
+    public static function invokeDecodeHeaders(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('iconv_mime_decode_headers() requires between 1 and 3 arguments');
+        }
+
+        $folded = self::tryCompileTimeFoldHeaders($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        $headers = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv_mime_decode_headers', 0, 'headers')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'iconv_mime_decode_headers', 0, 'headers');
+
+        $i64 = $context->getTypeFromString('int64');
+        $mode = $i64->constInt(0, false);
+        if ($argc >= 2) {
+            $mode = JitLongArg::lower($context, $args[1], 'iconv_mime_decode_headers() mode');
+        }
+
+        if ($argc >= 3) {
+            $charsetIsNull = JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant;
+            $charset = $charsetIsNull
+                ? $context->builder->load($context->constantStringFromString(''))
+                : ($context->callerStrictTypes
+                    ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'iconv_mime_decode_headers', 2, 'encoding')
+                    : JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'iconv_mime_decode_headers', 2, 'encoding'));
+        } else {
+            $charset = $context->builder->load($context->constantStringFromString(''));
+        }
+
+        StringIconvMime::ensureDecodeHeadersLinked($context);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__compiler_iconv_mime_decode_headers'),
+            $headers,
+            $mode,
+            $charset
+        );
+
+        return self::materializeHashtableOrFalse($context, $ht);
     }
 
     public static function invokeEncode(Context $context, JITVariable ...$args): Value
@@ -163,6 +209,55 @@ final class JitIconvMime
     /**
      * @param JITVariable[] $args
      */
+    private static function tryCompileTimeFoldHeaders(Context $context, array $args): ?Value
+    {
+        $headers = JitStringBuiltinArg::compileTimeLiteral($args[0]);
+        if (null === $headers) {
+            return null;
+        }
+        $mode = 0;
+        if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
+            if (null === $args[1]->compileTimeLong) {
+                return null;
+            }
+            $mode = (int) $args[1]->compileTimeLong;
+        }
+        $charset = null;
+        if (isset($args[2])) {
+            if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+                $charset = null;
+            } else {
+                $charset = JitStringBuiltinArg::compileTimeLiteral($args[2]);
+                if (null === $charset) {
+                    return null;
+                }
+            }
+        }
+
+        $result = VmIconvMime::mimeDecodeHeaders($headers, $mode, $charset, null);
+        if (false === $result) {
+            $slot = JitValueBox::alloc($context);
+            $i1 = $context->getTypeFromString('int1');
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        $ht = JitJsonDecode::materializeArray($context, $result);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $ht
+        );
+
+        return $ptr;
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
     private static function tryCompileTimeFoldEncode(Context $context, array $args): ?Value
     {
         $fieldName = JitStringBuiltinArg::compileTimeLiteral($args[0]);
@@ -215,6 +310,37 @@ final class JitIconvMime
             $context->lookupFunction('__value__writeString'),
             $ptr,
             $contents
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
+    private static function materializeHashtableOrFalse(Context $context, Value $ht): Value
+    {
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $failed = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtrTy->constNull());
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+
+        $failBlock = BasicBlockHelper::append($context, 'iconv_mime_hdr_fail');
+        $okBlock = BasicBlockHelper::append($context, 'iconv_mime_hdr_ok');
+        $doneBlock = BasicBlockHelper::append($context, 'iconv_mime_hdr_done');
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $ht
         );
         $context->builder->branch($doneBlock);
 

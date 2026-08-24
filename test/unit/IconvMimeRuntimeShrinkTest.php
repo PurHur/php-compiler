@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** iconv_mime_decode/encode JIT routes through IconvMimeJitHelper PHP (#27424, #31310). */
+/** iconv_mime_decode/encode/decode_headers JIT routes through IconvMimeJitHelper PHP (#27424, #31310, #34441). */
 final class IconvMimeRuntimeShrinkTest extends TestCase
 {
     public function testIconvMimeDecodeCallUsesJitIconvMime(): void
@@ -23,6 +23,13 @@ final class IconvMimeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('not lowered for JIT/AOT', $source);
     }
 
+    public function testIconvMimeDecodeHeadersCallUsesJitIconvMime(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/iconv/iconv_mime_decode_headers.php');
+        $this->assertStringContainsString('JitIconvMime::invokeDecodeHeaders', $source);
+        $this->assertStringNotContainsString('not lowered for JIT/AOT', $source);
+    }
+
     public function testIconvMimeJitHelperDelegatesToVmIconvMime(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/iconv/IconvMimeJitHelper.php');
@@ -30,6 +37,9 @@ final class IconvMimeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('mimeDecodeArgv', $source);
         $this->assertStringContainsString('VmIconvMime::mimeEncode', $source);
         $this->assertStringContainsString('mimeEncodeArgv', $source);
+        $this->assertStringContainsString('VmIconvMime::mimeDecodeHeaders', $source);
+        $this->assertStringContainsString('mimeDecodeHeadersArgv', $source);
+        $this->assertStringContainsString('headersResultToHashTable', $source);
     }
 
     public function testStringIconvMimeUsesJitVmHelperLinkEnsureBridge(): void
@@ -37,8 +47,10 @@ final class IconvMimeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringIconvMime.php');
         $this->assertStringContainsString('::mimeDecodeArgv', $source);
         $this->assertStringContainsString('::mimeEncodeArgv', $source);
+        $this->assertStringContainsString('::mimeDecodeHeadersArgv', $source);
         $this->assertStringContainsString('__compiler_iconv_mime_decode', $source);
         $this->assertStringContainsString('__compiler_iconv_mime_encode', $source);
+        $this->assertStringContainsString('__compiler_iconv_mime_decode_headers', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
