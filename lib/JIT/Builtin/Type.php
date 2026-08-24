@@ -886,15 +886,24 @@ class Type extends Builtin {
         // (peer #34414). Eager NestedJIT on every full load vs Runtime ABI drift
         // mints readfile.1 / file_get_contents.1 / … (#31894 / #32122).
         // StringTime still eager below (TimeRuntimeShrinkTest).
+        // StringStrtr / StringPhpinfoRuntime / StringDir /
+        // DirectoryIteratorSnapshotRuntime / GlobIteratorSnapshotRuntime /
+        // SplFileObjectSnapshotRuntime / StringFsGlob / StringFsDir always-on
+        // ensureLinked removed (#34433): call-site StringStrtr::ensureLinked /
+        // StringPhpinfoRuntime::ensureLinked / StringDir::ensureLinked /
+        // DirectoryIteratorSnapshotRuntime::ensureLinked /
+        // GlobIteratorSnapshotRuntime::ensureLinked /
+        // SplFileObjectSnapshotRuntime::ensureLinked (via snapshotPath) /
+        // StringFsGlob::ensureLinked / StringFsDir::ensureLinked (JitStrtr /
+        // JitInfo / readdir.php / closedir.php / rewinddir.php /
+        // DirectoryIteratorJitHelper / GlobIteratorJitHelper /
+        // SplFileObjectJitHelper / glob_.php / scandir.php /
+        // JitIsUploadedFile / JitMoveUploadedFile / StringDirFactory /
+        // DirectoryIteratorSnapshotRuntime / GlobIteratorSnapshotRuntime)
+        // already run before lookup (peer #34423). Eager NestedJIT on every
+        // full load vs Runtime ABI drift mints strtr.1 / phpinfo.1 / … (#31894 /
+        // #32122). StringTime still eager below (TimeRuntimeShrinkTest).
         StringCslashes::ensureStandaloneBodies($this->context);
-        StringStrtr::ensureLinked($this->context);
-        StringPhpinfoRuntime::ensureLinked($this->context);
-        StringDir::ensureLinked($this->context);
-        DirectoryIteratorSnapshotRuntime::ensureLinked($this->context);
-        GlobIteratorSnapshotRuntime::ensureLinked($this->context);
-        SplFileObjectSnapshotRuntime::ensureLinked($this->context);
-        StringFsGlob::ensureLinked($this->context);
-        StringFsDir::ensureLinked($this->context);
         StatCache::ensureLinked($this->context);
         StatPath::ensureLinked($this->context);
         StreamSync::ensureLinked($this->context);
