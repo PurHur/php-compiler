@@ -13,11 +13,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT: dom_import_simplexml() (#34413).
+ * User-script AOT: dom_import_simplexml() / Dom\import_simplexml() (#34413, #34481).
  *
- * php-src ext/dom/node.c PHP_FUNCTION(dom_import_simplexml) — wraps the SimpleXML
- * element as a DOMElement under a fresh document. NestedJIT of the live peer bridge
- * is unsafe for host-tracked SXE objects; materialize like loadXML / createFromString.
+ * php-src ext/dom/node.c PHP_FUNCTION(dom_import_simplexml) and
+ * ext/dom/php_dom.c Dom_import_simplexml (PHP_LIBXML_CLASS_MODERN) — wraps the
+ * SimpleXML element as DOMElement / Dom\Element under a fresh document.
+ * NestedJIT of the live peer bridge is unsafe for host-tracked SXE objects;
+ * materialize like loadXML / createFromString.
  */
 final class JitDomImportSimpleXmlUserScript
 {
@@ -25,10 +27,25 @@ final class JitDomImportSimpleXmlUserScript
 
     private const CLASS_ELEMENT = 'DOMElement';
 
+    private const CLASS_LIVING_DOCUMENT = 'Dom\\XMLDocument';
+
+    private const CLASS_LIVING_ELEMENT = 'Dom\\Element';
+
     /** @var array<string, string>|null */
     private static ?array $pendingImportAttributes = null;
 
     public static function tryImport(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::tryImportInternal($context, false, ...$args);
+    }
+
+    /** Living Dom\import_simplexml() — Dom\XMLDocument + Dom\Element (#34481 / #20711). */
+    public static function tryImportModern(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::tryImportInternal($context, true, ...$args);
+    }
+
+    private static function tryImportInternal(Context $context, bool $modern, JITVariable ...$args): ?Value
     {
         if (!UserScriptAotEnv::isActive() || 1 !== \count($args)) {
             return null;
@@ -51,12 +68,22 @@ final class JitDomImportSimpleXmlUserScript
             return null;
         }
 
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_import_simplexml_us');
-        JitDomLoadXMLUserScript::rememberCompileTimeXml($forParse, self::CLASS_DOCUMENT);
+        $docClass = $modern ? self::CLASS_LIVING_DOCUMENT : self::CLASS_DOCUMENT;
+        $elemClass = $modern ? self::CLASS_LIVING_ELEMENT : self::CLASS_ELEMENT;
+
+        BasicBlockHelper::ensureOpenInsertBlock(
+            $context,
+            $modern ? 'dom_ns_import_simplexml_us' : 'dom_import_simplexml_us'
+        );
+        JitDomLoadXMLUserScript::rememberCompileTimeXml($forParse, $docClass);
         JitDomLoadXMLUserScript::markLastLoadPureUserScript();
+        if ($modern) {
+            JitDomLoadXMLUserScript::rememberLivingDocumentClass($docClass);
+            JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
+        }
 
         $objectType = $context->type->object;
-        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        $docClassId = $objectType->lookup($docClass);
         if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCUMENT_ELEMENT)) {
             $objectType->defineProperty($docClassId, VmDom::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
         }
@@ -67,14 +94,19 @@ final class JitDomImportSimpleXmlUserScript
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($forParse);
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($forParse);
         $attrs = DomParseSimpleXmlJitHelper::rootAttributesArgv($forParse);
-        $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
-        JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
+        $element = JitDomCreateElement::materializeElementWithTextContent(
+            $context,
+            $tag,
+            $text,
+            $elemClass
+        );
+        JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner, $elemClass);
         $rootMarkup = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($forParse);
         if (null !== $rootMarkup && '' !== $rootMarkup['attrs']) {
-            JitDomCreateElement::storeUserScriptXmlnsAttr($context, $element, $rootMarkup['attrs']);
+            JitDomCreateElement::storeUserScriptXmlnsAttr($context, $element, $rootMarkup['attrs'], $elemClass);
         }
-        JitDomCreateElement::storeAttributesPresence($context, $element, $attrs);
-        JitDomGetNodePath::storeOn($context, $element, self::CLASS_ELEMENT, '/'.$tag);
+        JitDomCreateElement::storeAttributesPresence($context, $element, $attrs, $elemClass);
+        JitDomGetNodePath::storeOn($context, $element, $elemClass, '/'.$tag);
         JitDomDocumentElement::syncChildrenFromXmlPublic(
             $context,
             $element,
@@ -96,18 +128,18 @@ final class JitDomImportSimpleXmlUserScript
             $document
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCUMENT_ELEMENT),
+            $objectType->propertySlotFor($document, $docClass, VmDom::PROP_DOCUMENT_ELEMENT),
             $elemJit,
             JITVariable::TYPE_OBJECT
         );
 
-        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        $elementClassId = $objectType->lookup($elemClass);
         foreach ([VmDom::PROP_PARENT_NODE, VmDom::PROP_OWNER_DOCUMENT] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
             $objectType->propertyStore(
-                $objectType->propertySlotFor($element, self::CLASS_ELEMENT, $prop),
+                $objectType->propertySlotFor($element, $elemClass, $prop),
                 $docJit,
                 JITVariable::TYPE_VALUE
             );

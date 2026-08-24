@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -42,6 +44,18 @@ final class ns_import_simplexml extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireExactJitArgCount($context, $args, 'Dom\\import_simplexml', 1)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+        if (UserScriptAotEnv::isActive()) {
+            $result = JitDomImportSimpleXmlUserScript::tryImportModern($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'Dom\\import_simplexml() user-script AOT requires a tracked SimpleXMLElement (#34481)'
+            );
+        }
         throw new \LogicException('Dom\\import_simplexml() is not JIT-lowered in this compiler build');
     }
 }
