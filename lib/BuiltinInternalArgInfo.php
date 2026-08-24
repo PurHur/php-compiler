@@ -280,6 +280,9 @@ final class BuiltinInternalArgInfo
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#23357)
             'long2ip' => 'string|false',
             'gethostbyaddr' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false (#26318)
+            'getservbyname', 'getprotobyname' => 'int|false',
+            'getservbyport', 'getprotobynumber' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28000)
             'gethostname' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return string (missing |false) (#28334)

@@ -1986,6 +1986,17 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src basic_functions.stub.php — InternalArgInfo omits |false (#26318). */
+    public function testNetworkServiceProtoReflectionReturnUnions(): void
+    {
+        foreach (['getservbyname', 'getprotobyname'] as $f) {
+            $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+        foreach (['getservbyport', 'getprotobynumber'] as $f) {
+            $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+    }
+
     /** php-src file.stub.php — InternalArgInfo omits |false / ?int $length (#25750). */
     public function testStreamGetContentsReflectionTypes(): void
     {
