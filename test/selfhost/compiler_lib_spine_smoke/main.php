@@ -527,6 +527,7 @@ require_once __DIR__.'/../../../ext/dom/JitDomGetElementsByTagName.php';
 require_once __DIR__.'/../../../ext/dom/JitDomGetElementsByTagNameUserScript.php';
 require_once __DIR__.'/../../../ext/dom/JitDomAdoptNode.php';
 require_once __DIR__.'/../../../ext/dom/JitDomImportNode.php';
+require_once __DIR__.'/../../../ext/dom/JitDomImportSimpleXmlUserScript.php';
 require_once __DIR__.'/../../../ext/dom/JitDomInsertAdjacent.php';
 require_once __DIR__.'/../../../ext/dom/JitDomInstanceMethodKernel.php';
 require_once __DIR__.'/../../../ext/dom/JitDomLoad.php';

@@ -13091,6 +13091,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateDomImportSimpleXmlCompileTime(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     $this->propagateJsonEncodeFoldedString(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
@@ -16145,6 +16149,30 @@ class JIT {
                 && null !== $var->compileTimeString
             ) {
                 $this->context->namedVariableBindings[$resolved]->compileTimeString = $var->compileTimeString;
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
+    }
+
+    private function propagateDomImportSimpleXmlCompileTime(Operand $result, mixed $toCall): void
+    {
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        if (!\PHPCompiler\ext\dom\JitDomImportSimpleXmlUserScript::applyPendingImportAssign($var)) {
+            return;
+        }
+        $var->classUserType = 'DOMElement';
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])
+                && $this->context->namedVariableBindings[$resolved] !== $var
+            ) {
+                $this->context->namedVariableBindings[$resolved]->compileTimeDomAttributes
+                    = $var->compileTimeDomAttributes;
+                $this->context->namedVariableBindings[$resolved]->classUserType = 'DOMElement';
             }
             $this->context->bindVariableByName($resolved, $var);
         }
