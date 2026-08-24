@@ -168,7 +168,11 @@ final class JitDomNodeChildProperty
     {
         $result->compileTimeDomChildIndex = $index;
         self::$lastFetchedChildIndex = $index;
-        if ('element' === ($nodes[$index]['kind'] ?? '')) {
+        $kind = $nodes[$index]['kind'] ?? '';
+        if ('text' === $kind) {
+            $result->compileTimeDomTextData = $nodes[$index]['data'];
+        }
+        if ('element' === $kind) {
             $result->compileTimeDomTagName = $nodes[$index]['data'];
             self::$lastFetchedTagName = $nodes[$index]['data'];
             $inner = $nodes[$index]['inner'] ?? null;
