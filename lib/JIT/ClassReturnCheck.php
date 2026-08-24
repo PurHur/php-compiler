@@ -75,12 +75,63 @@ final class ClassReturnCheck
 
             return false;
         }
+        // Bare `: object` is ZEND_TYPE_IS_OBJECT — any object passes. Do not emitInstanceOf
+        // against a synthetic class named "object" (stdClass then TypeErrors; #34403).
+        if ('object' === $classLc) {
+            return self::enforceAnyObjectReturn($context, $return, $callableName, $expected);
+        }
         if (Variable::TYPE_VALUE === $return->type) {
             return self::enforceValueBox($context, $objectType, $return, $callableName, $expected);
         }
         $ok = $objectType->emitInstanceOf($return, $classLc);
 
         return self::branchOnBoolOrRaise($context, $ok, $callableName, $expected, $return, $objectType);
+    }
+
+    /**
+     * Bare `: object` return — accept any object / reject scalars (zend_execute_API.c; #34403).
+     *
+     * @return bool false when a TypeError path was emitted
+     */
+    private static function enforceAnyObjectReturn(
+        Context $context,
+        Variable $return,
+        ?string $callableName,
+        string $expected
+    ): bool {
+        if (Variable::TYPE_OBJECT === $return->type) {
+            return true;
+        }
+        if (Variable::TYPE_VALUE === $return->type) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $return);
+            $map = $context->structFieldMap['__value__'];
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($valuePtr, $map['type'])
+            );
+            $fn = $context->builder->getInsertBlock()->getParent();
+            assert($fn instanceof \PHPLLVM\Value\Function_);
+            $objectBlock = $fn->appendBasicBlock('object_return_value_object');
+            $scalarBlock = $fn->appendBasicBlock('object_return_value_scalar');
+            $resume = $fn->appendBasicBlock('object_return_value_resume');
+            $i8 = $context->getTypeFromString('int8');
+            $isObject = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_OBJECT, false)
+            );
+            $context->builder->branchIf($isObject, $objectBlock, $scalarBlock);
+            $context->builder->positionAtEnd($scalarBlock);
+            self::raiseReturnTypeError($context, $callableName, $expected, 'int');
+            self::emitUnreachableIfNeeded($context);
+            $context->builder->positionAtEnd($objectBlock);
+            $context->builder->branch($resume);
+            $context->builder->positionAtEnd($resume);
+
+            return true;
+        }
+        self::raiseReturnTypeError($context, $callableName, $expected, 'null');
+
+        return false;
     }
 
     /**
