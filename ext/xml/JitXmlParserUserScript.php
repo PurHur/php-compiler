@@ -22,12 +22,13 @@ use PHPLLVM\Value;
  * xml_get_error_code / xml_parser_free / xml_parser_set_option / xml_parser_get_option /
  * xml_parse_into_struct / xml_error_string / xml_get_current_{line,column,byte}_* /
  * xml_set_element_handler / xml_set_character_data_handler
- * (#27293, #29318, #34377, #34378, #34383, #34407, #34487).
+ * (#27293, #29318, #34377, #34378, #34383, #34407, #34487, #34515).
  *
  * Runs the existing PHP-in-PHP parser model ({@see VmXml}, {@see XmlParserSupport}) at
  * compile time when arguments are literals, then emits constant results / an allocated
  * XMLParser shell — same shape as {@see \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript}.
- * SAX Closures are replayed via {@see NestedClosureInvoke} (#34487). No runtime/*.c growth.
+ * SAX Closures replay via Variable::$closureCall (ArrayReduce peer); NestedClosureInvoke
+ * multi-candidate dispatch wrong-targets when Closures use() (#34515 / #34487). No runtime/*.c.
  */
 final class JitXmlParserUserScript
 {
@@ -449,6 +450,23 @@ final class JitXmlParserUserScript
     }
 
     /**
+     * Invoke a compile-time SAX Closure with known Variable::$closureCall (#34515).
+     *
+     * Falls back to NestedClosureInvoke only when closureCall was stripped (should not
+     * happen for handlers accepted by {@see optionalClosureHandler}).
+     */
+    private static function invokeSaxClosure(Context $context, JITVariable $handler, JITVariable ...$args): void
+    {
+        if (null !== $handler->closureCall) {
+            $handler->closureCall->call($context, ...$args);
+
+            return;
+        }
+        $invoke = new NestedClosureInvoke();
+        $invoke->call($context, $handler, ...$args);
+    }
+
+    /**
      * @param array{element_start: ?JITVariable, element_end: ?JITVariable, character_data: ?JITVariable} $handlers
      */
     private static function emitSaxHandlerReplay(
@@ -464,12 +482,14 @@ final class JitXmlParserUserScript
             return null;
         }
 
+        // Prefer Variable::$closureCall (ArrayReduceLlvm peer #24156). NestedClosureInvoke →
+        // RuntimeIndirectClosureCall misfires when multiple Closures with use() share a module:
+        // end events call the start body → ArgumentCountError (#34515 / re-#34487).
         NestedClosureInvokeLlvm::ensureLinked($context);
-        $invoke = new NestedClosureInvoke();
         foreach ($events['events'] as $ev) {
             $kind = $ev['kind'];
             if ('start' === $kind && null !== $handlers['element_start']) {
-                $invoke->call(
+                self::invokeSaxClosure(
                     $context,
                     $handlers['element_start'],
                     $parserVar,
@@ -477,14 +497,14 @@ final class JitXmlParserUserScript
                     self::attrsArg($context, $ev['attrs'])
                 );
             } elseif ('end' === $kind && null !== $handlers['element_end']) {
-                $invoke->call(
+                self::invokeSaxClosure(
                     $context,
                     $handlers['element_end'],
                     $parserVar,
                     self::stringArg($context, $ev['name'])
                 );
             } elseif ('cdata' === $kind && null !== $handlers['character_data']) {
-                $invoke->call(
+                self::invokeSaxClosure(
                     $context,
                     $handlers['character_data'],
                     $parserVar,
