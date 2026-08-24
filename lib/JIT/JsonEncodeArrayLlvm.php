@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\ext\standard\JitJsonEncode;
+use PHPCompiler\ext\standard\VmJsonFlags;
 use PHPCompiler\JIT\Builtin\JsonEncodeQuoteStringRuntime;
 use PHPCompiler\JIT\Call\HashTableExportKeyValuePairs;
 use PHPCompiler\JIT\Call\HashTableIsPackedList;
@@ -142,7 +143,13 @@ final class JsonEncodeArrayLlvm
         $quotedKeyPhi->addIncoming($quotedKey, $keyDoneStr);
         $quotedKeyPhi->addIncoming($quotedKeyLong, $keyDoneLong);
 
-        $valJson = JitJsonEncode::encodeBoxedValue($context, $valPtr, $flags);
+        // FORCE_OBJECT shapes this HT container only — nested arrays stay JSON arrays (#34522).
+        $forceBit = $i64->constInt(VmJsonFlags::FORCE_OBJECT, false);
+        $childFlags = $context->builder->xor(
+            $flags,
+            $context->builder->and($flags, $forceBit)
+        );
+        $valJson = JitJsonEncode::encodeBoxedValue($context, $valPtr, $childFlags);
 
         $withKey = $context->builder->select(
             $packed,
