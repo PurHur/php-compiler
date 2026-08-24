@@ -29,8 +29,10 @@ final class TypeDeadPhpcRunCommandAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_phpc_run_command (#33212)'
         );
-        // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('ProcessRuntime::ensureLinked', $type);
+        // ProcessRuntime ensureLinked moved to call-site (#34333); phpc_run_command
+        // links via ensurePhpcRunCommandLinked from JitPhpcRunCommand.
+        $this->assertStringContainsString('#34333', $type);
+        $this->assertStringNotContainsString('ProcessRuntime::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresPhpcRunCommandAbiModuleLocally(): void

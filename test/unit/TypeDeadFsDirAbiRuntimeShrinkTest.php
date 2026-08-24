@@ -43,7 +43,9 @@ final class TypeDeadFsDirAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('FtokRuntime::ensureLinked', $type);
+        // FtokRuntime ensureLinked moved to call-site (#34333).
+        $this->assertStringContainsString('#34333', $type);
+        $this->assertStringNotContainsString('FtokRuntime::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnersDeclareFsDirAbisModuleLocally(): void

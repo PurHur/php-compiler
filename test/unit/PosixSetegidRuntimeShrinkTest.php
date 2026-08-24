@@ -81,9 +81,11 @@ final class PosixSetegidRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31066', $source);
     }
 
-    public function testTypeRegistersPosixSetegidBridge(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkPosixSetegid(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('PosixSetegidJit::ensureLinked', $source);
+        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertStringNotContainsString('PosixSetegidJit::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PosixSetegidJit.php');
+        $this->assertStringContainsString('self::ensureLinked($context)', $jit);
     }
 }
