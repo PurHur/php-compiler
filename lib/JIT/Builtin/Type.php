@@ -671,13 +671,15 @@ class Type extends Builtin {
         // StreamPathJitHelper / VmFs (php-src ext/standard/streamsfuncs.c).
         // __compiler_fgetcsv always-on shell removed (#33189): StringStreamCsv /
         // StringFgetcsvJit owns the ABI (getNamedFunction first, then addFunction if
-        // absent via implementFgetcsvBridge; Type::initialize still
-        // StringStreamCsv::ensureLinked on the full load path). Leftover Type empty
+        // absent via implementFgetcsvBridge; Type::initialize always-on
+        // StringStreamCsv::ensureLinked removed (#34445) — JitFgetcsv /
+        // JitStrGetcsv link StringStrGetcsv before use). Leftover Type empty
         // decls vs Runtime ABI drift mint fgetcsv.1 (#31894 / #32122). User-script
         // fgetcsv() stays JitFgetcsv / CsvStrGetcsvJitHelper (php-src file.c).
         // __compiler_str_getcsv always-on shell removed (#33196): StringStrGetcsv /
         // StringStreamCsv owns the ABI (getNamedFunction first via implementStrGetcsvBridge;
-        // Type::initialize still StringStreamCsv::ensureLinked → StringStrGetcsv). Leftover
+        // Type::initialize always-on StringStreamCsv::ensureLinked removed (#34445) —
+        // JitStrGetcsv links StringStrGetcsv). Leftover
         // Type empty decls vs Runtime ABI drift mint str_getcsv.1 (#31894 / #32122).
         // User-script str_getcsv() stays JitStrGetcsv / CsvStrGetcsvJitHelper
         // (php-src ext/standard/file.c — PHP_FUNCTION(str_getcsv)).
@@ -919,14 +921,19 @@ class Type extends Builtin {
         // JitGetResources / SettypeRuntime) already run before lookup (peer #34433).
         // Eager NestedJIT on every full load vs Runtime ABI drift mints fsync.1 /
         // fopen.1 / feof.1 / … (#31894 / #32122). StringTime still eager below.
+        // StatCache / StatPath / Stats / StreamGlobals / GzStreamIo / Bz2StreamIo /
+        // StringStreamCsv always-on ensureLinked removed (#34445): call-site
+        // StatCacheRuntime::ensureLinked / StatPathRuntime::ensureLinked /
+        // Stats::ensureLinked / StreamGlobalsJit::implement|ensureGlobals /
+        // GzStreamIo::ensureLinked / GzStreamRuntime::ensureLinked /
+        // Bz2StreamRuntime::ensureLinked / StringStrGetcsv::ensureLinked
+        // (JitStat / JitStatPathKernel / JitClearstatcache / JitStats /
+        // JitStreamIoKernel / JitStreamSyncKernel / JitStreamMetaThinAot /
+        // JitGz* / JitBz2* / JitStrGetcsv / JitFgetcsv) already run before lookup
+        // (peer #34439). Eager NestedJIT on every full load vs Runtime ABI drift
+        // mints clearstatcache.1 / file_exists.1 / gzopen.1 / bzopen.1 /
+        // fgetcsv.1 / … (#31894 / #32122). StringTime still eager above.
         StringCslashes::ensureStandaloneBodies($this->context);
-        StatCache::ensureLinked($this->context);
-        StatPath::ensureLinked($this->context);
-        Stats::ensureLinked($this->context);
-        StreamGlobals::ensureLinked($this->context);
-        GzStreamIo::ensureLinked($this->context);
-        Bz2StreamIo::ensureLinked($this->context);
-        StringStreamCsv::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);

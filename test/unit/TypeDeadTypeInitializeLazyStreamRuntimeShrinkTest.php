@@ -39,11 +39,7 @@ final class TypeDeadTypeInitializeLazyStreamRuntimeShrinkTest extends TestCase
             $type,
             'StringTime stays eager (#34439 / TimeRuntimeShrinkTest)'
         );
-        $this->assertStringContainsString(
-            'StreamGlobals::ensureLinked($this->context)',
-            $type,
-            'StreamGlobals stays eager for later peer (#34439)'
-        );
+        // StreamGlobals lazy-linked in peer #34445 — no longer asserted here.
     }
 
     public function testCallSitesEnsureLinkBeforeLookup(): void
