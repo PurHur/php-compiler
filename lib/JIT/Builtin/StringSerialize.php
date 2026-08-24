@@ -15,6 +15,7 @@ use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\SerializeArrayLlvm;
+use PHPCompiler\JIT\SerializeObjectPropsLlvm;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
@@ -34,7 +35,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * {@see SerializeNestedJitHelper::encodeHashtable} SIGABRTs on non-empty HTs (#34483).
  *
  * Object ABI builds the `O:len:"Class":` header via NestedJIT with LLVM-loaded length,
- * then concatenates NestedJIT property bag (peer JsonEncode #27020 shape for arrays).
+ * then concatenates {@see SerializeObjectPropsLlvm} property bag (`N:{…}`) — NestedJIT
+ * {@see SerializeObjectNestedJitHelper::encodeObjectProps} SIGABRTs on non-empty props (#34493).
  * php-src: ext/standard/var.c — php_var_serialize
  */
 final class StringSerialize
@@ -324,15 +326,20 @@ final class StringSerialize
             return;
         }
 
+        // Nested array props need HT ABI before object bag emit (#34493 / peer #34483).
+        self::implementSerializeHashtableBridge($context);
+
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $ft = $context->context->functionType($strPtr, false, $strPtr, $htPtr);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        // Register before body emit: EncodeBoxedValue may recurse into object ABI.
+        $context->registerFunction($abiName, $fn);
 
         JitVmHelperLink::ensureCompiled(
             $context,
             self::OBJECT_HELPER_PATH,
-            self::OBJECT_COMPILED_HELPERS,
+            [self::OBJECT_HEADER_HELPER],
             '#27030'
         );
 
@@ -347,40 +354,35 @@ final class StringSerialize
             $context->registerFunction('__string__alloc', $alloc);
         }
 
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::OBJECT_BRIDGE_ENTRY);
-        $context->builder->positionAtEnd($entry);
-        $className = $fn->getParam(0);
-        $props = $fn->getParam(1);
-        $strMap = $context->structFieldMap['__string__'];
-        $classLen = $context->builder->load(
-            $context->builder->structGep($className, $strMap['length'])
-        );
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn, $strPtr): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::OBJECT_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            $className = $fn->getParam(0);
+            $props = $fn->getParam(1);
+            $strMap = $context->structFieldMap['__string__'];
+            $classLen = $context->builder->load(
+                $context->builder->structGep($className, $strMap['length'])
+            );
 
-        $headerFn = self::objectHelperFunction($context, self::OBJECT_HEADER_HELPER);
-        $classArg = JitNestedHelperCoerce::coerceArgForHelper(
-            $context,
-            $className,
-            $headerFn->getParam(0)->typeOf()
-        );
-        $lenArg = JitNestedHelperCoerce::coerceArgForHelper(
-            $context,
-            $classLen,
-            $headerFn->getParam(1)->typeOf()
-        );
-        $headerRaw = $context->builder->call($headerFn, $classArg, $lenArg);
-        $header = JitNestedHelperCoerce::coerceBridgeResult($context, $headerRaw, $strPtr);
+            $headerFn = self::objectHelperFunction($context, self::OBJECT_HEADER_HELPER);
+            $classArg = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $className,
+                $headerFn->getParam(0)->typeOf()
+            );
+            $lenArg = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $classLen,
+                $headerFn->getParam(1)->typeOf()
+            );
+            $headerRaw = $context->builder->call($headerFn, $classArg, $lenArg);
+            $header = JitNestedHelperCoerce::coerceBridgeResult($context, $headerRaw, $strPtr);
 
-        $propsFn = self::objectHelperFunction($context, self::OBJECT_PROPS_HELPER);
-        $htArg = JitNestedHelperCoerce::coerceArgForHelper(
-            $context,
-            $props,
-            $propsFn->getParam(0)->typeOf()
-        );
-        $bagRaw = $context->builder->call($propsFn, $htArg);
-        $bag = JitNestedHelperCoerce::coerceBridgeResult($context, $bagRaw, $strPtr);
+            // LLVM property bag — NestedJIT encodeObjectProps SIGABRTs on non-empty HTs (#34493).
+            $bag = SerializeObjectPropsLlvm::encode($context, $props);
 
-        $context->builder->returnValue(self::concatStr($context, $header, $bag));
-        $context->registerFunction($abiName, $fn);
+            $context->builder->returnValue(self::concatStr($context, $header, $bag));
+        });
         BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 
