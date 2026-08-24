@@ -2,7 +2,8 @@
 # AOT build + CLI execute smoke for shipped examples (issue #667).
 #
 # Builds each example to .phpc/smoke/<name>/app, runs the native binary once,
-# and checks stdout needles (no HTTP). Skips with exit 0 when LLVM 9 is missing.
+# and checks stdout needles (no HTTP). On hosts without image LLVM, re-execs via
+# docker-exec (#34538); skips with exit 0 only when LLVM is unavailable in-image too.
 #
 # Usage:
 #   ./script/examples-aot-smoke.sh
@@ -19,11 +20,44 @@
 # Docker:
 #   ./script/docker-exec.sh -- make examples-aot-smoke
 #
+# On RunForge / hosts without image LLVM, re-execs via docker-exec.sh (#34538 / peer #34536) —
+# same honesty gate as phpunit.sh / aot-smoke.sh. Host skip+exit 0 is a cheap green for
+# EXAMPLES_AOT_SMOKE_GATE (ci-common / release-readiness).
+#
 # 003-MiniWebApp: link probe + execute bytes; fails when MINIWEBAPP_AOT_EXECUTE_GATE=1 and stdout empty (#747, #676).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
+
+# Harness-safe: require image LLVM — bare /.dockerenv is also set on RunForge hosts (#34538).
+if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
+    && [[ "${PHP_COMPILER_IN_DOCKER:-0}" != "1" ]]; then
+  # Forward slice/gate env — ci_docker_run only passes a fixed -e allowlist.
+  _fwd=()
+  for _v in \
+    EXAMPLES_AOT_SMOKE_ONLY \
+    EXAMPLES_AOT_SMOKE_GATE \
+    THROWSWEB_AOT_SMOKE_GATE \
+    SESSIONS_WEB_AOT_SMOKE_GATE \
+    FILE_UPLOAD_WEB_AOT_SMOKE_GATE \
+    SELFHOSTPROBE_AOT_SMOKE_GATE \
+    FASTCGI_WEB_AOT_SMOKE_GATE \
+    MINIWEBAPP_AOT_EXECUTE_GATE
+  do
+    if [[ -n "${!_v+x}" ]]; then
+      _fwd+=("${_v}=$(printf '%q' "${!_v}")")
+    fi
+  done
+  args=$(printf '%q ' "$@")
+  _fwd_str=""
+  if ((${#_fwd[@]} > 0)); then
+    _fwd_str="${_fwd[*]} "
+  fi
+  # shellcheck disable=SC2086
+  exec ./script/docker-exec.sh -- bash -lc "source script/php-env.sh && ${_fwd_str}./script/examples-aot-smoke.sh ${args}"
+fi
+
 PHPC="${ROOT}/phpc"
 SMOKE_ROOT="${ROOT}/.phpc/smoke"
 MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
