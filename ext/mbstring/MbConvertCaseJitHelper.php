@@ -12,6 +12,10 @@ namespace PHPCompiler\ext\mbstring;
  * + NestedJIT-safe upper/lower maps (Latin-1 + Cyrillic + Greek; peer MbChrOrdJitHelper — no
  * PHP chr()).
  *
+ * Illegal UTF-8 bytes emit default `?` (mb_substitute_character / MODE_CHAR) — same as
+ * {@see MbCaseJitHelper} (#34346 leftover of #34340). Without this, a lone 0x80 is treated as
+ * U+0080 and re-encoded as UTF-8 c280.
+ *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_convert_case)
  */
 final class MbConvertCaseJitHelper
@@ -34,6 +38,15 @@ final class MbConvertCaseJitHelper
         $i = 0;
         while ($i < $len) {
             $charLen = self::utf8ByteLenAt($string, $i);
+            if ($charLen <= 0) {
+                break;
+            }
+            if (self::isIllegalUtf8Byte($string, $i, $charLen)) {
+                $out .= '?';
+                $upperNext = false;
+                $i += $charLen;
+                continue;
+            }
             $cp = self::utf8CpAt($string, $i, $charLen);
             if ($upperNext) {
                 if (0xDF === $cp) {
@@ -52,6 +65,20 @@ final class MbConvertCaseJitHelper
         }
 
         return $out;
+    }
+
+    /**
+     * Single-byte walk result with lead ≥ 0x80 ⇒ illegal (truncated / bad lead / bad cont).
+     * Peer {@see MbCaseJitHelper::isIllegalUtf8Byte} (#34340 / #34346).
+     */
+    private static function isIllegalUtf8Byte(string $string, int $offset, int $charLen): bool
+    {
+        if (1 !== $charLen) {
+            return false;
+        }
+        $b0 = \ord(\substr($string, $offset, 1));
+
+        return $b0 >= 128;
     }
 
     private static function isTitleDelimiter(int $codepoint): bool
