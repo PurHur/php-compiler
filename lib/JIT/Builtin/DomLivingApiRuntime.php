@@ -399,7 +399,9 @@ final class DomLivingApiRuntime
         $objPtr = $context->getTypeFromString('__object__*');
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
-        foreach ([VmDom::PROP_PARENT_NODE, VmDom::PROP_NEXT_ELEMENT_SIBLING] as $prop) {
+        // Document-order sibling axis is nextSibling (php-src dom_node_compare_document_position).
+        // nextElementSibling is often unset after loadXML under thin AOT — declared-slot GEP SIGSEGVs (#34345).
+        foreach ([VmDom::PROP_PARENT_NODE, VmDom::PROP_NEXT_SIBLING] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, Variable::TYPE_VALUE);
             }
@@ -463,8 +465,9 @@ final class DomLivingApiRuntime
         $objPtr = $context->getTypeFromString('__object__*');
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
-        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NEXT_ELEMENT_SIBLING)) {
-            $objectType->defineProperty($elementClassId, VmDom::PROP_NEXT_ELEMENT_SIBLING, Variable::TYPE_VALUE);
+        // Must be nextSibling — nextElementSibling is unset on loadXML elements under thin AOT (#34345).
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NEXT_SIBLING)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_NEXT_SIBLING, Variable::TYPE_VALUE);
         }
 
         $hit = $fn->appendBasicBlock('dom_nsf_hit_'.$tag);
@@ -473,7 +476,7 @@ final class DomLivingApiRuntime
 
         $current = $start;
         for ($hop = 0; $hop < 16; ++$hop) {
-            $next = self::loadLinkedObject($context, $current, $elementClassId, VmDom::PROP_NEXT_ELEMENT_SIBLING, 'nsf_'.$tag.'_'.$hop);
+            $next = self::loadLinkedObject($context, $current, $elementClassId, VmDom::PROP_NEXT_SIBLING, 'nsf_'.$tag.'_'.$hop);
             $isNull = $context->builder->icmp(Builder::INT_EQ, $next, $objPtr->constNull());
             $afterNull = $fn->appendBasicBlock('dom_nsf_n_'.$tag.'_'.$hop);
             $context->builder->branchIf($isNull, $miss, $afterNull);
