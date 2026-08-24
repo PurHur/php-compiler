@@ -88,6 +88,7 @@ final class NestedJitCompileScope
         $savedForeachIteratorReceiverSlots = $context->foreachIteratorReceiverSlots;
         $savedForeachIteratorAdvanceSlots = $context->foreachIteratorAdvanceSlots;
         $savedForeachDatePeriodSnapshotHts = $context->foreachDatePeriodSnapshotHts;
+        $savedForeachSimpleXmlSnapshotSlots = $context->foreachSimpleXmlSnapshotSlots;
         $savedForeachAggregateInnerHtSlots = $context->foreachAggregateInnerHtSlots;
         $context->scope->blockStorage = new \SplObjectStorage();
         $context->scope->blockEntryStorage = new \SplObjectStorage();
@@ -104,6 +105,7 @@ final class NestedJitCompileScope
         $context->foreachIteratorReceiverSlots = [];
         $context->foreachIteratorAdvanceSlots = [];
         $context->foreachDatePeriodSnapshotHts = [];
+        $context->foreachSimpleXmlSnapshotSlots = [];
         $context->foreachAggregateInnerHtSlots = [];
         // Drop outer activeFunction while insert is cleared — otherwise parentFunction() /
         // entryAlloca pin allocas into the outer fn and NestedJIT bodies load them (#28053).
@@ -137,6 +139,7 @@ final class NestedJitCompileScope
             $context->foreachIteratorReceiverSlots = $savedForeachIteratorReceiverSlots;
             $context->foreachIteratorAdvanceSlots = $savedForeachIteratorAdvanceSlots;
             $context->foreachDatePeriodSnapshotHts = $savedForeachDatePeriodSnapshotHts;
+            $context->foreachSimpleXmlSnapshotSlots = $savedForeachSimpleXmlSnapshotSlots;
             $context->foreachAggregateInnerHtSlots = $savedForeachAggregateInnerHtSlots;
             self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;

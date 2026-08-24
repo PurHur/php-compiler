@@ -20242,6 +20242,9 @@ class JIT {
             $objectUserType = $value->classUserType ?? null;
             if (is_string($objectUserType) && '' !== $objectUserType) {
                 $resultOp->type = new Type(Type::TYPE_OBJECT, [], $objectUserType);
+                // Keep classUserType on the value-box Variable so SXE cast/echo folds
+                // can unwrap FE_FETCH locals (#34543 / #27535).
+                $result->classUserType = $objectUserType;
             }
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {

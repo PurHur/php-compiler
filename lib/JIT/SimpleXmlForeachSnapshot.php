@@ -12,6 +12,8 @@ use PHPCompiler\ext\simplexml\JitSimpleXmlUserScript;
  * NestedJIT of VmSimpleXml iterator methods is deferred under user-script AOT;
  * ExternalMethod stubs for rewind/valid made foreach empty or segfault after children().
  * When a host tree is known, pack children (php-src sxe iterator) like {@see DatePeriodForeachSnapshot}.
+ *
+ * Keys are element/attribute names (Zend sxe_iterator_get_current_key), not packed indices (#34543).
  */
 final class SimpleXmlForeachSnapshot
 {
@@ -27,9 +29,10 @@ final class SimpleXmlForeachSnapshot
             throw new \LogicException('SimpleXML foreach snapshot missing host tree (#27535)');
         }
 
-        $elementVars = [];
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $n = 0;
         try {
-            foreach ($tree as $child) {
+            foreach ($tree as $key => $child) {
                 if (!($child instanceof \SimpleXMLElement)) {
                     continue;
                 }
@@ -44,7 +47,11 @@ final class SimpleXmlForeachSnapshot
                 );
                 // Bind host child so nested getName/cast/foreach can fold (#27535).
                 JitSimpleXmlUserScript::bindHostTreeForSnapshot($context, $receiver, $child);
-                $elementVars[] = $receiver;
+                $keyStr = $context->builder->load(
+                    $context->constantStringFromString((string) $key)
+                );
+                HashTableHelper::setAtStringKey($context, $ht, $keyStr, $receiver);
+                ++$n;
             }
         } catch (\Throwable $e) {
             throw new \LogicException(
@@ -54,10 +61,12 @@ final class SimpleXmlForeachSnapshot
             );
         }
 
-        $htVar = HashTableHelper::packVariables($context, $elementVars);
+        $htVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $ht);
         $key = $context->foreachSlotMapKey($slotKey);
         // Reuse DatePeriod snapshot HT table — same packed-HT foreach walk (#26772 / #27535).
         $context->foreachDatePeriodSnapshotHts[$key] = $htVar;
+        // Mark so FE_FETCH returns TYPE_OBJECT — TYPE_VALUE skips tryFoldStringCast and SIGSEGVs (#34543).
+        $context->foreachSimpleXmlSnapshotSlots[$key] = true;
 
         $sizeT = $context->getTypeFromString('size_t');
         if (!isset($context->foreachIndexSlots[$key])) {
@@ -67,5 +76,6 @@ final class SimpleXmlForeachSnapshot
         $one = $sizeT->constInt(1, false);
         $invalid = $context->builder->sub($zero, $one);
         $context->builder->store($invalid, $context->foreachIndexSlots[$key]);
+        unset($n);
     }
 }

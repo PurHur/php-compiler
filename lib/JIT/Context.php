@@ -486,10 +486,20 @@ class Context {
 
     /**
      * DatePeriod compile-time foreach snapshot hashtables (#26772).
+     * Also reused by SimpleXMLElement foreach snapshots (#27535) — see
+     * {@see $foreachSimpleXmlSnapshotSlots} for SXE-specific value typing.
      *
      * @var array<string, Variable>
      */
     public array $foreachDatePeriodSnapshotHts = [];
+
+    /**
+     * SimpleXMLElement children()/attributes() foreach snapshot slots (#34543 / #27535).
+     * FE_FETCH must yield TYPE_OBJECT (baked name/text), not opaque TYPE_VALUE boxes.
+     *
+     * @var array<string, true>
+     */
+    public array $foreachSimpleXmlSnapshotSlots = [];
 
     /**
      * DOMNodeList / DOMNamedNodeMap foreach — snapshot to hashtable, then iterate.

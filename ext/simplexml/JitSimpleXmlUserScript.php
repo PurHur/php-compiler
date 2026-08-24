@@ -397,13 +397,15 @@ final class JitSimpleXmlUserScript
     /**
      * Fold (string)$sxe / echo when a host tree is known (#26863).
      * Exact match only — lastTree would mis-fold foreach values (#27535).
+     * Value-boxed SXE from FE_FETCH: unwrap when receiver is TYPE_VALUE (#34543).
      */
     public static function tryToString(Context $context, JITVariable ...$args): ?Value
     {
         if ([] === $args || !\extension_loaded('simplexml')) {
             return null;
         }
-        $tree = self::lookupExact($args[0]);
+        $receiver = $args[0];
+        $tree = self::lookupExact($receiver);
         if (null !== $tree) {
             $text = (string) $tree;
 
@@ -411,11 +413,21 @@ final class JitSimpleXmlUserScript
         }
         // Baked __phpc_sxe_text lives on TYPE_OBJECT SXE only. Opaque TYPE_VALUE locals are
         // often plain strings — emitting readObject there segfaults concat/echo (#28625).
-        if (JITVariable::TYPE_OBJECT !== $args[0]->type) {
+        // Foreach snapshot locals are value-boxed objects with a SimpleXMLElement class
+        // hint from assignOperand — unwrap those (#34543).
+        if (JITVariable::TYPE_VALUE === $receiver->type) {
+            $hint = $receiver->classUserType ?? null;
+            $unwrapped = self::unwrapSxeObjectFromValueBox($context, $receiver, $hint);
+            if (null === $unwrapped) {
+                return null;
+            }
+            $receiver = $unwrapped;
+        }
+        if (JITVariable::TYPE_OBJECT !== $receiver->type) {
             return null;
         }
 
-        return self::readBakedStringProp($context, $args[0], self::BAKED_TEXT_PROP);
+        return self::readBakedStringProp($context, $receiver, self::BAKED_TEXT_PROP);
     }
 
     /**
@@ -424,6 +436,10 @@ final class JitSimpleXmlUserScript
      * Must not treat opaque TYPE_VALUE (e.g. `$k = "a"`) as SXE (#28625).
      * Must not read SXE baked slots on unrelated TYPE_OBJECT (plain `__toString`
      * classes) — that GEPs past the object header and segfaults under AOT (#28646).
+     *
+     * FE_FETCH of children()/attributes() snapshots assigns TYPE_OBJECT into a
+     * TYPE_VALUE local (assignOperand writeObject). Unwrap object-tagged boxes when
+     * the class hint may be SimpleXMLElement so (string)$c matches Zend (#34543).
      */
     public static function tryFoldStringCast(
         Context $context,
@@ -443,6 +459,18 @@ final class JitSimpleXmlUserScript
                 JITVariable::KIND_VALUE,
                 $context->builder->load($context->constantStringFromString($text))
             );
+        }
+        if (JITVariable::TYPE_VALUE === $var->type) {
+            if (!self::classHintMayBeSimpleXmlElement($context, $classHint)) {
+                return null;
+            }
+            // Concrete SXE hint (foreach local after assignOperand) — safe to readObject.
+            // Null/object/unknown hints: only when the box is object-tagged (#28625).
+            $objVar = self::unwrapSxeObjectFromValueBox($context, $var, $classHint);
+            if (null === $objVar) {
+                return null;
+            }
+            $var = $objVar;
         }
         if (JITVariable::TYPE_OBJECT !== $var->type) {
             return null;
@@ -466,6 +494,43 @@ final class JitSimpleXmlUserScript
             JITVariable::KIND_VALUE,
             $str
         );
+    }
+
+    /**
+     * Unwrap a TYPE_VALUE box to TYPE_OBJECT for SXE cast/echo (#34543).
+     *
+     * Only when the class hint is a concrete SimpleXMLElement (or subclass) — the
+     * FE_FETCH assignOperand path stamps that on the operand. Never readObject
+     * opaque/string value boxes (#28625).
+     */
+    private static function unwrapSxeObjectFromValueBox(
+        Context $context,
+        JITVariable $var,
+        ?string $classHint
+    ): ?JITVariable {
+        if (null === $classHint || '' === $classHint) {
+            return null;
+        }
+        $lc = strtolower(ltrim($classHint, '\\'));
+        if ('object' === $lc || 'unknown' === $lc) {
+            return null;
+        }
+        if (!self::classHintMayBeSimpleXmlElement($context, $classHint)) {
+            return null;
+        }
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $var)
+        );
+        $objVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $obj
+        );
+        $objVar->classUserType = 'SimpleXMLElement';
+
+        return $objVar;
     }
 
     /**
@@ -1067,10 +1132,11 @@ final class JitSimpleXmlUserScript
     private static function isolateHostElement(\SimpleXMLElement $tree): \SimpleXMLElement
     {
         $xml = $tree->asXML();
-        if (false === $xml || '' === $xml) {
+        // Attribute nodes' asXML() is `name="value"` — not well-formed for load_string (#34543).
+        if (false === $xml || '' === $xml || '<' !== $xml[0]) {
             return clone $tree;
         }
-        $copy = \simplexml_load_string($xml);
+        $copy = @\simplexml_load_string($xml);
         if ($copy instanceof \SimpleXMLElement) {
             return $copy;
         }

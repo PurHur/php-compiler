@@ -1021,6 +1021,11 @@ final class VmIteratorForeach
         }
         if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
+            // SXE snapshot packs TYPE_OBJECT elements with baked name/text. Loading as
+            // TYPE_VALUE makes (string)$c / echo skip tryFoldStringCast and SIGSEGV (#34543).
+            if (isset($context->foreachSimpleXmlSnapshotSlots[$context->foreachSlotMapKey($slotKey)])) {
+                return self::compileValueHashtableAsObject($context, $ht, $slotKey, 'SimpleXMLElement');
+            }
 
             return self::compileValueHashtable($context, $ht, $slotKey);
         }
@@ -1225,6 +1230,27 @@ final class VmIteratorForeach
         $context->builder->positionAtEnd($done);
 
         return new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
+    }
+
+    /**
+     * Packed-HT foreach value as TYPE_OBJECT (SimpleXMLElement snapshot; #34543 / #27535).
+     * Baked __phpc_sxe_* props and tryFoldStringCast require TYPE_OBJECT — not TYPE_VALUE.
+     */
+    private static function compileValueHashtableAsObject(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey,
+        string $classUserType
+    ): JitVariable {
+        $box = self::compileValueHashtable($context, $array, $slotKey);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $box)
+        );
+        $var = new JitVariable($context, JitVariable::TYPE_OBJECT, JitVariable::KIND_VALUE, $obj);
+        $var->classUserType = $classUserType;
+
+        return $var;
     }
 
     /**
