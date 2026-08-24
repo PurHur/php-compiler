@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\ext\standard\JitExplode;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbEregRuntime;
+use PHPCompiler\JIT\Builtin\MbSplitRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for mb_ereg() / mb_eregi() / mb_ereg_match() / mb_ereg*_replace()
- * via MbEregJitHelper (#33811, #34389).
+ * LLVM lowering for mb_ereg() / mb_eregi() / mb_ereg_match() / mb_ereg*_replace() / mb_split()
+ * via MbEregJitHelper / MbSplitJitHelper (#33811, #34389, #34391).
  *
  * Compile-time fold stays in {@see JitMbEregSearch}; runtime uses NestedJIT helper calls
  * (peer {@see JitMbStrSplit} / #26870). &$regs write deferred — 3-arg FUNCCALL IR (#33811).
@@ -24,6 +29,8 @@ use PHPLLVM\Value;
  */
 final class JitMbEreg
 {
+    private static int $splitBlockSerial = 0;
+
     /**
      * mb_ereg() / mb_eregi() — runtime pattern/string (2-arg path; &$regs follow-up).
      *
@@ -172,6 +179,130 @@ final class JitMbEreg
         );
 
         return self::boxStringFalseOrNull($context, $raw);
+    }
+
+    /**
+     * mb_split() — runtime pattern/string(/limit) (#34391 leftover of #13367).
+     *
+     * Peer {@see JitMbStrSplit}: NestedJIT string peel + JitExplode HT rebuild.
+     * Regex-compile failure peels as empty HT (FALSE_SENTINEL starts with NUL → empty strlen
+     * path is not used; sentinel is exploded as a single odd part — rare; fold path keeps
+     * false for compile-time literals).
+     *
+     * @param list<JITVariable> $args
+     */
+    public static function invokeSplit(Context $context, array $args): Value
+    {
+        $pattern = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $args[0],
+            'mb_split',
+            0,
+            'pattern'
+        );
+        $string = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $args[1],
+            'mb_split',
+            1,
+            'string'
+        );
+        $limitEnc = '-1';
+        if (\count($args) >= 3) {
+            $resolved = self::compileTimeLongLimit($context, $args[2]);
+            if (null === $resolved) {
+                $limitVal = JitLongArg::lower($context, $args[2], 'mb_split() $limit');
+                $lib = $context->llvm->lib;
+                if (null !== $lib->LLVMIsAConstantInt($limitVal->value)) {
+                    $resolved = (int) $lib->LLVMConstIntGetSExtValue($limitVal->value);
+                }
+            }
+            if (null !== $resolved) {
+                $limitEnc = (string) $resolved;
+            }
+        }
+        $limitPtr = $context->builder->load($context->constantStringFromString($limitEnc));
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbSplitRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            MbSplitRuntime::helperFunction($context),
+            [$pattern, $string, $limitPtr]
+        );
+        $joined = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+        $ht = self::hashtableFromJoined($context, $joined);
+
+        // Box like {@see \PHPCompiler\ext\standard\JitPregSplit} — FUNCCALL temps expect __value__*.
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $ht
+        );
+
+        return $ptr;
+    }
+
+    /** Empty joined → []; otherwise explode on {@see MbSplitJitHelper::JOIN_DELIM}. */
+    private static function hashtableFromJoined(Context $context, Value $joined): Value
+    {
+        $tag = 'mbspl'.(string) (++self::$splitBlockSerial);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $slen = $context->builder->call($context->lookupFunction('__string__strlen'), $joined);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $slen, $zero);
+
+        $emptyBlock = BasicBlockHelper::append($context, 'mb_split_empty_'.$tag);
+        $explodeBlock = BasicBlockHelper::append($context, 'mb_split_explode_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'mb_split_join_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $explodeBlock);
+
+        $htTy = $context->getTypeFromString('__hashtable__*');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $htTy);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->store(HashTableHelper::alloc($context), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($explodeBlock);
+        $delim = $context->builder->load(
+            $context->constantStringFromString(MbSplitJitHelper::JOIN_DELIM)
+        );
+        $ownedJoined = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $joined
+        );
+        $ht = JitExplode::explode($context, $delim, $ownedJoined);
+        $context->builder->store($ht, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function compileTimeLongLimit(Context $context, JITVariable $var): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $var->type && JITVariable::KIND_VALUE === $var->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($var->value->value);
+            }
+        }
+        if (JITVariable::TYPE_INTEGER === $var->type && null !== ($var->compileTimeInteger ?? null)) {
+            return $var->compileTimeInteger;
+        }
+        if (null !== ($var->compileTimeLong ?? null)) {
+            return (int) $var->compileTimeLong;
+        }
+
+        return null;
     }
 
     private static function boolBoxFromI64(Context $context, Value $matchedRaw): Value

@@ -249,6 +249,8 @@ final class HelperRuntimeCache
         // thin AOT (NestedJIT cannot construct HashTable — peer explode #27660). Force NestedJIT
         // of the string-joined peel into the user module; JitMbStrSplit rebuilds HT via JitExplode.
         'phpcompiler\\ext\\mbstring\\mbstrsplitjithelper::strsplitargv' => true,
+        // #34391 — same peel shape for mb_split(); keep out of prelinked MbEregJitHelper corpus.
+        'phpcompiler\\ext\\mbstring\\mbsplitjithelper::splitargv' => true,
     ];
 
     private static bool $loggedHit = false;
