@@ -1229,10 +1229,11 @@ restart:
                         'right'
                     );
                 }
-                // Ordered compares (< > <= >=) are handled float-aware at the
-                // orderedValueToNativeLong check below; skip JitLongArg::lower
-                // which truncates doubles (#23471).
-                if (!self::isOrderedCompareOpcode($opcode->type)) {
+                // Ordered compares (< > <= >=) and <=> are handled float-aware below;
+                // skip JitLongArg::lower which truncates doubles (#23471, #34542).
+                if (!self::isOrderedCompareOpcode($opcode->type)
+                    && OpCode::TYPE_SPACESHIP !== $opcode->type
+                ) {
                 if (OpCode::TYPE_MODULO === $opcode->type) {
                     $i64 = $this->context->getTypeFromString('int64');
                     $result = JitNumericDivisionGuard::moduloWithNegOneShortCircuit(
@@ -1404,10 +1405,11 @@ restart:
                         'left'
                     );
                 }
-                // Ordered compares (< > <= >=) are handled float-aware at the
-                // orderedNativeLongToValue check below; skip JitLongArg::lower
-                // which truncates doubles (#23471).
-                if (!self::isOrderedCompareOpcode($opcode->type)) {
+                // Ordered compares (< > <= >=) and <=> are handled float-aware below;
+                // skip JitLongArg::lower which truncates doubles (#23471, #34542).
+                if (!self::isOrderedCompareOpcode($opcode->type)
+                    && OpCode::TYPE_SPACESHIP !== $opcode->type
+                ) {
                 $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
                 if (Variable::TYPE_NATIVE_BOOL === $leftType) {
                     $__left = $this->context->builder->zExt($leftValue, $rightLong->typeOf());
@@ -1816,6 +1818,23 @@ restart:
                     JitValueBox::valuePtrFromVariable($this->context, $right)
                 );
                 $result = JitFloatCompare::spaceship($this->context, $leftValue, $rightDouble);
+                goto return_long;
+            }
+            // Boxed NAN/float <=> native long: promote long to double (#34542 / re-#31967).
+            if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_NATIVE_LONG === $rightType) {
+                $result = JitValueCompare::spaceshipValueToNativeLong(
+                    $this->context,
+                    $left,
+                    $rightValue
+                );
+                goto return_long;
+            }
+            if (Variable::TYPE_NATIVE_LONG === $leftType && Variable::TYPE_VALUE === $rightType) {
+                $result = JitValueCompare::spaceshipNativeLongToValue(
+                    $this->context,
+                    $leftValue,
+                    $right
+                );
                 goto return_long;
             }
         }
