@@ -58,7 +58,8 @@ final class JitSerialize
         );
     }
 
-    private static function encodeBoxedValue(Context $context, Value $valuePtr, Value $flags): Value
+    /** Public for {@see \PHPCompiler\JIT\SerializeArrayLlvm} value walk (#34483 / peer JitJsonEncode). */
+    public static function encodeBoxedValue(Context $context, Value $valuePtr, Value $flags): Value
     {
         $valuePtr = JitValueBox::normalizeValuePtr($context, $valuePtr);
         $map = $context->structFieldMap['__value__'];
