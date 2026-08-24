@@ -659,7 +659,7 @@ final class BuiltinInternalArgInfo
             'array_is_list' => 'bool',
             // ext/standard/array.stub.php — InternalArgInfo omits mixed return (#26112)
             'array_pop', 'array_shift' => 'mixed',
-            // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#25386, #26172, #25389)
+            // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#25386, #25389, #26172)
             'sort', 'asort', 'arsort', 'shuffle',
             'usort', 'uasort', 'uksort', 'ksort', 'krsort',
             'array_walk', 'array_walk_recursive' => 'true',
@@ -1204,9 +1204,8 @@ final class BuiltinInternalArgInfo
             'array_first', 'array_last' => 0 === $index ? 'array' : null,
             // ext/standard/array.stub.php — array $array; absent from InternalArgInfo (#26111, #26182)
             'array_key_first', 'array_key_last', 'array_is_list' => 0 === $index ? 'array' : null,
-            // ext/standard/array.stub.php — object|array $array (InternalArgInfo array only) (#26113)
-            'current', 'end', 'reset', 'next', 'prev', 'key' => 0 === $index ? 'object|array' : null,
-            // ext/standard/array.stub.php — $array object|array; InternalArgInfo array only (#25389)
+            // ext/standard/array.stub.php — object|array $array (InternalArgInfo array only) (#25389, #26113)
+            'current', 'end', 'reset', 'next', 'prev', 'key',
             'array_walk', 'array_walk_recursive' => 0 === $index ? 'object|array' : null,
             // ext/standard/array.stub.php — ?int $length = null, mixed $replacement = [] (#24824)
             'array_splice' => match ($index) {
