@@ -299,11 +299,14 @@ final class JitDomCreateElement
             );
             // Seed getAttribute/hasAttribute cache (peer createFromString #19281). Presence-only
             // NamedNodeMap pins left DomElementGetAttribute falling through to the ImportNode
-            // HTML-id stub, which always returned "target" (#32956).
+            // HTML-id stub, which always returned "target" (#32956). Prefixed attrs must not
+            // dual-key under empty-NS+local — Zend xmlHasProp / hasAttribute(local) is false
+            // for namespaced properties (#34330 / php-src ext/dom/element.c).
             $pos = strpos($qname, ':');
             $local = false === $pos ? $qname : substr($qname, $pos + 1);
-            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
-            if ($local !== $qname) {
+            if ($local === $qname) {
+                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
+            } else {
                 DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
             }
             // getAttributeNS keys by namespace URI (#33128 leftover of #33116).

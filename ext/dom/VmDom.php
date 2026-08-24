@@ -2248,8 +2248,10 @@ final class VmDom
                 continue;
             }
             $attrNs = self::resolveAttributeNamespaceUri($element, $qName, $prefix);
-
-            return $attrNs === $wantNs;
+            if ($attrNs === $wantNs) {
+                return true;
+            }
+            // Keep scanning — a later unprefixed attr may match null NS (#34330).
         }
 
         return false;

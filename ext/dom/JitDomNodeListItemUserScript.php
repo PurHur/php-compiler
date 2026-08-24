@@ -310,8 +310,10 @@ final class JitDomNodeListItemUserScript
         $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals($context, '', $qname, $value);
         $pos = strpos($qname, ':');
         $local = false === $pos ? $qname : substr($qname, $pos + 1);
-        DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
-        if ($local !== $qname) {
+        // Prefixed: empty-NS+qname only — never empty-NS+local (#34330).
+        if ($local === $qname) {
+            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
+        } else {
             DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
         }
 
@@ -345,8 +347,10 @@ final class JitDomNodeListItemUserScript
                     $qname,
                     $value
                 );
-                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
-                if ($local !== $qname) {
+                // Prefixed: empty-NS+qname only — never empty-NS+local (#34330).
+                if ($local === $qname) {
+                    DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
+                } else {
                     DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
                 }
             }
@@ -401,8 +405,10 @@ final class JitDomNodeListItemUserScript
                 $qname,
                 $value
             );
-            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
-            if ($local !== $qname) {
+            // Prefixed: empty-NS+qname only — never empty-NS+local (#34330).
+            if ($local === $qname) {
+                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
+            } else {
                 DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
             }
         }

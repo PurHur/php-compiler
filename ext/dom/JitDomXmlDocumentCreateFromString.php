@@ -195,9 +195,10 @@ final class JitDomXmlDocumentCreateFromString
                 JitDomAttributeNodeNS::CLASS_LIVING_ATTR,
                 true
             );
-            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
-            // Also key by qname when unprefixed (local === qname).
-            if ($local !== $qname) {
+            // Prefixed attrs: key by qname only — never empty-NS+local (#34330 / xmlHasProp).
+            if ($local === $qname) {
+                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
+            } else {
                 DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
             }
         }
