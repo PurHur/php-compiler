@@ -991,8 +991,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/standard/basic_functions.stub.php — mixed &$var (InternalArgInfo untyped) (#27766)
             'settype' => 0 === $index ? 'mixed' : null,
-            // ext/standard/basic_functions.stub.php — mixed ...$values variadic type (#28177)
-            'sprintf', 'printf' => 1 === $index ? 'mixed' : null,
+            // ext/standard/basic_functions.stub.php — mixed ...$values variadic type (#28177, #26300 pack)
+            'sprintf', 'printf', 'pack' => 1 === $index ? 'mixed' : null,
             'fprintf' => 2 === $index ? 'mixed' : null,
             // ext/standard/basic_functions.stub.php — mixed $value, mixed ...$values (#27982, re-#23679)
             'debug_zval_dump' => match ($index) {
@@ -1083,8 +1083,8 @@ final class BuiltinInternalArgInfo
             'ini_parse_quantity' => 0 === $index ? 'string' : null,
             // ext/date/php_date.stub.php — hour required; ?int minute…year = null (#25147)
             'mktime', 'gmmktime' => ($index >= 1 && $index <= 5) ? '?int' : null,
-            // ext/standard/basic_functions.stub.php — mixed ...$values (InternalArgInfo untyped variadic) (#28177)
-            'sprintf', 'printf' => 1 === $index ? 'mixed' : null,
+            // ext/standard/basic_functions.stub.php — mixed ...$values (InternalArgInfo untyped variadic) (#28177, #26300 pack)
+            'sprintf', 'printf', 'pack' => 1 === $index ? 'mixed' : null,
             'fprintf' => 2 === $index ? 'mixed' : null,
             // ext/standard/basic_functions.stub.php — mixed &...$vars (InternalArgInfo string) (#26058)
             'fscanf' => 2 === $index ? 'mixed' : null,
