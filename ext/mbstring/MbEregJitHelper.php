@@ -8,10 +8,11 @@ use PHPCompiler\ext\standard\VmPregMatches;
 use PHPCompiler\VM\HashTable;
 
 /**
- * mb_ereg*() for compiled JIT/AOT modules (#33811 follow-up #33648/#33655, php-in-PHP).
+ * mb_ereg*() for compiled JIT/AOT modules (#33811 follow-up #33648/#33655, #34389).
  *
- * SSOT: {@see VmMbstring::eregMatch()} / {@see VmMbstring::eregMatchAnchored()}
- * php-src: ext/mbstring/php_mbregex.c — PHP_FUNCTION(mb_ereg) / mb_ereg_match
+ * SSOT: {@see VmMbstring::eregMatch()} / {@see VmMbstring::eregMatchAnchored()} /
+ * {@see VmMbstring::eregReplace()}
+ * php-src: ext/mbstring/php_mbregex.c — PHP_FUNCTION(mb_ereg) / mb_ereg_match / mb_ereg_replace
  *
  * {@see self::$lastMatch} pairs match argv with {@see lastRegistersHt()} for future &$regs (#33811).
  */
@@ -53,6 +54,40 @@ final class MbEregJitHelper
         $opt = 0 !== $hasOptions ? $options : null;
 
         return VmMbstring::eregMatchAnchored($pattern, $string, $opt) ? 1 : 0;
+    }
+
+    /**
+     * mb_ereg_replace() — runtime pattern/replacement/string (#34389 leftover of #33765).
+     *
+     * @return string|false|null
+     */
+    public static function eregReplaceArgv(
+        string $pattern,
+        string $replacement,
+        string $string,
+        string $options,
+        int $hasOptions
+    ): string|false|null {
+        $opt = 0 !== $hasOptions ? $options : null;
+
+        return VmMbstring::eregReplace($pattern, $replacement, $string, false, $opt);
+    }
+
+    /**
+     * mb_eregi_replace() — case-insensitive runtime replace (#34389 leftover of #33656).
+     *
+     * @return string|false|null
+     */
+    public static function eregiReplaceArgv(
+        string $pattern,
+        string $replacement,
+        string $string,
+        string $options,
+        int $hasOptions
+    ): string|false|null {
+        $opt = 0 !== $hasOptions ? $options : null;
+
+        return VmMbstring::eregReplace($pattern, $replacement, $string, true, $opt);
     }
 
     private static function matchArgv(
