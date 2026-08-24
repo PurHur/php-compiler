@@ -13636,6 +13636,12 @@ class JIT {
                     }
                     $obj = $block->getOperand($op->arg2);
                     $name = $block->getOperand($op->arg3);
+                    $nameSlot = $op->arg3;
+                    // inheritUndefinedLocals freshLiteralConstantSlot can leave the first
+                    // AssignOp fetch's name slot vacant if the Literal was relocated (#34426).
+                    if (!$name instanceof Operand\Literal && null !== $nameSlot && isset($block->constants[$nameSlot])) {
+                        $name = new Operand\Literal($block->constants[$nameSlot]->toString());
+                    }
                     $propName = $name instanceof Operand\Literal ? $name->value : null;
                     // NestedJIT VM\Variable is a __value__* box (#16565) — `$v->type` must
                     // read the value-box type byte (masked), not an object property (#21921).
@@ -14330,6 +14336,11 @@ class JIT {
                         }
                         $this->applyExternalPropertyResultType($result, $declaringClass, $name->value);
                     } else {
+                        if (!$name instanceof Operand) {
+                            throw new \LogicException(
+                                'PROPERTY_FETCH name operand missing at slot '.(string) $op->arg3
+                            );
+                        }
                         $nameVar = $this->context->getVariableFromOp($name);
                         $fetched = $this->context->type->object->propertyFetchDynamic(
                             $receiver,
