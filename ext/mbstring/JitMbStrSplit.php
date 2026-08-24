@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\ext\standard\JitExplode;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbStrSplitRuntime;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -26,6 +27,8 @@ use PHPLLVM\Value;
  */
 final class JitMbStrSplit
 {
+    private const LENGTH_ERROR = 'mb_str_split(): Argument #2 ($length) must be greater than 0';
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         // Arity checked by mb_str_split::call via requireArgCountRangeJit (#30786).
@@ -79,6 +82,7 @@ final class JitMbStrSplit
         if ($argc >= 2) {
             $length = JitStrictIntArg::lower($context, $args[1], 'mb_str_split', 2, 'length');
         }
+        self::emitLengthGuard($context, $length);
 
         // NestedJIT helper compile can clear insert; restore before arg coerce/call (#34270).
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
@@ -96,6 +100,22 @@ final class JitMbStrSplit
         $joined = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::hashtableFromJoined($context, $joined);
+    }
+
+    /** php-src ext/mbstring/mbstring.c — length must be > 0 before split. */
+    private static function emitLengthGuard(Context $context, Value $length): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $one = $i64->constInt(1, false);
+        $valid = $context->builder->icmp(Builder::INT_SGE, $length, $one);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            $valid,
+            'mb_str_split_len',
+            self::LENGTH_ERROR
+        );
     }
 
     /** Empty joined → []; otherwise explode on {@see MbStrSplitJitHelper::JOIN_DELIM}. */
