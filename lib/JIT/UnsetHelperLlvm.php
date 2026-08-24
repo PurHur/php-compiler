@@ -467,7 +467,10 @@ final class UnsetHelperLlvm
         Operand $dimOp,
         ?\PHPCompiler\JIT $jit = null
     ): void {
-        $operandUserType = Type::TYPE_OBJECT === $containerOp->type->type
+        // try { inheritUndefinedLocals } often nulls CFG Operand::$type; reading
+        // ->type->type without a guard warns and falls through to declaringClass
+        // "object", so typed unset never marks UNDEF (#34431 / peer #32749).
+        $operandUserType = null !== $containerOp->type && Type::TYPE_OBJECT === $containerOp->type->type
             ? $containerOp->type->userType
             : null;
         $blockClassName = null !== $block->func && null !== $block->func->class
@@ -477,6 +480,11 @@ final class UnsetHelperLlvm
             $operandUserType,
             $blockClassName,
             $context->scope->className
+        );
+        $declaringClass = self::recoverDeclaringClassFromJitBinding(
+            $context,
+            $containerOp,
+            $declaringClass
         );
         // php-src DateInterval living fields — unset is a no-op (ext/date/php_date.c; #26180).
         // Skip before loadPropertyReceiver/propertyFetch: NATIVE_LONG←null breaks AOT verify.
@@ -638,7 +646,48 @@ final class UnsetHelperLlvm
             $blockClassName,
             $context->scope->className
         );
+        $declaringClass = self::recoverDeclaringClassFromJitBinding(
+            $context,
+            $containerOp,
+            $declaringClass
+        );
 
         return self::shouldNoopDateIntervalUnset($declaringClass, $dimOp);
+    }
+
+    /**
+     * When CFG collapsed receiver userType to generic object/null, use JIT classUserType
+     * (#34431 / peer PROPERTY_FETCH #32749 / #34382).
+     */
+    private static function recoverDeclaringClassFromJitBinding(
+        Context $context,
+        Operand $containerOp,
+        string $declaringClass
+    ): string {
+        $lc = strtolower(ltrim($declaringClass, '\\'));
+        if (!\in_array($lc, ['object', 'stdclass', ''], true)) {
+            return $declaringClass;
+        }
+        $tagged = null;
+        if ($context->hasVariableOpInScopes($containerOp)) {
+            $recv = $context->getVariableFromOpInScopes($containerOp);
+            $tagged = $recv->classUserType ?? null;
+        }
+        if ((!is_string($tagged) || '' === $tagged || 'object' === strtolower(ltrim($tagged, '\\')))
+            && null !== ($resolved = OperandName::resolve($containerOp))
+            && isset($context->namedVariableBindings[$resolved])
+        ) {
+            $bound = $context->namedVariableBindings[$resolved];
+            $tagged = $bound->classUserType ?? null;
+        }
+        if (!is_string($tagged) || '' === $tagged) {
+            return $declaringClass;
+        }
+        $tagLc = strtolower(ltrim($tagged, '\\'));
+        if ('' === $tagLc || \in_array($tagLc, ['object', 'stdclass'], true)) {
+            return $declaringClass;
+        }
+
+        return ltrim($tagged, '\\');
     }
 }
