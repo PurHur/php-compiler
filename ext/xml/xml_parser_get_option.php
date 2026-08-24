@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xml;
 
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
 
-/** xml_parser_get_option() — read parser option (php-src ext/xml/xml.c; #18203). */
+/** xml_parser_get_option() — read parser option (php-src ext/xml/xml.c; #18203, #34377). */
 final class xml_parser_get_option extends XmlFunction
 {
     public function __construct()
@@ -35,5 +38,19 @@ final class xml_parser_get_option extends XmlFunction
         } else {
             $frame->returnVar->bool((bool) $value);
         }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = JitXmlParserUserScript::tryGetOption($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'xml_parser_get_option() user-script AOT requires a tracked parser + compile-time option (#34377)'
+            );
+        }
+        throw new \LogicException('xml_parser_get_option() is not JIT-lowered in this compiler build');
     }
 }

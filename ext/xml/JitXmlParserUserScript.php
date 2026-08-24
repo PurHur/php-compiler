@@ -13,8 +13,8 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPLLVM\Value;
 
 /**
- * User-script standalone AOT: xml_parser_create / xml_parse / xml_get_error_code / xml_parser_free
- * (#27293, #29318).
+ * User-script standalone AOT: xml_parser_create / xml_parse / xml_get_error_code /
+ * xml_parser_free / xml_parser_set_option / xml_parser_get_option (#27293, #29318, #34377).
  *
  * Runs the existing PHP-in-PHP parser model ({@see VmXml}, {@see XmlParserSupport}) at
  * compile time when arguments are literals, then emits constant results / an allocated
@@ -130,6 +130,60 @@ final class JitXmlParserUserScript
         return self::boolValue($context, VmXml::parserFree($parser->id));
     }
 
+    /**
+     * xml_parser_set_option(XMLParser $parser, int $option, string|int|bool $value): bool (#34377).
+     */
+    public static function trySetOption(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || 3 !== \count($args)) {
+            return null;
+        }
+        $parser = self::lookup($args[0]);
+        if (null === $parser) {
+            return null;
+        }
+        $option = self::compileTimeOptionInt($context, $args[1]);
+        if (null === $option) {
+            return null;
+        }
+        $resolved = self::compileTimeOptionValue($args[2]);
+        if (null === $resolved) {
+            return null;
+        }
+
+        $ok = XmlParserHandlers::setOption($parser, $option, $resolved['value']);
+
+        return self::boolValue($context, $ok);
+    }
+
+    /**
+     * xml_parser_get_option(XMLParser $parser, int $option): string|int|bool (#34377).
+     */
+    public static function tryGetOption(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || 2 !== \count($args)) {
+            return null;
+        }
+        $parser = self::lookup($args[0]);
+        if (null === $parser) {
+            return null;
+        }
+        $option = self::compileTimeOptionInt($context, $args[1]);
+        if (null === $option) {
+            return null;
+        }
+
+        $value = XmlParserHandlers::getOption($parser, $option);
+        if (\is_int($value)) {
+            return self::intValue($context, $value);
+        }
+        if (\is_string($value)) {
+            return self::stringValue($context, $value);
+        }
+
+        return self::boolValue($context, (bool) $value);
+    }
+
     private static function isOptionalEncodingOk(JITVariable $arg): bool
     {
         if (JITVariable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant)) {
@@ -163,6 +217,68 @@ final class JitXmlParserUserScript
             if (\is_object($const) && \method_exists($const, 'constInt')) {
                 try {
                     return 0 !== (int) $const->constInt(false);
+                } catch (\Throwable) {
+                    return null;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Resolve XML_OPTION_* / literal int for set/get_option (#34377). */
+    private static function compileTimeOptionInt(Context $context, JITVariable $arg): ?int
+    {
+        if (null !== $arg->compileTimeLong) {
+            return (int) $arg->compileTimeLong;
+        }
+        if (null !== $arg->compileTimeConstantName && null !== $context->runtime->vmContext) {
+            $fetched = $context->runtime->vmContext->constantFetch($arg->compileTimeConstantName);
+            if (null !== $fetched && \PHPCompiler\VM\Variable::TYPE_INTEGER === $fetched->type) {
+                return $fetched->toInt();
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Compile-time set_option $value — string|int|bool|null.
+     *
+     * @return null|array{value: string|int|bool|null}  null = dynamic (cannot lower)
+     */
+    private static function compileTimeOptionValue(JITVariable $arg): ?array
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant)) {
+            return ['value' => null];
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($arg) ?? $arg->compileTimeString;
+        if (null !== $lit && !str_starts_with($lit, '__phpc_xmlp_')) {
+            return ['value' => $lit];
+        }
+        if (null !== $arg->compileTimeLong) {
+            return ['value' => (int) $arg->compileTimeLong];
+        }
+        if (null !== $arg->compileTimeConstantName) {
+            $cn = strtolower($arg->compileTimeConstantName);
+            if ('true' === $cn) {
+                return ['value' => true];
+            }
+            if ('false' === $cn) {
+                return ['value' => false];
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if (\is_object($const) && \method_exists($const, 'constInt')) {
+                try {
+                    return ['value' => 0 !== (int) $const->constInt(false)];
                 } catch (\Throwable) {
                     return null;
                 }
@@ -233,6 +349,19 @@ final class JitXmlParserUserScript
         $slot = JitValueBox::alloc($context);
         $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $slot, $i1->constInt($v ? 1 : 0, false));
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    private static function stringValue(Context $context, string $str): Value
+    {
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $context->builder->load($context->constantStringFromString($str))
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
 
         return JitValueBox::normalizeValuePtr($context, $slot);
     }
