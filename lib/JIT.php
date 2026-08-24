@@ -25759,12 +25759,30 @@ class JIT {
         }
 
         if ($this->jitCallArgsHaveUnpack($argEntries)) {
+            // Instance methods / constructors prepend $this (NEW result). Named-arg
+            // resolution already slices that prefix (#11844); unpack must too or
+            // mergeCallArgEntries packs $this into the HT and CallUnpackExpand
+            // either mis-indexes or drops user args → ACE "0 passed" (#34468).
+            $prefixLen = $this->jitNamedCallArgPrefixLength($toCall, $argEntries);
+            $prefix = \array_slice($argEntries, 0, $prefixLen);
+            $prefixOperands = \array_slice($argOperands, 0, $prefixLen);
+            $userEntries = \array_slice($argEntries, $prefixLen);
+            $userOperands = \array_slice($argOperands, $prefixLen);
+            $prefixVars = [];
+            foreach ($prefix as $entry) {
+                if ($entry instanceof Variable) {
+                    $prefixVars[] = $entry;
+                } elseif (\is_array($entry) && isset($entry['value']) && $entry['value'] instanceof Variable) {
+                    $prefixVars[] = $entry['value'];
+                }
+            }
+
             [$paramNames, $variadicIndex] = $this->jitCalleeParamMetadata($toCall);
             $functionName = $this->jitInternalBuiltinFunctionName($toCall);
             $namedUnpack = JIT\CallUnpackHelper::tryResolveCompileTimeNamedUnpack(
                 $this->context->jitEnclosingBlock,
-                $argEntries,
-                $argOperands,
+                $userEntries,
+                $userOperands,
                 $paramNames,
                 $variadicIndex,
                 $this,
@@ -25782,14 +25800,17 @@ class JIT {
                         $toCall
                     );
                     if (null !== $expanded) {
-                        return [$expanded, array_fill(0, \count($expanded), null)];
+                        $full = array_merge($prefixVars, $expanded);
+
+                        return [$full, array_merge($prefixOperands, array_fill(0, \count($expanded), null))];
                     }
                 }
+                $full = array_merge($prefixVars, $namedUnpack[0]);
 
-                return $namedUnpack;
+                return [$full, array_merge($prefixOperands, $namedUnpack[1])];
             }
 
-            $callArgs = $this->finalizeJitCallArgs($argEntries);
+            $callArgs = $this->finalizeJitCallArgs($userEntries);
             if (
                 $toCall instanceof JIT\Call\Native
                 && 1 === \count($callArgs)
@@ -25801,13 +25822,16 @@ class JIT {
                     $toCall
                 );
                 if (null !== $expanded) {
-                    return [$expanded, array_fill(0, \count($expanded), null)];
+                    $full = array_merge($prefixVars, $expanded);
+
+                    return [$full, array_merge($prefixOperands, array_fill(0, \count($expanded), null))];
                 }
             }
+            $full = array_merge($prefixVars, $callArgs);
 
             return [
-                $callArgs,
-                $argOperands,
+                $full,
+                array_merge($prefixOperands, $userOperands),
             ];
         }
 
