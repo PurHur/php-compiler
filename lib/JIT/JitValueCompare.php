@@ -221,6 +221,24 @@ final class JitValueCompare
         return VmValueCompare::orderedNativeLongToValue($context, $opcodeType, $nativeLong, $boxed);
     }
 
+    /** @see VmValueCompare::spaceshipValueToNativeLong (#34542) */
+    public static function spaceshipValueToNativeLong(
+        Context $context,
+        Variable $boxed,
+        Value $nativeLong
+    ): Value {
+        return VmValueCompare::spaceshipValueToNativeLong($context, $boxed, $nativeLong);
+    }
+
+    /** @see VmValueCompare::spaceshipNativeLongToValue (#34542) */
+    public static function spaceshipNativeLongToValue(
+        Context $context,
+        Value $nativeLong,
+        Variable $boxed
+    ): Value {
+        return VmValueCompare::spaceshipNativeLongToValue($context, $nativeLong, $boxed);
+    }
+
     public static function orderedValueToNativeDouble(
         Context $context,
         int $opcodeType,

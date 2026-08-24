@@ -1104,6 +1104,52 @@ final class VmValueCompare
         return $phi;
     }
 
+    /**
+     * Boxed __value__ <=> native long — promote long to double via __value__readDouble + siToFp
+     * (same pattern as TYPE_VALUE⊙TYPE_NATIVE_DOUBLE spaceship; #34542 / re-#31967).
+     * php-src: Zend/zend_operators.c compare_function.
+     */
+    public static function spaceshipValueToNativeLong(
+        Context $context,
+        Variable $boxed,
+        Value $nativeLong
+    ): Value {
+        if (!JitValueBox::isValueOperand($boxed)) {
+            throw new \LogicException('Expected boxed __value__ operand');
+        }
+
+        $f64 = $context->getTypeFromString('double');
+        $boxedDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            JitValueBox::valuePtrFromVariable($context, $boxed)
+        );
+        $nativeDouble = $context->builder->siToFp($nativeLong, $f64);
+
+        return VmFloatCompare::spaceship($context, $boxedDouble, $nativeDouble);
+    }
+
+    /**
+     * Native long <=> boxed __value__ — same promotion as {@see spaceshipValueToNativeLong} (#34542).
+     */
+    public static function spaceshipNativeLongToValue(
+        Context $context,
+        Value $nativeLong,
+        Variable $boxed
+    ): Value {
+        if (!JitValueBox::isValueOperand($boxed)) {
+            throw new \LogicException('Expected boxed __value__ operand');
+        }
+
+        $f64 = $context->getTypeFromString('double');
+        $boxedDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            JitValueBox::valuePtrFromVariable($context, $boxed)
+        );
+        $nativeDouble = $context->builder->siToFp($nativeLong, $f64);
+
+        return VmFloatCompare::spaceship($context, $nativeDouble, $boxedDouble);
+    }
+
     public static function orderedValueToNativeDouble(
         Context $context,
         int $opcodeType,
