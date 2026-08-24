@@ -58,7 +58,8 @@ final class JitSerialize
         );
     }
 
-    private static function encodeBoxedValue(Context $context, Value $valuePtr, Value $flags): Value
+    /** Public for {@see \PHPCompiler\JIT\SerializeHashtableLlvm} nested values (#34483). */
+    public static function encodeBoxedValue(Context $context, Value $valuePtr, Value $flags): Value
     {
         $valuePtr = JitValueBox::normalizeValuePtr($context, $valuePtr);
         $map = $context->structFieldMap['__value__'];

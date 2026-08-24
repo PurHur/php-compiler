@@ -101,9 +101,9 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\jsonencodenestedjithelper::encodevalue' => true,
         'phpcompiler\\ext\\standard\\jsonencodenestedjithelper::encodehashtable' => true,
         // #27030 — SerializeJitHelper → VmSerialize SIGSEGVs on thin AOT (arrays/objects).
-        // NestedJIT SerializeNestedJitHelper (Context-free) into the user AOT module.
+        // NestedJIT SerializeNestedJitHelper scalars (Context-free) into the user AOT module.
+        // HT walk is SerializeHashtableLlvm — not NestedJIT (#34483 / peer #26367).
         'phpcompiler\\ext\\standard\\serializenestedjithelper::encodevalue' => true,
-        'phpcompiler\\ext\\standard\\serializenestedjithelper::encodehashtable' => true,
         'phpcompiler\\ext\\standard\\serializeobjectnestedjithelper::formatobjectheader' => true,
         'phpcompiler\\ext\\standard\\serializeobjectnestedjithelper::encodeobjectprops' => true,
         // #27030 — NestedJIT O: parse into user AOT (peer serialize object helpers).

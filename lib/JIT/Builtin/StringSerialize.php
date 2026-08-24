@@ -13,6 +13,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
+use PHPCompiler\JIT\SerializeHashtableLlvm;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
@@ -21,15 +22,16 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_serialize_* via SerializeNestedJitHelper PHP (#9180, #20773, #27030, #33207).
+ * JIT/AOT link for __compiler_serialize_* (#9180, #20773, #27030, #33207, #34483).
  *
  * Owns `__compiler_serialize_value` / `__compiler_serialize_hashtable` /
  * `__compiler_serialize_object` ABI module-locally: {@see getNamedFunction} first, then
  * bridges / {@see JitVmHelperLink::ensureBridge}. Do not re-add empty always-on shells in
  * {@see Type} — leftover decls mint serialize_hashtable.1 (#31894 / #32122 / #33207).
  *
- * Object ABI builds the `O:len:"Class":` header via NestedJIT with LLVM-loaded length,
- * then concatenates NestedJIT property bag (peer JsonEncode #27020 shape for arrays).
+ * Hashtable ABI: {@see SerializeHashtableLlvm} (peer {@see JsonEncodeArrayLlvm}) — NestedJIT
+ * exportKeyValuePairs dim-fetch SIGABRTs on `$pair[1]->toInt()` (#34483 / #26367).
+ * Scalars still use {@see SerializeNestedJitHelper}; objects use NestedJIT header+props.
  * php-src: ext/standard/var.c — php_var_serialize
  */
 final class StringSerialize
@@ -39,8 +41,6 @@ final class StringSerialize
     private const OBJECT_HELPER_PATH = '/ext/standard/SerializeObjectNestedJitHelper.php';
 
     private const ENCODE_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\SerializeNestedJitHelper::encodeValue';
-
-    private const ENCODE_HT_HELPER = 'PHPCompiler\\ext\\standard\\SerializeNestedJitHelper::encodeHashtable';
 
     private const OBJECT_HEADER_HELPER = 'PHPCompiler\\ext\\standard\\SerializeObjectNestedJitHelper::formatObjectHeader';
 
@@ -53,9 +53,8 @@ final class StringSerialize
     private const OBJECT_BRIDGE_ENTRY = 'serialize_object_bridge_entry';
 
     /** @var list<string> */
-    private const COMPILED_HELPERS = [
+    private const COMPILED_VALUE_HELPERS = [
         self::ENCODE_VALUE_HELPER,
-        self::ENCODE_HT_HELPER,
     ];
 
     /** @var list<string> */
@@ -128,19 +127,43 @@ final class StringSerialize
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
         self::implementSerializeValueBridge($context);
-        JitVmHelperLink::ensureBridge(
-            $context,
-            '__compiler_serialize_hashtable',
-            self::HT_BRIDGE_ENTRY,
-            [$htPtr, $i64],
-            $strPtr,
-            self::ENCODE_HT_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#27030'
-        );
+        self::implementSerializeHashtableBridge($context);
         self::implementObjectBridge($context);
         self::registerLinkedRuntime($context);
+    }
+
+    /**
+     * Array serialize via export pairs in LLVM — NestedJIT dim-fetch SIGABRTs (#34483 / peer #26367).
+     */
+    private static function implementSerializeHashtableBridge(Context $context): void
+    {
+        $abiName = '__compiler_serialize_hashtable';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::HT_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        self::implementSerializeValueBridge($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $htPtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        // Register before body emit: nested array values recurse into this ABI (#34483).
+        $context->registerFunction($abiName, $fn);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::HT_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue(
+                SerializeHashtableLlvm::encode($context, $fn->getParam(0), $fn->getParam(1))
+            );
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     /** Float scalar via {@see ZendDoubleStringRuntime} — NestedJIT `(string)` float SIGSEGV (#31963). */
@@ -169,6 +192,9 @@ final class StringSerialize
 
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::VALUE_BRIDGE_ENTRY);
         $floatBb = $fn->appendBasicBlock('ser_val_float');
+        $boolCheckBb = $fn->appendBasicBlock('ser_val_bool_check');
+        $boolTrueBb = $fn->appendBasicBlock('ser_val_bool_true');
+        $boolFalseBb = $fn->appendBasicBlock('ser_val_bool_false');
         $helperBb = $fn->appendBasicBlock('ser_val_helper');
 
         $context->builder->positionAtEnd($entry);
@@ -178,6 +204,16 @@ final class StringSerialize
             $context->builder->structGep($valPtr, $valueMap['type'])
         );
         $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        // JIT TYPE_NATIVE_BOOL (=2) collides with VM TYPE_FLOAT — check bool first (#34483 / peer #26367).
+        $isJitBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(JitVariable::TYPE_NATIVE_BOOL, false)
+        );
+        $afterJitBoolBb = $fn->appendBasicBlock('ser_val_after_jit_bool');
+        $context->builder->branchIf($isJitBool, $boolCheckBb, $afterJitBoolBb);
+
+        $context->builder->positionAtEnd($afterJitBoolBb);
         $isVmFloat = $context->builder->icmp(
             Builder::INT_EQ,
             $typeKind,
@@ -189,7 +225,32 @@ final class StringSerialize
             $i8->constInt(JitVariable::TYPE_NATIVE_DOUBLE, false)
         );
         $isFloat = $context->builder->or($isVmFloat, $isJitDouble);
-        $context->builder->branchIf($isFloat, $floatBb, $helperBb);
+        $notFloatBb = $fn->appendBasicBlock('ser_val_not_float');
+        $context->builder->branchIf($isFloat, $floatBb, $notFloatBb);
+
+        $context->builder->positionAtEnd($notFloatBb);
+        $isVmBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
+        );
+        $context->builder->branchIf($isVmBool, $boolCheckBb, $helperBb);
+
+        $context->builder->positionAtEnd($boolCheckBb);
+        // __value__readLong has no TYPE_NATIVE_BOOL arm — returns 0 (#21892).
+        $boolByte = \PHPCompiler\JIT\JitValueBox::readBoolByte($context, $valPtr);
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolByte,
+            $i8->constInt(0, false)
+        );
+        $context->builder->branchIf($isTrue, $boolTrueBb, $boolFalseBb);
+
+        $context->builder->positionAtEnd($boolTrueBb);
+        $context->builder->returnValue($context->builder->load($context->constantStringFromString('b:1;')));
+
+        $context->builder->positionAtEnd($boolFalseBb);
+        $context->builder->returnValue($context->builder->load($context->constantStringFromString('b:0;')));
 
         $context->builder->positionAtEnd($floatBb);
         try {
@@ -224,7 +285,7 @@ final class StringSerialize
         JitVmHelperLink::ensureCompiled(
             $context,
             self::HELPER_PATH,
-            self::COMPILED_HELPERS,
+            self::COMPILED_VALUE_HELPERS,
             '#27030'
         );
     }
