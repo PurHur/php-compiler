@@ -130,29 +130,63 @@ final class JitGettype
         );
     }
 
-    /** True when handle was opened (was_used) but {@see __compiler_is_resource} is now false. */
+    /**
+     * True when handle was opened (was_used) but {@see __compiler_is_resource} is now false.
+     *
+     * Must branch on range **before** GEP/load — AND-after-load still indexes
+     * `phpc_stream_was_used[handle]` for ints ≥ {@see StreamGlobalsJit::MAX_HANDLES}
+     * and negatives, which SIGSEGVs thin AOT `var_dump`/`print_r` (#34519 / re-#34507).
+     * Peer: {@see StreamGlobalsJit} resolve_table BB-guard / #33398.
+     */
     public static function isClosedStreamHandle(Context $context, Value $handle): Value
     {
+        // Capture caller insert before ensureGlobals — append on *this* function only
+        // (BasicBlockHelper::append follows activeFunction and can land in another fn; #34507/#34519).
+        $insert = $context->builder->getInsertBlock();
         StreamGlobalsJit::ensureGlobals($context);
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
         $zero = $i64->constInt(0, false);
         $three = $i64->constInt(3, false);
         $max = $i64->constInt(StreamGlobalsJit::MAX_HANDLES, false);
         $false = $context->constantFromBool(false);
 
-        $inRange = $context->builder->and(
-            $context->builder->icmp(Builder::INT_SGE, $handle, $three),
-            $context->builder->icmp(Builder::INT_SLT, $handle, $max)
-        );
         $global = $context->module->getNamedGlobal(StreamGlobalsJit::GLOBAL_WAS_USED);
         if (null === $global) {
             return $false;
         }
+
+        $context->builder->positionAtEnd($insert);
+        $fn = $insert->getParent();
+        if (null === $fn) {
+            throw new \LogicException('isClosedStreamHandle: insert block has no parent function');
+        }
+
+        $inRange = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $handle, $three),
+            $context->builder->icmp(Builder::INT_SLT, $handle, $max)
+        );
+        $probeBb = $fn->appendBasicBlock('closed_stream_was_used_probe');
+        $oobBb = $fn->appendBasicBlock('closed_stream_was_used_oob');
+        $doneBb = $fn->appendBasicBlock('closed_stream_was_used_done');
+        $context->builder->branchIf($inRange, $probeBb, $oobBb);
+
+        $context->builder->positionAtEnd($oobBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($probeBb);
         $slot = $context->builder->gep($global, $zero, $handle);
         $wasUsed = $context->builder->load($slot);
         $used = $context->builder->icmp(Builder::INT_NE, $wasUsed, $i8->constInt(0, false));
+        $probeEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        return $context->builder->and($inRange, $used);
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i1, 'closed_stream_was_used_phi');
+        $phi->addIncoming($false, $oobBb);
+        $phi->addIncoming($used, $probeEnd);
+
+        return $phi;
     }
 }
