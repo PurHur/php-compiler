@@ -48,8 +48,6 @@ final class mb_ereg_search_getregs extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_ereg_search_getregs() is not lowered for JIT/AOT in this compiler build'
-        );
+        return JitMbEregSearch::foldSearchGetRegs($context, $args);
     }
 }
