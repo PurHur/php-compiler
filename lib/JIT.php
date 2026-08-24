@@ -997,6 +997,46 @@ class JIT {
     }
 
     /**
+     * Non-hashtable property reads must not leave objectPropertySlot on ASSIGN dest —
+     * the next `$s = …` would propertyStore into the previous object (#34465 / peer #33849).
+     * Hashtable props keep the alias for dim writes (#848).
+     */
+    private function isScalarObjectPropertyAliasType(?int $propertyType): bool
+    {
+        if (null === $propertyType) {
+            return true;
+        }
+        if (Variable::TYPE_HASHTABLE === $propertyType) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Reseat a non-hashtable property fetch into a stack box and drop the live-slot alias (#34465).
+     */
+    private function detachScalarObjectPropertyAliasForAssign(Variable $var): Variable
+    {
+        if (null === $var->objectPropertySlot) {
+            return $var;
+        }
+        if (!$this->isScalarObjectPropertyAliasType($var->objectPropertyType)) {
+            return $var;
+        }
+        $boxed = $this->reseatPropertyFetchReadIntoValueBox($var);
+        $boxed->objectPropertySlot = null;
+        $boxed->objectPropertyType = null;
+        $boxed->objectPropertyReceiver = null;
+        $boxed->objectPropertyReceiverOp = null;
+        $boxed->objectPropertyName = null;
+        $boxed->objectPropertyClassName = null;
+        $boxed->objectPropertyDnfArms = null;
+
+        return $boxed;
+    }
+
+    /**
      * CONCAT operands that are ?: phi aliases must read the stack-phi dest (#32908 / #18052).
      *
      * Do not redirect when this block's CONCAT *defines* $slot (dest === $slot): php-cfg
@@ -8614,6 +8654,8 @@ class JIT {
                         }
                     }
                     $value = $this->resolveAssignRhsFromFormalParam($block, $rhsOperand, $value);
+                    // `$sink = $obj->nodeName` must copy the string, not alias the live slot (#34465).
+                    $value = $this->detachScalarObjectPropertyAliasForAssign($value);
                     if (null !== $this->context->ternarySharedReturnSlot && $this->isTernaryBranchMergeAssign($block, $op)) {
                         $this->emitJitReturnFromValue($func, $block, $value);
                         break;
@@ -18613,6 +18655,13 @@ class JIT {
     }
 
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
+        // `$s = $obj->scalarProp` must not leave a live property alias on `$s` (#34465).
+        if (!(
+            $force
+            && $this->context->retainCoalesceInstancePropertyLvalue
+        )) {
+            $value = $this->detachScalarObjectPropertyAliasForAssign($value);
+        }
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         $resolvedName = JIT\OperandName::resolve($resultOp);
         // Generator create results carry resume/state tags — first-bind must not strip them via
@@ -18730,6 +18779,27 @@ class JIT {
             }
         }
         $result = $this->resolveAssignLvalue($resultOp);
+        // Locals that still carry a non-hashtable property alias from a prior read assign
+        // must rebind — writing through would mutate the previous object (#34465).
+        if (
+            null !== $result->objectPropertySlot
+            && $this->isScalarObjectPropertyAliasType($result->objectPropertyType)
+            && !(
+                $force
+                && $this->context->retainCoalesceInstancePropertyLvalue
+            )
+        ) {
+            $lvName = JIT\OperandName::resolve($resultOp);
+            if (null !== $lvName && '' !== $lvName) {
+                $result->objectPropertySlot = null;
+                $result->objectPropertyType = null;
+                $result->objectPropertyReceiver = null;
+                $result->objectPropertyReceiverOp = null;
+                $result->objectPropertyName = null;
+                $result->objectPropertyClassName = null;
+                $result->objectPropertyDnfArms = null;
+            }
+        }
         if (
             null !== $this->context->listUnpackAssignRootBlock
             && Variable::TYPE_VALUE === $result->type
@@ -20606,6 +20676,15 @@ class JIT {
             $dest->objectPropertySlot = null;
             $dest->objectPropertyType = null;
             $dest->objectPropertyReceiver = null;
+            $dest->objectPropertyName = null;
+            $dest->objectPropertyClassName = null;
+            $dest->objectPropertyDnfArms = null;
+        } elseif ($this->isScalarObjectPropertyAliasType($src->objectPropertyType)) {
+            // Scalar prop reads: copy the value only (#34465 / peer #33849).
+            $dest->objectPropertySlot = null;
+            $dest->objectPropertyType = null;
+            $dest->objectPropertyReceiver = null;
+            $dest->objectPropertyReceiverOp = null;
             $dest->objectPropertyName = null;
             $dest->objectPropertyClassName = null;
             $dest->objectPropertyDnfArms = null;
@@ -27458,15 +27537,16 @@ class JIT {
 
     private function reseatPropertyFetchReadIntoValueBox(Variable $fetched): Variable
     {
-        if (null === $fetched->objectPropertySlot || null === $fetched->objectPropertyType) {
+        if (null === $fetched->objectPropertySlot) {
             return $fetched;
         }
+        $propType = $fetched->objectPropertyType ?? $fetched->type;
         $slot = JIT\JitValueBox::alloc($this->context);
         JIT\Builtin\Type\ObjectInstancePropertyLlvm::boxFetchedPropertyIntoValue(
             $this->context->type->object,
             $slot,
             $fetched,
-            $fetched->objectPropertyType
+            $propType
         );
         $boxed = new Variable(
             $this->context,
