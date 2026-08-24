@@ -97,11 +97,17 @@ final class SerializeObjectPropsLlvm
         $keyDoneStr = $context->builder->getInsertBlock();
         $context->builder->branch($keyDone);
 
-        // Object props are string names; long keys still emit as s:len:"digits"; (defensive).
+        // Int keys → i:N; (SplFixedArray __spl_ht / #34491). String prop names stay s:len:"…";.
         $context->builder->positionAtEnd($keyLongBlock);
         $keyLong = $context->builder->call($context->lookupFunction('__value__readLong'), $keyPtr);
         $keyDigits = VmResourceIdString::formatNativeLong($context, $keyLong);
-        $keyWireLong = self::quoteStringWire($context, $keyDigits);
+        $iColon = $context->builder->load($context->constantStringFromString('i:'));
+        $semi = $context->builder->load($context->constantStringFromString(';'));
+        $keyWireLong = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $iColon, $keyDigits),
+            $semi
+        );
         $keyDoneLong = $context->builder->getInsertBlock();
         $context->builder->branch($keyDone);
 

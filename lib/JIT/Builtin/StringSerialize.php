@@ -16,6 +16,7 @@ use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\SerializeArrayLlvm;
 use PHPCompiler\JIT\SerializeObjectPropsLlvm;
+use PHPCompiler\JIT\SerializeSplBagLlvm;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
@@ -131,9 +132,90 @@ final class StringSerialize
         }
 
         self::implementSerializeValueBridge($context);
+        // Declare object ABI before HT body so SPL compileSerialize can leaf-call it while
+        // SerializeArrayLlvm → encodeBoxedValue walks object arms during HT IR gen (#34491).
+        self::declareSerializeObjectAbi($context);
+        self::declareSerializeArrayObjectAbi($context);
         self::implementSerializeHashtableBridge($context);
         self::implementObjectBridge($context);
+        self::implementSerializeArrayObjectBridge($context);
         self::registerLinkedRuntime($context);
+    }
+
+    /** Add/register `__compiler_serialize_object` without emitting the body yet. */
+    private static function declareSerializeObjectAbi(Context $context): void
+    {
+        $abiName = '__compiler_serialize_object';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $htPtr);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private const ARRAYOBJECT_BRIDGE_ENTRY = 'serialize_arrayobject_bridge_entry';
+
+    /** Add/register `__compiler_serialize_arrayobject` without emitting the body yet. */
+    private static function declareSerializeArrayObjectAbi(Context $context): void
+    {
+        $abiName = '__compiler_serialize_arrayobject';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $i64, $htPtr);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * ArrayObject/ArrayIterator bag: `O:len:"Class":4:{i:0;i:flags;i:1;a:N:{…}i:2;a:0:{}i:3;N;}` (#34491).
+     */
+    private static function implementSerializeArrayObjectBridge(Context $context): void
+    {
+        $abiName = '__compiler_serialize_arrayobject';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::ARRAYOBJECT_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        self::implementSerializeHashtableBridge($context);
+        self::implementObjectBridge($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $i64, $htPtr);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::ARRAYOBJECT_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue(
+                SerializeSplBagLlvm::encodeArrayObject(
+                    $context,
+                    $fn->getParam(0),
+                    $fn->getParam(1),
+                    $fn->getParam(2)
+                )
+            );
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     /**
