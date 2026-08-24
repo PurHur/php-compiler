@@ -26,6 +26,7 @@ use PHPLLVM\Value;
  * comma lists use detect-then-convert (#31488).
  *
  * Excess argc → Zend `expects at most` ArgumentCountError (#30891).
+ * JIT/AOT runtime strings via {@see JitMbConvertEncoding} NestedJIT (#34309).
  */
 final class mb_convert_encoding extends Internal
 {
@@ -104,7 +105,6 @@ final class mb_convert_encoding extends Internal
         if (!$this->requireArgCountRangeJit($context, $args, 'mb_convert_encoding', 2, 3)) {
             return self::foldFalse($context);
         }
-        $argc = \count($args);
 
         // Compile-time null $string — strict TypeError / weak soft-null (#29777 / #21282).
         $sourceIsNull = JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant;
@@ -128,48 +128,7 @@ final class mb_convert_encoding extends Internal
             );
         }
 
-        $sourceLit = $sourceIsNull ? '' : JitStringBuiltinArg::compileTimeLiteral($args[0]);
-        $toLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
-        // Explicit null $from_encoding folds like omitted — internal encoding (#31488).
-        $fromIsDefault = 2 === $argc
-            || (
-                3 === $argc
-                && (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant)
-            );
-        $fromLit = $fromIsDefault
-            ? (MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding())
-            : JitStringBuiltinArg::compileTimeLiteral($args[2]);
-        if (null !== $sourceLit && null !== $toLit && null !== $fromLit) {
-            $fromList = preg_split('/\s*,\s*/', $fromLit) ?: [];
-            $fromList = array_values(array_filter($fromList, static fn (string $p): bool => '' !== $p));
-            if ([] === $fromList) {
-                return self::foldFalse($context);
-            }
-            foreach ($fromList as $from) {
-                if (
-                    !VmMbstring::isMbConvertPseudoEncoding($from)
-                    && null === CharsetEngine::parseEncodingSpec($from)
-                ) {
-                    return self::foldFalse($context);
-                }
-            }
-            if (
-                !VmMbstring::isMbConvertPseudoEncoding($toLit)
-                && null === CharsetEngine::parseEncodingSpec($toLit)
-            ) {
-                return self::foldFalse($context);
-            }
-            $converted = VmMbstring::convertEncodingWithFromList($sourceLit, $toLit, $fromList);
-            if (false === $converted) {
-                return self::foldFalse($context);
-            }
-
-            // constantFromString() is a C-string global — box as __string__/__value__ so AOT can
-            // infer the array|string|false return (same shape as iconv fold; #28525).
-            return self::foldString($context, $converted);
-        }
-
-        throw new \LogicException('mb_convert_encoding() is not lowered for JIT/AOT in this compiler build');
+        return JitMbConvertEncoding::invoke($context, $args, $sourceIsNull);
     }
 
     private static function foldFalse(Context $context): Value
@@ -179,19 +138,5 @@ final class mb_convert_encoding extends Internal
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
 
         return JitValueBox::pointer($context, $slot);
-    }
-
-    private static function foldString(Context $context, string $converted): Value
-    {
-        $strPtr = $context->builder->load($context->constantStringFromString($converted));
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $ptr,
-            $strPtr
-        );
-
-        return $ptr;
     }
 }
