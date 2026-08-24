@@ -18,6 +18,7 @@ use PHPCompiler\JIT\Builtin\StringTime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\ScriptMagic;
@@ -296,14 +297,24 @@ final class JitDate
         $format = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], $function, 0, 'format');
         $gmtI8 = $context->getTypeFromString('int8')->constInt($gmt ? 1 : 0, false);
 
-        // Type always-on format_datetime drop (#33215) — must ensureLinked before lookup.
-        StringDateTime::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_format_datetime'),
+        // Runtime format string: NestedJIT FormatDatetime SIGSEGV under thin AOT (#34482).
+        // Strcmp-dispatch onto the same civil snprintf path used for compile-time literals.
+        return self::emitRuntimeCivilFormatDispatch(
+            $context,
             $format,
             $timestamp,
-            $gmtI8
+            null,
+            !$gmt,
+            static function () use ($context, $format, $timestamp, $gmtI8): Value {
+                StringDateTime::ensureLinked($context);
+
+                return $context->builder->call(
+                    $context->lookupFunction('__compiler_format_datetime'),
+                    $format,
+                    $timestamp,
+                    $gmtI8
+                );
+            }
         );
     }
 
@@ -587,6 +598,95 @@ final class JitDate
             $len,
             $bufChar
         );
+    }
+
+    /**
+     * Formats handled by {@see tryFormatCivilLiteral} (exact match).
+     *
+     * @return list<string>
+     */
+    public static function civilLiteralFormatKeys(): array
+    {
+        return [
+            'U',
+            'U.u',
+            'u',
+            'Y',
+            'y',
+            'm',
+            'd',
+            'H',
+            'i',
+            's',
+            'Y-m-d',
+            'Ymd',
+            'H:i:s',
+            'Y-m-d H:i',
+            'Y-m-d H:i:s',
+            'H:i:s.u',
+            'Y-m-d H:i:s.u',
+            'c',
+        ];
+    }
+
+    /**
+     * Runtime format string → civil snprintf when the needle matches a known literal (#34482).
+     *
+     * NestedJIT FormatDatetime / DateTimeFormatRuntime SIGSEGV under thin PROFILE=8.4 AOT
+     * for non-literal formats (`$fmts[0]`, foreach). Compile-time literals already bake via
+     * {@see tryFormatCivilLiteral}; this IR strcmp ladder reuses that path at runtime.
+     *
+     * @param callable(): Value $emitFallback positioned at the miss block
+     */
+    public static function emitRuntimeCivilFormatDispatch(
+        Context $context,
+        Value $formatStr,
+        Value $timestamp,
+        ?Value $microsecond,
+        bool $local,
+        callable $emitFallback
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'date_civil_rt');
+        $insert = $context->builder->getInsertBlock();
+        if (null === $insert) {
+            return $emitFallback();
+        }
+        $fn = $insert->getParent();
+        if (null === $fn) {
+            return $emitFallback();
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $resultSlot = $context->builder->alloca($strPtr, 1, 'civil_rt_result');
+        $end = $fn->appendBasicBlock('civil_rt_end');
+
+        foreach (self::civilLiteralFormatKeys() as $i => $lit) {
+            $match = $fn->appendBasicBlock('civil_rt_match_'.$i);
+            $next = $fn->appendBasicBlock('civil_rt_next_'.$i);
+            $litVal = $context->builder->load($context->constantStringFromString($lit));
+            $cmp = JitStringCompare::strcmp($context, $formatStr, $litVal);
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+            $context->builder->branchIf($isMatch, $match, $next);
+            $context->builder->positionAtEnd($match);
+            $baked = self::tryFormatCivilLiteral($context, $lit, $timestamp, $microsecond, $local);
+            if (null === $baked) {
+                throw new \LogicException(
+                    'civilLiteralFormatKeys out of sync with tryFormatCivilLiteral: '.$lit.' (#34482)'
+                );
+            }
+            $context->builder->store($baked, $resultSlot);
+            $context->builder->branch($end);
+            $context->builder->positionAtEnd($next);
+        }
+
+        $fallback = $emitFallback();
+        $context->builder->store($fallback, $resultSlot);
+        $context->builder->branch($end);
+        $context->builder->positionAtEnd($end);
+
+        return $context->builder->load($resultSlot);
     }
 
     /**
