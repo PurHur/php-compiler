@@ -133,6 +133,7 @@ final class JitDomDocumentElement
             self::storeChildNodesLength($context, $element, 0);
             // Shallow cloneNode / empty markup must read firstChild as null (#32949).
             self::clearFirstLast($context, $element);
+            self::clearElementNav($context, $element);
 
             return;
         }
@@ -142,6 +143,10 @@ final class JitDomDocumentElement
         $first = null;
         $second = null;
         $last = null;
+        $prevElement = null;
+        $firstElement = null;
+        $lastElement = null;
+        $elementCount = 0;
         foreach ($children as $idx => $node) {
             $child = match ($node['kind']) {
                 'comment' => JitDomCreateComment::materialize($context, $node['data']),
@@ -229,6 +234,46 @@ final class JitDomDocumentElement
                     JITVariable::TYPE_VALUE
                 );
             }
+            if ('element' === $node['kind']) {
+                if (null !== $prevElement) {
+                    $childJit = new JITVariable(
+                        $context,
+                        JITVariable::TYPE_OBJECT,
+                        JITVariable::KIND_VALUE,
+                        $child
+                    );
+                    $prevElJit = new JITVariable(
+                        $context,
+                        JITVariable::TYPE_OBJECT,
+                        JITVariable::KIND_VALUE,
+                        $prevElement
+                    );
+                    $objectType->propertyStore(
+                        $objectType->propertySlotFor(
+                            $prevElement,
+                            self::CLASS_ELEMENT,
+                            VmDom::PROP_NEXT_ELEMENT_SIBLING
+                        ),
+                        $childJit,
+                        JITVariable::TYPE_VALUE
+                    );
+                    $objectType->propertyStore(
+                        $objectType->propertySlotFor(
+                            $child,
+                            self::CLASS_ELEMENT,
+                            VmDom::PROP_PREVIOUS_ELEMENT_SIBLING
+                        ),
+                        $prevElJit,
+                        JITVariable::TYPE_VALUE
+                    );
+                }
+                if (null === $firstElement) {
+                    $firstElement = $child;
+                }
+                $lastElement = $child;
+                ++$elementCount;
+                $prevElement = $child;
+            }
             if (null === $first) {
                 $first = $child;
             } elseif (null === $second) {
@@ -241,6 +286,7 @@ final class JitDomDocumentElement
         if (null !== $first && null !== $last) {
             self::storeFirstLast($context, $element, $first, $last);
         }
+        self::storeElementNav($context, $element, $firstElement, $lastElement, $elementCount);
         self::storeChildNodesLength($context, $element, \count($children), $first, $second);
     }
 
@@ -397,6 +443,114 @@ final class JitDomDocumentElement
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
+        // ParentNode / NonDocumentTypeChildNode element-nav (#19431, #34352).
+        foreach ([
+            VmDom::PROP_FIRST_ELEMENT_CHILD,
+            VmDom::PROP_LAST_ELEMENT_CHILD,
+            VmDom::PROP_NEXT_ELEMENT_SIBLING,
+            VmDom::PROP_PREVIOUS_ELEMENT_SIBLING,
+        ] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+        }
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_CHILD_ELEMENT_COUNT)) {
+            $objectType->defineProperty(
+                $elementClassId,
+                VmDom::PROP_CHILD_ELEMENT_COUNT,
+                JITVariable::TYPE_NATIVE_LONG
+            );
+        }
+    }
+
+    /**
+     * Seed ParentNode first/lastElementChild + childElementCount after loadXML (#34352).
+     */
+    private static function storeElementNav(
+        \PHPCompiler\JIT\Context $context,
+        Value $element,
+        ?Value $firstElement,
+        ?Value $lastElement,
+        int $elementCount
+    ): void {
+        self::ensureLinkProps($context);
+        $objectType = $context->type->object;
+        if (null !== $firstElement && null !== $lastElement && $elementCount > 0) {
+            $firstJit = new JITVariable(
+                $context,
+                JITVariable::TYPE_OBJECT,
+                JITVariable::KIND_VALUE,
+                $firstElement
+            );
+            $lastJit = new JITVariable(
+                $context,
+                JITVariable::TYPE_OBJECT,
+                JITVariable::KIND_VALUE,
+                $lastElement
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_FIRST_ELEMENT_CHILD),
+                $firstJit,
+                JITVariable::TYPE_VALUE
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_LAST_ELEMENT_CHILD),
+                $lastJit,
+                JITVariable::TYPE_VALUE
+            );
+        } else {
+            self::clearElementNav($context, $element);
+        }
+        $countJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt($elementCount, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_CHILD_ELEMENT_COUNT),
+            $countJit,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+    }
+
+    /** Null ParentNode element-nav slots when a parent has no element children (#34352). */
+    private static function clearElementNav(
+        \PHPCompiler\JIT\Context $context,
+        Value $element
+    ): void {
+        self::ensureLinkProps($context);
+        $objectType = $context->type->object;
+        $nullSlot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+        $nullPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $nullSlot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+        $nullJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $nullSlot
+        );
+        foreach ([
+            VmDom::PROP_FIRST_ELEMENT_CHILD,
+            VmDom::PROP_LAST_ELEMENT_CHILD,
+        ] as $prop) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($element, self::CLASS_ELEMENT, $prop),
+                $nullJit,
+                JITVariable::TYPE_NULL
+            );
+        }
+        $countJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_CHILD_ELEMENT_COUNT),
+            $countJit,
+            JITVariable::TYPE_NATIVE_LONG
+        );
     }
 
     private static function linkSingleChild(
