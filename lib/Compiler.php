@@ -30862,6 +30862,10 @@ class Compiler {
      * as replaceChild(createElement, getElementsByTagName()->item()) keep a later call with live
      * usages in the window (#25563) or fall inside the dead-temp span (item).
      *
+     * PropertyFetch that only feeds a later MethodCall before the consumer (`$el->childNodes`
+     * → `item(N)`) is part of the inline arg chain — not a statement boundary (#34436). Breaking
+     * on it dropped createElement so both ARG_SENDs bound item().
+     *
      * @param list<Op> $cfgChildren
      */
     private function mixedCallArgProducerIsStatementLevelEmptyUsages(
@@ -30888,12 +30892,31 @@ class Compiler {
                 ) {
                     return false;
                 }
+                // Empty-usages MethodCall inside the trailing dead-temp span is an inline arg
+                // producer (DOMNodeList::item) — keep preceding createElement (#34436).
+                if ($deadInlineArgCount > 0 && ($consumerIndex - $scan) <= $deadInlineArgCount) {
+                    return false;
+                }
                 continue;
             }
             if (
                 $between instanceof Op\Expr\PropertyFetch
                 || $between instanceof Op\Expr\NullsafePropertyFetch
-                || $between instanceof Op\Expr\ConstFetch
+            ) {
+                // childNodes → item(N) chain: keep scanning (#34436). Leaf lastChild / prior
+                // statement PropertyFetch still ends the window.
+                if ($this->propertyFetchFeedsCallProducerBeforeConsumer(
+                    $between,
+                    $scan,
+                    $consumerIndex,
+                    $cfgChildren
+                )) {
+                    continue;
+                }
+                break;
+            }
+            if (
+                $between instanceof Op\Expr\ConstFetch
                 || $between instanceof Op\Expr\ClassConstFetch
             ) {
                 break;
@@ -30901,6 +30924,42 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * True when $fetch's result is the receiver of a MethodCall/StaticCall before $consumerIndex
+     * (e.g. `$el->childNodes` feeding `item(N)` in insertBefore args — #34436).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function propertyFetchFeedsCallProducerBeforeConsumer(
+        Op\Expr\PropertyFetch|Op\Expr\NullsafePropertyFetch $fetch,
+        int $fetchIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if (null === $fetch->result) {
+            return false;
+        }
+        for ($i = $fetchIndex + 1; $i < $consumerIndex; ++$i) {
+            $op = $cfgChildren[$i] ?? null;
+            if (
+                !(
+                    $op instanceof Op\Expr\MethodCall
+                    || $op instanceof Op\Expr\StaticCall
+                )
+            ) {
+                continue;
+            }
+            if (
+                null !== $op->var
+                && $this->operandsReferToSameVariable($fetch->result, $op->var)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -36520,6 +36579,13 @@ class Compiler {
             if (null !== $methodSlot) {
                 return $methodSlot;
             }
+            // Name-paired INIT missing and producer is a dead-temp MethodCall: do not fall through
+            // to ordinal EXEC_RETURN (binds prior loadXML) — compileExpr must emit first (#34436).
+            if (null === $producer->result || empty($producer->result->usages)) {
+                $operandSlot = $block->slotForOperand($producer->result);
+
+                return null !== $operandSlot ? (string) $operandSlot : null;
+            }
         }
         if (null !== $consumer && null !== $cfgChildren) {
             $execReturn = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
@@ -36888,6 +36954,14 @@ class Compiler {
         $paired = $this->slotForMethodOrStaticCallInitFollowingExecReturn($block, $producer);
         if (null !== $paired) {
             return $paired;
+        }
+        // Dead-temp createElement/item not yet on the block: ordinal EXEC_RETURN would bind a
+        // prior loadXML return slot so ARG_SEND gets bool and createElement never emits (#34436).
+        if (
+            $producer instanceof Op\Expr\MethodCall
+            && (null === $producer->result || empty($producer->result->usages))
+        ) {
+            return null;
         }
         $producerIndex = array_search($producer, $cfgChildren, true);
         $consumerIndex = array_search($consumer, $cfgChildren, true);
@@ -41287,7 +41361,23 @@ class Compiler {
             if (
                 $mid instanceof Op\Expr\PropertyFetch
                 || $mid instanceof Op\Expr\NullsafePropertyFetch
-                || $mid instanceof Op\Expr\ConstFetch
+            ) {
+                // `$el->childNodes->item(N)` — PropertyFetch feeds item(), not a prior
+                // statement separator. Skipping createElement here made both ARG_SENDs
+                // bind item() (#34436 / peer #34405 statement skip).
+                if ($this->propertyFetchFeedsCallProducerBeforeConsumer(
+                    $mid,
+                    $j,
+                    $consumerIndex,
+                    $cfgChildren
+                )) {
+                    continue;
+                }
+
+                return true;
+            }
+            if (
+                $mid instanceof Op\Expr\ConstFetch
                 || $mid instanceof Op\Expr\ClassConstFetch
             ) {
                 return true;
@@ -49557,11 +49647,16 @@ class Compiler {
                             if (null === $mixedSlot) {
                                 // Already-lowered statement MethodCall (unused appendChild(createElement)
                                 // before importNode — #34405) — do not compileExpr again or the tree is
-                                // mutated twice.
+                                // mutated twice. Match THIS producer ordinal's INIT→EXEC_RETURN, not
+                                // merely the method name (second createElement in the same block was
+                                // skipped and both replaceChild ARG_SENDs bound item() — #34436).
                                 if (
                                     $mixedMatched instanceof Op\Expr\MethodCall
                                     && (null === $mixedMatched->result || empty($mixedMatched->result->usages))
-                                    && $this->emittedMethodCallOpcodesForCfgStmt($block, $mixedMatched)
+                                    && null !== $this->slotForMethodOrStaticCallInitFollowingExecReturn(
+                                        $block,
+                                        $mixedMatched
+                                    )
                                 ) {
                                     $mixedMatched = null;
                                 } else {
