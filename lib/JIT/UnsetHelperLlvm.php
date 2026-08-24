@@ -467,9 +467,20 @@ final class UnsetHelperLlvm
         Operand $dimOp,
         ?\PHPCompiler\JIT $jit = null
     ): void {
-        $operandUserType = Type::TYPE_OBJECT === $containerOp->type->type
+        $operandUserType = (null !== $containerOp->type && Type::TYPE_OBJECT === $containerOp->type->type)
             ? $containerOp->type->userType
             : null;
+        // Try-body inheritUndefinedLocals can drop CFG userType on the receiver Temporary;
+        // recover from the JIT binding's classUserType (peer PROPERTY_FETCH #32749 / #34431).
+        if ((null === $operandUserType || '' === $operandUserType) && $context->hasVariableOp($containerOp)) {
+            $tagged = $context->getVariableFromOp($containerOp)->classUserType ?? null;
+            if (\is_string($tagged) && '' !== $tagged
+                && !\in_array(\strtolower(\ltrim($tagged, '\\')), ['object', 'stdclass'], true)
+            ) {
+                $operandUserType = $tagged;
+                $containerOp->type = new Type(Type::TYPE_OBJECT, [], $tagged);
+            }
+        }
         $blockClassName = null !== $block->func && null !== $block->func->class
             ? $block->func->class->value
             : null;
