@@ -117,6 +117,16 @@ final class ObjectInstancePropertyLlvm
             if (null !== $runtimeFetch) {
                 return $runtimeFetch;
             }
+            // CFG types `$this->o` as generic object after `new stdClass`. Declared-slot
+            // lookup on the synthetic ClassEntry used to recurse (#34395). Writes go to
+            // stdClass dynamics (zend_std_write_property); reads without a user-class
+            // candidate fall through to defineProperty on this id.
+            if ('object' === $classLc && $forWrite) {
+                $stdId = $object->classIdForLowerName('stdclass');
+                if (null !== $stdId && $stdId !== $classId) {
+                    return self::propertyFetchDeclaredSlot($object, $obj, 'stdClass', $name, $stdId, true);
+                }
+            }
         }
         $nameId = $object->propNameIdFor($name);
         $hasProp = false;
@@ -322,6 +332,13 @@ final class ObjectInstancePropertyLlvm
     ): ?Variable {
         $candidates = [];
         foreach ($object->allClassNamesById() as $id => $className) {
+            $classLc = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
+            // The synthetic `object` ClassEntry is how CFG types `$this->o` after
+            // `$this->o = new stdClass`. Dispatching back into propertyFetchOrdinary
+            // with that same name recurses until PHP OOMs (#34395 / leftover #34382).
+            if (\in_array($classLc, ['static', 'self', 'parent', 'object'], true)) {
+                continue;
+            }
             if (null !== $object->resolvePropertySlot($className, $name)) {
                 $candidates[(int) $id] = $className;
             }
