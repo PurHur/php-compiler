@@ -68,10 +68,16 @@ final class TimeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('isPreRegisterModuleNestedJitKernel', $source);
     }
 
-    public function testTypeLinksStringTime(): void
+    public function testStringTimeInvokeSelfLinks(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringTime::ensureLinked', $source);
+        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StringTime::ensureLinked\\(\\$this->context\\)/',
+            $type,
+            'Type::initialize must not eagerly StringTime::ensureLinked (#34513)'
+        );
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringTime.php');
+        $this->assertStringContainsString('self::ensureLinked($context)', $bridge);
     }
 
     public function testSpineBundleIncludesTimeArtifacts(): void

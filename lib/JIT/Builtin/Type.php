@@ -597,9 +597,9 @@ class Type extends Builtin {
         // (#33249): StringTriggerError / JitTriggerErrorKernel owns the ABIs
         // (getNamedFunction first via declareUndefinedArrayKeyAbis / implementUndefKey*Bridge;
         // Type::register declares via owner before HashTable::implement looks them up;
-        // Type::initialize still StringTriggerError::ensureLinked on the full load path).
-        // Leftover Type empty decls vs Runtime ABI drift mint undefined_array_key_warning_*.1
-        // (#31894 / #32122).
+        // Type::initialize always-on ensureLinked removed (#34513) — register still
+        // ensureLinked for HELPER_RUNTIME_O=0). Leftover Type empty decls vs Runtime
+        // ABI drift mint undefined_array_key_warning_*.1 (#31894 / #32122).
         StringTriggerError::declareUndefinedArrayKeyAbis($this->context);
         // __compiler_trigger_error always-on shell removed (#33234): StringTriggerError
         // / JitTriggerErrorKernel owns the ABI (getNamedFunction first via
@@ -607,13 +607,12 @@ class Type extends Builtin {
         // NestedJIT in register() when HELPER_RUNTIME_O=0 (#33248) — HashTable /
         // other register NestedJIT looks up the ABI. SessionStartOptions NestedJIT
         // moved to call-site (#33945) and also ensureLinked trigger_error inside
-        // SessionStartOptionsRuntime::ensureLinked. Type::initialize still
-        // ensureLinked on the full (non-STANDALONE) load path; Context
-        // ensureStandaloneBodies + call-site ensureLinked before lookup. Leftover
-        // Type empty decls vs Runtime ABI drift mint trigger_error.1 (#31894 /
-        // #32122). User-script trigger_error()/user_error() stay trigger_error_ /
-        // JitBuiltinWarning (php-src Zend/zend_execute_API.c, main/php_errors.c,
-        // ext/standard/basic_functions.c).
+        // SessionStartOptionsRuntime::ensureLinked. Type::initialize always-on
+        // ensureLinked removed (#34513); Context ensureStandaloneBodies + call-site
+        // ensureLinked before lookup. Leftover Type empty decls vs Runtime ABI drift
+        // mint trigger_error.1 (#31894 / #32122). User-script trigger_error()/
+        // user_error() stay trigger_error_ / JitBuiltinWarning (php-src
+        // Zend/zend_execute_API.c, main/php_errors.c, ext/standard/basic_functions.c).
         StringTriggerError::ensureLinked($this->context);
         // __compiler_assert_fail / __compiler_assert_fail_string always-on shells
         // removed (#33237 / #33241): AssertFail owns both ABIs (getNamedFunction
@@ -646,8 +645,8 @@ class Type extends Builtin {
         // __phpc_response_headers_flush / __phpc_setcookie_add Type::register
         // declarePendingHeaderAbis removed (#33891 / peer #33255): PendingHeadersRuntime /
         // PendingHeadersJitBridge own the ABI (getNamedFunction first via
-        // declarePendingHeaderAbis / ensureLinked → implement). Type::initialize still
-        // PendingHeadersRuntime::ensureLinked on the non-thin path; thin AOT lazy-links
+        // declarePendingHeaderAbis / ensureLinked → implement). Type::initialize
+        // always-on ensureLinked removed (#34513); thin AOT + call sites lazy-link
         // on first header() use. Leftover Type empty decls vs Runtime ABI drift mint
         // pending_header_*.1 (#31894 / #32122). User-script header()/setcookie() stay
         // header_ / JitPendingHeaders (php-src ext/standard/head.c).
@@ -813,11 +812,12 @@ class Type extends Builtin {
         // ValueEchoRuntime::ensureLinked; EMBED via EmbedObOutput::implement). Leftover Type
         // empty decls vs Runtime ABI drift mint ob_start.1 (#31894 / #32122). User-script
         // ob_*()/echo stay ObOutputJitHelper (php-src ext/standard/output.c).
-        // Thin user-script AOT: lazy-link PendingHeaders on first header()/headers_list use
-        // — NestedJIT during Type::initialize segfaults (#20930, peer #13571).
-        if (!$this->context->isThinStandaloneAotMain()) {
-            PendingHeadersRuntime::ensureLinked($this->context);
-        }
+        // PendingHeaders always-on ensureLinked removed (#34513): header_() /
+        // PendingHeaders / JitSuperglobalRefreshKernel / JitSessionStorageKernel
+        // already ensureLinked before lookup (peer #34474). Thin AOT already
+        // skipped NestedJIT here (#20930); full/EMBED/non-thin now match.
+        // Leftover Type NestedJIT vs Runtime ABI drift mints pending_header_*.1
+        // (#31894 / #32122).
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
             || Builtin::LOAD_TYPE_EMBED === $this->loadType
         ) {
@@ -834,8 +834,8 @@ class Type extends Builtin {
         // #32122). StringSuperglobalName still ensureLinked from JIT.php.
         // TimeSleep / getenv / microtime always-on ensureLinked removed (#34320):
         // JitSleep / JitEnv / JitDate / JitGettimeofday already ensureLinked
-        // before lookup (peer #34241 PowInt batch). StringTime still eager below
-        // (TimeRuntimeShrinkTest::testTypeLinksStringTime).
+        // before lookup (peer #34241 PowInt batch). StringTime lazy as of #34513
+        // (StringTime::invoke ensureLinked before lookup).
         // ProcessIdentity / gettimeofday / getrusage / net_get_interfaces /
         // ListUnpack always-on ensureLinked removed (#34327): JitDate
         // (getmypid*), JitGettimeofday, JitGetrusage, JitNetGetInterfaces,
@@ -846,13 +846,12 @@ class Type extends Builtin {
         // JitProcOpen / JitProcClose / JitProcTerminate / JitProcGetStatus /
         // stream_socket_pair.php / JitStreamSocketGetName /
         // JitStreamSocketAccept / FtokRuntime::invoke / Posix*Jit::invoke
-        // already ensureLinked before lookup (peer #34327). StringTime still
-        // eager below (TimeRuntimeShrinkTest::testTypeLinksStringTime).
+        // already ensureLinked before lookup (peer #34327). StringTime lazy
+        // as of #34513.
         // StringInfo / StringVersionCompare always-on ensureLinked removed
         // (#34337): JitInfo / ReflectionExtensionGetVersion already
         // ensureLinked before lookup (peer #34333). Crypto/json/password/
         // random_bytes batch is peer #34332.
-        StringTime::ensureLinked($this->context);
         // openssl / hash / json / libcrypt / password / random_bytes always-on
         // ensureLinked removed (#34332): JitOpenssl* / OpensslEncryptCrypto /
         // JitHash / JitJson* / JitLibcrypt / JitPassword* / JitRandomBytes /
@@ -861,20 +860,18 @@ class Type extends Builtin {
         // StringUnpack always-on ensureLinked removed (#34357): JitPreg* /
         // JitXmlrpc / JitSprintf / JitPrintf / JitNumberFormat / JitVsprintf /
         // JitSscanf / PackJitRuntime / UnpackJitRuntime already ensureLinked or
-        // implementIfDeclared before lookup (peer #34337). StringTime still
-        // eager below (TimeRuntimeShrinkTest::testTypeLinksStringTime).
+        // implementIfDeclared before lookup (peer #34337).
         // StringVarExport / StringPrintR / StringVarDump / StringSerialize /
         // StringUnserialize always-on ensureLinked removed (#34384): JitVarExport /
         // JitPrintR / JitVarDump / JitSerialize / JitUnserialize already
-        // ensureLinked before lookup (peer #34357). StringTime still eager below
-        // (TimeRuntimeShrinkTest::testTypeLinksStringTime).
+        // ensureLinked before lookup (peer #34357).
         // StringStripTags / StringConvertUu / StringQuotPrint / StringUtf8Latin1 /
         // StringUtf8Runtime always-on ensureLinked removed (#34414): call-site
         // StringStripTags::ensureLinked / StringConvertUu::ensureLinked /
         // StringQuotPrint::ensureLinked / StringUtf8Latin1::ensureLinked /
         // StringUtf8Runtime::ensureLinked (strip_tags.php / JitConvertUu* /
         // JitQuotedPrintable* / JitUtf8Latin1 / JitMbStrlen / validFromPtr)
-        // already run before lookup (peer #34384). StringTime still eager below.
+        // already run before lookup (peer #34384).
         // StringReadfile / StringFileGetContents / StringFilePutContents /
         // MimeContentTypeRuntime / MetaTagsRuntime / StringErrorLog /
         // GetHeadersRuntime / ParseUrlRuntime always-on ensureLinked removed
@@ -887,7 +884,6 @@ class Type extends Builtin {
         // JitGetHeaders / JitParseUrl / ParseUrl.php) already run before lookup
         // (peer #34414). Eager NestedJIT on every full load vs Runtime ABI drift
         // mints readfile.1 / file_get_contents.1 / … (#31894 / #32122).
-        // StringTime still eager below (TimeRuntimeShrinkTest).
         // StringStrtr / StringPhpinfoRuntime / StringDir /
         // DirectoryIteratorSnapshotRuntime / GlobIteratorSnapshotRuntime /
         // SplFileObjectSnapshotRuntime / StringFsGlob / StringFsDir always-on
@@ -904,7 +900,7 @@ class Type extends Builtin {
         // DirectoryIteratorSnapshotRuntime / GlobIteratorSnapshotRuntime)
         // already run before lookup (peer #34423). Eager NestedJIT on every
         // full load vs Runtime ABI drift mints strtr.1 / phpinfo.1 / … (#31894 /
-        // #32122). StringTime still eager below (TimeRuntimeShrinkTest).
+        // #32122).
         // StreamSync / StreamIo / StreamCaps / StreamLifecycle / StreamBuffer /
         // StreamMeta / StreamRead / StreamResource always-on ensureLinked removed
         // (#34439): call-site StreamSync::ensureLinked / StreamIo::ensureLinked /
@@ -920,7 +916,7 @@ class Type extends Builtin {
         // JitStreamGetContents / JitStreamCopyToStream / JitGetResourceType /
         // JitGetResources / SettypeRuntime) already run before lookup (peer #34433).
         // Eager NestedJIT on every full load vs Runtime ABI drift mints fsync.1 /
-        // fopen.1 / feof.1 / … (#31894 / #32122). StringTime still eager below.
+        // fopen.1 / feof.1 / … (#31894 / #32122).
         // StatCache / StatPath / Stats / StreamGlobals / GzStreamIo / Bz2StreamIo /
         // StringStreamCsv always-on ensureLinked removed (#34445): call-site
         // StatCacheRuntime::ensureLinked / StatPathRuntime::ensureLinked /
@@ -932,7 +928,7 @@ class Type extends Builtin {
         // JitGz* / JitBz2* / JitStrGetcsv / JitFgetcsv) already run before lookup
         // (peer #34439). Eager NestedJIT on every full load vs Runtime ABI drift
         // mints clearstatcache.1 / file_exists.1 / gzopen.1 / bzopen.1 /
-        // fgetcsv.1 / … (#31894 / #32122). StringTime still eager above.
+        // fgetcsv.1 / … (#31894 / #32122).
         // LastError / CliArgv / FunctionExists / Memory / AssertFail /
         // AssertOptions / ProgressNote always-on ensureLinked removed (#34463):
         // call-site LastErrorRuntime::ensureLinked / CliArgvRuntime::ensureLinked /
@@ -947,7 +943,6 @@ class Type extends Builtin {
         // ensureStandaloneBodies from Context for Assert*/LastError/CliArgv/
         // ProgressNote. Eager NestedJIT on every full load vs Runtime ABI
         // drift mints error_get_last.1 / assert_fail.1 / … (#31894 / #32122).
-        // StringTime still eager above (TimeRuntimeShrinkTest).
         // Ini / IncludePath / WeakRef / Session* / Define / RewriteVars always-on
         // ensureLinked removed (#34474): call-site IniRuntime::ensureLinked /
         // IncludePathRuntime::ensureLinked / WeakRefRegistryRuntime::ensureLinked /
@@ -962,13 +957,18 @@ class Type extends Builtin {
         // JitSessionDecode / JitDefine / DefineRuntime emit* / JitOutputRewriteVars
         // via emitAdd/emitReset) already run before lookup (peer #34463). Eager
         // NestedJIT on every full load vs Runtime ABI drift mints ini_get.1 /
-        // session_start_apply.1 / define.1 / … (#31894 / #32122). EnvLocalRuntime
-        // still eager below (TypeDeadEnvLocalAbiRuntimeShrinkTest / Context
-        // ensureStandaloneBodies). StringTriggerError still ensureLinked below
-        // (register already links for HELPER_RUNTIME_O=0; initialize keeps the
-        // full-load path peer). SessionStorageGlobals::ensureGlobals stays.
+        // session_start_apply.1 / define.1 / … (#31894 / #32122).
+        // StringTime / EnvLocal / StringTriggerError(initialize) / PendingHeaders
+        // always-on ensureLinked removed (#34513): StringTime::invoke /
+        // TouchLibcRuntime / Context::ensureStandaloneBodies (EnvLocal +
+        // StringTriggerError) / trigger_error_ / JitBuiltinWarning / header_ /
+        // PendingHeaders already ensureLinked before lookup (peer #34474).
+        // Type::register still StringTriggerError::ensureLinked for
+        // HELPER_RUNTIME_O=0 NestedJIT (#33248). Eager NestedJIT on every full
+        // load vs Runtime ABI drift mints time.1 / env_local_lookup.1 /
+        // trigger_error.1 / pending_header_*.1 (#31894 / #32122).
+        // SessionStorageGlobals::ensureGlobals stays.
         StringCslashes::ensureStandaloneBodies($this->context);
-        EnvLocalRuntime::ensureLinked($this->context);
         // __phpc_error_handler_* / __phpc_exception_handler_* always-on shells removed
         // (#33842): ErrorHandlerJitRuntime / ExceptionHandlerJitRuntime own the ABI
         // (getNamedFunction first via implement*Bridge). Do not re-add
@@ -979,7 +979,6 @@ class Type extends Builtin {
         // (JitErrorHandler / JitExceptionHandler / JitTriggerErrorKernel /
         // TryCatchHelper) ensureLinked before lookup. php-src:
         // ext/standard/basic_functions.c — set_error_handler / set_exception_handler.
-        StringTriggerError::ensureLinked($this->context);
         CallArgv::implement($this->context);
         // SessionStart/WriteClose/RegenerateId/Destroy/Abort/Unset::implement always-on
         // removed (#33980): those implement() methods are no-ops since #21564 — bodies live

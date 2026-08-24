@@ -30,11 +30,7 @@ final class TypeDeadTypeInitializeLazyInfoVersionCompareRuntimeShrinkTest extend
                 'Builtin\\Type::initialize must not eagerly '.$call.' (#34337)'
             );
         }
-        $this->assertStringContainsString(
-            'StringTime::ensureLinked($this->context)',
-            $type,
-            'StringTime stays eager (#34337 / TimeRuntimeShrinkTest)'
-        );
+        // StringTime lazy as of #34513 — see TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest.
     }
 
     public function testCallSitesEnsureLinkBeforeLookup(): void

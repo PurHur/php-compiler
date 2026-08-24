@@ -47,7 +47,9 @@ final class TypeDeadEnvLocalAbiRuntimeShrinkTest extends TestCase
         }
         $this->assertStringNotContainsString('function ensureExternalFunction', $type);
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('EnvLocalRuntime::ensureLinked', $type);
+        $this->assertStringContainsString('#34513', $type);
+        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('EnvLocalRuntime::ensureLinked', $ctx);
     }
 
     public function testRuntimeOwnerDeclaresEnvLocalAbisModuleLocally(): void
@@ -64,10 +66,16 @@ final class TypeDeadEnvLocalAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#32729', $orch);
     }
 
-    public function testTypeRegisterStillEnsureLinksEnvLocalRuntime(): void
+    public function testContextStillEnsureLinksEnvLocalRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('EnvLocalRuntime::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])EnvLocalRuntime::ensureLinked\\(\\$this->context\\)/',
+            $type,
+            'Type::initialize must not eagerly EnvLocalRuntime::ensureLinked (#34513)'
+        );
+        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('EnvLocalRuntime::ensureLinked($this)', $ctx);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void

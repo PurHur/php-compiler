@@ -38,20 +38,12 @@ final class TypeDeadTypeInitializeLazySessionIniIncludeDefineRuntimeShrinkTest e
             );
         }
         $this->assertStringContainsString(
-            'StringTime::ensureLinked($this->context)',
-            $type,
-            'StringTime stays eager (#34474 / TimeRuntimeShrinkTest)'
-        );
-        $this->assertStringContainsString(
-            'EnvLocalRuntime::ensureLinked($this->context)',
-            $type,
-            'EnvLocalRuntime stays eager (#34474 / TypeDeadEnvLocalAbiRuntimeShrinkTest)'
-        );
-        $this->assertStringContainsString(
             'SessionStorageGlobals::ensureGlobals($this->context)',
             $type,
             'SessionStorageGlobals::ensureGlobals stays (#34474)'
         );
+        // StringTime / EnvLocalRuntime lazy as of #34513 — covered by
+        // TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest.
     }
 
     public function testCallSitesEnsureLinkBeforeLookup(): void

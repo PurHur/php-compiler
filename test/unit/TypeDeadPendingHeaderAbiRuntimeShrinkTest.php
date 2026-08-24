@@ -46,6 +46,7 @@ final class TypeDeadPendingHeaderAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type::register must not eagerly declare pending-header ABIs (#33891)'
         );
+        $this->assertStringContainsString('#34513', $type);
         $this->assertStringContainsString('PendingHeadersRuntime::ensureLinked', $type);
     }
 
@@ -69,10 +70,16 @@ final class TypeDeadPendingHeaderAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__phpc_pending_header_reset', $bridge);
     }
 
-    public function testTypeInitializeStillEnsureLinksPendingHeaders(): void
+    public function testTypeInitializeNoLongerEagerLinksPendingHeaders(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('PendingHeadersRuntime::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])PendingHeadersRuntime::ensureLinked\\(\\$this->context\\)/',
+            $type,
+            'Type::initialize must not eagerly PendingHeadersRuntime::ensureLinked (#34513)'
+        );
+        $header = (string) file_get_contents(__DIR__.'/../../ext/standard/header_.php');
+        $this->assertStringContainsString('PendingHeadersRuntime::ensureLinked', $header);
     }
 
     public function testNoNewRuntimeCForPendingHeaderAbi(): void

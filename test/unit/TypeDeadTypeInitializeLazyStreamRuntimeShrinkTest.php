@@ -34,11 +34,7 @@ final class TypeDeadTypeInitializeLazyStreamRuntimeShrinkTest extends TestCase
                 "Builtin\\Type::initialize must not eagerly {$class}::ensureLinked (#34439)"
             );
         }
-        $this->assertStringContainsString(
-            'StringTime::ensureLinked($this->context)',
-            $type,
-            'StringTime stays eager (#34439 / TimeRuntimeShrinkTest)'
-        );
+        // StringTime lazy as of #34513 — see TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest.
         // StreamGlobals lazy-linked in peer #34445 — no longer asserted here.
     }
 
