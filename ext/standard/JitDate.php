@@ -479,6 +479,37 @@ final class JitDate
             );
         }
 
+        // 'U.u' — seconds + zero-padded micros (php_format_date tokens U/u). NestedJIT
+        // formatStateArgv special-case miscompiles under thin AOT PROFILE=8.4 (#34476):
+        // sprintf('%.5f', (float)$ts) → `1700000000.00000` instead of `….500000`.
+        if ('U.u' === $fmtLit) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'date_uu_civil');
+            $i8 = $context->getTypeFromString('int8');
+            $i64 = $context->getTypeFromString('int64');
+            $sizeT = $context->getTypeFromString('size_t');
+            $charPtr = $context->getTypeFromString('char*');
+            $micro = $microsecond ?? $i64->constInt(0, false);
+            $buf = $context->builder->alloca($i8, 32, 'uu_buf');
+            $bufChar = $context->builder->pointerCast($buf, $charPtr);
+            LibcExtern::ensureSnprintf($context);
+            $fmt = $context->builder->pointerCast($context->constantFromString('%lld.%06lld'), $charPtr);
+            $written = $context->builder->call(
+                $context->lookupFunction('snprintf'),
+                $bufChar,
+                $sizeT->constInt(32, false),
+                $fmt,
+                $timestamp,
+                $micro
+            );
+            $len = $context->builder->sext($written, $i64);
+
+            return $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $len,
+                $bufChar
+            );
+        }
+
         // Bare `u` and `H:i:s.u` go through $specs below (#33930). A dedicated early
         // snprintf for `u` (added in #33927) SIGSEGV'd under thin AOT; `H:i:s.u` was
         // never registered and fell through to NestedJIT DateTimeFormatRuntime (SIGABRT).

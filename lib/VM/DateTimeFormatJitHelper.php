@@ -68,7 +68,8 @@ final class DateTimeFormatJitHelper
             }
         }
         if (\is_string($fmtLit)) {
-            $needsMicro = ('u' === $fmtLit || str_contains($fmtLit, '.u') || str_contains($fmtLit, 'u'));
+            $needsMicro = ('u' === $fmtLit || 'U.u' === $fmtLit
+                || str_contains($fmtLit, '.u') || str_contains($fmtLit, 'u'));
             // Bare 'U' is unix seconds — not microseconds.
             if ('U' === $fmtLit) {
                 $needsMicro = false;
