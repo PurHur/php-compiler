@@ -1548,6 +1548,9 @@ final class TryCatchHelper
      * Return from the current LLVM function after setting throw-pending (#24680).
      *
      * The return value is irrelevant — the caller checks throw-pending before using it.
+     * Must still match the LLVM signature width: `constantFromInteger(0)` is always i64,
+     * which fails module verify for `: bool` (i1) / `: float` (double) functions whose
+     * untyped-arg paths emit many TypeError propagate returns (#34524).
      */
     private static function emitPropagateReturn(Context $context, Function_ $func): void
     {
@@ -1574,6 +1577,14 @@ final class TryCatchHelper
             $builder->returnValue($builder->load($slot));
         } elseif (\PHPLLVM\Type::KIND_POINTER === $kind) {
             $builder->returnValue($retType->constNull());
+        } elseif (\PHPLLVM\Type::KIND_INTEGER === $kind) {
+            // i1 (`: bool`), i32, i64 — same shape as InstantiableClassJitGuard (#34524).
+            $builder->returnValue($retType->constInt(0, false));
+        } elseif (
+            \PHPLLVM\Type::KIND_FLOAT === $kind
+            || \PHPLLVM\Type::KIND_DOUBLE === $kind
+        ) {
+            $builder->returnValue($retType->constReal(0.0));
         } else {
             $builder->returnValue($context->constantFromInteger(0));
         }
