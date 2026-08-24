@@ -12526,6 +12526,17 @@ class JIT {
                     }
                     if (null !== $coalesceMergeOperand) {
                         $sendValue = $this->materializeCoalesceMergeSlotArgSend($block, $sendOperand);
+                    } elseif (
+                        null === $sendOperand
+                        && isset($block->constants[$sendSlot])
+                    ) {
+                        // Nested createElement('r') / similar: string (or other) literal stays on
+                        // Block::$constants[$slot] while getOperand($slot) is null — ARG_SEND must
+                        // rematerialize or AOT throws TypeError (#34302, peer #27623 / #24571).
+                        $sendValue = JIT\VmConstantJit::toVariable(
+                            $this->context,
+                            $block->constants[$sendSlot]
+                        );
                     } else {
                         $sendValue = $this->context->getVariableFromOp($sendOperand);
                         if (
