@@ -21,7 +21,9 @@ use PHPLLVM\Value;
 /**
  * mb_split() — multibyte regex split (php-src ext/mbstring/php_mbregex.c; #13367, #29811, #31312, #34391).
  *
- * Compile-time fold for string literals; runtime via {@see JitMbEreg::invokeSplit} / MbSplitJitHelper.
+ * Compile-time fold when both strings are known — including TYPE_VALUE boxes that still carry
+ * {@see JITVariable::$compileTimeString} after `$p = '…'` (#34391). Runtime via
+ * {@see JitMbEreg::invokeSplit} / MbSplitJitHelper.
  */
 final class mb_split extends Internal
 {
@@ -106,12 +108,9 @@ final class mb_split extends Internal
 
         $patternLit = $args[0]->compileTimeString ?? null;
         $stringLit = $args[1]->compileTimeString ?? null;
-        if (
-            JITVariable::TYPE_STRING === $args[0]->type
-            && null !== $patternLit
-            && JITVariable::TYPE_STRING === $args[1]->type
-            && null !== $stringLit
-        ) {
+        // TYPE_VALUE boxes from `$p = '…'` still carry compileTimeString (#34391).
+        // Do not require TYPE_STRING — that skipped fold and hit NestedJIT / LogicException.
+        if (null !== $patternLit && null !== $stringLit) {
             $limit = -1;
             if ($argc >= 3) {
                 if ($limitIsNull) {
@@ -161,14 +160,14 @@ final class mb_split extends Internal
 
     private static function compileTimeLong(Context $context, JITVariable $var): ?int
     {
+        if (null !== $var->compileTimeLong) {
+            return (int) $var->compileTimeLong;
+        }
         if (JITVariable::TYPE_NATIVE_LONG === $var->type && JITVariable::KIND_VALUE === $var->kind) {
             $lib = $context->llvm->lib;
             if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
                 return (int) $lib->LLVMConstIntGetSExtValue($var->value->value);
             }
-        }
-        if (JITVariable::TYPE_INTEGER === $var->type && null !== ($var->compileTimeInteger ?? null)) {
-            return $var->compileTimeInteger;
         }
 
         return null;
