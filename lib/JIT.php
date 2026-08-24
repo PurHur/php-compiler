@@ -9591,9 +9591,24 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
-                    $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    $resultOp = $block->getOperand($op->arg1);
+                    $result = $this->context->getVariableFromOp($resultOp);
                     JIT\HashTableHelper::initArray($this->context, $result);
                     $result->compileTimeEmptyArrayLiteral = null === $op->arg2;
+                    // Keep named locals (e.g. `$out = []`) flagged so DateTime New_ sync
+                    // does not treat them as pending object slots (#34461).
+                    if ($result->compileTimeEmptyArrayLiteral) {
+                        if (Variable::TYPE_VALUE === $result->type) {
+                            $result->valueBoxHashtable = true;
+                        }
+                        $arrayName = JIT\OperandName::resolve($resultOp);
+                        if (null !== $arrayName && '' !== $arrayName) {
+                            $this->context->bindVariableByName(
+                                $this->context->resolveRefAliasName($arrayName),
+                                $result
+                            );
+                        }
+                    }
                     if (null !== $op->arg2) {
                         $elementOp = $block->getOperand($op->arg2);
                         // NestedJIT VmPregEngine can emit INIT_ARRAY with a dangling arg2 index (#24115).
@@ -13563,6 +13578,14 @@ class JIT {
                                 ) {
                                     $this->context->lastDateTimeNewResultOp = $resultOp;
                                     $this->context->lastDateTimeNewResultVar = $this->context->getVariableFromOp($resultOp);
+                                    // Bind `$p = new DateTime` LHS before __construct sync so empty-hint
+                                    // does not publish onto a later preallocated local like `$a` (#34461).
+                                    $this->prebindDateTimeNewAssignTarget(
+                                        $block,
+                                        $op,
+                                        $resultOp,
+                                        $this->context->lastDateTimeNewResultVar
+                                    );
                                 }
                                 if (0 === strcasecmp($resolvedName, 'DateInterval')) {
                                     $this->context->lastDateIntervalNewResultOp = $resultOp;
@@ -18615,6 +18638,21 @@ class JIT {
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         $resolvedName = JIT\OperandName::resolve($resultOp);
+        // Propagate empty-array markers onto the assign destination before DateTime New_
+        // sync can mistake `$out = []` for a pending object local (#34461).
+        if ($value->compileTimeEmptyArrayLiteral || $value->valueBoxHashtable || Variable::TYPE_HASHTABLE === $value->type) {
+            if ($this->context->hasVariableOp($resultOp)) {
+                $destEarly = $this->context->getVariableFromOp($resultOp);
+                if ($value->compileTimeEmptyArrayLiteral || Variable::TYPE_HASHTABLE === $value->type) {
+                    $destEarly->compileTimeEmptyArrayLiteral = $destEarly->compileTimeEmptyArrayLiteral
+                        || $value->compileTimeEmptyArrayLiteral
+                        || (Variable::TYPE_HASHTABLE === $value->type && 0 === $value->nextFreeElement);
+                }
+                if (Variable::TYPE_VALUE === $destEarly->type) {
+                    $destEarly->valueBoxHashtable = true;
+                }
+            }
+        }
         // Generator create results carry resume/state tags — first-bind must not strip them via
         // makeVariableFromValueOp, or foreach ($g as …) misses the Generator ITER path (#28624).
         if ($value->isJitGenerator) {
@@ -19806,6 +19844,7 @@ class JIT {
                 $this->context->helper->loadValue($value)
             );
             $result->valueBoxHashtable = true;
+            $result->compileTimeEmptyArrayLiteral = $value->compileTimeEmptyArrayLiteral;
 
             return;
         } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_VALUE === $value->type) {
@@ -20580,6 +20619,7 @@ class JIT {
             return;
         }
         $dest->valueBoxHashtable = $src->valueBoxHashtable;
+        $dest->compileTimeEmptyArrayLiteral = $src->compileTimeEmptyArrayLiteral;
         $dest->isNullConstant = $src->isNullConstant;
         $dest->compileTimeConstantName = $src->compileTimeConstantName;
         $dest->compileTimeEnumCase = $src->compileTimeEnumCase;
@@ -20962,11 +21002,78 @@ class JIT {
     }
 
     /**
-     * Rebind `new DateTime` result to the constructed object and copy the unix instant
-     * so format/getTimestamp do not __value__readObject a wiped box (#27192).
+     * If `new DateTime` / `DateTimeImmutable` feeds `$name = <new>`, bind `$name` to the New_
+     * result before __construct sync. Prevents empty-hint from claiming a later preallocated
+     * local (`$a` in `$out=[]; $p=new …; $a=[]; …`) (#34461 / re-#27309).
      *
-     * @param list<JIT\Variable|array{unpack: JIT\Variable}> $callArgs
+     * TYPE_ASSIGN layout: arg1/arg2 = lvalue(s), arg3 = RHS (see assignRhsSlot).
      */
+    private function prebindDateTimeNewAssignTarget(
+        Block $block,
+        OpCode $newOp,
+        Operand $resultOp,
+        JIT\Variable $resultVar
+    ): void {
+        $existingName = JIT\OperandName::resolve($resultOp);
+        if (null !== $existingName && '' !== $existingName) {
+            $this->context->bindVariableByName(
+                $this->context->resolveRefAliasName($existingName),
+                $resultVar
+            );
+
+            return;
+        }
+        $newSlot = $block->slotForOperand($resultOp);
+        if (null === $newSlot) {
+            return;
+        }
+        $ops = $block->opCodes;
+        $idx = array_search($newOp, $ops, true);
+        if (false === $idx) {
+            return;
+        }
+        $n = \count($ops);
+        for ($i = (int) $idx + 1; $i < $n && $i < (int) $idx + 48; ++$i) {
+            $next = $ops[$i];
+            if (OpCode::TYPE_ASSIGN !== $next->type) {
+                // Skip construct / arg-send noise between New_ and Assign.
+                if (
+                    OpCode::TYPE_ARG_SEND === $next->type
+                    || OpCode::TYPE_FUNCCALL_INIT === $next->type
+                    || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $next->type
+                    || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $next->type
+                    || OpCode::TYPE_NEW === $next->type
+                ) {
+                    continue;
+                }
+                // Other ops may sit between New_ and `$p = <temp>`; keep scanning.
+                continue;
+            }
+            $rhsSlot = null !== $next->arg3 ? (int) $next->arg3 : (null !== $next->arg2 ? (int) $next->arg2 : -1);
+            if ($rhsSlot !== (int) $newSlot) {
+                continue;
+            }
+            foreach ([$next->arg2, $next->arg1] as $lhsSlot) {
+                if (null === $lhsSlot) {
+                    continue;
+                }
+                $lhsOp = $block->getOperand((int) $lhsSlot);
+                $lhsName = JIT\OperandName::resolve($lhsOp);
+                if (null === $lhsName || '' === $lhsName) {
+                    continue;
+                }
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($lhsName),
+                    $resultVar
+                );
+
+                return;
+            }
+
+            return;
+        }
+    }
+
     private function syncDateTimeConstructMetaToAliases(?JIT\Call $toCall, array $callArgs): void
     {
         if (
@@ -21030,15 +21137,25 @@ class JIT {
                 if (null !== $bound->compileTimeDateTimeTimestamp) {
                     continue;
                 }
+                // Empty hint is only for unboxed pending DateTime *object* slots (re-#27309).
+                // Never claim TYPE_VALUE locals: `$out = []` / preallocated `$a` before
+                // `$a = []` are TYPE_VALUE and were stolen by nested DateTimeImmutable New_
+                // inside `new DatePeriod(...)` (#34461). DateTime-tagged VALUE locals still
+                // match via the hint/legacy checks below (assignOperand may box New_, #33876).
                 $hint = strtolower(ltrim((string) ($bound->classUserType ?? ''), '\\'));
                 $legacy = (string) ($bound->compileTimeString ?? '');
-                // New_ locals often only have compileTimeString=class name / empty userType until
-                // we stamp them here — allow empty hint so `$a` is found (re-#27309).
-                if (
-                    '' !== $hint
-                    && !\in_array($hint, ['datetime', 'datetimeimmutable'], true)
-                    && !\in_array($legacy, ['DateTime', 'DateTimeImmutable'], true)
-                ) {
+                $dateTimeTagged = \in_array($hint, ['datetime', 'datetimeimmutable'], true)
+                    || \in_array($legacy, ['DateTime', 'DateTimeImmutable'], true);
+                if ($dateTimeTagged) {
+                    if (
+                        JIT\Variable::TYPE_OBJECT !== $bound->type
+                        && JIT\Variable::TYPE_VALUE !== $bound->type
+                    ) {
+                        continue;
+                    }
+                } elseif (JIT\Variable::TYPE_OBJECT === $bound->type && '' === $hint && '' === $legacy) {
+                    // pending unboxed New_ object slot
+                } else {
                     continue;
                 }
                 $publishName = $boundName;
@@ -21048,8 +21165,17 @@ class JIT {
         }
         if (null !== $publishName && '' !== $publishName) {
             $resolved = $this->context->resolveRefAliasName($publishName);
-            $this->context->bindVariableByName($resolved, $first);
-            $this->context->dateTimeLocalInstants[$resolved] = $instant;
+            $existing = $this->context->namedVariableBindings[$resolved] ?? null;
+            // Never replace a live array local with the DateTime New_ (#34461).
+            $existingIsArray = $existing instanceof JIT\Variable && (
+                JIT\Variable::TYPE_HASHTABLE === $existing->type
+                || !empty($existing->compileTimeEmptyArrayLiteral)
+                || !empty($existing->valueBoxHashtable)
+            );
+            if (!$existingIsArray || $existing === $first || $existing === $resultVar) {
+                $this->context->bindVariableByName($resolved, $first);
+                $this->context->dateTimeLocalInstants[$resolved] = $instant;
+            }
         }
         foreach ($this->context->namedVariableBindings as $boundName => $bound) {
             if ($bound === $first || $bound === $resultVar) {
