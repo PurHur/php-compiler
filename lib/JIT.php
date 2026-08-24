@@ -15311,11 +15311,20 @@ class JIT {
         if (!\in_array($lc, ['object', 'stdclass', ''], true)) {
             return $declaringClass;
         }
-        if (!$this->context->hasVariableOpInScopes($obj)) {
-            return $declaringClass;
+        $tagged = null;
+        if ($this->context->hasVariableOpInScopes($obj)) {
+            $recv = $this->context->getVariableFromOpInScopes($obj);
+            $tagged = $recv->classUserType ?? null;
         }
-        $recv = $this->context->getVariableFromOpInScopes($obj);
-        $tagged = $recv->classUserType ?? null;
+        // `$b = new B` stamps classUserType on the named binding; later SSA temps for the
+        // same CV often keep CFG userType "object" without copying the tag (#34382 / #32749).
+        if ((!is_string($tagged) || '' === $tagged || 'object' === strtolower(ltrim($tagged, '\\')))
+            && null !== ($resolved = JIT\OperandName::resolve($obj))
+            && isset($this->context->namedVariableBindings[$resolved])
+        ) {
+            $bound = $this->context->namedVariableBindings[$resolved];
+            $tagged = $bound->classUserType ?? null;
+        }
         if (!is_string($tagged) || '' === $tagged) {
             return $declaringClass;
         }

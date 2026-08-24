@@ -3488,20 +3488,44 @@ class Object_ extends Type {
             return true;
         }
         // Child classId may lack a copied flag when inherit ran before the parent
-        // DECLARE_PROPERTY typed-guard mark, or slot maps diverged (#33886 / re-#33007).
-        $declId = $this->instancePropertySlotDeclaringClassId[$classId][$slotIndex] ?? null;
-        if (null === $declId || $declId === $classId) {
+        // DECLARE_PROPERTY typed-guard mark, or slot maps diverged (#33886 / re-#33007 / #34382).
+        $propName = null;
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[3] === $slotIndex) {
+                $propName = $propset[1];
+                break;
+            }
+        }
+        if (null === $propName) {
             return false;
         }
-        foreach ($this->properties[$classId] ?? [] as $propset) {
-            if ($propset[3] !== $slotIndex) {
-                continue;
-            }
-            $declSet = $this->findInstancePropertySet($declId, $propset[1], false);
+        $declId = $this->instancePropertySlotDeclaringClassId[$classId][$slotIndex]
+            ?? ($this->instancePropertyDeclaringClassId[$classId][strtolower($propName)] ?? null);
+        if (null !== $declId && $declId !== $classId) {
+            $declSet = $this->findInstancePropertySet($declId, $propName, false);
             if (null !== $declSet && isset($this->typedPropertyInitGuardSlots[$declId][$declSet[3]])) {
+                $this->typedPropertyInitGuardSlots[$classId][$slotIndex] = true;
+
                 return true;
             }
-            break;
+        }
+        // defineProperty stamps declaring=child before copyInherited meta; if meta never
+        // refreshed, walk the parent chain by property name (#34382).
+        $parentLc = $this->parentClassLc(strtolower($this->classNameForId($classId)));
+        for ($depth = 0; $depth < 64 && null !== $parentLc; ++$depth) {
+            if (!isset($this->classes[$parentLc])) {
+                break;
+            }
+            $parentId = $this->classes[$parentLc];
+            $parentSet = $this->findInstancePropertySet($parentId, $propName, false);
+            if (null !== $parentSet
+                && isset($this->typedPropertyInitGuardSlots[$parentId][$parentSet[3]])
+            ) {
+                $this->typedPropertyInitGuardSlots[$classId][$slotIndex] = true;
+
+                return true;
+            }
+            $parentLc = $this->parentClassLc($parentLc);
         }
 
         return false;
@@ -5644,10 +5668,12 @@ class Object_ extends Type {
         $parentId = $this->classes[$parentLc];
         foreach ($this->properties[$parentId] ?? [] as $propset) {
             $name = $propset[1];
-            if ($this->hasProperty($childId, $name)) {
-                continue;
+            // Always refresh slot meta (typed-init guard, declaring ce, defaults). Skipping when
+            // hasProperty was true left child string/object slots without TypedPropertyUninitGuard
+            // after unset — empty echo instead of Error (#34382 leftover of #33886 / #31895).
+            if (!$this->hasProperty($childId, $name)) {
+                $this->defineProperty($childId, $name, $propset[2]);
             }
-            $this->defineProperty($childId, $name, $propset[2]);
             $this->copyInheritedInstancePropertySlotMeta($childId, $parentId, $name, $propset);
         }
         // Do not markHasConstructor on the child — that makes `new Child` look for
