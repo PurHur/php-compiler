@@ -12526,6 +12526,18 @@ class JIT {
                     }
                     if (null !== $coalesceMergeOperand) {
                         $sendValue = $this->materializeCoalesceMergeSlotArgSend($block, $sendOperand);
+                    } elseif (null === $sendOperand && isset($block->constants[$sendSlot])) {
+                        // Nested appendChild(createElement('r')) before importNode leaves the
+                        // createElement name ARG_SEND with a string constant but no Block operand
+                        // (#34302 / re-#24571). Rematerialize like bool/int/null (#27623).
+                        $sendValue = JIT\VmConstantJit::toVariable(
+                            $this->context,
+                            $block->constants[$sendSlot]
+                        );
+                    } elseif (null === $sendOperand) {
+                        throw new \LogicException(
+                            'ARG_SEND slot '.$sendSlot.' has neither operand nor constant'
+                        );
                     } else {
                         $sendValue = $this->context->getVariableFromOp($sendOperand);
                         if (
