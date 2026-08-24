@@ -31,7 +31,8 @@ final class SimpleXmlElementChildren extends VmClassMethod
             'SimpleXMLElement::children()'
         );
         $namespaceOrPrefix = null;
-        $isPrefix = true;
+        // php-src simplexml.stub.php default (#34554).
+        $isPrefix = false;
         if (\count($frame->calledArgs) >= 2) {
             $arg = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_NULL !== $arg->type) {
