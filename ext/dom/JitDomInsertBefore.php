@@ -154,9 +154,10 @@ final class JitDomInsertBefore
     ): Value {
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             self::syncUserScriptInsertBeforeSlots($context, $parentVar, $newChildVar, $refChildVar);
-            // LiveSlots refresh held pins (#32801); saveXML still reads INNER_XML (#32940 / peer #32903).
-            // When InnerXml refresh rewrites compile-time XML to include the new child,
-            // countTagArgv already sees it — do not also bump PENDING (#33679).
+            // LiveSlots refresh held pins (#32801) and rebuild INNER_XML (#33450).
+            // Compile-time fold refresh only — do not store over LiveSlots (#34428 / #32940).
+            // When the fold already includes the new child, countTagArgv sees it —
+            // do not also bump PENDING (#33679).
             $xmlRefreshed = self::syncUserScriptInnerXml(
                 $context,
                 $parentVar,
@@ -241,14 +242,20 @@ final class JitDomInsertBefore
     }
 
     /**
-     * Splice createElement markup into parent PROP_USER_SCRIPT_INNER_XML (#32940).
+     * Refresh loadXML compile-time fold after insertBefore (#32940 / #34428).
+     *
+     * LiveSlots already rebuilt {@see VmDom::PROP_USER_SCRIPT_INNER_XML} from the
+     * live sibling chain ({@see JitDomInsertBeforeLiveSlots::syncNonFragment}).
+     * Storing a second compile-time splice over that slot duplicated the new child
+     * in saveXML when inserting before the last sibling (#34428) — peer prepend
+     * #33637 / append skipInnerXmlSlotMerge #33918. Only refresh the C14N fold;
+     * relocate markup already present in the fold instead of inserting again.
      *
      * Peer {@see JitDomReplaceChild::syncUserScriptInnerXml}: item($N) ARG_SEND
      * temps often drop compileTimeDomChildIndex — use lastFetched* fallbacks.
      * Only called from {@see invoke} (not ChildNode::before, which owns its own
      * InnerXml path via DomNodeChildNodeMutationRuntime).
-     */
-    /**
+     *
      * @return bool true when compile-time XML was rewritten to include the new child
      */
     private static function syncUserScriptInnerXml(
@@ -274,12 +281,6 @@ final class JitDomInsertBefore
             ? '<'.$newTag.'/>'
             : '<'.$newTag.'>'.$newInner.'</'.$newTag.'>';
         $parentInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
-        // Already applied this insert into the fold source (invoke can re-enter) (#32972).
-        $open = '<'.$newTag;
-        if (str_starts_with(ltrim($parentInner), $open)) {
-            // Fold already contains the child — countTagArgv sees it (#33679).
-            return true;
-        }
         $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
         $index = $refChildVar->compileTimeDomChildIndex
             ?? JitDomNodeListItem::$lastFetchedChildIndex
@@ -300,9 +301,16 @@ final class JitDomInsertBefore
             }
         }
         if (null === $index) {
+            // Already applied this insert into the fold source (invoke can re-enter)
+            // when the child sits at the start (#32972 / #33679).
+            $open = '<'.$newTag;
+            if (str_starts_with(ltrim($parentInner), $open)) {
+                return true;
+            }
+
             return false;
         }
-        $inner = DomParseSimpleXmlJitHelper::innerXmlInsertMarkupAt(
+        $inner = DomParseSimpleXmlJitHelper::innerXmlRelocateOrInsertMarkupAt(
             $parentInner,
             $index,
             $markup,
@@ -311,8 +319,7 @@ final class JitDomInsertBefore
         if (null === $inner) {
             return false;
         }
-        $parent = self::loadObjectArg($context, $parentVar);
-        JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+        // Do not storeUserScriptInnerXml — LiveSlots owns the slot (#34428).
         JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner, $parentVar);
 
         return true;
