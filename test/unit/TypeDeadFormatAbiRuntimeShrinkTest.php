@@ -42,7 +42,8 @@ final class TypeDeadFormatAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StringFormat::ensureLinked', $type);
+        $this->assertStringContainsString('#34357', $type);
+        $this->assertStringNotContainsString('StringFormat::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresFormatAbisModuleLocally(): void
@@ -59,10 +60,14 @@ final class TypeDeadFormatAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitPrintf.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksFormatRuntime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkFormatRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringFormat::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringFormat::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitVsprintf.php');
+        $this->assertStringContainsString('StringFormat::ensureLinked', $jit);
+        $jitSprintf = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSprintf.php');
+        $this->assertStringContainsString('StringFormat::implementIfDeclared', $jitSprintf);
     }
 
     public function testNoNewRuntimeCForFormatAbis(): void

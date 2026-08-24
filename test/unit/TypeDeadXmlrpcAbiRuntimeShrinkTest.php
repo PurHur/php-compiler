@@ -41,7 +41,8 @@ final class TypeDeadXmlrpcAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StringXmlrpc::ensureLinked', $type);
+        $this->assertStringContainsString('#34357', $type);
+        $this->assertStringNotContainsString('StringXmlrpc::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresXmlrpcAbisModuleLocally(): void
@@ -57,10 +58,13 @@ final class TypeDeadXmlrpcAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringXmlrpc::ensureDecodeLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksXmlrpcRuntime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkXmlrpcRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringXmlrpc::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringXmlrpc::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/xmlrpc/JitXmlrpc.php');
+        $this->assertStringContainsString('StringXmlrpc::ensureEncodeLinked', $jit);
+        $this->assertStringContainsString('StringXmlrpc::ensureDecodeLinked', $jit);
     }
 
     public function testNoNewRuntimeCForXmlrpcAbis(): void

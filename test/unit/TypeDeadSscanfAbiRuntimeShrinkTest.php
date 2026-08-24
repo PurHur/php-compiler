@@ -44,7 +44,8 @@ final class TypeDeadSscanfAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('Sscanf::ensureLinked', $type);
+        $this->assertStringContainsString('#34357', $type);
+        $this->assertStringNotContainsString('Sscanf::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresSscanfAbisModuleLocally(): void
@@ -69,10 +70,12 @@ final class TypeDeadSscanfAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitVfscanf.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksSscanfRuntime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkSscanfRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('Sscanf::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('Sscanf::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSscanf.php');
+        $this->assertStringContainsString('Sscanf::ensureLinked', $jit);
     }
 
     public function testNoNewRuntimeCForSscanfAbis(): void

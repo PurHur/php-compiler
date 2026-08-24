@@ -41,8 +41,9 @@ final class TypeDeadPackAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StringPack::ensureLinked', $type);
-        $this->assertStringContainsString('StringUnpack::ensureLinked', $type);
+        $this->assertStringContainsString('#34357', $type);
+        $this->assertStringNotContainsString('StringPack::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringUnpack::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresPackAbisModuleLocally(): void
@@ -61,11 +62,15 @@ final class TypeDeadPackAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitUnpack.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksPackRuntime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkPackRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringPack::ensureLinked($this->context)', $type);
-        $this->assertStringContainsString('StringUnpack::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringPack::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringUnpack::ensureLinked($this->context)', $type);
+        $pack = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PackJitRuntime.php');
+        $this->assertStringContainsString('StringPack::ensureLinked', $pack);
+        $unpack = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/UnpackJitRuntime.php');
+        $this->assertStringContainsString('StringUnpack::ensureLinked', $unpack);
     }
 
     public function testNoNewRuntimeCForPackAbis(): void
