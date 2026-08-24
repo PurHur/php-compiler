@@ -222,6 +222,8 @@ final class BuiltinInternalArgInfo
             'file_put_contents', 'fwrite', 'fputcsv' => 'int|false',
             // ext/standard/file.stub.php — InternalArgInfo return string (missing |false) (#28341)
             'mime_content_type' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return int; Zend bool (#26144)
+            'mail' => 'bool',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25750)
             'stream_get_contents' => 'string|false',
             // ext/standard/streamsfuncs.stub.php — InternalArgInfo return int (missing |false) (#27739)
@@ -986,6 +988,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/random/random.stub.php — int $seed = 0, int $mode = MT_RAND_MT19937 (#23596)
             'mt_srand', 'srand' => (0 === $index || 1 === $index) ? 'int' : null,
+            // ext/standard/basic_functions.stub.php — InternalArgInfo additional_headers string; Zend array|string (#26144)
+            'mail' => 3 === $index ? 'array|string' : null,
             // ext/standard/basic_functions.stub.php — InternalArgInfo 2-arg / required 4-arg strings (#25067)
             'number_format' => match ($index) {
                 0 => 'float',
