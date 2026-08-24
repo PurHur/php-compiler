@@ -563,7 +563,8 @@ final class MbstringState
     {
         $previous = self::$regexOptions;
         if (null !== $options) {
-            self::$regexOptions = $options;
+            // Zend normalizes via _php_mb_regex_init_options + get_option_string (#34438).
+            self::$regexOptions = MbRegexOptions::normalize($options);
         }
 
         return $previous;

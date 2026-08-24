@@ -14,7 +14,7 @@ use PHPCompiler\JIT\Context;
  */
 final class MbstringAotFoldState
 {
-    /** @var array<int, array{http?: string, internal?: string, detect?: list<string>, regex?: string}> */
+    /** @var array<int, array{http?: string, internal?: string, detect?: list<string>, regex?: string, regexOpts?: string}> */
     private static array $byContext = [];
 
     public static function httpOutput(Context $context): ?string
@@ -59,6 +59,16 @@ final class MbstringAotFoldState
         self::$byContext[spl_object_id($context)]['regex'] = $encoding;
     }
 
+    public static function regexOptions(Context $context): ?string
+    {
+        return self::$byContext[spl_object_id($context)]['regexOpts'] ?? null;
+    }
+
+    public static function setRegexOptions(Context $context, string $options): void
+    {
+        self::$byContext[spl_object_id($context)]['regexOpts'] = $options;
+    }
+
     /**
      * Apply per-context regex encoding into {@see MbstringState} before mbregex folds (#30781).
      */
@@ -67,6 +77,19 @@ final class MbstringAotFoldState
         $enc = self::regexEncoding($context);
         if (null !== $enc) {
             MbstringState::regexEncoding($enc);
+        }
+        self::syncRegexOptionsIntoState($context);
+    }
+
+    /**
+     * Apply per-context mbregex options into {@see MbstringState} before folds (#34438).
+     */
+    public static function syncRegexOptionsIntoState(Context $context): void
+    {
+        $opts = self::regexOptions($context);
+        if (null !== $opts) {
+            // Already normalized when stored; assign via getter/setter path.
+            MbstringState::regexOptions($opts);
         }
     }
 }
