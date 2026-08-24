@@ -44,7 +44,8 @@ final class JitJsonEncodeCompileTime
         Context $context,
         ?Block $block,
         ?Operand $operand,
-        int $flags
+        int $flags,
+        int $maxDepth = 512
     ): ?Value {
         $context->jitJsonEncodeFoldedString = null;
         if (null === $block || null === $operand) {
@@ -52,7 +53,7 @@ final class JitJsonEncodeCompileTime
         }
         $stdClass = self::tryCompileTimeStdClassFromOperand($block, $operand);
         if (null !== $stdClass) {
-            return self::emitEncodedExported($context, $stdClass, $flags);
+            return self::emitEncodedExported($context, $stdClass, $flags, $maxDepth);
         }
         $vmArray = CallUnpackHelper::tryCompileTimeArrayFromOperand($block, $operand);
         if (null === $vmArray) {
@@ -132,7 +133,7 @@ final class JitJsonEncodeCompileTime
             return self::emitFalse($context);
         }
         try {
-            $encoded = VmJsonFormat::encodeExported($exported, $flags);
+            $encoded = VmJsonFormat::encodeExported($exported, $flags, $maxDepth);
         } catch (\JsonException $e) {
             return JitJsonThrow::emitFromException($context, $e);
         }
@@ -213,10 +214,14 @@ final class JitJsonEncodeCompileTime
     }
 
     /** @return Value|null */
-    private static function emitEncodedExported(Context $context, mixed $exported, int $flags): ?Value
-    {
+    private static function emitEncodedExported(
+        Context $context,
+        mixed $exported,
+        int $flags,
+        int $maxDepth = 512
+    ): ?Value {
         try {
-            $encoded = VmJsonFormat::encodeExported($exported, $flags);
+            $encoded = VmJsonFormat::encodeExported($exported, $flags, $maxDepth);
         } catch (VmJsonExportException $e) {
             if (VmJsonFlags::throwsOnError($flags)) {
                 return JitJsonThrow::emitFromException(
