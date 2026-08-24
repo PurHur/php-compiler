@@ -920,7 +920,10 @@ final class JitSimpleXmlUserScript
                 JITVariable::KIND_VALUE,
                 $obj
             );
+            // Bake name/text like materializeElement / foreach snapshots (#27535).
+            // Without this, `$xpath[$i]->getName()` reads an empty baked slot under AOT (#34539).
             self::store($receiver, $node);
+            self::bakeElementScalars($context, $receiver, $node);
             $elementVars[] = $receiver;
         }
         if ([] === $elementVars) {
