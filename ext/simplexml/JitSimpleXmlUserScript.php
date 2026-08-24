@@ -498,8 +498,8 @@ final class JitSimpleXmlUserScript
 
     /**
      * Host tree for thin-AOT foreach snapshot (#27535).
-     * Prefer exact/token match; fall back to lastTree for load_string results
-     * before pending-assign propagation (same as {@see lookup()}).
+     * Exact/token match only — lastTree fallback picked the wrong node after a prior
+     * children() foreach (last bound child), so attributes() snapshot became empty (#34543).
      */
     public static function hostTreeForForeach(JITVariable $var): ?\SimpleXMLElement
     {
@@ -507,7 +507,7 @@ final class JitSimpleXmlUserScript
             return null;
         }
 
-        return self::lookupExact($var) ?? self::$lastTree;
+        return self::lookupExact($var);
     }
 
     /** SimpleXMLElement::__get — host child view (#26863). */
@@ -1113,18 +1113,55 @@ final class JitSimpleXmlUserScript
             $obj = JITVariable::KIND_VALUE === $receiver->kind
                 ? $receiver->value
                 : $context->builder->load($receiver->value);
-            $slot = $context->type->object->propertySlotFor($obj, 'SimpleXMLElement', $prop);
-            $raw = $context->builder->load($slot);
-            $strPtr = $context->builder->pointerCast($raw, $context->getTypeFromString('__string__*'));
-            $owned = $context->builder->call(
-                $context->lookupFunction('__string__separate'),
-                $strPtr
-            );
 
-            return self::boxOwnedString($context, $owned);
+            return self::readBakedStringPropFromObjectPtr($context, $obj, $prop);
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Read a baked SXE string slot from an `__object__*` (foreach value-box unwrap; #34543).
+     */
+    public static function readBakedTextFromObjectPtr(Context $context, Value $obj): Value
+    {
+        $owned = self::loadBakedOwnedStringFromObjectPtr($context, $obj, self::BAKED_TEXT_PROP);
+
+        return $owned;
+    }
+
+    private static function readBakedStringPropFromObjectPtr(Context $context, Value $obj, string $prop): Value
+    {
+        $owned = self::loadBakedOwnedStringFromObjectPtr($context, $obj, $prop);
+
+        return self::boxOwnedString($context, $owned);
+    }
+
+    private static function loadBakedOwnedStringFromObjectPtr(Context $context, Value $obj, string $prop): Value
+    {
+        $slot = $context->type->object->propertySlotFor($obj, 'SimpleXMLElement', $prop);
+        $raw = $context->builder->load($slot);
+        $strPtr = $context->builder->pointerCast($raw, $context->getTypeFromString('__string__*'));
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $strPtr
+        );
+    }
+
+    /**
+     * Whether string cast of a TYPE_VALUE box may be an SXE foreach element (#34543).
+     * Null/object/unknown hints stay eligible; unrelated class hints refuse (#28646).
+     */
+    public static function valueBoxMayBeSimpleXmlElement(Context $context, ?string $classHint): bool
+    {
+        return self::classHintMayBeSimpleXmlElement($context, $classHint);
+    }
+
+    /** SimpleXMLElement class id for runtime value-box probes (#34543). */
+    public static function simpleXmlElementClassId(Context $context): int
+    {
+        return $context->type->object->lookup('SimpleXMLElement');
     }
 
     private static function boxConstantString(Context $context, string $text): Value
