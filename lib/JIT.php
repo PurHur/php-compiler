@@ -24023,6 +24023,11 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::replacedata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::replacedata');
                 }
+                // loadXML firstChild temps lose DOMText userType — peer substringData (#34311 / re-#32362).
+                if ('splittext' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::splittext');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::splittext');
+                }
                 // Living createElement* — peer createAttribute object-receiver path (#28958).
                 if ('createelement' === $methodLc || 'createelementns' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmldocument::'.$methodLc);
@@ -24150,6 +24155,12 @@ class JIT {
                 }
                 if ('replacedata' === $methodLc && $this->context->functionIsRegistered('domtext::replacedata')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::replacedata');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('splittext' === $methodLc && $this->context->functionIsRegistered('domtext::splittext')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::splittext');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
