@@ -307,13 +307,93 @@ final class JitDomElementTextContent
             );
         }
         $valueLit = JitStringBuiltinArg::compileTimeLiteral($value) ?? $value->compileTimeString;
-        if (null !== $valueLit) {
-            $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
-            $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
-            if (null !== $local) {
-                DomUserScriptAttributeCacheLlvm::setLiteralValue($ns, $local, $valueLit);
-            }
+        if (null === $valueLit) {
+            return;
         }
+        // getAttributeNode remembers the key via lastFetchedKey; createAttribute via
+        // lastCreateLocalName. Prefer fetch key so loadXML Attr writes refresh saveXML (#34305).
+        $fetched = JitDomAttrRename::lastFetchedKey();
+        $ns = $fetched[0] ?? DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+        $local = $fetched[1] ?? DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        if (null === $local || 'xmlns' === $local) {
+            return;
+        }
+        DomUserScriptAttributeCacheLlvm::setLiteralValue($ns, $local, $valueLit);
+        self::syncOwnerElementSaveXmlAfterAttrValueWrite($context, $receiver, $local, $valueLit);
+    }
+
+    /**
+     * Attr slot writes leave PROP_USER_SCRIPT_XMLNS_ATTR / INNER_XML stale (#34305).
+     *
+     * Mirror setAttribute / removeAttribute: refresh loadXML compile-time open-tag and
+     * push onto Attr::$ownerElement (peer #32981 / #34257).
+     */
+    private static function syncOwnerElementSaveXmlAfterAttrValueWrite(
+        Context $context,
+        Value $attr,
+        string $local,
+        string $valueLit
+    ): void {
+        $hadLoadXml = null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
+            && JitDomLoadXMLUserScript::lastLoadWasPureUserScript();
+        $id = JitDomCreateElementAttrs::lastId();
+        if (null !== $id) {
+            JitDomCreateElementAttrs::set($id, $local, $valueLit);
+        }
+        if ($hadLoadXml) {
+            JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeSet($local, $valueLit);
+        }
+        if (!$hadLoadXml && null === $id) {
+            return;
+        }
+
+        // storeOwnerElement writes boxed TYPE_VALUE on DOMAttr (#33570 / #22709).
+        $attrClass = 'DOMAttr';
+        $objectType = $context->type->object;
+        $attrClassId = $objectType->lookup($attrClass);
+        if (!$objectType->hasProperty($attrClassId, VmDom::PROP_OWNER_ELEMENT)) {
+            $objectType->defineProperty($attrClassId, VmDom::PROP_OWNER_ELEMENT, JITVariable::TYPE_VALUE);
+        }
+        $ownerElPtr = $context->builder->load(
+            $objectType->propertySlotFor($attr, $attrClass, VmDom::PROP_OWNER_ELEMENT)
+        );
+        $ownerRaw = $context->builder->pointerCast(
+            $ownerElPtr,
+            $context->getTypeFromString('__value__*')
+        );
+        $ownerNull = \PHPCompiler\JIT\JitNestedHelperCoerce::isHelperResultNull($context, $ownerRaw);
+        $tag = (string) (++self::$tcSeq);
+        $bbNull = BasicBlockHelper::append($context, 'dom_attr_tc_owner_null_'.$tag);
+        $bbHas = BasicBlockHelper::append($context, 'dom_attr_tc_owner_has_'.$tag);
+        $bbDone = BasicBlockHelper::append($context, 'dom_attr_tc_owner_done_'.$tag);
+        $context->builder->branchIf($ownerNull, $bbNull, $bbHas);
+
+        $context->builder->positionAtEnd($bbHas);
+        $ownerObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::normalizeValuePtr($context, $ownerRaw)
+        );
+        $ownerVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $ownerObj
+        );
+        if ($hadLoadXml) {
+            JitDomLoadXMLUserScript::syncElementXmlnsAttrFromCompileTimeXml($context, $ownerVar);
+        } elseif (null !== $id) {
+            JitDomAttributeNodeNS::syncSaveXmlAttrSuffix(
+                $context,
+                $ownerVar,
+                JitDomCreateElementAttrs::get($id)
+            );
+        }
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbNull);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     /**
