@@ -6,7 +6,9 @@ PHP_COMPILER_PROFILE=8.4
 <?php
 echo DateTime::createFromTimestamp(1700000000)->format('U'), "\n";
 echo DateTimeImmutable::createFromTimestamp(1700000000.5)->format('U.u'), "\n";
+echo DateTime::createFromTimestamp(1700000000)->format('U.u'), "\n";
 ?>
 --EXPECT--
 1700000000
 1700000000.500000
+1700000000.000000
