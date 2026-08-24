@@ -805,7 +805,7 @@ final class BuiltinParamNames
             case 'array_filter':
                 return ['array', 'callback=', 'mode='];
             case 'array_reduce':
-                return ['array', 'callback', 'initial'];
+                return ['array', 'callback', 'initial='];
             // php-src ext/standard/basic_functions.stub.php — arity 3; no $pad_type (#24002)
             case 'array_pad':
                 return ['array', 'length', 'value'];

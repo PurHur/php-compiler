@@ -658,7 +658,7 @@ final class BuiltinInternalArgInfo
             'array_key_first', 'array_key_last' => 'string|int|null',
             'array_is_list' => 'bool',
             // ext/standard/array.stub.php — InternalArgInfo omits mixed return (#26112)
-            'array_pop', 'array_shift' => 'mixed',
+            'array_pop', 'array_shift', 'array_reduce' => 'mixed',
             // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#25386, #25389, #26172)
             'sort', 'asort', 'arsort', 'shuffle',
             'usort', 'uasort', 'uksort', 'ksort', 'krsort',
@@ -1182,6 +1182,13 @@ final class BuiltinInternalArgInfo
             },
             // ext/standard/array.stub.php — ?callable $callback (InternalArgInfo non-nullable callable) (#25396)
             'array_map' => 0 === $index ? '?callable' : null,
+            // ext/standard/array.stub.php — array $array, callable $callback, mixed $initial = null (#25512)
+            'array_reduce' => match ($index) {
+                0 => 'array',
+                1 => 'callable',
+                2 => 'mixed',
+                default => null,
+            },
             // ext/standard/array.stub.php — absent from InternalArgInfo (#24844)
             'array_column' => match ($index) {
                 0 => 'array',

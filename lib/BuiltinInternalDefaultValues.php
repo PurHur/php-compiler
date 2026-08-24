@@ -485,6 +485,10 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'null'],
             1 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/standard/array.stub.php — mixed $initial = null (#25512)
+        'array_reduce' => [
+            2 => ['kind' => 'null'],
+        ],
         // php-src ext/standard/array.stub.php — callback=null, mode=0 (#24843)
         'array_filter' => [
             1 => ['kind' => 'null'],
