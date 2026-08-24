@@ -995,6 +995,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/array.stub.php — InternalArgInfo $value untyped; Zend mixed (#25761)
             'array_fill_keys' => 1 === $index ? 'mixed' : null,
             'array_pad' => 2 === $index ? 'mixed' : null,
+            // ext/standard/array.stub.php — Zend 8.2 reflects untyped &$array, &...$rest (#25391)
+            'array_multisort' => '' ,
             // ext/standard/basic_functions.stub.php — InternalArgInfo 2-arg / required 4-arg strings (#25067)
             'number_format' => match ($index) {
                 0 => 'float',

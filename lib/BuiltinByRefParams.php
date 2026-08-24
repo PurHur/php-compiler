@@ -17,6 +17,7 @@ final class BuiltinByRefParams
     {
         switch (strtolower($name)) {
             case 'array_multisort':
+                return [0, 1];
             case 'array_push':
             case 'array_pop':
             case 'array_shift':
