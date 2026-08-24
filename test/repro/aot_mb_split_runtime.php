@@ -15,3 +15,6 @@ echo implode('|', mb_split($empty, $subj)), "\n";
 $dash = '-';
 $nums = '1-2-3-4';
 echo implode('|', mb_split($dash, $nums, -1)), "\n";
+$p2 = 'ab';
+$s2 = 'xabyabz';
+echo implode('|', mb_split($p2, $s2)), "\n";
