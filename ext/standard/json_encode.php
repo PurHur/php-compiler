@@ -85,14 +85,23 @@ final class json_encode extends Internal
         // Resolve compile-time flags before lowerIntBuiltinArg mutates the arg shape.
         $knownFlags = self::tryCompileTimeFlags($context, $args);
         $flagsVal = self::lowerFlagsJitValue($context, $args);
+        $knownDepth = self::tryCompileTimeDepth($args);
+        $depthVal = self::lowerDepthJitValue($context, $args);
+        // Publish max depth for runtime ArrayLlvm / object encode (#34544).
+        \PHPCompiler\JIT\JsonEncodeDepthLlvm::resetForEncode($context, $depthVal);
         // Arrays / stdClass with literal props before string fold — object temps stash
         // class names in compileTimeString (#26872) and would fold to "\"stdClass\"" (#28638).
-        $arrayLiteral = JitJsonEncodeCompileTime::tryEncode(
-            $context,
-            $context->jitEnclosingBlock,
-            $context->jitJsonEncodeValueOperand,
-            $knownFlags ?? 0
-        );
+        // Skip fold when $depth is runtime-unknown — baked 512 would ignore the arg (#34544).
+        $arrayLiteral = null;
+        if (null !== $knownDepth) {
+            $arrayLiteral = JitJsonEncodeCompileTime::tryEncode(
+                $context,
+                $context->jitEnclosingBlock,
+                $context->jitJsonEncodeValueOperand,
+                $knownFlags ?? 0,
+                $knownDepth
+            );
+        }
         if (null !== $arrayLiteral) {
             return $arrayLiteral;
         }
@@ -107,10 +116,10 @@ final class json_encode extends Internal
         )) {
             $literal = null;
         }
-        if (null !== $literal && null !== $knownFlags) {
+        if (null !== $literal && null !== $knownFlags && null !== $knownDepth) {
             // PHP-in-PHP fold — same encoder as VM/runtime (#21723); avoid host ext/json skew.
             try {
-                $encoded = VmJsonFormat::encodeExported($literal, $knownFlags);
+                $encoded = VmJsonFormat::encodeExported($literal, $knownFlags, $knownDepth);
             } catch (\JsonException $e) {
                 // Compile-time THROW fold → runtime catchable JsonException (#27623).
                 return JitJsonThrow::emitFromException($context, $e);
@@ -202,7 +211,7 @@ final class json_encode extends Internal
     /**
      * Validate $depth (Z_PARAM_LONG) on JIT/AOT before folds — php-src ext/json/json.c (#30486).
      *
-     * Depth is not yet plumbed into `__compiler_json_encode_*`; this still must run so
+     * Depth is plumbed into ArrayLlvm / compile-time folds (#34544). This still must run so
      * `null` under `declare(strict_types=1)` TypeErrors instead of folding past the arg.
      *
      * @param list<JITVariable> $args
@@ -230,10 +239,47 @@ final class json_encode extends Internal
 
             return true;
         }
-        // Non-strict null → DEP+0 via Z_PARAM_LONG lowering; other types as usual.
-        JitIntdiv::lowerIntBuiltinArgForCaller($context, $depthArg, 'json_encode', 3, 'depth');
 
         return false;
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function lowerDepthJitValue(Context $context, array $args): Value
+    {
+        if (!isset($args[2]) || NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+            return $context->getTypeFromString('int64')->constInt(512, false);
+        }
+
+        return JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'json_encode', 3, 'depth');
+    }
+
+    /**
+     * Compile-time $depth when known — null means runtime-unknown (skip depth-sensitive folds).
+     *
+     * @param list<JITVariable> $args
+     */
+    private static function tryCompileTimeDepth(array $args): ?int
+    {
+        if (!isset($args[2]) || NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+            return 512;
+        }
+        $depthArg = $args[2];
+        if (null !== ($depthArg->compileTimeLong ?? null)) {
+            return (int) $depthArg->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $depthArg->type
+            && null !== ($depthArg->value ?? null)
+            && method_exists($depthArg->value, 'getConstIntValue')) {
+            try {
+                return (int) $depthArg->value->getConstIntValue();
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /**

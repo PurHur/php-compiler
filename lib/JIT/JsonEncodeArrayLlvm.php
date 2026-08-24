@@ -30,6 +30,23 @@ final class JsonEncodeArrayLlvm
     {
         JsonEncodeQuoteStringRuntime::ensureLinked($context);
         Builtin\StringJsonEncode::ensureJitHelperCompiled($context);
+        JsonEncodeDepthLlvm::ensureGlobals($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $tag = (string) ++self::$seq;
+        $merge = BasicBlockHelper::append($context, 'json_ht_enc_merge_'.$tag);
+
+        $enterOk = JsonEncodeDepthLlvm::tryEnter($context);
+        $depthFail = BasicBlockHelper::append($context, 'json_ht_enc_depth_fail_'.$tag);
+        $depthOk = BasicBlockHelper::append($context, 'json_ht_enc_depth_ok_'.$tag);
+        $context->builder->branchIf($enterOk, $depthOk, $depthFail);
+
+        $context->builder->positionAtEnd($depthFail);
+        $depthFailEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($depthOk);
 
         $packedVar = new Variable(
             $context,
@@ -60,7 +77,6 @@ final class JsonEncodeArrayLlvm
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
-        $tag = (string) ++self::$seq;
 
         $openAssoc = $context->builder->load($context->constantStringFromString('{'));
         $openList = $context->builder->load($context->constantStringFromString('['));
@@ -72,16 +88,17 @@ final class JsonEncodeArrayLlvm
         $open = $context->builder->select($packed, $openList, $openAssoc);
         $close = $context->builder->select($packed, $closeList, $closeAssoc);
 
-        $accSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+        $accSlot = BasicBlockHelper::entryAlloca($context, $strPtr);
         $context->builder->store($open, $accSlot);
         $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $needCommaSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int1'));
-        $context->builder->store($context->getTypeFromString('int1')->constInt(0, false), $needCommaSlot);
+        $needCommaSlot = BasicBlockHelper::entryAlloca($context, $i1);
+        $context->builder->store($i1->constInt(0, false), $needCommaSlot);
         $context->builder->store($zero, $idxSlot);
 
         $head = BasicBlockHelper::append($context, 'json_ht_enc_head_'.$tag);
         $body = BasicBlockHelper::append($context, 'json_ht_enc_body_'.$tag);
         $done = BasicBlockHelper::append($context, 'json_ht_enc_done_'.$tag);
+        $childFail = BasicBlockHelper::append($context, 'json_ht_enc_child_fail_'.$tag);
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
@@ -139,7 +156,7 @@ final class JsonEncodeArrayLlvm
         $context->builder->branch($keyDone);
 
         $context->builder->positionAtEnd($keyDone);
-        $quotedKeyPhi = $context->builder->phi($context->getTypeFromString('__string__*'));
+        $quotedKeyPhi = $context->builder->phi($strPtr);
         $quotedKeyPhi->addIncoming($quotedKey, $keyDoneStr);
         $quotedKeyPhi->addIncoming($quotedKeyLong, $keyDoneLong);
 
@@ -149,6 +166,16 @@ final class JsonEncodeArrayLlvm
             $i64->constInt(-1 & ~VmJsonFlags::FORCE_OBJECT, false)
         );
         $valJson = JitJsonEncode::encodeBoxedValue($context, $valPtr, $childFlags);
+        $childNull = $context->builder->icmp(Builder::INT_EQ, $valJson, $nullStr);
+        $childOk = BasicBlockHelper::append($context, 'json_ht_enc_child_ok_'.$tag);
+        $context->builder->branchIf($childNull, $childFail, $childOk);
+
+        $context->builder->positionAtEnd($childFail);
+        JsonEncodeDepthLlvm::leave($context);
+        $childFailEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($childOk);
 
         $withKey = $context->builder->select(
             $packed,
@@ -162,13 +189,23 @@ final class JsonEncodeArrayLlvm
         $withVal = JitStringConcat::concat($context, $withKey, $valJson);
 
         $context->builder->store($withVal, $accSlot);
-        $context->builder->store($context->getTypeFromString('int1')->constInt(1, false), $needCommaSlot);
+        $context->builder->store($i1->constInt(1, false), $needCommaSlot);
         $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
         $accFinal = $context->builder->load($accSlot);
+        $closed = JitStringConcat::concat($context, $accFinal, $close);
+        JsonEncodeDepthLlvm::leave($context);
+        $doneEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
 
-        return JitStringConcat::concat($context, $accFinal, $close);
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($strPtr, 'json_ht_enc_result_'.$tag);
+        $phi->addIncoming($nullStr, $depthFailEnd);
+        $phi->addIncoming($nullStr, $childFailEnd);
+        $phi->addIncoming($closed, $doneEnd);
+
+        return $phi;
     }
 }
