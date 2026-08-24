@@ -11,7 +11,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
-use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -66,39 +65,12 @@ final class iconv_mime_decode_headers extends Internal
 
                 return;
             }
-            $ret->array(self::resultToHashTable($result));
+            $ret->array(VmIconvMime::headersResultToHashTable($result));
         });
-    }
-
-    /**
-     * @param array<string, string|list<string>> $result
-     */
-    private static function resultToHashTable(array $result): HashTable
-    {
-        $ht = new HashTable();
-        foreach ($result as $name => $value) {
-            $slot = new Variable();
-            if (\is_array($value)) {
-                $list = new HashTable();
-                foreach ($value as $one) {
-                    $item = new Variable();
-                    $item->string($one);
-                    $list->append($item);
-                }
-                $slot->array($list);
-            } else {
-                $slot->string($value);
-            }
-            $ht->add($name, $slot);
-        }
-
-        return $ht;
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'iconv_mime_decode_headers() is not lowered for JIT/AOT in this compiler build'
-        );
+        return JitIconvMime::invokeDecodeHeaders($context, ...$args);
     }
 }

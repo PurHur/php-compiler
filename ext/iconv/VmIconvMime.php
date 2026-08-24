@@ -6,6 +6,8 @@ namespace PHPCompiler\ext\iconv;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
 
 /**
  * iconv MIME + encoding helpers (php-src ext/iconv/iconv.c; #6364).
@@ -216,6 +218,33 @@ final class VmIconvMime
         }
 
         return $out;
+    }
+
+    /**
+     * Build VM HashTable from {@see mimeDecodeHeaders()} result (#19448 / #34441).
+     *
+     * @param array<string, string|list<string>> $result
+     */
+    public static function headersResultToHashTable(array $result): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($result as $name => $value) {
+            $slot = new Variable();
+            if (\is_array($value)) {
+                $list = new HashTable();
+                foreach ($value as $one) {
+                    $item = new Variable();
+                    $item->string($one);
+                    $list->append($item);
+                }
+                $slot->array($list);
+            } else {
+                $slot->string($value);
+            }
+            $ht->add($name, $slot);
+        }
+
+        return $ht;
     }
 
     /**
