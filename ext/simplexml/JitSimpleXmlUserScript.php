@@ -121,6 +121,53 @@ final class JitSimpleXmlUserScript
         return self::materializeElement($context, $tree, true);
     }
 
+    /**
+     * simplexml_import_dom($node) — compile-time DOM loadXML / SXE peer (#34419).
+     *
+     * php-src ext/simplexml/simplexml.c PHP_FUNCTION(simplexml_import_dom)
+     */
+    public static function tryImportDom(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!UserScriptAotEnv::isActive() || \count($args) < 1 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
+            $classLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $classLit || ('' !== $classLit && 0 !== strcasecmp($classLit, 'SimpleXMLElement'))) {
+                return null;
+            }
+        }
+        $xml = self::compileTimeXmlForImportDom($args[0]);
+        if (null === $xml || '' === $xml) {
+            return null;
+        }
+        $forParse = ltrim(\PHPCompiler\ext\dom\VmDom::stripLeadingUtf8Bom($xml));
+        $forParse = preg_replace('/^\s*<\?xml[^?]*\?>\s*/i', '', $forParse) ?? $forParse;
+        $forParse = ltrim($forParse);
+        if ('' === $forParse || '<' !== $forParse[0]) {
+            return null;
+        }
+        $prevInternal = null;
+        if (\function_exists('libxml_use_internal_errors')) {
+            $prevInternal = \libxml_use_internal_errors(true);
+            \libxml_clear_errors();
+        }
+        try {
+            $tree = \simplexml_load_string($forParse);
+        } catch (\Throwable) {
+            $tree = false;
+        } finally {
+            if (null !== $prevInternal && \function_exists('libxml_use_internal_errors')) {
+                \libxml_use_internal_errors($prevInternal);
+            }
+        }
+        if (false === $tree || !($tree instanceof \SimpleXMLElement)) {
+            return null;
+        }
+
+        return self::materializeElement($context, $tree, true);
+    }
+
     public static function tryConstruct(Context $context, JITVariable ...$args): ?Value
     {
         self::$lastConstructParseFailed = false;
@@ -1053,6 +1100,40 @@ final class JitSimpleXmlUserScript
     private static function lookup(JITVariable $receiver): ?\SimpleXMLElement
     {
         return self::lookupExact($receiver) ?? self::$lastTree;
+    }
+
+    /**
+     * Compile-time XML for simplexml_import_dom: SXE asXML, loadXML stamp, or element rebuild (#34419).
+     */
+    private static function compileTimeXmlForImportDom(JITVariable $node): ?string
+    {
+        $host = self::compileTimeTree($node);
+        if (null !== $host) {
+            $as = $host->asXML();
+            if (false !== $as && '' !== $as) {
+                return $as;
+            }
+        }
+        $xml = $node->compileTimeDomLoadXml
+            ?? \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::compileTimeXmlFor($node)
+            ?? \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null !== $xml && '' !== $xml) {
+            return $xml;
+        }
+        $tag = $node->compileTimeDomTagName ?? null;
+        if (null === $tag || '' === $tag) {
+            return null;
+        }
+        $attrXml = '';
+        if (\is_array($node->compileTimeDomAttributes)) {
+            foreach ($node->compileTimeDomAttributes as $name => $value) {
+                $attrXml .= ' '.htmlspecialchars((string) $name, ENT_XML1 | ENT_QUOTES)
+                    .'="'.htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES).'"';
+            }
+        }
+        $inner = $node->compileTimeDomInnerXml ?? '';
+
+        return '<'.$tag.$attrXml.'>'.$inner.'</'.$tag.'>';
     }
 
     /**
