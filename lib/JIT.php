@@ -25964,37 +25964,48 @@ class JIT {
         }
 
         if ($this->jitCallArgsHaveUnpack($argEntries)) {
+            // Keep $this / receiver prefix out of the packed HT — same split as named
+            // args. Without it, `new C(...$a)` / `$o->m(...$a)` merge the receiver into
+            // the unpack list and Native sees 0 user args (#34468 / peer #24144).
+            $prefixLen = $this->jitNamedCallArgPrefixLength($toCall, $argEntries);
+            $prefix = \array_slice($argEntries, 0, $prefixLen);
+            $prefixOperands = \array_slice($argOperands, 0, $prefixLen);
+            $userEntries = \array_slice($argEntries, $prefixLen);
+            $userOperands = \array_slice($argOperands, $prefixLen);
+
             [$paramNames, $variadicIndex] = $this->jitCalleeParamMetadata($toCall);
             $functionName = $this->jitInternalBuiltinFunctionName($toCall);
             $namedUnpack = JIT\CallUnpackHelper::tryResolveCompileTimeNamedUnpack(
                 $this->context->jitEnclosingBlock,
-                $argEntries,
-                $argOperands,
+                $userEntries,
+                $userOperands,
                 $paramNames,
                 $variadicIndex,
                 $this,
                 $functionName
             );
             if (null !== $namedUnpack) {
+                [$userArgs, $userOps] = $namedUnpack;
                 if (
                     $toCall instanceof JIT\Call\Native
-                    && 1 === \count($namedUnpack[0])
-                    && Variable::TYPE_HASHTABLE === $namedUnpack[0][0]->type
+                    && 1 === \count($userArgs)
+                    && Variable::TYPE_HASHTABLE === $userArgs[0]->type
                 ) {
                     $expanded = JIT\CallUnpackExpand::expandPackedForNative(
                         $this->context,
-                        $namedUnpack[0][0],
+                        $userArgs[0],
                         $toCall
                     );
                     if (null !== $expanded) {
-                        return [$expanded, array_fill(0, \count($expanded), null)];
+                        $userArgs = $expanded;
+                        $userOps = array_fill(0, \count($expanded), null);
                     }
                 }
 
-                return $namedUnpack;
+                return $this->prependJitCallArgPrefix($prefix, $prefixOperands, $userArgs, $userOps);
             }
 
-            $callArgs = $this->finalizeJitCallArgs($argEntries);
+            $callArgs = $this->finalizeJitCallArgs($userEntries);
             if (
                 $toCall instanceof JIT\Call\Native
                 && 1 === \count($callArgs)
@@ -26006,14 +26017,16 @@ class JIT {
                     $toCall
                 );
                 if (null !== $expanded) {
-                    return [$expanded, array_fill(0, \count($expanded), null)];
+                    return $this->prependJitCallArgPrefix(
+                        $prefix,
+                        $prefixOperands,
+                        $expanded,
+                        array_fill(0, \count($expanded), null)
+                    );
                 }
             }
 
-            return [
-                $callArgs,
-                $argOperands,
-            ];
+            return $this->prependJitCallArgPrefix($prefix, $prefixOperands, $callArgs, $userOperands);
         }
 
         if ($this->jitCallArgsHaveNamed($argEntries)) {
@@ -26250,6 +26263,37 @@ class JIT {
         }
 
         return 0;
+    }
+
+    /**
+     * Reattach $this / receiver args after unpack expand (#34468).
+     *
+     * @param list<Variable>       $prefix
+     * @param list<Operand|null>   $prefixOperands
+     * @param list<Variable>       $userArgs
+     * @param list<Operand|null>   $userOps
+     *
+     * @return array{0: list<Variable>, 1: list<Operand|null>}
+     */
+    private function prependJitCallArgPrefix(
+        array $prefix,
+        array $prefixOperands,
+        array $userArgs,
+        array $userOps
+    ): array {
+        if ([] === $prefix) {
+            return [$userArgs, $userOps];
+        }
+        $callArgs = $prefix;
+        foreach ($userArgs as $idx => $value) {
+            $callArgs[\count($prefix) + (int) $idx] = $value;
+        }
+        $callOperands = $prefixOperands;
+        foreach ($userOps as $idx => $operand) {
+            $callOperands[\count($prefix) + (int) $idx] = $operand;
+        }
+
+        return [$callArgs, $callOperands];
     }
 
     /**
