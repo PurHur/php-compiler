@@ -1574,6 +1574,11 @@ final class TryCatchHelper
             $builder->returnValue($builder->load($slot));
         } elseif (\PHPLLVM\Type::KIND_POINTER === $kind) {
             $builder->returnValue($retType->constNull());
+        } elseif (\PHPLLVM\Type::KIND_INTEGER === $kind) {
+            // i1 bool returns must not use i64 stubs — module verify rejects ret i64 into i1 (#34524).
+            $builder->returnValue($retType->constInt(0, false));
+        } elseif (\PHPLLVM\Type::KIND_FLOAT === $kind || \PHPLLVM\Type::KIND_DOUBLE === $kind) {
+            $builder->returnValue($retType->constReal(0.0));
         } else {
             $builder->returnValue($context->constantFromInteger(0));
         }
