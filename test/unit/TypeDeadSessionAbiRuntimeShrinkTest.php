@@ -102,10 +102,20 @@ final class TypeDeadSessionAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('declareSessionEncodeAbis', $encode);
     }
 
-    public function testTypeInitializeStillEnsureLinksSessionLifecycle(): void
+    public function testTypeInitializeNoLongerEagerLinksSessionLifecycle(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('SessionLifecycleRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34474', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/SessionLifecycleRuntime::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type::initialize must not eagerly SessionLifecycleRuntime::ensureLinked (#34474)'
+        );
+        $this->assertStringContainsString(
+            'SessionLifecycleRuntime::ensureLinked',
+            (string) file_get_contents(__DIR__.'/../../ext/standard/JitSessionStart.php'),
+            'JitSessionStart must link SessionLifecycleRuntime (#34474)'
+        );
     }
 
     public function testNoNewRuntimeCForSessionAbi(): void

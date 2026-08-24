@@ -53,6 +53,8 @@ final class RewriteVarsRuntime
 
     public static function emitAdd(Context $context, Value $nameStr, Value $valueStr): Value
     {
+        // Lazy Type::initialize (#34474) — link blob helpers before ObOutput NestedJIT.
+        self::ensureLinked($context);
         // NestedJIT full ObOutput+flush into this module BEFORE any helper-cache ObOutput
         // bind — otherwise startWithUrlRewriter and getLevel split across TUs (#27566).
         ObOutputJitBridge::ensureUrlRewriterStack($context);
@@ -66,6 +68,8 @@ final class RewriteVarsRuntime
 
     public static function emitReset(Context $context): Value
     {
+        // Lazy Type::initialize (#34474) — peer emitAdd / DefineRuntime::emit*.
+        self::ensureLinked($context);
         OutputRewriteVarsStorage::ensureGlobals($context);
         OutputRewriteVarsStorage::emitReset($context);
         $i1 = $context->getTypeFromString('int1');
