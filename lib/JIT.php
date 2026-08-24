@@ -21030,6 +21030,13 @@ class JIT {
                 if (null !== $bound->compileTimeDateTimeTimestamp) {
                     continue;
                 }
+                // #34461: empty classUserType alone is not enough — `$out = []` is
+                // TYPE_HASHTABLE with an empty hint and must not become the New_
+                // publish target (bindVariableByName would turn `$out[] =` into
+                // "__object__*" offset access). Only object-shaped locals (#27309).
+                if (Variable::TYPE_OBJECT !== $bound->type) {
+                    continue;
+                }
                 $hint = strtolower(ltrim((string) ($bound->classUserType ?? ''), '\\'));
                 $legacy = (string) ($bound->compileTimeString ?? '');
                 // New_ locals often only have compileTimeString=class name / empty userType until

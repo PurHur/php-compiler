@@ -43,6 +43,23 @@ final class Issue33744DatePeriodForeachAotTest extends TestCase
         );
     }
 
+    public function testDateTimeConstructSyncEmptyHintSkipsNonObjectBindings(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $this->assertStringContainsString('#34461', $source);
+        $sync = strpos($source, 'private function syncDateTimeConstructMetaToAliases');
+        $this->assertNotFalse($sync);
+        $next = strpos($source, 'private function syncDateIntervalConstructMetaToAliases', $sync + 1);
+        $chunk = false === $next
+            ? substr($source, $sync, 8000)
+            : substr($source, $sync, $next - $sync);
+        $this->assertStringContainsString(
+            'Variable::TYPE_OBJECT !== $bound->type',
+            $chunk,
+            'empty-hint New_ publish must skip hashtable locals like $out = [] (#34461)'
+        );
+    }
+
     public function testForeachResetPrefersDatePeriodSnapshotOverObjectProperties(): void
     {
         $source = (string) file_get_contents(
