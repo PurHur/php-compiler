@@ -24307,6 +24307,13 @@ class JIT {
                 if ('splittext' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::splittext');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::splittext');
+                    // Bind before RuntimeIndirect — :object firstChild temps (#34314 / #34475).
+                    if ($this->context->functionIsRegistered('domtext::splittext')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::splittext');
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
                 }
                 // Living createElement* — peer createAttribute object-receiver path (#28958).
                 if ('createelement' === $methodLc || 'createelementns' === $methodLc) {
@@ -24561,6 +24568,27 @@ class JIT {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, $proxyName);
                 if ($this->context->functionIsRegistered($proxyName)) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
+            // loadXML #text / createTextNode stand-ins are DOMElement (#34375 classUserType).
+            // domelement::splittext is unregistered → ExternalMethod null; remap to domtext (#34475).
+            if (
+                'splittext' === $methodLc
+                || 'substringdata' === $methodLc
+                || 'appenddata' === $methodLc
+                || 'insertdata' === $methodLc
+                || 'deletedata' === $methodLc
+                || 'replacedata' === $methodLc
+                || 'iswhitespaceinelementcontent' === $methodLc
+                || 'iselementcontentwhitespace' === $methodLc
+            ) {
+                $textProxy = 'domtext::'.$methodLc;
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, $textProxy);
+                if ($this->context->functionIsRegistered($textProxy)) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($textProxy);
                     $this->context->scope->args = [$receiverVar];
 
                     return;
