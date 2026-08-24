@@ -291,6 +291,8 @@ final class BuiltinInternalArgInfo
             'symlink' => 'bool',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#26058)
             'fscanf' => 'array|int|false|null',
+            // ext/standard/string.stub.php — InternalArgInfo omits return (#25398)
+            'sscanf' => 'array|int|null',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false (#26187)
             'ini_get' => 'string|false',
             'ini_get_all' => 'array|false',
@@ -1091,7 +1093,7 @@ final class BuiltinInternalArgInfo
             'sprintf', 'printf', 'pack' => 1 === $index ? 'mixed' : null,
             'fprintf' => 2 === $index ? 'mixed' : null,
             // ext/standard/basic_functions.stub.php — mixed &...$vars (InternalArgInfo string) (#26058)
-            'fscanf' => 2 === $index ? 'mixed' : null,
+            'fscanf', 'sscanf' => 2 === $index ? 'mixed' : null,
             // ext/standard/password.stub.php — absent from InternalArgInfo (#23292)
             'password_get_info' => 0 === $index ? 'string' : null,
             'password_needs_rehash' => match ($index) {
