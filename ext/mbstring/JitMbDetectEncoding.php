@@ -4,17 +4,91 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MbDetectEncodingRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TypeErrorRaise;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helpers for mb_detect_encoding() (#3075, soft-null #21516).
+ * LLVM JIT/AOT for mb_detect_encoding() (#3075, #34358 leftover).
+ *
+ * Compile-time fold when $string is a literal; runtime haystack via NestedJIT
+ * {@see MbDetectEncodingJitHelper} (peer {@see JitMbScrub}). Encodings list +
+ * $strict stay compile-time (NestedJIT of MbstringState / arrays aborts).
+ *
+ * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_detect_encoding)
  */
 final class JitMbDetectEncoding
 {
+    private const SUPPORTED = [
+        'ASCII' => true,
+        'UTF-8' => true,
+        'ISO-8859-1' => true,
+        '8BIT' => true,
+    ];
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    public static function invoke(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('mb_detect_encoding() expects 1 to 3 arguments in this compiler build');
+        }
+
+        $folded = self::tryCompileTimeFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        $order = self::compileTimeOrder($context, $args, $argc);
+        if (null === $order) {
+            throw new \LogicException(
+                'mb_detect_encoding() encodings must be a compile-time string or array of string literals in this compiler build'
+            );
+        }
+        foreach ($order as $enc) {
+            if (!isset(self::SUPPORTED[$enc])) {
+                throw new \LogicException(
+                    'mb_detect_encoding() NestedJIT only supports ASCII, UTF-8, ISO-8859-1, and 8BIT encodings in this compiler build'
+                );
+            }
+        }
+
+        $str = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $args[0],
+            'mb_detect_encoding',
+            0,
+            'string'
+        );
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbDetectEncodingRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_detect_encoding_runtime');
+
+        $orderPtr = $context->builder->load($context->constantStringFromString(self::orderCodes($order)));
+        $strictI = self::strictI64($context, $args);
+        $resultStr = $context->builder->call(
+            MbDetectEncodingRuntime::detectHelper($context),
+            $str,
+            $orderPtr,
+            $strictI
+        );
+
+        return self::boxDetectResult($context, $resultStr);
+    }
+
     /**
      * @param JITVariable[] $args
      */
@@ -23,7 +97,6 @@ final class JitMbDetectEncoding
         if (!isset($args[0])) {
             return null;
         }
-        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21516, reverts #20225 TypeError).
         if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
             if ($context->callerStrictTypes) {
                 return JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'mb_detect_encoding', 0, 'string');
@@ -35,15 +108,195 @@ final class JitMbDetectEncoding
                 return null;
             }
         }
-        // Only fold the one-arg form (default detect order); list/strict need runtime.
-        if (\count($args) > 1) {
+        $order = self::compileTimeOrder($context, $args, \count($args));
+        if (null === $order) {
             return null;
         }
-        $result = VmMbstring::detectEncoding($string, null, false);
+        $strict = self::compileTimeStrict($args);
+        if (null === $strict) {
+            return null;
+        }
+        $result = VmMbstring::detectEncoding($string, $order, $strict);
         if (false === $result) {
             return $context->constantFromBool(false);
         }
 
         return $context->builder->load($context->constantStringFromString($result));
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     *
+     * @return list<string>|null
+     */
+    private static function compileTimeOrder(Context $context, array $args, int $argc): ?array
+    {
+        if ($argc < 2 || JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            return MbstringAotFoldState::detectOrder($context) ?? MbstringState::detectOrder();
+        }
+        $lit = JitStringArg::compileTimeLiteral($args[1]);
+        if (null !== $lit) {
+            return MbstringEncodingRegistry::parseOrderList('mb_detect_encoding', 1, $lit);
+        }
+        $fromNative = self::compileTimeOrderFromNativeArray($context, $args[1]);
+        if (null !== $fromNative) {
+            return $fromNative;
+        }
+        $arr = $args[1]->compileTimeArray ?? null;
+        if (null === $arr) {
+            return null;
+        }
+        $order = [];
+        foreach ($arr as $elem) {
+            if (\is_string($elem)) {
+                $s = $elem;
+            } elseif ($elem instanceof JITVariable) {
+                $s = JitStringArg::compileTimeLiteral($elem);
+                if (null === $s) {
+                    return null;
+                }
+            } else {
+                return null;
+            }
+            $canonical = MbstringEncodingRegistry::resolve($s);
+            if (null === $canonical) {
+                TypeErrorRaise::emitValueError(
+                    $context,
+                    sprintf(
+                        'mb_detect_encoding(): Argument #2 ($encodings) contains invalid encoding "%s"',
+                        $s
+                    )
+                );
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_detect_enc_bad_list');
+
+                return null;
+            }
+            $order[] = $canonical;
+        }
+        if ([] === $order) {
+            return null;
+        }
+
+        return $order;
+    }
+
+    /**
+     * Packed native-array encoding list (`['UTF-8','ASCII']`) via dimFetch (#34358).
+     *
+     * @return list<string>|null
+     */
+    private static function compileTimeOrderFromNativeArray(Context $context, JITVariable $arg): ?array
+    {
+        if (0 === ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return null;
+        }
+        $n = $arg->nextFreeElement;
+        if ($n <= 0) {
+            return null;
+        }
+        $order = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $elem = $arg->dimFetch(JITVariable::fromConstantInt($context, $i));
+            $s = JitStringArg::compileTimeLiteral($elem);
+            if (null === $s) {
+                return null;
+            }
+            $canonical = MbstringEncodingRegistry::resolve($s);
+            if (null === $canonical) {
+                return null;
+            }
+            $order[] = $canonical;
+        }
+
+        return $order;
+    }
+
+    /**
+     * Packed NestedJIT order: A=ASCII U=UTF-8 L=ISO-8859-1 B=8BIT (#34358).
+     *
+     * @param list<string> $order
+     */
+    private static function orderCodes(array $order): string
+    {
+        $out = '';
+        foreach ($order as $enc) {
+            $out .= match ($enc) {
+                'ASCII' => 'A',
+                'UTF-8' => 'U',
+                'ISO-8859-1' => 'L',
+                '8BIT' => 'B',
+                default => '',
+            };
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function strictI64(Context $context, array $args): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $folded = self::compileTimeStrict($args);
+        if (null !== $folded) {
+            return $i64->constInt($folded ? 1 : 0, false);
+        }
+        if (isset($args[2]) && JITVariable::TYPE_NATIVE_BOOL === $args[2]->type) {
+            return $context->builder->zExt($context->helper->loadValue($args[2]), $i64);
+        }
+        throw new \LogicException(
+            'mb_detect_encoding() strict must be a bool in this compiler build'
+        );
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function compileTimeStrict(array $args): ?bool
+    {
+        if (!isset($args[2]) || JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
+            return false;
+        }
+        if (null !== ($args[2]->compileTimeBool ?? null)) {
+            return (bool) $args[2]->compileTimeBool;
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $args[2]->type && JITVariable::KIND_VALUE === $args[2]->kind) {
+            $const = $args[2]->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return 0 !== (int) $const->constInt();
+            }
+        }
+
+        return null;
+    }
+
+    private static function boxDetectResult(Context $context, Value $resultStr): Value
+    {
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $resultStr);
+        $zero = $context->getTypeFromString('int64')->constInt(0, false);
+        $isFalse = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+        $fn = BasicBlockHelper::parentFunction($context);
+        $falseBlock = $fn->appendBasicBlock('mb_detect_false');
+        $strBlock = $fn->appendBasicBlock('mb_detect_str');
+        $doneBlock = $fn->appendBasicBlock('mb_detect_done');
+        $context->builder->branchIf($isFalse, $falseBlock, $strBlock);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+
+        $context->builder->positionAtEnd($falseBlock);
+        JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($strBlock);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $resultStr);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_detect_encoding_done');
+
+        return $ptr;
     }
 }

@@ -16,6 +16,8 @@ use PHPLLVM\Value;
 
 /**
  * mb_detect_encoding() — guess byte-string encoding (php-src ext/mbstring/mbstring.c; #3075).
+ *
+ * JIT/AOT runtime strings via {@see JitMbDetectEncoding} NestedJIT (#34358 leftover).
  */
 final class mb_detect_encoding extends Internal
 {
@@ -67,14 +69,7 @@ final class mb_detect_encoding extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('mb_detect_encoding() expects 1 to 3 arguments in this compiler build');
         }
-        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21516); compile-time fold for 1-arg form.
-        $folded = JitMbDetectEncoding::tryCompileTimeFold($context, $args);
-        if (null !== $folded) {
-            return $folded;
-        }
-
-        throw new \LogicException(
-            'mb_detect_encoding() JIT requires a compile-time string literal (1-arg) in this compiler build'
-        );
+        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21516); NestedJIT runtime (#34358).
+        return JitMbDetectEncoding::invoke($context, $args);
     }
 }
