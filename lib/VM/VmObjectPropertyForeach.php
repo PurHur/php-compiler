@@ -136,9 +136,10 @@ final class VmObjectPropertyForeach
         JitVariable $slotKey,
         ?string $containerUserType = null
     ): JitVariable {
-        $fetched = self::propertyAtIndex($context, $slotKey, $containerUserType);
+        // Box inside each property case before the merge — a post-merge
+        // objectPropertySlot from one case does not dominate (#34464).
         $slot = JitValueBox::alloc($context);
-        $context->type->object->boxFetchedPropertyIntoValueBox($slot, $fetched);
+        self::emitPropertyValueAtIndex($context, $slotKey, $containerUserType, $slot);
 
         return new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
     }
@@ -197,6 +198,27 @@ final class VmObjectPropertyForeach
         return $result;
     }
 
+    private static function emitPropertyValueAtIndex(
+        Context $context,
+        JitVariable $slotKey,
+        ?string $containerUserType,
+        Value $destSlot
+    ): void {
+        $idx = $context->builder->load(self::indexSlot($context, $slotKey));
+        $receiver = VmIteratorProtocol::loadReceiver($context, $slotKey);
+        $obj = $context->helper->loadValue($receiver);
+
+        if (null !== $containerUserType && '' !== $containerUserType) {
+            self::fetchPropertyForClassAtIndex($context, $obj, $containerUserType, $idx, $destSlot);
+
+            return;
+        }
+
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load($context->builder->structGep($obj, $objMap['class_id']));
+        self::fetchPropertyForRuntimeClass($context, $obj, $classId, $idx, $destSlot);
+    }
+
     private static function propertyAtIndex(
         Context $context,
         JitVariable $slotKey,
@@ -207,24 +229,31 @@ final class VmObjectPropertyForeach
         $obj = $context->helper->loadValue($receiver);
 
         if (null !== $containerUserType && '' !== $containerUserType) {
-            return self::fetchPropertyForClassAtIndex($context, $obj, $containerUserType, $idx);
+            return self::fetchPropertyForClassAtIndex($context, $obj, $containerUserType, $idx, null);
         }
 
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load($context->builder->structGep($obj, $objMap['class_id']));
 
-        return self::fetchPropertyForRuntimeClass($context, $obj, $classId, $idx);
+        return self::fetchPropertyForRuntimeClass($context, $obj, $classId, $idx, null);
     }
 
+    /**
+     * @return JitVariable|null null when $destSlot is set (value already boxed)
+     */
     private static function fetchPropertyForRuntimeClass(
         Context $context,
         Value $obj,
         Value $classId,
-        Value $idx
-    ): JitVariable {
+        Value $idx,
+        ?Value $destSlot
+    ): ?JitVariable {
         $fn = $context->builder->getInsertBlock()->getParent();
+        $done = $fn->appendBasicBlock('foreach_objprop_fetch_done');
         $entry = $context->builder->getInsertBlock();
         $checkBlock = $entry;
+        $slotIncomings = [];
+        $propType = JitVariable::TYPE_VALUE;
         foreach ($context->type->object->allClassNamesById() as $id => $className) {
             if ($checkBlock !== $entry) {
                 $context->builder->positionAtEnd($checkBlock);
@@ -238,26 +267,58 @@ final class VmObjectPropertyForeach
             $nextCheck = $fn->appendBasicBlock('foreach_objprop_fetch_next_'.$id);
             $context->builder->branchIf($isClass, $matchBlock, $nextCheck);
             $context->builder->positionAtEnd($matchBlock);
-
-            return self::fetchPropertyForClassAtIndex($context, $obj, $className, $idx);
+            $fetched = self::fetchPropertyForClassAtIndex($context, $obj, $className, $idx, $destSlot);
+            if (null === $destSlot) {
+                if (null === $fetched || null === $fetched->objectPropertySlot) {
+                    throw new \LogicException('foreach object by-ref requires a property lvalue slot');
+                }
+                $slotIncomings[] = [$fetched->objectPropertySlot, $context->builder->getInsertBlock()];
+                $propType = $fetched->objectPropertyType ?? $fetched->type;
+            }
+            $context->builder->branch($done);
+            $checkBlock = $nextCheck;
         }
         $context->builder->positionAtEnd($checkBlock);
         $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
 
-        throw new \LogicException('foreach object property fetch requires a known class');
+        if (null !== $destSlot) {
+            return null;
+        }
+        if ([] === $slotIncomings) {
+            throw new \LogicException('foreach object property fetch requires a known class');
+        }
+        $phi = $context->builder->phi($slotIncomings[0][0]->typeOf());
+        foreach ($slotIncomings as [$slot, $block]) {
+            $phi->addIncoming($slot, $block);
+        }
+        $phi->addIncoming($slotIncomings[0][0]->typeOf()->constNull(), $checkBlock);
+        $var = new JitVariable($context, $propType, JitVariable::KIND_VALUE, $phi);
+        $var->objectPropertySlot = $phi;
+        $var->objectPropertyType = $propType;
+
+        return $var;
     }
 
+    /**
+     * @return JitVariable|null null when $destSlot is set (value already boxed)
+     */
     private static function fetchPropertyForClassAtIndex(
         Context $context,
         Value $obj,
         string $className,
-        Value $idx
-    ): JitVariable {
+        Value $idx,
+        ?Value $destSlot
+    ): ?JitVariable {
         $classId = $context->type->object->lookup(strtolower(ltrim($className, '\\')));
         $props = self::visiblePropertySets($context, $classId);
         // Empty visible set: compileValid() never yields; fetch is unreachable (#24247 / re-#23430).
         if ([] === $props) {
             $context->builder->call($context->lookupFunction('abort'));
+            if (null !== $destSlot) {
+                return null;
+            }
             $slot = JitValueBox::alloc($context);
 
             return new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
@@ -267,7 +328,8 @@ final class VmObjectPropertyForeach
         $objectType = $context->type->object;
         $entry = $context->builder->getInsertBlock();
         $checkBlock = $entry;
-        $fetched = null;
+        $slotIncomings = [];
+        $propType = JitVariable::TYPE_VALUE;
         foreach ($props as $i => $propset) {
             if ($checkBlock !== $entry) {
                 $context->builder->positionAtEnd($checkBlock);
@@ -285,14 +347,38 @@ final class VmObjectPropertyForeach
             $context->builder->positionAtEnd($caseBlock);
             $fetched = $objectType->propertyFetch($obj, $className, $propset[1]);
             TypedPropertyUninitGuard::emitBeforeRead($context, $fetched);
+            if (null !== $destSlot) {
+                $objectType->boxFetchedPropertyIntoValueBox($destSlot, $fetched);
+            } else {
+                if (null === $fetched->objectPropertySlot) {
+                    throw new \LogicException('foreach object by-ref requires a property lvalue slot');
+                }
+                // Guard may insert blocks — PHI incoming must be the block that branches to $done.
+                $slotIncomings[] = [$fetched->objectPropertySlot, $context->builder->getInsertBlock()];
+                $propType = $fetched->objectPropertyType ?? $fetched->type;
+            }
             $context->builder->branch($done);
             $checkBlock = $nextCheck;
         }
         $context->builder->positionAtEnd($checkBlock);
         $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
 
-        return $fetched;
+        if (null !== $destSlot) {
+            return null;
+        }
+        $phi = $context->builder->phi($slotIncomings[0][0]->typeOf());
+        foreach ($slotIncomings as [$slot, $block]) {
+            $phi->addIncoming($slot, $block);
+        }
+        // oob → done has no slot; use null so PHI is well-formed if abort ever returned
+        $phi->addIncoming($slotIncomings[0][0]->typeOf()->constNull(), $checkBlock);
+        $var = new JitVariable($context, $propType, JitVariable::KIND_VALUE, $phi);
+        $var->objectPropertySlot = $phi;
+        $var->objectPropertyType = $propType;
+
+        return $var;
     }
 
     private static function emitPropertyNameAtIndex(
@@ -312,6 +398,7 @@ final class VmObjectPropertyForeach
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load($context->builder->structGep($obj, $objMap['class_id']));
         $fn = $context->builder->getInsertBlock()->getParent();
+        $done = $fn->appendBasicBlock('foreach_objprop_key_done');
         $entry = $context->builder->getInsertBlock();
         $checkBlock = $entry;
         foreach ($context->type->object->allClassNamesById() as $id => $className) {
@@ -328,11 +415,13 @@ final class VmObjectPropertyForeach
             $context->builder->branchIf($isClass, $matchBlock, $nextCheck);
             $context->builder->positionAtEnd($matchBlock);
             self::writePropertyNameForClassAtIndex($context, $className, $idx, $destPtr);
-
-            return;
+            $context->builder->branch($done);
+            $checkBlock = $nextCheck;
         }
         $context->builder->positionAtEnd($checkBlock);
         $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
     }
 
     private static function writePropertyNameForClassAtIndex(
@@ -344,8 +433,16 @@ final class VmObjectPropertyForeach
         $classId = $context->type->object->lookup(strtolower(ltrim($className, '\\')));
         $props = self::visiblePropertySets($context, $classId);
         $fn = $context->builder->getInsertBlock()->getParent();
+        $done = $fn->appendBasicBlock('foreach_objprop_keyname_done');
         $entry = $context->builder->getInsertBlock();
         $checkBlock = $entry;
+        if ([] === $props) {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($done);
+
+            return;
+        }
         foreach ($props as $i => $propset) {
             if ($checkBlock !== $entry) {
                 $context->builder->positionAtEnd($checkBlock);
@@ -367,11 +464,13 @@ final class VmObjectPropertyForeach
                 $destPtr,
                 $keyStr
             );
-
-            return;
+            $context->builder->branch($done);
+            $checkBlock = $nextCheck;
         }
         $context->builder->positionAtEnd($checkBlock);
         $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
     }
 
     private static function indexSlot(Context $context, JitVariable $slotKey): Value
