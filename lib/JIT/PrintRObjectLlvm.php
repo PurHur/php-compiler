@@ -4,37 +4,47 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\JitGetObjectVars;
 use PHPCompiler\ext\standard\JitStringConcat;
-use PHPCompiler\JIT\Builtin\StringVarExport;
+use PHPCompiler\JIT\Builtin\StringPrintR;
 use PHPCompiler\JIT\Call\HashTableExportKeyValuePairs;
+use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\VM\VmResourceIdString;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Call-site LLVM var_export() on {@see __hashtable__*} (#34497).
+ * Call-site LLVM print_r() on objects (#34506).
  *
- * Thin AOT {@see StringVarExport::implementThinScalarBridge} aborted non-scalars
- * (#26855). Peer of {@see SerializeArrayLlvm} / {@see JsonEncodeArrayLlvm}: walk
- * export pairs in LLVM and build Zend-shaped `array (…)` text. Nested arrays
- * recurse via {@see StringVarExport::HT_ABI} (LLVM call, not PHP IR emission).
+ * Thin AOT {@see StringPrintR::implementThinScalarBridge} aborted TYPE_OBJECT.
+ * Peer of {@see PrintRArrayLlvm}: `{Class} Object\n(…)` via get_object_vars.
  *
- * php-src: ext/standard/var.c — php_var_export_ex / php_array_element_export
+ * php-src: ext/standard/var.c — zend_print_zval_r object branch
  */
-final class VarExportArrayLlvm
+final class PrintRObjectLlvm
 {
     private static int $seq = 0;
 
     /**
-     * Emit body for `__compiler_var_export_hashtable(ht, level)` — must be called
-     * only while positioned in that function's entry (after registerFunction).
-     *
-     * @param Value $level native int64 indent level (0 = top-level array)
-     * @param bool  $compact true → `array(` + 3-space keys (object __set_state / (object), #34506)
+     * @param Value $valuePtr `__value__*` typed as TYPE_OBJECT
+     * @param Value $level    native int64 indent level (0 = top-level)
      */
-    public static function encode(Context $context, Value $ht, Value $level, bool $compact = false): Value
+    public static function encode(Context $context, Value $valuePtr, Value $level): Value
     {
-        StringVarExport::ensureFormatHelpersForArrayLlvm($context);
+        StringPrintR::ensureHelpersForArrayLlvm($context);
+
+        $objVar = new JitVariable(
+            $context,
+            JitVariable::TYPE_VALUE,
+            JitVariable::KIND_VALUE,
+            $valuePtr
+        );
+        $className = ReflectionBuiltinHelper::getDebugTypeClassName($context, $objVar);
+        $varsBoxed = JitGetObjectVars::invoke($context, $objVar, false);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::normalizeValuePtr($context, $varsBoxed)
+        );
 
         $pairs = HashTableExportKeyValuePairs::exportPairsForSlice($context, $ht);
         $num = $context->builder->call(
@@ -49,27 +59,45 @@ final class VarExportArrayLlvm
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
         $oneI64 = $i64->constInt(1, false);
+        $four = $i64->constInt(4, false);
         $tag = (string) ++self::$seq;
 
-        $indent = self::repeatTwoSpaces($context, $level);
-        // php_object_element_export: compact keys use level+1 base + one extra space (#23742).
-        $innerBase = self::repeatTwoSpaces(
-            $context,
-            $context->builder->addNoSignedWrap($level, $oneI64)
+        $isTop = $context->builder->icmp(
+            Builder::INT_EQ,
+            $level,
+            $i64->constInt(0, false)
         );
-        $inner = $compact
-            ? JitStringConcat::concat(
-                $context,
-                $innerBase,
-                $context->builder->load($context->constantStringFromString(' '))
+        $openCount = $context->builder->select(
+            $isTop,
+            $i64->constInt(0, false),
+            $context->builder->mul(
+                $four,
+                $context->builder->addNoSignedWrap($level, $oneI64)
             )
-            : $innerBase;
+        );
+        $keyCount = $context->builder->select(
+            $isTop,
+            $four,
+            $context->builder->mul(
+                $four,
+                $context->builder->addNoSignedWrap($level, $i64->constInt(2, false))
+            )
+        );
+        $openSpaces = self::repeatSpaces($context, $openCount);
+        $keySpaces = self::repeatSpaces($context, $keyCount);
 
-        $headerLit = $compact ? "array(\n" : "array (\n";
         $header = JitStringConcat::concat(
             $context,
-            $indent,
-            $context->builder->load($context->constantStringFromString($headerLit))
+            JitStringConcat::concat(
+                $context,
+                $className,
+                $context->builder->load($context->constantStringFromString(" Object\n"))
+            ),
+            JitStringConcat::concat(
+                $context,
+                $openSpaces,
+                $context->builder->load($context->constantStringFromString("(\n"))
+            )
         );
 
         $accSlot = BasicBlockHelper::entryAlloca($context, $strPtr);
@@ -77,9 +105,9 @@ final class VarExportArrayLlvm
         $context->builder->store($header, $accSlot);
         $context->builder->store($zero, $idxSlot);
 
-        $head = BasicBlockHelper::append($context, 've_ht_enc_head_'.$tag);
-        $body = BasicBlockHelper::append($context, 've_ht_enc_body_'.$tag);
-        $done = BasicBlockHelper::append($context, 've_ht_enc_done_'.$tag);
+        $head = BasicBlockHelper::append($context, 'pr_obj_enc_head_'.$tag);
+        $body = BasicBlockHelper::append($context, 'pr_obj_enc_body_'.$tag);
+        $done = BasicBlockHelper::append($context, 'pr_obj_enc_done_'.$tag);
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
@@ -109,20 +137,21 @@ final class VarExportArrayLlvm
             $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
         );
 
-        $keyStrBlock = BasicBlockHelper::append($context, 've_ht_enc_key_str_'.$tag);
-        $keyLongBlock = BasicBlockHelper::append($context, 've_ht_enc_key_long_'.$tag);
-        $keyDone = BasicBlockHelper::append($context, 've_ht_enc_key_done_'.$tag);
+        $keyStrBlock = BasicBlockHelper::append($context, 'pr_obj_enc_key_str_'.$tag);
+        $keyLongBlock = BasicBlockHelper::append($context, 'pr_obj_enc_key_long_'.$tag);
+        $keyDone = BasicBlockHelper::append($context, 'pr_obj_enc_key_done_'.$tag);
         $context->builder->branchIf($isLongKey, $keyLongBlock, $keyStrBlock);
 
         $context->builder->positionAtEnd($keyStrBlock);
         $rawKey = $context->builder->call($context->lookupFunction('__value__readString'), $keyPtr);
-        $keyWireStr = StringVarExport::formatQuotedStringLlvm($context, $rawKey);
+        $keyWireStr = self::bracketKey($context, $rawKey);
         $keyDoneStr = $context->builder->getInsertBlock();
         $context->builder->branch($keyDone);
 
         $context->builder->positionAtEnd($keyLongBlock);
         $keyLong = $context->builder->call($context->lookupFunction('__value__readLong'), $keyPtr);
-        $keyWireLong = VmResourceIdString::formatNativeLong($context, $keyLong);
+        $keyDigits = VmResourceIdString::formatNativeLong($context, $keyLong);
+        $keyWireLong = self::bracketKey($context, $keyDigits);
         $keyDoneLong = $context->builder->getInsertBlock();
         $context->builder->branch($keyDone);
 
@@ -141,13 +170,11 @@ final class VarExportArrayLlvm
             $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
         );
 
-        $valHtBlock = BasicBlockHelper::append($context, 've_ht_enc_val_ht_'.$tag);
-        $valOtherBlock = BasicBlockHelper::append($context, 've_ht_enc_val_other_'.$tag);
-        $valDone = BasicBlockHelper::append($context, 've_ht_enc_val_done_'.$tag);
+        $valHtBlock = BasicBlockHelper::append($context, 'pr_obj_enc_val_ht_'.$tag);
+        $valOtherBlock = BasicBlockHelper::append($context, 'pr_obj_enc_val_other_'.$tag);
+        $valDone = BasicBlockHelper::append($context, 'pr_obj_enc_val_done_'.$tag);
         $context->builder->branchIf($isHtVal, $valHtBlock, $valOtherBlock);
 
-        // Nested array: Zend puts a newline after "=> " then indents the nested header
-        // at the same column as the key (php_array_element_export).
         $context->builder->positionAtEnd($valHtBlock);
         $nestedHt = $context->builder->call(
             $context->lookupFunction('__value__readHashtable'),
@@ -155,56 +182,44 @@ final class VarExportArrayLlvm
         );
         $nestedLevel = $context->builder->addNoSignedWrap($level, $oneI64);
         $nestedFormatted = $context->builder->call(
-            $context->lookupFunction(StringVarExport::HT_ABI),
+            $context->lookupFunction(StringPrintR::HT_ABI),
             $nestedHt,
             $nestedLevel
-        );
-        $arrowNl = $context->builder->load($context->constantStringFromString(" => \n"));
-        $lineHt = JitStringConcat::concat(
-            $context,
-            JitStringConcat::concat(
-                $context,
-                JitStringConcat::concat(
-                    $context,
-                    JitStringConcat::concat($context, $inner, $keyWirePhi),
-                    $arrowNl
-                ),
-                $nestedFormatted
-            ),
-            $context->builder->load($context->constantStringFromString(",\n"))
         );
         $valDoneHt = $context->builder->getInsertBlock();
         $context->builder->branch($valDone);
 
         $context->builder->positionAtEnd($valOtherBlock);
         $scalarFormatted = $context->builder->call(
-            $context->lookupFunction('__compiler_var_export'),
+            $context->lookupFunction('__compiler_print_r'),
             $valPtr
-        );
-        $arrowSp = $context->builder->load($context->constantStringFromString(' => '));
-        $lineOther = JitStringConcat::concat(
-            $context,
-            JitStringConcat::concat(
-                $context,
-                JitStringConcat::concat(
-                    $context,
-                    JitStringConcat::concat($context, $inner, $keyWirePhi),
-                    $arrowSp
-                ),
-                $scalarFormatted
-            ),
-            $context->builder->load($context->constantStringFromString(",\n"))
         );
         $valDoneOther = $context->builder->getInsertBlock();
         $context->builder->branch($valDone);
 
         $context->builder->positionAtEnd($valDone);
-        $linePhi = $context->builder->phi($strPtr);
-        $linePhi->addIncoming($lineHt, $valDoneHt);
-        $linePhi->addIncoming($lineOther, $valDoneOther);
+        $valPhi = $context->builder->phi($strPtr);
+        $valPhi->addIncoming($nestedFormatted, $valDoneHt);
+        $valPhi->addIncoming($scalarFormatted, $valDoneOther);
+
+        $arrow = $context->builder->load($context->constantStringFromString(' => '));
+        $nl = $context->builder->load($context->constantStringFromString("\n"));
+        $line = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat(
+                $context,
+                JitStringConcat::concat(
+                    $context,
+                    JitStringConcat::concat($context, $keySpaces, $keyWirePhi),
+                    $arrow
+                ),
+                $valPhi
+            ),
+            $nl
+        );
 
         $acc = $context->builder->load($accSlot);
-        $context->builder->store(JitStringConcat::concat($context, $acc, $linePhi), $accSlot);
+        $context->builder->store(JitStringConcat::concat($context, $acc, $line), $accSlot);
         $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
         $context->builder->branch($head);
 
@@ -212,20 +227,32 @@ final class VarExportArrayLlvm
         $accFinal = $context->builder->load($accSlot);
         $close = JitStringConcat::concat(
             $context,
-            $indent,
-            $context->builder->load($context->constantStringFromString(')'))
+            $openSpaces,
+            $context->builder->load($context->constantStringFromString(")\n"))
         );
 
         return JitStringConcat::concat($context, $accFinal, $close);
     }
 
-    /** {@see \PHPCompiler\ext\standard\VmVarExport} indent: two spaces per level. */
-    private static function repeatTwoSpaces(Context $context, Value $level): Value
+    private static function bracketKey(Context $context, Value $inner): Value
+    {
+        return JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat(
+                $context,
+                $context->builder->load($context->constantStringFromString('[')),
+                $inner
+            ),
+            $context->builder->load($context->constantStringFromString(']'))
+        );
+    }
+
+    private static function repeatSpaces(Context $context, Value $n): Value
     {
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $tag = (string) ++self::$seq;
-        $unit = $context->builder->load($context->constantStringFromString('  '));
+        $unit = $context->builder->load($context->constantStringFromString(' '));
         $empty = $context->builder->load($context->constantStringFromString(''));
 
         $accSlot = BasicBlockHelper::entryAlloca($context, $strPtr);
@@ -233,14 +260,14 @@ final class VarExportArrayLlvm
         $context->builder->store($empty, $accSlot);
         $context->builder->store($i64->constInt(0, false), $idxSlot);
 
-        $head = BasicBlockHelper::append($context, 've_sp_head_'.$tag);
-        $body = BasicBlockHelper::append($context, 've_sp_body_'.$tag);
-        $done = BasicBlockHelper::append($context, 've_sp_done_'.$tag);
+        $head = BasicBlockHelper::append($context, 'pr_obj_sp_head_'.$tag);
+        $body = BasicBlockHelper::append($context, 'pr_obj_sp_body_'.$tag);
+        $done = BasicBlockHelper::append($context, 'pr_obj_sp_done_'.$tag);
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
         $i = $context->builder->load($idxSlot);
-        $past = $context->builder->icmp(Builder::INT_SGE, $i, $level);
+        $past = $context->builder->icmp(Builder::INT_SGE, $i, $n);
         $context->builder->branchIf($past, $done, $body);
 
         $context->builder->positionAtEnd($body);
