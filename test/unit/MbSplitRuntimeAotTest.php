@@ -29,6 +29,7 @@ final class MbSplitRuntimeAotTest extends TestCase
         $root = dirname(__DIR__, 2);
         $helper = (string) file_get_contents($root.'/ext/mbstring/MbSplitJitHelper.php');
         $this->assertStringContainsString('function splitJoinedArgv', $helper);
+        $this->assertStringNotContainsString('if (1 !== $plen)', $helper);
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbSplitRuntime.php');
         $this->assertStringContainsString('splitJoinedHelper', $runtime);
         $this->assertStringContainsString('MbSplitJitHelper::splitJoinedArgv', $runtime);

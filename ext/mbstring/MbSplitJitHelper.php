@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * mb_split() NestedJIT peel for thin AOT (#34391 leftover of #13367).
+ * mb_split() NestedJIT peel for thin AOT (#34391 leftover of #13367, #34400).
  *
- * Thin AOT cannot NestedJIT HashTable / preg_split arrays / preg_replace
- * (peer {@see MbStrSplitJitHelper} / #26870). Single-byte delimiter scan matches
- * Onig/PCRE for literal one-byte patterns; longer patterns fall back to a
- * no-split copy of $string (compile-time fold still uses {@see VmMbstring::split}).
+ * Thin AOT cannot NestedJIT HashTable / preg_split arrays (peer {@see MbStrSplitJitHelper}).
+ * Literal delimiter scan (any length); compile-time fold still uses {@see VmMbstring::split}.
+ * Pieces from substr($string) — NestedJIT interned string returns are empty (#27181).
  *
  * php-src: ext/mbstring/php_mbregex.c — PHP_FUNCTION(mb_split)
  */
@@ -27,14 +26,13 @@ final class MbSplitJitHelper
             return $string;
         }
         $plen = self::byteLength($pattern);
-        if (1 !== $plen) {
+        if ($plen <= 0) {
             return $string;
         }
-        $delim = $pattern[0];
-        $maxSplits = 1048576;
         if (0 === $limit || 1 === $limit) {
             return $string;
         }
+        $maxSplits = 1048576;
         if ($limit > 1) {
             $maxSplits = 0;
             $k = 1;
@@ -50,13 +48,23 @@ final class MbSplitJitHelper
         $i = 0;
         $splits = 0;
         $rs = "\x1E";
-        while ($i < $len) {
-            $ch = $string[$i];
-            if ($ch === $delim) {
+        $last = $len - $plen;
+        while ($i <= $last) {
+            $ok = 1;
+            $k = 0;
+            while ($k < $plen) {
+                if ($string[$i + $k] !== $pattern[$k]) {
+                    $ok = 0;
+                    break;
+                }
+                $k = $k + 1;
+            }
+            if (1 === $ok) {
                 if ($splits >= $maxSplits) {
                     break;
                 }
-                $part = \substr($string, $start, $i - $start);
+                $partLen = $i - $start;
+                $part = $partLen > 0 ? \substr($string, $start, $partLen) : \substr($string, 0, 0);
                 if (1 === $first) {
                     $joined = $part;
                     $first = 0;
@@ -64,11 +72,14 @@ final class MbSplitJitHelper
                     $joined = $joined.$rs.$part;
                 }
                 ++$splits;
-                $start = $i + 1;
+                $i = $i + $plen;
+                $start = $i;
+                continue;
             }
             ++$i;
         }
-        $tail = \substr($string, $start, $len - $start);
+        $tailLen = $len - $start;
+        $tail = $tailLen > 0 ? \substr($string, $start, $tailLen) : \substr($string, 0, 0);
         if (1 === $first) {
             return $tail;
         }
