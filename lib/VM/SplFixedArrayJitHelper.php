@@ -411,10 +411,12 @@ final class SplFixedArrayJitHelper
     }
 
     /**
-     * php-src SplFixedArray serialize — integer-keyed elements from `__spl_ht` (#33634 / #33639).
+     * php-src SplFixedArray serialize — integer-keyed elements from `__spl_ht` (#33634 / #33639 / #34491).
      *
-     * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33625.
-     * Null holes require exportKeyValuePairs to keep TYPE_NULL (#33639).
+     * NestedJIT encodeWire SIGABRTs on non-empty HT (peer #34483). Call registered
+     * `__compiler_serialize_hashtable` (SerializeArrayLlvm) then rewrite `a:N:{…}` →
+     * `O:len:"Class":N:{…}`. Must not inline SerializeArrayLlvm::encodeObject here —
+     * that recurses through encodeBoxedValue → compileSerialize during IR emit.
      *
      * @return Value {@see __string__*} full `O:len:"SplFixedArray":N:{…}` wire
      */
@@ -425,41 +427,64 @@ final class SplFixedArrayJitHelper
         $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
         $classNameStr = \PHPCompiler\JIT\ReflectionBuiltinHelper::getClassName($context, $objVar);
         $ht = self::htPtr($context, $obj);
-        $logical = 'PHPCompiler\\ext\\standard\\SerializeSplFixedArrayNestedJitHelper::encodeWire';
-        $saved = BasicBlockHelper::tryGetInsertBlock($context);
-        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
-            $context,
-            '/ext/standard/SerializeSplFixedArrayNestedJitHelper.php',
-            [$logical],
-            '#33639'
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $flags = $i64->constInt(0, false);
+        $arrayWire = $context->builder->call(
+            $context->lookupFunction('__compiler_serialize_hashtable'),
+            $ht,
+            $flags
         );
-        BasicBlockHelper::restoreInsertBlock($context, $saved);
-        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33639');
         $strMap = $context->structFieldMap['__string__'];
         $classLen = $context->builder->load(
             $context->builder->structGep($classNameStr, $strMap['length'])
         );
-        $args = [
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+        $classLenDigits = \PHPCompiler\VM\VmResourceIdString::formatNativeLong(
+            $context,
+            $context->builder->zExt($classLen, $i64)
+        );
+        $oColon = $context->builder->load($context->constantStringFromString('O:'));
+        $colonQuote = $context->builder->load($context->constantStringFromString(':"'));
+        $quoteColon = $context->builder->load($context->constantStringFromString('":'));
+        $prefix = \PHPCompiler\ext\standard\JitStringConcat::concat(
+            $context,
+            \PHPCompiler\ext\standard\JitStringConcat::concat(
                 $context,
-                $classNameStr,
-                $fn->getParam(0)->typeOf()
+                \PHPCompiler\ext\standard\JitStringConcat::concat(
+                    $context,
+                    \PHPCompiler\ext\standard\JitStringConcat::concat($context, $oColon, $classLenDigits),
+                    $colonQuote
+                ),
+                $classNameStr
             ),
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $classLen,
-                $fn->getParam(1)->typeOf()
-            ),
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $ht,
-                $fn->getParam(2)->typeOf()
-            ),
-        ];
-        $raw = $context->builder->call($fn, ...$args);
-        $strPtr = $context->getTypeFromString('__string__*');
+            $quoteColon
+        );
+        // Skip leading "a:" from array wire — remainder is N:{…}
+        try {
+            $context->lookupFunction('__string__alloc');
+        } catch (\Throwable) {
+            $alloc = $context->module->addFunction(
+                '__string__alloc',
+                $context->context->functionType($strPtr, false, $sizeT)
+            );
+            $context->registerFunction('__string__alloc', $alloc);
+        }
+        $wireLen = $context->builder->load(
+            $context->builder->structGep($arrayWire, $strMap['length'])
+        );
+        $two = $sizeT->constInt(2, false);
+        $restLen = $context->builder->sub($wireLen, $two);
+        $rest = $context->builder->call($context->lookupFunction('__string__alloc'), $restLen);
+        $context->intrinsic->builder = $context->builder;
+        $src = $context->builder->gep(
+            $context->builder->structGep($arrayWire, $strMap['value']),
+            $two
+        );
+        $dst = $context->builder->structGep($rest, $strMap['value']);
+        $context->intrinsic->memcpy($dst, $src, $restLen, false);
 
-        return \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr);
+        return \PHPCompiler\ext\standard\JitStringConcat::concat($context, $prefix, $rest);
     }
 
     /** Expose object load for {@see \PHPCompiler\ext\standard\JitSerialize} (#33634). */
