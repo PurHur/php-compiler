@@ -706,9 +706,13 @@ final class ArrayObjectJitHelper
     }
 
     /**
-     * php-src ArrayObject/ArrayIterator::__serialize bag under thin AOT (#33625 / #33683 object values).
+     * php-src ArrayObject/ArrayIterator::__serialize bag under thin AOT (#33625 / #33683 / #34491).
      *
-     * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925.
+     * NestedJIT encodeWire SIGABRTs on non-empty HT (peer #34483). Call registered
+     * `__compiler_serialize_hashtable` for storage then wrap
+     * `O:len:"Class":4:{i:0;i:flags;i:1;<a:N:{…}>i:2;a:0:{}i:3;N;}`.
+     * Must not inline SerializeArrayLlvm::encode here — nested object values recurse
+     * through encodeBoxedValue → compileSerialize during IR emit (peer SplFixedArray).
      *
      * @return Value {@see __string__*} full `O:len:"Class":4:{…}` wire
      */
@@ -728,46 +732,39 @@ final class ArrayObjectJitHelper
             );
 
         $ht = self::htPtr($context, $obj);
-        $logical = 'PHPCompiler\\ext\\standard\\SerializeSplArrayNestedJitHelper::encodeWire';
-        $saved = BasicBlockHelper::tryGetInsertBlock($context);
-        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
-            $context,
-            '/ext/standard/SerializeSplArrayNestedJitHelper.php',
-            [$logical],
-            '#33625'
+        $i64 = $context->getTypeFromString('int64');
+        $serFlags = $i64->constInt(0, false);
+        $storageWire = $context->builder->call(
+            $context->lookupFunction('__compiler_serialize_hashtable'),
+            $ht,
+            $serFlags
         );
-        BasicBlockHelper::restoreInsertBlock($context, $saved);
-        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33625');
+
         $strMap = $context->structFieldMap['__string__'];
         $classLen = $context->builder->load(
             $context->builder->structGep($classNameStr, $strMap['length'])
         );
-        $args = [
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $classNameStr,
-                $fn->getParam(0)->typeOf()
-            ),
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $classLen,
-                $fn->getParam(1)->typeOf()
-            ),
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $flags,
-                $fn->getParam(2)->typeOf()
-            ),
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $ht,
-                $fn->getParam(3)->typeOf()
-            ),
-        ];
-        $raw = $context->builder->call($fn, ...$args);
-        $strPtr = $context->getTypeFromString('__string__*');
+        $classLenDigits = \PHPCompiler\VM\VmResourceIdString::formatNativeLong(
+            $context,
+            $context->builder->zExt($classLen, $i64)
+        );
+        $flagDigits = \PHPCompiler\VM\VmResourceIdString::formatNativeLong($context, $flags);
 
-        return \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr);
+        $oColon = $context->builder->load($context->constantStringFromString('O:'));
+        $colonQuote = $context->builder->load($context->constantStringFromString(':"'));
+        $quoteFour = $context->builder->load($context->constantStringFromString('":4:{i:0;i:'));
+        $mid = $context->builder->load($context->constantStringFromString(';i:1;'));
+        $tail = $context->builder->load($context->constantStringFromString('i:2;a:0:{}i:3;N;}'));
+
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $oColon, $classLenDigits);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $colonQuote);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $classNameStr);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $quoteFour);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $flagDigits);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $mid);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $storageWire);
+
+        return \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $tail);
     }
 
     /** Expose object load for {@see \PHPCompiler\ext\standard\JitSerialize} (#33625). */
