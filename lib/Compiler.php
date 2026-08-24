@@ -30862,15 +30862,6 @@ class Compiler {
      * as replaceChild(createElement, getElementsByTagName()->item()) keep a later call with live
      * usages in the window (#25563) or fall inside the dead-temp span (item).
      *
-     * @param list<Op> $cfgChildren
-     */
-    /**
-     * Empty-usages MethodCall in a mixed PropertyFetch+call arg window is statement-level when it
-     * sits outside the trailing dead-temp arg span and every intervening call also has empty
-     * usages (appendChild(createElement) before importNode — #24571). Inline dead-temp args such
-     * as replaceChild(createElement, getElementsByTagName()->item()) keep a later call with live
-     * usages in the window (#25563) or fall inside the dead-temp span (item).
-     *
      * PropertyFetch that only feeds a later MethodCall before the consumer (`$el->childNodes`
      * → `item(N)`) is part of the inline arg chain — not a statement boundary (#34436). Breaking
      * on it dropped createElement so both ARG_SENDs bound item().
