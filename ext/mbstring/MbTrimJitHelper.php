@@ -5,122 +5,181 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * mb_trim() / mb_ltrim() / mb_rtrim() NestedJIT runtime (#34379 leftover of #5957/#23883).
+ * mb_trim() NestedJIT runtime (#34379 leftover of #5957/#23883).
  *
- * Single-function leaf kept small — NestedJIT of large UTF-8 CFGs SIGSEGVs under thin AOT.
- * Handles ASCII default whitespace + U+00A0 (C2 A0), mode, and literal `$characters`.
- * Broader Unicode defaults (U+1680…U+3000) stay on VM / compile-time fold.
+ * Public two-string leaves like {@see MbScrubJitHelper::scrubArgv} (`__string__*`).
+ * Private bodies: ascending for-loops only, no `break`/`continue`/strrev (those
+ * SIGSEGV under thin AOT when several leaves share a module).
  *
- * Int params: compare `$mode` / `$useDefaultWhat` directly (NestedJIT zeros copied locals —
- * peer {@see MbStrwidthJitHelper}). Haystack length via isset-index; `$what` length is
- * passed as `$whatLen` (NestedJIT isset on helper string params is unreliable).
- *
- * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_trim) / mb_ltrim / mb_rtrim
+ * Default charset: ASCII ws + U+00A0 (C2 A0). php-src: ext/mbstring/mbstring.c
  */
 final class MbTrimJitHelper
 {
-    /**
-     * @param int $useDefaultWhat 1 = default trim set; 0 = use $what ('' = no trim)
-     */
-    public static function trimArgv(
-        string $value,
-        string $what,
-        string $encoding,
-        int $mode,
-        int $useDefaultWhat,
-        int $whatLen
-    ): string {
-        unset($encoding);
-
-        $doLeft = 0;
-        $doRight = 0;
-        if (1 === $mode || 3 === $mode) {
-            $doLeft = 1;
-        }
-        if (2 === $mode || 3 === $mode) {
-            $doRight = 1;
-        }
-
-        $byteLen = 0;
-        while (isset($value[$byteLen])) {
-            $byteLen = $byteLen + 1;
-            if ($byteLen > 1048576) {
-                break;
-            }
-        }
-        if (0 === $byteLen) {
-            return '';
-        }
-
-        $start = 0;
-        if (1 === $doLeft) {
-            while ($start < $byteLen) {
-                $ch = \substr($value, $start, 1);
-                $w = 1;
-                $trim = 0;
-                if (1 === $useDefaultWhat) {
-                    if (' ' === $ch || "\t" === $ch || "\n" === $ch || "\r" === $ch
-                        || "\0" === $ch || "\x0B" === $ch || "\x0C" === $ch || "\x85" === $ch) {
-                        $trim = 1;
-                    } elseif ("\xC2" === $ch && $start + 1 < $byteLen
-                        && "\xA0" === \substr($value, $start + 1, 1)) {
-                        $trim = 1;
-                        $w = 2;
-                    }
-                } else {
-                    $wi = 0;
-                    while ($wi < $whatLen) {
-                        if (\substr($what, $wi, 1) === $ch) {
-                            $trim = 1;
-                            break;
-                        }
-                        $wi = $wi + 1;
-                    }
-                }
-                if (0 === $trim) {
-                    break;
-                }
-                $start = $start + $w;
-            }
-        }
-
-        $end = $byteLen;
-        if (1 === $doRight) {
-            while ($end > $start) {
-                // Prefer NBSP (2 bytes) at end when present
-                $w = 1;
-                $ch = \substr($value, $end - 1, 1);
-                $trim = 0;
-                if (1 === $useDefaultWhat) {
-                    if ($end - $start >= 2 && "\xC2" === \substr($value, $end - 2, 1)
-                        && "\xA0" === $ch) {
-                        $trim = 1;
-                        $w = 2;
-                    } elseif (' ' === $ch || "\t" === $ch || "\n" === $ch || "\r" === $ch
-                        || "\0" === $ch || "\x0B" === $ch || "\x0C" === $ch || "\x85" === $ch) {
-                        $trim = 1;
-                    }
-                } else {
-                    $wi = 0;
-                    while ($wi < $whatLen) {
-                        if (\substr($what, $wi, 1) === $ch) {
-                            $trim = 1;
-                            break;
-                        }
-                        $wi = $wi + 1;
-                    }
-                }
-                if (0 === $trim) {
-                    break;
-                }
-                $end = $end - $w;
-            }
-        }
-
-        if (0 === $start && $end === $byteLen) {
+    public static function trimDefault(string $value, string $encoding): string
+    {
+        if ('8BIT' === $encoding) {
             return $value;
         }
 
-        return \substr($value, $start, $end - $start);
+        return self::trimRightBody(self::trimLeftBody($value));
+    }
+
+    public static function ltrimDefault(string $value, string $encoding): string
+    {
+        if ('8BIT' === $encoding) {
+            return $value;
+        }
+
+        return self::trimLeftBody($value);
+    }
+
+    public static function rtrimDefault(string $value, string $encoding): string
+    {
+        if ('8BIT' === $encoding) {
+            return $value;
+        }
+
+        return self::trimRightBody($value);
+    }
+
+    public static function trimChars(string $value, string $what): string
+    {
+        if ('' === $what) {
+            return $value;
+        }
+
+        return self::trimCharsRightBody(self::trimCharsLeftBody($value, $what), $what);
+    }
+
+    private static function trimLeftBody(string $value): string
+    {
+        $n = \strlen($value);
+        $out = '';
+        $started = 0;
+        $prev = '';
+        for ($i = 0; $i < $n; ++$i) {
+            $c = \substr($value, $i, 1);
+            $ws = 0;
+            if (' ' === $c || "\t" === $c || "\n" === $c || "\r" === $c
+                || "\0" === $c || "\x0B" === $c) {
+                $ws = 1;
+            } elseif ("\xA0" === $c && "\xC2" === $prev) {
+                $ws = 1;
+            }
+            if ("\xC2" === $c) {
+                // Hold C2 until next byte decides NBSP vs content.
+                $prev = $c;
+            } else {
+                if (0 === $started) {
+                    if (1 === $ws) {
+                        // skip leading ws (incl trailing A0 of NBSP)
+                    } else {
+                        if ("\xC2" === $prev) {
+                            $out .= $prev;
+                        }
+                        $started = 1;
+                        $out .= $c;
+                    }
+                } else {
+                    if ("\xC2" === $prev) {
+                        $out .= $prev;
+                    }
+                    $out .= $c;
+                }
+                $prev = $c;
+            }
+        }
+        if ("\xC2" === $prev && 1 === $started) {
+            $out .= $prev;
+        }
+
+        return $out;
+    }
+
+    private static function trimRightBody(string $value): string
+    {
+        $n = \strlen($value);
+        $last = -1;
+        $prev = '';
+        for ($i = 0; $i < $n; ++$i) {
+            $c = \substr($value, $i, 1);
+            $ws = 0;
+            if (' ' === $c || "\t" === $c || "\n" === $c || "\r" === $c
+                || "\0" === $c || "\x0B" === $c) {
+                $ws = 1;
+            } elseif ("\xA0" === $c && "\xC2" === $prev) {
+                $ws = 1;
+                // previous C2 was start of NBSP — retract last if it pointed at C2
+                if ($last === $i - 1) {
+                    $last = $i - 2;
+                }
+            }
+            if (0 === $ws) {
+                $last = $i;
+            }
+            $prev = $c;
+        }
+        if ($last === $n - 1) {
+            return $value;
+        }
+        if ($last < 0) {
+            return '';
+        }
+
+        return \substr($value, 0, $last + 1);
+    }
+
+    private static function trimCharsLeftBody(string $value, string $what): string
+    {
+        $n = \strlen($value);
+        $wlen = \strlen($what);
+        $out = '';
+        $started = 0;
+        for ($i = 0; $i < $n; ++$i) {
+            $c = \substr($value, $i, 1);
+            if (0 === $started) {
+                $hit = 0;
+                for ($k = 0; $k < $wlen; ++$k) {
+                    if (\substr($what, $k, 1) === $c) {
+                        $hit = 1;
+                    }
+                }
+                if (0 === $hit) {
+                    $started = 1;
+                    $out .= $c;
+                }
+            } else {
+                $out .= $c;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function trimCharsRightBody(string $value, string $what): string
+    {
+        $n = \strlen($value);
+        $wlen = \strlen($what);
+        $last = -1;
+        for ($i = 0; $i < $n; ++$i) {
+            $c = \substr($value, $i, 1);
+            $hit = 0;
+            for ($k = 0; $k < $wlen; ++$k) {
+                if (\substr($what, $k, 1) === $c) {
+                    $hit = 1;
+                }
+            }
+            if (0 === $hit) {
+                $last = $i;
+            }
+        }
+        if ($last === $n - 1) {
+            return $value;
+        }
+        if ($last < 0) {
+            return '';
+        }
+
+        return \substr($value, 0, $last + 1);
     }
 }
