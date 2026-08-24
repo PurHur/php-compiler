@@ -14,6 +14,8 @@ use PHPLLVM\Value;
 
 /**
  * mb_decode_mimeheader() — decode RFC 2047 encoded words (php-src ext/mbstring/mbstring.c; #6038, #30311).
+ *
+ * JIT/AOT: compile-time fold + runtime NestedJIT via {@see JitMbMimeheader} (#34299).
  */
 final class mb_decode_mimeheader extends Internal
 {
@@ -51,13 +53,6 @@ final class mb_decode_mimeheader extends Internal
             }
         }
 
-        $folded = JitMbMimeheader::tryDecodeCompileTimeFold($context, $args);
-        if (null !== $folded) {
-            return $folded;
-        }
-
-        throw new \LogicException(
-            'mb_decode_mimeheader() is not lowered for JIT/AOT in this compiler build'
-        );
+        return JitMbMimeheader::invokeDecode($context, $args);
     }
 }
