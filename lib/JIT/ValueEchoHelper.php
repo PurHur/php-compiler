@@ -104,6 +104,20 @@ final class ValueEchoHelper
      */
     public static function echoObjectVariable(Context $context, Variable $objectVar, ?string $classHint = null): void
     {
+        // Thin AOT: SimpleXMLElement has no NestedJIT __toString; cast folds via baked
+        // __phpc_sxe_text / host tree. Echo must use the same path or prints "Object"
+        // for `$sxe['attr']` while `(string)$sxe['attr']` is correct (php-src sxe.c).
+        $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast(
+            $context,
+            $objectVar,
+            $classHint
+        );
+        if (null !== $sxeFold) {
+            self::echoStringVariable($context, $sxeFold);
+
+            return;
+        }
+
         $asString = MagicMethodDispatch::coerceObjectToString($context, $objectVar, $classHint);
         if (null !== $asString) {
             self::echoStringVariable($context, $asString);
