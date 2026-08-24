@@ -659,8 +659,10 @@ final class BuiltinInternalArgInfo
             'array_is_list' => 'bool',
             // ext/standard/array.stub.php — InternalArgInfo omits mixed return (#26112)
             'array_pop', 'array_shift' => 'mixed',
-            // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#26172)
-            'usort', 'uasort', 'uksort', 'ksort', 'krsort' => 'true',
+            // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#25386, #26172)
+            'sort', 'asort', 'arsort', 'shuffle', 'usort', 'uasort', 'uksort', 'ksort', 'krsort' => 'true',
+            // ext/standard/array.stub.php — InternalArgInfo omits return; Zend bool (#25386)
+            'natsort', 'natcasesort' => 'bool',
             // ext/imap/php_imap.stub.php — InternalArgInfo return string (missing |false) (#27681, #27764, #27765)
             'imap_utf7_decode', 'imap_utf8_to_mutf7', 'imap_mutf7_to_utf8', 'imap_mail_compose' => 'string|false',
             // ext/imap/php_imap.stub.php — InternalArgInfo return empty; Zend int|bool (#27680)
