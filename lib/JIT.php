@@ -16134,7 +16134,9 @@ class JIT {
             return;
         }
         $var = $this->context->getVariableFromOp($result);
-        if (!\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign($var)) {
+        $imported = \PHPCompiler\ext\dom\JitDomImportSimpleXmlUserScript::applyPendingImportAssign($var);
+        $sxe = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign($var);
+        if (!$imported && !$sxe) {
             return;
         }
         $name = JIT\OperandName::resolve($result);
@@ -16142,9 +16144,20 @@ class JIT {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])
                 && $this->context->namedVariableBindings[$resolved] !== $var
-                && null !== $var->compileTimeString
             ) {
-                $this->context->namedVariableBindings[$resolved]->compileTimeString = $var->compileTimeString;
+                $bound = $this->context->namedVariableBindings[$resolved];
+                if (null !== $var->compileTimeString) {
+                    $bound->compileTimeString = $var->compileTimeString;
+                }
+                if (null !== $var->compileTimeDomAttributes) {
+                    $bound->compileTimeDomAttributes = $var->compileTimeDomAttributes;
+                }
+                if (null !== $var->compileTimeDomTagName) {
+                    $bound->compileTimeDomTagName = $var->compileTimeDomTagName;
+                }
+                if (null !== $var->classUserType) {
+                    $bound->classUserType = $var->classUserType;
+                }
             }
             $this->context->bindVariableByName($resolved, $var);
         }
@@ -23272,6 +23285,21 @@ class JIT {
                 if ($this->context->functionIsRegistered('domnode::appendchild')) {
                     $receiverVar = $this->context->getVariableFromOp($receiverOp);
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::appendchild');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
+            // import_simplexml / boxed DOMElement temps lose TYPE_OBJECT — getAttribute
+            // via RuntimeIndirect returns empty instead of open-tag attrs (#34413).
+            if (
+                'getattribute' === $methodLcEarly
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::getattribute');
+                if ($this->context->functionIsRegistered('domelement::getattribute')) {
+                    $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domelement::getattribute');
                     $this->context->scope->args = [$receiverVar];
 
                     return;

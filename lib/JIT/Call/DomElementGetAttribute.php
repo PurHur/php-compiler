@@ -62,6 +62,18 @@ final class DomElementGetAttribute implements Call
             );
         }
 
+        $xml = \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null !== $nameLit && null !== $xml) {
+            foreach (\PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::rootAttributesArgv($xml) as $pair) {
+                $qname = $pair['qname'];
+                $pos = strpos($qname, ':');
+                $local = false === $pos ? $qname : substr($qname, $pos + 1);
+                if ($nameLit === $qname || $nameLit === $local) {
+                    return self::boxConstantString($context, $pair['value']);
+                }
+            }
+        }
+
         // Otherwise fall back to importNode/getElementById HTML-id stub (#19212).
         return JitDomImportNode::invokeGetAttribute($context, ...$args);
     }
