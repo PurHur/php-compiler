@@ -30,7 +30,11 @@ final class TypeDeadGetResourceTypeAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_get_resource_type (#33183)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StreamResource::ensureLinked', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamResource::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamResource::ensureLinked($this->context)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresGetResourceTypeAbiModuleLocally(): void
@@ -50,10 +54,14 @@ final class TypeDeadGetResourceTypeAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#33183', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksStreamResource(): void
+    public function testTypeInitializeDropsEagerStreamResourceEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StreamResource::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamResource::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamResource::ensureLinked($this->context)'
+        );
     }
 
     public function testNoNewRuntimeCForGetResourceTypeAbi(): void

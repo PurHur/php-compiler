@@ -30,7 +30,11 @@ final class TypeDeadFsyncAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_fsync (#33114)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StreamSync::ensureLinked', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamSync::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamSync::ensureLinked($this->context)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresFsyncAbiModuleLocally(): void
@@ -46,10 +50,14 @@ final class TypeDeadFsyncAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamSyncKernel.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksStreamSync(): void
+    public function testTypeInitializeDropsEagerStreamSyncEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StreamSync::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamSync::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamSync::ensureLinked($this->context)'
+        );
     }
 
     public function testNoNewRuntimeCForFsyncAbi(): void
