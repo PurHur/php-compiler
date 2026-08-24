@@ -96,14 +96,18 @@ final class JitFilter
         if (JITVariable::TYPE_NULL === $filter->type) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
+        // Named constants assigned to locals often keep compileTimeLong while the LLVM
+        // operand is a script-global `__value__**` — fold when possible (#34450).
+        if (null !== $filter->compileTimeLong) {
+            return $context->getTypeFromString('int64')->constInt((int) $filter->compileTimeLong, false);
+        }
         if (JITVariable::TYPE_NATIVE_LONG === $filter->type) {
             return $context->helper->loadValue($filter);
         }
         if (JITVariable::TYPE_VALUE === $filter->type) {
-            $ptrType = $context->getTypeFromString('__value__*');
-            $ptr = JITVariable::KIND_VALUE === $filter->kind
-                ? $filter->value
-                : $context->builder->pointerCast($filter->value, $ptrType);
+            // Script globals / KIND_VALUE may still be `__value__**`; never pass raw
+            // `$filter->value` to `__value__readLong` (#34450 / peer #21041).
+            $ptr = JitValueBox::valuePtrFromVariable($context, $filter);
 
             return $context->builder->call(
                 $context->lookupFunction('__value__readLong'),
