@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_ereg_search_getpos() — current search byte offset (php-src php_mbregex.c; #20024).
+ * mb_ereg_search_getpos() — current search byte offset (php-src php_mbregex.c; #20024, #34424 AOT).
  */
 final class mb_ereg_search_getpos extends Internal
 {
@@ -43,8 +43,6 @@ final class mb_ereg_search_getpos extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_ereg_search_getpos() is not lowered for JIT/AOT in this compiler build'
-        );
+        return JitMbEregSearch::foldSearchGetPos($context, $args);
     }
 }

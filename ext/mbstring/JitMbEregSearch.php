@@ -11,7 +11,8 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding (#30781, #33648, #33655, #33656, #33765).
+ * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding
+ * (#30781, #33648, #33655, #33656, #33765, #34424).
  *
  * Same shape as {@see JitMbSearch} / {@see mb_internal_encoding}: literals only;
  * search cursor lives in {@see MbstringState} for the duration of one AOT/JIT
@@ -213,6 +214,191 @@ final class JitMbEregSearch
         $out = VmMbstring::eregSearchExec(0, $pattern, $options);
 
         return $context->getTypeFromString('int1')->constInt($out ? 1 : 0, false);
+    }
+
+    /**
+     * mb_ereg_search_pos() — mode 1 ([offset, length] or false). #34424 / php_mbregex.c.
+     *
+     * @param JITVariable[] $args
+     */
+    public static function foldSearchPos(Context $context, array $args): Value
+    {
+        [$pattern, $options] = self::parseOptionalPatternOptions(
+            $args,
+            'mb_ereg_search_pos'
+        );
+
+        MbstringAotFoldState::syncRegexEncodingIntoState($context);
+        $out = VmMbstring::eregSearchExec(1, $pattern, $options);
+        if (false === $out) {
+            return self::foldFalse($context);
+        }
+        /** @var array{0: int, 1: int} $out */
+        $ht = VmMbstring::searchPosPairToHashTable($out);
+        $cacheKey = 'mb_ereg_search_pos_'.md5(serialize($out).'|'.MbstringState::searchPos());
+
+        return self::foldHashTable($context, $cacheKey, $ht);
+    }
+
+    /**
+     * mb_ereg_search_regs() — mode 2 (captures or false). #34424 / php_mbregex.c.
+     *
+     * @param JITVariable[] $args
+     */
+    public static function foldSearchRegs(Context $context, array $args): Value
+    {
+        [$pattern, $options] = self::parseOptionalPatternOptions(
+            $args,
+            'mb_ereg_search_regs'
+        );
+
+        MbstringAotFoldState::syncRegexEncodingIntoState($context);
+        $out = VmMbstring::eregSearchExec(2, $pattern, $options);
+        if (false === $out) {
+            return self::foldFalse($context);
+        }
+        /** @var array<int, string|false> $out */
+        $ht = VmMbstring::mbRegsToHashTable($out);
+        $cacheKey = 'mb_ereg_search_regs_'.md5(serialize($out).'|'.MbstringState::searchPos());
+
+        return self::foldHashTable($context, $cacheKey, $ht);
+    }
+
+    /**
+     * mb_ereg_search_getpos() — current byte offset. #34424 / php_mbregex.c.
+     *
+     * @param JITVariable[] $args
+     */
+    public static function foldSearchGetPos(Context $context, array $args): Value
+    {
+        if (\count($args) > 0) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_ereg_search_getpos() expects exactly 0 arguments, %d given',
+                \count($args)
+            ));
+        }
+        $pos = MbstringState::searchPos();
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong(
+            $context,
+            $slot,
+            $context->getTypeFromString('int64')->constInt($pos, true)
+        );
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * mb_ereg_search_getregs() — last captures or false. #34424 / php_mbregex.c.
+     *
+     * @param JITVariable[] $args
+     */
+    public static function foldSearchGetRegs(Context $context, array $args): Value
+    {
+        if (\count($args) > 0) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_ereg_search_getregs() expects exactly 0 arguments, %d given',
+                \count($args)
+            ));
+        }
+        $regs = VmMbstring::eregSearchGetRegs();
+        if (false === $regs) {
+            return self::foldFalse($context);
+        }
+        $ht = VmMbstring::mbRegsToHashTable($regs);
+        $cacheKey = 'mb_ereg_search_getregs_'.md5(serialize($regs).'|'.MbstringState::searchPos());
+
+        return self::foldHashTable($context, $cacheKey, $ht);
+    }
+
+    /**
+     * mb_ereg_search_setpos() — set byte offset (literal int). #34424 / php_mbregex.c.
+     *
+     * @param JITVariable[] $args
+     */
+    public static function foldSearchSetPos(Context $context, array $args): Value
+    {
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_ereg_search_setpos() expects exactly 1 argument, %d given',
+                \count($args)
+            ));
+        }
+        $offset = self::requireLiteralInt($context, $args[0], 'mb_ereg_search_setpos', 'offset');
+        $ok = VmMbstring::eregSearchSetPos($offset);
+
+        return $context->getTypeFromString('int1')->constInt($ok ? 1 : 0, false);
+    }
+
+    /**
+     * @param JITVariable[] $args
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    private static function parseOptionalPatternOptions(array $args, string $function): array
+    {
+        $argc = \count($args);
+        if ($argc > 2) {
+            throw new \ArgumentCountError(sprintf(
+                '%s() expects at most 2 arguments, %d given',
+                $function,
+                $argc
+            ));
+        }
+        $pattern = null;
+        if (isset($args[0])) {
+            $pattern = self::optionalLiteralString($args[0], $function, 'pattern');
+        }
+        $options = null;
+        if (isset($args[1])) {
+            $options = self::optionalLiteralString($args[1], $function, 'options');
+        }
+
+        return [$pattern, $options];
+    }
+
+    private static function foldFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function foldHashTable(
+        Context $context,
+        string $cacheKey,
+        \PHPCompiler\VM\HashTable $ht
+    ): Value {
+        $global = $context->constantArrayFromVmHashTable($cacheKey, $ht);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::copyFromPointer($context, $slot, $context->builder->load($global));
+
+        return $ptr;
+    }
+
+    private static function requireLiteralInt(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        string $param
+    ): int {
+        if (null !== $arg->compileTimeLong) {
+            return (int) $arg->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
+            }
+        }
+        throw new \LogicException(sprintf(
+            '%s() $%s must be a compile-time int in this compiler build',
+            $function,
+            $param
+        ));
     }
 
     private static function requireLiteralString(

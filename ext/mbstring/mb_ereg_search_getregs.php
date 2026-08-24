@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_ereg_search_getregs() — last search captures (php-src php_mbregex.c; #20024).
+ * mb_ereg_search_getregs() — last search captures (php-src php_mbregex.c; #20024, #34424 AOT).
  */
 final class mb_ereg_search_getregs extends Internal
 {
@@ -48,8 +48,6 @@ final class mb_ereg_search_getregs extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_ereg_search_getregs() is not lowered for JIT/AOT in this compiler build'
-        );
+        return JitMbEregSearch::foldSearchGetRegs($context, $args);
     }
 }
