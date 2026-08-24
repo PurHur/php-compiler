@@ -35,7 +35,9 @@ final class TypeDeadVersionCompareAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-declare __compiler_version_compare in a table (#32843)'
         );
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StringVersionCompare::ensureLinked', $type);
+        // StringVersionCompare ensureLinked moved to call-site (#34337).
+        $this->assertStringContainsString('#34337', $type);
+        $this->assertStringNotContainsString('StringVersionCompare::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresVersionCompareAbiModuleLocally(): void
@@ -47,10 +49,12 @@ final class TypeDeadVersionCompareAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('module->addFunction(', $svc);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringVersionCompare(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkStringVersionCompare(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringVersionCompare::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringVersionCompare::ensureLinked($this->context)', $type);
+        $jitInfo = (string) file_get_contents(__DIR__.'/../../ext/standard/JitInfo.php');
+        $this->assertStringContainsString('StringVersionCompare::ensureLinked', $jitInfo);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltin(): void
