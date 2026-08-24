@@ -10,7 +10,7 @@ namespace PHPCompiler\ext\mbstring;
  * Separate from {@see MbCaseJitHelper}: calling {@see VmMbstring} / {@see Utf8CaseMap} from a
  * titleArgv entry SIGSEGVs/aborts under thin AOT NestedJIT. This unit uses only strlen/ord/substr
  * + NestedJIT-safe upper/lower maps (Latin-1 + Cyrillic + Greek; peer MbChrOrdJitHelper — no
- * PHP chr()).
+ * PHP chr()). Illegal UTF-8 bytes emit default `?` (#34344 leftover of #34340).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_convert_case)
  */
@@ -34,6 +34,16 @@ final class MbConvertCaseJitHelper
         $i = 0;
         while ($i < $len) {
             $charLen = self::utf8ByteLenAt($string, $i);
+            if ($charLen <= 0) {
+                break;
+            }
+            // Illegal lead/truncated → default '?' (mb_substitute_character); keep upperNext
+            // so Zend `chr(0x80)."Ab"` → `?Ab` (#34344 leftover of #34340).
+            if (self::isIllegalUtf8Byte($string, $i, $charLen)) {
+                $out .= '?';
+                $i += $charLen;
+                continue;
+            }
             $cp = self::utf8CpAt($string, $i, $charLen);
             if ($upperNext) {
                 if (0xDF === $cp) {
@@ -52,6 +62,20 @@ final class MbConvertCaseJitHelper
         }
 
         return $out;
+    }
+
+    /**
+     * Single-byte walk result with lead ≥ 0x80 ⇒ illegal (truncated / bad lead / bad cont).
+     * Peer {@see MbCaseJitHelper} (#34343).
+     */
+    private static function isIllegalUtf8Byte(string $string, int $offset, int $charLen): bool
+    {
+        if (1 !== $charLen) {
+            return false;
+        }
+        $b0 = \ord(\substr($string, $offset, 1));
+
+        return $b0 >= 128;
     }
 
     private static function isTitleDelimiter(int $codepoint): bool
