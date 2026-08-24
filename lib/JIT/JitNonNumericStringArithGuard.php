@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\VM\VmNonNumericStringArithGuard;
 
 /**
- * JIT trampoline for non-numeric string ⊙ arithmetic TypeErrors (#34449).
+ * JIT trampoline for non-numeric string ⊙ arithmetic/bitwise TypeErrors (#34449, #34453).
  *
  * SSOT: {@see \PHPCompiler\VM\VmNonNumericStringArithGuard}
  */

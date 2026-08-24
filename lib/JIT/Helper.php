@@ -239,7 +239,8 @@ return_string:
                 $this->context->getTypeFromString('int64')->constInt(0, false)
             );
         }
-        // non-numeric string ⊙ arith: zend_type_error (not strtol→0) (#34449).
+        // non-numeric string ⊙ arith/bitwise: zend_type_error (not strtol→0) (#34449, #34453).
+        // string⊙string &|^ stays byte-wise (#32431) — guard skips that pair.
         if (JitNonNumericStringArithGuard::guardArithmetic($this->context, $opcode->type, $left, $right)) {
             return $this->nativeLongResultVariable(
                 $this->context->getTypeFromString('int64')->constInt(0, false)
