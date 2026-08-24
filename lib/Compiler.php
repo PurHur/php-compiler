@@ -30934,6 +30934,24 @@ class Compiler {
             return $deadInlineArgCount < 1
                 || ($consumerIndex - $childIndex) > $deadInlineArgCount;
         }
+        // Unused `$d->appendChild($d->createElement('root')); $d->importNode($src->documentElement, true)`
+        // — typed createElement/appendChild still look like call-arg producers (DOMElement/DOMNode),
+        // but PropertyFetch/ConstFetch before the consumer mark them as prior statements. Re-emitting
+        // them as importNode nested producers duplicates the tree (phantom sibling / trailing
+        // `<root/>` in saveXML) (#34405 / re-#24571). Keep replaceChild(createElement, item) — no
+        // PF/Const between.
+        if (
+            [] !== $cfgChildren
+            && (null === $child->result || empty($child->result->usages))
+            && $this->emptyUsagesDomMutationIsPriorStatementBeforeConsumer(
+                $child,
+                $childIndex,
+                $consumerIndex,
+                $cfgChildren
+            )
+        ) {
+            return true;
+        }
         if ($this->methodCallInlineProducerSuppliesCallArgValue($child)) {
             return false;
         }
@@ -41238,6 +41256,72 @@ class Compiler {
     }
 
     /**
+     * Empty-usages createElement/appendChild (etc.) before PropertyFetch/ConstFetch + consumer are
+     * prior statements, not importNode/replaceChild inline args.
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function emptyUsagesDomMutationIsPriorStatementBeforeConsumer(
+        Op\Expr\MethodCall $child,
+        int $childIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        $method = strtolower($this->staticNameFromOperand($child->name) ?? '');
+        if (!\in_array($method, [
+            'appendchild',
+            'insertbefore',
+            'replacechild',
+            'removechild',
+            'append',
+            'prepend',
+            'createelement',
+            'createelementns',
+            'createtextnode',
+            'createcomment',
+        ], true)) {
+            return false;
+        }
+        for ($j = $childIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if (
+                $mid instanceof Op\Expr\PropertyFetch
+                || $mid instanceof Op\Expr\NullsafePropertyFetch
+                || $mid instanceof Op\Expr\ConstFetch
+                || $mid instanceof Op\Expr\ClassConstFetch
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Whether this MethodCall's METHODCALL_INIT was already lowered onto $block. */
+    private function emittedMethodCallOpcodesForCfgStmt(Block $block, Op\Expr\MethodCall $call): bool
+    {
+        $method = strtolower($this->staticNameFromOperand($call->name) ?? '');
+        if ('' === $method) {
+            return false;
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT !== $op->type) {
+                continue;
+            }
+            $initName = strtolower($this->resolveCompileTimeStringSlot((int) $op->arg2, $block) ?? '');
+            // METHODCALL_INIT arg2 is the method name slot; also try arg1 when layout differs.
+            if ('' === $initName) {
+                $initName = strtolower($this->resolveCompileTimeStringSlot((int) $op->arg1, $block) ?? '');
+            }
+            if ($method === $initName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * php-cfg dead multi-arg temps with no dataflow to hoisted producers (#9463, #9351).
      *
      * @param list<Operand> $callArgs
@@ -49464,15 +49548,26 @@ class Compiler {
                                 $block->orig->children
                             ) ?? $block->slotForOperand($mixedMatched->result);
                             if (null === $mixedSlot) {
-                                foreach ($this->compileExpr($mixedMatched, $block) as $op) {
-                                    $block->addOpCode($op);
+                                // Already-lowered statement MethodCall (unused appendChild(createElement)
+                                // before importNode — #34405) — do not compileExpr again or the tree is
+                                // mutated twice.
+                                if (
+                                    $mixedMatched instanceof Op\Expr\MethodCall
+                                    && (null === $mixedMatched->result || empty($mixedMatched->result->usages))
+                                    && $this->emittedMethodCallOpcodesForCfgStmt($block, $mixedMatched)
+                                ) {
+                                    $mixedMatched = null;
+                                } else {
+                                    foreach ($this->compileExpr($mixedMatched, $block) as $op) {
+                                        $block->addOpCode($op);
+                                    }
+                                    $mixedSlot = $this->slotForInlineCallArgProducerResult(
+                                        $block,
+                                        $mixedMatched,
+                                        $cfgCallOp,
+                                        $block->orig->children
+                                    ) ?? $block->slotForOperand($mixedMatched->result);
                                 }
-                                $mixedSlot = $this->slotForInlineCallArgProducerResult(
-                                    $block,
-                                    $mixedMatched,
-                                    $cfgCallOp,
-                                    $block->orig->children
-                                ) ?? $block->slotForOperand($mixedMatched->result);
                             }
                             if (null !== $mixedSlot) {
                                 $sends[] = new OpCode(
