@@ -29,8 +29,14 @@ final class TypeDeadFgetcsvAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_fgetcsv (#33189)'
         );
-        // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StringStreamCsv::ensureLinked', $type);
+        // Type::initialize no longer eagerly StringStreamCsv::ensureLinked (#34445);
+        // JitFgetcsv links StringStrGetcsv (compose path) before use.
+        $this->assertStringContainsString('#34445', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StringStreamCsv::ensureLinked\(\$this->context\)/',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringStreamCsv::ensureLinked (#34445)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresFgetcsvAbiModuleLocally(): void
@@ -47,14 +53,19 @@ final class TypeDeadFgetcsvAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/CsvStrGetcsvJitHelper.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitFgetcsv.php');
         $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitFgetcsv.php');
-        $this->assertStringContainsString('#33189', $jit);
-        $this->assertStringContainsString('StringStreamCsv::ensureLinked', $jit);
+        $this->assertStringContainsString('#33334', $jit);
+        // Compose path links StringStrGetcsv — not the StreamCsv aggregate (#27069 / #34445).
+        $this->assertStringContainsString('StringStrGetcsv::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringStreamCsv(): void
+    public function testTypeInitializeDropsEagerStringStreamCsvEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringStreamCsv::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StringStreamCsv::ensureLinked\(\$this->context\)/',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringStreamCsv::ensureLinked (#34445)'
+        );
     }
 
     public function testNoNewRuntimeCForFgetcsvAbi(): void

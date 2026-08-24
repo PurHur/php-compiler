@@ -29,8 +29,14 @@ final class TypeDeadStrGetcsvAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_str_getcsv (#33196)'
         );
-        // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StringStreamCsv::ensureLinked', $type);
+        // Type::initialize no longer eagerly StringStreamCsv::ensureLinked (#34445);
+        // JitStrGetcsv links StringStrGetcsv before lookup.
+        $this->assertStringContainsString('#34445', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StringStreamCsv::ensureLinked\(\$this->context\)/',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringStreamCsv::ensureLinked (#34445)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresStrGetcsvAbiModuleLocally(): void
@@ -50,10 +56,14 @@ final class TypeDeadStrGetcsvAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringStrGetcsv::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringStreamCsv(): void
+    public function testTypeInitializeDropsEagerStringStreamCsvEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringStreamCsv::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StringStreamCsv::ensureLinked\(\$this->context\)/',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringStreamCsv::ensureLinked (#34445)'
+        );
     }
 
     public function testNoNewRuntimeCForStrGetcsvAbi(): void
