@@ -62,10 +62,20 @@ final class TypeDeadIncludePathAbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeRegisterStillEnsureLinksIncludePathRuntime(): void
+    public function testTypeInitializeNoLongerEagerLinksIncludePathRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('IncludePathRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34474', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/IncludePathRuntime::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type::initialize must not eagerly IncludePathRuntime::ensureLinked (#34474)'
+        );
+        $this->assertStringContainsString(
+            'IncludePathRuntime::ensureLinked',
+            (string) file_get_contents(__DIR__.'/../../ext/standard/JitIncludePath.php'),
+            'JitIncludePath must link IncludePathRuntime (#34474)'
+        );
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void

@@ -948,10 +948,26 @@ class Type extends Builtin {
         // ProgressNote. Eager NestedJIT on every full load vs Runtime ABI
         // drift mints error_get_last.1 / assert_fail.1 / … (#31894 / #32122).
         // StringTime still eager above (TimeRuntimeShrinkTest).
+        // Ini / IncludePath / WeakRef / Session* / Define / RewriteVars always-on
+        // ensureLinked removed (#34474): call-site IniRuntime::ensureLinked /
+        // IncludePathRuntime::ensureLinked / WeakRefRegistryRuntime::ensureLinked /
+        // SessionLifecycleRuntime::ensureLinked / SessionCreateIdRuntime::ensureLinked /
+        // SessionGcRuntime::ensureLinked / SessionStorageRuntime::ensureLinked /
+        // SessionEncodeRuntime::ensureLinked / DefineRuntime::{ensureLinked,emit*} /
+        // RewriteVarsRuntime::ensureLinked (JitIni / IniGet / IniSet / ErrorReporting /
+        // ZendDoubleStringRuntime / JitIncludePath / JitResolveIncludePath / JitFile /
+        // WeakRefRuntime / GcCollectCyclesRuntime / JitSessionStart / WriteClose /
+        // RegenerateId / Destroy / Abort / Unset / Reset / JitSessionCreateId /
+        // JitSessionGc / JitSessionLifecycleKernel / JitSessionEncode /
+        // JitSessionDecode / JitDefine / DefineRuntime emit* / JitOutputRewriteVars
+        // via emitAdd/emitReset) already run before lookup (peer #34463). Eager
+        // NestedJIT on every full load vs Runtime ABI drift mints ini_get.1 /
+        // session_start_apply.1 / define.1 / … (#31894 / #32122). EnvLocalRuntime
+        // still eager below (TypeDeadEnvLocalAbiRuntimeShrinkTest / Context
+        // ensureStandaloneBodies). StringTriggerError still ensureLinked below
+        // (register already links for HELPER_RUNTIME_O=0; initialize keeps the
+        // full-load path peer). SessionStorageGlobals::ensureGlobals stays.
         StringCslashes::ensureStandaloneBodies($this->context);
-        WeakRefRegistryRuntime::ensureLinked($this->context);
-        IniRuntime::ensureLinked($this->context);
-        IncludePathRuntime::ensureLinked($this->context);
         EnvLocalRuntime::ensureLinked($this->context);
         // __phpc_error_handler_* / __phpc_exception_handler_* always-on shells removed
         // (#33842): ErrorHandlerJitRuntime / ExceptionHandlerJitRuntime own the ABI
@@ -965,23 +981,17 @@ class Type extends Builtin {
         // ext/standard/basic_functions.c — set_error_handler / set_exception_handler.
         StringTriggerError::ensureLinked($this->context);
         CallArgv::implement($this->context);
-        SessionLifecycleRuntime::ensureLinked($this->context);
-        SessionCreateIdRuntime::ensureLinked($this->context);
-        SessionGcRuntime::ensureLinked($this->context);
         // SessionStart/WriteClose/RegenerateId/Destroy/Abort/Unset::implement always-on
         // removed (#33980): those implement() methods are no-ops since #21564 — bodies live
-        // in JitSessionLifecycleKernel via SessionLifecycleRuntime::ensureLinked above.
-        // SessionId/Name/ModuleName::implement always-on removed (#33980): owners NestedJIT
-        // __phpc_session_{id,name,module}_apply via ensureLinked (getNamedFunction first).
-        // Call sites JitSessionId / JitSessionName / JitSessionModuleName already
-        // ensureLinked before lookup (#32989). Leftover Type NestedJIT on every full load
-        // path vs Runtime ABI drift mints session_id_apply.1 (#31894 / #32122). User-script
+        // in JitSessionLifecycleKernel via SessionLifecycleRuntime::ensureLinked at
+        // call sites (#34474). SessionId/Name/ModuleName::implement always-on removed
+        // (#33980): owners NestedJIT __phpc_session_{id,name,module}_apply via
+        // ensureLinked (getNamedFunction first). Call sites JitSessionId /
+        // JitSessionName / JitSessionModuleName already ensureLinked before lookup
+        // (#32989). Leftover Type NestedJIT on every full load path vs Runtime ABI
+        // drift mints session_id_apply.1 (#31894 / #32122). User-script
         // session_id()/session_name()/session_module_name() stay ext/session/session.c.
         SessionStorageGlobals::ensureGlobals($this->context);
-        SessionStorageRuntime::ensureLinked($this->context);
-        SessionEncodeRuntime::ensureLinked($this->context);
-        DefineRuntime::ensureLinked($this->context);
-        RewriteVarsRuntime::ensureLinked($this->context);
     }
 
 }

@@ -72,10 +72,20 @@ final class TypeDeadIniSilenceAbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeRegisterStillEnsureLinksIniRuntime(): void
+    public function testTypeInitializeNoLongerEagerLinksIniRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('IniRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34474', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/IniRuntime::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type::initialize must not eagerly IniRuntime::ensureLinked (#34474)'
+        );
+        $this->assertStringContainsString(
+            'IniRuntime::ensureLinked',
+            (string) file_get_contents(__DIR__.'/../../ext/standard/JitIni.php'),
+            'JitIni must link IniRuntime (#34474)'
+        );
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void
