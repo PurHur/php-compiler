@@ -44,10 +44,14 @@ final class TypeDeadMimeContentTypeAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitMimeContentType.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksMimeContentTypeRuntime(): void
+    public function testTypeInitializeDropsEagerMimeContentTypeEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('MimeContentTypeRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString(
+            'MimeContentTypeRuntime::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly MimeContentTypeRuntime::ensureLinked($this->context) (#34423)'
+        );
     }
 
     public function testNoNewRuntimeCForMimeContentTypeAbi(): void

@@ -46,10 +46,14 @@ final class TypeDeadErrorLogAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitErrorLog.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksErrorLogRuntime(): void
+    public function testTypeInitializeDropsEagerErrorLogEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringErrorLog::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString(
+            'StringErrorLog::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringErrorLog::ensureLinked($this->context) (#34423)'
+        );
     }
 
     public function testNoNewRuntimeCForErrorLogAbi(): void

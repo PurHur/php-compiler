@@ -49,10 +49,14 @@ final class TypeDeadGetMetaTagsAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitGetMetaTags.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksGetMetaTagsRuntime(): void
+    public function testTypeInitializeDropsEagerGetMetaTagsEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('MetaTagsRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString(
+            'MetaTagsRuntime::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly MetaTagsRuntime::ensureLinked($this->context) (#34423)'
+        );
         $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringContainsString('MetaTagsRuntime::ensureStandaloneBodies($this)', $context);
     }

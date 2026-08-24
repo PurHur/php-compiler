@@ -44,10 +44,14 @@ final class TypeDeadReadfileAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/readfile.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksReadfileRuntime(): void
+    public function testTypeInitializeDropsEagerReadfileEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringReadfile::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString(
+            'StringReadfile::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringReadfile::ensureLinked($this->context) (#34423)'
+        );
     }
 
     public function testNoNewRuntimeCForReadfileAbi(): void

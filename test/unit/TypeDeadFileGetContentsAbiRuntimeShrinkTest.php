@@ -44,10 +44,14 @@ final class TypeDeadFileGetContentsAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitFileGetContents.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksFileGetContentsRuntime(): void
+    public function testTypeInitializeDropsEagerFileGetContentsEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringFileGetContents::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString(
+            'StringFileGetContents::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly StringFileGetContents::ensureLinked($this->context) (#34423)'
+        );
     }
 
     public function testNoNewRuntimeCForFileGetContentsAbi(): void
