@@ -11,8 +11,8 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding
- * (#30781, #30873, #33648, #33655, #33656, #33765, #34424).
+ * Compile-time fold for mb_ereg* / mb_ereg_search_* / mb_regex_encoding /
+ * mb_regex_set_options (#30781, #30873, #33648, #33655, #33656, #33765, #34424, #34438).
  *
  * Same shape as {@see JitMbSearch} / {@see mb_internal_encoding}: literals only;
  * search cursor lives in {@see MbstringState} for the duration of one AOT/JIT
@@ -159,6 +159,45 @@ final class JitMbEregSearch
         MbstringState::regexEncoding($valid);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    /**
+     * mb_regex_set_options() — get/set default mbregex options (#34438 / #4635).
+     *
+     * Peer {@see foldRegexEncoding}: compile-time literals only. Returns the previous
+     * (normalized) option string — php-src php_mbregex.c PHP_FUNCTION(mb_regex_set_options).
+     *
+     * @param JITVariable[] $args
+     */
+    public static function foldRegexSetOptions(Context $context, array $args): Value
+    {
+        $argc = \count($args);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_regex_set_options() expects at most 1 argument, %d given',
+                $argc
+            ));
+        }
+        $current = MbstringAotFoldState::regexOptions($context)
+            ?? MbstringState::regexOptions();
+        if (0 === $argc
+            || (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
+        ) {
+            return $context->builder->load($context->constantStringFromString($current));
+        }
+
+        $optionsLit = JitStringArg::compileTimeLiteral($args[0]);
+        if (null === $optionsLit) {
+            throw new \LogicException(
+                'mb_regex_set_options() options must be a compile-time string in this compiler build'
+            );
+        }
+        // ValueError on unsupported chars — same as Zend / VM execute path.
+        $normalized = MbRegexOptions::normalize($optionsLit);
+        MbstringAotFoldState::setRegexOptions($context, $normalized);
+        MbstringState::regexOptions($normalized);
+
+        return $context->builder->load($context->constantStringFromString($current));
     }
 
     /**

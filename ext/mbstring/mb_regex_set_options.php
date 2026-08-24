@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_regex_set_options() — get/set mbregex compile options (php-src ext/mbstring/php_mbregex.c; #4635).
+ * mb_regex_set_options() — get/set mbregex compile options (php-src ext/mbstring/php_mbregex.c; #4635, #34438 AOT).
  */
 final class mb_regex_set_options extends Internal
 {
@@ -54,6 +54,6 @@ final class mb_regex_set_options extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('mb_regex_set_options() is not lowered for JIT/AOT in this compiler build');
+        return JitMbEregSearch::foldRegexSetOptions($context, $args);
     }
 }
