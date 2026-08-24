@@ -142,6 +142,10 @@ final class JitDomDocumentElement
         $first = null;
         $second = null;
         $last = null;
+        /** @var list<Value> */
+        $childObjs = [];
+        /** @var list<string> */
+        $childKinds = [];
         foreach ($children as $idx => $node) {
             $child = match ($node['kind']) {
                 'comment' => JitDomCreateComment::materialize($context, $node['data']),
@@ -149,6 +153,8 @@ final class JitDomDocumentElement
                 // Seed textContent/INNER_XML/attrs like documentElement (#33014 / peer #25475).
                 default => self::materializeElementChild($context, $node),
             };
+            $childObjs[] = $child;
+            $childKinds[] = $node['kind'];
             $segment = DomParseSimpleXmlJitHelper::nodePathSegmentArgv($children, $idx);
             if ('element' === $node['kind'] && null !== $segment && '' !== $segment) {
                 $childPath = rtrim($parentPath, '/').'/'.$segment;
@@ -242,6 +248,9 @@ final class JitDomDocumentElement
             self::storeFirstLast($context, $element, $first, $last);
         }
         self::storeChildNodesLength($context, $element, \count($children), $first, $second);
+        // ParentNode / NonDocumentTypeChildNode — nextSibling was wired above; element-nav
+        // slots were left null after loadXML (#34352 leftover of #34345 / #19431).
+        self::syncElementNavFromChildren($context, $element, $childObjs, $childKinds);
     }
 
     /**
@@ -392,11 +401,170 @@ final class JitDomDocumentElement
             VmDom::PROP_NEXT_SIBLING,
             VmDom::PROP_PREVIOUS_SIBLING,
             VmDom::PROP_PARENT_NODE,
+            // ParentNode / NonDocumentTypeChildNode — must be in allocate() layout before
+            // loadXML stores (#34352; peer createElement stand-in layout).
+            VmDom::PROP_FIRST_ELEMENT_CHILD,
+            VmDom::PROP_LAST_ELEMENT_CHILD,
+            VmDom::PROP_NEXT_ELEMENT_SIBLING,
+            VmDom::PROP_PREVIOUS_ELEMENT_SIBLING,
         ] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_CHILD_ELEMENT_COUNT)) {
+            $objectType->defineProperty(
+                $elementClassId,
+                VmDom::PROP_CHILD_ELEMENT_COUNT,
+                JITVariable::TYPE_NATIVE_LONG
+            );
+        }
+    }
+
+    /**
+     * Wire ParentNode / NonDocumentTypeChildNode element-nav slots after loadXML (#34352).
+     *
+     * Peer {@see VmDom::syncParentNodeElementProperties} / {@see VmDom::syncElementSiblingProperties}
+     * and {@see DomNodeLiveMutationRuntime::syncElementNavSlots} (appendChild — first/last only).
+     *
+     * @param list<Value>  $childObjs
+     * @param list<string> $childKinds
+     */
+    private static function syncElementNavFromChildren(
+        \PHPCompiler\JIT\Context $context,
+        Value $parent,
+        array $childObjs,
+        array $childKinds
+    ): void {
+        self::ensureLinkProps($context);
+        $objectType = $context->type->object;
+        $n = \count($childObjs);
+        /** @var list<int> */
+        $elementIdx = [];
+        for ($i = 0; $i < $n; ++$i) {
+            if ('element' === ($childKinds[$i] ?? '')) {
+                $elementIdx[] = $i;
+            }
+        }
+        $elementCount = \count($elementIdx);
+        $countJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt($elementCount, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($parent, self::CLASS_ELEMENT, VmDom::PROP_CHILD_ELEMENT_COUNT),
+            $countJit,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $nullJit = self::boxedNullJit($context);
+        if (0 === $elementCount) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($parent, self::CLASS_ELEMENT, VmDom::PROP_FIRST_ELEMENT_CHILD),
+                $nullJit,
+                JITVariable::TYPE_NULL
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($parent, self::CLASS_ELEMENT, VmDom::PROP_LAST_ELEMENT_CHILD),
+                $nullJit,
+                JITVariable::TYPE_NULL
+            );
+        } else {
+            $firstEl = $childObjs[$elementIdx[0]];
+            $lastEl = $childObjs[$elementIdx[$elementCount - 1]];
+            $firstJit = new JITVariable(
+                $context,
+                JITVariable::TYPE_OBJECT,
+                JITVariable::KIND_VALUE,
+                $firstEl
+            );
+            $lastJit = new JITVariable(
+                $context,
+                JITVariable::TYPE_OBJECT,
+                JITVariable::KIND_VALUE,
+                $lastEl
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($parent, self::CLASS_ELEMENT, VmDom::PROP_FIRST_ELEMENT_CHILD),
+                $firstJit,
+                JITVariable::TYPE_VALUE
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($parent, self::CLASS_ELEMENT, VmDom::PROP_LAST_ELEMENT_CHILD),
+                $lastJit,
+                JITVariable::TYPE_VALUE
+            );
+        }
+        for ($i = 0; $i < $n; ++$i) {
+            $nextEl = null;
+            for ($j = $i + 1; $j < $n; ++$j) {
+                if ('element' === ($childKinds[$j] ?? '')) {
+                    $nextEl = $childObjs[$j];
+                    break;
+                }
+            }
+            $prevEl = null;
+            for ($j = $i - 1; $j >= 0; --$j) {
+                if ('element' === ($childKinds[$j] ?? '')) {
+                    $prevEl = $childObjs[$j];
+                    break;
+                }
+            }
+            if (null !== $nextEl) {
+                $nextJit = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_OBJECT,
+                    JITVariable::KIND_VALUE,
+                    $nextEl
+                );
+                $objectType->propertyStore(
+                    $objectType->propertySlotFor($childObjs[$i], self::CLASS_ELEMENT, VmDom::PROP_NEXT_ELEMENT_SIBLING),
+                    $nextJit,
+                    JITVariable::TYPE_VALUE
+                );
+            } else {
+                $objectType->propertyStore(
+                    $objectType->propertySlotFor($childObjs[$i], self::CLASS_ELEMENT, VmDom::PROP_NEXT_ELEMENT_SIBLING),
+                    $nullJit,
+                    JITVariable::TYPE_NULL
+                );
+            }
+            if (null !== $prevEl) {
+                $prevJit = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_OBJECT,
+                    JITVariable::KIND_VALUE,
+                    $prevEl
+                );
+                $objectType->propertyStore(
+                    $objectType->propertySlotFor($childObjs[$i], self::CLASS_ELEMENT, VmDom::PROP_PREVIOUS_ELEMENT_SIBLING),
+                    $prevJit,
+                    JITVariable::TYPE_VALUE
+                );
+            } else {
+                $objectType->propertyStore(
+                    $objectType->propertySlotFor($childObjs[$i], self::CLASS_ELEMENT, VmDom::PROP_PREVIOUS_ELEMENT_SIBLING),
+                    $nullJit,
+                    JITVariable::TYPE_NULL
+                );
+            }
+        }
+    }
+
+    /** Boxed null for element-nav / firstChild clear (#32949 / #34352). */
+    private static function boxedNullJit(\PHPCompiler\JIT\Context $context): JITVariable
+    {
+        $nullSlot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+        $nullPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $nullSlot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $nullSlot
+        );
     }
 
     private static function linkSingleChild(
@@ -449,21 +617,32 @@ final class JitDomDocumentElement
         self::ensureLinkProps($context);
         $objectType = $context->type->object;
         // Boxed null (not raw object nullptr) so === null / fetch match Zend (#32949).
-        $nullSlot = \PHPCompiler\JIT\JitValueBox::alloc($context);
-        $nullPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $nullSlot);
-        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
-        $nullJit = new JITVariable(
-            $context,
-            JITVariable::TYPE_VALUE,
-            JITVariable::KIND_VARIABLE,
-            $nullSlot
-        );
-        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+        $nullJit = self::boxedNullJit($context);
+        foreach ([
+            VmDom::PROP_FIRST_CHILD,
+            VmDom::PROP_LAST_CHILD,
+            // Empty loadXML / shallow clone — element-nav must read null too (#34352).
+            VmDom::PROP_FIRST_ELEMENT_CHILD,
+            VmDom::PROP_LAST_ELEMENT_CHILD,
+            VmDom::PROP_NEXT_ELEMENT_SIBLING,
+            VmDom::PROP_PREVIOUS_ELEMENT_SIBLING,
+        ] as $prop) {
             $objectType->propertyStore(
                 $objectType->propertySlotFor($element, self::CLASS_ELEMENT, $prop),
                 $nullJit,
                 JITVariable::TYPE_NULL
             );
         }
+        $zero = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_CHILD_ELEMENT_COUNT),
+            $zero,
+            JITVariable::TYPE_NATIVE_LONG
+        );
     }
 }
