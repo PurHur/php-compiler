@@ -145,6 +145,8 @@ final class BuiltinInternalArgInfo
             'getenv' => 'array|string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#27782)
             'iptcparse' => 'array|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return array (missing |false) (#26057)
+            'unpack' => 'array|false',
             // ext/standard/string.stub.php — chop rtrim alias absent from InternalArgInfo (#28255, re-#24039)
             'chop' => 'string',
             // ext/standard/string.stub.php — InternalArgInfo return empty (#23919)
@@ -1091,6 +1093,12 @@ final class BuiltinInternalArgInfo
             'mktime', 'gmmktime' => ($index >= 1 && $index <= 5) ? '?int' : null,
             // ext/standard/basic_functions.stub.php — mixed ...$values (InternalArgInfo untyped variadic) (#28177, #26300 pack)
             'sprintf', 'printf', 'pack' => 1 === $index ? 'mixed' : null,
+            // ext/standard/basic_functions.stub.php — string $format, string $string, int $offset (#26057)
+            'unpack' => match ($index) {
+                0, 1 => 'string',
+                2 => 'int',
+                default => null,
+            },
             'fprintf' => 2 === $index ? 'mixed' : null,
             // ext/standard/basic_functions.stub.php — mixed &...$vars (InternalArgInfo string) (#26058)
             'fscanf', 'sscanf' => 2 === $index ? 'mixed' : null,
