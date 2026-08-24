@@ -12,6 +12,9 @@ use PHPCompiler\ext\simplexml\JitSimpleXmlUserScript;
  * NestedJIT of VmSimpleXml iterator methods is deferred under user-script AOT;
  * ExternalMethod stubs for rewind/valid made foreach empty or segfault after children().
  * When a host tree is known, pack children (php-src sxe iterator) like {@see DatePeriodForeachSnapshot}.
+ *
+ * Values must surface as TYPE_OBJECT so (string) cast reads baked `__phpc_sxe_text` (#34543).
+ * Keys are preserved (attribute/child names) — packVariables() would force 0..n (#34543).
  */
 final class SimpleXmlForeachSnapshot
 {
@@ -27,9 +30,10 @@ final class SimpleXmlForeachSnapshot
             throw new \LogicException('SimpleXML foreach snapshot missing host tree (#27535)');
         }
 
-        $elementVars = [];
+        $ht = HashTableHelper::alloc($context);
+        $i64 = $context->getTypeFromString('int64');
         try {
-            foreach ($tree as $child) {
+            foreach ($tree as $key => $child) {
                 if (!($child instanceof \SimpleXMLElement)) {
                     continue;
                 }
@@ -44,7 +48,19 @@ final class SimpleXmlForeachSnapshot
                 );
                 // Bind host child so nested getName/cast/foreach can fold (#27535).
                 JitSimpleXmlUserScript::bindHostTreeForSnapshot($context, $receiver, $child);
-                $elementVars[] = $receiver;
+                if (\is_int($key)) {
+                    HashTableHelper::setAtIndex(
+                        $context,
+                        $ht,
+                        $i64->constInt($key, false),
+                        $receiver
+                    );
+                } else {
+                    $keyStr = $context->builder->load(
+                        $context->constantStringFromString((string) $key)
+                    );
+                    HashTableHelper::setAtStringKey($context, $ht, $keyStr, $receiver);
+                }
             }
         } catch (\Throwable $e) {
             throw new \LogicException(
@@ -54,10 +70,16 @@ final class SimpleXmlForeachSnapshot
             );
         }
 
-        $htVar = HashTableHelper::packVariables($context, $elementVars);
+        $htVar = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $ht
+        );
         $key = $context->foreachSlotMapKey($slotKey);
         // Reuse DatePeriod snapshot HT table — same packed-HT foreach walk (#26772 / #27535).
         $context->foreachDatePeriodSnapshotHts[$key] = $htVar;
+        $context->foreachSimpleXmlSnapshotKeys[$key] = true;
 
         $sizeT = $context->getTypeFromString('size_t');
         if (!isset($context->foreachIndexSlots[$key])) {

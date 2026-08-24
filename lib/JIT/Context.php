@@ -492,6 +492,14 @@ class Context {
     public array $foreachDatePeriodSnapshotHts = [];
 
     /**
+     * Keys in {@see $foreachDatePeriodSnapshotHts} that are SimpleXMLElement snapshots (#34543).
+     * Those values must load as TYPE_OBJECT so (string) cast reads baked SXE slots.
+     *
+     * @var array<string, true>
+     */
+    public array $foreachSimpleXmlSnapshotKeys = [];
+
+    /**
      * DOMNodeList / DOMNamedNodeMap foreach — snapshot to hashtable, then iterate.
      * Keyed by {@see foreachSlotMapKey()}, value is the snapshot HT JitVariable.
      *

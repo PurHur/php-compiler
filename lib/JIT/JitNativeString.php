@@ -126,6 +126,14 @@ final class JitNativeString
             } else {
                 $classHint = ltrim($classHint, '\\');
             }
+            if (
+                (null === $classHint || '' === $classHint || 'object' === strtolower((string) $classHint)
+                    || 'unknown' === strtolower((string) $classHint))
+                && null !== ($var->magicGetOverloadedClass ?? null)
+                && '' !== $var->magicGetOverloadedClass
+            ) {
+                $classHint = ltrim((string) $var->magicGetOverloadedClass, '\\');
+            }
             // Class hint before SXE fold — same #28646 guard as TYPE_OBJECT.
             $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast(
                 $context,
@@ -161,6 +169,23 @@ final class JitNativeString
                     Variable::KIND_VALUE,
                     $objPtr
                 );
+                // SXE foreach values: read baked text (cast handler, not only __toString) (#34543).
+                if (\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::valueBoxMayBeSimpleXmlElement(
+                    $context,
+                    $classHint
+                ) && 'simplexmlelement' === strtolower($classHint)) {
+                    $sxeStr = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::readBakedTextFromObjectPtr(
+                        $context,
+                        $objPtr
+                    );
+
+                    return new Variable(
+                        $context,
+                        Variable::TYPE_STRING,
+                        Variable::KIND_VALUE,
+                        $sxeStr
+                    );
+                }
                 $magic = MagicMethodDispatch::coerceObjectToString($context, $objVar, $classHint);
                 if (null !== $magic) {
                     return $magic;
@@ -179,87 +204,112 @@ final class JitNativeString
                 );
             }
 
-            // Value-boxed BcMath\Number without a class hint — same class_id probe as echo (#24683 / #26803).
+            // Value-boxed objects without a class hint: BcMath\Number (#24683 / #26803) and
+            // SimpleXMLElement foreach elements (#34543 / re-#27535). strval() on object kind
+            // SIGSEGVs — probe class_id after a kind check (plain strings stay on strval; #28625).
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
+            $map = $context->structFieldMap['__value__'];
+            $kindRaw = $context->builder->load($context->builder->structGep($valuePtr, $map['type']));
+            $i8 = $context->getTypeFromString('int8');
+            $isObj = $context->builder->icmp(
+                Builder::INT_EQ,
+                $context->builder->and($kindRaw, $i8->constInt(0x7f, false)),
+                $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+            );
+            $yesKind = BasicBlockHelper::append($context, 'cast_vbox_obj_yes');
+            $noKind = BasicBlockHelper::append($context, 'cast_vbox_obj_no');
+            $join = BasicBlockHelper::append($context, 'cast_vbox_obj_join');
+            $context->builder->branchIf($isObj, $yesKind, $noKind);
+
+            $context->builder->positionAtEnd($yesKind);
+            $objPtr = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $valuePtr
+            );
+            $objMap = $context->structFieldMap['__object__'];
+            $classIdVal = $context->builder->load($context->builder->structGep($objPtr, $objMap['class_id']));
+            $i64 = $context->getTypeFromString('int64');
+            $objVar = new Variable(
+                $context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $objPtr
+            );
+
+            $sxeId = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::simpleXmlElementClassId($context);
+            $isSxe = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classIdVal,
+                $i64->constInt($sxeId, false)
+            );
+            $yesSxe = BasicBlockHelper::append($context, 'cast_vbox_sxe_yes');
+            $notSxe = BasicBlockHelper::append($context, 'cast_vbox_sxe_no');
+            $context->builder->branchIf($isSxe, $yesSxe, $notSxe);
+
+            $context->builder->positionAtEnd($yesSxe);
+            $sxeStr = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::readBakedTextFromObjectPtr(
+                $context,
+                $objPtr
+            );
+            $sxeEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($join);
+
+            $context->builder->positionAtEnd($notSxe);
+            $specialStr = null;
+            $specialEnd = null;
             if (
                 \PHPCompiler\CompilerVersion::supportsBcmath()
                 && $context->functionIsRegistered('bcmath\\number::__tostring')
             ) {
-                $numberLc = 'bcmath\\number';
-                $object = $context->type->object;
-                $numberId = $object->lookup($numberLc);
-                $numberProxy = 'bcmath\\number::__tostring';
-                $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
-                $map = $context->structFieldMap['__value__'];
-                $kindRaw = $context->builder->load($context->builder->structGep($valuePtr, $map['type']));
-                $i8 = $context->getTypeFromString('int8');
-                $isObj = $context->builder->icmp(
-                    Builder::INT_EQ,
-                    $context->builder->and($kindRaw, $i8->constInt(0x7f, false)),
-                    $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
-                );
-                $yesKind = BasicBlockHelper::append($context, 'cast_bcmath_kind_yes');
-                $noKind = BasicBlockHelper::append($context, 'cast_bcmath_kind_no');
-                $join = BasicBlockHelper::append($context, 'cast_bcmath_join');
-                $context->builder->branchIf($isObj, $yesKind, $noKind);
-
-                $context->builder->positionAtEnd($yesKind);
-                $objPtr = $context->builder->call(
-                    $context->lookupFunction('__value__readObject'),
-                    $valuePtr
-                );
-                $objMap = $context->structFieldMap['__object__'];
+                $numberId = $context->type->object->lookup('bcmath\\number');
                 $isNumber = $context->builder->icmp(
                     Builder::INT_EQ,
-                    $context->builder->load($context->builder->structGep($objPtr, $objMap['class_id'])),
-                    $context->getTypeFromString('int64')->constInt($numberId, false)
+                    $classIdVal,
+                    $i64->constInt($numberId, false)
                 );
-                $yesNum = BasicBlockHelper::append($context, 'cast_bcmath_number_yes');
-                $context->builder->branchIf($isNumber, $yesNum, $noKind);
+                $yesNum = BasicBlockHelper::append($context, 'cast_vbox_bcmath_yes');
+                $notNum = BasicBlockHelper::append($context, 'cast_vbox_bcmath_no');
+                $context->builder->branchIf($isNumber, $yesNum, $notNum);
                 $context->builder->positionAtEnd($yesNum);
-                $objVar = new Variable(
-                    $context,
-                    Variable::TYPE_OBJECT,
-                    Variable::KIND_VALUE,
-                    $objPtr
-                );
-                $toCall = $context->resolveFunctionProxy($numberProxy);
+                $toCall = $context->resolveFunctionProxy('bcmath\\number::__tostring');
                 $raw = $toCall->call($context, $objVar);
-                $numStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                $specialStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
                     $context,
                     JitValueBox::coerceToValuePtrForStore($context, $raw)
                 );
-                $yesEnd = $context->builder->getInsertBlock();
+                $specialEnd = $context->builder->getInsertBlock();
                 $context->builder->branch($join);
-
-                $context->builder->positionAtEnd($noKind);
-                $fallbackStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
-                    $context,
-                    $valuePtr
-                );
-                $noEnd = $context->builder->getInsertBlock();
-                $context->builder->branch($join);
-
-                $context->builder->positionAtEnd($join);
-                $phi = $context->builder->phi($numStr->typeOf());
-                $phi->addIncoming($numStr, $yesEnd);
-                $phi->addIncoming($fallbackStr, $noEnd);
-
-                return new Variable(
-                    $context,
-                    Variable::TYPE_STRING,
-                    Variable::KIND_VALUE,
-                    $phi
-                );
+                $context->builder->positionAtEnd($notNum);
             }
+            $objFallback = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                $context,
+                $valuePtr
+            );
+            $objFallbackEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($join);
+
+            $context->builder->positionAtEnd($noKind);
+            $scalarStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                $context,
+                $valuePtr
+            );
+            $noEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($join);
+
+            $context->builder->positionAtEnd($join);
+            $phi = $context->builder->phi($sxeStr->typeOf());
+            $phi->addIncoming($sxeStr, $sxeEnd);
+            if (null !== $specialStr && null !== $specialEnd) {
+                $phi->addIncoming($specialStr, $specialEnd);
+            }
+            $phi->addIncoming($objFallback, $objFallbackEnd);
+            $phi->addIncoming($scalarStr, $noEnd);
 
             return new Variable(
                 $context,
                 Variable::TYPE_STRING,
                 Variable::KIND_VALUE,
-                (new \PHPCompiler\ext\standard\strval())->valueToString(
-                    $context,
-                    JitValueBox::valuePtrFromVariable($context, $var)
-                )
+                $phi
             );
         }
 

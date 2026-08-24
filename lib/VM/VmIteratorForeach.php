@@ -1021,8 +1021,26 @@ final class VmIteratorForeach
         }
         if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
+            $boxed = self::compileValueHashtable($context, $ht, $slotKey);
+            $mapKey = $context->foreachSlotMapKey($slotKey);
+            // SXE snapshots bake name/text on TYPE_OBJECT; foreach HT load is TYPE_VALUE and
+            // (string) cast skipped baked folds → SIGSEGV (#34543 / re-#27535).
+            if (isset($context->foreachSimpleXmlSnapshotKeys[$mapKey])) {
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+                $obj = $context->builder->call(
+                    $context->lookupFunction('__value__readObject'),
+                    $valuePtr
+                );
 
-            return self::compileValueHashtable($context, $ht, $slotKey);
+                return new JitVariable(
+                    $context,
+                    JitVariable::TYPE_OBJECT,
+                    JitVariable::KIND_VALUE,
+                    $obj
+                );
+            }
+
+            return $boxed;
         }
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileValue($context, $slotKey, $containerUserType);

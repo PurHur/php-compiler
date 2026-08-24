@@ -1,0 +1,18 @@
+--TEST--
+AOT: SimpleXMLElement children/attributes foreach string cast (#34543)
+--FILE--
+<?php
+$xml = simplexml_load_string("<r><a>1</a><b>2</b></r>");
+foreach ($xml->children() as $c) {
+    echo $c->getName(), ":", (string) $c, ";";
+}
+echo "\n";
+
+$xml2 = simplexml_load_string("<r a=\"1\" b=\"2\"/>");
+foreach ($xml2->attributes() as $k => $v) {
+    echo $k, ":", (string) $v, ";";
+}
+echo "\n";
+--EXPECT--
+a:1;b:2;
+a:1;b:2;
