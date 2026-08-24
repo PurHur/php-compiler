@@ -9,14 +9,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link hook for mb_encode/decode_mimeheader() — MbMimeheaderJitHelper (#34299 / #6038).
+ * JIT/AOT link hook for mb_encode/decode_mimeheader() — MbMimeheaderJitHelper (#34310 / #34299).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_encode_mimeheader) / mb_decode_mimeheader
  */
 final class MbMimeheaderRuntime
 {
-    private const HELPER_PATH = '/ext/mbstring/MbMimeheaderJitHelper.php';
-
     private const ENCODE_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbMimeheaderJitHelper::encodeArgv';
 
     private const DECODE_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbMimeheaderJitHelper::decodeArgv';
@@ -48,9 +46,13 @@ final class MbMimeheaderRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
+        // Base64JitHelper before mimeheader — decodeArgv calls decodeArgv (#26890 / #34310).
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
+            [
+                '/ext/standard/Base64JitHelper.php',
+                '/ext/mbstring/MbMimeheaderJitHelper.php',
+            ],
             self::COMPILED_HELPERS,
             'mb_mimeheader'
         );
