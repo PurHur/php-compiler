@@ -43,10 +43,11 @@ final class TypeDeadStripTagsAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/strip_tags.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksStripTagsRuntime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkStripTagsRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringStripTags::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringStripTags::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34414', $type);
     }
 
     public function testNoNewRuntimeCForStripTagsAbi(): void

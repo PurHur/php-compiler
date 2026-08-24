@@ -64,10 +64,11 @@ final class TypeDeadUtf8StrlenAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/mbstring/JitMbCheckEncoding.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksUtf8Runtime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkUtf8Runtime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringUtf8Runtime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringUtf8Runtime::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34414', $type);
     }
 
     public function testNoNewRuntimeCForUtf8StrlenAbi(): void

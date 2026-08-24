@@ -55,10 +55,11 @@ final class TypeDeadQuotPrintAbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeInitializeStillEnsureLinksQuotPrintRuntime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkQuotPrintRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringQuotPrint::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringQuotPrint::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34414', $type);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void
