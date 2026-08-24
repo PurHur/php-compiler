@@ -15271,7 +15271,13 @@ class JIT {
             );
         }
         if (null === $declaringClass && null !== $block->func && null !== $block->func->class) {
-            $declaringClass = $block->func->class->value;
+            // Only `$this->prop` may use the enclosing class. `$t = $this->o; $t->x` and
+            // `($this->o)->x` are SSA temps whose CFG userType is often null — using
+            // func->class wrote A::$x (or OOMed via synthetic object) (#34395).
+            $recvName = strtolower(JIT\OperandName::resolve($obj) ?? '');
+            if ('this' === $recvName) {
+                $declaringClass = $block->func->class->value;
+            }
         }
         // Prior nullsafe on the same CV leaves CFG userType generic "object" even after
         // `$c = new C` refreshed classUserType on the binding (#32749, #29748 pattern).
@@ -15296,9 +15302,12 @@ class JIT {
             }
         }
         if (null === $declaringClass || '' === $declaringClass) {
-            $declaringClass = $this->context->scope->className !== ''
-                ? $this->context->scope->className
-                : 'object';
+            $recvName = strtolower(JIT\OperandName::resolve($obj) ?? '');
+            if ('this' === $recvName && $this->context->scope->className !== '') {
+                $declaringClass = $this->context->scope->className;
+            } else {
+                $declaringClass = 'object';
+            }
         }
         // php-types InternalArgInfo typo: simplexml_load_* → simplemxml_element (#25338, #26863).
         if (0 === strcasecmp(ltrim($declaringClass, '\\'), 'simplemxml_element')) {

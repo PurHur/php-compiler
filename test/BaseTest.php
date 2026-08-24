@@ -192,6 +192,8 @@ abstract class BaseTest extends TestCase {
         }
         self::applyLlvmToolchainEnv($env);
         self::applyEnvSection($env, $sections);
+        // v1.1.0 release-unsupported intl/gmp: keep functional compliance runnable (#24697).
+        ReleaseUnsupportedExtensions::applyComplianceEnv($name, $env);
         PhptWebSections::applyToEnv($env, $sections);
         // JIT/VM children must run llvm-env preload; PHPUnit parent skips it (#98, #2055).
         unset($env['PHP_COMPILER_SKIP_LLVM_PRELOAD']);

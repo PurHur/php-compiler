@@ -271,6 +271,8 @@ Legacy entrypoints (`bin/vm.php`, `bin/jit.php`, `bin/compile.php`) still work.
 | `PHP_COMPILER_SKIP_SERVE_TESTS` | Skip HTTP tests when loopback bind fails |
 | `PHP_COMPILER_DEBUG` | Verbose errors on `phpc serve` / CGI |
 | `PHP_COMPILER_SELFHOST_AOT` | Stub-tolerant self-host bundle link |
+| `PHP_COMPILER_ENABLE_INTL` | Opt in to experimental `ext/intl` (unsupported in v1.1.0, #24697) |
+| `PHP_COMPILER_ENABLE_GMP` | Opt in to experimental `ext/gmp` (unsupported in v1.1.0, #24697) |
 
 Full list: [README § Environment variables](../README.md#environment-variables).
 
