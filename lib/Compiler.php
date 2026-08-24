@@ -42944,48 +42944,55 @@ class Compiler {
 
     /**
      * ?: echo merge phi must not share a slot with method-name literals (#3790, #5506).
+     *
+     * Clone the PHPCfg Literal before forceFreshVarSlot: AssignOp lowers two
+     * PROPERTY_FETCHes that share one Literal object. SplObjectStorage would
+     * relocate the first fetch's name slot, leaving try-body arg3 vacant and
+     * AOT TypeErroring in getVariableFromOp (#34426, zend_vm_def.h ASSIGN_OBJ_OP).
      */
     private function freshLiteralConstantSlot(Operand $operand, Block $block): int
     {
         if (!$operand instanceof Operand\Literal) {
             return $block->forceFreshVarSlot($operand);
         }
-        $mappedType = null !== $operand->type
-            ? Variable::mapFromType($operand->type)
+        $fresh = new Operand\Literal($operand->value);
+        $fresh->type = $operand->type;
+        $mappedType = null !== $fresh->type
+            ? Variable::mapFromType($fresh->type)
             : Variable::TYPE_UNDEFINED;
         if ($mappedType === Variable::TYPE_UNDEFINED) {
-            if (is_int($operand->value)) {
+            if (is_int($fresh->value)) {
                 $mappedType = Variable::TYPE_INTEGER;
-            } elseif (is_float($operand->value)) {
+            } elseif (is_float($fresh->value)) {
                 $mappedType = Variable::TYPE_FLOAT;
-            } elseif (is_string($operand->value)) {
+            } elseif (is_string($fresh->value)) {
                 $mappedType = Variable::TYPE_STRING;
-            } elseif (is_bool($operand->value)) {
+            } elseif (is_bool($fresh->value)) {
                 $mappedType = Variable::TYPE_BOOLEAN;
-            } elseif (null === $operand->value) {
+            } elseif (null === $fresh->value) {
                 $mappedType = Variable::TYPE_NULL;
             }
         }
         $const = new Variable($mappedType);
         switch ($mappedType) {
             case Variable::TYPE_STRING:
-                $const->string($operand->value, true);
+                $const->string($fresh->value, true);
                 break;
             case Variable::TYPE_INTEGER:
-                $const->int($operand->value);
+                $const->int($fresh->value);
                 break;
             case Variable::TYPE_FLOAT:
-                $const->float($operand->value);
+                $const->float($fresh->value);
                 break;
             case Variable::TYPE_BOOLEAN:
-                $const->bool($operand->value);
+                $const->bool($fresh->value);
                 break;
             case Variable::TYPE_NULL:
                 break;
             default:
-                $this->throwCompileLogic('Unknown Literal Operand Type: ' . ($operand->type ?? 'untyped'));
+                $this->throwCompileLogic('Unknown Literal Operand Type: ' . ($fresh->type ?? 'untyped'));
         }
-        $slot = $block->forceFreshVarSlot($operand);
+        $slot = $block->forceFreshVarSlot($fresh);
         $block->constants[$slot] = $const;
 
         return $slot;
