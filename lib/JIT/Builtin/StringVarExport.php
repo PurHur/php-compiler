@@ -11,6 +11,7 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\ValueEchoHelper;
+use PHPCompiler\JIT\VarExportArrayLlvm;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
@@ -24,19 +25,24 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Embed: NestedJIT {@see VarExportJitHelper} (php-in-PHP).
- * Thin standalone AOT: scalar LLVM bridge — NestedJIT of the helper segfaults without
+ * Thin standalone AOT: scalar + array LLVM bridge — NestedJIT of the helper segfaults without
  * Runtime->vm (peer StringPrintR #24266 / StringVarDump #23540; #26855).
+ * Arrays: {@see VarExportArrayLlvm} (#34497; peer SerializeArrayLlvm #34483).
  * String scalars use pure-LLVM quote/escape (not NestedJIT addslashes — #27574).
  * SSOT: {@see \PHPCompiler\ext\standard\VmVarExport::formatVariable()}.
  * php-src: ext/standard/var.c — php_var_export_ex / PHP_FUNCTION(var_export)
  */
 final class StringVarExport
 {
+    public const HT_ABI = '__compiler_var_export_hashtable';
+
     private const HELPER_PATH = '/ext/standard/VarExportJitHelper.php';
 
     private const FORMAT_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\VarExportJitHelper::formatValue';
 
     private const BRIDGE_ENTRY = 'var_export_bridge_entry';
+
+    private const HT_BRIDGE_ENTRY = 'var_export_ht_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -46,6 +52,7 @@ final class StringVarExport
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
         '__compiler_var_export',
+        self::HT_ABI,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -134,7 +141,7 @@ final class StringVarExport
     }
 
     /**
-     * Thin standalone AOT: format scalars like Zend var_export without NestedJIT (#26855).
+     * Thin standalone AOT: format scalars + arrays like Zend var_export without NestedJIT (#26855 / #34497).
      */
     private static function implementThinScalarBridge(Context $context): void
     {
@@ -142,6 +149,7 @@ final class StringVarExport
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
+            self::implementVarExportHashtableBridge($context);
 
             return;
         }
@@ -157,6 +165,9 @@ final class StringVarExport
         $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($strPtr, false, $valuePtr);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        // Register before body: HT bridge + nested scalar formatting may call back (#34497).
+        $context->registerFunction($abiName, $fn);
+        self::implementVarExportHashtableBridge($context);
 
         $entry = $fn->appendBasicBlock('var_export_thin_scalar_entry');
         $boolBlock = $fn->appendBasicBlock('var_export_thin_bool');
@@ -164,6 +175,7 @@ final class StringVarExport
         $doubleBlock = $fn->appendBasicBlock('var_export_thin_double');
         $nullBlock = $fn->appendBasicBlock('var_export_thin_null');
         $stringBlock = $fn->appendBasicBlock('var_export_thin_string');
+        $arrayBlock = $fn->appendBasicBlock('var_export_thin_array');
         $fallback = $fn->appendBasicBlock('var_export_thin_fallback');
         $done = $fn->appendBasicBlock('var_export_thin_done');
 
@@ -266,7 +278,8 @@ final class StringVarExport
         $context->builder->positionAtEnd($afterNull);
         // TYPE_STRING carries IS_REFCOUNTED; $kind is already masked with 0x7f above.
         $isString = $context->builder->icmp(Builder::INT_EQ, $kind, $i8->constInt(JitVariable::TYPE_STRING & 0x7f, false));
-        $context->builder->branchIf($isString, $stringBlock, $fallback);
+        $afterString = $fn->appendBasicBlock('var_export_thin_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
         // Thin AOT must not call NestedJIT __string__addslashes — it segfaults without
@@ -275,6 +288,24 @@ final class StringVarExport
         $rawStr = $context->builder->call($context->lookupFunction('__value__readString'), $arg);
         $stringStr = self::formatExportQuotedString($context, $rawStr);
         $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $context->builder->branchIf($isArray, $arrayBlock, $fallback);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $ht = $context->builder->call($context->lookupFunction('__value__readHashtable'), $arg);
+        $arrayStr = $context->builder->call(
+            $context->lookupFunction(self::HT_ABI),
+            $ht,
+            $i64->constInt(0, false)
+        );
+        $arrayEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($fallback);
@@ -289,8 +320,62 @@ final class StringVarExport
         $result->addIncoming($doubleStr, $doubleEnd);
         $result->addIncoming($nullStr, $nullEnd);
         $result->addIncoming($stringStr, $stringEnd);
+        $result->addIncoming($arrayStr, $arrayEnd);
         $context->builder->returnValue($result);
+    }
+
+    /**
+     * Array HT ABI for thin AOT — NestedJIT VarExportJitHelper needs Runtime->vm (#34497).
+     * Peer {@see StringSerialize::implementSerializeHashtableBridge}.
+     */
+    private static function implementVarExportHashtableBridge(Context $context): void
+    {
+        $abiName = self::HT_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::HT_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        self::ensureFormatHelpersForArrayLlvm($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $htPtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $context->registerFunction($abiName, $fn);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::HT_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue(
+                VarExportArrayLlvm::encode($context, $fn->getParam(0), $fn->getParam(1))
+            );
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+    /** Public for {@see VarExportArrayLlvm} string keys (#34497). */
+    public static function formatQuotedStringLlvm(Context $context, Value $rawStr): Value
+    {
+        return self::formatExportQuotedString($context, $rawStr);
+    }
+
+    /** Ensure quote/float helpers before {@see VarExportArrayLlvm} emit (#34497). */
+    public static function ensureFormatHelpersForArrayLlvm(Context $context): void
+    {
+        StringDir::ensureLinked($context);
+        ZendDoubleStringRuntime::ensureLinked($context);
+        self::ensureFormatExportStringHelper($context);
+        self::ensureVarExportFloatDecimalHelper($context);
     }
 
     private static function constExportString(Context $context, string $text): Value
