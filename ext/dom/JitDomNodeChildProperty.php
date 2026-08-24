@@ -63,6 +63,12 @@ final class JitDomNodeChildProperty
             $propName,
             $objectType->lookup($slotClass)
         );
+        // Result object is the child (AOT element/text stand-in), not the parent
+        // whose firstChild pointer lives on $slotClass. CFG types the temp unknown;
+        // chained `$el->firstChild->nodeName` would then defineProperty nodeName on
+        // stdClass and GEP past the allocation (SIGSEGV after setAttribute adds
+        // DOMAttr::$nodeName as a second same-name slot).
+        $result->classUserType = 'DOMElement';
         self::annotateCompileTimeChild($result, $propName, $receiverVar);
         $propLc = strtolower($propName);
         // GetNodePath's child-fetch annotator only knows first/last (defaults other

@@ -13821,12 +13821,21 @@ class JIT {
                             $declaringClass = 'stdClass';
                         }
                     }
-                    // User-script AOT: documentElement temps often lose DOMElement userType (#23251).
+                    // User-script AOT: documentElement / firstChild temps often lose DOMElement
+                    // userType (#23251). nodeName/tagName on stdClass define a new slot and
+                    // SIGSEGV after setAttribute (DOMAttr shares the name).
                     if (
                         null !== $propName
-                        && \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
-                        && \in_array(strtolower($propName), ['textcontent', 'nodevalue'], true)
+                        && \in_array(
+                            strtolower($propName),
+                            ['textcontent', 'nodevalue', 'nodename', 'tagname'],
+                            true
+                        )
                         && \in_array(strtolower($declaringClass), ['object', 'stdclass', ''], true)
+                        && (
+                            \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+                            || null !== \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName
+                        )
                     ) {
                         $declaringClass = 'DOMElement';
                     }
@@ -15350,6 +15359,9 @@ class JIT {
             return;
         }
         $result->type = Type::object($userType);
+        if ($this->context->hasVariableOp($result)) {
+            $this->context->getVariableFromOp($result)->classUserType = $userType;
+        }
     }
 
     private function externalPropertyResultUserType(string $class, string $name): ?string
@@ -15363,6 +15375,13 @@ class JIT {
             return 'PHPCfg\\Block';
         }
         if ('domdocument' === $lcClass && 'documentelement' === $lcName) {
+            return 'DOMElement';
+        }
+        if (
+            str_starts_with($lcClass, 'dom')
+            && \in_array($lcName, ['firstchild', 'lastchild', 'nextsibling', 'previoussibling'], true)
+        ) {
+            // Result is a child node; AOT materializes elements/text as DOMElement (#32315).
             return 'DOMElement';
         }
 
