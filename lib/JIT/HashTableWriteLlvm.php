@@ -1592,6 +1592,114 @@ final class HashTableWriteLlvm
     }
 
     /**
+     * zend_array_separate before FETCH_DIM_W / append when the HT is shared (#34508).
+     *
+     * By-value `$b = $a` stores the same `__hashtable__*` and addrefs; mutation must
+     * duplicate when refcount > 1 so the source stays unchanged (php-src zend_array_dup).
+     * `__ref__separate_ex` only duplicates strings — MASKED_ARRAY falls through.
+     *
+     * @return Value `__hashtable__*` to mutate (possibly a fresh duplicate rebound onto $array)
+     */
+    public static function separateContainerForWrite(Context $context, Variable $array): Value
+    {
+        if ($array->borrowedHashtable || null !== $array->superglobalName) {
+            return HashTableReadLlvm::loadHashtablePointer($context, $array);
+        }
+        if ($array->type & Variable::IS_NATIVE_ARRAY) {
+            return HashTableReadLlvm::loadHashtablePointer($context, $array);
+        }
+
+        $ht = HashTableReadLlvm::loadHashtablePointer($context, $array);
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $nullHt = $htPtrTy->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $nullHt);
+        $fn = BasicBlockHelper::parentFunction($context);
+        $tag = (string) self::nextSeq();
+        $nullBlock = $fn->appendBasicBlock('ht_cow_sep_null_'.$tag);
+        $checkBlock = $fn->appendBasicBlock('ht_cow_sep_check_'.$tag);
+        $dupBlock = $fn->appendBasicBlock('ht_cow_sep_dup_'.$tag);
+        $doneBlock = $fn->appendBasicBlock('ht_cow_sep_done_'.$tag);
+        $context->builder->branchIf($isNull, $nullBlock, $checkBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($checkBlock);
+        $refVirtual = $context->builder->pointerCast(
+            $ht,
+            $context->getTypeFromString('__ref__virtual*')
+        );
+        $refMap = $context->structFieldMap['__ref__virtual'];
+        $refStruct = $context->builder->load(
+            $context->builder->structGep($refVirtual, $refMap['ref'])
+        );
+        $rcOff = $context->structFieldMap['__ref__']['refcount'];
+        $rc = $context->builder->extractValue($refStruct, $rcOff);
+        $i32 = $context->getTypeFromString('int32');
+        $shared = $context->builder->icmp(
+            Builder::INT_SGT,
+            $rc,
+            $i32->constInt(1, false)
+        );
+        $context->builder->branchIf($shared, $dupBlock, $doneBlock);
+
+        $context->builder->positionAtEnd($dupBlock);
+        HashTableDuplicateRuntime::ensureLinked($context);
+        $copy = HashTableDuplicateRuntime::duplicate($context, $ht);
+        // Rebind the lvalue onto the private copy; release this variable's claim on the shared HT
+        // unless writeHashtable already valueDelref'd the old pointer (#34508).
+        $releasedByStore = self::rebindHashtablePointer($context, $array, $copy);
+        if (!$releasedByStore) {
+            $context->refcount->delref($ht);
+        }
+        $dupEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($htPtrTy, 'ht_cow_sep_'.$tag);
+        $phi->addIncoming($nullHt, $nullBlock);
+        $phi->addIncoming($ht, $checkBlock);
+        $phi->addIncoming($copy, $dupEnd);
+
+        return $phi;
+    }
+
+    /**
+     * Store a (possibly duplicated) HT pointer back into a KIND_VARIABLE / value-box lvalue.
+     *
+     * @return bool true when the store already released the previous HT (writeHashtable)
+     */
+    private static function rebindHashtablePointer(Context $context, Variable $array, Value $ht): bool
+    {
+        if (Variable::TYPE_HASHTABLE === $array->type && Variable::KIND_VARIABLE === $array->kind) {
+            // duplicate()/alloc already addref'd once for the new owner (#34508).
+            $context->builder->store($ht, $array->value);
+
+            return false;
+        }
+        if (Variable::TYPE_VALUE === $array->type || $array->valueBoxHashtable || JitValueBox::isValueOperand($array)) {
+            self::storeHashtableInArrayVariable($context, $array, $ht);
+
+            return true;
+        }
+        if (null !== $array->objectPropertySlot
+            && Variable::TYPE_HASHTABLE === ($array->objectPropertyType ?? null)
+        ) {
+            $context->builder->store(
+                $context->builder->pointerCast(
+                    $ht,
+                    $context->getTypeFromString('void*')
+                ),
+                $array->objectPropertySlot
+            );
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
      * Reserve the next packed-list slot for $arr[] = … (issue #116).
      *
      * Returns a {@see Variable::TYPE_VALUE} lvalue pointing at the new __value__ entry.
@@ -1609,7 +1717,7 @@ final class HashTableWriteLlvm
             return new Variable($context, $elementType, Variable::KIND_VARIABLE, $slot);
         }
 
-        $ht = HashTableReadLlvm::loadHashtablePointer($context, $array);
+        $ht = self::separateContainerForWrite($context, $array);
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         // Runtime nextFreeElement — a compile-time counter is one index for the whole
