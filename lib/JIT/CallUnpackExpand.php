@@ -13,6 +13,9 @@ use PHPLLVM\Builder;
  * {@see JIT::finalizeJitCallArgs()} merges unpack entries into one HT — correct for
  * Internal varargs and pure-variadic user functions (`function f(...$a)`). Fixed-arity
  * Native callees need one LLVM argument per parameter (Zend ZEND_SEND_UNPACK).
+ *
+ * Callers must strip any `$this` / receiver prefix before merge+expand so
+ * `new C(...$a)` and `$o->m(...$a)` keep the receiver (#34468).
  */
 final class CallUnpackExpand
 {
@@ -52,9 +55,17 @@ final class CallUnpackExpand
         $numSize = $context->builder->truncOrBitCast($num, $sizeT);
 
         $fixedCount = null === $variadicIndex ? $paramCount : $variadicIndex;
+        $prefix = 0;
+        if (
+            [] !== $toCall->paramNames
+            && \count($toCall->argTypes) === \count($toCall->paramNames) + 1
+        ) {
+            $prefix = 1;
+        }
         $out = [];
         for ($i = 0; $i < $fixedCount; ++$i) {
-            $out[] = self::readIndexedOrMissing($context, $ht, $numSize, $i);
+            $default = $toCall->defaultArgs[$prefix + $i] ?? null;
+            $out[] = self::readIndexedOrMissing($context, $ht, $numSize, $i, $default);
         }
 
         if (null !== $variadicIndex) {
@@ -68,7 +79,8 @@ final class CallUnpackExpand
         Context $context,
         \PHPLLVM\Value $ht,
         \PHPLLVM\Value $numSize,
-        int $index
+        int $index,
+        ?Variable $defaultOnMiss = null
     ): Variable {
         $tag = (string) (++self::$seq);
         $sizeT = $context->getTypeFromString('size_t');
@@ -92,10 +104,20 @@ final class CallUnpackExpand
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($miss);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            $dest
-        );
+        // Prefer the callee default over null so `f(...[1])` with `$b = 9` matches Zend
+        // (and `new C(...$a)` with optional ctor params) (#34468 / #24144).
+        if ($defaultOnMiss instanceof Variable) {
+            JitValueBox::copyFromPointer(
+                $context,
+                $dest,
+                JitValueBox::valuePtrFromVariable($context, $defaultOnMiss)
+            );
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                $dest
+            );
+        }
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
