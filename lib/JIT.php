@@ -24307,6 +24307,16 @@ class JIT {
                 if ('splittext' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::splittext');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::splittext');
+                    // Assigned firstChild temps lose DOMText userType and would otherwise
+                    // RuntimeIndirect no-op under thin AOT (#34475 / re-#34314).
+                    if ($this->context->functionIsRegistered('domtext::splittext')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                            'domtext::splittext'
+                        );
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
                 }
                 // Living createElement* — peer createAttribute object-receiver path (#28958).
                 if ('createelement' === $methodLc || 'createelementns' === $methodLc) {
@@ -24533,6 +24543,19 @@ class JIT {
                 $receiverVar
             )) {
                 return;
+            }
+            // firstChild temps stamped DOMElement (#34375) resolve domelement::splittext as
+            // ExternalMethod no-op; force DOMText fold (#34475 / re-#34314).
+            if ('splittext' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::splittext');
+                if ($this->context->functionIsRegistered('domtext::splittext')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                        'domtext::splittext'
+                    );
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
             }
             if ($this->isBundledJitExternalClassPrefix($declaringClassLc)) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);

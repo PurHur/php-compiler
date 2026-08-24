@@ -899,7 +899,12 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domtext::splittext' === $lc || 'domcdatasection::splittext' === $lc) {
+            if ('domtext::splittext' === $lc
+                || 'domcdatasection::splittext' === $lc
+                // firstChild temps are stamped DOMElement (#34375); still fold as DOMText (#34475).
+                || 'domelement::splittext' === $lc
+                || 'domnode::splittext' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomTextSplitText();
 
                 return;

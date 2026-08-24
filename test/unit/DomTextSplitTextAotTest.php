@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: DOMText::splitText xmlTextSplitText (#32362).
+ * AOT: DOMText::splitText xmlTextSplitText (#32362, #34475 / re-#34314).
  *
  * @see php-src ext/dom/text.c PHP_METHOD(DOMText, splitText)
  *

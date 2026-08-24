@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * AOT: in-tree splitText must link the suffix (childNodes / nextSibling) (#34314, re-#34311).
+ * AOT: in-tree splitText must link the suffix (childNodes / nextSibling) (#34475, re-#34314/#34311).
  * php-src ext/dom/text.c PHP_METHOD(DOMText, splitText) → xmlTextSplitText.
  */
 $d = new DOMDocument();
