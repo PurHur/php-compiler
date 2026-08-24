@@ -352,7 +352,10 @@ final class DomParseSimpleXmlJitHelper
     /**
      * Attributes from an open-tag string (xmlns* skipped) for user-script AOT (#27275).
      *
-     * @return list<array{qname: string, value: string}>
+     * Resolves prefixed attrs against xmlns decls on the same open-tag so
+     * get/hasAttributeNS cache keys match Zend (peer rootAttributesArgv #33116).
+     *
+     * @return list<array{qname: string, value: string, namespace: string}>
      */
     public static function attributesFromOpenTagArgv(string $openTag): array
     {
@@ -362,6 +365,19 @@ final class DomParseSimpleXmlJitHelper
         $attrs = $root[2] ?? '';
         if ('' === trim($attrs)) {
             return [];
+        }
+        $nsDecl = [];
+        if (preg_match_all('/xmlns:([A-Za-z_][\w.-]*)\s*=\s*"([^"]*)"/', $attrs, $decls, PREG_SET_ORDER)
+            || preg_match_all("/xmlns:([A-Za-z_][\w.-]*)\s*=\s*'([^']*)'/", $attrs, $decls, PREG_SET_ORDER)
+        ) {
+            foreach ($decls as $d) {
+                $nsDecl[$d[1]] = $d[2];
+            }
+        }
+        if (preg_match('/xmlns\s*=\s*"([^"]*)"/', $attrs, $def)
+            || preg_match("/xmlns\s*=\s*'([^']*)'/", $attrs, $def)
+        ) {
+            $nsDecl[''] = $def[1];
         }
         $out = [];
         if (!preg_match_all('/([A-Za-z_][\w:.-]*)\s*=\s*"([^"]*)"/', $attrs, $pairs, PREG_SET_ORDER)
@@ -374,7 +390,13 @@ final class DomParseSimpleXmlJitHelper
             if (0 === stripos($qname, 'xmlns')) {
                 continue;
             }
-            $out[] = ['qname' => $qname, 'value' => $pair[2]];
+            $pos = strpos($qname, ':');
+            $prefix = false === $pos ? '' : substr($qname, 0, $pos);
+            $out[] = [
+                'qname' => $qname,
+                'value' => $pair[2],
+                'namespace' => $nsDecl[$prefix] ?? '',
+            ];
         }
 
         return $out;

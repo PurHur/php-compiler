@@ -2239,6 +2239,8 @@ final class VmDom
     {
         $wantNs = $namespace ?? '';
         $state = DomRegistry::state($element);
+        // Scan all attrs with matching localName — early return on the first qname
+        // mismatched NS (e.g. p:a before a) hid null-NS hits (php-src xmlHasNsProp).
         foreach ($state->attributes as $qName => $value) {
             if (self::isXmlnsAttributeName($qName)) {
                 continue;
@@ -2248,8 +2250,9 @@ final class VmDom
                 continue;
             }
             $attrNs = self::resolveAttributeNamespaceUri($element, $qName, $prefix);
-
-            return $attrNs === $wantNs;
+            if ($attrNs === $wantNs) {
+                return true;
+            }
         }
 
         return false;

@@ -185,21 +185,22 @@ final class JitDomXmlDocumentCreateFromString
         foreach (DomParseSimpleXmlJitHelper::rootAttributesArgv($forParse) as $attrPair) {
             $qname = $attrPair['qname'];
             $value = $attrPair['value'];
-            $pos = strpos($qname, ':');
-            $local = false === $pos ? $qname : substr($qname, $pos + 1);
+            $namespace = $attrPair['namespace'] ?? '';
             $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals(
                 $context,
-                '',
+                $namespace,
                 $qname,
                 $value,
                 JitDomAttributeNodeNS::CLASS_LIVING_ATTR,
                 true
             );
-            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
-            // Also key by qname when unprefixed (local === qname).
-            if ($local !== $qname) {
-                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
-            }
+            DomUserScriptAttributeCacheLlvm::storeLiteralForQName(
+                $context,
+                $namespace,
+                $qname,
+                $attr,
+                $value
+            );
         }
 
         $slot = JitValueBox::alloc($context);
