@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitGettype;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitValueCompare;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
@@ -18,6 +20,7 @@ use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPCompiler\VM\EnumCasePropertyJitHelper;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -319,13 +322,8 @@ final class StringVarDump
             $context->lookupFunction('__value__readLong'),
             $arg
         );
-        ValueEchoHelper::echoLiteral($context, 'int(');
-        $context->builder->call(
-            $context->lookupFunction('__phpc_ob_echo_ll'),
-            $longVal
-        );
-        ValueEchoHelper::echoLiteral($context, ")\n");
-        $context->builder->branch($done);
+        // Thin AOT stores stream handles as TYPE_NATIVE_LONG — dump like Zend resource() (#34507).
+        self::echoThinNativeLongOrResource($context, $fn, $longVal, $done);
 
         $context->builder->positionAtEnd($afterLong);
         $isDouble = $context->builder->icmp(
@@ -442,6 +440,82 @@ final class StringVarDump
 
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
+    }
+
+    /**
+     * Thin AOT long arm: plain int vs stream/dir resource / closed stream (#34507 / peer #5149).
+     *
+     * Handles are TYPE_NATIVE_LONG under thin standalone; {@see ValueEchoHelper::echoNativeLong}
+     * already special-cases open resources for echo (#4740). Closed streams keep
+     * `resource(id) of type (Unknown)` (php-src / #5149).
+     */
+    private static function echoThinNativeLongOrResource(
+        Context $context,
+        LlvmFunction $fn,
+        Value $longVal,
+        \PHPLLVM\BasicBlock $done
+    ): void {
+        $longBlock = $context->builder->getInsertBlock();
+        StringDir::ensureLinked($context);
+        StreamResource::ensureLinked($context);
+        StreamLifecycleRuntime::ensureLinked($context);
+        $context->builder->positionAtEnd($longBlock);
+
+        $isOpen = JitValueCompare::nativeLongIsResource($context, $longVal);
+        $wasClosed = JitGettype::isClosedStreamHandle($context, $longVal);
+        // Closed probe is was_used; only treat as resource when no longer open.
+        $isClosed = $context->builder->and($wasClosed, $context->builder->not($isOpen));
+        $isRes = $context->builder->or($isOpen, $isClosed);
+
+        $resBlock = $fn->appendBasicBlock('var_dump_ex_long_resource');
+        $intBlock = $fn->appendBasicBlock('var_dump_ex_long_int');
+        $context->builder->branchIf($isRes, $resBlock, $intBlock);
+
+        $context->builder->positionAtEnd($intBlock);
+        ValueEchoHelper::echoLiteral($context, 'int(');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_ll'),
+            $longVal
+        );
+        ValueEchoHelper::echoLiteral($context, ")\n");
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($resBlock);
+        ValueEchoHelper::echoLiteral($context, 'resource(');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_ll'),
+            $longVal
+        );
+        ValueEchoHelper::echoLiteral($context, ') of type (');
+
+        $openTypeBlock = $fn->appendBasicBlock('var_dump_ex_long_res_open_type');
+        $closedTypeBlock = $fn->appendBasicBlock('var_dump_ex_long_res_closed_type');
+        $typeDone = $fn->appendBasicBlock('var_dump_ex_long_res_type_done');
+        $context->builder->branchIf($isOpen, $openTypeBlock, $closedTypeBlock);
+
+        $context->builder->positionAtEnd($openTypeBlock);
+        $typeStr = $context->builder->call(
+            $context->lookupFunction('__compiler_get_resource_type'),
+            $longVal
+        );
+        ValueEchoHelper::echoStringVariable(
+            $context,
+            new JitVariable(
+                $context,
+                JitVariable::TYPE_STRING,
+                JitVariable::KIND_VALUE,
+                $typeStr
+            )
+        );
+        $context->builder->branch($typeDone);
+
+        $context->builder->positionAtEnd($closedTypeBlock);
+        ValueEchoHelper::echoLiteral($context, 'Unknown');
+        $context->builder->branch($typeDone);
+
+        $context->builder->positionAtEnd($typeDone);
+        ValueEchoHelper::echoLiteral($context, ")\n");
+        $context->builder->branch($done);
     }
 
     /**
