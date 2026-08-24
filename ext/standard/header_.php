@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\HttpResponseCode;
 use PHPCompiler\JIT\Builtin\PendingHeadersRuntime;
+use PHPCompiler\JIT\Builtin\SapiHeaderGuardJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
@@ -106,45 +107,44 @@ final class header_ extends Internal
         // Thin AOT otherwise keeps Type::register no-op ABI shells (#20932); header()+exit
         // then emits no CGI Status (005-SessionsWeb POST flash, #1974).
         PendingHeadersRuntime::ensureLinked($context);
-        $line = self::jitHeaderArg($context, $args[0]);
-        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
-            $codeArg = $args[2];
-            if (null !== $codeArg->compileTimeLong) {
-                $code64 = $context->constantFromInteger((int) $codeArg->compileTimeLong);
-            } else {
-                $code64 = JitLongArg::lower($context, $codeArg, 'header(): Argument #3 ($response_code)');
-            }
-            HttpResponseCode::emitStandaloneStatusLine($context, $code64);
-        }
-        $i32 = $context->getTypeFromString('int32');
-        $replaceI32 = $i32->constInt(1, false);
-        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
-            $replaceArg = $args[1];
-            // Prefer i32 immediates / direct box reads. JitBoolArg::lowerBoxed emits
-            // mid-function BB diamonds that corrupt thin AOT after `(string)$arr[$k]` (#23427).
-            if (null !== $replaceArg->compileTimeLong) {
-                $replaceI32 = $i32->constInt(0 !== $replaceArg->compileTimeLong ? 1 : 0, false);
-            } elseif (JITVariable::TYPE_NATIVE_BOOL === $replaceArg->type) {
-                $replaceI32 = $context->builder->zExt(
-                    $context->helper->loadValue($replaceArg),
-                    $i32
-                );
-            } else {
-                // TYPE_VALUE without compileTimeLong: avoid JitBoolArg BB diamonds (#23427).
-                // Rematerialized bool literals hit compileTimeLong / TYPE_NATIVE_BOOL above.
-                if (JITVariable::TYPE_VALUE === $replaceArg->type) {
-                    $replaceI32 = $i32->constInt(1, false);
-                } else {
-                    $replaceI32 = $context->builder->zExt(
-                        JitBoolArg::lower($context, $replaceArg, 'header(): Argument #2 ($replace)'),
-                        $i32
-                    );
-                }
-            }
-        }
-        JitPendingHeaders::add($context, $line, $replaceI32);
+        $lineArg = $args[0];
+        $replaceArg = $args[1] ?? null;
+        $codeArg = $args[2] ?? null;
 
-        return $context->getTypeFromString('int32')->constInt(0, false);
+        return SapiHeaderGuardJit::emitGuardedHeader(
+            $context,
+            static function () use ($context, $lineArg, $replaceArg, $codeArg): void {
+                $line = self::jitHeaderArg($context, $lineArg);
+                if (null !== $codeArg && !NamedOptionalCallArgs::isOmittedOptional($codeArg)) {
+                    if (null !== $codeArg->compileTimeLong) {
+                        $code64 = $context->constantFromInteger((int) $codeArg->compileTimeLong);
+                    } else {
+                        $code64 = JitLongArg::lower($context, $codeArg, 'header(): Argument #3 ($response_code)');
+                    }
+                    HttpResponseCode::emitStandaloneStatusLine($context, $code64);
+                }
+                $i32 = $context->getTypeFromString('int32');
+                $replaceI32 = $i32->constInt(1, false);
+                if (null !== $replaceArg && !NamedOptionalCallArgs::isOmittedOptional($replaceArg)) {
+                    if (null !== $replaceArg->compileTimeLong) {
+                        $replaceI32 = $i32->constInt(0 !== $replaceArg->compileTimeLong ? 1 : 0, false);
+                    } elseif (JITVariable::TYPE_NATIVE_BOOL === $replaceArg->type) {
+                        $replaceI32 = $context->builder->zExt(
+                            $context->helper->loadValue($replaceArg),
+                            $i32
+                        );
+                    } elseif (JITVariable::TYPE_VALUE === $replaceArg->type) {
+                        $replaceI32 = $i32->constInt(1, false);
+                    } else {
+                        $replaceI32 = $context->builder->zExt(
+                            JitBoolArg::lower($context, $replaceArg, 'header(): Argument #2 ($replace)'),
+                            $i32
+                        );
+                    }
+                }
+                JitPendingHeaders::add($context, $line, $replaceI32);
+            }
+        );
     }
 
     /** Z_PARAM_STR — Zend 8.4 DEP+coerces null (#21234, ext/standard/head.c). */
