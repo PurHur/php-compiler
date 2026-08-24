@@ -817,13 +817,16 @@ class Type extends Builtin {
         // JitSleep / JitEnv / JitDate / JitGettimeofday already ensureLinked
         // before lookup (peer #34241 PowInt batch). StringTime still eager below
         // (TimeRuntimeShrinkTest::testTypeLinksStringTime).
+        // ProcessIdentity / gettimeofday / getrusage / net_get_interfaces /
+        // ListUnpack always-on ensureLinked removed (#34327): ProcessIdentityJit /
+        // JitGettimeofday / JitGetrusage / JitNetGetInterfaces / ListUnpackHelper /
+        // CallUnpackRuntime already ensureLinked before lookup (peer #34320).
         ProcessRuntime::ensureLinked($this->context);
         ProcessOpen::ensureLinked($this->context);
         StreamSocketPair::ensureLinked($this->context);
         StreamSocketGetNameRuntime::ensureLinked($this->context);
         StreamSocketAccept::ensureLinked($this->context);
         StringTime::ensureLinked($this->context);
-        ProcessIdentityJit::ensureLinked($this->context);
         FtokRuntime::ensureLinked($this->context);
         PosixGetpidJit::ensureLinked($this->context);
         PosixGetppidJit::ensureLinked($this->context);
@@ -837,10 +840,6 @@ class Type extends Builtin {
         PosixSetegidJit::ensureLinked($this->context);
         PosixSetsidJit::ensureLinked($this->context);
         PosixSetpgidJit::ensureLinked($this->context);
-        StringGettimeofday::ensureLinked($this->context);
-        StringGetrusage::ensureLinked($this->context);
-        StringNetInterfacesJit::ensureLinked($this->context);
-        ListUnpackRuntime::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
         StringVersionCompare::ensureLinked($this->context);
         LibcryptRuntime::ensureLinked($this->context);
