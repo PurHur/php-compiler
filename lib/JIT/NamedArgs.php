@@ -81,12 +81,18 @@ final class NamedArgs
     ): ?array {
         $normalized = self::normalizeEntries($entries, $operands);
         $vmEntries = [];
+        /** @var array<int, array{value: Variable, operand: Operand|null}> $originByVmId */
+        $originByVmId = [];
         foreach ($normalized as $entry) {
             if ('n' === $entry['kind']) {
                 $vmValue = CallUnpackCompileTime::tryCompileTimeValueFromJitVariable($entry['value']);
                 if (null === $vmValue) {
                     return null;
                 }
+                $originByVmId[\spl_object_id($vmValue)] = [
+                    'value' => $entry['value'],
+                    'operand' => $entry['operand'],
+                ];
                 $vmEntries[] = ['n', $entry['name'], $vmValue];
                 continue;
             }
@@ -94,6 +100,10 @@ final class NamedArgs
             if (null === $vmValue) {
                 return null;
             }
+            $originByVmId[\spl_object_id($vmValue)] = [
+                'value' => $entry['value'],
+                'operand' => $entry['operand'],
+            ];
             $vmEntries[] = ['p', $vmValue];
         }
 
@@ -144,10 +154,21 @@ final class NamedArgs
             }
         }
 
+        // Reuse the live ARG_SEND JIT Variables when resolve only reorders them.
+        // Rematerializing strings via VmConstantJit/fromLiteral yields slots that
+        // crash under echo $a.$b (writeString → valueDelref) — #34457 / php-src
+        // Zend/zend_execute.c named-arg binding keeps the caller temps.
         $jitResult = [];
         $jitOperands = [];
         foreach ($vmResolved as $idx => $vmVar) {
-            $jitVar = $jit->jitVariableFromVmConstantForCallUnpack($vmVar);
+            $origin = $originByVmId[\spl_object_id($vmVar)] ?? null;
+            if (null !== $origin) {
+                $jitVar = $origin['value'];
+                $jitOperands[(int) $idx] = $origin['operand'];
+            } else {
+                $jitVar = $jit->jitVariableFromVmConstantForCallUnpack($vmVar);
+                $jitOperands[(int) $idx] = null;
+            }
             if (
                 null !== $variadicParamIndex
                 && (int) $idx === $variadicParamIndex
@@ -156,7 +177,6 @@ final class NamedArgs
                 $jitVar->variadicElementChecksDone = true;
             }
             $jitResult[(int) $idx] = $jitVar;
-            $jitOperands[(int) $idx] = null;
         }
         ksort($jitResult);
         ksort($jitOperands);

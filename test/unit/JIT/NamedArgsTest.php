@@ -38,4 +38,25 @@ final class NamedArgsTest extends TestCase
             null
         );
     }
+
+    public function testResolverPreservesOperandIdentityOnReorder(): void
+    {
+        $a = new \stdClass();
+        $b = new \stdClass();
+        $opA = new \stdClass();
+        $opB = new \stdClass();
+        [$resolved, $ops] = NamedArgs::resolveOutgoing(
+            [
+                ['named' => 'b', 'value' => $b, 'operand' => $opB],
+                ['named' => 'a', 'value' => $a, 'operand' => $opA],
+            ],
+            [null, null],
+            ['a', 'b'],
+            null
+        );
+        $this->assertSame($a, $resolved[0]);
+        $this->assertSame($b, $resolved[1]);
+        $this->assertSame($opA, $ops[0]);
+        $this->assertSame($opB, $ops[1]);
+    }
 }
