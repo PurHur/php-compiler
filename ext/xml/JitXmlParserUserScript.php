@@ -4,25 +4,30 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xml;
 
+use PHPCompiler\JIT\Call\NestedClosureInvoke;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Value;
 
 /**
  * User-script standalone AOT: xml_parser_create / xml_parser_create_ns / xml_parse /
  * xml_get_error_code / xml_parser_free / xml_parser_set_option / xml_parser_get_option /
- * xml_parse_into_struct / xml_error_string / xml_get_current_{line,column,byte}_*
- * (#27293, #29318, #34377, #34378, #34383, #34407).
+ * xml_parse_into_struct / xml_error_string / xml_get_current_{line,column,byte}_* /
+ * xml_set_element_handler / xml_set_character_data_handler
+ * (#27293, #29318, #34377, #34378, #34383, #34407, #34487).
  *
  * Runs the existing PHP-in-PHP parser model ({@see VmXml}, {@see XmlParserSupport}) at
  * compile time when arguments are literals, then emits constant results / an allocated
  * XMLParser shell — same shape as {@see \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript}.
- * No runtime/*.c growth.
+ * SAX Closures are replayed via {@see NestedClosureInvoke} (#34487). No runtime/*.c growth.
  */
 final class JitXmlParserUserScript
 {
@@ -38,6 +43,13 @@ final class JitXmlParserUserScript
 
     /** Last xml_get_error_code fold — so xml_error_string(xml_get_error_code($p)) can lower. */
     private static ?int $lastErrorCodeFold = null;
+
+    /**
+     * AOT Closure handlers keyed by parser object id (#34487).
+     *
+     * @var array<int, array{element_start: ?JITVariable, element_end: ?JITVariable, character_data: ?JITVariable}>
+     */
+    private static array $aotHandlers = [];
 
     public static function isUserScriptAot(): bool
     {
@@ -102,7 +114,70 @@ final class JitXmlParserUserScript
     }
 
     /**
+     * xml_set_element_handler(XMLParser $parser, $start, $end) — store Closures (#34487).
+     *
+     * php-src ext/xml/xml.c PHP_FUNCTION(xml_set_element_handler).
+     */
+    public static function trySetElementHandler(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || \count($args) < 1 || \count($args) > 3) {
+            return null;
+        }
+        $parser = self::lookup($args[0]);
+        if (null === $parser) {
+            return null;
+        }
+        $start = self::optionalClosureHandler($args[1] ?? null);
+        $end = self::optionalClosureHandler($args[2] ?? null);
+        if (false === $start || false === $end) {
+            return null;
+        }
+        $slot = self::$aotHandlers[$parser->id] ?? [
+            'element_start' => null,
+            'element_end' => null,
+            'character_data' => null,
+        ];
+        $slot['element_start'] = $start;
+        $slot['element_end'] = $end;
+        self::$aotHandlers[$parser->id] = $slot;
+
+        return self::boolValue($context, true);
+    }
+
+    /**
+     * xml_set_character_data_handler(XMLParser $parser, $handler) (#34487).
+     *
+     * php-src ext/xml/xml.c PHP_FUNCTION(xml_set_character_data_handler).
+     */
+    public static function trySetCharacterDataHandler(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || \count($args) < 1 || \count($args) > 2) {
+            return null;
+        }
+        $parser = self::lookup($args[0]);
+        if (null === $parser) {
+            return null;
+        }
+        $handler = self::optionalClosureHandler($args[1] ?? null);
+        if (false === $handler) {
+            return null;
+        }
+        $slot = self::$aotHandlers[$parser->id] ?? [
+            'element_start' => null,
+            'element_end' => null,
+            'character_data' => null,
+        ];
+        $slot['character_data'] = $handler;
+        self::$aotHandlers[$parser->id] = $slot;
+
+        return self::boolValue($context, true);
+    }
+
+    /**
      * xml_parse(XMLParser $parser, string $data, bool $is_final = false) (#27293).
+     *
+     * When AOT Closures were registered via xml_set_*_handler, collect SAX events with
+     * host Ext/xml (Zend event order) and emit {@see NestedClosureInvoke} calls (#34487).
      */
     public static function tryParse(Context $context, JITVariable ...$args): ?Value
     {
@@ -124,6 +199,16 @@ final class JitXmlParserUserScript
                 return null;
             }
             $isFinal = $flag;
+        }
+
+        $handlers = self::$aotHandlers[$parser->id] ?? null;
+        if (null !== $handlers && self::hasAnyAotHandler($handlers)) {
+            $replayed = self::emitSaxHandlerReplay($context, $parser, $args[0], $data, $isFinal, $handlers);
+            if (null === $replayed) {
+                return null;
+            }
+
+            return $replayed;
         }
 
         $status = VmXml::parse(
@@ -336,6 +421,165 @@ final class JitXmlParserUserScript
         }
 
         return self::intValue($context, $parsed['status']);
+    }
+
+    /**
+     * @return null|JITVariable|false  null=cleared; JITVariable=ok; false=cannot lower
+     */
+    private static function optionalClosureHandler(?JITVariable $arg): null|JITVariable|false
+    {
+        if (null === $arg || JITVariable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant)) {
+            return null;
+        }
+        if (null === $arg->closureCall) {
+            return false;
+        }
+
+        return $arg;
+    }
+
+    /**
+     * @param array{element_start: ?JITVariable, element_end: ?JITVariable, character_data: ?JITVariable} $handlers
+     */
+    private static function hasAnyAotHandler(array $handlers): bool
+    {
+        return null !== $handlers['element_start']
+            || null !== $handlers['element_end']
+            || null !== $handlers['character_data'];
+    }
+
+    /**
+     * @param array{element_start: ?JITVariable, element_end: ?JITVariable, character_data: ?JITVariable} $handlers
+     */
+    private static function emitSaxHandlerReplay(
+        Context $context,
+        ObjectEntry $parser,
+        JITVariable $parserVar,
+        string $data,
+        bool $isFinal,
+        array $handlers
+    ): ?Value {
+        $events = self::collectHostSaxEvents($parser, $data, $isFinal, $handlers);
+        if (null === $events) {
+            return null;
+        }
+
+        NestedClosureInvokeLlvm::ensureLinked($context);
+        $invoke = new NestedClosureInvoke();
+        foreach ($events['events'] as $ev) {
+            $kind = $ev['kind'];
+            if ('start' === $kind && null !== $handlers['element_start']) {
+                $invoke->call(
+                    $context,
+                    $handlers['element_start'],
+                    $parserVar,
+                    self::stringArg($context, $ev['name']),
+                    self::attrsArg($context, $ev['attrs'])
+                );
+            } elseif ('end' === $kind && null !== $handlers['element_end']) {
+                $invoke->call(
+                    $context,
+                    $handlers['element_end'],
+                    $parserVar,
+                    self::stringArg($context, $ev['name'])
+                );
+            } elseif ('cdata' === $kind && null !== $handlers['character_data']) {
+                $invoke->call(
+                    $context,
+                    $handlers['character_data'],
+                    $parserVar,
+                    self::stringArg($context, $ev['data'])
+                );
+            }
+        }
+
+        // Advance VM parser cursor / error state like a real xml_parse (no ObjectEntry handlers).
+        $status = VmXml::parse(
+            $context->runtime->vmContext,
+            $parser->id,
+            $data,
+            $isFinal,
+            null,
+            $parser
+        );
+
+        return self::intValue($context, $status);
+    }
+
+    /**
+     * Host Ext/xml event capture — matches Zend SAX order / CASE_FOLDING (#34487).
+     *
+     * @param array{element_start: ?JITVariable, element_end: ?JITVariable, character_data: ?JITVariable} $handlers
+     *
+     * @return null|array{events: list<array<string, mixed>>}
+     */
+    private static function collectHostSaxEvents(
+        ObjectEntry $parser,
+        string $data,
+        bool $isFinal,
+        array $handlers
+    ): ?array {
+        if (!\function_exists('xml_parser_create')) {
+            return null;
+        }
+        $state = VmXml::parserState($parser->id) ?? [];
+        $caseFolding = 0 !== (int) ($state['options'][XmlConstants::XML_OPTION_CASE_FOLDING] ?? 1);
+        $needStart = null !== $handlers['element_start'];
+        $needEnd = null !== $handlers['element_end'];
+        $needCdata = null !== $handlers['character_data'];
+
+        $events = [];
+        $host = \xml_parser_create();
+        \xml_parser_set_option($host, \XML_OPTION_CASE_FOLDING, $caseFolding ? 1 : 0);
+        if ($needStart || $needEnd) {
+            \xml_set_element_handler(
+                $host,
+                $needStart
+                    ? static function ($p, string $name, array $attrs) use (&$events): void {
+                        $events[] = ['kind' => 'start', 'name' => $name, 'attrs' => $attrs];
+                    }
+                    : null,
+                $needEnd
+                    ? static function ($p, string $name) use (&$events): void {
+                        $events[] = ['kind' => 'end', 'name' => $name];
+                    }
+                    : null
+            );
+        }
+        if ($needCdata) {
+            \xml_set_character_data_handler(
+                $host,
+                static function ($p, string $chunk) use (&$events): void {
+                    $events[] = ['kind' => 'cdata', 'data' => $chunk];
+                }
+            );
+        }
+        \xml_parse($host, $data, $isFinal);
+        \xml_parser_free($host);
+
+        return ['events' => $events];
+    }
+
+    private static function stringArg(Context $context, string $str): JITVariable
+    {
+        $lit = $context->builder->load($context->constantStringFromString($str));
+        $var = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $lit);
+        $var->compileTimeString = $str;
+
+        return $var;
+    }
+
+    /** @param array<string, string> $attrs */
+    private static function attrsArg(Context $context, array $attrs): JITVariable
+    {
+        $ht = new HashTable();
+        foreach ($attrs as $key => $value) {
+            $val = new VmVariable();
+            $val->string((string) $value);
+            $ht->add((string) $key, $val);
+        }
+
+        return HashTableHelper::variableFromVmHashTable($context, $ht);
     }
 
     private static function isOptionalEncodingOk(JITVariable $arg): bool
