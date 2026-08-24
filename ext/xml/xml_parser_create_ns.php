@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\xml;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -45,6 +46,18 @@ final class xml_parser_create_ns extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireAtMostJitArgCount($context, $args, 'xml_parser_create_ns', 2)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = JitXmlParserUserScript::tryCreateNs($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'xml_parser_create_ns() user-script AOT requires compile-time encoding + separator (#34407)'
+            );
+        }
         throw new \LogicException('xml_parser_create_ns() is not JIT-lowered in this compiler build');
     }
 }

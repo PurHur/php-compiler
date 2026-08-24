@@ -14,10 +14,10 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPLLVM\Value;
 
 /**
- * User-script standalone AOT: xml_parser_create / xml_parse / xml_get_error_code /
- * xml_parser_free / xml_parser_set_option / xml_parser_get_option / xml_parse_into_struct /
- * xml_error_string / xml_get_current_{line,column,byte}_*
- * (#27293, #29318, #34377, #34378, #34383).
+ * User-script standalone AOT: xml_parser_create / xml_parser_create_ns / xml_parse /
+ * xml_get_error_code / xml_parser_free / xml_parser_set_option / xml_parser_get_option /
+ * xml_parse_into_struct / xml_error_string / xml_get_current_{line,column,byte}_*
+ * (#27293, #29318, #34377, #34378, #34383, #34407).
  *
  * Runs the existing PHP-in-PHP parser model ({@see VmXml}, {@see XmlParserSupport}) at
  * compile time when arguments are literals, then emits constant results / an allocated
@@ -62,6 +62,40 @@ final class JitXmlParserUserScript
         $vmCtx = $context->runtime->vmContext;
         XmlParserSupport::registerClass($vmCtx);
         $parserVar = XmlParserSupport::createParser($vmCtx);
+        $entry = $parserVar->toObject();
+
+        return self::materializeParser($context, $entry);
+    }
+
+    /**
+     * xml_parser_create_ns(?string $encoding = null, string $separator = ":") (#34407).
+     *
+     * php-src ext/xml/xml.c PHP_FUNCTION(xml_parser_create_ns) — names expand as
+     * uri + separator + localname. Encoding is accepted for signature parity.
+     */
+    public static function tryCreateNs(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()) {
+            return null;
+        }
+        if (\count($args) > 2) {
+            return null;
+        }
+        if (isset($args[0]) && !self::isOptionalEncodingOk($args[0])) {
+            return null;
+        }
+        $separator = ':';
+        if (isset($args[1])) {
+            $sep = self::compileTimeSeparator($args[1]);
+            if (null === $sep) {
+                return null;
+            }
+            $separator = $sep;
+        }
+
+        $vmCtx = $context->runtime->vmContext;
+        XmlParserSupport::registerClass($vmCtx);
+        $parserVar = XmlParserSupport::createParser($vmCtx, true, $separator);
         $entry = $parserVar->toObject();
 
         return self::materializeParser($context, $entry);
@@ -302,6 +336,20 @@ final class JitXmlParserUserScript
         }
 
         return self::intValue($context, $parsed['status']);
+    }
+
+    /** @return ?string null = dynamic / unknown; empty string is a valid separator */
+    private static function compileTimeSeparator(JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant)) {
+            return ':';
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($arg) ?? $arg->compileTimeString;
+        if (null !== $lit && !str_starts_with($lit, '__phpc_xmlp_')) {
+            return $lit;
+        }
+
+        return null;
     }
 
     private static function isOptionalEncodingOk(JITVariable $arg): bool
