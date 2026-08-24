@@ -11,6 +11,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -18,9 +19,10 @@ use PHPLLVM\Value;
  *
  * createTextNode stand-ins are unregistered DOMElement objects, so NestedJIT
  * DomRegistry split would abort. Fold compile-time data + offset like
- * {@see JitDomCreateTextNode}.
+ * {@see JitDomCreateTextNode}. In-tree receivers (loadXML firstChild) also
+ * link the suffix as nextSibling via ChildNode::after LiveSlots (#34314).
  *
- * php-src: ext/dom/text.c PHP_METHOD(DOMText, splitText) (#32362)
+ * php-src: ext/dom/text.c PHP_METHOD(DOMText, splitText) (#32362, #34314)
  */
 final class JitDomSplitText
 {
@@ -45,7 +47,9 @@ final class JitDomSplitText
             return self::boxNullResult($context);
         }
 
-        $data = $args[0]->compileTimeDomTextData ?? JitDomCreateTextNode::$lastMaterializedData;
+        $data = $args[0]->compileTimeDomTextData
+            ?? JitDomCreateTextNode::$lastMaterializedData
+            ?? JitDomSubstringData::$lastMaterializedData;
         $offset = self::compileTimeOffset($args[1]);
         if (null === $data || null === $offset) {
             if (JitDomInstanceMethodKernel::shouldUse($context)) {
@@ -79,7 +83,42 @@ final class JitDomSplitText
         $args[0]->compileTimeDomTextData = $prefix;
         self::$lastResultData = $suffix;
 
-        return JitDomCreateTextNode::materialize($context, $suffix);
+        $tailObj = JitDomCreateTextNode::materialize($context, $suffix);
+        self::linkTailAfterReceiver($context, $receiverObj, $args[0], $tailObj);
+
+        return $tailObj;
+    }
+
+    /**
+     * php-src xmlTextSplitText inserts the new node after $node when parented.
+     * Detached createTextNode (#32362) has a null parentNode — skip linking.
+     */
+    private static function linkTailAfterReceiver(
+        Context $context,
+        Value $receiverObj,
+        JITVariable $receiverVar,
+        Value $tailObj
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_split_link');
+        $parent = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $receiverObj,
+            VmDom::PROP_PARENT_NODE,
+            'dom_split_parent'
+        );
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $parent, $objPtrTy->constNull());
+        $bbLink = BasicBlockHelper::append($context, 'dom_split_link_do');
+        $bbDone = BasicBlockHelper::append($context, 'dom_split_link_done');
+        $context->builder->branchIf($isNull, $bbDone, $bbLink);
+
+        $context->builder->positionAtEnd($bbLink);
+        $parentVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $parent);
+        $tailVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $tailObj);
+        JitDomChildNodeSiblingInsert::invokeAfter($context, $parentVar, $tailVar, $receiverVar);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     private static function compileTimeOffset(JITVariable $arg): ?int
