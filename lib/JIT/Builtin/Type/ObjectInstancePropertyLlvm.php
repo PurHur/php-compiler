@@ -296,6 +296,13 @@ final class ObjectInstancePropertyLlvm
                     Variable::KIND_VALUE,
                     $typed,
                 );
+                // Read-mode string props: do not alias the live slot. ASSIGN into a local
+                // that keeps objectPropertySlot write-throughs on the next iteration
+                // (foreach `$sink = $n->nodeName` corrupts DOMElement::$nodeName; #34465 /
+                // peer #33849). Write fetches keep the slot for `$obj->prop = …`.
+                if (!$forWrite && Variable::TYPE_STRING === $propset[2]) {
+                    return $var;
+                }
                 $var->objectPropertySlot = $slot;
                 $var->objectPropertyType = $propset[2];
                 $var->objectPropertyReceiver = $obj;
