@@ -41,9 +41,10 @@ final class JitPrintf
             return $context->constantFromInteger(0, 'int64');
         }
         $numArgs = $argc - 1;
+        $i64 = $context->getTypeFromString('int64');
         if (0 === $numArgs) {
             $nullArgv = $context->builder->pointerCast(
-                $context->getTypeFromString('int64')->constInt(0, false),
+                $i64->constInt(0, false),
                 $context->getTypeFromString('__value__*')
             );
 
@@ -51,30 +52,50 @@ final class JitPrintf
                 $context->builder->call(
                     $context->lookupFunction('__compiler_printf'),
                     $fmt,
-                    $context->getTypeFromString('int64')->constInt(0, false),
+                    $i64->constInt(0, false),
                     $nullArgv
                 ),
-                $context->getTypeFromString('int64')
+                $i64
             );
         }
 
-        // Multi-arg: format via JitSprintf (direct snprintf), then echo the result.
+        // Format via JitSprintf::format (keeps compile-time format on $args[0] — formatWithFmt
+        // dropped it and routed through a broken echo path; #24258). Echo once here, matching
+        // implementPrintfBridge (inline buffer GEP + size_t length).
         \PHPCompiler\JIT\Builtin\StringFormat::ensureRuntimeHelpersPublic($context);
-        $formatted = JitSprintf::formatWithFmt($context, $fmt, ...array_slice($args, 1));
+        $formatted = JitSprintf::format($context, ...$args);
 
-        $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        $strPtr = $context->getTypeFromString('__string__*');
         $stringMap = $context->structFieldMap['__string__'];
 
-        $data = $context->builder->structGep($formatted, $stringMap['value']);
-        $len = $context->builder->load($context->builder->structGep($formatted, $stringMap['length']));
+        $data = $context->builder->pointerCast(
+            $context->builder->structGep($formatted, $stringMap['value']),
+            $i8p
+        );
+        $len = $context->builder->load(
+            $context->builder->structGep($formatted, $stringMap['length'])
+        );
+        $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($context);
+        $echoBb = $fn->appendBasicBlock('jit_printf_echo');
+        $doneBb = $fn->appendBasicBlock('jit_printf_done');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                \PHPLLVM\Builder::INT_UGT,
+                $len,
+                $sizeT->constInt(0, false)
+            ),
+            $echoBb,
+            $doneBb
+        );
+        $context->builder->positionAtEnd($echoBb);
         $context->builder->call(
             $context->lookupFunction('__phpc_ob_echo_substr'),
             $data,
-            $len
+            $context->builder->zExt($len, $sizeT)
         );
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
 
         return $context->builder->zExt($len, $i64);
     }

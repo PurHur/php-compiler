@@ -353,16 +353,32 @@ final class SprintfSnprintfRuntime
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($fallbackBb);
-        // Never call snprintf with a conversion and zero args — %s with missing arg is UB (#33010).
+        // php-src formatted_print.c — null/unknown coerces to '' for %s, 0 for %d (#24258).
+        $fallbackStrBb = $fn->appendBasicBlock('sprintf_snprintf_fallback_s');
+        $fallbackNumBb = $fn->appendBasicBlock('sprintf_snprintf_fallback_num');
+        $context->builder->branchIf($fmtIsS, $fallbackStrBb, $fallbackNumBb);
+
+        $context->builder->positionAtEnd($fallbackStrBb);
         $emptyFb = $context->builder->pointerCast($context->constantFromString(''), $charPtr);
-        $writtenF = $context->builder->call(
+        $writtenFStr = $context->builder->call(
             $context->lookupFunction('snprintf'),
             $outChar,
             $bufSize,
             $fmtNul,
             $emptyFb
         );
-        $endF = $context->builder->getInsertBlock();
+        $endFStr = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($fallbackNumBb);
+        $writtenFNum = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $outChar,
+            $bufSize,
+            $fmtNul,
+            $i64->constInt(0, false)
+        );
+        $endFNum = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
@@ -376,7 +392,8 @@ final class SprintfSnprintfRuntime
         $writtenPhi->addIncoming($writtenD, $endD);
         $writtenPhi->addIncoming($writtenL, $endL);
         $writtenPhi->addIncoming($writtenS, $endS);
-        $writtenPhi->addIncoming($writtenF, $endF);
+        $writtenPhi->addIncoming($writtenFStr, $endFStr);
+        $writtenPhi->addIncoming($writtenFNum, $endFNum);
 
         $len = $context->builder->zExt($writtenPhi, $i64);
         $result = $context->builder->call(

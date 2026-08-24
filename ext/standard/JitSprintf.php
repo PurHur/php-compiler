@@ -200,6 +200,12 @@ final class JitSprintf
      */
     private static function extractAsCString(Context $context, JITVariable $arg, array &$toFree): Value
     {
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            return $context->builder->pointerCast(
+                $context->constantFromString(''),
+                $context->getTypeFromString('char*')
+            );
+        }
         if (JITVariable::TYPE_STRING === $arg->type) {
             return self::extractSnprintfArg($context, $arg, $toFree);
         }
@@ -320,6 +326,8 @@ final class JitSprintf
             }
         }
         switch ($arg->type) {
+            case JITVariable::TYPE_NULL:
+                return $context->getTypeFromString('int64')->constInt(0, false);
             case JITVariable::TYPE_NATIVE_LONG:
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->helper->loadValue($arg);
