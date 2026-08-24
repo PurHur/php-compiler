@@ -45,7 +45,6 @@ final class TypeDeadPasswordCryptoAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('PasswordCryptoRuntime::ensureLinked', $type);
     }
 
     public function testRuntimeOwnerDeclaresPasswordCryptoAbisModuleLocally(): void
@@ -61,10 +60,12 @@ final class TypeDeadPasswordCryptoAbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeInitializeStillEnsureLinksPasswordCryptoRuntime(): void
+    public function testCallSiteEnsureLinksPasswordCryptoRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('PasswordCryptoRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('PasswordCryptoRuntime::ensureLinked($this->context)', $type);
+        $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPasswordCrypto.php');
+        $this->assertStringContainsString('PasswordCryptoRuntime::ensureLinked', $owner);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void

@@ -475,14 +475,14 @@ class Type extends Builtin {
         // drift mints time_nanosleep.1 (#31894 / #32122).
         // __compiler_password_random_bytes / __compiler_libcrypt always-on shells
         // removed (#32851): NestedJIT/AOT bridges are PasswordRandomBytesRuntime /
-        // LibcryptRuntime (getNamedFunction first; Type::initialize still ensureLinked).
+        // LibcryptRuntime (getNamedFunction first; call-site ensureLinked #34332).
         // Leftover Type empty decls vs Runtime ABI drift mint password_random_bytes.1 /
         // libcrypt.1 (#31894 / #32122).
         // __compiler_password_hash / __compiler_password_verify / __compiler_crypt /
         // __compiler_password_get_info / __compiler_password_needs_rehash /
         // __compiler_password_algos always-on shells removed (#32855): NestedJIT/AOT
-        // bridge is PasswordCryptoRuntime (getNamedFunction first; Type::initialize
-        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
+        // bridge is PasswordCryptoRuntime (getNamedFunction first; call-site
+        // ensureLinked #34332). Leftover Type empty decls vs Runtime ABI drift mint
         // password_hash.1 (#31894 / #32122).
         // __compiler_strtr / __compiler_strtr_array always-on shells removed (#32858):
         // NestedJIT/AOT bridge is StringStrtr (getNamedFunction first; Type::initialize
@@ -844,21 +844,11 @@ class Type extends Builtin {
         PosixSetpgidJit::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
         StringVersionCompare::ensureLinked($this->context);
-        LibcryptRuntime::ensureLinked($this->context);
-        PasswordRandomBytesRuntime::ensureLinked($this->context);
-        StringRandomBytes::ensureLinked($this->context);
-        PasswordCryptoRuntime::ensureLinked($this->context);
-        StringHashCrypto::ensureLinked($this->context);
+        // openssl / hash / json / libcrypt / password / random_bytes always-on
+        // ensureLinked removed (#34332): JitOpenssl* / OpensslEncryptCrypto /
+        // JitHash / JitJson* / JitLibcrypt / JitPassword* / JitRandomBytes /
+        // JitPasswordRandomBytes already ensureLinked before lookup (peer #34327).
         StringPregMatch::ensureLinked($this->context);
-        OpensslEncryptRuntime::ensureLinked($this->context);
-        OpensslSignRuntime::ensureLinked($this->context);
-        OpensslDigestRuntime::ensureLinked($this->context);
-        OpensslPbkdf2Runtime::ensureLinked($this->context);
-        StringHashEquals::ensureLinked($this->context);
-        StringHashHmacAlgos::ensureLinked($this->context);
-        StringHashAlgos::ensureLinked($this->context);
-        StringJsonEncode::ensureLinked($this->context);
-        StringJsonDecode::ensureLinked($this->context);
         StringXmlrpc::ensureLinked($this->context);
         StringFormat::ensureLinked($this->context);
         Sscanf::ensureLinked($this->context);

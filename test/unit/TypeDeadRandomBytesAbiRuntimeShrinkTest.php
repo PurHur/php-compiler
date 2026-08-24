@@ -30,7 +30,6 @@ final class TypeDeadRandomBytesAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_random_bytes (#33160)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StringRandomBytes::ensureLinked', $type);
     }
 
     public function testRuntimeOwnerDeclaresRandomBytesAbiModuleLocally(): void
@@ -44,10 +43,12 @@ final class TypeDeadRandomBytesAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitRandomBytes.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksStringRandomBytes(): void
+    public function testCallSiteEnsureLinksStringRandomBytes(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringRandomBytes::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringRandomBytes::ensureLinked($this->context)', $type);
+        $owner = (string) file_get_contents(__DIR__.'/../../ext/standard/JitRandomBytes.php');
+        $this->assertStringContainsString('StringRandomBytes::ensureLinked', $owner);
     }
 
     public function testNoNewRuntimeCForRandomBytesAbi(): void

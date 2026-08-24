@@ -40,7 +40,6 @@ final class TypeDeadOpensslDigestAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('OpensslDigestRuntime::ensureLinked', $type);
     }
 
     public function testRuntimeOwnerDeclaresOpensslDigestAbiModuleLocally(): void
@@ -56,10 +55,12 @@ final class TypeDeadOpensslDigestAbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeInitializeStillEnsureLinksOpensslDigestRuntime(): void
+    public function testCallSiteEnsureLinksOpensslDigestRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('OpensslDigestRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('OpensslDigestRuntime::ensureLinked($this->context)', $type);
+        $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/OpensslDigestCrypto.php');
+        $this->assertStringContainsString('OpensslDigestRuntime::ensureLinked', $owner);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltin(): void

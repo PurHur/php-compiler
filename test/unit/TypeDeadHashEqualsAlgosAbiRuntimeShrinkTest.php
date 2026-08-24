@@ -42,9 +42,6 @@ final class TypeDeadHashEqualsAlgosAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StringHashEquals::ensureLinked', $type);
-        $this->assertStringContainsString('StringHashHmacAlgos::ensureLinked', $type);
-        $this->assertStringContainsString('StringHashAlgos::ensureLinked', $type);
     }
 
     public function testRuntimeOwnersDeclareHashEqualsAlgosAbisModuleLocally(): void
@@ -71,12 +68,20 @@ final class TypeDeadHashEqualsAlgosAbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeInitializeStillEnsureLinksHashEqualsAlgosRuntimes(): void
+    public function testCallSiteEnsureLinksHashEqualsAlgosRuntimes(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringHashEquals::ensureLinked($this->context)', $type);
-        $this->assertStringContainsString('StringHashHmacAlgos::ensureLinked($this->context)', $type);
-        $this->assertStringContainsString('StringHashAlgos::ensureLinked($this->context)', $type);
+        foreach ([
+            'StringHashEquals::ensureLinked($this->context)',
+            'StringHashHmacAlgos::ensureLinked($this->context)',
+            'StringHashAlgos::ensureLinked($this->context)',
+        ] as $call) {
+            $this->assertStringNotContainsString($call, $type);
+        }
+        $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHashCryptoJit.php');
+        $this->assertStringContainsString('StringHashEquals::ensureLinked', $owner);
+        $this->assertStringContainsString('StringHashHmacAlgos::ensureLinked', $owner);
+        $this->assertStringContainsString('StringHashAlgos::ensureLinked', $owner);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void
