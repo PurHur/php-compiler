@@ -128,10 +128,15 @@ final class HashTableExportKeyValuePairs implements Call
         $context->builder->branchIf($isNull, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        // Match foreach key lowering — __string__separate on strKeys call-site literals
-        // yields "" keys under json_encode while FE_RESET reads the node key directly (#26367).
+        // Own a copy of the node key — VarExportArrayLlvm / PrintRArrayLlvm quote paths
+        // must not alias the live HT strKeys buffer (var_export then print_r showed every
+        // key as the last key, #34514). Foreach / json_encode keep the direct load (#26367).
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
-        $keyVar = self::stringPtrValueBox($context, $keyStr);
+        $ownedKey = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $keyStr
+        );
+        $keyVar = self::stringPtrValueBox($context, $ownedKey);
         $valField = $context->builder->structGep($node, $nodeMap['value']);
         $valVar = self::valueBoxFromEntry($context, $valField);
         self::appendPair($context, $result, $outIdxSlot, $keyVar, $valVar);
