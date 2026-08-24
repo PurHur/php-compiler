@@ -11,6 +11,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -35,11 +36,29 @@ final class JitPrintR
         }
 
         StringPrintR::ensureLinked($context);
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[0]);
-        $str = $context->builder->call(
-            $context->lookupFunction('__compiler_print_r'),
-            $valuePtr
-        );
+        // Extract object props at the call site so defineProperty from `(object)[…]`
+        // is visible (shared OBJ_ABI must not bake get_object_vars) (#34506).
+        if (JITVariable::TYPE_OBJECT === $args[0]->type) {
+            $className = ReflectionBuiltinHelper::getClassName($context, $args[0]);
+            $varsBoxed = JitGetObjectVars::invoke($context, $args[0], false);
+            $ht = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                JitValueBox::normalizeValuePtr($context, $varsBoxed)
+            );
+            $i64 = $context->getTypeFromString('int64');
+            $str = $context->builder->call(
+                $context->lookupFunction(StringPrintR::OBJ_ABI),
+                $className,
+                $ht,
+                $i64->constInt(0, false)
+            );
+        } else {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[0]);
+            $str = $context->builder->call(
+                $context->lookupFunction('__compiler_print_r'),
+                $valuePtr
+            );
+        }
         $outSlot = JitValueBox::alloc($context);
         $outPtr = JitValueBox::pointer($context, $outSlot);
         $context->builder->call(

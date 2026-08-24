@@ -13,6 +13,7 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\PrintRArrayLlvm;
+use PHPCompiler\JIT\PrintRObjectLlvm;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
@@ -38,11 +39,20 @@ final class StringPrintR
 {
     public const HT_ABI = '__compiler_print_r_hashtable';
 
+    public const OBJ_ABI = '__compiler_print_r_object';
+
+    /** value* → extract + {@see OBJ_ABI} (thin/nested; avoids emit-time cross-fn IR) (#34506). */
+    public const OBJ_VALUE_ABI = '__compiler_print_r_object_value';
+
     private const HELPER_PATH = '/ext/standard/PrintRJitHelper.php';
 
     private const FORMAT_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\PrintRJitHelper::formatValue';
 
     private const HT_BRIDGE_ENTRY = 'print_r_ht_bridge_entry';
+
+    private const OBJ_BRIDGE_ENTRY = 'print_r_obj_bridge_entry';
+
+    private const OBJ_VALUE_BRIDGE_ENTRY = 'print_r_obj_value_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -53,6 +63,8 @@ final class StringPrintR
     private const ABI_FUNCTIONS = [
         '__compiler_print_r',
         self::HT_ABI,
+        self::OBJ_ABI,
+        self::OBJ_VALUE_ABI,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -121,6 +133,8 @@ final class StringPrintR
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
             self::implementPrintRHashtableBridge($context);
+            self::implementPrintRObjectBridge($context);
+            self::implementPrintRObjectValueBridge($context);
 
             return;
         }
@@ -141,6 +155,8 @@ final class StringPrintR
             : $context->module->addFunction($abiName, $ft);
         $context->registerFunction($abiName, $fn);
         self::implementPrintRHashtableBridge($context);
+        self::implementPrintRObjectBridge($context);
+        self::implementPrintRObjectValueBridge($context);
 
         $entry = $fn->appendBasicBlock('print_r_thin_scalar_entry');
         $boolBlock = $fn->appendBasicBlock('print_r_thin_bool');
@@ -149,6 +165,7 @@ final class StringPrintR
         $nullBlock = $fn->appendBasicBlock('print_r_thin_null');
         $stringBlock = $fn->appendBasicBlock('print_r_thin_string');
         $arrayBlock = $fn->appendBasicBlock('print_r_thin_array');
+        $objectBlock = $fn->appendBasicBlock('print_r_thin_object');
         $fallback = $fn->appendBasicBlock('print_r_thin_fallback');
         $done = $fn->appendBasicBlock('print_r_thin_done');
 
@@ -291,7 +308,8 @@ final class StringPrintR
             $kind,
             $i8->constInt(JitVariable::TYPE_HASHTABLE & 0x7f, false)
         );
-        $context->builder->branchIf($isArray, $arrayBlock, $fallback);
+        $afterArray = $fn->appendBasicBlock('print_r_thin_after_array');
+        $context->builder->branchIf($isArray, $arrayBlock, $afterArray);
 
         $context->builder->positionAtEnd($arrayBlock);
         $ht = $context->builder->call($context->lookupFunction('__value__readHashtable'), $arg);
@@ -301,6 +319,23 @@ final class StringPrintR
             $i64->constInt(0, false)
         );
         $arrayEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterArray);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_OBJECT & 0x7f, false)
+        );
+        $context->builder->branchIf($isObject, $objectBlock, $fallback);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $objectStr = $context->builder->call(
+            $context->lookupFunction(self::OBJ_VALUE_ABI),
+            $arg,
+            $i64->constInt(0, false)
+        );
+        $objectEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($fallback);
@@ -317,6 +352,7 @@ final class StringPrintR
         $result->addIncoming($nullStr, $nullEnd);
         $result->addIncoming($stringStr, $stringEnd);
         $result->addIncoming($arrayStr, $arrayEnd);
+        $result->addIncoming($objectStr, $objectEnd);
         $context->builder->returnValue($result);
     }
 
@@ -340,6 +376,8 @@ final class StringPrintR
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureHelpersForArrayLlvm($context);
+        self::ensurePrintRObjectAbiDeclared($context);
+        self::ensurePrintRObjectValueAbiDeclared($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -356,6 +394,130 @@ final class StringPrintR
             );
         });
         BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+    /**
+     * Object ABI for thin AOT — NestedJIT PrintRJitHelper needs Runtime->vm (#34506).
+     * Peer {@see implementPrintRHashtableBridge} / {@see PrintRObjectLlvm}.
+     */
+    private static function implementPrintRObjectBridge(Context $context): void
+    {
+        $abiName = self::OBJ_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::OBJ_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        self::ensureHelpersForArrayLlvm($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $htPtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+        self::ensurePrintRObjectValueAbiDeclared($context);
+        self::implementPrintRHashtableBridge($context);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::OBJ_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue(
+                PrintRObjectLlvm::encode(
+                    $context,
+                    $fn->getParam(0),
+                    $fn->getParam(1),
+                    $fn->getParam(2)
+                )
+            );
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+    /**
+     * value*-in object ABI — extract at runtime inside this fn, then OBJ_ABI (#34506).
+     */
+    private static function implementPrintRObjectValueBridge(Context $context): void
+    {
+        $abiName = self::OBJ_VALUE_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::OBJ_VALUE_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        self::implementPrintRObjectBridge($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $valuePtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::OBJ_VALUE_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue(
+                PrintRObjectLlvm::encodeFromValueBox(
+                    $context,
+                    $fn->getParam(0),
+                    $fn->getParam(1)
+                )
+            );
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+    /** Declare OBJ_VALUE_ABI without body (HT nested-object arms may lookup) (#34506). */
+    private static function ensurePrintRObjectValueAbiDeclared(Context $context): void
+    {
+        $abiName = self::OBJ_VALUE_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $valuePtr, $i64);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    /** Declare/register OBJ_ABI without emitting body (avoids HT↔OBJ init cycles) (#34506). */
+    private static function ensurePrintRObjectAbiDeclared(Context $context): void
+    {
+        $abiName = self::OBJ_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $htPtr, $i64);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
     }
 
     /** Ensure libc/string helpers before {@see PrintRArrayLlvm} emit (#34497). */

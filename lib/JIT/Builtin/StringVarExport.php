@@ -12,6 +12,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\VarExportArrayLlvm;
+use PHPCompiler\JIT\VarExportObjectLlvm;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
@@ -36,6 +37,11 @@ final class StringVarExport
 {
     public const HT_ABI = '__compiler_var_export_hashtable';
 
+    public const OBJ_ABI = '__compiler_var_export_object';
+
+    /** value* → extract + {@see OBJ_ABI} (thin/nested; avoids emit-time cross-fn IR) (#34506). */
+    public const OBJ_VALUE_ABI = '__compiler_var_export_object_value';
+
     private const HELPER_PATH = '/ext/standard/VarExportJitHelper.php';
 
     private const FORMAT_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\VarExportJitHelper::formatValue';
@@ -43,6 +49,10 @@ final class StringVarExport
     private const BRIDGE_ENTRY = 'var_export_bridge_entry';
 
     private const HT_BRIDGE_ENTRY = 'var_export_ht_bridge_entry';
+
+    private const OBJ_BRIDGE_ENTRY = 'var_export_obj_bridge_entry';
+
+    private const OBJ_VALUE_BRIDGE_ENTRY = 'var_export_obj_value_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -53,6 +63,8 @@ final class StringVarExport
     private const ABI_FUNCTIONS = [
         '__compiler_var_export',
         self::HT_ABI,
+        self::OBJ_ABI,
+        self::OBJ_VALUE_ABI,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -150,6 +162,8 @@ final class StringVarExport
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
             self::implementVarExportHashtableBridge($context);
+            self::implementVarExportObjectBridge($context);
+            self::implementVarExportObjectValueBridge($context);
 
             return;
         }
@@ -168,6 +182,8 @@ final class StringVarExport
         // Register before body: HT bridge + nested scalar formatting may call back (#34497).
         $context->registerFunction($abiName, $fn);
         self::implementVarExportHashtableBridge($context);
+        self::implementVarExportObjectBridge($context);
+        self::implementVarExportObjectValueBridge($context);
 
         $entry = $fn->appendBasicBlock('var_export_thin_scalar_entry');
         $boolBlock = $fn->appendBasicBlock('var_export_thin_bool');
@@ -176,6 +192,7 @@ final class StringVarExport
         $nullBlock = $fn->appendBasicBlock('var_export_thin_null');
         $stringBlock = $fn->appendBasicBlock('var_export_thin_string');
         $arrayBlock = $fn->appendBasicBlock('var_export_thin_array');
+        $objectBlock = $fn->appendBasicBlock('var_export_thin_object');
         $fallback = $fn->appendBasicBlock('var_export_thin_fallback');
         $done = $fn->appendBasicBlock('var_export_thin_done');
 
@@ -296,7 +313,8 @@ final class StringVarExport
             $kind,
             $i8->constInt(JitVariable::TYPE_HASHTABLE & 0x7f, false)
         );
-        $context->builder->branchIf($isArray, $arrayBlock, $fallback);
+        $afterArray = $fn->appendBasicBlock('var_export_thin_after_array');
+        $context->builder->branchIf($isArray, $arrayBlock, $afterArray);
 
         $context->builder->positionAtEnd($arrayBlock);
         $ht = $context->builder->call($context->lookupFunction('__value__readHashtable'), $arg);
@@ -306,6 +324,23 @@ final class StringVarExport
             $i64->constInt(0, false)
         );
         $arrayEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterArray);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_OBJECT & 0x7f, false)
+        );
+        $context->builder->branchIf($isObject, $objectBlock, $fallback);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $objectStr = $context->builder->call(
+            $context->lookupFunction(self::OBJ_VALUE_ABI),
+            $arg,
+            $i64->constInt(0, false)
+        );
+        $objectEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($fallback);
@@ -321,6 +356,7 @@ final class StringVarExport
         $result->addIncoming($nullStr, $nullEnd);
         $result->addIncoming($stringStr, $stringEnd);
         $result->addIncoming($arrayStr, $arrayEnd);
+        $result->addIncoming($objectStr, $objectEnd);
         $context->builder->returnValue($result);
     }
 
@@ -345,6 +381,9 @@ final class StringVarExport
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureFormatHelpersForArrayLlvm($context);
+        // Predeclare OBJ_ABI so nested-object arms in VarExportArrayLlvm can lookup (#34506).
+        self::ensureVarExportObjectAbiDeclared($context);
+        self::ensureVarExportObjectValueAbiDeclared($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -361,6 +400,136 @@ final class StringVarExport
             );
         });
         BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+
+    /**
+     * Object ABI for thin AOT — NestedJIT VarExportJitHelper needs Runtime->vm (#34506).
+     * Peer {@see implementVarExportHashtableBridge} / {@see VarExportObjectLlvm}.
+     */
+    private static function implementVarExportObjectBridge(Context $context): void
+    {
+        $abiName = self::OBJ_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::OBJ_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        self::ensureFormatHelpersForArrayLlvm($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $htPtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        // Register before HT bridge: VarExportArrayLlvm may lookup OBJ_ABI for nested
+        // objects while emitting HT body (#34506).
+        $context->registerFunction($abiName, $fn);
+        self::ensureVarExportObjectValueAbiDeclared($context);
+        self::implementVarExportHashtableBridge($context);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::OBJ_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue(
+                VarExportObjectLlvm::encode(
+                    $context,
+                    $fn->getParam(0),
+                    $fn->getParam(1),
+                    $fn->getParam(2)
+                )
+            );
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+
+
+    /**
+     * value*-in object ABI — extract at runtime inside this fn (scopeLowering), then OBJ_ABI (#34506).
+     */
+    private static function implementVarExportObjectValueBridge(Context $context): void
+    {
+        $abiName = self::OBJ_VALUE_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::OBJ_VALUE_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        self::implementVarExportObjectBridge($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $valuePtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::OBJ_VALUE_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue(
+                VarExportObjectLlvm::encodeFromValueBox(
+                    $context,
+                    $fn->getParam(0),
+                    $fn->getParam(1)
+                )
+            );
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+
+    /** Declare OBJ_VALUE_ABI without body (HT nested-object arms may lookup) (#34506). */
+    private static function ensureVarExportObjectValueAbiDeclared(Context $context): void
+    {
+        $abiName = self::OBJ_VALUE_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $valuePtr, $i64);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    /** Declare/register OBJ_ABI without emitting body (avoids HT↔OBJ init cycles) (#34506). */
+    private static function ensureVarExportObjectAbiDeclared(Context $context): void
+    {
+        $abiName = self::OBJ_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $htPtr, $i64);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
     }
 
     /** Public for {@see VarExportArrayLlvm} string keys (#34497). */

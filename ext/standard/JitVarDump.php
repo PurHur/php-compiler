@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin\StringVarDump;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -31,6 +32,22 @@ final class JitVarDump
 
         StringVarDump::ensureLinkedAtCallSite($context);
         foreach ($args as $arg) {
+            if (JITVariable::TYPE_OBJECT === $arg->type) {
+                $className = ReflectionBuiltinHelper::getClassName($context, $arg);
+                $varsBoxed = JitGetObjectVars::invoke($context, $arg, false);
+                $ht = $context->builder->call(
+                    $context->lookupFunction('__value__readHashtable'),
+                    JitValueBox::normalizeValuePtr($context, $varsBoxed)
+                );
+                $i64 = $context->getTypeFromString('int64');
+                $context->builder->call(
+                    $context->lookupFunction(StringVarDump::OBJ_ABI),
+                    $className,
+                    $ht,
+                    $i64->constInt(1, false)
+                );
+                continue;
+            }
             $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
             $context->builder->call(
                 $context->lookupFunction('__compiler_var_dump'),
