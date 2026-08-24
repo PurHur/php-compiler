@@ -14,6 +14,10 @@ use PHPCompiler\VM\Variable;
  * Mirrors {@see JsonEncodeNestedJitHelper} (#27020) structure closely — NestedJIT is
  * sensitive to helper shape (extra methods in the same TU have mis-typed $pair slots).
  * AOT HT export keeps JIT tags (#33520): NATIVE_BOOL=2, NATIVE_DOUBLE=3 (#33682).
+ *
+ * Non-empty array HT ABI is {@see \PHPCompiler\JIT\SerializeArrayLlvm} via
+ * {@see \PHPCompiler\JIT\Builtin\StringSerialize} (#34483) — NestedJIT encodeHashtable
+ * SIGABRTed on flat/assoc arrays; this helper remains for scalar encodeValue + fallback.
  * php-src: ext/standard/var.c — php_var_serialize
  */
 final class SerializeNestedJitHelper
@@ -51,8 +55,11 @@ final class SerializeNestedJitHelper
 
     public static function encodeHashtable(HashTable $ht, int $flags): ?string
     {
+        // NestedJIT foreach does not reliably mutate bare int counters ($n++ stays 0 /
+        // aborts). Use a string latch for the element count (#31101 / peer JsonEncode).
         $body = '';
-        $n = 0;
+        $count = '0';
+        $n = '0';
         foreach ($ht->exportKeyValuePairs(true) as $pair) {
             $key = $pair[0];
             $kt = $key->type & 0x7f;
@@ -66,51 +73,14 @@ final class SerializeNestedJitHelper
             $val = $pair[1];
             $t = $val->type & 0x7f;
             if (6 === $t || 7 === $t) {
-                // NestedJIT: $val->toArray() SIGABRTs on pair values (#27031 / #32925).
-                // Key=>value foreach preserves assoc string keys (#32927); packed stays i:N.
-                $inner = '';
-                $in = 0;
-                $had = '0';
-                foreach ($val as $ik => $elem) {
-                    $had = '1';
-                    if (\is_int($ik)) {
-                        $inner .= 'i:'.((string) $ik).';';
-                    } elseif (\is_string($ik)) {
-                        $inner .= self::quote($ik);
-                    } elseif (\is_object($ik)) {
-                        $ikt = $ik->type & 0x7f;
-                        if (1 === $ikt) {
-                            $inner .= 'i:'.((string) $ik->toInt()).';';
-                        } else {
-                            $inner .= self::quote($ik->toString());
-                        }
-                    } else {
-                        $inner .= 'i:'.((string) $in).';';
-                    }
-                    $et = $elem->type & 0x7f;
-                    if (1 === $et) {
-                        $inner .= 'i:'.((string) $elem->toInt()).';';
-                    } elseif (0 === $et) {
-                        $inner .= 'N;';
-                    } elseif (2 === $et) {
-                        if ($elem->toBool()) {
-                            $inner .= 'b:1;';
-                        } else {
-                            $inner .= 'b:0;';
-                        }
-                    } elseif (4 === $et) {
-                        $inner .= self::quote($elem->toString());
-                    } elseif (3 === $et) {
-                        $inner .= 'd:'.((string) $elem->toFloat()).';';
-                    } else {
-                        $inner .= 'i:'.((string) $elem->toInt()).';';
-                    }
-                    ++$in;
-                }
-                if ('1' === $had) {
-                    $body .= 'a:'.((string) $in).':{'.$inner.'}';
-                } else {
+                // toArray + recurse — NestedJIT foreach on typed HT aborts under thin
+                // O=0 HashTableChunkLlvm (#27182 / JsonEncode). Prefer this over the
+                // value-foreach nest that SIGABRTed flat arrays too (#34483).
+                $nested = self::encodeHashtable($val->toArray(), $flags);
+                if (null === $nested) {
                     $body .= 'N;';
+                } else {
+                    $body .= $nested;
                 }
             } elseif (1 === $t) {
                 $body .= 'i:'.((string) $val->toInt()).';';
@@ -127,56 +97,25 @@ final class SerializeNestedJitHelper
             } elseif (4 === $t) {
                 $body .= self::quote($val->toString());
             } else {
-                // #27182: NestedJIT nested HTs often lack type 6/7 — same key=>value walk.
-                $inner = '';
-                $in = 0;
-                $had = '0';
-                foreach ($val as $ik => $elem) {
-                    $had = '1';
-                    if (\is_int($ik)) {
-                        $inner .= 'i:'.((string) $ik).';';
-                    } elseif (\is_string($ik)) {
-                        $inner .= self::quote($ik);
-                    } elseif (\is_object($ik)) {
-                        $ikt = $ik->type & 0x7f;
-                        if (1 === $ikt) {
-                            $inner .= 'i:'.((string) $ik->toInt()).';';
-                        } else {
-                            $inner .= self::quote($ik->toString());
-                        }
-                    } else {
-                        $inner .= 'i:'.((string) $in).';';
-                    }
-                    $et = $elem->type & 0x7f;
-                    if (1 === $et) {
-                        $inner .= 'i:'.((string) $elem->toInt()).';';
-                    } elseif (0 === $et) {
-                        $inner .= 'N;';
-                    } elseif (2 === $et) {
-                        if ($elem->toBool()) {
-                            $inner .= 'b:1;';
-                        } else {
-                            $inner .= 'b:0;';
-                        }
-                    } elseif (4 === $et) {
-                        $inner .= self::quote($elem->toString());
-                    } elseif (3 === $et) {
-                        $inner .= 'd:'.((string) $elem->toFloat()).';';
-                    } else {
-                        $inner .= 'i:'.((string) $elem->toInt()).';';
-                    }
-                    ++$in;
-                }
-                if ('1' === $had) {
-                    $body .= 'a:'.((string) $in).':{'.$inner.'}';
-                } else {
+                // #27182: helper-runtime nested HTs often lack type 6/7 — try toArray.
+                $maybe = $val->toArray();
+                if (null === $maybe) {
                     $body .= 'N;';
+                } else {
+                    $nested = self::encodeHashtable($maybe, $flags);
+                    if (null === $nested) {
+                        $body .= 'N;';
+                    } else {
+                        $body .= $nested;
+                    }
                 }
             }
-            ++$n;
+            // String latch increment: '0'→'1'→'2'… via strlen of a digit run (#31101).
+            $count .= '1';
+            $n = (string) (\strlen($count) - 1);
         }
 
-        return 'a:'.((string) $n).':{'.$body.'}';
+        return 'a:'.$n.':{'.$body.'}';
     }
 
     /**
@@ -191,8 +130,8 @@ final class SerializeNestedJitHelper
         if (null === $s) {
             return 's:0:"";';
         }
-        $n = \strlen($s);
+        $len = \strlen($s);
 
-        return 's:'.((string) $n).':"'.$s.'";';
+        return 's:'.((string) $len).':"'.$s.'";';
     }
 }
