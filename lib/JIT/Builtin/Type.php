@@ -70,9 +70,10 @@ class Type extends Builtin {
         // UnpackJitHelper.
         // __compiler_var_export / __compiler_print_r / __compiler_var_dump always-on
         // shells removed (#32941): StringVarExport / StringPrintR / StringVarDump own
-        // the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
-        // still ensureLinked). Thin AOT already calls ensureLinked from JitVarExport /
-        // JitPrintR / JitVarDump. Leftover Type empty decls vs Runtime ABI drift mint
+        // the ABI (getNamedFunction first, then addFunction if absent). Type::initialize
+        // always-on ensureLinked removed (#34384): JitVarExport / JitPrintR /
+        // JitVarDump (ensureLinkedAtCallSite) already ensureLinked before lookup
+        // (peer #34357). Leftover Type empty decls vs Runtime ABI drift mint
         // var_export.1 / print_r.1 / var_dump.1 (#31894 / #32122). User-script
         // var_export()/print_r()/var_dump() stay VarExportJitHelper / PrintRJitHelper /
         // VarDumpJitHelper (thin scalar bridge; non-scalar needs Runtime->vm — #23540).
@@ -725,16 +726,19 @@ class Type extends Builtin {
         // ABI drift mint xmlrpc_encode.1 (#31894 / #32122).
         // __compiler_serialize_hashtable / __compiler_serialize_value /
         // __compiler_serialize_object always-on shells removed (#33207): StringSerialize
-        // owns the ABI (getNamedFunction first via bridges / JitVmHelperLink::ensureBridge;
-        // Type::initialize still StringSerialize::ensureLinked on the full load path).
-        // Leftover Type empty decls vs Runtime ABI drift mint serialize_hashtable.1
-        // (#31894 / #32122). User-script serialize() stays JitSerialize /
-        // SerializeNestedJitHelper (php-src ext/standard/var.c).
+        // owns the ABI (getNamedFunction first via bridges / JitVmHelperLink::ensureBridge).
+        // Type::initialize always-on ensureLinked removed (#34384): JitSerialize /
+        // SessionEncodeRuntime / Spl* / ArrayObject helpers already ensureLinked before
+        // lookup (peer #34357). Leftover Type empty decls vs Runtime ABI drift mint
+        // serialize_hashtable.1 (#31894 / #32122). User-script serialize() stays
+        // JitSerialize / SerializeNestedJitHelper (php-src ext/standard/var.c).
         // __compiler_unserialize always-on shell removed (#33213): StringUnserialize
-        // owns the ABI (getNamedFunction first via implementUnserializeBridge;
-        // Type::initialize still StringUnserialize::ensureLinked). Leftover Type empty
-        // decls vs Runtime ABI drift mint unserialize.1 (#31894 / #32122). User-script
-        // unserialize() stays JitUnserialize / UnserializeJitHelper
+        // owns the ABI (getNamedFunction first via implementUnserializeBridge).
+        // Type::initialize always-on ensureLinked removed (#34384): JitUnserialize /
+        // SessionEncodeRuntime / Spl* / ArrayObject helpers already ensureLinked before
+        // lookup (peer #34357). Leftover Type empty decls vs Runtime ABI drift mint
+        // unserialize.1 (#31894 / #32122). User-script unserialize() stays
+        // JitUnserialize / UnserializeJitHelper
         // (php-src ext/standard/var.c / var_unserializer.re).
         // __compiler_shell_exec / __compiler_escapeshellarg / __compiler_escapeshellcmd
         // always-on shells removed (#33201): ProcessRuntime owns the ABI (getNamedFunction
@@ -844,9 +848,11 @@ class Type extends Builtin {
         // JitSscanf / PackJitRuntime / UnpackJitRuntime already ensureLinked or
         // implementIfDeclared before lookup (peer #34337). StringTime still
         // eager below (TimeRuntimeShrinkTest::testTypeLinksStringTime).
-        StringVarExport::ensureLinked($this->context);
-        StringPrintR::ensureLinked($this->context);
-        StringVarDump::ensureLinked($this->context);
+        // StringVarExport / StringPrintR / StringVarDump / StringSerialize /
+        // StringUnserialize always-on ensureLinked removed (#34384): JitVarExport /
+        // JitPrintR / JitVarDump / JitSerialize / JitUnserialize already
+        // ensureLinked before lookup (peer #34357). StringTime still eager below
+        // (TimeRuntimeShrinkTest::testTypeLinksStringTime).
         StringStripTags::ensureLinked($this->context);
         StringConvertUu::ensureLinked($this->context);
         StringQuotPrint::ensureLinked($this->context);
@@ -884,8 +890,6 @@ class Type extends Builtin {
         StreamRead::ensureLinked($this->context);
         StreamResource::ensureLinked($this->context);
         StringStreamCsv::ensureLinked($this->context);
-        StringSerialize::ensureLinked($this->context);
-        StringUnserialize::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);

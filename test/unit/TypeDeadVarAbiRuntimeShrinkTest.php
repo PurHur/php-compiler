@@ -41,10 +41,12 @@ final class TypeDeadVarAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#32941)"
             );
         }
-        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StringVarExport::ensureLinked', $type);
-        $this->assertStringContainsString('StringPrintR::ensureLinked', $type);
-        $this->assertStringContainsString('StringVarDump::ensureLinked', $type);
+        // No further Type always-on leftover after #33267 exit/abort drop.
+        // Type::initialize always-on ensureLinked removed (#34384); call sites link lazily.
+        $this->assertStringContainsString('#34384', $type);
+        $this->assertStringNotContainsString('StringVarExport::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringPrintR::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringVarDump::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresVarAbisModuleLocally(): void
@@ -69,12 +71,18 @@ final class TypeDeadVarAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitVarDump.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksVarRuntime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkVarRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringVarExport::ensureLinked($this->context)', $type);
-        $this->assertStringContainsString('StringPrintR::ensureLinked($this->context)', $type);
-        $this->assertStringContainsString('StringVarDump::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringVarExport::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringPrintR::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringVarDump::ensureLinked($this->context)', $type);
+        $export = (string) file_get_contents(__DIR__.'/../../ext/standard/JitVarExport.php');
+        $printR = (string) file_get_contents(__DIR__.'/../../ext/standard/JitPrintR.php');
+        $dump = (string) file_get_contents(__DIR__.'/../../ext/standard/JitVarDump.php');
+        $this->assertStringContainsString('StringVarExport::ensureLinked', $export);
+        $this->assertStringContainsString('StringPrintR::ensureLinked', $printR);
+        $this->assertStringContainsString('StringVarDump::ensureLinkedAtCallSite', $dump);
     }
 
     public function testNoNewRuntimeCForVarAbis(): void

@@ -13821,12 +13821,21 @@ class JIT {
                             $declaringClass = 'stdClass';
                         }
                     }
-                    // User-script AOT: documentElement temps often lose DOMElement userType (#23251).
+                    // User-script AOT: documentElement / firstChild temps often lose DOMElement
+                    // userType (#23251). nodeName/tagName on stdClass define a new slot and
+                    // SIGSEGV after setAttribute (DOMAttr shares the name).
                     if (
                         null !== $propName
-                        && \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
-                        && \in_array(strtolower($propName), ['textcontent', 'nodevalue'], true)
+                        && \in_array(
+                            strtolower($propName),
+                            ['textcontent', 'nodevalue', 'nodename', 'tagname'],
+                            true
+                        )
                         && \in_array(strtolower($declaringClass), ['object', 'stdclass', ''], true)
+                        && (
+                            \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+                            || null !== \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName
+                        )
                     ) {
                         $declaringClass = 'DOMElement';
                     }
@@ -15311,11 +15320,20 @@ class JIT {
         if (!\in_array($lc, ['object', 'stdclass', ''], true)) {
             return $declaringClass;
         }
-        if (!$this->context->hasVariableOpInScopes($obj)) {
-            return $declaringClass;
+        $tagged = null;
+        if ($this->context->hasVariableOpInScopes($obj)) {
+            $recv = $this->context->getVariableFromOpInScopes($obj);
+            $tagged = $recv->classUserType ?? null;
         }
-        $recv = $this->context->getVariableFromOpInScopes($obj);
-        $tagged = $recv->classUserType ?? null;
+        // `$b = new B` stamps classUserType on the named binding; later SSA temps for the
+        // same CV often keep CFG userType "object" without copying the tag (#34382 / #32749).
+        if ((!is_string($tagged) || '' === $tagged || 'object' === strtolower(ltrim($tagged, '\\')))
+            && null !== ($resolved = JIT\OperandName::resolve($obj))
+            && isset($this->context->namedVariableBindings[$resolved])
+        ) {
+            $bound = $this->context->namedVariableBindings[$resolved];
+            $tagged = $bound->classUserType ?? null;
+        }
         if (!is_string($tagged) || '' === $tagged) {
             return $declaringClass;
         }
@@ -15350,6 +15368,9 @@ class JIT {
             return;
         }
         $result->type = Type::object($userType);
+        if ($this->context->hasVariableOp($result)) {
+            $this->context->getVariableFromOp($result)->classUserType = $userType;
+        }
     }
 
     private function externalPropertyResultUserType(string $class, string $name): ?string
@@ -15363,6 +15384,13 @@ class JIT {
             return 'PHPCfg\\Block';
         }
         if ('domdocument' === $lcClass && 'documentelement' === $lcName) {
+            return 'DOMElement';
+        }
+        if (
+            str_starts_with($lcClass, 'dom')
+            && \in_array($lcName, ['firstchild', 'lastchild', 'nextsibling', 'previoussibling'], true)
+        ) {
+            // Result is a child node; AOT materializes elements/text as DOMElement (#32315).
             return 'DOMElement';
         }
 

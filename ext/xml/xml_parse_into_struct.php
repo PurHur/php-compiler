@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -57,6 +58,18 @@ final class xml_parse_into_struct extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireArgCountRangeJit($context, $args, 'xml_parse_into_struct', 3, 4)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = JitXmlParserUserScript::tryParseIntoStruct($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'xml_parse_into_struct() user-script AOT requires a tracked parser + compile-time data (#34378)'
+            );
+        }
         throw new \LogicException('xml_parse_into_struct() is not JIT-lowered in this compiler build');
     }
 }

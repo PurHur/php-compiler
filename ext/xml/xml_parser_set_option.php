@@ -6,11 +6,14 @@ namespace PHPCompiler\ext\xml;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
 
-/** xml_parser_set_option() — configure parser (php-src ext/xml/xml.c; #18203, #30652). */
+/** xml_parser_set_option() — configure parser (php-src ext/xml/xml.c; #18203, #30652, #34377). */
 final class xml_parser_set_option extends XmlFunction
 {
     public function __construct()
@@ -58,6 +61,20 @@ final class xml_parser_set_option extends XmlFunction
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = JitXmlParserUserScript::trySetOption($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'xml_parser_set_option() user-script AOT requires a tracked parser + compile-time option/value (#34377)'
+            );
+        }
+        throw new \LogicException('xml_parser_set_option() is not JIT-lowered in this compiler build');
     }
 
     /**
