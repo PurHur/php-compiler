@@ -239,6 +239,12 @@ return_string:
                 $this->context->getTypeFromString('int64')->constInt(0, false)
             );
         }
+        // non-numeric string ⊙ arith: zend_type_error (not strtol→0) (#34449).
+        if (JitNonNumericStringArithGuard::guardArithmetic($this->context, $opcode->type, $left, $right)) {
+            return $this->nativeLongResultVariable(
+                $this->context->getTypeFromString('int64')->constInt(0, false)
+            );
+        }
         // object/array vs scalar < > <= >= <=> / object vs string == : zend_compare (#32503, #32515).
         $unlike = JitUnlikeCompare::tryLower($this->context, $opcode->type, $left, $right);
         if (null !== $unlike) {

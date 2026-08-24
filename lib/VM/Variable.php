@@ -2055,6 +2055,22 @@ restart:
     }
 
     /**
+     * True when convert_scalar_to_number would zend_type_error (no numeric prefix) (#34449).
+     *
+     * Leading numeric junk ({@code "5x"}) is false — warn+coerce, not TypeError.
+     */
+    public static function isArithmeticNonNumericString(string $s): bool
+    {
+        try {
+            self::parseStringForArithmetic($s);
+
+            return false;
+        } catch (\LogicException) {
+            return true;
+        }
+    }
+
+    /**
      * Zend convert_scalar_to_number for string operands in add_function / compound assign (#4892).
      *
      * @return array{0: int|float, 1: bool} numeric value and whether E_WARNING is needed
