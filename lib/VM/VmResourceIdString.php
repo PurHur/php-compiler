@@ -74,6 +74,18 @@ final class VmResourceIdString
         return self::snprintf($context, $handle, '%lld');
     }
 
+    /** `Resource id #%lld` — open or closed stream display (#34507 / peer #5149). */
+    public static function formatResourceIdLabel(Context $context, Value $longVal): Value
+    {
+        StringDir::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $handle = $longVal->typeOf() === $i64
+            ? $longVal
+            : $context->builder->zExt($longVal, $i64);
+
+        return self::snprintf($context, $handle, ValueEchoSupport::RESOURCE_FORMAT);
+    }
+
     private static function snprintf(Context $context, Value $handle, string $format): Value
     {
         $sizeT = $context->getTypeFromString('size_t');

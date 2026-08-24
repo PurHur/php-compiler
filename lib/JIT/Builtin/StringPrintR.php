@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitGettype;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitValueCompare;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
@@ -227,7 +229,9 @@ final class StringPrintR
             $context->lookupFunction('__value__readLong'),
             $arg
         );
-        $longStr = VmResourceIdString::formatBoxedNativeLong($context, $longVal);
+        // Thin AOT: stream handles are boxed TYPE_NATIVE_LONG — Resource id #N (#34507).
+        // formatBoxedNativeLong always uses %lld (#23811); open/closed need RESOURCE_FORMAT.
+        $longStr = self::formatThinNativeLongOrResource($context, $fn, $longVal);
         $longEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
@@ -359,6 +363,51 @@ final class StringPrintR
     {
         StringDir::ensureLinked($context);
         ZendDoubleStringRuntime::ensureLinked($context);
+    }
+
+    /**
+     * Thin AOT long → string: Resource id #N for open/closed streams, else digits (#34507).
+     */
+    private static function formatThinNativeLongOrResource(
+        Context $context,
+        LlvmFunction $fn,
+        Value $longVal
+    ): Value {
+        $longBlock = $context->builder->getInsertBlock();
+        StringDir::ensureLinked($context);
+        StreamLifecycleRuntime::ensureLinked($context);
+        $context->builder->positionAtEnd($longBlock);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $isOpen = JitValueCompare::nativeLongIsResource($context, $longVal);
+        $wasClosed = JitGettype::isClosedStreamHandle($context, $longVal);
+        $isClosed = $context->builder->and($wasClosed, $context->builder->not($isOpen));
+        $isRes = $context->builder->or($isOpen, $isClosed);
+
+        // Append on $fn explicitly — ensureLinked must not leave insert on another fn (#34507).
+        $resBlock = $fn->appendBasicBlock('print_r_thin_long_resource');
+        $plainBlock = $fn->appendBasicBlock('print_r_thin_long_plain');
+        $doneBlock = $fn->appendBasicBlock('print_r_thin_long_done');
+        $context->builder->branchIf($isRes, $resBlock, $plainBlock);
+
+        $context->builder->positionAtEnd($plainBlock);
+        $plainStr = VmResourceIdString::formatBoxedNativeLong($context, $longVal);
+        $context->builder->positionAtEnd($plainBlock);
+        $plainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($resBlock);
+        $resStr = VmResourceIdString::formatResourceIdLabel($context, $longVal);
+        $context->builder->positionAtEnd($resBlock);
+        $resEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($strPtr);
+        $phi->addIncoming($plainStr, $plainEnd);
+        $phi->addIncoming($resStr, $resEnd);
+
+        return $phi;
     }
 
     private static function emptyString(Context $context): Value

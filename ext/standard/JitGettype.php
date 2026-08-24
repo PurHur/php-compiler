@@ -131,7 +131,7 @@ final class JitGettype
     }
 
     /** True when handle was opened (was_used) but {@see __compiler_is_resource} is now false. */
-    private static function isClosedStreamHandle(Context $context, Value $handle): Value
+    public static function isClosedStreamHandle(Context $context, Value $handle): Value
     {
         StreamGlobalsJit::ensureGlobals($context);
         $i64 = $context->getTypeFromString('int64');
