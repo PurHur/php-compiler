@@ -992,6 +992,9 @@ final class BuiltinInternalArgInfo
             'mt_srand', 'srand' => (0 === $index || 1 === $index) ? 'int' : null,
             // ext/standard/basic_functions.stub.php — InternalArgInfo additional_headers string; Zend array|string (#26144)
             'mail' => 3 === $index ? 'array|string' : null,
+            // ext/standard/array.stub.php — InternalArgInfo $value untyped; Zend mixed (#25761)
+            'array_fill_keys' => 1 === $index ? 'mixed' : null,
+            'array_pad' => 2 === $index ? 'mixed' : null,
             // ext/standard/basic_functions.stub.php — InternalArgInfo 2-arg / required 4-arg strings (#25067)
             'number_format' => match ($index) {
                 0 => 'float',
