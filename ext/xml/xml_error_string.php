@@ -47,6 +47,15 @@ final class xml_error_string extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = JitXmlParserUserScript::tryErrorString($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'xml_error_string() user-script AOT requires a compile-time error code (#34383)'
+            );
+        }
         throw new \LogicException('xml_error_string() is not JIT-lowered in this compiler build');
     }
 }

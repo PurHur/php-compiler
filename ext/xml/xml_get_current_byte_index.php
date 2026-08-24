@@ -36,6 +36,15 @@ final class xml_get_current_byte_index extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = JitXmlParserUserScript::tryGetCurrentByteIndex($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'xml_get_current_byte_index() user-script AOT requires a tracked XMLParser (#34383)'
+            );
+        }
         throw new \LogicException('xml_get_current_byte_index() is not JIT-lowered in this compiler build');
     }
 }

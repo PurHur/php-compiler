@@ -14,7 +14,8 @@ use PHPLLVM\Value;
 
 /**
  * User-script standalone AOT: xml_parser_create / xml_parse / xml_get_error_code /
- * xml_parser_free / xml_parser_set_option / xml_parser_get_option (#27293, #29318, #34377).
+ * xml_parser_free / xml_parser_set_option / xml_parser_get_option / xml_error_string /
+ * xml_get_current_{line,column,byte}_* (#27293, #29318, #34377, #34383).
  *
  * Runs the existing PHP-in-PHP parser model ({@see VmXml}, {@see XmlParserSupport}) at
  * compile time when arguments are literals, then emits constant results / an allocated
@@ -32,6 +33,9 @@ final class JitXmlParserUserScript
     private static ?ObjectEntry $lastParser = null;
 
     private static int $tokenSeq = 0;
+
+    /** Last xml_get_error_code fold — so xml_error_string(xml_get_error_code($p)) can lower. */
+    private static ?int $lastErrorCodeFold = null;
 
     public static function isUserScriptAot(): bool
     {
@@ -110,8 +114,87 @@ final class JitXmlParserUserScript
         if (null === $parser) {
             return null;
         }
+        $code = VmXml::getErrorCode($parser->id);
+        self::$lastErrorCodeFold = $code;
 
-        return self::intValue($context, VmXml::getErrorCode($parser->id));
+        return self::intValue($context, $code);
+    }
+
+    /**
+     * xml_error_string(int $error_code): ?string (#34383).
+     *
+     * php-src XML_ErrorString() always returns a C string for defined codes; VM maps
+     * unknown codes to "Unknown" ({@see VmXml::errorString}).
+     */
+    public static function tryErrorString(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || 1 !== \count($args)) {
+            return null;
+        }
+        $code = self::compileTimeOptionInt($context, $args[0]);
+        if (null === $code && null !== $args[0]->compileTimeLong) {
+            $code = (int) $args[0]->compileTimeLong;
+        }
+        if (
+            null === $code
+            && JITVariable::TYPE_VALUE === $args[0]->type
+            && null !== self::$lastErrorCodeFold
+        ) {
+            $code = self::$lastErrorCodeFold;
+        }
+        if (null === $code) {
+            return null;
+        }
+
+        return self::stringValue($context, VmXml::errorString($code));
+    }
+
+    /**
+     * xml_get_current_line_number(XMLParser $parser): int (#34383).
+     */
+    public static function tryGetCurrentLineNumber(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || 1 !== \count($args)) {
+            return null;
+        }
+        $parser = self::lookup($args[0]);
+        if (null === $parser) {
+            return null;
+        }
+
+        return self::intValue($context, VmXml::getCurrentLineNumber($parser->id));
+    }
+
+    /**
+     * xml_get_current_column_number(XMLParser $parser): int (#34383).
+     */
+    public static function tryGetCurrentColumnNumber(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || 1 !== \count($args)) {
+            return null;
+        }
+        $parser = self::lookup($args[0]);
+        if (null === $parser) {
+            return null;
+        }
+
+        return self::intValue($context, VmXml::getCurrentColumnNumber($parser->id));
+    }
+
+    /**
+     * xml_get_current_byte_index(XMLParser $parser): int (#34383).
+     */
+    public static function tryGetCurrentByteIndex(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || 1 !== \count($args)) {
+            return null;
+        }
+        $parser = self::lookup($args[0]);
+        if (null === $parser) {
+            return null;
+        }
+
+        return self::intValue($context, VmXml::getCurrentByteIndex($parser->id));
     }
 
     /**
