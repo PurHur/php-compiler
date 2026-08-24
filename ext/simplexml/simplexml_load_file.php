@@ -8,11 +8,12 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** simplexml_load_file() — load XML file into SimpleXMLElement tree (#3338, #22406). */
+/** simplexml_load_file() — load XML file into SimpleXMLElement tree (#3338, #22406, #34454). */
 final class simplexml_load_file extends Internal
 {
     public function __construct()
@@ -60,6 +61,10 @@ final class simplexml_load_file extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('simplexml_load_file() is not JIT-lowered in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'simplexml_load_file', 1, 5)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
+        return JitSimpleXmlLoadFile::invoke($context, ...$args);
     }
 }
