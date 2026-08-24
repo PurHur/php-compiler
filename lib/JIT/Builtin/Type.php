@@ -975,6 +975,11 @@ class Type extends Builtin {
         // NestedJIT on every full load vs Runtime ABI drift mints addcslashes.1 /
         // stripcslashes.1 (#31894 / #32122). User-script stays CslashesJitHelper
         // (php-src ext/standard/string.c).
+        // CallArgv::implement always-on removed (#34550): ensureGlobal is lazy via
+        // CallArgv::emitStore / CallArgv::load (Native.php / JitFuncArgs.php) and
+        // remaining implement() call sites (SessionGcRuntime / ObGzhandlerJitRuntime).
+        // Scripts that never touch func_get_args/func_num_args skip the module global
+        // on the full load path (peer #34534). php-src Zend/zend_builtin_functions.c.
         // SessionStorageGlobals::ensureGlobals stays.
         // __phpc_error_handler_* / __phpc_exception_handler_* always-on shells removed
         // (#33842): ErrorHandlerJitRuntime / ExceptionHandlerJitRuntime own the ABI
@@ -986,7 +991,6 @@ class Type extends Builtin {
         // (JitErrorHandler / JitExceptionHandler / JitTriggerErrorKernel /
         // TryCatchHelper) ensureLinked before lookup. php-src:
         // ext/standard/basic_functions.c — set_error_handler / set_exception_handler.
-        CallArgv::implement($this->context);
         // SessionStart/WriteClose/RegenerateId/Destroy/Abort/Unset::implement always-on
         // removed (#33980): those implement() methods are no-ops since #21564 — bodies live
         // in JitSessionLifecycleKernel via SessionLifecycleRuntime::ensureLinked at
