@@ -1,0 +1,22 @@
+<?php
+echo "VE empty:\n";
+var_export([]);
+echo "\n---\n";
+echo "VE packed:\n";
+var_export([1, 2]);
+echo "\n---\n";
+echo "VE assoc:\n";
+var_export(['a' => 1, 'b' => 'x']);
+echo "\n---\n";
+echo "VE nested:\n";
+var_export([[1, 2]]);
+echo "\n---\n";
+echo "PR empty:\n";
+echo print_r([], true);
+echo "---\n";
+echo "PR packed:\n";
+echo print_r([1], true);
+echo "---\n";
+echo "PR nested:\n";
+echo print_r([[1, 2]], true);
+echo "---\n";

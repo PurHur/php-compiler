@@ -10,6 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\PrintRArrayLlvm;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
@@ -24,9 +25,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Embed: NestedJIT {@see PrintRJitHelper} (php-in-PHP).
- * Thin standalone AOT: scalar LLVM bridge (bool/null/int/float/string) — NestedJIT of the helper
- * segfaults or throws without Runtime->vm (#23540 / #24220 / #24259). Non-scalar thin AOT aborts
- * with a stderr diagnostic (peer StringVarDump).
+ * Thin standalone AOT: scalar + array LLVM bridge (bool/null/int/float/string/array) — NestedJIT
+ * of the helper segfaults or throws without Runtime->vm (#23540 / #24220 / #24259 / #34497).
+ * Arrays: {@see PrintRArrayLlvm} (peer VarExportArrayLlvm / SerializeArrayLlvm).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringVarExport #20589).
  * Thin standalone AOT publishes sg_vm_context before NestedJIT (#17391 / #23540) on the embed path.
  * php-src: ext/standard/var.c — php_print_r_ex / zend_print_zval_r / PHP_FUNCTION(print_r)
@@ -102,7 +103,7 @@ final class StringPrintR
     }
 
     /**
-     * Thin standalone AOT: format scalars like Zend print_r without NestedJIT (#24259 / #24220).
+     * Thin standalone AOT: format scalars + arrays like Zend print_r without NestedJIT (#24259 / #34497).
      *
      * php-src zend_print_zval_r: bool true → "1", false/null → ""; int/float/string as themselves.
      */
@@ -130,6 +131,9 @@ final class StringPrintR
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
+        // Register before HT helper emit: PrintRArrayLlvm recurses via this ABI (#34497).
+        $context->registerFunction($abiName, $fn);
+        PrintRArrayLlvm::ensureHelper($context);
 
         $entry = $fn->appendBasicBlock('print_r_thin_scalar_entry');
         $boolBlock = $fn->appendBasicBlock('print_r_thin_bool');
@@ -137,6 +141,7 @@ final class StringPrintR
         $doubleBlock = $fn->appendBasicBlock('print_r_thin_double');
         $nullBlock = $fn->appendBasicBlock('print_r_thin_null');
         $stringBlock = $fn->appendBasicBlock('print_r_thin_string');
+        $arrayBlock = $fn->appendBasicBlock('print_r_thin_array');
         $fallback = $fn->appendBasicBlock('print_r_thin_fallback');
         $done = $fn->appendBasicBlock('print_r_thin_done');
 
@@ -260,7 +265,8 @@ final class StringPrintR
             $kind,
             $i8->constInt(JitVariable::TYPE_STRING & 0x7f, false)
         );
-        $context->builder->branchIf($isString, $stringBlock, $fallback);
+        $afterString = $fn->appendBasicBlock('print_r_thin_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
         $stringStr = $context->builder->call(
@@ -268,6 +274,20 @@ final class StringPrintR
             $arg
         );
         $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $context->builder->branchIf($isArray, $arrayBlock, $fallback);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $ht = $context->builder->call($context->lookupFunction('__value__readHashtable'), $arg);
+        $arrayStr = PrintRArrayLlvm::encode($context, $ht, $i64->constInt(0, false));
+        $arrayEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($fallback);
@@ -283,6 +303,7 @@ final class StringPrintR
         $result->addIncoming($doubleStr, $doubleEnd);
         $result->addIncoming($nullStr, $nullEnd);
         $result->addIncoming($stringStr, $stringEnd);
+        $result->addIncoming($arrayStr, $arrayEnd);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
