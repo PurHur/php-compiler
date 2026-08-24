@@ -15,6 +15,7 @@ use PHPLLVM\Value;
  * mb_scrub() — replace invalid byte sequences (php-src ext/mbstring/mbstring.c; PHP 8.4, #6050).
  *
  * Excess argc → Zend `expects at most` ArgumentCountError (#30786).
+ * JIT/AOT runtime strings via {@see JitMbScrub} NestedJIT (#34338).
  */
 final class mb_scrub extends Internal
 {
@@ -50,14 +51,7 @@ final class mb_scrub extends Internal
         if (!$this->requireArgCountRangeJit($context, $args, 'mb_scrub', 1, 2)) {
             return $context->builder->load($context->constantStringFromString(''));
         }
-        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21516, reverts #21061 TypeError).
-        $folded = JitMbScrub::tryCompileTimeFold($context, $args);
-        if (null !== $folded) {
-            return $folded;
-        }
-
-        throw new \LogicException(
-            'mb_scrub() JIT requires compile-time string and encoding literals in this compiler build'
-        );
+        // Soft-null DEP+coerce on 8.4; runtime NestedJIT via {@see JitMbScrub} (#34338).
+        return JitMbScrub::invoke($context, $args);
     }
 }
