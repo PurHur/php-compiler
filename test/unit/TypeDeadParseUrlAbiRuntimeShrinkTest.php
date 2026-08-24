@@ -59,10 +59,14 @@ final class TypeDeadParseUrlAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ParseUrlRuntime::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksParseUrlRuntime(): void
+    public function testTypeInitializeDropsEagerParseUrlEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('ParseUrlRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString(
+            'ParseUrlRuntime::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly ParseUrlRuntime::ensureLinked($this->context) (#34423)'
+        );
     }
 
     public function testNoNewRuntimeCForParseUrlAbi(): void

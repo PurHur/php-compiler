@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -17,9 +18,27 @@ use PHPLLVM\Value;
  *
  * NestedJIT leaf: {@see JitFileGetContentsLibc} so `@file_get_contents` does not re-enter
  * {@see FileGetContentsJitHelper} via `__compiler_file_get_contents` (#29833 / #29545).
+ * Call-site {@see StringFileGetContents::ensureLinked} before lookup (#34423) — Type no longer
+ * eagerly links on initialize (peer #34414).
  */
 final class JitFileGetContents
 {
+    private static function ensureCompilerAbi(Context $context): void
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        $savedInsert = null;
+        try {
+            $savedInsert = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        StringFileGetContents::ensureLinked($context);
+        if (null !== $savedInsert) {
+            $context->builder->positionAtEnd($savedInsert);
+        }
+    }
+
     public static function emitLengthValueErrorIfNegative(Context $context, Value $length): void
     {
         $i64 = $context->getTypeFromString('int64');
@@ -59,6 +78,7 @@ final class JitFileGetContents
             );
         }
 
+        self::ensureCompilerAbi($context);
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $pathStr
@@ -69,12 +89,15 @@ final class JitFileGetContents
 
     public static function invokeSlice(Context $context, Value $pathStr, Value $offset, Value $length): Value
     {
-        $contents = NestedJitCompileScope::isActive()
-            ? JitFileGetContentsLibc::call($context, $pathStr)
-            : $context->builder->call(
+        if (NestedJitCompileScope::isActive()) {
+            $contents = JitFileGetContentsLibc::call($context, $pathStr);
+        } else {
+            self::ensureCompilerAbi($context);
+            $contents = $context->builder->call(
                 $context->lookupFunction('__compiler_file_get_contents'),
                 $pathStr
             );
+        }
         $strPtr = $context->getTypeFromString('__string__*');
         $failed = $context->builder->icmp(Builder::INT_EQ, $contents, $strPtr->constNull());
 

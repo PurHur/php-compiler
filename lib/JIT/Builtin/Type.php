@@ -114,19 +114,22 @@ class Type extends Builtin {
         // (getNamedFunction first; Type::register still ensureLinked). Leftover Type
         // empty decls vs Runtime ABI drift mints env_local_lookup.1 (#31894 / #32122).
         // __compiler_readfile always-on shell removed (#33021): StringReadfile owns the
-        // ABI (getNamedFunction first, then addFunction if absent; Type::initialize still
-        // ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint readfile.1
+        // ABI (getNamedFunction first, then addFunction if absent). Type::initialize
+        // always-on ensureLinked removed (#34423): readfile.php already ensureLinked
+        // before lookup. Leftover Type empty decls vs Runtime ABI drift mint readfile.1
         // (#31894 / #32122). User-script readfile() stays ReadfileJitHelper / VmFs.
         // __compiler_file_get_contents always-on shell removed (#33030): StringFileGetContents
-        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
-        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
-        // file_get_contents.1 (#31894 / #32122). User-script file_get_contents() stays
-        // FileGetContentsJitHelper / VmFs.
+        // owns the ABI (getNamedFunction first, then addFunction if absent).
+        // Type::initialize always-on ensureLinked removed (#34423): JitFileGetContents
+        // already ensureLinked before lookup. Leftover Type empty decls vs Runtime ABI
+        // drift mint file_get_contents.1 (#31894 / #32122). User-script file_get_contents()
+        // stays FileGetContentsJitHelper / VmFs.
         // __compiler_mime_content_type always-on shell removed (#33034): MimeContentTypeRuntime
-        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
-        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
-        // mime_content_type.1 (#31894 / #32122). User-script mime_content_type() stays
-        // MimeContentTypeJitHelper / VmMime.
+        // owns the ABI (getNamedFunction first, then addFunction if absent).
+        // Type::initialize always-on ensureLinked removed (#34423): JitMimeContentType
+        // already ensureLinked before lookup. Leftover Type empty decls vs Runtime ABI
+        // drift mint mime_content_type.1 (#31894 / #32122). User-script mime_content_type()
+        // stays MimeContentTypeJitHelper / VmMime.
         // __compiler_include_path_init / __compiler_get_include_path /
         // __compiler_set_include_path / __compiler_restore_include_path /
         // __compiler_stream_resolve_include_path always-on shells removed
@@ -137,25 +140,29 @@ class Type extends Builtin {
         // stream_resolve_include_path() stay IncludePathJitHelper /
         // IncludePathResolveJitHelper.
         // __compiler_get_meta_tags always-on shell removed (#33035): MetaTagsRuntime
-        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
-        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
-        // get_meta_tags.1 (#31894 / #32122). User-script get_meta_tags() stays
+        // owns the ABI (getNamedFunction first, then addFunction if absent).
+        // Type::initialize always-on ensureLinked removed (#34423): JitGetMetaTags
+        // already ensureLinked before lookup. Leftover Type empty decls vs Runtime ABI
+        // drift mint get_meta_tags.1 (#31894 / #32122). User-script get_meta_tags() stays
         // MetaTagsJitHelper / VmMetaTags.
         // __compiler_error_log always-on shell removed (#33044): StringErrorLog
-        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
-        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
-        // error_log.1 (#31894 / #32122). User-script error_log() stays
+        // owns the ABI (getNamedFunction first, then addFunction if absent).
+        // Type::initialize always-on ensureLinked removed (#34423): JitErrorLog
+        // already ensureLinked before lookup. Leftover Type empty decls vs Runtime ABI
+        // drift mint error_log.1 (#31894 / #32122). User-script error_log() stays
         // ErrorLogJitHelper / VmErrorLog.
         // __compiler_get_headers always-on shell removed (#33042): GetHeadersRuntime
-        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
-        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
-        // get_headers.1 (#31894 / #32122). User-script get_headers() stays
+        // owns the ABI (getNamedFunction first, then addFunction if absent).
+        // Type::initialize always-on ensureLinked removed (#34423): JitGetHeaders
+        // already ensureLinked before lookup. Leftover Type empty decls vs Runtime ABI
+        // drift mint get_headers.1 (#31894 / #32122). User-script get_headers() stays
         // GetHeadersJitHelper / VmHttpHeaders (#27317).
         // __compiler_file_put_contents always-on shell removed (#33043): StringFilePutContents
-        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
-        // still ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
-        // file_put_contents.1 (#31894 / #32122). User-script file_put_contents() stays
-        // FilePutContentsJitHelper / VmFs::filePutContents.
+        // owns the ABI (getNamedFunction first, then addFunction if absent).
+        // Type::initialize always-on ensureLinked removed (#34423): JitFilePutContents
+        // already ensureLinked before lookup. Leftover Type empty decls vs Runtime ABI
+        // drift mint file_put_contents.1 (#31894 / #32122). User-script file_put_contents()
+        // stays FilePutContentsJitHelper / VmFs::filePutContents.
         // __compiler_fwrite always-on shell removed (#33048): StreamIoRuntime owns the
         // ABI (getNamedFunction first, then addFunction if absent via
         // ensureRuntimeAbiDeclared / implementFwriteBridge; Type::initialize still
@@ -676,10 +683,11 @@ class Type extends Builtin {
         // (php-src ext/standard/file.c — PHP_FUNCTION(str_getcsv)).
         // __phpc_parse_url_component / __phpc_parse_url_assoc always-on shells removed (#33236):
         // ParseUrlRuntime owns the ABI (getNamedFunction first via implementIfMissing +
-        // scopeLoweringToFunction #33226; Type::initialize still ParseUrlRuntime::ensureLinked;
-        // JitParseUrl ensureLinked before lookup). Leftover Type empty decls vs Runtime ABI
-        // drift mint parse_url_component.1 (#31894 / #32122). User-script parse_url() stays
-        // JitParseUrl / ParseUrlJitHelper (php-src ext/standard/url.c).
+        // scopeLoweringToFunction #33226). Type::initialize always-on ensureLinked removed
+        // (#34423): JitParseUrl / ParseUrl.php already ensureLinked before lookup.
+        // Leftover Type empty decls vs Runtime ABI drift mint parse_url_component.1
+        // (#31894 / #32122). User-script parse_url() stays JitParseUrl / ParseUrlJitHelper
+        // (php-src ext/standard/url.c).
         // __compiler_getdate always-on shell removed (#32250): user-script getdate()
         // stays JitGetdate IR / GetdateJitHelper (#26900). StringGetdate::implement()
         // is an intentional no-op.
@@ -865,14 +873,19 @@ class Type extends Builtin {
         // StringUtf8Runtime::ensureLinked (strip_tags.php / JitConvertUu* /
         // JitQuotedPrintable* / JitUtf8Latin1 / JitMbStrlen / validFromPtr)
         // already run before lookup (peer #34384). StringTime still eager below.
-        StringReadfile::ensureLinked($this->context);
-        StringFileGetContents::ensureLinked($this->context);
-        StringFilePutContents::ensureLinked($this->context);
-        MimeContentTypeRuntime::ensureLinked($this->context);
-        MetaTagsRuntime::ensureLinked($this->context);
-        StringErrorLog::ensureLinked($this->context);
-        GetHeadersRuntime::ensureLinked($this->context);
-        ParseUrlRuntime::ensureLinked($this->context);
+        // StringReadfile / StringFileGetContents / StringFilePutContents /
+        // MimeContentTypeRuntime / MetaTagsRuntime / StringErrorLog /
+        // GetHeadersRuntime / ParseUrlRuntime always-on ensureLinked removed
+        // (#34423): call-site StringReadfile::ensureLinked /
+        // StringFileGetContents::ensureLinked / StringFilePutContents::ensureLinked /
+        // MimeContentTypeRuntime::ensureLinked / MetaTagsRuntime::ensureLinked /
+        // StringErrorLog::ensureLinked / GetHeadersRuntime::ensureLinked /
+        // ParseUrlRuntime::ensureLinked (readfile.php / JitFileGetContents /
+        // JitFilePutContents / JitMimeContentType / JitGetMetaTags / JitErrorLog /
+        // JitGetHeaders / JitParseUrl / ParseUrl.php) already run before lookup
+        // (peer #34414). Eager NestedJIT on every full load vs Runtime ABI drift
+        // mints readfile.1 / file_get_contents.1 / … (#31894 / #32122).
+        // StringTime still eager below (TimeRuntimeShrinkTest).
         StringCslashes::ensureStandaloneBodies($this->context);
         StringStrtr::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);

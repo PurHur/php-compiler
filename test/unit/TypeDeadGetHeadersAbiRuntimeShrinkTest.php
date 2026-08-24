@@ -45,10 +45,14 @@ final class TypeDeadGetHeadersAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitGetHeaders.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksGetHeadersRuntime(): void
+    public function testTypeInitializeDropsEagerGetHeadersEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('GetHeadersRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString(
+            'GetHeadersRuntime::ensureLinked($this->context)',
+            $type,
+            'Builtin\\Type::initialize must not eagerly GetHeadersRuntime::ensureLinked($this->context) (#34423)'
+        );
     }
 
     public function testNoNewRuntimeCForGetHeadersAbi(): void
