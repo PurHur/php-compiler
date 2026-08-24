@@ -1424,6 +1424,15 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('error_code', $share['name']);
     }
 
+    /** php-src basic_functions.stub.php — ?string return; InternalArgInfo string (#26299). */
+    public function testCliGetProcessTitleReflectionStubTypes(): void
+    {
+        $fn = 'cli_get_process_title';
+        $this->assertSame('?string', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn));
+        $this->assertSame(0, BuiltinInternalArgInfo::paramCountForFunction($fn));
+    }
+
         /** php-src curl.stub.php — CurlHandle $handle → bool; InternalArgInfo omits the function (#27702). */
     public function testCurlUpkeepReflectionStubTypes(): void
     {

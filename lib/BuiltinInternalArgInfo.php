@@ -715,6 +715,8 @@ final class BuiltinInternalArgInfo
             'php_ini_scanned_files' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return boolean; Zend bool (#28152)
             'cli_set_process_title' => 'bool',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return string; Zend ?string (#26299)
+            'cli_get_process_title' => '?string',
             // ext/standard/assert.stub.php — InternalArgInfo return int; Zend bool (#28335)
             'assert' => 'bool',
             // ext/standard/assert.stub.php — InternalArgInfo omits return; Zend mixed (#23942)
