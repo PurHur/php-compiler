@@ -24,7 +24,7 @@ final class MbMimeheaderRuntimeShrinkTest extends TestCase
     public function testMbMimeheaderUsesJitVmHelperLink(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MbMimeheaderRuntime.php');
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);

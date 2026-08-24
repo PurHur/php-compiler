@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: mb_encode/decode_mimeheader() runtime via MbMimeheaderJitHelper (#34299 leftover of #6038).
+ * AOT: mb_encode/decode_mimeheader() NestedJIT peel (#34310 leftover of #34307/#6038).
  *
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_encode_mimeheader)
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_decode_mimeheader)
@@ -25,17 +25,29 @@ final class MbMimeheaderRuntimeAotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/mb_mimeheader_runtime_aot.php');
     }
 
+    public function testAotNonFoldableRoundtripMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(__DIR__.'/../repro/mb_mimeheader_runtime_roundtrip_aot.php');
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
         $helper = (string) file_get_contents($root.'/ext/mbstring/MbMimeheaderJitHelper.php');
         $this->assertStringContainsString('function encodeArgv', $helper);
         $this->assertStringContainsString('function decodeArgv', $helper);
-        $this->assertStringContainsString('VmMbstring::encodeMimeheader', $helper);
-        $this->assertStringContainsString('VmMbstring::decodeMimeheader', $helper);
+        $this->assertStringContainsString('Base64JitHelper::decodeArgv', $helper);
+        $this->assertStringContainsString('b64EncodeRange', $helper);
+        $this->assertStringNotContainsString('VmMbstring::', $helper);
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbMimeheaderRuntime.php');
         $this->assertStringContainsString('encodeHelper', $runtime);
         $this->assertStringContainsString('decodeHelper', $runtime);
+        $this->assertStringContainsString('ensureCompiledBundle', $runtime);
+        $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbMimeheader.php');
+        $this->assertStringContainsString('JitNestedHelperCoerce::callHelper', $jit);
         $enc = (string) file_get_contents($root.'/ext/mbstring/mb_encode_mimeheader.php');
         $this->assertStringContainsString('JitMbMimeheader::invokeEncode', $enc);
         $this->assertStringNotContainsString(

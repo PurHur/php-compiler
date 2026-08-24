@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbMimeheaderRuntime;
+use PHPCompiler\JIT\Builtin\StringBase64Decode;
+use PHPCompiler\JIT\Builtin\StringBase64Encode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -13,10 +17,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT for mb_encode_mimeheader()/mb_decode_mimeheader() (#6038, #34299).
+ * LLVM JIT/AOT for mb_encode_mimeheader()/mb_decode_mimeheader() (#6038, #34299, #34310).
  *
- * Compile-time fold for string literals; runtime via NestedJIT {@see MbMimeheaderJitHelper}.
- * Peer {@see JitMbConvertKana} / #34294.
+ * Compile-time fold for string literals; runtime via NestedJIT {@see MbMimeheaderJitHelper}
+ * through {@see JitNestedHelperCoerce} (raw call / VmMbstring TU SIGSEGVs — leftover #34307).
  */
 final class JitMbMimeheader
 {
@@ -41,15 +45,22 @@ final class JitMbMimeheader
         self::assertSupportedCharset($charset);
         $transfer = self::runtimeTransferLiteral($args, $argc);
 
+        // NestedJIT helper compile can clear insert; restore before coerce/call (#34270).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringBase64Encode::ensureLinked($context);
+        StringBase64Decode::ensureLinked($context);
         MbMimeheaderRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
         $charsetPtr = $context->builder->load($context->constantStringFromString($charset));
         $transferPtr = $context->builder->load($context->constantStringFromString($transfer));
-        $resultStr = $context->builder->call(
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbMimeheaderRuntime::encodeHelper($context),
-            $str,
-            $charsetPtr,
-            $transferPtr
+            [$str, $charsetPtr, $transferPtr]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::materializeOwnedString($context, $resultStr);
     }
@@ -72,11 +83,19 @@ final class JitMbMimeheader
         // Soft-null DEP+coerce (non-strict) / TypeError path handled by caller (#30311).
         $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_decode_mimeheader', 0, 'string');
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringBase64Encode::ensureLinked($context);
+        StringBase64Decode::ensureLinked($context);
         MbMimeheaderRuntime::ensureLinked($context);
-        $resultStr = $context->builder->call(
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbMimeheaderRuntime::decodeHelper($context),
-            $str
+            [$str]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::materializeOwnedString($context, $resultStr);
     }
