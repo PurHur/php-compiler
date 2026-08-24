@@ -85,16 +85,19 @@ class Type extends Builtin {
         // User-script ini_get()/ini_set()/@ stay IniJitHelper / ErrorSilenceJitHelper.
         // __compiler_strip_tags always-on shell removed (#32971): StringStripTags owns
         // the ABI (getNamedFunction first, then addFunction if absent via
-        // JitVmHelperLink::ensureBridge; Type::initialize still ensureLinked). Thin AOT
-        // already calls StringStripTags::ensureLinked from ext/standard/strip_tags.php.
-        // Leftover Type empty decls vs Runtime ABI drift mint strip_tags.1 (#31894 / #32122).
-        // User-script strip_tags() stays StripTagsJitHelper / VmString.
+        // JitVmHelperLink::ensureBridge). Type::initialize always-on ensureLinked
+        // removed (#34414): ext/standard/strip_tags.php / JitStripTags already
+        // ensureLinked before lookup (peer #34384). Leftover Type empty decls vs
+        // Runtime ABI drift mint strip_tags.1 (#31894 / #32122). User-script
+        // strip_tags() stays StripTagsJitHelper / VmString.
         // __compiler_utf8_strlen / __compiler_utf8_valid always-on shells removed (#33001):
         // StringUtf8Runtime owns the ABI (getNamedFunction first, then addFunction if
-        // absent via StringUtf8StrlenJit / StringUtf8ValidJit; Type::initialize still
-        // ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
-        // utf8_strlen.1 / utf8_valid.1 (#31894 / #32122). User-script mb_strlen() /
-        // mb_check_encoding() stay JitMbStrlen / JitMbCheckEncoding / Utf8JitHelper.
+        // absent via StringUtf8StrlenJit / StringUtf8ValidJit). Type::initialize always-on
+        // ensureLinked removed (#34414): JitMbStrlen / StringUtf8Runtime::validFromPtr
+        // already ensureLinked before lookup (peer #34384). Leftover Type empty decls vs
+        // Runtime ABI drift mint utf8_strlen.1 / utf8_valid.1 (#31894 / #32122).
+        // User-script mb_strlen() / mb_check_encoding() stay JitMbStrlen /
+        // JitMbCheckEncoding / Utf8JitHelper.
         // Leftover always-on libc decls removed (#32202 / peer Type $libcFns #32173):
         // getenv(3)/putenv(3) — StringGetenv::ensureLibcGetenv / BootstrapCompileSmokeM3Emit::
         //   ensureLibcPutenv after LibcExtern drops (#31637 / #31582). User-script getenv()/
@@ -491,21 +494,23 @@ class Type extends Builtin {
         // strtr.1 (#31894 / #32122).
         // __compiler_convert_uuencode / __compiler_convert_uudecode always-on shells
         // removed (#32982): NestedJIT/AOT bridge is StringConvertUu (getNamedFunction
-        // first via JitVmHelperLink::ensureBridge; Type::initialize still ensureLinked).
-        // Thin AOT already calls StringConvertUu::ensureLinked from
-        // ext/standard/JitConvertUuencode.php / JitConvertUudecode.php. Leftover Type
-        // empty decls vs Runtime ABI drift mint convert_uuencode.1 / convert_uudecode.1
+        // first via JitVmHelperLink::ensureBridge). Type::initialize always-on
+        // ensureLinked removed (#34414): JitConvertUuencode / JitConvertUudecode already
+        // ensureLinked before lookup (peer #34384). Leftover Type empty decls vs
+        // Runtime ABI drift mint convert_uuencode.1 / convert_uudecode.1
         // (#31894 / #32122). User-script convert_uuencode()/convert_uudecode() stays
         // ConvertUuJitHelper / VmConvertUu / VmString.
         // __compiler_quoted_printable_encode / __compiler_quoted_printable_decode
         // always-on shells removed (#32882): NestedJIT/AOT bridge is StringQuotPrint
-        // (JitVmHelperLink::ensureBridge; Type::initialize still ensureLinked). Leftover
-        // Type empty decls vs Runtime ABI drift mint quoted_printable_encode.1
-        // (#31894 / #32122).
+        // (JitVmHelperLink::ensureBridge). Type::initialize always-on ensureLinked
+        // removed (#34414): JitQuotedPrintableEncode / JitQuotedPrintableDecode already
+        // ensureLinked before lookup (peer #34384). Leftover Type empty decls vs
+        // Runtime ABI drift mint quoted_printable_encode.1 (#31894 / #32122).
         // __compiler_utf8_encode / __compiler_utf8_decode always-on shells removed
-        // (#32879): NestedJIT/AOT bridge is StringUtf8Latin1 (getNamedFunction first;
-        // Type::initialize still ensureLinked). Leftover Type empty decls vs Runtime
-        // ABI drift mint utf8_encode.1 (#31894 / #32122).
+        // (#32879): NestedJIT/AOT bridge is StringUtf8Latin1 (getNamedFunction first).
+        // Type::initialize always-on ensureLinked removed (#34414): JitUtf8Latin1
+        // already ensureLinked before lookup (peer #34384). Leftover Type empty decls
+        // vs Runtime ABI drift mint utf8_encode.1 (#31894 / #32122).
         // __compiler_addcslashes / __compiler_stripcslashes always-on shells removed
         // (#32893): NestedJIT/AOT bridge is StringCslashes (JitVmHelperLink::ensureBridge;
         // Type::initialize still ensureLinked / ensureStripcslashes). Leftover Type empty
@@ -853,11 +858,13 @@ class Type extends Builtin {
         // JitPrintR / JitVarDump / JitSerialize / JitUnserialize already
         // ensureLinked before lookup (peer #34357). StringTime still eager below
         // (TimeRuntimeShrinkTest::testTypeLinksStringTime).
-        StringStripTags::ensureLinked($this->context);
-        StringConvertUu::ensureLinked($this->context);
-        StringQuotPrint::ensureLinked($this->context);
-        StringUtf8Latin1::ensureLinked($this->context);
-        StringUtf8Runtime::ensureLinked($this->context);
+        // StringStripTags / StringConvertUu / StringQuotPrint / StringUtf8Latin1 /
+        // StringUtf8Runtime always-on ensureLinked removed (#34414): call-site
+        // StringStripTags::ensureLinked / StringConvertUu::ensureLinked /
+        // StringQuotPrint::ensureLinked / StringUtf8Latin1::ensureLinked /
+        // StringUtf8Runtime::ensureLinked (strip_tags.php / JitConvertUu* /
+        // JitQuotedPrintable* / JitUtf8Latin1 / JitMbStrlen / validFromPtr)
+        // already run before lookup (peer #34384). StringTime still eager below.
         StringReadfile::ensureLinked($this->context);
         StringFileGetContents::ensureLinked($this->context);
         StringFilePutContents::ensureLinked($this->context);

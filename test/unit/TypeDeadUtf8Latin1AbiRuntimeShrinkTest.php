@@ -57,10 +57,11 @@ final class TypeDeadUtf8Latin1AbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeInitializeStillEnsureLinksUtf8Latin1Runtime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkUtf8Latin1Runtime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringUtf8Latin1::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringUtf8Latin1::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34414', $type);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltin(): void

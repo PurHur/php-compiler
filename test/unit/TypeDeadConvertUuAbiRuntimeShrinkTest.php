@@ -58,10 +58,11 @@ final class TypeDeadConvertUuAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/convert_uudecode.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksConvertUuRuntime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkConvertUuRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringConvertUu::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringConvertUu::ensureLinked($this->context)', $type);
+        $this->assertStringContainsString('#34414', $type);
     }
 
     public function testNoNewRuntimeCForConvertUuAbi(): void
