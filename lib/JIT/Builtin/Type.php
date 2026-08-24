@@ -813,13 +813,15 @@ class Type extends Builtin {
         // already ensureLinked before lookup (peer #33980 SessionId). Eager
         // NestedJIT on every full load vs Runtime ABI drift mints *.1 (#31894 /
         // #32122). StringSuperglobalName still ensureLinked from JIT.php.
-        TimeSleepRuntime::ensureLinked($this->context);
+        // TimeSleep / getenv / microtime always-on ensureLinked removed (#34320):
+        // JitSleep / JitEnv / JitDate / JitGettimeofday already ensureLinked
+        // before lookup (peer #34241 PowInt batch). StringTime still eager below
+        // (TimeRuntimeShrinkTest::testTypeLinksStringTime).
         ProcessRuntime::ensureLinked($this->context);
         ProcessOpen::ensureLinked($this->context);
         StreamSocketPair::ensureLinked($this->context);
         StreamSocketGetNameRuntime::ensureLinked($this->context);
         StreamSocketAccept::ensureLinked($this->context);
-        StringMicrotime::ensureLinked($this->context);
         StringTime::ensureLinked($this->context);
         ProcessIdentityJit::ensureLinked($this->context);
         FtokRuntime::ensureLinked($this->context);
@@ -838,8 +840,6 @@ class Type extends Builtin {
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);
         StringNetInterfacesJit::ensureLinked($this->context);
-        StringGetenv::ensureLinked($this->context);
-        StringGetenvAll::ensureLinked($this->context);
         ListUnpackRuntime::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
         StringVersionCompare::ensureLinked($this->context);
