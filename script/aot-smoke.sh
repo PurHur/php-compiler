@@ -16,10 +16,20 @@
 # Run it before believing any sweep result. Usage:
 #   script/aot-smoke.sh            # compile+run each case, diff against expected
 #   script/aot-smoke.sh --keep     # keep the built binaries for inspection
+#
+# On RunForge / hosts without image LLVM, re-execs via docker-exec.sh (#34536) — same
+# honesty gate as phpunit.sh. Host-green smoke alone can miss image/host glibc skew.
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
+
+if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
+    && [[ "${PHP_COMPILER_IN_DOCKER:-0}" != "1" ]]; then
+    args=$(printf '%q ' "$@")
+    # shellcheck disable=SC2086
+    exec ./script/docker-exec.sh -- bash -lc "source script/php-env.sh && ./script/aot-smoke.sh ${args}"
+fi
 
 KEEP=0
 [ "${1:-}" = "--keep" ] && KEEP=1

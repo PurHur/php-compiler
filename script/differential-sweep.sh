@@ -11,6 +11,10 @@
 #   script/differential-sweep.sh --dir path/to/cases  # your own programs
 #   script/differential-sweep.sh --aot --repeat 10    # run each built binary 10x (see below)
 #
+# On RunForge / hosts without image LLVM, this re-execs via docker-exec.sh (same gate as
+# phpunit.sh). Host glibc ≠ Ubuntu 22.04 image glibc: AOT binaries that match Zend in the
+# image can SIGSEGV on the harness host for ordinary encapsed/call shapes (#34536).
+#
 # Exit status is the number of mismatching programs, so it can gate a build.
 #
 # Every case must be deterministic: no clocks, no randomness, no network, no filesystem writes
@@ -30,7 +34,35 @@
 
 set -uo pipefail
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/test/differential/cases"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT" || exit 2
+
+# Harness-safe: AOT (and VM for consistency) must compile+run inside php-compiler:22.04-dev.
+# Bare /.dockerenv is set on RunForge hosts that lack /opt/llvm9 — require image LLVM (#34536).
+if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
+    && [[ "${PHP_COMPILER_IN_DOCKER:-0}" != "1" ]]; then
+    wrap_args=()
+    prev=""
+    for a in "$@"; do
+        if [[ "$prev" == "--dir" ]]; then
+            # Repo-absolute host paths must become /compiler/... inside the image.
+            case "$a" in
+                "$ROOT"/*) a="/compiler/${a#"$ROOT"/}" ;;
+                /*) ;; # leave other abs paths; they only work if bind-visible
+            esac
+            wrap_args+=("$a")
+            prev=""
+            continue
+        fi
+        wrap_args+=("$a")
+        prev="$a"
+    done
+    args=$(printf '%q ' "${wrap_args[@]}")
+    # shellcheck disable=SC2086
+    exec ./script/docker-exec.sh -- bash -lc "source script/php-env.sh && ./script/differential-sweep.sh ${args}"
+fi
+
+DIR="$ROOT/test/differential/cases"
 BACKEND=vm
 QUIET=0
 REPEAT=1
@@ -42,7 +74,7 @@ while [ $# -gt 0 ]; do
         --dir)    DIR="$2"; shift 2 ;;
         --quiet)  QUIET=1; shift ;;
         --repeat) REPEAT="$2"; shift 2 ;;
-        -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -56,9 +88,6 @@ if [ ! -d "$DIR" ]; then
     echo "no such directory: $DIR" >&2
     exit 2
 fi
-
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT" || exit 2
 
 fail=0
 total=0
