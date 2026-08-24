@@ -1433,6 +1433,29 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(0, BuiltinInternalArgInfo::paramCountForFunction($fn));
     }
 
+    /** php-src basic_functions.stub.php — ?callable return; InternalArgInfo omits (#26289). */
+    public function testGetHandlerIntrospectionReflectionStubTypes(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.5';
+        try {
+            $this->assertTrue(\PHPCompiler\CompilerVersion::supportsGetHandlerIntrospection());
+            foreach (['get_error_handler', 'get_exception_handler'] as $fn) {
+                $this->assertSame('?callable', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+                $this->assertSame('?callable', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn), $fn);
+            }
+        } finally {
+            unset($_ENV['PHP_COMPILER_PROFILE']);
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
         /** php-src curl.stub.php — CurlHandle $handle → bool; InternalArgInfo omits the function (#27702). */
     public function testCurlUpkeepReflectionStubTypes(): void
     {

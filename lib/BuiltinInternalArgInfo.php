@@ -102,6 +102,17 @@ final class BuiltinInternalArgInfo
             }
         }
 
+        // ext/standard/basic_functions.stub.php — PHP 8.5+ only; InternalArgInfo omits (#26289)
+        if (CompilerVersion::supportsGetHandlerIntrospection()) {
+            $handlerReturn = match ($callableLc) {
+                'get_error_handler', 'get_exception_handler' => '?callable',
+                default => null,
+            };
+            if (null !== $handlerReturn) {
+                return $handlerReturn;
+            }
+        }
+
         return match ($callableLc) {
             // ext/date/php_date.stub.php — absent from php-types InternalArgInfo (#25392)
             'date_create' => 'DateTime|false',
