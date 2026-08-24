@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Drop leftover always-on addcslashes/stripcslashes ABI shells from Builtin\Type (#32893).
+ * Type::initialize always-on ensureStandaloneBodies removed (#34534).
  *
  * NestedJIT/AOT bridge stays StringCslashes.
  * Runtime owner declares module-locally via JitVmHelperLink::ensureBridge so leftover
@@ -28,6 +29,7 @@ final class TypeDeadCslashesAbiRuntimeShrinkTest extends TestCase
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
         $this->assertStringContainsString('#32893', $type);
+        $this->assertStringContainsString('#34534', $type);
         foreach ($this->droppedAbis() as $sym) {
             $this->assertDoesNotMatchRegularExpression(
                 '/addFunction\(\s*[\'"]'.preg_quote($sym, '/').'[\'"]/',
@@ -41,7 +43,14 @@ final class TypeDeadCslashesAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StringCslashes::ensureStandaloneBodies', $type);
+        $initPos = strpos($type, 'public function initialize(): void');
+        $this->assertNotFalse($initPos);
+        $initBody = substr($type, $initPos);
+        $this->assertDoesNotMatchRegularExpression(
+            '/StringCslashes::ensureStandaloneBodies\\(\\$this->context\\)/',
+            $initBody,
+            'Type::initialize must not eagerly StringCslashes::ensureStandaloneBodies (#34534)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresCslashesAbisModuleLocally(): void
@@ -53,12 +62,6 @@ final class TypeDeadCslashesAbiRuntimeShrinkTest extends TestCase
         foreach ($this->droppedAbis() as $sym) {
             $this->assertStringContainsString($sym, $svc, "{$sym} must remain owned by StringCslashes (#32893)");
         }
-    }
-
-    public function testTypeInitializeStillEnsureLinksCslashesRuntime(): void
-    {
-        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringCslashes::ensureStandaloneBodies($this->context)', $type);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void

@@ -16,7 +16,8 @@ use PHPCompiler\JIT\NestedJitCompileScope;
  * StringStrRepeat #21601.
  * Module-local ABI owner (ensureBridge getNamedFunction first): Builtin\Type no longer
  * always-declares empty shells (#32893 / peer #32879) — leftover Type decls mint
- * addcslashes.1 (#31894 / #32122).
+ * addcslashes.1 (#31894 / #32122). Type::initialize always-on ensureStandaloneBodies
+ * removed (#34534); addcslashes.php / stripcslashes.php ensureLinked before lookup.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(addcslashes) / PHP_FUNCTION(stripcslashes)
  */

@@ -519,9 +519,11 @@ class Type extends Builtin {
         // already ensureLinked before lookup (peer #34384). Leftover Type empty decls
         // vs Runtime ABI drift mint utf8_encode.1 (#31894 / #32122).
         // __compiler_addcslashes / __compiler_stripcslashes always-on shells removed
-        // (#32893): NestedJIT/AOT bridge is StringCslashes (JitVmHelperLink::ensureBridge;
-        // Type::initialize still ensureLinked / ensureStripcslashes). Leftover Type empty
-        // decls vs Runtime ABI drift mint addcslashes.1 (#31894 / #32122).
+        // (#32893): NestedJIT/AOT bridge is StringCslashes (JitVmHelperLink::ensureBridge).
+        // Type::initialize always-on ensureStandaloneBodies removed (#34534) —
+        // addcslashes.php / stripcslashes.php already ensureLinked before lookup.
+        // Leftover Type empty decls vs Runtime ABI drift mint addcslashes.1
+        // (#31894 / #32122).
         // __compiler_substr_replace always-on shell removed (#32250): user-script
         // substr_replace() stays VmString / ext/standard/substr_replace.php. No
         // NestedJIT lookupFunction remains.
@@ -967,8 +969,13 @@ class Type extends Builtin {
         // HELPER_RUNTIME_O=0 NestedJIT (#33248). Eager NestedJIT on every full
         // load vs Runtime ABI drift mints time.1 / env_local_lookup.1 /
         // trigger_error.1 / pending_header_*.1 (#31894 / #32122).
+        // StringCslashes::ensureStandaloneBodies always-on removed (#34534):
+        // addcslashes.php / stripcslashes.php / StringStripcslashesRuntime already
+        // ensureLinked / ensureStripcslashes before lookup (peer #34513). Eager
+        // NestedJIT on every full load vs Runtime ABI drift mints addcslashes.1 /
+        // stripcslashes.1 (#31894 / #32122). User-script stays CslashesJitHelper
+        // (php-src ext/standard/string.c).
         // SessionStorageGlobals::ensureGlobals stays.
-        StringCslashes::ensureStandaloneBodies($this->context);
         // __phpc_error_handler_* / __phpc_exception_handler_* always-on shells removed
         // (#33842): ErrorHandlerJitRuntime / ExceptionHandlerJitRuntime own the ABI
         // (getNamedFunction first via implement*Bridge). Do not re-add
