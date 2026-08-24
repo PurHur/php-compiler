@@ -321,6 +321,9 @@ final class GeneratorIteratorJitHelper
         // Clear AT_FIRST_YIELD like zend_generator_resume.
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['at_first_yield']));
         $yielded = $context->builder->call($resumeFn, $state);
+        // Direct resume call bypasses invokeJitCall — surface body throw to outer try (#34455).
+        TryCatchHelper::emitCheckPendingThrowAfterCall($context);
+        $afterThrowCheck = $context->builder->getInsertBlock();
         $context->builder->store($i1->constInt(1, false), $needsAdvanceField);
         $hasYield = $context->builder->icmp(Builder::INT_NE, $yielded, $i64->constInt(0, false));
         $afterResume = $fn->appendBasicBlock('gen_iter_after_resume');
@@ -333,7 +336,7 @@ final class GeneratorIteratorJitHelper
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($i1->constInt(0, false), $doneBb);
         $phi->addIncoming($i1->constInt(1, false), $useCurrentBb);
-        $phi->addIncoming($i1->constInt(1, false), $resumeBb);
+        $phi->addIncoming($i1->constInt(1, false), $afterThrowCheck);
 
         return $phi;
     }

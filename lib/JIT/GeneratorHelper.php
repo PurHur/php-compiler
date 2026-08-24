@@ -313,6 +313,8 @@ final class GeneratorHelper
 
         // Resume past the last yield (resume_ip == n): run the post-yield tail, capture
         // Generator::getReturn(), and set has_returned — mirrors FiberHelperLlvm (#28624).
+        // A TYPE_THROW tail must be lowered (not skipped) so foreach / next() observe the
+        // exception — Zend zend_generator_resume (#34455).
         $context->builder->positionAtEnd($doneBb);
         $doneEntry = GeneratorIteratorJitHelper::emitInjectPendingThrow(
             $jit,
@@ -331,12 +333,32 @@ final class GeneratorHelper
             );
         }
         $context->builder->positionAtEnd($doneEntry);
-        self::compilePostYieldReturnTail($jit, $func, $points, $stateParam, $doneEntry, $map);
-        $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['has_returned']));
-        $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['done']));
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_current']));
-        $context->builder->returnValue($i64->constInt(0, false));
-
+        $tailTerminated = self::compilePostYieldReturnTail(
+            $jit,
+            $func,
+            $points,
+            $stateParam,
+            $doneEntry,
+            $map
+        );
+        if (!$tailTerminated) {
+            $insert = $context->builder->getInsertBlock();
+            if (null === $insert || null === $insert->getTerminator()) {
+                $context->builder->store(
+                    $i1->constInt(1, false),
+                    $context->builder->structGep($stateParam, $map['has_returned'])
+                );
+                $context->builder->store(
+                    $i1->constInt(1, false),
+                    $context->builder->structGep($stateParam, $map['done'])
+                );
+                $context->builder->store(
+                    $i1->constInt(0, false),
+                    $context->builder->structGep($stateParam, $map['has_current'])
+                );
+                $context->builder->returnValue($i64->constInt(0, false));
+            }
+        }
         $context->builder->clearInsertionPosition();
         $context->builder = $savedBuilder;
         $context->compilingGeneratorResume = false;
@@ -357,10 +379,12 @@ final class GeneratorHelper
     }
 
     /**
-     * Lower opcodes after the last yield up to RETURN into gen_done, then store return_value.
+     * Lower opcodes after the last yield up to RETURN or THROW into gen_done.
      *
      * @param list<array{kind: string, op: OpCode, block: Block}> $points
      * @param array<string, int>                                  $map
+     *
+     * @return bool true when the tail ended in TYPE_THROW (caller must not store has_returned)
      */
     private static function compilePostYieldReturnTail(
         \PHPCompiler\JIT $jit,
@@ -369,7 +393,7 @@ final class GeneratorHelper
         Value $stateParam,
         \PHPLLVM\BasicBlock $doneEntry,
         array $map
-    ): void {
+    ): bool {
         $context = $jit->context;
         $n = \count($points);
         if (0 === $n) {
@@ -378,7 +402,7 @@ final class GeneratorHelper
                 JitValueBox::pointer($context, $context->builder->structGep($stateParam, $map['return_value']))
             );
 
-            return;
+            return false;
         }
 
         $last = $points[$n - 1];
@@ -386,6 +410,7 @@ final class GeneratorHelper
         $tailStart = GeneratorJitHelper::opcodeIndex($tailBlock, $last['op']) + 1;
         $returnIdx = null;
         $retOp = null;
+        $throwIdx = null;
         for ($i = $tailStart, $end = $tailBlock->nOpCodes; $i < $end; ++$i) {
             $op = $tailBlock->opCodes[$i];
             if (OpCode::TYPE_RETURN === $op->type || OpCode::TYPE_RETURN_VOID === $op->type) {
@@ -393,10 +418,15 @@ final class GeneratorHelper
                 $retOp = $op;
                 break;
             }
+            if (OpCode::TYPE_THROW === $op->type) {
+                // yield …; throw — must resume into the throw (#34455).
+                $throwIdx = $i;
+                break;
+            }
             if (OpCode::TYPE_YIELD === $op->type || OpCode::TYPE_YIELD_FROM === $op->type) {
                 break;
             }
-            // Common CFG: last yield then JUMP into a return block (no further yields).
+            // Common CFG: last yield then JUMP into a return/throw block (no further yields).
             if (OpCode::TYPE_JUMP === $op->type && null !== $op->block2 && $i + 1 === $end) {
                 if ($tailStart < $i) {
                     $savedStorage = $context->scope->blockStorage;
@@ -410,11 +440,16 @@ final class GeneratorHelper
                 $tailStart = 0;
                 $returnIdx = null;
                 $retOp = null;
+                $throwIdx = null;
                 for ($j = 0, $jEnd = $tailBlock->nOpCodes; $j < $jEnd; ++$j) {
                     $rop = $tailBlock->opCodes[$j];
                     if (OpCode::TYPE_RETURN === $rop->type || OpCode::TYPE_RETURN_VOID === $rop->type) {
                         $returnIdx = $j;
                         $retOp = $rop;
+                        break;
+                    }
+                    if (OpCode::TYPE_THROW === $rop->type) {
+                        $throwIdx = $j;
                         break;
                     }
                     if (OpCode::TYPE_YIELD === $rop->type || OpCode::TYPE_YIELD_FROM === $rop->type) {
@@ -423,6 +458,22 @@ final class GeneratorHelper
                 }
                 break;
             }
+        }
+
+        if (null !== $throwIdx) {
+            // Inclusive of THROW — emitThrow terminates the resume BB (#34455).
+            $savedStorage = $context->scope->blockStorage;
+            $context->scope->blockStorage = new \SplObjectStorage();
+            $jit->compileGeneratorResumePrefix(
+                $func,
+                $tailBlock,
+                $tailStart,
+                $throwIdx + 1,
+                $doneEntry
+            );
+            $context->scope->blockStorage = $savedStorage;
+
+            return true;
         }
 
         if (null !== $returnIdx && $tailStart < $returnIdx) {
@@ -453,8 +504,9 @@ final class GeneratorHelper
                 JitValueBox::pointer($context, $context->builder->structGep($stateParam, $map['return_value']))
             );
         }
-    }
 
+        return false;
+    }
     public static function prefixOpcodesSafeForYieldFromInit(Block $block, int $yieldFromIndex): bool
     {
         return GeneratorJitHelper::prefixOpcodesSafeForYieldFromInit($block, $yieldFromIndex);

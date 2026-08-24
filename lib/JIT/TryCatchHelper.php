@@ -397,6 +397,28 @@ final class TryCatchHelper
         $builder->returnValue($i64->constInt(0, false));
     }
 
+    /**
+     * Uncaught throw from generator body during resume: close (not returned) + pend (#34455).
+     *
+     * php-src: Zend/zend_generators.c — zend_generator_close after body exception.
+     */
+    private static function emitGeneratorResumeBodyThrow(Context $context, Value $excObj): void
+    {
+        $stateParam = $context->generatorStateParam;
+        if (null === $stateParam) {
+            throw new \LogicException('emitGeneratorResumeBodyThrow requires generatorStateParam');
+        }
+        $map = $context->structFieldMap['__generator_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $builder = $context->builder;
+        $builder->store($i1->constInt(1, false), $builder->structGep($stateParam, $map['done']));
+        $builder->store($i1->constInt(0, false), $builder->structGep($stateParam, $map['has_current']));
+        $builder->store($i1->constInt(0, false), $builder->structGep($stateParam, $map['has_returned']));
+        $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excObj);
+        $builder->returnValue($i64->constInt(0, false));
+    }
+
     public static function emitMergeEntryCheck(
         \PHPCompiler\JIT $jit,
         Function_ $func,
@@ -829,7 +851,11 @@ final class TryCatchHelper
             $builder->positionAtEnd($validThrow);
             $obj = self::loadThrownObject($context, $thrown);
             ExceptionThrowToStringSeed::seed($context, $obj, $block);
-            if (self::isNonMainUserFunction($block)) {
+            if (null !== $context->generatorStateParam) {
+                // Body throw during resume: close generator (not has_returned) and pend for
+                // the caller — Zend zend_generator_close on uncaught body throw (#34455).
+                self::emitGeneratorResumeBodyThrow($context, $obj);
+            } elseif (self::isNonMainUserFunction($block)) {
                 $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
                 self::emitPropagateReturn($context, $func);
             } else {
