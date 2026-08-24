@@ -224,6 +224,8 @@ final class BuiltinInternalArgInfo
             'mime_content_type' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return int; Zend bool (#26144)
             'mail' => 'bool',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return array; Zend array|false (#26057)
+            'unpack' => 'array|false',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25750)
             'stream_get_contents' => 'string|false',
             // ext/standard/streamsfuncs.stub.php — InternalArgInfo return int (missing |false) (#27739)
@@ -997,6 +999,8 @@ final class BuiltinInternalArgInfo
             'array_pad' => 2 === $index ? 'mixed' : null,
             // ext/standard/array.stub.php — Zend 8.2 reflects untyped &$array, &...$rest (#25391)
             'array_multisort' => '' ,
+            // ext/standard/basic_functions.stub.php — int $offset = 0; absent from InternalArgInfo (#26057)
+            'unpack' => 2 === $index ? 'int' : null,
             // ext/standard/basic_functions.stub.php — InternalArgInfo 2-arg / required 4-arg strings (#25067)
             'number_format' => match ($index) {
                 0 => 'float',
