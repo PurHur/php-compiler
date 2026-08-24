@@ -6749,6 +6749,7 @@ require_once __DIR__.'/../../../lib/ReadonlyAnonymousClassSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/ReadonlyFunctionRejector.php';
 require_once __DIR__.'/../../../lib/ReadonlyMethodModifierRejector.php';
 require_once __DIR__.'/../../../lib/ReferenceProfileTokenScan.php';
+require_once __DIR__.'/../../../lib/ReleaseUnsupportedExtensions.php';
 require_once __DIR__.'/../../../lib/Runtime.php';
 require_once __DIR__.'/../../../lib/RuntimeStrictness.php';
 require_once __DIR__.'/../../../lib/SourceBareThrowRewriter.php';

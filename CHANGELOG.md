@@ -18,6 +18,7 @@ User release v1.1.0 ([#8739](https://github.com/PurHur/php-compiler/issues/8739)
 
 - Bootstrap inventory and spine coverage (2744/2744 Phase A at 2026-06-16); prelinked gen-0/vendor blobs for fast M5 verification.
 - Docs, capability matrices, and examples 000–009 ladder synced (sessions, file upload, throws web, self-host probe).
+- **Release scope (#24697):** `ext/intl` and `ext/gmp` are unsupported in v1.1.0. They stay in-tree for development but are withheld from `extension_loaded()` / `function_exists()` unless `PHP_COMPILER_ENABLE_INTL=1` / `PHP_COMPILER_ENABLE_GMP=1`. Compliance still runs the cases (enable flags injected) so debt stays visible in the baseline.
 
 ### Fixed
 
@@ -25,6 +26,10 @@ User release v1.1.0 ([#8739](https://github.com/PurHur/php-compiler/issues/8739)
 - Spine AOT/JIT blockers and inventory driver refresh ([#8559](https://github.com/PurHur/php-compiler/issues/8559), [#8683](https://github.com/PurHur/php-compiler/issues/8683)).
 - MiniWebApp AOT: nested layout `$_REQUEST` reads, POST body env in AOT harness, per-method include/script-global scope ([#878](https://github.com/PurHur/php-compiler/issues/878), [#764](https://github.com/PurHur/php-compiler/issues/764)).
 - AOT multipart file upload: LF header lines in `__phpc_multipart_find_header_value`, null-safe `Content-Type` in `__phpc_multipart_set_file_entry` ([#878](https://github.com/PurHur/php-compiler/issues/878), 006-FileUploadWeb).
+
+### Known limitations (v1.1.0)
+
+- **`intl` and `gmp` are not supported.** Opt in only for experimental work via `PHP_COMPILER_ENABLE_INTL=1` / `PHP_COMPILER_ENABLE_GMP=1` ([#24697](https://github.com/PurHur/php-compiler/issues/24697)).
 
 ### Release gates
 

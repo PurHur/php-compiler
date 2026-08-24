@@ -12,67 +12,97 @@ final class IntlExtensionPolicyTest extends TestCase
 {
     public function testUnicodeCoreAdvertisedWhenHostIntlLoaded(): void
     {
-        if (!\extension_loaded('intl')) {
-            self::assertFalse(IntlExtensionPolicy::advertisesExtension());
-            self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
-            self::assertFalse(IntlExtensionPolicy::advertisesIdn());
-            self::assertFalse(IntlExtensionPolicy::advertisesNormalizer());
-            self::assertFalse(IntlExtensionPolicy::advertisesLocale());
-            self::assertFalse(IntlExtensionPolicy::advertisesIntlDateFormatter());
+        $prev = getenv('PHP_COMPILER_ENABLE_INTL');
+        putenv('PHP_COMPILER_ENABLE_INTL=1');
+        $_ENV['PHP_COMPILER_ENABLE_INTL'] = '1';
+        try {
+            if (!\extension_loaded('intl')) {
+                self::assertFalse(IntlExtensionPolicy::advertisesExtension());
+                self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
+                self::assertFalse(IntlExtensionPolicy::advertisesIdn());
+                self::assertFalse(IntlExtensionPolicy::advertisesNormalizer());
+                self::assertFalse(IntlExtensionPolicy::advertisesLocale());
+                self::assertFalse(IntlExtensionPolicy::advertisesIntlDateFormatter());
+
+                $runtime = new Runtime();
+                self::assertFalse(
+                    ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
+                );
+                self::assertFalse(
+                    ext\standard\ModuleRegistry::extensionLoaded('intl')
+                );
+
+                return;
+            }
+
+            self::assertTrue(IntlExtensionPolicy::advertisesExtension());
+            self::assertTrue(IntlExtensionPolicy::advertisesBuiltins());
+            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeCore());
+            self::assertTrue(IntlExtensionPolicy::advertisesNormalizer());
+            self::assertTrue(IntlExtensionPolicy::advertisesLocale());
+            self::assertTrue(IntlExtensionPolicy::advertisesIntlDateFormatter());
+            self::assertTrue(IntlExtensionPolicy::advertisesIntlCalendar());
+            self::assertTrue(IntlExtensionPolicy::advertisesNumberFormatter());
+            self::assertSame(
+                IntlExtensionPolicy::advertisesIdn(),
+                \PHPCompiler\ext\intl\VmIdn::available()
+            );
 
             $runtime = new Runtime();
-            self::assertFalse(
-                ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
-            );
-            self::assertFalse(
+            self::assertTrue(
                 ext\standard\ModuleRegistry::extensionLoaded('intl')
             );
-
-            return;
+            self::assertTrue(
+                ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
+            );
+            self::assertTrue(
+                ext\standard\VmReflection::functionExists($runtime->vmContext, 'normalizer_normalize')
+            );
+            self::assertTrue(
+                ext\standard\VmReflection::classExists($runtime->vmContext, 'Normalizer')
+            );
+            self::assertTrue(
+                ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_default')
+            );
+            self::assertTrue(
+                ext\standard\VmReflection::classExists($runtime->vmContext, 'Locale')
+            );
+            self::assertTrue(
+                ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlDateFormatter')
+            );
+            if (IntlExtensionPolicy::advertisesIdn()) {
+                self::assertTrue(
+                    ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_ascii')
+                );
+                self::assertTrue(
+                    ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_utf8')
+                );
+            }
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_ENABLE_INTL');
+                unset($_ENV['PHP_COMPILER_ENABLE_INTL']);
+            } else {
+                putenv('PHP_COMPILER_ENABLE_INTL='.$prev);
+                $_ENV['PHP_COMPILER_ENABLE_INTL'] = $prev;
+            }
         }
+    }
 
-        self::assertTrue(IntlExtensionPolicy::advertisesExtension());
-        self::assertTrue(IntlExtensionPolicy::advertisesBuiltins());
-        self::assertTrue(IntlExtensionPolicy::advertisesGraphemeCore());
-        self::assertTrue(IntlExtensionPolicy::advertisesNormalizer());
-        self::assertTrue(IntlExtensionPolicy::advertisesLocale());
-        self::assertTrue(IntlExtensionPolicy::advertisesIntlDateFormatter());
-        self::assertTrue(IntlExtensionPolicy::advertisesIntlCalendar());
-        self::assertTrue(IntlExtensionPolicy::advertisesNumberFormatter());
-        self::assertSame(
-            IntlExtensionPolicy::advertisesIdn(),
-            \PHPCompiler\ext\intl\VmIdn::available()
-        );
-
-        $runtime = new Runtime();
-        self::assertTrue(
-            ext\standard\ModuleRegistry::extensionLoaded('intl')
-        );
-        self::assertTrue(
-            ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
-        );
-        self::assertTrue(
-            ext\standard\VmReflection::functionExists($runtime->vmContext, 'normalizer_normalize')
-        );
-        self::assertTrue(
-            ext\standard\VmReflection::classExists($runtime->vmContext, 'Normalizer')
-        );
-        self::assertTrue(
-            ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_default')
-        );
-        self::assertTrue(
-            ext\standard\VmReflection::classExists($runtime->vmContext, 'Locale')
-        );
-        self::assertTrue(
-            ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlDateFormatter')
-        );
-        if (IntlExtensionPolicy::advertisesIdn()) {
-            self::assertTrue(
-                ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_ascii')
-            );
-            self::assertTrue(
-                ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_utf8')
-            );
+    public function testReleaseScopeWithholdsIntlWithoutEnableEvenWhenHostLoaded(): void
+    {
+        $prev = getenv('PHP_COMPILER_ENABLE_INTL');
+        putenv('PHP_COMPILER_ENABLE_INTL');
+        unset($_ENV['PHP_COMPILER_ENABLE_INTL']);
+        try {
+            self::assertFalse(IntlExtensionPolicy::advertisesExtension());
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_ENABLE_INTL');
+            } else {
+                putenv('PHP_COMPILER_ENABLE_INTL='.$prev);
+                $_ENV['PHP_COMPILER_ENABLE_INTL'] = $prev;
+            }
         }
     }
 
@@ -114,7 +144,10 @@ final class IntlExtensionPolicyTest extends TestCase
     public function testLocaleParsersAdvertisedOnForwardProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
+        $prevEnable = getenv('PHP_COMPILER_ENABLE_INTL');
         putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_ENABLE_INTL=1');
+        $_ENV['PHP_COMPILER_ENABLE_INTL'] = '1';
         try {
             self::assertTrue(CompilerVersion::supportsLocaleParserForwardProfile());
             self::assertTrue(CompilerVersion::advertisesLocaleParserForwardProfile());
@@ -143,6 +176,13 @@ final class IntlExtensionPolicyTest extends TestCase
                 putenv('PHP_COMPILER_PROFILE');
             } else {
                 putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+            if (false === $prevEnable || null === $prevEnable) {
+                putenv('PHP_COMPILER_ENABLE_INTL');
+                unset($_ENV['PHP_COMPILER_ENABLE_INTL']);
+            } else {
+                putenv('PHP_COMPILER_ENABLE_INTL='.$prevEnable);
+                $_ENV['PHP_COMPILER_ENABLE_INTL'] = $prevEnable;
             }
         }
     }
@@ -179,6 +219,8 @@ final class IntlExtensionPolicyTest extends TestCase
                 return;
             }
 
+            putenv('PHP_COMPILER_ENABLE_INTL=1');
+            $_ENV['PHP_COMPILER_ENABLE_INTL'] = '1';
             self::assertTrue(IntlExtensionPolicy::advertisesGraphemeCore());
             self::assertTrue(IntlExtensionPolicy::advertisesBuiltins());
             self::assertTrue(IntlExtensionPolicy::advertisesGraphemeStrContains());
@@ -228,6 +270,8 @@ final class IntlExtensionPolicyTest extends TestCase
                 return;
             }
 
+            putenv('PHP_COMPILER_ENABLE_INTL=1');
+            $_ENV['PHP_COMPILER_ENABLE_INTL'] = '1';
             self::assertTrue(IntlExtensionPolicy::advertisesBuiltins());
             self::assertTrue(IntlExtensionPolicy::advertisesGraphemeCore());
 

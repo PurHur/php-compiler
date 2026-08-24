@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7878 |
-| Phase A inventory files (M2 ratio SSOT) | 7878 |
+| PHP files on vm.php path | 7879 |
+| Phase A inventory files (M2 ratio SSOT) | 7879 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25069 |
+| Source constructs flagged (warnings) | 25070 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7053,6 +7053,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
+| `lib/ReleaseUnsupportedExtensions.php` | 0 | 1 |
 | `lib/Runtime.php` | 0 | 44 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
@@ -16397,9 +16398,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 407)
-- new locale_get_region (line 408)
-- new locale_get_script (line 409)
+- new locale_get_primary_language (line 420)
+- new locale_get_region (line 421)
+- new locale_get_script (line 422)
 - 36 class method(s)
 
 ### `ext/intl/IntlSerializeDeny.php`
@@ -58165,6 +58166,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `lib/ReleaseUnsupportedExtensions.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/Runtime.php`
 

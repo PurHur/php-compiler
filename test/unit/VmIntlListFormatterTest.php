@@ -39,6 +39,8 @@ final class VmIntlListFormatterTest extends TestCase
             $this->markTestSkipped('host php-intl required');
         }
         putenv('PHP_COMPILER_PROFILE=8.5');
+        putenv('PHP_COMPILER_ENABLE_INTL=1');
+        $_ENV['PHP_COMPILER_ENABLE_INTL'] = '1';
         $this->assertTrue(CompilerVersion::advertisesIntlListFormatter());
         $this->assertTrue(IntlExtensionPolicy::advertisesIntlListFormatter());
 

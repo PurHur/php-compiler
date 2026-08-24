@@ -4020,11 +4020,12 @@ final class CompilerVersion
 
 
     /**
-     * ext/gmp GMP object + gmp_* — withheld on reference profile (#22860 / #3341).
+     * ext/gmp GMP object + gmp_* — forward-profile helper (#22860 / #3341 / #24697).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
-     * Zend 8.2 phantom gate (host php-gmp absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`
-     * or install host ext/gmp ({@see \PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension()}).
+     * v1.1.0 release scope withholds the product surface unless
+     * {@code PHP_COMPILER_ENABLE_GMP=1} ({@see \PHPCompiler\ext\gmp\GmpExtensionPolicy}).
+     * This profile gate remains for forward-PHPT / docs that mention 8.4 GMP availability;
+     * it alone must not advertise the module.
      */
     public static function supportsGmp(): bool
     {
