@@ -11,6 +11,10 @@ namespace PHPCompiler\ext\mbstring;
  * Private bodies: ascending for-loops only, no `break`/`continue`/strrev (those
  * SIGSEGV under thin AOT when several leaves share a module).
  *
+ * Byte access via $value[$i] — NestedJIT substr() mis-fires under thin AOT (#34338).
+ * Rtrim NBSP uses a C2-hold deferral — `$last = $i - 1` / `$last === $n - 1` miscompile
+ * under thin AOT (#34396 leftover).
+ *
  * Default charset: ASCII ws + U+00A0 (C2 A0). php-src: ext/mbstring/mbstring.c
  */
 final class MbTrimJitHelper
@@ -58,7 +62,7 @@ final class MbTrimJitHelper
         $started = 0;
         $prev = '';
         for ($i = 0; $i < $n; ++$i) {
-            $c = \substr($value, $i, 1);
+            $c = $value[$i];
             $ws = 0;
             if (' ' === $c || "\t" === $c || "\n" === $c || "\r" === $c
                 || "\0" === $c || "\x0B" === $c) {
@@ -100,33 +104,43 @@ final class MbTrimJitHelper
     {
         $n = \strlen($value);
         $last = -1;
-        $prev = '';
+        $pendingC2 = -1;
         for ($i = 0; $i < $n; ++$i) {
-            $c = \substr($value, $i, 1);
-            $ws = 0;
-            if (' ' === $c || "\t" === $c || "\n" === $c || "\r" === $c
-                || "\0" === $c || "\x0B" === $c) {
-                $ws = 1;
-            } elseif ("\xA0" === $c && "\xC2" === $prev) {
-                $ws = 1;
-                // previous C2 was start of NBSP — retract last if it pointed at C2
-                if ($last === $i - 1) {
-                    $last = $i - 2;
+            $c = $value[$i];
+            if ($pendingC2 >= 0) {
+                if ("\xA0" === $c) {
+                    $pendingC2 = -1;
+                } else {
+                    $last = $pendingC2;
+                    $pendingC2 = -1;
+                    if (0 === self::defaultWsFlag($c)) {
+                        $last = $i;
+                    }
                 }
-            }
-            if (0 === $ws) {
+            } elseif ("\xC2" === $c) {
+                $pendingC2 = $i;
+            } elseif (0 === self::defaultWsFlag($c)) {
                 $last = $i;
             }
-            $prev = $c;
         }
-        if ($last === $n - 1) {
-            return $value;
+        if ($pendingC2 >= 0) {
+            $last = $pendingC2;
         }
         if ($last < 0) {
             return '';
         }
 
-        return \substr($value, 0, $last + 1);
+        return self::copyPrefix($value, $last + 1);
+    }
+
+    private static function defaultWsFlag(string $c): int
+    {
+        if (' ' === $c || "\t" === $c || "\n" === $c || "\r" === $c
+            || "\0" === $c || "\x0B" === $c) {
+            return 1;
+        }
+
+        return 0;
     }
 
     private static function trimCharsLeftBody(string $value, string $what): string
@@ -136,11 +150,11 @@ final class MbTrimJitHelper
         $out = '';
         $started = 0;
         for ($i = 0; $i < $n; ++$i) {
-            $c = \substr($value, $i, 1);
+            $c = $value[$i];
             if (0 === $started) {
                 $hit = 0;
                 for ($k = 0; $k < $wlen; ++$k) {
-                    if (\substr($what, $k, 1) === $c) {
+                    if ($what[$k] === $c) {
                         $hit = 1;
                     }
                 }
@@ -162,10 +176,10 @@ final class MbTrimJitHelper
         $wlen = \strlen($what);
         $last = -1;
         for ($i = 0; $i < $n; ++$i) {
-            $c = \substr($value, $i, 1);
+            $c = $value[$i];
             $hit = 0;
             for ($k = 0; $k < $wlen; ++$k) {
-                if (\substr($what, $k, 1) === $c) {
+                if ($what[$k] === $c) {
                     $hit = 1;
                 }
             }
@@ -173,13 +187,20 @@ final class MbTrimJitHelper
                 $last = $i;
             }
         }
-        if ($last === $n - 1) {
-            return $value;
-        }
         if ($last < 0) {
             return '';
         }
 
-        return \substr($value, 0, $last + 1);
+        return self::copyPrefix($value, $last + 1);
+    }
+
+    private static function copyPrefix(string $value, int $len): string
+    {
+        $out = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $out .= $value[$i];
+        }
+
+        return $out;
     }
 }
