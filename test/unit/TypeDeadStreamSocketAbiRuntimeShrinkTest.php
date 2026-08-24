@@ -45,9 +45,10 @@ final class TypeDeadStreamSocketAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-declare {$sym} in a table (#32807)"
             );
         }
-        // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StreamSocketGetNameRuntime::ensureLinked', $type);
-        $this->assertStringContainsString('StreamSocketAccept::ensureLinked', $type);
+        // StreamSocket ensureLinked moved to call-site (#34333).
+        $this->assertStringContainsString('#34333', $type);
+        $this->assertStringNotContainsString('StreamSocketGetNameRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StreamSocketAccept::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnersDeclareStreamSocketAbisModuleLocally(): void
@@ -64,11 +65,15 @@ final class TypeDeadStreamSocketAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('module->addFunction(', $accept);
     }
 
-    public function testTypeInitializeStillEnsureLinksStreamSocketRuntimes(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkStreamSocketRuntimes(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StreamSocketGetNameRuntime::ensureLinked($this->context)', $type);
-        $this->assertStringContainsString('StreamSocketAccept::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StreamSocketGetNameRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StreamSocketAccept::ensureLinked($this->context)', $type);
+        $getName = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamSocketGetName.php');
+        $accept = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamSocketAccept.php');
+        $this->assertStringContainsString('StreamSocketGetNameRuntime::ensureLinked', $getName);
+        $this->assertStringContainsString('StreamSocketAcceptRuntime::ensureLinked', $accept);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void

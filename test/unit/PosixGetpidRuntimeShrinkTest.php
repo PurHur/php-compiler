@@ -82,9 +82,11 @@ final class PosixGetpidRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#30696', $source);
     }
 
-    public function testTypeRegistersPosixGetpidBridge(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkPosixGetpid(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('PosixGetpidJit::ensureLinked', $source);
+        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertStringNotContainsString('PosixGetpidJit::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PosixGetpidJit.php');
+        $this->assertStringContainsString('self::ensureLinked($context)', $jit);
     }
 }

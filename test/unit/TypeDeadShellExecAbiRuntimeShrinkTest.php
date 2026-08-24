@@ -41,8 +41,9 @@ final class TypeDeadShellExecAbiRuntimeShrinkTest extends TestCase
                 "Builtin\\Type must not always-register {$sym} (#33201)"
             );
         }
-        // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('ProcessRuntime::ensureLinked', $type);
+        // ProcessRuntime ensureLinked moved to call-site (#34333).
+        $this->assertStringContainsString('#34333', $type);
+        $this->assertStringNotContainsString('ProcessRuntime::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresShellExecAbisModuleLocally(): void
@@ -65,10 +66,14 @@ final class TypeDeadShellExecAbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeInitializeStillEnsureLinksProcessRuntime(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkProcessRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('ProcessRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('ProcessRuntime::ensureLinked($this->context)', $type);
+        foreach (['JitShellExec.php', 'JitEscapeshellarg.php', 'JitEscapeshellcmd.php'] as $jit) {
+            $src = (string) file_get_contents(__DIR__.'/../../ext/standard/'.$jit);
+            $this->assertStringContainsString('ProcessRuntime::ensureLinked', $src);
+        }
     }
 
     public function testNoNewRuntimeCForShellExecAbis(): void

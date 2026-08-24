@@ -106,9 +106,11 @@ final class FtokRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('FtokRuntime.php', $spine);
     }
 
-    public function testTypeRegistersFtokBridge(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkFtok(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('FtokRuntime::ensureLinked', $source);
+        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertStringNotContainsString('FtokRuntime::ensureLinked($this->context)', $type);
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/FtokRuntime.php');
+        $this->assertStringContainsString('self::ensureLinked($context)', $runtime);
     }
 }

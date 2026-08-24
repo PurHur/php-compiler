@@ -81,9 +81,11 @@ final class PosixSeteuidRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#31066', $source);
     }
 
-    public function testTypeRegistersPosixSeteuidBridge(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkPosixSeteuid(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('PosixSeteuidJit::ensureLinked', $source);
+        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
+        $this->assertStringNotContainsString('PosixSeteuidJit::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PosixSeteuidJit.php');
+        $this->assertStringContainsString('self::ensureLinked($context)', $jit);
     }
 }

@@ -821,27 +821,16 @@ class Type extends Builtin {
         // ListUnpack always-on ensureLinked removed (#34327): JitDate
         // (getmypid*), JitGettimeofday, JitGetrusage, JitNetGetInterfaces,
         // ListUnpackHelper / CallUnpackRuntime / HashTableWriteLlvm already
-        // ensureLinked before lookup (peer #34320). Process/Posix/StreamSocket
-        // / Ftok remain eager this batch (sentinel StillEnsureLinks peers).
-        ProcessRuntime::ensureLinked($this->context);
-        ProcessOpen::ensureLinked($this->context);
-        StreamSocketPair::ensureLinked($this->context);
-        StreamSocketGetNameRuntime::ensureLinked($this->context);
-        StreamSocketAccept::ensureLinked($this->context);
+        // ensureLinked before lookup (peer #34320).
+        // Process / ProcessOpen / StreamSocket* / Ftok / Posix* always-on
+        // ensureLinked removed (#34333): JitShellExec / JitEscapeshell* /
+        // JitProcOpen / JitProcClose / JitProcTerminate / JitProcGetStatus /
+        // stream_socket_pair.php / JitStreamSocketGetName /
+        // JitStreamSocketAccept / FtokRuntime::invoke / Posix*Jit::invoke
+        // already ensureLinked before lookup (peer #34327). StringTime still
+        // eager below (TimeRuntimeShrinkTest::testTypeLinksStringTime).
+        // Crypto/json/password/random_bytes batch is peer #34332.
         StringTime::ensureLinked($this->context);
-        FtokRuntime::ensureLinked($this->context);
-        PosixGetpidJit::ensureLinked($this->context);
-        PosixGetppidJit::ensureLinked($this->context);
-        PosixGetuidJit::ensureLinked($this->context);
-        PosixGeteuidJit::ensureLinked($this->context);
-        PosixGetgidJit::ensureLinked($this->context);
-        PosixGetegidJit::ensureLinked($this->context);
-        PosixSetuidJit::ensureLinked($this->context);
-        PosixSetgidJit::ensureLinked($this->context);
-        PosixSeteuidJit::ensureLinked($this->context);
-        PosixSetegidJit::ensureLinked($this->context);
-        PosixSetsidJit::ensureLinked($this->context);
-        PosixSetpgidJit::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
         StringVersionCompare::ensureLinked($this->context);
         // openssl / hash / json / libcrypt / password / random_bytes always-on

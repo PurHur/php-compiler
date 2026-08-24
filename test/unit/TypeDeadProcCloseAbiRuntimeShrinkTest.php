@@ -30,8 +30,9 @@ final class TypeDeadProcCloseAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_proc_close (#33118)'
         );
-        // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('ProcessOpen::ensureLinked', $type);
+        // ProcessOpen ensureLinked moved to call-site (#34333).
+        $this->assertStringContainsString('#34333', $type);
+        $this->assertStringNotContainsString('ProcessOpen::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresProcCloseAbiModuleLocally(): void
@@ -49,10 +50,12 @@ final class TypeDeadProcCloseAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/proc_open.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksProcessOpen(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkProcessOpen(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('ProcessOpen::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('ProcessOpen::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitProcClose.php');
+        $this->assertStringContainsString('ProcessOpen::ensureLinked', $jit);
     }
 
     public function testNoNewRuntimeCForProcCloseAbi(): void
