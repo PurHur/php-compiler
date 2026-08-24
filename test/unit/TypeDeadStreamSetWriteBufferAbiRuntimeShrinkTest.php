@@ -30,7 +30,11 @@ final class TypeDeadStreamSetWriteBufferAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_stream_set_write_buffer (#33139)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StreamBuffer::ensureLinked', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamBuffer::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamBuffer::ensureLinked($this->context)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresStreamSetWriteBufferAbiModuleLocally(): void
@@ -47,10 +51,14 @@ final class TypeDeadStreamSetWriteBufferAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamBufferKernel.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksStreamBuffer(): void
+    public function testTypeInitializeDropsEagerStreamBufferEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StreamBuffer::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamBuffer::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamBuffer::ensureLinked($this->context)'
+        );
     }
 
     public function testNoNewRuntimeCForStreamSetWriteBufferAbi(): void

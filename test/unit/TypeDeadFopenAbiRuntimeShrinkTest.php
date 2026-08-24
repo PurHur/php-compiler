@@ -31,7 +31,11 @@ final class TypeDeadFopenAbiRuntimeShrinkTest extends TestCase
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StreamIo::ensureLinked', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamIo::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamIo::ensureLinked($this->context)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresFopenAbiModuleLocally(): void
@@ -45,10 +49,14 @@ final class TypeDeadFopenAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamIoKernel.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksStreamIoRuntime(): void
+    public function testTypeInitializeDropsEagerStreamIoRuntimeEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StreamIo::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamIo::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamIo::ensureLinked($this->context)'
+        );
     }
 
     public function testNoNewRuntimeCForFopenAbi(): void

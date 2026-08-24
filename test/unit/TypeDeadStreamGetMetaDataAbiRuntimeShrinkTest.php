@@ -30,7 +30,11 @@ final class TypeDeadStreamGetMetaDataAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_stream_get_meta_data (#33154)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StreamMeta::ensureLinked', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamMeta::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamMeta::ensureLinked($this->context)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresStreamGetMetaDataAbiModuleLocally(): void
@@ -51,10 +55,14 @@ final class TypeDeadStreamGetMetaDataAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamMetaKernel.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksStreamMeta(): void
+    public function testTypeInitializeDropsEagerStreamMetaEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StreamMeta::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamMeta::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamMeta::ensureLinked($this->context)'
+        );
     }
 
     public function testNoNewRuntimeCForStreamGetMetaDataAbi(): void

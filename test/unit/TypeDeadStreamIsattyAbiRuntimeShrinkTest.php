@@ -30,7 +30,11 @@ final class TypeDeadStreamIsattyAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_stream_isatty (#33151)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StreamCaps::ensureLinked', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamCaps::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamCaps::ensureLinked($this->context)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresStreamIsattyAbiModuleLocally(): void
@@ -51,10 +55,14 @@ final class TypeDeadStreamIsattyAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamCapsKernel.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksStreamCaps(): void
+    public function testTypeInitializeDropsEagerStreamCapsEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StreamCaps::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamCaps::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamCaps::ensureLinked($this->context)'
+        );
     }
 
     public function testNoNewRuntimeCForStreamIsattyAbi(): void

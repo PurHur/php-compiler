@@ -30,7 +30,11 @@ final class TypeDeadStreamSupportsAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_stream_supports (#33145)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StreamIo::ensureLinked', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamIo::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamIo::ensureLinked($this->context)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresStreamSupportsAbiModuleLocally(): void
@@ -51,10 +55,14 @@ final class TypeDeadStreamSupportsAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamIoKernel.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksStreamIo(): void
+    public function testTypeInitializeDropsEagerStreamIoEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StreamIo::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamIo::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamIo::ensureLinked($this->context)'
+        );
     }
 
     public function testNoNewRuntimeCForStreamSupportsAbi(): void

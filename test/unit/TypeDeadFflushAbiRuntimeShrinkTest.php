@@ -31,7 +31,11 @@ final class TypeDeadFflushAbiRuntimeShrinkTest extends TestCase
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StreamLifecycle::ensureLinked', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamLifecycle::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamLifecycle::ensureLinked($this->context)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresFflushAbiModuleLocally(): void
@@ -45,10 +49,14 @@ final class TypeDeadFflushAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitFflush.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksStreamLifecycle(): void
+    public function testTypeInitializeDropsEagerStreamLifecycleEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StreamLifecycle::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamLifecycle::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamLifecycle::ensureLinked($this->context)'
+        );
     }
 
     public function testNoNewRuntimeCForFflushAbi(): void

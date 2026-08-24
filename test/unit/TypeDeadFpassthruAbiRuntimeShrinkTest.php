@@ -31,7 +31,11 @@ final class TypeDeadFpassthruAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_fpassthru (#33106)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StreamRead::ensureLinked', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamRead::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamRead::ensureLinked($this->context)'
+        );
     }
 
     public function testRuntimeOwnerDeclaresFpassthruAbiModuleLocally(): void
@@ -46,10 +50,14 @@ final class TypeDeadFpassthruAbiRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamReadBridgeKernel.php');
     }
 
-    public function testTypeInitializeStillEnsureLinksStreamRead(): void
+    public function testTypeInitializeDropsEagerStreamReadEnsureLinked(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StreamRead::ensureLinked($this->context)', $type);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<![A-Za-z0-9_])StreamRead::ensureLinked\(\$this->context\)/',
+            $type,
+            'Type must not eagerly StreamRead::ensureLinked($this->context)'
+        );
     }
 
     public function testNoNewRuntimeCForFpassthruAbi(): void

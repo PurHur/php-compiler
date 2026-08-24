@@ -903,21 +903,29 @@ class Type extends Builtin {
         // already run before lookup (peer #34423). Eager NestedJIT on every
         // full load vs Runtime ABI drift mints strtr.1 / phpinfo.1 / … (#31894 /
         // #32122). StringTime still eager below (TimeRuntimeShrinkTest).
+        // StreamSync / StreamIo / StreamCaps / StreamLifecycle / StreamBuffer /
+        // StreamMeta / StreamRead / StreamResource always-on ensureLinked removed
+        // (#34439): call-site StreamSync::ensureLinked / StreamIo::ensureLinked /
+        // StreamIoRuntime::ensureLinkedForUserScriptLowering / StreamCaps::ensureLinked /
+        // StreamLifecycleRuntime::ensureLinked(ForUserScriptLowering) / StreamBufferRuntime::ensureLinked /
+        // StreamMeta::ensureLinked / StreamReadRuntime::ensureLinked /
+        // StreamResource::ensureLinked (JitFsync / JitFdatasync / JitFopen / JitFwrite /
+        // JitFread / JitTmpfile / JitPopen / vprintf_ / vfprintf_ / JitStreamIsLocal /
+        // JitStreamIsatty / JitStreamSupports / JitFclose / JitFeof / JitFflush /
+        // JitIsResource / JitPclose / JitStreamSet* / JitStreamGetMetaData /
+        // JitStreamSetBlocking / StreamEnableCrypto / JitFgetc / JitFgets / JitFseek /
+        // JitFtell / JitFtruncate / JitFlock / JitFpassthru / JitStreamGetLine /
+        // JitStreamGetContents / JitStreamCopyToStream / JitGetResourceType /
+        // JitGetResources / SettypeRuntime) already run before lookup (peer #34433).
+        // Eager NestedJIT on every full load vs Runtime ABI drift mints fsync.1 /
+        // fopen.1 / feof.1 / … (#31894 / #32122). StringTime still eager below.
         StringCslashes::ensureStandaloneBodies($this->context);
         StatCache::ensureLinked($this->context);
         StatPath::ensureLinked($this->context);
-        StreamSync::ensureLinked($this->context);
-        StreamIo::ensureLinked($this->context);
-        StreamCaps::ensureLinked($this->context);
         Stats::ensureLinked($this->context);
         StreamGlobals::ensureLinked($this->context);
-        StreamLifecycle::ensureLinked($this->context);
         GzStreamIo::ensureLinked($this->context);
         Bz2StreamIo::ensureLinked($this->context);
-        StreamBuffer::ensureLinked($this->context);
-        StreamMeta::ensureLinked($this->context);
-        StreamRead::ensureLinked($this->context);
-        StreamResource::ensureLinked($this->context);
         StringStreamCsv::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);
