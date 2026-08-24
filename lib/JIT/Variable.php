@@ -1149,6 +1149,10 @@ final class Variable {
             case self::TYPE_HASHTABLE:
                 // Property slots own the hashtable; transient delref would free it (#58).
                 $propertyBacked = null !== $this->objectPropertySlot;
+                // Shared HTs from by-value `$b = $a` must separate before FETCH_DIM_W (#34508).
+                if ($forWrite && !$propertyBacked) {
+                    HashTableWriteLlvm::separateContainerForWrite($this->context, $this);
+                }
                 $container = HashTableHelper::asDetachedHashtable($this->context, $this);
                 if ('GLOBALS' === $container->superglobalName) {
                     return GlobalsTableInit::offsetFetch($this->context, $dim, $forWrite);
@@ -1339,6 +1343,8 @@ final class Variable {
                 if (!$forWrite) {
                     return $this->dimFetchValueBoxRead($dim, $expectedType);
                 }
+                // Value-boxed arrays share HTs after by-value assign — separate first (#34508).
+                HashTableWriteLlvm::separateContainerForWrite($this->context, $this);
                 $childHt = HashTableHelper::loadHashtablePointer($this->context, $this);
                 $htVar = new Variable(
                     $this->context,

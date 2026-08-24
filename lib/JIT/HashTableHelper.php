@@ -67,6 +67,14 @@ final class HashTableHelper
     }
 
     /**
+     * zend_array_separate before dim write / append when HT refcount > 1 (#34508).
+     */
+    public static function separateContainerForWrite(Context $context, Variable $array): Value
+    {
+        return HashTableWriteLlvm::separateContainerForWrite($context, $array);
+    }
+
+    /**
      * Stable string key for SplObjectStorage object offsets (pointer identity, issue #601).
      */
     public static function objectPointerAsStringKey(Context $context, Variable $keyObject): Variable
