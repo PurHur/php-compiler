@@ -617,17 +617,17 @@ class Type extends Builtin {
         StringTriggerError::ensureLinked($this->context);
         // __compiler_assert_fail / __compiler_assert_fail_string always-on shells
         // removed (#33237 / #33241): AssertFail owns both ABIs (getNamedFunction
-        // first, then addFunction if absent; Type::initialize still
-        // AssertFail::ensureLinked on the full load path; JitAssert ensureLinked
-        // before lookup). Leftover Type empty decls vs Runtime ABI drift mint
+        // first, then addFunction if absent). Type::initialize always-on
+        // ensureLinked removed (#34463): JitAssert already ensureLinked before
+        // lookup (peer #34445). Leftover Type empty decls vs Runtime ABI drift mint
         // assert_fail.1 / assert_fail_string.1 (#31894 / #32122). User-script
         // assert() stays JitAssert (php-src ext/standard/assert.c).
         // __compiler_assert_options always-on shell removed (#33245): AssertOptionsRuntime
-        // owns the ABI (getNamedFunction first, then addFunction if absent; Type::initialize
-        // still AssertOptionsRuntime::ensureLinked on the full load path; JitAssertOptions
-        // ensureLinked before lookup). Leftover Type empty decls vs Runtime ABI drift mint
-        // assert_options.1 (#31894 / #32122). User-script assert_options() stays
-        // JitAssertOptions (php-src ext/standard/assert.c).
+        // owns the ABI (getNamedFunction first, then addFunction if absent).
+        // Type::initialize always-on ensureLinked removed (#34463): JitAssertOptions
+        // already ensureLinked before lookup (peer #34445). Leftover Type empty decls
+        // vs Runtime ABI drift mint assert_options.1 (#31894 / #32122). User-script
+        // assert_options() stays JitAssertOptions (php-src ext/standard/assert.c).
         // Leftover always-on $libcFns removed (#32217 / peer Type I/O #32202 / calendar #32173):
         // time(2) — JitTimeKernel::ensureLibcTime (#30332). User-script time() stays TimeJitHelper.
         // gettimeofday(2) — JitMicrotimeKernel::ensureLibcGettimeofday (#29405).
@@ -933,12 +933,23 @@ class Type extends Builtin {
         // (peer #34439). Eager NestedJIT on every full load vs Runtime ABI drift
         // mints clearstatcache.1 / file_exists.1 / gzopen.1 / bzopen.1 /
         // fgetcsv.1 / … (#31894 / #32122). StringTime still eager above.
+        // LastError / CliArgv / FunctionExists / Memory / AssertFail /
+        // AssertOptions / ProgressNote always-on ensureLinked removed (#34463):
+        // call-site LastErrorRuntime::ensureLinked / CliArgvRuntime::ensureLinked /
+        // FunctionExistsRuntime::ensureLinked / MemoryRuntime::ensureLinked /
+        // AssertFail::ensureLinked / AssertOptionsRuntime::ensureLinked /
+        // ProgressNoteRuntime::ensureLinked (JitErrorGetLast /
+        // JitTriggerErrorKernel / JitGetopt / CliArgvGlobalInit /
+        // StringFunctionExists / JIT::jitNoteMemoryReleaseForUnset / JitAssert /
+        // JitAssertOptions / JIT::tryResolveProgressStaticCall /
+        // MemoryRuntime::{getUsageValue,getPeakUsageValue,resetPeakUsage}) already run
+        // before lookup (peer #34445). Thin/full standalone still
+        // ensureStandaloneBodies from Context for Assert*/LastError/CliArgv/
+        // ProgressNote. Eager NestedJIT on every full load vs Runtime ABI
+        // drift mints error_get_last.1 / assert_fail.1 / … (#31894 / #32122).
+        // StringTime still eager above (TimeRuntimeShrinkTest).
         StringCslashes::ensureStandaloneBodies($this->context);
-        LastErrorRuntime::ensureLinked($this->context);
-        CliArgvRuntime::ensureLinked($this->context);
-        FunctionExistsRuntime::ensureLinked($this->context);
         WeakRefRegistryRuntime::ensureLinked($this->context);
-        MemoryRuntime::ensureLinked($this->context);
         IniRuntime::ensureLinked($this->context);
         IncludePathRuntime::ensureLinked($this->context);
         EnvLocalRuntime::ensureLinked($this->context);
@@ -954,9 +965,6 @@ class Type extends Builtin {
         // ext/standard/basic_functions.c — set_error_handler / set_exception_handler.
         StringTriggerError::ensureLinked($this->context);
         CallArgv::implement($this->context);
-        ProgressNoteRuntime::ensureLinked($this->context);
-        AssertFail::ensureLinked($this->context);
-        AssertOptionsRuntime::ensureLinked($this->context);
         SessionLifecycleRuntime::ensureLinked($this->context);
         SessionCreateIdRuntime::ensureLinked($this->context);
         SessionGcRuntime::ensureLinked($this->context);
