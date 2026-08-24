@@ -25,10 +25,16 @@ final class JsonEncodeArrayLlvm
 {
     private static int $seq = 0;
 
-    public static function encode(Context $context, Value $ht, Value $flags): Value
+    /**
+     * @param Value|null $childFlags flags for nested values; defaults to $flags. Object
+     *                               property HTs pass container $flags | FORCE_OBJECT while
+     *                               child values keep the caller's original flags (#34522).
+     */
+    public static function encode(Context $context, Value $ht, Value $flags, ?Value $childFlags = null): Value
     {
         JsonEncodeQuoteStringRuntime::ensureLinked($context);
         Builtin\StringJsonEncode::ensureJitHelperCompiled($context);
+        $valueFlags = $childFlags ?? $flags;
 
         $packedVar = new Variable(
             $context,
@@ -142,7 +148,7 @@ final class JsonEncodeArrayLlvm
         $quotedKeyPhi->addIncoming($quotedKey, $keyDoneStr);
         $quotedKeyPhi->addIncoming($quotedKeyLong, $keyDoneLong);
 
-        $valJson = JitJsonEncode::encodeBoxedValue($context, $valPtr, $flags);
+        $valJson = JitJsonEncode::encodeBoxedValue($context, $valPtr, $valueFlags);
 
         $withKey = $context->builder->select(
             $packed,

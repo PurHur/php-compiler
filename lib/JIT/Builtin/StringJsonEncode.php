@@ -143,7 +143,7 @@ final class StringJsonEncode
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($strPtr, false, $htPtr, $i64);
+        $ft = $context->context->functionType($strPtr, false, $htPtr, $i64, $i64);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         // Register before body emit: JsonEncodeArrayLlvm → encodeBoxedValue self-calls
         // this ABI. Type empty shells used to pre-register it (#32897 follow-up / #32326).
@@ -153,7 +153,12 @@ final class StringJsonEncode
             $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::HT_BRIDGE_ENTRY);
             $context->builder->positionAtEnd($entry);
             $context->builder->returnValue(
-                JsonEncodeArrayLlvm::encode($context, $fn->getParam(0), $fn->getParam(1))
+                JsonEncodeArrayLlvm::encode(
+                    $context,
+                    $fn->getParam(0),
+                    $fn->getParam(1),
+                    $fn->getParam(2)
+                )
             );
         });
         BasicBlockHelper::restoreInsertBlock($context, $savedBlock);

@@ -57,6 +57,7 @@ final class JitJsonEncode
                 $context->builder->call(
                     $context->lookupFunction('__compiler_json_encode_array'),
                     $ht,
+                    $flags,
                     $flags
                 )
             );
@@ -353,7 +354,8 @@ final class JitJsonEncode
         return $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
             $ht,
-            $flagsObj
+            $flagsObj,
+            $flags
         );
     }
 
@@ -438,6 +440,7 @@ final class JitJsonEncode
         $fixedResult = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
             $htFixed,
+            $flags,
             $flags
         );
         $fixedEnd = $context->builder->getInsertBlock();
@@ -448,7 +451,8 @@ final class JitJsonEncode
         $splResult = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
             $context->helper->loadValue($htVar),
-            $flagsObj
+            $flagsObj,
+            $flags
         );
         $splEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
@@ -462,7 +466,8 @@ final class JitJsonEncode
         $plainResult = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
             $plainHt,
-            $flagsObj
+            $flagsObj,
+            $flags
         );
         $plainEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
@@ -577,6 +582,7 @@ final class JitJsonEncode
         $htResult = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
             $ht,
+            $flags,
             $flags
         );
         $htEnd = $context->builder->getInsertBlock();
