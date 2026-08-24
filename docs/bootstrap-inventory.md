@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7878 |
-| Phase A inventory files (M2 ratio SSOT) | 7878 |
+| PHP files on vm.php path | 7880 |
+| Phase A inventory files (M2 ratio SSOT) | 7880 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25069 |
+| Source constructs flagged (warnings) | 25071 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1577,6 +1577,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbPreferredMimeNameJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbScrubJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbSearchJitHelper.php` | 0 | 1 |
+| `ext/mbstring/MbSplitJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbStrSplitJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbStrcutJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbStrwidthJitHelper.php` | 0 | 1 |
@@ -5842,6 +5843,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MbPreferredMimeNameRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbScrubRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbSearchRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/MbSplitRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbStrSplitRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbStrcut.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbStrwidth.php` | 0 | 1 |
@@ -19878,7 +19880,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/JitMbEreg.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 7 class method(s)
 
 ### `ext/mbstring/JitMbEregSearch.php`
 
@@ -20024,6 +20026,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 17 class method(s)
+
+### `ext/mbstring/MbSplitJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/mbstring/MbStrSplitJitHelper.php`
 
@@ -20488,7 +20495,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_split.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 35)
+- new ArgumentCountError (line 37)
 - 5 class method(s)
 - 2 closure(s)
 
@@ -50862,6 +50869,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
+
+### `lib/JIT/Builtin/MbSplitRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/MbStrSplitRuntime.php`
 

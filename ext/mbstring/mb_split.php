@@ -19,7 +19,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_split() — multibyte regex split (php-src ext/mbstring/php_mbregex.c; #13367, #29811, #31312).
+ * mb_split() — multibyte regex split (php-src ext/mbstring/php_mbregex.c; #13367, #29811, #31312, #34391).
+ *
+ * Compile-time fold for string literals; runtime via {@see JitMbEreg::invokeSplit} / MbSplitJitHelper.
  */
 final class mb_split extends Internal
 {
@@ -119,9 +121,7 @@ final class mb_split extends Internal
                 } else {
                     $resolved = self::compileTimeLong($context, $args[2]);
                     if (null === $resolved) {
-                        throw new \LogicException(
-                            'mb_split() JIT requires a compile-time int $limit in this compiler build'
-                        );
+                        return JitMbEreg::invokeSplit($context, $args);
                     }
                     $limit = $resolved;
                 }
@@ -134,7 +134,7 @@ final class mb_split extends Internal
             return self::foldStringList($context, $result);
         }
 
-        throw new \LogicException('mb_split() is not lowered for JIT/AOT in this compiler build');
+        return JitMbEreg::invokeSplit($context, $args);
     }
 
     /** @param list<string> $parts */

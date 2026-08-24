@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\ext\standard\JitExplode;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbEregRuntime;
+use PHPCompiler\JIT\Builtin\MbSplitRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for mb_ereg() / mb_eregi() / mb_ereg_match() / mb_ereg*_replace()
- * via MbEregJitHelper (#33811, #34389).
+ * LLVM lowering for mb_ereg() / mb_eregi() / mb_ereg_match() / mb_ereg*_replace() /
+ * mb_split() via MbEregJitHelper / MbSplitJitHelper (#33811, #34389, #34391).
  *
  * Compile-time fold stays in {@see JitMbEregSearch}; runtime uses NestedJIT helper calls
  * (peer {@see JitMbStrSplit} / #26870). &$regs write deferred — 3-arg FUNCCALL IR (#33811).
@@ -172,6 +177,95 @@ final class JitMbEreg
         );
 
         return self::boxStringFalseOrNull($context, $raw);
+    }
+
+    /**
+     * mb_split() — runtime pattern/string(/limit) (#34391 leftover of #13367).
+     *
+     * NestedJIT stores parts (no HashTable under thin AOT); LLVM rebuilds packed HT
+     * (peer {@see JitMbStrSplit} / preg_split #1178).
+     *
+     * @param list<JITVariable> $args
+     */
+    public static function invokeSplit(Context $context, array $args): Value
+    {
+        $pattern = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $args[0],
+            'mb_split',
+            0,
+            'pattern'
+        );
+        $string = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $args[1],
+            'mb_split',
+            1,
+            'string'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $limit = $i64->constInt(-1, true);
+        if (\count($args) >= 3) {
+            $limit = JitStrictIntArg::lower($context, $args[2], 'mb_split', 3, 'limit');
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbSplitRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_split_runtime');
+
+        $joinedRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            MbSplitRuntime::splitJoinedHelper($context),
+            [$pattern, $string, $limit]
+        );
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_split_after_helper');
+        $joined = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $joinedRaw);
+
+        return self::hashtableFromJoined($context, $joined);
+    }
+
+    /**
+     * Rebuild HT from RS-joined parts (peer {@see JitMbStrSplit}).
+     * Empty joined → []; otherwise explode.
+     */
+    private static function hashtableFromJoined(Context $context, Value $joined): Value
+    {
+        $tag = 'mbspl';
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $slen = $context->builder->call($context->lookupFunction('__string__strlen'), $joined);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $slen, $zero);
+
+        $emptyBlock = BasicBlockHelper::append($context, 'mb_split_empty_'.$tag);
+        $explodeBlock = BasicBlockHelper::append($context, 'mb_split_explode_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'mb_split_joined_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $explodeBlock);
+
+        $htTy = $context->getTypeFromString('__hashtable__*');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $htTy);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->store(HashTableHelper::alloc($context), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($explodeBlock);
+        $delim = $context->builder->load(
+            $context->constantStringFromString(MbSplitJitHelper::JOIN_DELIM)
+        );
+        $ownedJoined = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $joined
+        );
+        $ht = JitExplode::explode($context, $delim, $ownedJoined);
+        $context->builder->store($ht, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
     }
 
     private static function boolBoxFromI64(Context $context, Value $matchedRaw): Value
