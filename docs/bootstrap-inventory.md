@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7874 |
-| Phase A inventory files (M2 ratio SSOT) | 7874 |
+| PHP files on vm.php path | 7878 |
+| Phase A inventory files (M2 ratio SSOT) | 7878 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25058 |
+| Source constructs flagged (warnings) | 25069 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -457,7 +457,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
 | `ext/dom/JitDomDeleteData.php` | 0 | 1 |
 | `ext/dom/JitDomDocumentDoctype.php` | 0 | 3 |
-| `ext/dom/JitDomDocumentElement.php` | 0 | 13 |
+| `ext/dom/JitDomDocumentElement.php` | 0 | 20 |
 | `ext/dom/JitDomDocumentMethodKernel.php` | 0 | 1 |
 | `ext/dom/JitDomElementNavigationProperty.php` | 0 | 3 |
 | `ext/dom/JitDomElementTextContent.php` | 0 | 10 |
@@ -1570,6 +1570,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbConvertCaseJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbConvertEncodingJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbConvertKanaJitHelper.php` | 0 | 1 |
+| `ext/mbstring/MbDetectEncodingJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbEregJitHelper.php` | 0 | 2 |
 | `ext/mbstring/MbMimeheaderJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbNumericEntityJitHelper.php` | 0 | 1 |
@@ -1580,6 +1581,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbStrcutJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbStrwidthJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbSubstrCountJitHelper.php` | 0 | 1 |
+| `ext/mbstring/MbTrimJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbstringAotFoldState.php` | 0 | 1 |
 | `ext/mbstring/MbstringConstants.php` | 0 | 1 |
 | `ext/mbstring/MbstringEncodingRegistry.php` | 0 | 1 |
@@ -5833,6 +5835,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MbConvertCaseRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbConvertEncodingRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbConvertKanaRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/MbDetectEncodingRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbEregRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbMimeheaderRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbNumericEntity.php` | 0 | 1 |
@@ -5843,6 +5846,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MbStrcut.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbStrwidth.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbSubstrCountRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/MbTrimRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MemoryManager.php` | 0 | 4 |
 | `lib/JIT/Builtin/MemoryManager/EmbedMcjit.php` | 0 | 1 |
 | `lib/JIT/Builtin/MemoryManager/Native.php` | 0 | 1 |
@@ -10739,19 +10743,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomDocumentElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 174)
-- new JITVariable (line 195)
-- new JITVariable (line 208)
-- new JITVariable (line 214)
-- new JITVariable (line 324)
-- new JITVariable (line 335)
-- new JITVariable (line 347)
-- new JITVariable (line 355)
-- new JITVariable (line 362)
-- new JITVariable (line 418)
-- new JITVariable (line 424)
-- new JITVariable (line 455)
-- 10 class method(s)
+- new JITVariable (line 179)
+- new JITVariable (line 200)
+- new JITVariable (line 213)
+- new JITVariable (line 219)
+- new JITVariable (line 345)
+- new JITVariable (line 356)
+- new JITVariable (line 368)
+- new JITVariable (line 376)
+- new JITVariable (line 383)
+- new JITVariable (line 439)
+- new JITVariable (line 445)
+- new JITVariable (line 479)
+- new JITVariable (line 485)
+- new JITVariable (line 501)
+- new JITVariable (line 521)
+- new JITVariable (line 527)
+- new JITVariable (line 572)
+- new JITVariable (line 585)
+- new JITVariable (line 609)
+- 14 class method(s)
 
 ### `ext/dom/JitDomDocumentMethodKernel.php`
 
@@ -19855,7 +19866,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/JitMbDetectEncoding.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 8 class method(s)
 
 ### `ext/mbstring/JitMbEncodingRegistry.php`
 
@@ -19941,7 +19952,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/JitMbTrim.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 9 class method(s)
 
 ### `ext/mbstring/JitMbUcfirstLcfirst.php`
 
@@ -19977,6 +19988,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/mbstring/MbDetectEncodingJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `ext/mbstring/MbEregJitHelper.php`
 
@@ -20028,6 +20044,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/mbstring/MbTrimJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/mbstring/MbstringAotFoldState.php`
 
@@ -20233,7 +20254,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_detect_encoding.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 33)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -47630,7 +47651,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 2656)
+- new InternalArgInfo (line 2691)
 - 24 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -50807,6 +50828,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/MbDetectEncodingRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `lib/JIT/Builtin/MbEregRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50853,6 +50879,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/MbSubstrCountRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `lib/JIT/Builtin/MbTrimRuntime.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
