@@ -154,9 +154,11 @@ final class JitDomInsertBefore
     ): Value {
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             self::syncUserScriptInsertBeforeSlots($context, $parentVar, $newChildVar, $refChildVar);
-            // LiveSlots refresh held pins (#32801); saveXML still reads INNER_XML (#32940 / peer #32903).
-            // When InnerXml refresh rewrites compile-time XML to include the new child,
-            // countTagArgv already sees it — do not also bump PENDING (#33679).
+            // LiveSlots already rebuilt PROP_USER_SCRIPT_INNER_XML from firstChild→next
+            // (#32801 / #33450). A second compile-time splice into that slot duplicated
+            // the inserted child in saveXML($el) — held childNodes stayed correct (peer
+            // prepend #33637 / append #33918). Fold the loadXML literal for document-wide
+            // saveXML / C14N / getElements only; do not storeUserScriptInnerXml again.
             $xmlRefreshed = self::syncUserScriptInnerXml(
                 $context,
                 $parentVar,
@@ -302,17 +304,46 @@ final class JitDomInsertBefore
         if (null === $index) {
             return false;
         }
-        $inner = DomParseSimpleXmlJitHelper::innerXmlInsertMarkupAt(
-            $parentInner,
-            $index,
-            $markup,
-            false
-        );
-        if (null === $inner) {
-            return false;
+        $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks($parentInner);
+        if (isset($chunks[$index]) && $chunks[$index] === $markup) {
+            // Dual-path emit already spliced this child at $index — do not insert again.
+            return true;
         }
-        $parent = self::loadObjectArg($context, $parentVar);
-        JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+        // createElement / prior fold may already append the new child as a trailing
+        // sibling; insertBefore must relocate it, not insert a second copy (#33637 peer).
+        $existingAt = null;
+        foreach ($chunks as $i => $chunk) {
+            if ($chunk === $markup) {
+                $existingAt = $i;
+                break;
+            }
+        }
+        if (null !== $existingAt) {
+            array_splice($chunks, $existingAt, 1);
+            $insertAt = $index;
+            if ($existingAt < $index) {
+                $insertAt = $index - 1;
+            }
+            if ($insertAt < 0) {
+                $insertAt = 0;
+            }
+            if ($insertAt > \count($chunks)) {
+                $insertAt = \count($chunks);
+            }
+            array_splice($chunks, $insertAt, 0, [$markup]);
+            $inner = implode('', $chunks);
+        } else {
+            $inner = DomParseSimpleXmlJitHelper::innerXmlInsertMarkupAt(
+                $parentInner,
+                $index,
+                $markup,
+                false
+            );
+            if (null === $inner) {
+                return false;
+            }
+        }
+        // Fold only — LiveSlots owns the INNER_XML slot (peer prepend #33637).
         JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner, $parentVar);
 
         return true;
