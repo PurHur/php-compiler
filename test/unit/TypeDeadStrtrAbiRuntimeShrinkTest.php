@@ -41,7 +41,11 @@ final class TypeDeadStrtrAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StringStrtr::ensureLinked', $type);
+        // Type::initialize no longer eagerly ensureLinked (#34433); call sites do.
+        $this->assertStringNotContainsString(
+            'StringStrtr::ensureLinked($this->context)',
+            $type
+        );
     }
 
     public function testRuntimeOwnerDeclaresStrtrAbisModuleLocally(): void
@@ -55,10 +59,10 @@ final class TypeDeadStrtrAbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeInitializeStillEnsureLinksStringStrtr(): void
+    public function testJitStrtrEnsureLinksBeforeLookup(): void
     {
-        $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringStrtr::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStrtr.php');
+        $this->assertStringContainsString('StringStrtr::ensureLinked', $jit);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void
