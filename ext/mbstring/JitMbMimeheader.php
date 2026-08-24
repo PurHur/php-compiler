@@ -115,9 +115,13 @@ final class JitMbMimeheader
             }
         }
 
-        return self::materializeString(
-            $context,
-            VmMbstring::encodeMimeheader($string, $charset, $base64)
+        // Fold returns a raw __string__* (pre-#34299 shape). Boxing fold results and then
+        // feeding them into NestedJIT crashes the same way NestedJIT→NestedJIT does for
+        // mb_convert_kana (#34294); keep the literal path as a plain constant string.
+        return $context->builder->load(
+            $context->constantStringFromString(
+                VmMbstring::encodeMimeheader($string, $charset, $base64)
+            )
         );
     }
 
@@ -137,9 +141,10 @@ final class JitMbMimeheader
             return null;
         }
 
-        return self::materializeString(
-            $context,
-            VmMbstring::decodeMimeheader($string)
+        return $context->builder->load(
+            $context->constantStringFromString(
+                VmMbstring::decodeMimeheader($string)
+            )
         );
     }
 
@@ -216,14 +221,6 @@ final class JitMbMimeheader
                 'mb_encode_mimeheader() JIT only supports UTF-8, ASCII, or 8BIT charset literals in this compiler build'
             );
         }
-    }
-
-    private static function materializeString(Context $context, string $str): Value
-    {
-        return self::materializeOwnedString(
-            $context,
-            $context->builder->load($context->constantStringFromString($str))
-        );
     }
 
     private static function materializeOwnedString(Context $context, Value $resultStr): Value
