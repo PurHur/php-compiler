@@ -15,6 +15,7 @@ use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\VarDumpArrayLlvm;
+use PHPCompiler\JIT\VarDumpObjectLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPCompiler\VM\EnumCasePropertyJitHelper;
@@ -28,19 +29,23 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Embed: NestedJIT {@see VarDumpJitHelper} (php-in-PHP).
- * Thin standalone AOT: scalar + enum-case + array LLVM bridge — NestedJIT of the helper
+ * Thin standalone AOT: scalar + enum-case + array + object LLVM bridge — NestedJIT of the helper
  * segfaults on `$ctx->runtime->vm` class-id layout (#23540 / #16075). Arrays use
- * {@see VarDumpArrayLlvm} (#34498; peer SerializeArrayLlvm #34483). Other non-scalars
- * thin AOT abort with a diagnostic (not silent SIGABRT).
+ * {@see VarDumpArrayLlvm} (#34498). Objects use {@see VarDumpObjectLlvm} (#34506; enums keep
+ * {@see emitThinEnumObjectDump}). Other non-scalars thin AOT abort with a diagnostic.
  * Thin body is deferred to {@see ensureLinkedAtCallSite()} so DECLARE_ENUM has run (#34207).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringVarExport #20589).
  * php-src: ext/standard/var.c — php_var_dump_ex / PHP_FUNCTION(var_dump)
  */
 final class StringVarDump
 {
+    public const OBJECT_ABI = '__compiler_var_dump_object';
+
     private const HELPER_PATH = '/ext/standard/VarDumpJitHelper.php';
 
     private const FORMAT_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\VarDumpJitHelper::formatVariableValue';
+
+    private const OBJECT_BRIDGE_ENTRY = 'var_dump_object_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -50,6 +55,7 @@ final class StringVarDump
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
         '__compiler_var_dump',
+        self::OBJECT_ABI,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -210,12 +216,51 @@ final class StringVarDump
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
-        // Register before body: VarDumpArrayLlvm recurses into this ABI (#34498).
+        // Register before body: VarDumpArrayLlvm / object ABI recurse into this ABI (#34498 / #34506).
         $context->registerFunction($abiName, $fn);
+        self::implementVarDumpObjectBridge($context);
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn, $valuePtr, $i64, $i8): void {
             self::emitThinExBody($context, $fn, $valuePtr, $i64, $i8);
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+    /**
+     * Object ABI for thin AOT — dedicated fn so get_object_vars IR stays local (#34506).
+     */
+    private static function implementVarDumpObjectBridge(Context $context): void
+    {
+        $abiName = self::OBJECT_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::OBJECT_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        ObOutputRuntime::ensureLinked($context);
+        ValueEchoRuntime::ensureLinked($context);
+
+        $voidTy = $context->getTypeFromString('void');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($voidTy, false, $valuePtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::OBJECT_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            VarDumpObjectLlvm::dump($context, $fn->getParam(0), $fn->getParam(1));
+            $context->builder->returnVoid();
         });
         BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
@@ -432,7 +477,15 @@ final class StringVarDump
         $context->builder->branchIf($isObject, $objectBlock, $fallback);
 
         $context->builder->positionAtEnd($objectBlock);
-        self::emitThinEnumObjectDump($context, $fn, $arg, $done, $fallback);
+        $nonEnumObject = $fn->appendBasicBlock('var_dump_ex_plain_object');
+        self::emitThinEnumObjectDump($context, $fn, $arg, $done, $nonEnumObject);
+        $context->builder->positionAtEnd($nonEnumObject);
+        $context->builder->call(
+            $context->lookupFunction(self::OBJECT_ABI),
+            $arg,
+            $level
+        );
+        $context->builder->branch($done);
 
         $context->builder->positionAtEnd($fallback);
         self::emitThinUnsupportedAbort($context);
