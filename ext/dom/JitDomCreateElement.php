@@ -297,19 +297,17 @@ final class JitDomCreateElement
                 $qname,
                 $value
             );
-            // Seed getAttribute/hasAttribute cache (peer createFromString #19281). Presence-only
-            // NamedNodeMap pins left DomElementGetAttribute falling through to the ImportNode
-            // HTML-id stub, which always returned "target" (#32956).
-            $pos = strpos($qname, ':');
-            $local = false === $pos ? $qname : substr($qname, $pos + 1);
-            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
-            if ($local !== $qname) {
-                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
-            }
-            // getAttributeNS keys by namespace URI (#33128 leftover of #33116).
-            if ('' !== $namespace) {
-                DomUserScriptAttributeCacheLlvm::storeLiteral($context, $namespace, $local, $attr, $value);
-            }
+            // Seed getAttribute/hasAttribute(+NS) cache (peer createFromString #19281).
+            // Presence-only NamedNodeMap pins left DomElementGetAttribute falling through to
+            // the ImportNode HTML-id stub, which always returned "target" (#32956).
+            // Do not dual-key namespaced attrs under empty-NS+localName (Zend false).
+            DomUserScriptAttributeCacheLlvm::storeLiteralForQName(
+                $context,
+                $namespace,
+                $qname,
+                $attr,
+                $value
+            );
             $pin = new JITVariable(
                 $context,
                 JITVariable::TYPE_OBJECT,

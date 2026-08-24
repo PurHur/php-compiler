@@ -84,6 +84,36 @@ final class DomUserScriptAttributeCacheLlvm
         return false;
     }
 
+    /**
+     * Seed get/hasAttribute(+NS) cache keys for a materialized Attr (php-src xmlHasNsProp).
+     *
+     * Namespaced attrs must not also key under empty-NS+localName — that made
+     * hasAttribute('a') / hasAttributeNS(null,'a') true for {@code p:a} while Zend
+     * returns false (loadXML / createFromString thin AOT).
+     */
+    public static function storeLiteralForQName(
+        Context $context,
+        string $namespace,
+        string $qname,
+        Value $attr,
+        ?string $value = null
+    ): void {
+        $pos = strpos($qname, ':');
+        $local = false === $pos ? $qname : substr($qname, $pos + 1);
+        if ('' !== $namespace) {
+            self::storeLiteral($context, $namespace, $local, $attr, $value);
+            // Qualified-name lookup: hasAttribute('p:a') / getAttribute('p:a').
+            self::storeLiteral($context, '', $qname, $attr, $value);
+
+            return;
+        }
+        self::storeLiteral($context, '', $local, $attr, $value);
+        if ($local !== $qname) {
+            // Prefixed qname with unresolved URI — keep hasAttribute('p:a').
+            self::storeLiteral($context, '', $qname, $attr, $value);
+        }
+    }
+
     /** True when setIdAttribute* marked this key as ID-bearing (#29884). */
     public static function isIdBearingLiteral(string $namespace, string $localName): bool
     {

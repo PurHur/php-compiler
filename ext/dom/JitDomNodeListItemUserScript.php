@@ -307,13 +307,9 @@ final class JitDomNodeListItemUserScript
         $pair = $attrs[$index];
         $qname = $pair['qname'];
         $value = $pair['value'];
-        $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals($context, '', $qname, $value);
-        $pos = strpos($qname, ':');
-        $local = false === $pos ? $qname : substr($qname, $pos + 1);
-        DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
-        if ($local !== $qname) {
-            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
-        }
+        $namespace = $pair['namespace'] ?? '';
+        $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals($context, $namespace, $qname, $value);
+        DomUserScriptAttributeCacheLlvm::storeLiteralForQName($context, $namespace, $qname, $attr, $value);
 
         return self::boxObject($context, $attr);
     }
@@ -337,18 +333,20 @@ final class JitDomNodeListItemUserScript
             foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open']) as $attrPair) {
                 $qname = $attrPair['qname'];
                 $value = $attrPair['value'];
-                $pos = strpos($qname, ':');
-                $local = false === $pos ? $qname : substr($qname, $pos + 1);
+                $namespace = $attrPair['namespace'] ?? '';
                 $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals(
                     $context,
-                    '',
+                    $namespace,
                     $qname,
                     $value
                 );
-                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
-                if ($local !== $qname) {
-                    DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
-                }
+                DomUserScriptAttributeCacheLlvm::storeLiteralForQName(
+                    $context,
+                    $namespace,
+                    $qname,
+                    $attr,
+                    $value
+                );
             }
         }
 
@@ -393,18 +391,20 @@ final class JitDomNodeListItemUserScript
         foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($openTag) as $attrPair) {
             $qname = $attrPair['qname'];
             $value = $attrPair['value'];
-            $pos = strpos($qname, ':');
-            $local = false === $pos ? $qname : substr($qname, $pos + 1);
+            $namespace = $attrPair['namespace'] ?? '';
             $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals(
                 $context,
-                '',
+                $namespace,
                 $qname,
                 $value
             );
-            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
-            if ($local !== $qname) {
-                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
-            }
+            DomUserScriptAttributeCacheLlvm::storeLiteralForQName(
+                $context,
+                $namespace,
+                $qname,
+                $attr,
+                $value
+            );
         }
 
         return self::boxObject($context, $element);
