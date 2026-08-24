@@ -42,7 +42,9 @@ final class TypeDeadSerializeAbiRuntimeShrinkTest extends TestCase
             );
         }
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StringSerialize::ensureLinked', $type);
+        // Type::initialize always-on ensureLinked removed (#34384); JitSerialize links lazily.
+        $this->assertStringContainsString('#34384', $type);
+        $this->assertStringNotContainsString('StringSerialize::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresSerializeAbisModuleLocally(): void
@@ -60,10 +62,12 @@ final class TypeDeadSerializeAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringSerialize::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringSerialize(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkStringSerialize(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringSerialize::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringSerialize::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSerialize.php');
+        $this->assertStringContainsString('StringSerialize::ensureLinked', $jit);
     }
 
     public function testNoNewRuntimeCForSerializeAbi(): void
