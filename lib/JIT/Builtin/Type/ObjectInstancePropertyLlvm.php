@@ -108,7 +108,11 @@ final class ObjectInstancePropertyLlvm
         $context = $object->jitContext();
         $className = $object->classNameForId($classId);
         $classLc = strtolower(ltrim($class, '\\'));
-        if (\in_array($classLc, ['static', 'self', 'parent'], true)) {
+        // CFG often collapses `$b = new B` receivers to generic "object" on later reads while
+        // unset still resolved B — defining an untyped slot on the synthetic object ClassEntry
+        // skipped TypedPropertyUninitGuard (empty/garbage after unset; #34382 / #33886).
+        // Same runtime class_id dispatch as static/self/parent (#31937).
+        if (\in_array($classLc, ['static', 'self', 'parent', 'object'], true)) {
             $runtimeFetch = self::tryPropertyFetchByRuntimeClass($object, $obj, $name, $forWrite);
             if (null !== $runtimeFetch) {
                 return $runtimeFetch;
