@@ -122,6 +122,72 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * simplexml_load_file($filename) with compile-time path literal (#34454).
+     *
+     * php-src ext/simplexml/simplexml.c PHP_FUNCTION(simplexml_load_file) —
+     * NestedJIT of VmSimpleXml hangs under user-script AOT (same as load_string #26863),
+     * so fold via host simplexml_load_file + materializeElement.
+     */
+    public static function tryLoadFile(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!UserScriptAotEnv::isActive() || \count($args) < 1 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $path = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (null === $path) {
+            return null;
+        }
+        if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
+            $classLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $classLit || ('' !== $classLit && 0 !== strcasecmp($classLit, 'SimpleXMLElement'))) {
+                return null;
+            }
+        }
+        $prevInternal = null;
+        $hostErrors = [];
+        if (\function_exists('libxml_use_internal_errors')) {
+            $prevInternal = \libxml_use_internal_errors(true);
+            \libxml_clear_errors();
+        }
+        try {
+            $tree = \simplexml_load_file($path);
+            if (\function_exists('libxml_get_errors')) {
+                $hostErrors = \libxml_get_errors();
+            }
+        } catch (\Throwable) {
+            $tree = false;
+            if (\function_exists('libxml_get_errors')) {
+                $hostErrors = \libxml_get_errors();
+            }
+        } finally {
+            if (null !== $prevInternal && \function_exists('libxml_use_internal_errors')) {
+                \libxml_use_internal_errors($prevInternal);
+            }
+        }
+        if (false === $tree || !($tree instanceof \SimpleXMLElement)) {
+            if (!is_file($path) || !is_readable($path)) {
+                JitBuiltinWarning::emit(
+                    $context,
+                    'simplexml_load_file(): I/O warning : failed to load external entity "'.$path.'"'
+                );
+            } else {
+                // php-src locus is "path:line" for file loads (#31183 sibling).
+                self::emitLoadFileParserWarnings($context, $path, $hostErrors);
+            }
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool(
+                $context,
+                $slot,
+                $context->getTypeFromString('int1')->constInt(0, false)
+            );
+
+            return JitValueBox::normalizeValuePtr($context, $slot);
+        }
+
+        return self::materializeElement($context, $tree, true);
+    }
+
+    /**
      * simplexml_import_dom($node) from a compile-time loadXML document (#34419).
      *
      * php-src ext/simplexml/simplexml.c PHP_FUNCTION(simplexml_import_dom) —
@@ -1187,6 +1253,40 @@ final class JitSimpleXmlUserScript
             JitBuiltinWarning::emit(
                 $context,
                 $prefix.'Entity: line '.$line.': parser error : '.$message
+            );
+            JitBuiltinWarning::emit($context, $prefix.$snippet);
+            JitBuiltinWarning::emit($context, $prefix.str_repeat(' ', $column).'^');
+        }
+    }
+
+    /**
+     * File-load parser warnings use "path:line" locus (php-src; #31183 sibling / #34454).
+     *
+     * @param list<\LibXMLError> $hostErrors
+     */
+    private static function emitLoadFileParserWarnings(Context $context, string $path, array $hostErrors): void
+    {
+        $prefix = 'simplexml_load_file(): ';
+        $contents = @file_get_contents($path);
+        $snippet = is_string($contents) ? trim($contents) : '';
+        if ([] === $hostErrors) {
+            JitBuiltinWarning::emit(
+                $context,
+                $prefix.$path.':1: parser error : StartTag: invalid element name'
+            );
+            JitBuiltinWarning::emit($context, $prefix.$snippet);
+            JitBuiltinWarning::emit($context, $prefix.str_repeat(' ', max(0, \strlen($snippet) > 0 ? 1 : 0)).'^');
+
+            return;
+        }
+
+        foreach ($hostErrors as $err) {
+            $line = (int) $err->line;
+            $message = rtrim((string) $err->message);
+            $column = max(0, (int) $err->column - 1);
+            JitBuiltinWarning::emit(
+                $context,
+                $prefix.$path.':'.$line.': parser error : '.$message
             );
             JitBuiltinWarning::emit($context, $prefix.$snippet);
             JitBuiltinWarning::emit($context, $prefix.str_repeat(' ', $column).'^');

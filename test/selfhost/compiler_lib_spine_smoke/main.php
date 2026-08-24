@@ -1988,6 +1988,7 @@ require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlConstruct.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlCount.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlGet.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlGetName.php';
+require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlLoadFile.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlLoadString.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlOffsetGet.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlToString.php';
