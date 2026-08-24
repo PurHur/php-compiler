@@ -55,6 +55,12 @@ together 62 of 422 — while `spl` (121 executed), `mbstring` (45), `phar` (21),
 `xmlwriter` (20) are perfectly clean. `stdlib` and `language` carry the largest counts but the
 *lowest* rates (~5%). That makes the debt a scoping decision rather than a quality verdict.
 
+**Decision (v1.1.0):** mark `intl` and `gmp` **explicitly unsupported** for the release. Product
+builds withhold `extension_loaded()` / `function_exists()` unless
+`PHP_COMPILER_ENABLE_INTL=1` / `PHP_COMPILER_ENABLE_GMP=1` (`lib/ReleaseUnsupportedExtensions.php`).
+Compliance still injects those flags for functional cases so the baseline keeps measuring debt.
+See CHANGELOG "Known limitations".
+
 > **CORRECTION 2026-07-29 — those rates count cases the corpus declares inapplicable.** `--SKIPIF--`
 > was parsed and then never read by `test/BaseTest.php`, so every skip guard in the corpus was dead
 > (#24888). 671 cases carry one; 455 executed; **81 were failing in the baseline**, and at least 19

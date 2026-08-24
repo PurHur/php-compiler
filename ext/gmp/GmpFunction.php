@@ -24,7 +24,10 @@ abstract class GmpFunction extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() is not supported for JIT/AOT in this compiler build (issue #3341)');
+        throw new \LogicException(
+            $this->getName().'() is not supported for JIT/AOT in this compiler build '
+            .'(issue #3341; release-unsupported unless PHP_COMPILER_ENABLE_GMP=1 — #24697)'
+        );
     }
 
     /** @return mixed */

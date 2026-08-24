@@ -5,20 +5,23 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ReleaseUnsupportedExtensions;
 
 /**
- * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration (#11768, #11825, #20630, #22691).
+ * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration
+ * (#11768, #11825, #20630, #22691, #24697).
  *
  * Grapheme helpers, IDN converters, Normalizer / normalizer_*, Locale / locale_*, IntlDateFormatter,
- * IntlCalendar / IntlTimeZone, NumberFormatter, and intl_* error functions require a loaded intl
- * extension on Zend. Advertise the logical {@code intl} module only when host Zend has php-intl
- * ({@see advertisesExtension()}) — libicu-on-disk alone must not flip extension_loaded('intl')
- * (#22691, re-#11472; #20630 disk-fallback regression). Module still registers under
- * {@code standard} with {@see getAdditionalExtensionNames()} when host intl is present.
+ * IntlCalendar / IntlTimeZone, NumberFormatter, and intl_* error functions stay in-tree but are
+ * **release-unsupported** for v1.1.0 (#24697): compliance debt is concentrated here (~89% failing
+ * when the surface runs). Product default: withhold {@code extension_loaded('intl')} unless the
+ * operator opts in with {@code PHP_COMPILER_ENABLE_INTL=1}.
  *
- * Zend never splits classes from the module: when extension_loaded('intl') is true, grapheme /
- * idn / Normalizer / Locale / formatters advertise together. Deeper ICU formatter fidelity remains
- * #3336.
+ * Host php-intl alone must not advertise a silently-wrong surface. libicu-on-disk alone must not
+ * flip the module either (#22691, re-#11472; #20630). When enabled, grapheme / idn / Normalizer /
+ * Locale / formatters advertise together (Zend never splits classes from the module). Compliance
+ * injects the enable flag for functional cases ({@see ReleaseUnsupportedExtensions::applyComplianceEnv()}).
+ * Deeper ICU formatter fidelity remains #3336.
  */
 final class IntlExtensionPolicy
 {
@@ -28,14 +31,17 @@ final class IntlExtensionPolicy
     private static ?int $icuMajorVersion = null;
 
     /**
-     * extension_loaded('intl') / CREDITS_MODULES — match host Zend php-intl (#22691, re-#11472).
+     * extension_loaded('intl') / CREDITS_MODULES — opt-in only for v1.1.0 (#24697).
      *
-     * php-src-strict: CI images ship libicu without php-intl; do not treat ICU presence as a
-     * loaded module (#20630 disk-fallback regression). Same gate as intl_unicode_core_icu.phpt
-     * --SKIPIF.
+     * When {@code PHP_COMPILER_ENABLE_INTL=1}, still require host Zend php-intl so ICU-backed
+     * builtins do not phantom-advertise on libicu-only images (#22691 / #20630).
      */
     public static function advertisesExtension(): bool
     {
+        if (!ReleaseUnsupportedExtensions::explicitEnableRequested(ReleaseUnsupportedExtensions::EXT_INTL)) {
+            return false;
+        }
+
         return \extension_loaded('intl');
     }
 
@@ -177,6 +183,10 @@ final class IntlExtensionPolicy
      */
     public static function advertisesLocaleParsers(): bool
     {
+        if (!ReleaseUnsupportedExtensions::explicitEnableRequested(ReleaseUnsupportedExtensions::EXT_INTL)) {
+            return false;
+        }
+
         return self::advertisesLocale()
             || CompilerVersion::advertisesLocaleParserForwardProfile();
     }
@@ -198,11 +208,12 @@ final class IntlExtensionPolicy
     /** Run Normalizer compliance when ext/intl is loaded or a phantom-registration guard matches (#19594). */
     public static function runsNormalizerCompliance(string $testFileName): bool
     {
-        if (self::advertisesNormalizer()) {
-            return true;
+        if (str_contains($testFileName, 'normalizer_phantom')) {
+            return !self::advertisesNormalizer();
         }
 
-        return str_contains($testFileName, 'normalizer_phantom');
+        // Functional cases always run; BaseTest injects ENABLE_INTL (#24697).
+        return true;
     }
 
     /**
@@ -316,23 +327,24 @@ final class IntlExtensionPolicy
     /** Run Locale compliance when ext/intl is loaded or a phantom-registration guard matches (#19670). */
     public static function runsLocaleCompliance(string $testFileName): bool
     {
-        if (self::advertisesLocale()) {
-            return true;
+        if (str_contains($testFileName, 'locale_gated')
+            || str_contains($testFileName, 'intl_phantom')) {
+            return !self::advertisesLocale();
         }
 
-        return str_contains($testFileName, 'locale_gated')
-            || str_contains($testFileName, 'intl_phantom');
+        // Functional cases always run; BaseTest injects ENABLE_INTL (#24697).
+        return true;
     }
 
     /** Run IntlDateFormatter / NumberFormatter / IntlCalendar compliance (#19670). */
     public static function runsIntlOopCompliance(string $testFileName): bool
     {
-        if (self::advertisesIntlDateFormatter()) {
-            return true;
+        if (str_contains($testFileName, 'intl_phantom')) {
+            return !self::advertisesIntlDateFormatter();
         }
 
-        return str_contains($testFileName, 'intl_phantom')
-            || str_contains($testFileName, 'intl_skeleton');
+        // Functional cases (incl. intl_skeleton) always run (#24697).
+        return true;
     }
 
     /**
@@ -346,11 +358,11 @@ final class IntlExtensionPolicy
     /** Run IDN compliance when ext/intl is loaded or a phantom-registration guard matches (#19593). */
     public static function runsIdnCompliance(string $testFileName): bool
     {
-        if (self::advertisesIdn()) {
-            return true;
+        if (str_contains($testFileName, 'idn_phantom')) {
+            return !self::advertisesIdn();
         }
 
-        return str_contains($testFileName, 'idn_phantom');
+        return true;
     }
 
     /** grapheme_strlen/substr/strpos/extract — require loaded ext/intl (#17694, php-src ext/intl/php_intl.c). */
@@ -399,6 +411,9 @@ final class IntlExtensionPolicy
      */
     public static function profileLocaleParserFunctions(): array
     {
+        if (!self::advertisesLocaleParsers()) {
+            return [];
+        }
         if (!CompilerVersion::supportsLocaleParserForwardProfile()) {
             return [];
         }
@@ -413,30 +428,22 @@ final class IntlExtensionPolicy
     /** Run locale parser compliance when ext/intl is loaded or forward 8.4 profile matches (#17072). */
     public static function runsLocaleParserCompliance(string $testFileName): bool
     {
-        if (self::advertisesLocaleParsers()) {
-            return true;
-        }
         if (str_contains($testFileName, 'locale_gated')
             || str_contains($testFileName, 'intl_phantom')) {
-            return true;
+            return !self::advertisesLocaleParsers();
         }
 
-        return false;
+        return true;
     }
 
     /** Run grapheme compliance when ext/intl is loaded or a phantom-registration guard matches (#17694). */
     public static function runsGraphemeCompliance(string $testFileName): bool
     {
-        if (self::advertisesBuiltins()) {
-            return true;
-        }
-        if (str_contains($testFileName, 'grapheme_phantom')
-            || str_contains($testFileName, 'grapheme_stripos_intl_gated')
-            || str_contains($testFileName, 'grapheme_forward_profile')
-            || str_contains($testFileName, 'grapheme_profile_84')) {
-            return true;
+        if (str_contains($testFileName, 'grapheme_phantom')) {
+            return !self::advertisesBuiltins();
         }
 
-        return false;
+        // Functional / gated / forward-profile cases always run (#24697).
+        return true;
     }
 }

@@ -316,6 +316,8 @@ On Runforge/harness sandboxes use `make test-harness` or `./script/docker-ci-loc
 | `PHP_COMPILER_LLVM14_INSTALL_DIR` | LLVM 14 install target (default: repo `.llvm14/`) |
 | `PHP_COMPILER_SKIP_SERVE_TESTS` | Skip HTTP tests when loopback bind fails |
 | `PHP_COMPILER_DEBUG` | Verbose errors on `phpc serve` (500 responses) |
+| `PHP_COMPILER_ENABLE_INTL` | Opt in to experimental `ext/intl` (unsupported in v1.1.0, [#24697](https://github.com/PurHur/php-compiler/issues/24697)) |
+| `PHP_COMPILER_ENABLE_GMP` | Opt in to experimental `ext/gmp` (unsupported in v1.1.0, [#24697](https://github.com/PurHur/php-compiler/issues/24697)) |
 
 Full list: run `./phpc doctor` or see the [local CI matrix](docs/local-ci-matrix.md).
 
