@@ -86,21 +86,28 @@ final class JitMbTrim
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_runtime');
 
-        $whatPtr = $context->builder->load(
-            $context->constantStringFromString(null === $what ? '' : $what)
-        );
-        $encPtr = $context->builder->load($context->constantStringFromString($canonical));
-        $i64 = $context->getTypeFromString('int64');
-        $whatLen = null === $what ? 0 : \strlen($what);
-        $resultStr = $context->builder->call(
-            MbTrimRuntime::trimHelper($context),
-            $str,
-            $whatPtr,
-            $encPtr,
-            $i64->constInt($mode, false),
-            $i64->constInt(null === $what ? 1 : 0, false),
-            $i64->constInt($whatLen, false)
-        );
+        if (null === $what) {
+            $helper = match ($mode) {
+                1 => MbTrimRuntime::ltrimDefaultHelper($context),
+                2 => MbTrimRuntime::rtrimDefaultHelper($context),
+                default => MbTrimRuntime::trimDefaultHelper($context),
+            };
+            $encPtr = $context->builder->load($context->constantStringFromString($canonical));
+            // Two-string ABI like mb_scrub — raw call; callHelper/`__value__` 1-arg SIGSEGVs.
+            $resultStr = $context->builder->call($helper, $str, $encPtr);
+        } else {
+            if (3 !== $mode) {
+                throw new \LogicException(
+                    $function.'() with custom $characters only supports trim (both sides) in this compiler build'
+                );
+            }
+            $whatPtr = $context->builder->load($context->constantStringFromString($what));
+            $resultStr = $context->builder->call(
+                MbTrimRuntime::trimCharsHelper($context),
+                $str,
+                $whatPtr
+            );
+        }
 
         return self::materializeOwnedString($context, $resultStr);
     }

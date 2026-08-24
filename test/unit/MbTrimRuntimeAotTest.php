@@ -35,10 +35,12 @@ final class MbTrimRuntimeAotTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $helper = (string) file_get_contents($root.'/ext/mbstring/MbTrimJitHelper.php');
-        $this->assertStringContainsString('function trimArgv', $helper);
+        $this->assertStringContainsString('function trimDefault', $helper);
+        $this->assertStringContainsString('function ltrimDefault', $helper);
+        $this->assertStringContainsString('function rtrimDefault', $helper);
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbTrimRuntime.php');
-        $this->assertStringContainsString('trimHelper', $runtime);
-        $this->assertStringContainsString('MbTrimJitHelper::trimArgv', $runtime);
+        $this->assertStringContainsString('trimDefaultHelper', $runtime);
+        $this->assertStringContainsString('MbTrimJitHelper::trimDefault', $runtime);
         $src = (string) file_get_contents($root.'/ext/mbstring/JitMbTrim.php');
         $this->assertStringContainsString('MbTrimRuntime::ensureLinked', $src);
         $this->assertStringNotContainsString(

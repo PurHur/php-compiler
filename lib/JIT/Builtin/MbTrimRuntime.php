@@ -17,11 +17,20 @@ final class MbTrimRuntime
 {
     private const HELPER_PATH = '/ext/mbstring/MbTrimJitHelper.php';
 
-    private const TRIM_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbTrimJitHelper::trimArgv';
+    private const TRIM_DEFAULT = 'PHPCompiler\\ext\\mbstring\\MbTrimJitHelper::trimDefault';
+
+    private const LTRIM_DEFAULT = 'PHPCompiler\\ext\\mbstring\\MbTrimJitHelper::ltrimDefault';
+
+    private const RTRIM_DEFAULT = 'PHPCompiler\\ext\\mbstring\\MbTrimJitHelper::rtrimDefault';
+
+    private const TRIM_CHARS = 'PHPCompiler\\ext\\mbstring\\MbTrimJitHelper::trimChars';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::TRIM_LOGICAL,
+        self::TRIM_DEFAULT,
+        self::LTRIM_DEFAULT,
+        self::RTRIM_DEFAULT,
+        self::TRIM_CHARS,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -29,11 +38,32 @@ final class MbTrimRuntime
         self::ensureJitHelperCompiled($context);
     }
 
-    public static function trimHelper(Context $context): LlvmFunction
+    public static function trimDefaultHelper(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, self::TRIM_LOGICAL, 'mb_trim');
+        return JitVmHelperLink::lookupCompiled($context, self::TRIM_DEFAULT, 'mb_trim');
+    }
+
+    public static function ltrimDefaultHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::LTRIM_DEFAULT, 'mb_ltrim');
+    }
+
+    public static function rtrimDefaultHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::RTRIM_DEFAULT, 'mb_rtrim');
+    }
+
+    public static function trimCharsHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::TRIM_CHARS, 'mb_trim_chars');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
