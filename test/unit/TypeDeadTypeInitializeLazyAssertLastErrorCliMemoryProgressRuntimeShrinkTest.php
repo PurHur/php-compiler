@@ -34,11 +34,7 @@ final class TypeDeadTypeInitializeLazyAssertLastErrorCliMemoryProgressRuntimeShr
                 "Builtin\\Type::initialize must not eagerly {$class}::ensureLinked (#34463)"
             );
         }
-        $this->assertStringContainsString(
-            'StringTime::ensureLinked($this->context)',
-            $type,
-            'StringTime stays eager (#34463 / TimeRuntimeShrinkTest)'
-        );
+        // StringTime lazy as of #34513 — see TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest.
     }
 
     public function testCallSitesEnsureLinkBeforeLookup(): void

@@ -51,10 +51,22 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#33234', $trig);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringTriggerError(): void
+    public function testTypeInitializeNoLongerEagerLinksStringTriggerError(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringTriggerError::ensureLinked($this->context)', $type);
+        $initPos = strpos($type, 'public function initialize(): void');
+        $this->assertNotFalse($initPos);
+        $initBody = substr($type, $initPos);
+        $this->assertDoesNotMatchRegularExpression(
+            '/StringTriggerError::ensureLinked\\(\\$this->context\\)/',
+            $initBody,
+            'Type::initialize must not eagerly StringTriggerError::ensureLinked (#34513)'
+        );
+        // register() still links for HELPER_RUNTIME_O=0 NestedJIT (#33248).
+        $regPos = strpos($type, 'public function register(): void');
+        $this->assertNotFalse($regPos);
+        $regBody = substr($type, $regPos, $initPos - $regPos);
+        $this->assertStringContainsString('StringTriggerError::ensureLinked($this->context)', $regBody);
     }
 
     public function testTypeRegisterNoLongerEagerLinksSessionStartOptionsNestedJit(): void
@@ -68,7 +80,7 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
             'Type::register must not eagerly NestedJIT SessionStartOptions (#33945)'
         );
         // Former register pair (#33248) is gone; register still ensureLinked trigger_error
-        // for HELPER_RUNTIME_O=0 NestedJIT (#33248), initialize still ensureLinked too.
+        // for HELPER_RUNTIME_O=0 NestedJIT (#33248); initialize lazy as of #34513.
         $this->assertDoesNotMatchRegularExpression(
             '/StringTriggerError::ensureLinked\(\$this->context\);\s*\n\s*SessionStartOptionsRuntime::ensureLinked\(\$this->context\);/',
             $type,
@@ -82,7 +94,7 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString(
             'StringTriggerError::ensureLinked($this->context)',
             $type,
-            'Type::register/initialize still ensureLinked StringTriggerError (#33248)'
+            'Type::register still ensureLinked StringTriggerError (#33248 / #34513)'
         );
     }
 

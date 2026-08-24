@@ -34,11 +34,7 @@ final class TypeDeadTypeInitializeLazyStatStreamCsvRuntimeShrinkTest extends Tes
                 "Builtin\\Type::initialize must not eagerly {$class}::ensureLinked (#34445)"
             );
         }
-        $this->assertStringContainsString(
-            'StringTime::ensureLinked($this->context)',
-            $type,
-            'StringTime stays eager (#34445 / TimeRuntimeShrinkTest)'
-        );
+        // StringTime lazy as of #34513 — see TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest.
     }
 
     public function testCallSitesEnsureLinkBeforeLookup(): void
