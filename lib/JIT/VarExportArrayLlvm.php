@@ -30,8 +30,9 @@ final class VarExportArrayLlvm
      * only while positioned in that function's entry (after registerFunction).
      *
      * @param Value $level native int64 indent level (0 = top-level array)
+     * @param bool  $compact php_object_element_export header {@code array(} + extra space (#34506)
      */
-    public static function encode(Context $context, Value $ht, Value $level): Value
+    public static function encode(Context $context, Value $ht, Value $level, bool $compact = false): Value
     {
         StringVarExport::ensureFormatHelpersForArrayLlvm($context);
 
@@ -55,11 +56,20 @@ final class VarExportArrayLlvm
             $context,
             $context->builder->addNoSignedWrap($level, $oneI64)
         );
+        if ($compact) {
+            // php_object_element_export: one extra space on property lines (#23742 / #34506).
+            $inner = JitStringConcat::concat(
+                $context,
+                $inner,
+                $context->builder->load($context->constantStringFromString(' '))
+            );
+        }
 
+        $headerLit = $compact ? "array(\n" : "array (\n";
         $header = JitStringConcat::concat(
             $context,
             $indent,
-            $context->builder->load($context->constantStringFromString("array (\n"))
+            $context->builder->load($context->constantStringFromString($headerLit))
         );
 
         $accSlot = BasicBlockHelper::entryAlloca($context, $strPtr);

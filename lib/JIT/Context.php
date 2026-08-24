@@ -2706,6 +2706,12 @@ class Context {
     }
 
     private function compileCommon() {
+        if ($this->isThinStandaloneAotMain()) {
+            // Late object var_export/print_r bodies — Native get_object_vars needs full
+            // property metadata after user-script lowering (#34506).
+            VarExportObjectLlvm::emitBodyIfPending($this);
+            PrintRObjectLlvm::emitBodyIfPending($this);
+        }
         Progress::noteFunction('jit_context_compile_common_phase_modules_shutdown');
         foreach ($this->modules as $module) {
             $module->jitShutdown($this);

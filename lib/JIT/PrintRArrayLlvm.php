@@ -29,6 +29,19 @@ final class PrintRArrayLlvm
      */
     public static function encode(Context $context, Value $ht, Value $level): Value
     {
+        return self::encodeLabeled(
+            $context,
+            $ht,
+            $level,
+            $context->builder->load($context->constantStringFromString('Array'))
+        );
+    }
+
+    /**
+     * @param Value $label display name without trailing newline ({@code Array} or {@code Foo Object})
+     */
+    public static function encodeLabeled(Context $context, Value $ht, Value $level, Value $label): Value
+    {
         StringPrintR::ensureHelpersForArrayLlvm($context);
 
         $pairs = HashTableExportKeyValuePairs::exportPairsForSlice($context, $ht);
@@ -75,7 +88,11 @@ final class PrintRArrayLlvm
 
         $header = JitStringConcat::concat(
             $context,
-            $context->builder->load($context->constantStringFromString("Array\n")),
+            JitStringConcat::concat(
+                $context,
+                $label,
+                $context->builder->load($context->constantStringFromString("\n"))
+            ),
             JitStringConcat::concat(
                 $context,
                 $openSpaces,

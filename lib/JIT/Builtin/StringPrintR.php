@@ -139,6 +139,7 @@ final class StringPrintR
             : $context->module->addFunction($abiName, $ft);
         $context->registerFunction($abiName, $fn);
         self::implementPrintRHashtableBridge($context);
+        \PHPCompiler\JIT\PrintRObjectLlvm::declareHelper($context);
 
         $entry = $fn->appendBasicBlock('print_r_thin_scalar_entry');
         $boolBlock = $fn->appendBasicBlock('print_r_thin_bool');
@@ -287,7 +288,8 @@ final class StringPrintR
             $kind,
             $i8->constInt(JitVariable::TYPE_HASHTABLE & 0x7f, false)
         );
-        $context->builder->branchIf($isArray, $arrayBlock, $fallback);
+        $afterArray = $fn->appendBasicBlock('print_r_thin_after_array');
+        $context->builder->branchIf($isArray, $arrayBlock, $afterArray);
 
         $context->builder->positionAtEnd($arrayBlock);
         $ht = $context->builder->call($context->lookupFunction('__value__readHashtable'), $arg);
@@ -297,6 +299,24 @@ final class StringPrintR
             $i64->constInt(0, false)
         );
         $arrayEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterArray);
+        $objectBlock = $fn->appendBasicBlock('print_r_thin_object');
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_OBJECT & 0x7f, false)
+        );
+        $context->builder->branchIf($isObject, $objectBlock, $fallback);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $objectStr = \PHPCompiler\JIT\PrintRObjectLlvm::encode(
+            $context,
+            $arg,
+            $i64->constInt(0, false)
+        );
+        $objectEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($fallback);
@@ -313,6 +333,7 @@ final class StringPrintR
         $result->addIncoming($nullStr, $nullEnd);
         $result->addIncoming($stringStr, $stringEnd);
         $result->addIncoming($arrayStr, $arrayEnd);
+        $result->addIncoming($objectStr, $objectEnd);
         $context->builder->returnValue($result);
     }
 
