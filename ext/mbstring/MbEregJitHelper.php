@@ -10,8 +10,8 @@ use PHPCompiler\VM\HashTable;
 /**
  * mb_ereg*() for compiled JIT/AOT modules (#33811 follow-up #33648/#33655, php-in-PHP).
  *
- * SSOT: {@see VmMbstring::eregMatch()} / {@see VmMbstring::eregMatchAnchored()}
- * php-src: ext/mbstring/php_mbregex.c — PHP_FUNCTION(mb_ereg) / mb_ereg_match
+ * SSOT: {@see VmMbstring::eregMatch()} / {@see VmMbstring::eregReplace()}
+ * php-src: ext/mbstring/php_mbregex.c — PHP_FUNCTION(mb_ereg) / mb_ereg_replace
  *
  * {@see self::$lastMatch} pairs match argv with {@see lastRegistersHt()} for future &$regs (#33811).
  */
@@ -53,6 +53,53 @@ final class MbEregJitHelper
         $opt = 0 !== $hasOptions ? $options : null;
 
         return VmMbstring::eregMatchAnchored($pattern, $string, $opt) ? 1 : 0;
+    }
+
+    /**
+     * mb_ereg_replace() — NestedJIT runtime (#34389 leftover of #33765).
+     *
+     * @return string|null string on success; null for false/null (boxed as false)
+     */
+    public static function eregReplaceArgv(
+        string $pattern,
+        string $replacement,
+        string $string,
+        string $options,
+        int $hasOptions
+    ): ?string {
+        return self::replaceArgv($pattern, $replacement, $string, false, $options, $hasOptions);
+    }
+
+    /**
+     * mb_eregi_replace() — NestedJIT runtime (#34389 leftover of #33656).
+     *
+     * @return string|null string on success; null for false/null (boxed as false)
+     */
+    public static function eregiReplaceArgv(
+        string $pattern,
+        string $replacement,
+        string $string,
+        string $options,
+        int $hasOptions
+    ): ?string {
+        return self::replaceArgv($pattern, $replacement, $string, true, $options, $hasOptions);
+    }
+
+    private static function replaceArgv(
+        string $pattern,
+        string $replacement,
+        string $string,
+        bool $caseInsensitive,
+        string $options,
+        int $hasOptions
+    ): ?string {
+        $opt = 0 !== $hasOptions ? $options : null;
+        $result = VmMbstring::eregReplace($pattern, $replacement, $string, $caseInsensitive, $opt);
+        if (!\is_string($result)) {
+            return null;
+        }
+
+        return $result;
     }
 
     private static function matchArgv(

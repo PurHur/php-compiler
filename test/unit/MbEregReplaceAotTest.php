@@ -106,6 +106,7 @@ final class MbEregReplaceAotTest extends TestCase
         $this->assertStringContainsString('emitArgumentCountErrorAndAbort', $src);
         $this->assertStringContainsString('#33765', $src);
         $this->assertStringContainsString('tryEregReplaceFold', $src);
+        $this->assertStringContainsString('JitMbEreg::invokeReplace', $src);
         $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/mb_ereg_replace.c');
     }
 }

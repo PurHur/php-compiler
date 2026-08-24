@@ -21,7 +21,8 @@ use PHPLLVM\Value;
  * mb_eregi_replace() — case-insensitive multibyte regex replace (php-src php_mbregex.c; #20024, #33656).
  *
  * JIT/AOT leftover #33656: catchable argc/TypeError paths (peer mb_ereg_replace #30311 /
- * mb_ereg #33648); 3-arg compile-time literal fold via {@see JitMbEregSearch::tryEregReplaceFold}.
+ * mb_ereg #33648); 3-arg compile-time literal fold via {@see JitMbEregSearch::tryEregReplaceFold};
+ * runtime NestedJIT via {@see JitMbEreg::invokeReplace} (#34389 leftover of #33656).
  */
 final class mb_eregi_replace extends Internal
 {
@@ -105,7 +106,7 @@ final class mb_eregi_replace extends Internal
             return $folded;
         }
 
-        throw new \LogicException('mb_eregi_replace() is not lowered for JIT/AOT in this compiler build');
+        return JitMbEreg::invokeReplace($context, $args, true);
     }
 
     private static function foldFalse(Context $context): Value

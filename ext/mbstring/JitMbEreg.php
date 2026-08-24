@@ -14,7 +14,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for mb_ereg() / mb_eregi() / mb_ereg_match() via MbEregJitHelper (#33811).
+ * LLVM lowering for mb_ereg*() via MbEregJitHelper (#33811 / #34389).
  *
  * Compile-time fold stays in {@see JitMbEregSearch}; runtime uses NestedJIT helper calls
  * (peer {@see JitMbStrSplit} / #26870). &$regs write deferred — 3-arg FUNCCALL IR (#33811).
@@ -110,6 +110,80 @@ final class JitMbEreg
         );
 
         return self::boolBoxFromI64($context, $matchedRaw);
+    }
+
+    /**
+     * mb_ereg_replace() / mb_eregi_replace() — runtime pattern/replacement/string (#34389).
+     *
+     * @param list<JITVariable> $args
+     */
+    public static function invokeReplace(Context $context, array $args, bool $caseInsensitive): Value
+    {
+        $fn = $caseInsensitive ? 'mb_eregi_replace' : 'mb_ereg_replace';
+        $pattern = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], $fn, 0, 'pattern');
+        $replacement = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], $fn, 1, 'replacement');
+        $string = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[2], $fn, 2, 'string');
+        $optionsPtr = $context->builder->load($context->constantStringFromString(''));
+        $hasOptions = $context->getTypeFromString('int64')->constInt(0, false);
+        if (\count($args) >= 4 && JITVariable::TYPE_NULL !== $args[3]->type && !$args[3]->isNullConstant) {
+            $optionsPtr = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[3], $fn, 3, 'options');
+            $hasOptions = $context->getTypeFromString('int64')->constInt(1, false);
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbEregRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+
+        $replaceFn = $caseInsensitive
+            ? MbEregRuntime::eregiReplaceHelper($context)
+            : MbEregRuntime::eregReplaceHelper($context);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            $replaceFn,
+            [$pattern, $replacement, $string, $optionsPtr, $hasOptions]
+        );
+
+        return self::boxStringOrFalse($context, $raw);
+    }
+
+    /**
+     * NestedJIT string|false → `__value__*` (peer {@see JitMbSearch} / #34211).
+     */
+    private static function boxStringOrFalse(Context $context, Value $raw): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_ereg_replace_box');
+        $i32 = $context->getTypeFromString('int32');
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $isMiss = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
+        $missBb = BasicBlockHelper::append($context, 'mb_ereg_replace_miss');
+        $hitBb = BasicBlockHelper::append($context, 'mb_ereg_replace_hit');
+        $doneBb = BasicBlockHelper::append($context, 'mb_ereg_replace_done');
+        $context->builder->branchIf($isMiss, $missBb, $hitBb);
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $ptr,
+            $i32->constInt(0, false)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($hitBb);
+        $strPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $strPtr);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $ptr;
     }
 
     private static function boolBoxFromI64(Context $context, Value $matchedRaw): Value
