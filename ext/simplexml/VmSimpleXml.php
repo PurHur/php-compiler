@@ -936,7 +936,7 @@ final class VmSimpleXml
         return false === $colon ? $qualifiedName : substr($qualifiedName, $colon + 1);
     }
 
-    public static function children(Context $ctx, ObjectEntry $entry, ?string $namespaceOrPrefix = null, bool $isPrefix = true): ObjectEntry
+    public static function children(Context $ctx, ObjectEntry $entry, ?string $namespaceOrPrefix = null, bool $isPrefix = false): ObjectEntry
     {
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             return self::wrapView($ctx, $entry->class, [], SimpleXmlRegistry::documentKey($entry));
@@ -988,7 +988,7 @@ final class VmSimpleXml
      * @return ObjectEntry|null null when the receiver has no element node (empty children()/
      *                      named-child view) — php-src sxe.c; #25148
      */
-    public static function attributes(Context $ctx, ObjectEntry $entry, ?string $namespaceOrPrefix = null, bool $isPrefix = true): ?ObjectEntry
+    public static function attributes(Context $ctx, ObjectEntry $entry, ?string $namespaceOrPrefix = null, bool $isPrefix = false): ?ObjectEntry
     {
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             return self::wrapAttributesView($ctx, $entry->class, new SimpleXmlNodeState(''), SimpleXmlRegistry::documentKey($entry));

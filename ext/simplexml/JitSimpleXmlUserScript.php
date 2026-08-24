@@ -293,7 +293,8 @@ final class JitSimpleXmlUserScript
             return null;
         }
         $namespaceOrPrefix = null;
-        $isPrefix = true;
+        // php-src simplexml.stub.php: bool $isPrefix = false (URI when omitted; #34554).
+        $isPrefix = false;
         if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
             $namespaceOrPrefix = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
             if (null === $namespaceOrPrefix) {
@@ -336,7 +337,8 @@ final class JitSimpleXmlUserScript
             return null;
         }
         $namespaceOrPrefix = null;
-        $isPrefix = true;
+        // php-src simplexml.stub.php: bool $isPrefix = false (URI when omitted; #34554).
+        $isPrefix = false;
         if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
             $namespaceOrPrefix = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
             if (null === $namespaceOrPrefix) {
@@ -1256,6 +1258,18 @@ final class JitSimpleXmlUserScript
 
     private static function compileTimeBool(Context $context, JITVariable $var): ?bool
     {
+        if (null !== $var->compileTimeLong) {
+            return 0 !== (int) $var->compileTimeLong;
+        }
+        if (null !== $var->compileTimeConstantName) {
+            $cn = strtolower($var->compileTimeConstantName);
+            if ('true' === $cn) {
+                return true;
+            }
+            if ('false' === $cn) {
+                return false;
+            }
+        }
         if (JITVariable::TYPE_NATIVE_BOOL === $var->type && JITVariable::KIND_VALUE === $var->kind) {
             $lib = $context->llvm->lib;
             if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
