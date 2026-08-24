@@ -12,6 +12,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
+use PHPCompiler\JIT\VarDumpArrayLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPCompiler\VM\EnumCasePropertyJitHelper;
@@ -23,18 +24,23 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Embed: NestedJIT {@see VarDumpJitHelper} (php-in-PHP).
- * Thin standalone AOT: scalar + enum-case LLVM bridge — NestedJIT of the helper
+ * Thin standalone AOT: scalar + enum-case + array LLVM bridge — NestedJIT of the helper
  * segfaults on `$ctx->runtime->vm` class-id layout (#23540 / #16075). Other non-scalars
  * thin AOT abort with a stderr diagnostic (not silent SIGABRT).
+ * Arrays: {@see VarDumpArrayLlvm} (#34498; peer PrintRArrayLlvm / VarExportArrayLlvm #34497).
  * Thin body is deferred to {@see ensureLinkedAtCallSite()} so DECLARE_ENUM has run (#34207).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringVarExport #20589).
  * php-src: ext/standard/var.c — php_var_dump_ex / PHP_FUNCTION(var_dump)
  */
 final class StringVarDump
 {
+    public const HT_ABI = '__compiler_var_dump_hashtable';
+
     private const HELPER_PATH = '/ext/standard/VarDumpJitHelper.php';
 
     private const FORMAT_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\VarDumpJitHelper::formatVariableValue';
+
+    private const HT_BRIDGE_ENTRY = 'var_dump_ht_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -132,10 +138,11 @@ final class StringVarDump
     }
 
     /**
-     * Thin standalone AOT: dump scalars + enum cases like Zend without NestedJIT (#23540 / #34207).
+     * Thin standalone AOT: dump scalars + enum cases + arrays like Zend without NestedJIT (#23540 / #34207 / #34498).
      *
      * Uses {@see ValueEchoHelper} / ob echo ABI already linked for `echo` in the same binary.
      * Enum arm: php-src `php_var_dump` prints `enum(Class::Case)` for enum case objects.
+     * Arrays: {@see VarDumpArrayLlvm} via {@see HT_ABI}.
      */
     private static function implementThinScalarBridge(Context $context): void
     {
@@ -143,6 +150,7 @@ final class StringVarDump
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
+            self::implementVarDumpHashtableBridge($context);
 
             return;
         }
@@ -150,14 +158,18 @@ final class StringVarDump
         ObOutputRuntime::ensureLinked($context);
         ValueEchoRuntime::ensureLinked($context);
         ZendDoubleStringRuntime::ensureLinked($context);
+        StringDir::ensureLinked($context);
 
         $voidTy = $context->getTypeFromString('void');
         $valuePtr = $context->getTypeFromString('__value__*');
         $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($voidTy, false, $valuePtr);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+        self::implementVarDumpHashtableBridge($context);
 
         $entry = $fn->appendBasicBlock('var_dump_thin_scalar_entry');
         $boolBlock = $fn->appendBasicBlock('var_dump_thin_bool');
@@ -165,6 +177,7 @@ final class StringVarDump
         $doubleBlock = $fn->appendBasicBlock('var_dump_thin_double');
         $nullBlock = $fn->appendBasicBlock('var_dump_thin_null');
         $stringBlock = $fn->appendBasicBlock('var_dump_thin_string');
+        $arrayBlock = $fn->appendBasicBlock('var_dump_thin_array');
         $objectBlock = $fn->appendBasicBlock('var_dump_thin_object');
         $fallback = $fn->appendBasicBlock('var_dump_thin_fallback');
         $done = $fn->appendBasicBlock('var_dump_thin_done');
@@ -324,6 +337,33 @@ final class StringVarDump
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterString);
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $afterArray = $fn->appendBasicBlock('var_dump_thin_after_array');
+        $context->builder->branchIf($isArray, $arrayBlock, $afterArray);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $ht = $context->builder->call($context->lookupFunction('__value__readHashtable'), $arg);
+        $arrayStr = $context->builder->call(
+            $context->lookupFunction(self::HT_ABI),
+            $ht,
+            $i64->constInt(1, false)
+        );
+        ValueEchoHelper::echoStringVariable(
+            $context,
+            new JitVariable(
+                $context,
+                JitVariable::TYPE_STRING,
+                JitVariable::KIND_VALUE,
+                $arrayStr
+            )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterArray);
         // TYPE_OBJECT carries IS_REFCOUNTED; enum cases are immortal singletons (#4445 / #34207).
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
@@ -342,6 +382,53 @@ final class StringVarDump
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * Array HT ABI for thin AOT — NestedJIT VarDumpJitHelper needs Runtime->vm (#34498).
+     */
+    private static function implementVarDumpHashtableBridge(Context $context): void
+    {
+        $abiName = self::HT_ABI;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::HT_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        self::ensureHelpersForArrayLlvm($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $htPtr, $i64);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn): void {
+            $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::HT_BRIDGE_ENTRY);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue(
+                VarDumpArrayLlvm::encode($context, $fn->getParam(0), $fn->getParam(1))
+            );
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+    /** Ensure libc/string/float helpers before {@see VarDumpArrayLlvm} emit (#34498). */
+    public static function ensureHelpersForArrayLlvm(Context $context): void
+    {
+        StringDir::ensureLinked($context);
+        ZendDoubleStringRuntime::ensureLinked($context);
+        ObOutputRuntime::ensureLinked($context);
+        ValueEchoRuntime::ensureLinked($context);
     }
 
     /**
