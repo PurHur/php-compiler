@@ -16,10 +16,12 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 
 /**
- * SSOT for JIT/AOT non-numeric string ⊙ arithmetic TypeErrors (#34449).
+ * SSOT for JIT/AOT non-numeric string ⊙ arithmetic/bitwise TypeErrors (#34449, #34453).
  *
- * php-src: Zend/zend_operators.c convert_scalar_to_number — strings with no
- * numeric prefix throw zend_type_error; leading junk ("5x") warns and coerces.
+ * php-src: Zend/zend_operators.c convert_scalar_to_number / convert_to_long —
+ * strings with no numeric prefix throw zend_type_error; leading junk ("5x")
+ * warns and coerces. Bitwise string⊙string stays byte-wise (#32431) and is
+ * not guarded here.
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitNonNumericStringArithGuard}
  */
@@ -34,7 +36,16 @@ final class VmNonNumericStringArithGuard
         Variable $left,
         Variable $right
     ): bool {
-        if (!JitValueNumeric::isArithOpcode($opCode)) {
+        $isArith = JitValueNumeric::isArithOpcode($opCode);
+        $isBitwise = self::isBitwiseLogicOpcode($opCode);
+        if (!$isArith && !$isBitwise) {
+            return false;
+        }
+        // string⊙string &|^ is byte-wise in zend bitwise_*_function (#32431).
+        if ($isBitwise
+            && Variable::TYPE_STRING === $left->type
+            && Variable::TYPE_STRING === $right->type
+        ) {
             return false;
         }
 
@@ -83,6 +94,13 @@ final class VmNonNumericStringArithGuard
         }
 
         return false;
+    }
+
+    private static function isBitwiseLogicOpcode(int $opCode): bool
+    {
+        return OpCode::TYPE_BITWISE_AND === $opCode
+            || OpCode::TYPE_BITWISE_OR === $opCode
+            || OpCode::TYPE_BITWISE_XOR === $opCode;
     }
 
     private static function isCompileTimeNonNumericString(Variable $var): bool
@@ -143,6 +161,9 @@ final class VmNonNumericStringArithGuard
             OpCode::TYPE_MINUS => '-',
             OpCode::TYPE_MUL => '*',
             OpCode::TYPE_DIV => '/',
+            OpCode::TYPE_BITWISE_AND => '&',
+            OpCode::TYPE_BITWISE_OR => '|',
+            OpCode::TYPE_BITWISE_XOR => '^',
             default => '?',
         };
     }
