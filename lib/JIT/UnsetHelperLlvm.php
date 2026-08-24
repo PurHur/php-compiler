@@ -8,7 +8,6 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPTypes\Type;
 use PHPCompiler\Block;
-use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\DateIntervalSupport;
@@ -174,10 +173,7 @@ final class UnsetHelperLlvm
         $context->builder->branchIf($isTrue, $errBb, $falseBb);
 
         $context->builder->positionAtEnd($errBb);
-        ErrorRaise::registerDeclarations($context);
-        ErrorRaise::ensureLinked($context);
-        ErrorRaise::emitRaise($context, VmUnset::ERROR_NON_ARRAY);
-        $context->builder->branch($doneBb);
+        self::emitUnsetDimError($context, VmUnset::ERROR_NON_ARRAY);
 
         $context->builder->positionAtEnd($falseBb);
         $deprecationLine = null !== $op->sourceLocation && $op->sourceLocation->startLine > 0
@@ -201,11 +197,9 @@ final class UnsetHelperLlvm
         Variable $container,
         ?Operand $containerOp
     ): void {
-        ErrorRaise::registerDeclarations($context);
-        ErrorRaise::ensureLinked($context);
         $displayName = self::objectDisplayNameForError($context, $container, $containerOp);
         if (null !== $displayName) {
-            ErrorRaise::emitRaise($context, VmUnset::cannotUseObjectAsArrayMessage($displayName));
+            self::emitUnsetDimError($context, VmUnset::cannotUseObjectAsArrayMessage($displayName));
 
             return;
         }
@@ -276,9 +270,22 @@ final class UnsetHelperLlvm
 
     private static function emitScalarUnsetDimError(Context $context, Variable $container): void
     {
-        ErrorRaise::registerDeclarations($context);
-        ErrorRaise::ensureLinked($context);
-        ErrorRaise::emitRaise($context, VmUnset::scalarUnsetDimErrorMessage($container->type));
+        self::emitUnsetDimError($context, VmUnset::scalarUnsetDimErrorMessage($container->type));
+    }
+
+    /**
+     * ZEND_UNSET_DIM Error — catchable in active try/catch, fatal when uncaught (#34440 / #32226).
+     *
+     * Must not fall through after {@see ErrorRaise::emitRaise}: that only sets a pending flag,
+     * so try bodies continue and standalone mains fatal at exit instead of entering catch.
+     */
+    private static function emitUnsetDimError(Context $context, string $message): void
+    {
+        ExceptionBridge::emitErrorAndAbort($context, $message);
+        $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null !== $insert && null === $insert->getTerminator()) {
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
     }
 
     private static function compileValueBoxOffsetUnset(
@@ -385,10 +392,7 @@ final class UnsetHelperLlvm
         );
 
         $context->builder->positionAtEnd($stringBb);
-        ErrorRaise::registerDeclarations($context);
-        ErrorRaise::ensureLinked($context);
-        ErrorRaise::emitRaise($context, VmUnset::ERROR_STRING_OFFSET);
-        $context->builder->branch($doneBb);
+        self::emitUnsetDimError($context, VmUnset::ERROR_STRING_OFFSET);
 
         // null / undef — silent no-op (#30099).
         $context->builder->positionAtEnd($afterString);
@@ -432,10 +436,7 @@ final class UnsetHelperLlvm
         $context->builder->branchIf($isTrue, $boolErrBb, $boolFalseBb);
 
         $context->builder->positionAtEnd($boolErrBb);
-        ErrorRaise::registerDeclarations($context);
-        ErrorRaise::ensureLinked($context);
-        ErrorRaise::emitRaise($context, VmUnset::ERROR_NON_ARRAY);
-        $context->builder->branch($doneBb);
+        self::emitUnsetDimError($context, VmUnset::ERROR_NON_ARRAY);
 
         $context->builder->positionAtEnd($boolFalseBb);
         $deprecationLine = null !== $op->sourceLocation && $op->sourceLocation->startLine > 0
@@ -452,10 +453,7 @@ final class UnsetHelperLlvm
         $context->builder->branch($scalarBb);
 
         $context->builder->positionAtEnd($scalarBb);
-        ErrorRaise::registerDeclarations($context);
-        ErrorRaise::ensureLinked($context);
-        ErrorRaise::emitRaise($context, VmUnset::ERROR_NON_ARRAY);
-        $context->builder->branch($doneBb);
+        self::emitUnsetDimError($context, VmUnset::ERROR_NON_ARRAY);
 
         $context->builder->positionAtEnd($doneBb);
     }
