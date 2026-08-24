@@ -128,6 +128,16 @@ final class DateTimeFormatJitHelper
             'format'
         );
 
-        return DateTimeFormatRuntime::invoke($context, $formatPtr, $timestamp, $microsecond, $tzPtr);
+        // Runtime / unknown format: civil IR dispatch before NestedJIT (#34482).
+        return JitDate::emitRuntimeCivilFormatDispatch(
+            $context,
+            $formatPtr,
+            $timestamp,
+            $microsecond,
+            true,
+            static function () use ($context, $formatPtr, $timestamp, $microsecond, $tzPtr): Value {
+                return DateTimeFormatRuntime::invoke($context, $formatPtr, $timestamp, $microsecond, $tzPtr);
+            }
+        );
     }
 }
