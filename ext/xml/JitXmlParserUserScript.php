@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xml;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\UserScriptAotEnv;
@@ -14,8 +15,9 @@ use PHPLLVM\Value;
 
 /**
  * User-script standalone AOT: xml_parser_create / xml_parse / xml_get_error_code /
- * xml_parser_free / xml_parser_set_option / xml_parser_get_option / xml_error_string /
- * xml_get_current_{line,column,byte}_* (#27293, #29318, #34377, #34383).
+ * xml_parser_free / xml_parser_set_option / xml_parser_get_option / xml_parse_into_struct /
+ * xml_error_string / xml_get_current_{line,column,byte}_*
+ * (#27293, #29318, #34377, #34378, #34383).
  *
  * Runs the existing PHP-in-PHP parser model ({@see VmXml}, {@see XmlParserSupport}) at
  * compile time when arguments are literals, then emits constant results / an allocated
@@ -265,6 +267,41 @@ final class JitXmlParserUserScript
         }
 
         return self::boolValue($context, (bool) $value);
+    }
+
+    /**
+     * xml_parse_into_struct(XMLParser $parser, string $data, &$values, &$index = null) (#34378).
+     *
+     * Compile-time SAX struct build via {@see VmXml::parseIntoStruct}; emit the resulting
+     * HashTables into the by-ref slots. php-src: ext/xml/xml.c PHP_FUNCTION(xml_parse_into_struct).
+     */
+    public static function tryParseIntoStruct(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || \count($args) < 3 || \count($args) > 4) {
+            return null;
+        }
+        $parser = self::lookup($args[0]);
+        if (null === $parser) {
+            return null;
+        }
+        $data = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $data || str_starts_with($data, '__phpc_xmlp_')) {
+            return null;
+        }
+
+        $parsed = VmXml::parseIntoStruct(
+            $context->runtime->vmContext,
+            $parser->id,
+            $data
+        );
+        $valuesHt = HashTableHelper::variableFromVmHashTable($context, $parsed['values']);
+        HashTableHelper::storeHashtableInArrayVariable($context, $args[2], $valuesHt->value);
+        if (isset($args[3])) {
+            $indexHt = HashTableHelper::variableFromVmHashTable($context, $parsed['index']);
+            HashTableHelper::storeHashtableInArrayVariable($context, $args[3], $indexHt->value);
+        }
+
+        return self::intValue($context, $parsed['status']);
     }
 
     private static function isOptionalEncodingOk(JITVariable $arg): bool

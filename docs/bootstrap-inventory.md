@@ -45109,8 +45109,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/JitXmlParserUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 379)
-- 21 class method(s)
+- new JITVariable (line 416)
+- 22 class method(s)
 
 ### `ext/xml/Module.php`
 
@@ -45277,9 +45277,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/xml_parse_into_struct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new Variable (line 45)
-- new Variable (line 50)
+- new ArgumentCountError (line 28)
+- new Variable (line 46)
+- new Variable (line 51)
 - 2 class method(s)
 
 ### `ext/xml/xml_parser_create.php`
