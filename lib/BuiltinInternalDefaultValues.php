@@ -27,6 +27,11 @@ final class BuiltinInternalDefaultValues
         'array_walk_recursive::2' => true,
         // php-src basic_functions.stub.php — mixed $value = UNKNOWN (#25845)
         'stream_context_set_option::3' => true,
+        // php-src ext/random/php_mt_rand.stub.php — int $min = UNKNOWN, int $max = UNKNOWN (#25397)
+        'mt_rand::0' => true,
+        'mt_rand::1' => true,
+        'rand::0' => true,
+        'rand::1' => true,
     ];
 
     /**
