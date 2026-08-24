@@ -101,13 +101,9 @@ final class AssertOptionsRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            // Thin/standalone: declare empty ABI so later ensureStandaloneBodies
-            // can fill; no Type always-on shell (#33245).
-            self::declareAssertOptionsAbi($context);
-
-            return;
-        }
+        // Always implement — thin/standalone call sites (JitAssertOptions) must not
+        // leave an empty `__compiler_assert_options` decl (#34463). Peer LastErrorRuntime.
+        // Context::ensureFullStandaloneBodies still calls ensureStandaloneBodies.
         self::implement($context);
     }
 
