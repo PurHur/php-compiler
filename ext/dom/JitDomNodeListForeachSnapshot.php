@@ -14,7 +14,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT foreach over DOMNodeList via snapshot → hashtable (#32707, #33082, #33645, #33659).
+ * Thin-AOT foreach over DOMNodeList via snapshot → hashtable (#32707, #33082, #33645, #33659, #34500).
  *
  * Iterator protocol and runtime item() inside the foreach CFG both break module
  * verification or abort under nested JIT. For user-script getElementsByTagName lists,
@@ -23,8 +23,10 @@ use PHPLLVM\Value;
  * linked via LiveSlots. Fall back to compile-time XML when the root is unset.
  * For {@code $el->childNodes} (no tag query), snapshot **live**
  * {@code owner.firstChild→nextSibling} at Iterator_Reset (#33645) — a compile-time
- * loadXML child list (#33082) ignored after/before/append/prepend. For
- * {@code $el->attributes} NamedNodeMap, snapshot root open-tag attributes (#33099).
+ * loadXML child list (#33082) ignored after/before/append/prepend. CreateElement-only
+ * trees have no compile-time XML; gating canLower on XML forced NestedJIT and SIGSEGV
+ * (#34500). For {@code $el->attributes} NamedNodeMap, snapshot root open-tag
+ * attributes (#33099).
  *
  * php-src: ext/dom/nodelist.c / namednodemap.c — InternalIterator; Zend copies
  * non-array Traversables when foreach stability requires a snapshot.
@@ -144,12 +146,17 @@ final class JitDomNodeListForeachSnapshot
         if (null !== $xml && null !== $xpathTag && '' !== $xpathTag) {
             return true;
         }
+        // Live childNodes walk only needs owner + firstChild→nextSibling (#33645).
+        // createElement-only trees have no compile-time XML; requiring it fell through
+        // to NestedJIT InternalIterator and SIGSEGV (#34500).
+        if (self::isChildNodesStyleList($containerUserType)) {
+            return true;
+        }
         if (null === $xml) {
             return false;
         }
-        // attributes NamedNodeMap (#33099) or childNodes / HTMLCollection (#33082).
-        return self::isNamedNodeMapStyleList($containerUserType)
-            || self::isChildNodesStyleList($containerUserType);
+        // attributes NamedNodeMap (#33099) still needs open-tag XML to bake.
+        return self::isNamedNodeMapStyleList($containerUserType);
     }
 
     public static function compileReset(
@@ -160,7 +167,7 @@ final class JitDomNodeListForeachSnapshot
     ): void {
         if (!self::canLower($context, $array, $containerUserType)) {
             throw new \LogicException(
-                'DOMNodeList foreach in thin AOT requires compile-time getElementsByTagName/loadXML (#32707/#33082/#33099)'
+                'DOMNodeList foreach in thin AOT requires compile-time getElementsByTagName/loadXML or live childNodes (#32707/#33082/#33099/#34500)'
             );
         }
 
@@ -170,9 +177,6 @@ final class JitDomNodeListForeachSnapshot
         $xpathTag = JitDomXPathQueryUserScript::lastQueryTag();
         if (null === $tag && null !== $xpathTag) {
             $tag = $xpathTag;
-        }
-        if (null === $xml) {
-            throw new \LogicException('DOMNodeList foreach snapshot missing compile-time XML (#32707/#33082/#33099)');
         }
 
         $sizeT = $context->getTypeFromString('size_t');
@@ -184,6 +188,11 @@ final class JitDomNodeListForeachSnapshot
         );
 
         if ($attrsMode) {
+            if (null === $xml) {
+                throw new \LogicException(
+                    'DOMNamedNodeMap foreach snapshot missing compile-time XML (#33099)'
+                );
+            }
             $attrs = DomParseSimpleXmlJitHelper::rootAttributesArgv($xml);
             $count = \count($attrs);
             $ht = HashTableHelper::alloc($context);
@@ -203,11 +212,17 @@ final class JitDomNodeListForeachSnapshot
             }
             $countVal = $sizeT->constInt($count, false);
         } elseif (!$useDirectChildren) {
+            if (null === $xml) {
+                throw new \LogicException(
+                    'DOMNodeList tag foreach snapshot missing compile-time XML (#32707/#33659)'
+                );
+            }
             // Live document-order walk when pinned root exists (#33659).
             [$ht, $countVal] = self::emitLiveTagListSnapshot($context, (string) $tag, $xml);
         } else {
-            // Live childNodes: owner.firstChild→nextSibling at Reset (#33645).
-            // Compile-time loadXML children (#33082) ignored after/before/append/prepend.
+            // Live childNodes: owner.firstChild→nextSibling at Reset (#33645 / #34500).
+            // Compile-time loadXML children (#33082) ignored after/before/append/prepend;
+            // XML is optional (createElement-only trees).
             [$ht, $countVal] = self::emitLiveChildNodesSnapshot($context, $array, $xml);
         }
 
@@ -288,18 +303,19 @@ final class JitDomNodeListForeachSnapshot
     }
 
     /**
-     * Pack live childNodes into a foreach hashtable (#33645).
+     * Pack live childNodes into a foreach hashtable (#33645 / #34500).
      *
      * Prefers {@code DOMNodeList} owner + firstChild→nextSibling (matches item()).
      * Falls back to compile-time loadXML children when the list has no owner yet
-     * (empty createElement before any child sync).
+     * (empty createElement before any child sync). When there is no compile-time
+     * XML either, emit an empty snapshot (#34500).
      *
      * @return array{0: Value, 1: Value} __hashtable__* and size_t element count
      */
     private static function emitLiveChildNodesSnapshot(
         Context $context,
         JITVariable $array,
-        string $xml
+        ?string $xml
     ): array {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nl_foreach_live');
         $objectType = $context->type->object;
@@ -340,28 +356,41 @@ final class JitDomNodeListForeachSnapshot
         $bbDone = BasicBlockHelper::append($context, 'dom_nl_foreach_live_done');
         $context->builder->branchIf($noOwner, $bbFallback, $bbLive);
 
-        // Fallback: original loadXML direct children (#33082) when owner unset.
+        // Fallback: original loadXML direct children (#33082) when owner unset;
+        // empty HT when createElement-only with no XML yet (#34500).
         $context->builder->positionAtEnd($bbFallback);
-        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
-        $fbCount = \count($nodes);
-        $fbHt = HashTableHelper::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__grow'),
-            $fbHt,
-            $sizeT->constInt($fbCount > 0 ? $fbCount : 1, false)
-        );
-        for ($i = 0; $i < $fbCount; ++$i) {
-            $itemPtr = JitDomNodeListItemUserScript::materializeDirectChildAtCompileTime(
-                $context,
-                $xml,
-                $i
+        if (null === $xml || '' === $xml) {
+            $fbHt = HashTableHelper::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__grow'),
+                $fbHt,
+                $sizeT->constInt(1, false)
             );
-            $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
-            HashTableHelper::setAtIndex($context, $fbHt, $sizeT->constInt($i, false), $elem);
+            $context->builder->store($fbHt, $htSlot);
+            $context->builder->store($sizeT->constInt(0, false), $countSlot);
+            $context->builder->branch($bbDone);
+        } else {
+            $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+            $fbCount = \count($nodes);
+            $fbHt = HashTableHelper::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__grow'),
+                $fbHt,
+                $sizeT->constInt($fbCount > 0 ? $fbCount : 1, false)
+            );
+            for ($i = 0; $i < $fbCount; ++$i) {
+                $itemPtr = JitDomNodeListItemUserScript::materializeDirectChildAtCompileTime(
+                    $context,
+                    $xml,
+                    $i
+                );
+                $elem = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $itemPtr);
+                HashTableHelper::setAtIndex($context, $fbHt, $sizeT->constInt($i, false), $elem);
+            }
+            $context->builder->store($fbHt, $htSlot);
+            $context->builder->store($sizeT->constInt($fbCount, false), $countSlot);
+            $context->builder->branch($bbDone);
         }
-        $context->builder->store($fbHt, $htSlot);
-        $context->builder->store($sizeT->constInt($fbCount, false), $countSlot);
-        $context->builder->branch($bbDone);
 
         // Live walk: grow from length; pack firstChild→nextSibling.
         $context->builder->positionAtEnd($bbLive);
