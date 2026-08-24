@@ -10930,6 +10930,10 @@ class JIT {
                     $this->context->callSiteLine = OpCode::TYPE_ECHO === $op->type
                         ? (int) ($op->arg2 ?? 0)
                         : (int) ($op->arg3 ?? 0);
+                    JIT\Builtin\SapiHeaderGuardJit::emitNoteOutputOrigin(
+                        $this->context,
+                        $this->context->callSiteLine
+                    );
                     $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
                     $echoOp = $block->getOperand($argOffset);
                     // echo/print $this in FLAG_STATIC / {main} / plain function (#31901).
