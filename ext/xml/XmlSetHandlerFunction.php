@@ -5,13 +5,35 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xml;
 
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
 
 /**
  * Shared wiring for xml_set_* handler registration (php-src ext/xml/xml.c; #18203, #19343, #21522).
  */
 abstract class XmlSetHandlerFunction extends XmlFunction
 {
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = match ($this->getName()) {
+                'xml_set_element_handler' => JitXmlParserUserScript::trySetElementHandler($context, ...$args),
+                'xml_set_character_data_handler' => JitXmlParserUserScript::trySetCharacterDataHandler($context, ...$args),
+                default => null,
+            };
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                $this->getName().'() user-script AOT requires a tracked parser + Closure handlers (#34487)'
+            );
+        }
+
+        return parent::call($context, ...$args);
+    }
+
     /** @param non-empty-string $slot */
     protected function setSingleHandler(Frame $frame, string $slot, int $handlerArgIndex): void
     {
