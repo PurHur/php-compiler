@@ -25,6 +25,9 @@ final class JitDomImportSimpleXmlUserScript
 
     private const CLASS_ELEMENT = 'DOMElement';
 
+    /** @var array<string, string>|null */
+    private static ?array $pendingImportAttributes = null;
+
     public static function tryImport(Context $context, JITVariable ...$args): ?Value
     {
         if (!UserScriptAotEnv::isActive() || 1 !== \count($args)) {
@@ -112,6 +115,15 @@ final class JitDomImportSimpleXmlUserScript
 
         DomUserScriptPinnedRootLlvm::pin($context, $element);
 
+        $attrMap = [];
+        foreach ($attrs as $pair) {
+            $attrMap[$pair['qname']] = $pair['value'];
+        }
+        // After child sync (which materializes siblings). ARG_SEND temps drop
+        // compileTimeDomAttributes; stamp lastFetched for getAttribute (#34413).
+        JitDomNodeChildProperty::$lastFetchedAttributes = $attrMap;
+        self::$pendingImportAttributes = $attrMap;
+
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeObject'),
@@ -120,5 +132,18 @@ final class JitDomImportSimpleXmlUserScript
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /** Stamp import result Variable so getAttribute survives nodeName fetch (#34413). */
+    public static function applyPendingImportAssign(JITVariable $result): bool
+    {
+        if (null === self::$pendingImportAttributes) {
+            return false;
+        }
+        $result->compileTimeDomAttributes = self::$pendingImportAttributes;
+        JitDomNodeChildProperty::$lastFetchedAttributes = self::$pendingImportAttributes;
+        self::$pendingImportAttributes = null;
+
+        return true;
     }
 }
