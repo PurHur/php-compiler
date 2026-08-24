@@ -41,7 +41,6 @@ final class TypeDeadOpensslSignAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('OpensslSignRuntime::ensureLinked', $type);
     }
 
     public function testRuntimeOwnerDeclaresOpensslSignAbisModuleLocally(): void
@@ -57,10 +56,12 @@ final class TypeDeadOpensslSignAbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeInitializeStillEnsureLinksOpensslSignRuntime(): void
+    public function testCallSiteEnsureLinksOpensslSignRuntime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('OpensslSignRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('OpensslSignRuntime::ensureLinked($this->context)', $type);
+        $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/OpensslSignCrypto.php');
+        $this->assertStringContainsString('OpensslSignRuntime::ensureLinked', $owner);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void

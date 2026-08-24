@@ -41,8 +41,6 @@ final class TypeDeadLibcryptPasswordRandomAbiRuntimeShrinkTest extends TestCase
             );
         }
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('LibcryptRuntime::ensureLinked', $type);
-        $this->assertStringContainsString('PasswordRandomBytesRuntime::ensureLinked', $type);
     }
 
     public function testRuntimeOwnersDeclareAbisModuleLocally(): void
@@ -60,11 +58,15 @@ final class TypeDeadLibcryptPasswordRandomAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('module->addFunction(', $pw);
     }
 
-    public function testTypeInitializeStillEnsureLinksOwners(): void
+    public function testCallSiteEnsureLinksOwners(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('LibcryptRuntime::ensureLinked($this->context)', $type);
-        $this->assertStringContainsString('PasswordRandomBytesRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('LibcryptRuntime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('PasswordRandomBytesRuntime::ensureLinked($this->context)', $type);
+        $crypt = (string) file_get_contents(__DIR__.'/../../ext/standard/JitLibcrypt.php');
+        $pw = (string) file_get_contents(__DIR__.'/../../ext/standard/JitPasswordRandomBytes.php');
+        $this->assertStringContainsString('LibcryptRuntime::ensureLinked', $crypt);
+        $this->assertStringContainsString('PasswordRandomBytesRuntime::ensureLinked', $pw);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void

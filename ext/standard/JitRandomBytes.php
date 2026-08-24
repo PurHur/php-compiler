@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringRandomBytes;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
@@ -21,6 +22,8 @@ final class JitRandomBytes
         if (NestedJitCompileScope::isActive()) {
             return JitRandomBytesKernel::invoke($context, $lengthI64);
         }
+
+        StringRandomBytes::ensureLinked($context); // #34332 — Type always-on random_bytes ABI dropped
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_random_bytes'),

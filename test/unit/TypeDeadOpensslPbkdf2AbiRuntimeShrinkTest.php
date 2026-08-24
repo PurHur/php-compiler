@@ -40,7 +40,6 @@ final class TypeDeadOpensslPbkdf2AbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('OpensslPbkdf2Runtime::ensureLinked', $type);
     }
 
     public function testRuntimeOwnerDeclaresOpensslPbkdf2AbiModuleLocally(): void
@@ -56,10 +55,12 @@ final class TypeDeadOpensslPbkdf2AbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeInitializeStillEnsureLinksOpensslPbkdf2Runtime(): void
+    public function testCallSiteEnsureLinksOpensslPbkdf2Runtime(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('OpensslPbkdf2Runtime::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('OpensslPbkdf2Runtime::ensureLinked($this->context)', $type);
+        $owner = (string) file_get_contents(__DIR__.'/../../ext/openssl/openssl_pbkdf2.php');
+        $this->assertStringContainsString('OpensslPbkdf2Runtime::ensureLinked', $owner);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltin(): void

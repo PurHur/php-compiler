@@ -48,8 +48,6 @@ final class TypeDeadJsonAbiRuntimeShrinkTest extends TestCase
             );
         }
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
-        $this->assertStringContainsString('StringJsonEncode::ensureLinked', $type);
-        $this->assertStringContainsString('StringJsonDecode::ensureLinked', $type);
     }
 
     public function testRuntimeOwnersDeclareJsonAbisModuleLocally(): void
@@ -98,11 +96,15 @@ final class TypeDeadJsonAbiRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testTypeInitializeStillEnsureLinksJsonRuntimes(): void
+    public function testCallSiteEnsureLinksJsonRuntimes(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringJsonEncode::ensureLinked($this->context)', $type);
-        $this->assertStringContainsString('StringJsonDecode::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringJsonEncode::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringJsonDecode::ensureLinked($this->context)', $type);
+        $enc = (string) file_get_contents(__DIR__.'/../../ext/standard/JitJsonEncode.php');
+        $dec = (string) file_get_contents(__DIR__.'/../../ext/standard/JitJsonDecode.php');
+        $this->assertStringContainsString('StringJsonEncode::ensureLinked', $enc);
+        $this->assertStringContainsString('StringJsonDecode::ensureLinked', $dec);
     }
 
     public function testNoNewRuntimeCForJsonAbis(): void

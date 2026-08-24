@@ -45,7 +45,6 @@ final class TypeDeadHashCryptoAbiRuntimeShrinkTest extends TestCase
             );
         }
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StringHashCrypto::ensureLinked', $type);
         // Peer #32875 already dropped these always-on shells
         $this->assertStringContainsString('#32875', $type);
         $this->assertDoesNotMatchRegularExpression(
@@ -65,10 +64,12 @@ final class TypeDeadHashCryptoAbiRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testTypeInitializeStillEnsureLinksStringHashCrypto(): void
+    public function testCallSiteEnsureLinksStringHashCrypto(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringHashCrypto::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringHashCrypto::ensureLinked($this->context)', $type);
+        $owner = (string) file_get_contents(__DIR__.'/../../ext/standard/JitHash.php');
+        $this->assertStringContainsString('StringHashCrypto::ensureLinked', $owner);
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void
