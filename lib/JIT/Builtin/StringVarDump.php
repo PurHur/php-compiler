@@ -12,9 +12,11 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
+use PHPCompiler\JIT\VarDumpArrayLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPCompiler\VM\EnumCasePropertyJitHelper;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -23,9 +25,10 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Owns module-local ABI decls (getNamedFunction first) — Type always-on shells removed.
  * Embed: NestedJIT {@see VarDumpJitHelper} (php-in-PHP).
- * Thin standalone AOT: scalar + enum-case LLVM bridge — NestedJIT of the helper
- * segfaults on `$ctx->runtime->vm` class-id layout (#23540 / #16075). Other non-scalars
- * thin AOT abort with a stderr diagnostic (not silent SIGABRT).
+ * Thin standalone AOT: scalar + enum-case + array LLVM bridge — NestedJIT of the helper
+ * segfaults on `$ctx->runtime->vm` class-id layout (#23540 / #16075). Arrays use
+ * {@see VarDumpArrayLlvm} (#34498; peer SerializeArrayLlvm #34483). Other non-scalars
+ * thin AOT abort with a diagnostic (not silent SIGABRT).
  * Thin body is deferred to {@see ensureLinkedAtCallSite()} so DECLARE_ENUM has run (#34207).
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringVarExport #20589).
  * php-src: ext/standard/var.c — php_var_dump_ex / PHP_FUNCTION(var_dump)
@@ -132,10 +135,12 @@ final class StringVarDump
     }
 
     /**
-     * Thin standalone AOT: dump scalars + enum cases like Zend without NestedJIT (#23540 / #34207).
+     * Thin standalone AOT: dump scalars + arrays + enum cases like Zend without NestedJIT
+     * (#23540 / #34207 / #34498).
      *
-     * Uses {@see ValueEchoHelper} / ob echo ABI already linked for `echo` in the same binary.
-     * Enum arm: php-src `php_var_dump` prints `enum(Class::Case)` for enum case objects.
+     * Public ABI `__compiler_var_dump(val)` wraps `__compiler_var_dump_ex(val, level)` so
+     * nested array elements keep php-src indent (level+2). Uses {@see ValueEchoHelper} /
+     * ob echo ABI already linked for `echo` in the same binary.
      */
     private static function implementThinScalarBridge(Context $context): void
     {
@@ -143,6 +148,10 @@ final class StringVarDump
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
+            $exProbe = $context->module->getNamedFunction('__compiler_var_dump_ex');
+            if (null !== $exProbe) {
+                $context->registerFunction('__compiler_var_dump_ex', $exProbe);
+            }
 
             return;
         }
@@ -151,29 +160,106 @@ final class StringVarDump
         ValueEchoRuntime::ensureLinked($context);
         ZendDoubleStringRuntime::ensureLinked($context);
 
+        self::implementThinExBridge($context);
+
         $voidTy = $context->getTypeFromString('void');
         $valuePtr = $context->getTypeFromString('__value__*');
-        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($voidTy, false, $valuePtr);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn, $i64): void {
+            $entry = $fn->appendBasicBlock('var_dump_thin_wrapper_entry');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->call(
+                $context->lookupFunction('__compiler_var_dump_ex'),
+                $fn->getParam(0),
+                $i64->constInt(1, false)
+            );
+            $context->builder->returnVoid();
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        $context->registerFunction($abiName, $fn);
+    }
 
-        $entry = $fn->appendBasicBlock('var_dump_thin_scalar_entry');
-        $boolBlock = $fn->appendBasicBlock('var_dump_thin_bool');
-        $longBlock = $fn->appendBasicBlock('var_dump_thin_long');
-        $doubleBlock = $fn->appendBasicBlock('var_dump_thin_double');
-        $nullBlock = $fn->appendBasicBlock('var_dump_thin_null');
-        $stringBlock = $fn->appendBasicBlock('var_dump_thin_string');
-        $objectBlock = $fn->appendBasicBlock('var_dump_thin_object');
-        $fallback = $fn->appendBasicBlock('var_dump_thin_fallback');
-        $done = $fn->appendBasicBlock('var_dump_thin_done');
+    /**
+     * Leveled thin dump: indent when level>1, then scalar / array / enum / abort.
+     *
+     * Array arm: {@see VarDumpArrayLlvm} (#34498). Recurses here at level+2.
+     */
+    private static function implementThinExBridge(Context $context): void
+    {
+        $abiName = '__compiler_var_dump_ex';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $voidTy = $context->getTypeFromString('void');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $ft = $context->context->functionType($voidTy, false, $valuePtr, $i64);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+        // Register before body: VarDumpArrayLlvm recurses into this ABI (#34498).
+        $context->registerFunction($abiName, $fn);
+
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn, $valuePtr, $i64, $i8): void {
+            self::emitThinExBody($context, $fn, $valuePtr, $i64, $i8);
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+    /**
+     * Body of `__compiler_var_dump_ex` — must run under {@see BasicBlockHelper::scopeLoweringToFunction}
+     * so {@see VarDumpArrayLlvm} / HT export appends stay on this fn (not outer main).
+     */
+    private static function emitThinExBody(
+        Context $context,
+        LlvmFunction $fn,
+        $valuePtr,
+        $i64,
+        $i8
+    ): void {
+        $entry = $fn->appendBasicBlock('var_dump_ex_entry');
+        $boolBlock = $fn->appendBasicBlock('var_dump_ex_bool');
+        $longBlock = $fn->appendBasicBlock('var_dump_ex_long');
+        $doubleBlock = $fn->appendBasicBlock('var_dump_ex_double');
+        $nullBlock = $fn->appendBasicBlock('var_dump_ex_null');
+        $stringBlock = $fn->appendBasicBlock('var_dump_ex_string');
+        $arrayBlock = $fn->appendBasicBlock('var_dump_ex_array');
+        $objectBlock = $fn->appendBasicBlock('var_dump_ex_object');
+        $fallback = $fn->appendBasicBlock('var_dump_ex_fallback');
+        $done = $fn->appendBasicBlock('var_dump_ex_done');
 
         $context->builder->positionAtEnd($entry);
         $arg = $fn->getParam(0);
+        $level = $fn->getParam(1);
+        // php-src dumpNested: spaces(level-1) before payload when level > 1.
+        $needIndent = $context->builder->icmp(
+            Builder::INT_SGT,
+            $level,
+            $i64->constInt(1, false)
+        );
+        $indentBlock = $fn->appendBasicBlock('var_dump_ex_indent');
+        $afterIndent = $fn->appendBasicBlock('var_dump_ex_after_indent');
+        $context->builder->branchIf($needIndent, $indentBlock, $afterIndent);
+        $context->builder->positionAtEnd($indentBlock);
+        $indentN = $context->builder->sub($level, $i64->constInt(1, false));
+        VarDumpArrayLlvm::echoSpaces($context, $indentN);
+        $context->builder->branch($afterIndent);
+        $context->builder->positionAtEnd($afterIndent);
+
         // Literal `null` can arrive as a null __value__* (no box) — load would SIGSEGV (#24220).
-        $nullPtrBlock = $fn->appendBasicBlock('var_dump_thin_null_ptr');
-        $havePtr = $fn->appendBasicBlock('var_dump_thin_have_ptr');
+        $nullPtrBlock = $fn->appendBasicBlock('var_dump_ex_null_ptr');
+        $havePtr = $fn->appendBasicBlock('var_dump_ex_have_ptr');
         $isNullPtr = $context->builder->icmp(
             Builder::INT_EQ,
             $arg,
@@ -196,7 +282,7 @@ final class StringVarDump
             $kind,
             $i8->constInt(JitVariable::TYPE_NATIVE_BOOL, false)
         );
-        $afterBool = $fn->appendBasicBlock('var_dump_thin_after_bool');
+        $afterBool = $fn->appendBasicBlock('var_dump_ex_after_bool');
         $context->builder->branchIf($isBool, $boolBlock, $afterBool);
 
         $context->builder->positionAtEnd($boolBlock);
@@ -206,9 +292,9 @@ final class StringVarDump
             $boolByte,
             $i8->constInt(0, false)
         );
-        $trueBlock = $fn->appendBasicBlock('var_dump_thin_bool_true');
-        $falseBlock = $fn->appendBasicBlock('var_dump_thin_bool_false');
-        $boolDone = $fn->appendBasicBlock('var_dump_thin_bool_done');
+        $trueBlock = $fn->appendBasicBlock('var_dump_ex_bool_true');
+        $falseBlock = $fn->appendBasicBlock('var_dump_ex_bool_false');
+        $boolDone = $fn->appendBasicBlock('var_dump_ex_bool_done');
         $context->builder->branchIf($isTrue, $trueBlock, $falseBlock);
         $context->builder->positionAtEnd($trueBlock);
         ValueEchoHelper::echoLiteral($context, "bool(true)\n");
@@ -225,7 +311,7 @@ final class StringVarDump
             $kind,
             $i8->constInt(JitVariable::TYPE_NATIVE_LONG, false)
         );
-        $afterLong = $fn->appendBasicBlock('var_dump_thin_after_long');
+        $afterLong = $fn->appendBasicBlock('var_dump_ex_after_long');
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($longBlock);
@@ -234,7 +320,6 @@ final class StringVarDump
             $arg
         );
         ValueEchoHelper::echoLiteral($context, 'int(');
-        // Plain %lld path — resource handles are not var_dump ints (#23540).
         $context->builder->call(
             $context->lookupFunction('__phpc_ob_echo_ll'),
             $longVal
@@ -248,7 +333,7 @@ final class StringVarDump
             $kind,
             $i8->constInt(JitVariable::TYPE_NATIVE_DOUBLE, false)
         );
-        $afterDouble = $fn->appendBasicBlock('var_dump_thin_after_double');
+        $afterDouble = $fn->appendBasicBlock('var_dump_ex_after_double');
         $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($doubleBlock);
@@ -256,8 +341,6 @@ final class StringVarDump
             $context->lookupFunction('__value__readDouble'),
             $arg
         );
-        // php-src var.c php_var_dump IS_DOUBLE: %.*H PG(serialize_precision) (#32328)
-        // with zend_gcvt INF/NAN tokens, not libc snprintf "inf"/"nan" (#32321 / #32316).
         ValueEchoHelper::echoLiteral($context, 'float(');
         $formatted = ZendDoubleStringRuntime::formatVarDumpH($context, $doubleVal);
         ValueEchoHelper::echoStringVariable(
@@ -272,15 +355,13 @@ final class StringVarDump
         ValueEchoHelper::echoLiteral($context, ")\n");
         $context->builder->branch($done);
 
-        // null and string are scalars too — without these arms they reached the non-scalar abort,
-        // so var_dump(null) and var_dump('hi') died in thin AOT (#24220).
         $context->builder->positionAtEnd($afterDouble);
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
             $i8->constInt(JitVariable::TYPE_NULL, false)
         );
-        $afterNull = $fn->appendBasicBlock('var_dump_thin_after_null');
+        $afterNull = $fn->appendBasicBlock('var_dump_ex_after_null');
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
 
         $context->builder->positionAtEnd($nullBlock);
@@ -288,13 +369,12 @@ final class StringVarDump
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterNull);
-        // TYPE_STRING carries IS_REFCOUNTED; $kind is already masked with 0x7f above.
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
             $i8->constInt(JitVariable::TYPE_STRING & 0x7f, false)
         );
-        $afterString = $fn->appendBasicBlock('var_dump_thin_after_string');
+        $afterString = $fn->appendBasicBlock('var_dump_ex_after_string');
         $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
@@ -312,8 +392,6 @@ final class StringVarDump
             $strLen
         );
         ValueEchoHelper::echoLiteral($context, ') "');
-        // Byte-exact echo: var_dump() must not stop at an embedded NUL, so length-bounded like
-        // ValueEchoHelper::echoStringVariable() rather than a C-string echo.
         $valOffset = $context->structFieldIndex($strPtr, 'value');
         $context->builder->call(
             $context->lookupFunction('__phpc_ob_echo_substr'),
@@ -324,7 +402,30 @@ final class StringVarDump
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterString);
-        // TYPE_OBJECT carries IS_REFCOUNTED; enum cases are immortal singletons (#4445 / #34207).
+        // JIT TYPE_HASHTABLE (7) or VM TYPE_ARRAY (6) — peer UnsetHelperLlvm (#34498).
+        $isVmArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_ARRAY, false)
+        );
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isArray = $context->builder->or($isVmArray, $isHt);
+        $afterArray = $fn->appendBasicBlock('var_dump_ex_after_array');
+        $context->builder->branchIf($isArray, $arrayBlock, $afterArray);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $arg
+        );
+        VarDumpArrayLlvm::dump($context, $ht, $level);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterArray);
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
@@ -341,7 +442,6 @@ final class StringVarDump
 
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
     }
 
     /**
