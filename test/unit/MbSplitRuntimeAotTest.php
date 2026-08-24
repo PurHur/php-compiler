@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: mb_split() runtime args via MbEregJitHelper (#34391).
+ * AOT: mb_split() runtime + TYPE_VALUE compileTimeString fold (#34391 leftover of #13367).
  *
  * @see php-src ext/mbstring/php_mbregex.c PHP_FUNCTION(mb_split)
  *
@@ -39,7 +39,13 @@ final class MbSplitRuntimeAotTest extends TestCase
             "throw new \\LogicException('mb_split() is not lowered for JIT/AOT",
             $src
         );
+        // TYPE_VALUE boxes from `$p = ','` must fold via compileTimeString (#34391 follow-up).
+        $this->assertStringContainsString(
+            'TYPE_VALUE boxes from `$p = \'…\'` still carry compileTimeString',
+            $src
+        );
         $this->assertFileDoesNotExist($root.'/lib/AOT/runtime/mb_split.c');
+        $this->assertFileDoesNotExist($root.'/runtime/php_mbregex.c');
     }
 
     private function assertAotMatchesZend(string $src): void
