@@ -19878,7 +19878,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/JitMbEreg.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `ext/mbstring/JitMbEregSearch.php`
 
@@ -19997,8 +19997,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/MbEregJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 41)
-- 5 class method(s)
+- new HashTable (line 42)
+- 7 class method(s)
 
 ### `ext/mbstring/MbMimeheaderJitHelper.php`
 
@@ -20370,7 +20370,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_eregi_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 37)
+- new ArgumentCountError (line 38)
 - 3 class method(s)
 - 1 closure(s)
 
@@ -50836,7 +50836,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MbEregRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/MbMimeheaderRuntime.php`
 

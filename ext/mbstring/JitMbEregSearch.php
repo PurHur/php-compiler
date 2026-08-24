@@ -119,7 +119,7 @@ final class JitMbEregSearch
         MbstringAotFoldState::syncRegexEncodingIntoState($context);
         $result = VmMbstring::eregReplace($pattern, $replacement, $string, $caseInsensitive);
         if (!\is_string($result)) {
-            // false/null — leave non-foldable (runtime path still LogicException for now).
+            // false/null — leave non-foldable; runtime uses NestedJIT (#34389).
             return null;
         }
 
