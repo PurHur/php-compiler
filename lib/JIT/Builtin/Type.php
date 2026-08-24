@@ -838,12 +838,12 @@ class Type extends Builtin {
         // ensureLinked removed (#34332): JitOpenssl* / OpensslEncryptCrypto /
         // JitHash / JitJson* / JitLibcrypt / JitPassword* / JitRandomBytes /
         // JitPasswordRandomBytes already ensureLinked before lookup (peer #34327).
-        StringPregMatch::ensureLinked($this->context);
-        StringXmlrpc::ensureLinked($this->context);
-        StringFormat::ensureLinked($this->context);
-        Sscanf::ensureLinked($this->context);
-        StringPack::ensureLinked($this->context);
-        StringUnpack::ensureLinked($this->context);
+        // StringPregMatch / StringXmlrpc / StringFormat / Sscanf / StringPack /
+        // StringUnpack always-on ensureLinked removed (#34357): JitPreg* /
+        // JitXmlrpc / JitSprintf / JitPrintf / JitNumberFormat / JitVsprintf /
+        // JitSscanf / PackJitRuntime / UnpackJitRuntime already ensureLinked or
+        // implementIfDeclared before lookup (peer #34337). StringTime still
+        // eager below (TimeRuntimeShrinkTest::testTypeLinksStringTime).
         StringVarExport::ensureLinked($this->context);
         StringPrintR::ensureLinked($this->context);
         StringVarDump::ensureLinked($this->context);

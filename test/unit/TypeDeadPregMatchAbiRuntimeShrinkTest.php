@@ -30,7 +30,8 @@ final class TypeDeadPregMatchAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_preg_match (#33187)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StringPregMatch::ensureLinked', $type);
+        $this->assertStringContainsString('#34357', $type);
+        $this->assertStringNotContainsString('StringPregMatch::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresPregMatchAbiModuleLocally(): void
@@ -51,10 +52,12 @@ final class TypeDeadPregMatchAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringPregMatch::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringPregMatch(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkStringPregMatch(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringPregMatch::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringPregMatch::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitPregMatch.php');
+        $this->assertStringContainsString('StringPregMatch::ensureLinked', $jit);
     }
 
     public function testNoNewRuntimeCForPregMatchAbi(): void
