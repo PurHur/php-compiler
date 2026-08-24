@@ -81,18 +81,23 @@ final class NamedArgs
     ): ?array {
         $normalized = self::normalizeEntries($entries, $operands);
         $vmEntries = [];
+        /** @var array<string, list<array{value: Variable, operand: Operand|null}>> $reusePool */
+        $reusePool = [];
         foreach ($normalized as $entry) {
-            if ('n' === $entry['kind']) {
-                $vmValue = CallUnpackCompileTime::tryCompileTimeValueFromJitVariable($entry['value']);
-                if (null === $vmValue) {
-                    return null;
-                }
-                $vmEntries[] = ['n', $entry['name'], $vmValue];
-                continue;
-            }
             $vmValue = CallUnpackCompileTime::tryCompileTimeValueFromJitVariable($entry['value']);
             if (null === $vmValue) {
                 return null;
+            }
+            $reuseKey = self::compileTimeScalarReuseKey($vmValue);
+            if (null !== $reuseKey) {
+                $reusePool[$reuseKey][] = [
+                    'value' => $entry['value'],
+                    'operand' => $entry['operand'],
+                ];
+            }
+            if ('n' === $entry['kind']) {
+                $vmEntries[] = ['n', $entry['name'], $vmValue];
+                continue;
             }
             $vmEntries[] = ['p', $vmValue];
         }
@@ -147,7 +152,19 @@ final class NamedArgs
         $jitResult = [];
         $jitOperands = [];
         foreach ($vmResolved as $idx => $vmVar) {
-            $jitVar = $jit->jitVariableFromVmConstantForCallUnpack($vmVar);
+            // Prefer the live ARG_SEND JIT Variable over a fresh fromLiteral rematerialize.
+            // Rematerialized TYPE_STRING slots SIGSEGV under AOT on `echo $a.$b` with named
+            // string literals (#34457) — positional ARG_SEND vars are fine; reuse them after
+            // VM named-arg reorder (php-src Zend/zend_execute.c named binding).
+            $reuseKey = self::compileTimeScalarReuseKey($vmVar);
+            if (null !== $reuseKey && [] !== ($reusePool[$reuseKey] ?? [])) {
+                $orig = \array_shift($reusePool[$reuseKey]);
+                $jitVar = $orig['value'];
+                $jitOperands[(int) $idx] = $orig['operand'];
+            } else {
+                $jitVar = $jit->jitVariableFromVmConstantForCallUnpack($vmVar);
+                $jitOperands[(int) $idx] = null;
+            }
             if (
                 null !== $variadicParamIndex
                 && (int) $idx === $variadicParamIndex
@@ -156,12 +173,33 @@ final class NamedArgs
                 $jitVar->variadicElementChecksDone = true;
             }
             $jitResult[(int) $idx] = $jitVar;
-            $jitOperands[(int) $idx] = null;
         }
         ksort($jitResult);
         ksort($jitOperands);
 
         return [$jitResult, $jitOperands];
+    }
+
+    /**
+     * Fingerprint for reusing ARG_SEND JIT Variables after VM named-arg reorder (#34457).
+     */
+    private static function compileTimeScalarReuseKey(VmVariable $vm): ?string
+    {
+        $vm = $vm->resolveIndirect();
+        switch ($vm->type) {
+            case VmVariable::TYPE_STRING:
+                return 's:'.$vm->toString();
+            case VmVariable::TYPE_INTEGER:
+                return 'i:'.(string) $vm->toInt();
+            case VmVariable::TYPE_FLOAT:
+                return 'f:'.\serialize($vm->toFloat());
+            case VmVariable::TYPE_BOOLEAN:
+                return 'b:'.($vm->toBool() ? '1' : '0');
+            case VmVariable::TYPE_NULL:
+                return 'n';
+            default:
+                return null;
+        }
     }
 
     /**
