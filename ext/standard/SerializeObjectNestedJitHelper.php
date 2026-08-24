@@ -7,10 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\HashTable;
 
 /**
- * Thin-standalone NestedJIT serialize() object pieces (#27030 / #33692).
+ * Thin-standalone NestedJIT serialize() object header (#27030 / #33692).
  *
- * Keep each helper to one HT or (string,int) — NestedJIT mis-types richer arities.
- * AOT HT export uses JIT tags (bool=2, double=3) — not VM float=2 / bool=3 (#33520 / #33687).
+ * Property bags use {@see \PHPCompiler\JIT\SerializeObjectPropsLlvm} under AOT (#34493) —
+ * NestedJIT encodeObjectProps SIGABRTs on non-empty HTs (same class as #34483).
+ * Keep formatObjectHeader NestedJIT: empty stdClass already green.
  * php-src: ext/standard/var.c — php_var_serialize object branch
  */
 final class SerializeObjectNestedJitHelper
