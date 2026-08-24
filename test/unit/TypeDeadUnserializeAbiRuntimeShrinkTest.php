@@ -30,7 +30,9 @@ final class TypeDeadUnserializeAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_unserialize (#33213)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StringUnserialize::ensureLinked', $type);
+        // Type::initialize always-on ensureLinked removed (#34384); JitUnserialize links lazily.
+        $this->assertStringContainsString('#34384', $type);
+        $this->assertStringNotContainsString('StringUnserialize::ensureLinked($this->context)', $type);
     }
 
     public function testRuntimeOwnerDeclaresUnserializeAbiModuleLocally(): void
@@ -47,10 +49,12 @@ final class TypeDeadUnserializeAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringUnserialize::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringUnserialize(): void
+    public function testTypeInitializeDoesNotEagerlyEnsureLinkStringUnserialize(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringUnserialize::ensureLinked($this->context)', $type);
+        $this->assertStringNotContainsString('StringUnserialize::ensureLinked($this->context)', $type);
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitUnserialize.php');
+        $this->assertStringContainsString('StringUnserialize::ensureLinked', $jit);
     }
 
     public function testNoNewRuntimeCForUnserializeAbi(): void
