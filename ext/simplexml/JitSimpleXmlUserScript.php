@@ -1056,6 +1056,18 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * Host SimpleXMLElement tracked for user-script AOT (dom_import_simplexml fold; #34413).
+     */
+    public static function compileTimeTree(JITVariable $receiver): ?\SimpleXMLElement
+    {
+        if (!UserScriptAotEnv::isActive()) {
+            return null;
+        }
+
+        return self::lookup($receiver);
+    }
+
+    /**
      * Array-shaped operands must not fall back to lastTree for count() (#27413).
      * Value-boxed SXE from load/property still count via an exact host-tree token
      * once applyPendingElementAssign has bound it (#26863 / #28639).
