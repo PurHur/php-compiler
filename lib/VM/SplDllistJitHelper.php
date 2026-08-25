@@ -533,9 +533,13 @@ final class SplDllistJitHelper
     }
 
     /**
-     * php-src SplDoublyLinkedList serialize — flags + dllist HT + empty members (#33966).
+     * php-src SplDoublyLinkedList serialize — flags + dllist HT + empty members (#33966 / #34592).
      *
-     * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33876.
+     * NestedJIT encodeWire SIGABRTs on non-empty HT (peer #34491 / #34483). Call registered
+     * `__compiler_serialize_hashtable` for storage then wrap
+     * `O:len:"Class":3:{i:0;i:flags;i:1;<a:N:{…}>i:2;a:0:{}}`.
+     * Must not inline SerializeArrayLlvm::encode here — nested object values recurse
+     * through encodeBoxedValue → compileSerialize during IR emit (peer ArrayObject).
      *
      * @return Value {@see __string__*} full `O:len:"Class":3:{…}` wire
      */
@@ -545,42 +549,100 @@ final class SplDllistJitHelper
         $obj = self::loadObject($context, $receiver);
         $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
         $classNameStr = ReflectionBuiltinHelper::getClassName($context, $objVar);
+
+        $flags = self::loadFlagsForAnyDllistClass($context, $obj);
+
         $ht = self::htPtr($context, $obj);
-        $logical = 'PHPCompiler\\ext\\standard\\SerializeSplDllistNestedJitHelper::encodeWire';
-        $saved = BasicBlockHelper::tryGetInsertBlock($context);
-        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
-            $context,
-            '/ext/standard/SerializeSplDllistNestedJitHelper.php',
-            [$logical],
-            '#33966'
+        $i64 = $context->getTypeFromString('int64');
+        $serFlags = $i64->constInt(0, false);
+        $storageWire = $context->builder->call(
+            $context->lookupFunction('__compiler_serialize_hashtable'),
+            $ht,
+            $serFlags
         );
-        BasicBlockHelper::restoreInsertBlock($context, $saved);
-        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33966');
+
         $strMap = $context->structFieldMap['__string__'];
         $classLen = $context->builder->load(
             $context->builder->structGep($classNameStr, $strMap['length'])
         );
-        $args = [
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $classNameStr,
-                $fn->getParam(0)->typeOf()
-            ),
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $classLen,
-                $fn->getParam(1)->typeOf()
-            ),
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $ht,
-                $fn->getParam(2)->typeOf()
-            ),
-        ];
-        $raw = $context->builder->call($fn, ...$args);
-        $strPtr = $context->getTypeFromString('__string__*');
+        $classLenDigits = VmResourceIdString::formatNativeLong(
+            $context,
+            $context->builder->zExt($classLen, $i64)
+        );
+        $flagDigits = VmResourceIdString::formatNativeLong($context, $flags);
 
-        return \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr);
+        $oColon = $context->builder->load($context->constantStringFromString('O:'));
+        $colonQuote = $context->builder->load($context->constantStringFromString(':"'));
+        $quoteThree = $context->builder->load($context->constantStringFromString('":3:{i:0;i:'));
+        $mid = $context->builder->load($context->constantStringFromString(';i:1;'));
+        $tail = $context->builder->load($context->constantStringFromString('i:2;a:0:{}}'));
+
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $oColon, $classLenDigits);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $colonQuote);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $classNameStr);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $quoteThree);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $flagDigits);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $mid);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $storageWire);
+
+        return \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $tail);
+    }
+
+    /**
+     * Load `__spl_flags` for SplDoublyLinkedList / SplQueue / SplStack (#34592).
+     *
+     * Construct stores the property under the concrete class name; branch on class_id.
+     */
+    private static function loadFlagsForAnyDllistClass(Context $context, Value $obj): Value
+    {
+        $objectType = $context->type->object;
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+
+        /** @var list<array{0: string, 1: int}> $candidates */
+        $candidates = [];
+        foreach (['SplDoublyLinkedList', 'SplQueue', 'SplStack'] as $name) {
+            $id = $objectType->classIdByName($name)
+                ?? $objectType->classIdForLowerName(strtolower($name));
+            if (null !== $id) {
+                $candidates[] = [$name, $id];
+            }
+        }
+        if ([] === $candidates) {
+            return $zero;
+        }
+
+        $flagsSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($zero, $flagsSlot);
+        $doneBb = BasicBlockHelper::append($context, 'dllist_ser_flags_done');
+        $continue = $context->builder->getInsertBlock();
+        foreach ($candidates as [$name, $cid]) {
+            $matchBb = BasicBlockHelper::append($context, 'dllist_ser_flags_match');
+            $nextBb = BasicBlockHelper::append($context, 'dllist_ser_flags_next');
+            $context->builder->positionAtEnd($continue);
+            $is = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($cid, false)
+            );
+            $context->builder->branchIf($is, $matchBb, $nextBb);
+            $context->builder->positionAtEnd($matchBb);
+            $context->builder->store(
+                self::loadLongProperty($context, $obj, $name, self::PROP_FLAGS),
+                $flagsSlot
+            );
+            $context->builder->branch($doneBb);
+            $continue = $nextBb;
+        }
+        $context->builder->positionAtEnd($continue);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+
+        return $context->builder->load($flagsSlot);
     }
 
     /** Expose object load for {@see \PHPCompiler\ext\standard\JitSerialize} (#33966). */
