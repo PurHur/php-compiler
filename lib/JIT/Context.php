@@ -3538,6 +3538,19 @@ class Context {
         if (null === $slot || !isset($block->constants[$slot])) {
             return false;
         }
+        // A Temporary rebound onto a FuncCall name-literal slot (ternary ?: phi sharing the
+        // INIT name's index) must not rematerialize that name string (#34814).
+        if ($op instanceof Operand\Temporary) {
+            foreach ($block->scopedOperands() as $scopedOp) {
+                if (
+                    $block->slotForOperand($scopedOp) === $slot
+                    && $scopedOp instanceof Operand\Literal
+                    && $scopedOp !== $op
+                ) {
+                    return false;
+                }
+            }
+        }
         // Function formals carry their default in ARG_RECV / call-site filling.
         // Rematerializing that constant as the CV makes `f($x = 1); f(7)` and
         // `__construct(public $x = 1); new C(7)` ignore the argument (#32349).
