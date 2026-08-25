@@ -49,7 +49,8 @@ final class TypeDeadEnvLocalAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $this->assertStringContainsString('#34513', $type);
         $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('EnvLocalRuntime::ensureLinked', $ctx);
+        $this->assertStringContainsString('#34807', $ctx);
+        $this->assertStringContainsString('EnvLocalRuntime::ensureBootstrapAotStubLinked', $ctx);
     }
 
     public function testRuntimeOwnerDeclaresEnvLocalAbisModuleLocally(): void
@@ -64,9 +65,10 @@ final class TypeDeadEnvLocalAbiRuntimeShrinkTest extends TestCase
         $orch = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/EnvLocalRuntime.php');
         $this->assertStringContainsString('JitEnvLocalKernel::ensureLinked', $orch);
         $this->assertStringContainsString('#32729', $orch);
+        $this->assertStringContainsString('#34807', $orch);
     }
 
-    public function testContextStillEnsureLinksEnvLocalRuntime(): void
+    public function testContextDropsEagerEnvLocalFromEnsureMinimal(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
         $this->assertDoesNotMatchRegularExpression(
@@ -75,7 +77,21 @@ final class TypeDeadEnvLocalAbiRuntimeShrinkTest extends TestCase
             'Type::initialize must not eagerly EnvLocalRuntime::ensureLinked (#34513)'
         );
         $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('EnvLocalRuntime::ensureLinked($this)', $ctx);
+        $minimalPos = strpos($ctx, 'private function ensureMinimalUserStandaloneBodies');
+        $this->assertNotFalse($minimalPos);
+        $minimalEnd = strpos($ctx, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
+        $this->assertNotFalse($minimalEnd);
+        $minimalBody = substr($ctx, $minimalPos, $minimalEnd - $minimalPos);
+        $this->assertStringNotContainsString(
+            'EnvLocalRuntime::ensureLinked($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly EnvLocalRuntime (#34807)'
+        );
+        $this->assertStringContainsString(
+            'EnvLocalRuntime::ensureBootstrapAotStubLinked($this)',
+            $ctx,
+            'bootstrap-aot still ensureBootstrapAotStubLinked (#34807)'
+        );
     }
 
     public function testPhpHelpersRemainForDroppedUserScriptBuiltins(): void

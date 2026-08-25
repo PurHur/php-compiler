@@ -342,6 +342,30 @@ final class DomNodeChildNodeMutationRuntime
         if ($index < 0 || $index >= \count($chunks)) {
             return false;
         }
+        // Same-parent move: an arg is already among the parent's children. Replacing
+        // the receiver chunk with <arg/> leaves a duplicate while LiveSlots already
+        // rebuilt INNER_XML (#34806 / peer replaceChild).
+        foreach ($extraArgs as $arg) {
+            if (null !== ($arg->compileTimeDomChildIndex ?? null)
+                && $arg->compileTimeDomChildIndex !== $index
+            ) {
+                return false;
+            }
+            $argTag = $arg->compileTimeDomTagName ?? null;
+            if (null === $argTag || '' === $argTag) {
+                continue;
+            }
+            $argLc = strtolower($argTag);
+            foreach ($chunks as $i => $chunk) {
+                if ($i === $index) {
+                    continue;
+                }
+                $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($chunk);
+                if (null !== $parsed && strtolower($parsed['tag']) === $argLc) {
+                    return false;
+                }
+            }
+        }
         $chunks[$index] = $markup;
         JitDomCreateElement::storeUserScriptInnerXml($context, $parent, implode('', $chunks));
 

@@ -26,6 +26,9 @@ use PHPLLVM\Value;
  * DocumentFragment stand-ins expand children before $refChild (#33312).
  * Cross-parent reparent must unlink the old parent first (php-src
  * dom_node_insert_before) — peer appendChild #33404 / #33450.
+ * Same-parent move must unlink sibling links before splice — otherwise
+ * next/prev form a cycle and INNER_XML walks forever (exit 137; #34803 /
+ * peer appendChild move #27476; identity hang #34709).
  * Attr newChild: Error before sibling slots (php-src / #33587).
  * Identity insert (new==ref): Error — must not self-cycle sibling links (#34709 / re-#22686).
  *
@@ -121,6 +124,146 @@ final class JitDomInsertBeforeLiveSlots
         // php-src: if newChild already has a different parent, remove it first (#33450).
         JitDomAppendChildLiveSlots::detachFromForeignParentIfNeeded($context, $parent, $newChild);
 
+        $bbDone = BasicBlockHelper::append($context, 'dom_ib_sync_done');
+
+        // Already immediately before ref → no-op (xmlAddPrevSibling; avoids c.next=c).
+        $newNext0 = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $newChild,
+            VmDom::PROP_NEXT_SIBLING,
+            'dom_ib_already_next'
+        );
+        $alreadyBefore = $context->builder->icmp(Builder::INT_EQ, $newNext0, $refChild);
+        $bbAlreadyBefore = BasicBlockHelper::append($context, 'dom_ib_already_before');
+        $bbNeedInsert = BasicBlockHelper::append($context, 'dom_ib_need_insert');
+        $context->builder->branchIf($alreadyBefore, $bbAlreadyBefore, $bbNeedInsert);
+        // No-op for tree links, but compile-time trySync may have spliced a duplicate
+        // tag into INNER_XML — rebuild from live children (peer after #34791).
+        $context->builder->positionAtEnd($bbAlreadyBefore);
+        $isDocAlready = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, 'dom_ib_already_doc');
+        $bbSkipAlreadyRebuild = BasicBlockHelper::append($context, 'dom_ib_already_skip_rebuild');
+        $bbAlreadyRebuild = BasicBlockHelper::append($context, 'dom_ib_already_rebuild');
+        $context->builder->branchIf($isDocAlready, $bbSkipAlreadyRebuild, $bbAlreadyRebuild);
+        $context->builder->positionAtEnd($bbAlreadyRebuild);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbSkipAlreadyRebuild);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbNeedInsert);
+
+        // Same-parent membership (peer appendChild #27476 / #33404).
+        $curFirst0 = JitDomParentChildLinkLayout::loadFirstChild($context, $parent, 'dom_ib_chk_first');
+        $curLast0 = JitDomParentChildLinkLayout::loadLastChild($context, $parent, 'dom_ib_chk_last');
+        $isFirstChild = $context->builder->icmp(Builder::INT_EQ, $curFirst0, $newChild);
+        $isLastChild = $context->builder->icmp(Builder::INT_EQ, $curLast0, $newChild);
+        $chkPrev = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $newChild,
+            VmDom::PROP_PREVIOUS_SIBLING,
+            'dom_ib_chk_prev'
+        );
+        $chkNext = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $newChild,
+            VmDom::PROP_NEXT_SIBLING,
+            'dom_ib_chk_next'
+        );
+        $hasPrev = $context->builder->icmp(Builder::INT_NE, $chkPrev, $objPtrTy->constNull());
+        $hasNext = $context->builder->icmp(Builder::INT_NE, $chkNext, $objPtrTy->constNull());
+        $isLinked = $context->builder->or($hasPrev, $hasNext);
+        $curParent = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $newChild,
+            VmDom::PROP_PARENT_NODE,
+            'dom_ib_chk_parent'
+        );
+        $parentMatches = $context->builder->icmp(Builder::INT_EQ, $curParent, $parent);
+        $linkedHere = $context->builder->and($isLinked, $parentMatches);
+        $isMember = $context->builder->or($context->builder->or($isFirstChild, $isLastChild), $linkedHere);
+
+        $bbUnlink = BasicBlockHelper::append($context, 'dom_ib_unlink');
+        $bbAfterUnlink = BasicBlockHelper::append($context, 'dom_ib_after_unlink');
+        $context->builder->branchIf($isMember, $bbUnlink, $bbAfterUnlink);
+
+        // ---- Same-parent: unlink from current position before splice (#34803) ----
+        $context->builder->positionAtEnd($bbUnlink);
+        $oldPrev = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $newChild,
+            VmDom::PROP_PREVIOUS_SIBLING,
+            'dom_ib_un_prev'
+        );
+        $oldNext = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $newChild,
+            VmDom::PROP_NEXT_SIBLING,
+            'dom_ib_un_next'
+        );
+        $firstU = JitDomParentChildLinkLayout::loadFirstChild($context, $parent, 'dom_ib_un_first');
+        $lastU = JitDomParentChildLinkLayout::loadLastChild($context, $parent, 'dom_ib_un_last');
+
+        $bbUnPrevLink = BasicBlockHelper::append($context, 'dom_ib_un_prev_link');
+        $bbUnAfterPrev = BasicBlockHelper::append($context, 'dom_ib_un_after_prev');
+        $oldPrevNull = $context->builder->icmp(Builder::INT_EQ, $oldPrev, $objPtrTy->constNull());
+        $context->builder->branchIf($oldPrevNull, $bbUnAfterPrev, $bbUnPrevLink);
+        $context->builder->positionAtEnd($bbUnPrevLink);
+        JitDomParentChildLinkLayout::storeSibling(
+            $context,
+            $oldPrev,
+            VmDom::PROP_NEXT_SIBLING,
+            self::objectOrNullVar($context, $oldNext)
+        );
+        $context->builder->branch($bbUnAfterPrev);
+
+        $context->builder->positionAtEnd($bbUnAfterPrev);
+        $bbUnNextLink = BasicBlockHelper::append($context, 'dom_ib_un_next_link');
+        $bbUnAfterNext = BasicBlockHelper::append($context, 'dom_ib_un_after_next');
+        $oldNextNull = $context->builder->icmp(Builder::INT_EQ, $oldNext, $objPtrTy->constNull());
+        $context->builder->branchIf($oldNextNull, $bbUnAfterNext, $bbUnNextLink);
+        $context->builder->positionAtEnd($bbUnNextLink);
+        JitDomParentChildLinkLayout::storeSibling(
+            $context,
+            $oldNext,
+            VmDom::PROP_PREVIOUS_SIBLING,
+            self::objectOrNullVar($context, $oldPrev)
+        );
+        $context->builder->branch($bbUnAfterNext);
+
+        $context->builder->positionAtEnd($bbUnAfterNext);
+        $firstIsNew = $context->builder->icmp(Builder::INT_EQ, $firstU, $newChild);
+        $bbUnSetFirst = BasicBlockHelper::append($context, 'dom_ib_un_set_first');
+        $bbUnAfterFirst = BasicBlockHelper::append($context, 'dom_ib_un_after_first');
+        $context->builder->branchIf($firstIsNew, $bbUnSetFirst, $bbUnAfterFirst);
+        $context->builder->positionAtEnd($bbUnSetFirst);
+        JitDomParentChildLinkLayout::storeFirstChild(
+            $context,
+            $parent,
+            self::objectOrNullVar($context, $oldNext)
+        );
+        $context->builder->branch($bbUnAfterFirst);
+
+        $context->builder->positionAtEnd($bbUnAfterFirst);
+        $lastIsNew = $context->builder->icmp(Builder::INT_EQ, $lastU, $newChild);
+        $bbUnSetLast = BasicBlockHelper::append($context, 'dom_ib_un_set_last');
+        $bbUnAfterLast = BasicBlockHelper::append($context, 'dom_ib_un_after_last');
+        $context->builder->branchIf($lastIsNew, $bbUnSetLast, $bbUnAfterLast);
+        $context->builder->positionAtEnd($bbUnSetLast);
+        JitDomParentChildLinkLayout::storeLastChild(
+            $context,
+            $parent,
+            self::objectOrNullVar($context, $oldPrev)
+        );
+        $context->builder->branch($bbUnAfterLast);
+
+        $context->builder->positionAtEnd($bbUnAfterLast);
+        JitDomParentChildLinkLayout::storeSibling($context, $newChild, VmDom::PROP_PREVIOUS_SIBLING, $nullBox);
+        JitDomParentChildLinkLayout::storeSibling($context, $newChild, VmDom::PROP_NEXT_SIBLING, $nullBox);
+        $context->builder->branch($bbAfterUnlink);
+
+        // ---- Splice before ref (fresh or after unlink) ----
+        $context->builder->positionAtEnd($bbAfterUnlink);
         $prev = JitDomParentChildLinkLayout::loadSibling(
             $context,
             $refChild,
@@ -158,15 +301,13 @@ final class JitDomInsertBeforeLiveSlots
         JitDomParentChildLinkLayout::storeParentNode($context, $newChild, $parentJit);
 
         // Document parents: skip Element firstElementChild / INNER_XML rebuild (#33584).
-        // childNodes lives on DOMDocument layout — still bump in place (#32743 / re-#32611).
         $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, 'dom_ib_parent');
         $bbDocFinish = BasicBlockHelper::append($context, 'dom_ib_doc_finish');
         $bbElFinish = BasicBlockHelper::append($context, 'dom_ib_el_finish');
-        $bbDone = BasicBlockHelper::append($context, 'dom_ib_sync_done');
         $context->builder->branchIf($isDoc, $bbDocFinish, $bbElFinish);
 
         $context->builder->positionAtEnd($bbDocFinish);
-        self::incrementChildNodesLengthInPlace($context, $parent);
+        self::finishChildNodesAfterInsert($context, $parent, $isMember);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbElFinish);
@@ -183,11 +324,130 @@ final class JitDomInsertBeforeLiveSlots
         $context->builder->branch($afterFec);
 
         $context->builder->positionAtEnd($afterFec);
-        self::incrementChildNodesLengthInPlace($context, $parent);
+        self::finishChildNodesAfterInsert($context, $parent, $isMember);
         // saveXML reads PROP_USER_SCRIPT_INNER_XML — rebuild destination + ancestors
         // so createElement trees match Zend after cross-parent insert (#33450).
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /**
+     * Fresh insert bumps held childNodes length; same-parent move only refreshes pins (#34803).
+     */
+    private static function finishChildNodesAfterInsert(
+        Context $context,
+        Value $parent,
+        Value $isMember
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_finish_cn');
+        $bbMove = BasicBlockHelper::append($context, 'dom_ib_finish_move');
+        $bbFresh = BasicBlockHelper::append($context, 'dom_ib_finish_fresh');
+        $bbDone = BasicBlockHelper::append($context, 'dom_ib_finish_done');
+        $context->builder->branchIf($isMember, $bbMove, $bbFresh);
+
+        $context->builder->positionAtEnd($bbMove);
+        self::refreshChildNodesPinsInPlace($context, $parent);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbFresh);
+        self::incrementChildNodesLengthInPlace($context, $parent);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /** Refresh held childNodes pins from parent.first / first→next without changing length. */
+    private static function refreshChildNodesPinsInPlace(Context $context, Value $parent): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_ib_refresh_pins');
+        self::ensureLayout($context);
+        JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
+
+        $objectType = $context->type->object;
+        $listClassId = $objectType->lookup('DOMNodeList');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $nullBox = self::nullValueVar($context);
+
+        $item0 = JitDomParentChildLinkLayout::loadFirstChild($context, $parent, 'dom_ib_rpin');
+        $bbSecondNull = BasicBlockHelper::append($context, 'dom_ib_rpin1_null');
+        $bbSecondRead = BasicBlockHelper::append($context, 'dom_ib_rpin1_read');
+        $bbSecondMerge = BasicBlockHelper::append($context, 'dom_ib_rpin1_merge');
+        $firstNull = $context->builder->icmp(Builder::INT_EQ, $item0, $objPtrTy->constNull());
+        $context->builder->branchIf($firstNull, $bbSecondNull, $bbSecondRead);
+        $context->builder->positionAtEnd($bbSecondNull);
+        $nullPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbSecondMerge);
+        $context->builder->positionAtEnd($bbSecondRead);
+        $loadedSecond = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $item0,
+            VmDom::PROP_NEXT_SIBLING,
+            'dom_ib_rpin1'
+        );
+        $readPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbSecondMerge);
+        $context->builder->positionAtEnd($bbSecondMerge);
+        $item1 = $context->builder->phi($objPtrTy);
+        $item1->addIncoming($objPtrTy->constNull(), $nullPred);
+        $item1->addIncoming($loadedSecond, $readPred);
+
+        $existing = self::loadChildNodesListObject($context, $parent);
+        $missing = $context->builder->icmp(Builder::INT_EQ, $existing, $objPtrTy->constNull());
+        $bbSkip = BasicBlockHelper::append($context, 'dom_ib_rpin_skip');
+        $bbSet = BasicBlockHelper::append($context, 'dom_ib_rpin_set');
+        $bbDone = BasicBlockHelper::append($context, 'dom_ib_rpin_done');
+        $context->builder->branchIf($missing, $bbSkip, $bbSet);
+
+        $context->builder->positionAtEnd($bbSkip);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbSet);
+        $firstNull2 = $context->builder->icmp(Builder::INT_EQ, $item0, $objPtrTy->constNull());
+        $bbClearPins = BasicBlockHelper::append($context, 'dom_ib_rpin_clear');
+        $bbSetPins = BasicBlockHelper::append($context, 'dom_ib_rpin_write');
+        $context->builder->branchIf($firstNull2, $bbClearPins, $bbSetPins);
+
+        $context->builder->positionAtEnd($bbClearPins);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem0'),
+            $nullBox,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem1'),
+            $nullBox,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbSetPins);
+        $i0 = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $item0);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem0'),
+            $i0,
+            JITVariable::TYPE_VALUE
+        );
+        $secondNull = $context->builder->icmp(Builder::INT_EQ, $item1, $objPtrTy->constNull());
+        $bbPin1Null = BasicBlockHelper::append($context, 'dom_ib_rpin_p1_null');
+        $bbPin1Set = BasicBlockHelper::append($context, 'dom_ib_rpin_p1_set');
+        $context->builder->branchIf($secondNull, $bbPin1Null, $bbPin1Set);
+        $context->builder->positionAtEnd($bbPin1Null);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem1'),
+            $nullBox,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbPin1Set);
+        $i1 = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $item1);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($existing, 'DOMNodeList', '__phpcItem1'),
+            $i1,
+            JITVariable::TYPE_VALUE
+        );
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);

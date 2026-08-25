@@ -495,6 +495,26 @@ final class JitDomReplaceChild
                 }
             }
             if (null !== $index) {
+                // Same-parent move: newChild is already among the compile-time children.
+                // Replacing old's slot with <new/> leaves a duplicate of new (#34806).
+                // LiveSlots already rebuilt INNER_XML from the sibling chain.
+                $newAlreadyChild = false;
+                foreach ($nodes as $i => $node) {
+                    if ($i === $index) {
+                        continue;
+                    }
+                    if ('element' === ($node['kind'] ?? '')
+                        && strtolower($newTag) === ($node['data'] ?? null)
+                    ) {
+                        $newAlreadyChild = true;
+                        break;
+                    }
+                }
+                if (null !== ($newChildVar->compileTimeDomChildIndex ?? null)
+                    || $newAlreadyChild
+                ) {
+                    return;
+                }
                 $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, $replacement);
                 if (null !== $inner) {
                     JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);

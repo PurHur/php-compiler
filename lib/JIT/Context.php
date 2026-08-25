@@ -2345,8 +2345,12 @@ class Context {
         // ensureLinked before lookup (peer #34621). LastErrorRuntime restores builder insert
         // mid-{main}. Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
         // Full standalone still ensureStandaloneBodies below (StringTriggerError then LastError).
+        // EnvLocal always-on removed (#34807): getenv()/putenv() lower via StringGetenv /
+        // PutenvJitHelper / GetenvLookupJitHelper (#32665 / #23414 / #29313). No call site looks
+        // up __compiler_env_local_* — NestedJIT of EnvLocalJitHelper during thin init only
+        // risked env_local_lookup.1 (#31894 / #32122). bootstrap-aot still
+        // ensureBootstrapAotStubLinked below. EnvLocalRuntime::ensureLinked stays callable.
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
-        Builtin\EnvLocalRuntime::ensureLinked($this);
         // CLI argv: NestedJIT CliArgvJitHelper during thin init (peer IncludePath #20877 / #20904)
         // — must precede {main} $argc/$argv lowering (compileToFile stubs are too late).
         Builtin\CliArgvRuntime::ensureStandaloneBodies($this);

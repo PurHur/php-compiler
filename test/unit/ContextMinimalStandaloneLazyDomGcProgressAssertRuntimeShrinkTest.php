@@ -38,11 +38,10 @@ final class ContextMinimalStandaloneLazyDomGcProgressAssertRuntimeShrinkTest ext
             );
         }
 
-        // Essentials for thin argv / getenv surface stay (#34695 dropped ObOutput;
+        // Essentials for thin argv / is_superglobal stay (#34807 dropped EnvLocal;
         // #34641 dropped StringTriggerError).
         foreach ([
             'CliArgvRuntime::ensureStandaloneBodies($this)',
-            'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34605)");
