@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\VM\CycleCollector;
@@ -200,6 +201,9 @@ final class GcCollectCyclesRuntime
             return;
         }
 
+        // Mid-{main} ensureLinked (#34605): bridges clearInsertionPosition — restore caller insert
+        // so JitGcCollectCycles::invoke does not mint parentless calls (Module.php:180 / #32122).
+        $restoreBlock = self::captureInsertBlock($context);
         ++self::$implementDepth;
         try {
             self::$blockSuffix = 0;
@@ -230,7 +234,22 @@ final class GcCollectCyclesRuntime
             self::registerLinkedRuntime($context);
         } finally {
             --self::$implementDepth;
+            self::restoreInsertBlock($context, $restoreBlock);
         }
+    }
+
+    private static function captureInsertBlock(Context $context): ?\PHPLLVM\BasicBlock
+    {
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?\PHPLLVM\BasicBlock $block): void
+    {
+        BasicBlockHelper::restoreInsertBlock($context, $block);
     }
 
     /**

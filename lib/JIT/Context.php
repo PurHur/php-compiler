@@ -2268,7 +2268,8 @@ class Context {
             Builtin\StreamBucket::ensureLinked($this);
         }
         Builtin\StringTriggerError::ensureStandaloneBodies($this);
-        Builtin\AssertFail::ensureStandaloneBodies($this);
+        // AssertFail always-on removed (#34605): JitAssert already ensureLinked before lookup
+        // (peer #34578). Full standalone still ensureStandaloneBodies below.
         Builtin\JitReturnPending::ensureStandaloneBodies($this);
         Builtin\ObOutputRuntime::ensureLinked($this);
         // StringRandomBytes / Utf8Latin1 / RewriteVars / Define / StrContains / StatPath /
@@ -2278,19 +2279,20 @@ class Context {
         // lookup (peer #34566 SessionStorageGlobals). Thin AOT hello-world must not NestedJIT
         // those ABIs. Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
         // Type::register __compiler_ini_* shells are gone (#34474); do not re-add IniRuntime here.
-        Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
-        Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
+        // ProgressNote / GcCollectCycles always-on removed (#34605): tryResolveProgressStaticCall /
+        // JitGcCollectCycles / Object_ / GcStatusRuntime already ensureLinked before lookup
+        // (peer #34578). Full standalone still ensureStandaloneBodies below.
         Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
         Builtin\EnvLocalRuntime::ensureLinked($this);
         // CLI argv: NestedJIT CliArgvJitHelper during thin init (peer IncludePath #20877 / #20904)
         // — must precede {main} $argc/$argv lowering (compileToFile stubs are too late).
         Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
-        if (DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
-            Builtin\DomStandaloneAotInitRuntime::ensureLinked($this);
-        } elseif (CompilerVersion::supportsDomTokenList()) {
-            Builtin\DomInstanceMethodRuntime::ensureLinked($this);
-        }
+        // DomStandaloneAotInit / DomInstanceMethod always-on removed (#34605):
+        // VmActiveContextInitLlvm::emitPendingBeforeSeal ensureLinked DomStandaloneAotInit when
+        // thin init is requested; DomInstanceMethodRuntime::invoke ensureBridge per arity
+        // (peer #34578). Leftover Context NestedJIT vs Runtime ABI drift mints
+        // dom_standalone_aot_init.1 / dom_instance_method_*.1 (#31894 / #32122).
     }
 
     /** bootstrap-aot-link fixtures: minimal init + CLI argv / superglobal refresh for standalone main (#14459). */
