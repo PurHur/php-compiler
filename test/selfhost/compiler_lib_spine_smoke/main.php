@@ -1471,6 +1471,7 @@ require_once __DIR__.'/../../../ext/openssl/JitOpensslSign.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslSignKernel.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslPkeyKernel.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslPkeyCryptKernel.php';
+require_once __DIR__.'/../../../ext/openssl/JitOpensslPkeyExportKernel.php';
 require_once __DIR__.'/../../../ext/openssl/OpensslPkeyNewJitSupport.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslPkeyNew.php';
 require_once __DIR__.'/../../../ext/openssl/JitOpensslPkeyGetDetails.php';

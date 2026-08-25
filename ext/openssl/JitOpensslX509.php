@@ -28,8 +28,8 @@ use PHPLLVM\Value;
  * openssl_csr_get_subject() (#32692 leftover of #6421),
  * openssl_csr_export() (#32697 leftover of #6421),
  * openssl_csr_export_to_file() (#32697 leftover of #6421),
- * openssl_pkey_export() (#32705 leftover of #6295),
- * openssl_pkey_export_to_file() (#32705 leftover of #20287),
+ * openssl_pkey_export() (#32705 leftover of #6295; runtime key #34755),
+ * openssl_pkey_export_to_file() (#32705 leftover of #20287; runtime key #34755),
  * openssl_public_encrypt() (#32713 leftover of #6666; runtime key #34722),
  * openssl_private_encrypt() (#32757 leftover of #6666; runtime key #34722),
  * openssl_private_decrypt() (#32759 leftover of #6666; runtime key #34722),
@@ -304,7 +304,7 @@ final class JitOpensslX509
     }
 
     /**
-     * openssl_pkey_export() — bake {@see VmOpensslPkeyNative::exportPrivateKeyPem} into &$output.
+     * openssl_pkey_export() — bake when key+passphrase are literals; else runtime leaf (#34755).
      *
      * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkey_export) / PEM_write_bio_PrivateKey
      * $options is type-checked only (VM {@see openssl_pkey_export} ignores cipher config).
@@ -316,20 +316,6 @@ final class JitOpensslX509
         ?JITVariable $passphrase = null,
         ?JITVariable $options = null
     ): Value {
-        $pem = JitStringArg::compileTimeLiteral($key);
-        if (null === $pem) {
-            throw new \LogicException(
-                'openssl_pkey_export() key must be a compile-time string literal '
-                .'for JIT/AOT in this compiler build (issue #32705)'
-            );
-        }
-        $pass = self::compileTimeNullableString($passphrase);
-        if (null === $pass) {
-            throw new \LogicException(
-                'openssl_pkey_export() passphrase must be a compile-time string or null '
-                .'for JIT/AOT in this compiler build (issue #32705)'
-            );
-        }
         if (!self::compileTimeOptionsOk($options)) {
             throw new \LogicException(
                 'openssl_pkey_export() options must be a compile-time ?array '
@@ -337,30 +323,28 @@ final class JitOpensslX509
             );
         }
 
-        if (!VmOpensslPkeyNative::available()) {
-            return self::boxedFalse($context);
+        $baked = self::tryBakePkeyExport($context, $key, $passphrase);
+        if (null !== $baked) {
+            if (false === $baked) {
+                return self::boxedFalse($context);
+            }
+            $outPtr = JitValueBox::valuePtrFromVariable($context, $output);
+            $str = $context->builder->load($context->constantStringFromString($baked));
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $outPtr,
+                $str
+            );
+            JitValueBox::publishAfterWrite($context, $outPtr);
+
+            return self::boxedBool($context, true);
         }
 
-        $exported = VmOpensslPkeyNative::exportPrivateKeyPem($pem, $pass[0]);
-        if (false === $exported) {
-            return self::boxedFalse($context);
-        }
-
-        $outPtr = JitValueBox::valuePtrFromVariable($context, $output);
-        $str = $context->builder->load($context->constantStringFromString($exported));
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $outPtr,
-            $str
-        );
-        JitValueBox::publishAfterWrite($context, $outPtr);
-
-        return self::boxedBool($context, true);
+        return self::pkeyExportRuntime($context, $key, $output, $passphrase, 'openssl_pkey_export');
     }
 
     /**
-     * openssl_pkey_export_to_file() — bake {@see VmOpensslPkeyNative::exportPrivateKeyPem}, write via
-     * {@see \PHPCompiler\JIT\Builtin\StringFilePutContents} / __compiler_file_put_contents.
+     * openssl_pkey_export_to_file() — bake when literals; else runtime export + file write (#34755).
      *
      * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkey_export_to_file)
      */
@@ -371,27 +355,6 @@ final class JitOpensslX509
         ?JITVariable $passphrase = null,
         ?JITVariable $options = null
     ): Value {
-        $pem = JitStringArg::compileTimeLiteral($key);
-        if (null === $pem) {
-            throw new \LogicException(
-                'openssl_pkey_export_to_file() key must be a compile-time string literal '
-                .'for JIT/AOT in this compiler build (issue #32705)'
-            );
-        }
-        $path = JitStringArg::compileTimeLiteral($outputFilename);
-        if (null === $path) {
-            throw new \LogicException(
-                'openssl_pkey_export_to_file() output_filename must be a compile-time string literal '
-                .'for JIT/AOT in this compiler build (issue #32705)'
-            );
-        }
-        $pass = self::compileTimeNullableString($passphrase);
-        if (null === $pass) {
-            throw new \LogicException(
-                'openssl_pkey_export_to_file() passphrase must be a compile-time string or null '
-                .'for JIT/AOT in this compiler build (issue #32705)'
-            );
-        }
         if (!self::compileTimeOptionsOk($options)) {
             throw new \LogicException(
                 'openssl_pkey_export_to_file() options must be a compile-time ?array '
@@ -399,20 +362,166 @@ final class JitOpensslX509
             );
         }
 
+        $pathLit = JitStringArg::compileTimeLiteral($outputFilename);
+        $baked = null !== $pathLit ? self::tryBakePkeyExport($context, $key, $passphrase) : null;
+        if (null !== $baked && null !== $pathLit) {
+            if (false === $baked) {
+                return self::boxedFalse($context);
+            }
+
+            $pathStr = $context->builder->load($context->constantStringFromString($pathLit));
+            $dataStr = $context->builder->load($context->constantStringFromString($baked));
+            $dataOwned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $dataStr
+            );
+            $written = $context->builder->call(
+                $context->lookupFunction('__compiler_file_put_contents'),
+                $pathStr,
+                $dataOwned,
+                $context->getTypeFromString('int64')->constInt(0, false)
+            );
+
+            return self::boxedBoolFromI64WriteResult($context, $written, 'ossl_pkey_export_file');
+        }
+
+        return self::pkeyExportToFileRuntime($context, $key, $outputFilename, $passphrase);
+    }
+
+    /**
+     * Compile-time bake when key PEM + passphrase are literals; otherwise null (#34755).
+     *
+     * @return string|false|null exported PEM, false on native failure, null when not bakeable
+     */
+    private static function tryBakePkeyExport(
+        Context $context,
+        JITVariable $key,
+        ?JITVariable $passphrase
+    ): string|false|null {
+        $pem = JitStringArg::compileTimeLiteral($key);
+        if (null === $pem) {
+            return null;
+        }
+        $pass = self::compileTimeNullableString($passphrase);
+        if (null === $pass) {
+            return null;
+        }
         if (!VmOpensslPkeyNative::available()) {
-            return self::boxedFalse($context);
+            return false;
         }
 
-        $exported = VmOpensslPkeyNative::exportPrivateKeyPem($pem, $pass[0]);
-        if (false === $exported) {
-            return self::boxedFalse($context);
-        }
+        return VmOpensslPkeyNative::exportPrivateKeyPem($pem, $pass[0]);
+    }
 
-        $pathStr = $context->builder->load($context->constantStringFromString($path));
-        $dataStr = $context->builder->load($context->constantStringFromString($exported));
+    /**
+     * Runtime openssl_pkey_export via {@see JitOpensslPkeyExportKernel} (#34755).
+     */
+    private static function pkeyExportRuntime(
+        Context $context,
+        JITVariable $key,
+        JITVariable $output,
+        ?JITVariable $passphrase,
+        string $fnName
+    ): Value {
+        JitOpensslPkeyExportKernel::ensureExportLeaf($context);
+
+        $pemStr = JitOpensslPkeyGetPublic::resolvePemString($context, $key);
+        $passStr = null === $passphrase
+            ? $context->getTypeFromString('__string__*')->constNull()
+            : JitStringBuiltinArg::lowerNullableString($context, $passphrase, $fnName, 2, 'passphrase');
+
+        $raw = $context->builder->call(
+            $context->lookupFunction(JitOpensslPkeyExportKernel::EVP_PKEY_EXPORT),
+            $pemStr,
+            $passStr
+        );
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $raw, $strPtr->constNull());
+
+        $id = (string) (++self::$blockSerial);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $failBlock = BasicBlockHelper::append($context, 'ossl_pkey_export_rt_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'ossl_pkey_export_rt_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_pkey_export_rt_done_'.$id);
+        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $output);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $outPtr,
+            $raw
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
+    /**
+     * Runtime openssl_pkey_export_to_file (#34755).
+     */
+    private static function pkeyExportToFileRuntime(
+        Context $context,
+        JITVariable $key,
+        JITVariable $outputFilename,
+        ?JITVariable $passphrase
+    ): Value {
+        JitOpensslPkeyExportKernel::ensureExportLeaf($context);
+        StringFilePutContents::ensureLinked($context);
+
+        $pemStr = JitOpensslPkeyGetPublic::resolvePemString($context, $key);
+        $passStr = null === $passphrase
+            ? $context->getTypeFromString('__string__*')->constNull()
+            : JitStringBuiltinArg::lowerNullableString(
+                $context,
+                $passphrase,
+                'openssl_pkey_export_to_file',
+                2,
+                'passphrase'
+            );
+        $pathStr = JitStringBuiltinArg::lowerPath(
+            $context,
+            $outputFilename,
+            'openssl_pkey_export_to_file',
+            1,
+            'output_filename'
+        );
+
+        $raw = $context->builder->call(
+            $context->lookupFunction(JitOpensslPkeyExportKernel::EVP_PKEY_EXPORT),
+            $pemStr,
+            $passStr
+        );
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $raw, $strPtr->constNull());
+
+        $id = (string) (++self::$blockSerial);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $failBlock = BasicBlockHelper::append($context, 'ossl_pkey_export_file_rt_fail_'.$id);
+        $writeBlock = BasicBlockHelper::append($context, 'ossl_pkey_export_file_rt_write_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_pkey_export_file_rt_done_'.$id);
+        $context->builder->branchIf($isNull, $failBlock, $writeBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($writeBlock);
         $dataOwned = $context->builder->call(
             $context->lookupFunction('__string__separate'),
-            $dataStr
+            $raw
         );
         $written = $context->builder->call(
             $context->lookupFunction('__compiler_file_put_contents'),
@@ -422,7 +531,32 @@ final class JitOpensslX509
         );
         $i64 = $context->getTypeFromString('int64');
         $failed = $context->builder->icmp(
-            \PHPLLVM\Builder::INT_SLT,
+            Builder::INT_SLT,
+            $written,
+            $i64->constInt(0, false)
+        );
+        $writeFail = BasicBlockHelper::append($context, 'ossl_pkey_export_file_rt_wfail_'.$id);
+        $writeOk = BasicBlockHelper::append($context, 'ossl_pkey_export_file_rt_wok_'.$id);
+        $context->builder->branchIf($failed, $writeFail, $writeOk);
+
+        $context->builder->positionAtEnd($writeFail);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($writeOk);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
+    private static function boxedBoolFromI64WriteResult(Context $context, Value $written, string $prefix): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $failed = $context->builder->icmp(
+            Builder::INT_SLT,
             $written,
             $i64->constInt(0, false)
         );
@@ -430,9 +564,9 @@ final class JitOpensslX509
         $id = (string) (++self::$blockSerial);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
-        $failBlock = BasicBlockHelper::append($context, 'ossl_pkey_export_file_fail_'.$id);
-        $okBlock = BasicBlockHelper::append($context, 'ossl_pkey_export_file_ok_'.$id);
-        $doneBlock = BasicBlockHelper::append($context, 'ossl_pkey_export_file_done_'.$id);
+        $failBlock = BasicBlockHelper::append($context, $prefix.'_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, $prefix.'_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, $prefix.'_done_'.$id);
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
