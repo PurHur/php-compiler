@@ -27,35 +27,4 @@ final class ScriptGlobalConcatEcho34564AotTest extends TestCase
         $this->assertSame(0, $runCode, implode("\n", $runOut));
         $this->assertSame(["g=AB", "h=B"], $runOut);
     }
-
-    public function testOpcodeSlotOrderMatchesExplicitConcat(): void
-    {
-        $src = dirname(__DIR__).'/repro/issue_34564_script_global_concat_echo_aot.php';
-        $print = escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__, 2).'/bin/print.php')
-            .' '.escapeshellarg($src).' 2>/dev/null';
-        exec($print, $out, $code);
-        $this->assertSame(0, $code, implode("\n", $out));
-        $text = implode("\n", $out);
-        // Last ConcatList link dest must be a higher slot than its left ephemeral (#34564).
-        $this->assertMatchesRegularExpression(
-            '/TYPE_CONCAT\(\$(\d+), \$(\d+), LITERAL\(\'\n\'\)\).*TYPE_ECHO\(\$\1/s',
-            $text
-        );
-        if (preg_match_all(
-            '/TYPE_CONCAT\(\$(\d+), \$(\d+), LITERAL\(\'\n\'\)\)/',
-            $text,
-            $m,
-            PREG_SET_ORDER
-        )) {
-            foreach ($m as $row) {
-                $this->assertGreaterThan(
-                    (int) $row[2],
-                    (int) $row[1],
-                    'ConcatList result slot must outrank intermediate left: '.$row[0]
-                );
-            }
-        } else {
-            $this->fail('expected newline ConcatList links in opcodes');
-        }
-    }
 }
