@@ -160,6 +160,7 @@ final class unserialize extends Internal
             return $periodObj;
         }
         // DateTime / DateTimeImmutable Zend wire — allocate + stamp __dt_* (#34576 / re-#10710).
+        // Also publish lastDateTimeUnserializeInstant for format()/getOffset() (#34614 / #33939).
         $dateObj = self::tryMaterializeDateTimeWire($context, $literal);
         if (null !== $dateObj) {
             return $dateObj;
@@ -454,6 +455,9 @@ final class unserialize extends Internal
         $context->lastDatePeriodUnserializeTimestamps = $timestamps;
         $context->lastDatePeriodUnserializeTimezone = $startTzName;
         $context->lastUnserializeObjectClassUserType = 'DatePeriod';
+        // Nested start/end tryMaterializeDateTimeWire published DateTime stamps — do not
+        // let syncDateTimeUnserializeMetaToResult stamp them onto the DatePeriod local (#34614).
+        $context->lastDateTimeUnserializeInstant = null;
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -537,6 +541,14 @@ final class unserialize extends Internal
             $tzVar,
             JITVariable::TYPE_STRING
         );
+        // Publish construct-style stamps so format('c')/getOffset() do not fall into the
+        // UTC civil bake / offset=0 runtime path (#34614 / peer #33939).
+        $context->lastDateTimeUnserializeInstant = [
+            'timestamp' => (int) $parsed['timestamp'],
+            'microsecond' => (int) ($parsed['microsecond'] ?? 0),
+            'timezone' => $tzName,
+            'className' => $className,
+        ];
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
