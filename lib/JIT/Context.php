@@ -2286,7 +2286,10 @@ class Context {
     /** examples/000–009 user-script AOT: thin LLVM bridges only — no nested-JIT stdlib during init (#13571). */
     private function ensureMinimalUserStandaloneBodies(): void
     {
-        Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
+        // StringHtmlspecialchars always-on removed (#34642): htmlspecialchars.php already
+        // ensureLinked before lookup (peer #34612 HtmlEntities/Decode). Leftover Context
+        // NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122). Thin hello-world must
+        // not NestedJIT htmlspecialchars ABI during init.
         // HtmlEntities / HtmlspecialcharsDecode always-on removed (#34612): htmlentities.php /
         // JitHtmlspecialcharsDecode already ensureLinked before lookup (peer #34605). Leftover
         // Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).

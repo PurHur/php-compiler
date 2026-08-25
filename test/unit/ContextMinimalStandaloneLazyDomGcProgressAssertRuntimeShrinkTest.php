@@ -42,7 +42,6 @@ final class ContextMinimalStandaloneLazyDomGcProgressAssertRuntimeShrinkTest ext
         // HtmlEntities / Decode / ErrorHandler / ExceptionHandler dropped in #34612 (peer this test).
         // LastError dropped in #34631 (peer this test).
         foreach ([
-            'StringHtmlspecialchars::ensureStandaloneBodies($this)',
             'ObOutputRuntime::ensureLinked($this)',
             'StringTriggerError::ensureStandaloneBodies($this)',
             'CliArgvRuntime::ensureStandaloneBodies($this)',

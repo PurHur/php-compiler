@@ -51,7 +51,6 @@ final class ContextMinimalStandaloneLazyStdlibRuntimeShrinkTest extends TestCase
 
         // Essentials for thin echo / error / argv / getenv surface stay.
         foreach ([
-            'StringHtmlspecialchars::ensureStandaloneBodies($this)',
             'ObOutputRuntime::ensureLinked($this)',
             'StringTriggerError::ensureStandaloneBodies($this)',
             'CliArgvRuntime::ensureStandaloneBodies($this)',

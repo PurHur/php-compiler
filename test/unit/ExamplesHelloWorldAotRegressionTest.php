@@ -24,9 +24,20 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
         $this->assertStringContainsString('ensureUserScriptRefreshPrerequisites', $refresh);
         $this->assertStringContainsString('ensureUserScriptRefreshEmit', $refresh);
         $this->assertStringContainsString('JitSuperglobalRefreshKernel::implement', $refresh);
-        $this->assertStringContainsString('StringHtmlspecialchars::ensureStandaloneBodies', $source);
-        // HtmlspecialcharsDecode / HtmlEntities / ErrorHandler / ExceptionHandler lazy (#34612).
+        // StringHtmlspecialchars lazy (#34642); HtmlspecialcharsDecode / HtmlEntities /
+        // ErrorHandler / ExceptionHandler lazy (#34612).
+        $this->assertStringContainsString('#34642', $source);
         $this->assertStringContainsString('#34612', $source);
+        $minimalPos = strpos($source, 'private function ensureMinimalUserStandaloneBodies');
+        $this->assertNotFalse($minimalPos);
+        $minimalEnd = strpos($source, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
+        $this->assertNotFalse($minimalEnd);
+        $minimalBody = substr($source, $minimalPos, $minimalEnd - $minimalPos);
+        $this->assertStringNotContainsString(
+            'StringHtmlspecialchars::ensureStandaloneBodies',
+            $minimalBody,
+            'thin hello-world must not eagerly NestedJIT htmlspecialchars (#34642)'
+        );
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
         $this->assertStringNotContainsString('SuperglobalRefreshUserScriptLlvm', $refresh);
         $userScript = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/JitSuperglobalRefreshKernel.php');
