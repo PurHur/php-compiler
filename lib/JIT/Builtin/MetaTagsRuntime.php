@@ -23,7 +23,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * via {@see JitNestedHelperCoerce::i64ToTypedPtr}.
  * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
  * (thin AOT: parentless call / module verify — peer GetHeadersRuntime #27317 / #27088).
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GcCollectCyclesCollectRuntime #26532).
+ * Helper compile: {@see JitVmHelperLink::ensureCompiledBundle} with FileGetContentsJitHelper
+ * for data:// NestedJIT decode (peer StringReadfile #34731 / #34787).
  * SSOT {@see \PHPCompiler\ext\standard\VmMetaTags}.
  * php-src: ext/standard/php_meta_tags.c — PHP_FUNCTION(get_meta_tags)
  */
@@ -32,6 +33,8 @@ final class MetaTagsRuntime
     private const ABI_NAME = '__compiler_get_meta_tags';
 
     private const HELPER_PATH = '/ext/standard/MetaTagsJitHelper.php';
+
+    private const FGC_HELPER_PATH = '/ext/standard/FileGetContentsJitHelper.php';
 
     private const GET_META_TAGS_HELPER = 'PHPCompiler\\ext\\standard\\MetaTagsJitHelper::getMetaTags';
 
@@ -118,9 +121,14 @@ final class MetaTagsRuntime
     private static function ensureJitHelperCompiled(Context $context): void
     {
         self::ensureNativeHtInternalProxies($context);
-        JitVmHelperLink::ensureCompiled(
+        // data:// via FileGetContentsJitHelper::readPathArgv NestedJIT (#34787 / peer #34731).
+        StringBase64Decode::ensureLinked($context);
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
+            [
+                self::FGC_HELPER_PATH,
+                self::HELPER_PATH,
+            ],
             self::COMPILED_HELPERS,
             '#26568'
         );

@@ -78,6 +78,9 @@ final class HelperRuntimeCache
         // NestedJIT of the helper (+ VmDataUri bundle) matches Zend/VM.
         'phpcompiler\\ext\\standard\\filegetcontentsjithelper::readpathargv' => true,
         'phpcompiler\\ext\\standard\\readfilejithelper::readfile' => true,
+        // #34787 — prelinked MetaTagsJitHelper unit.o skips data:// (libc @file_get_contents);
+        // NestedJIT of getMetaTags + FileGetContentsJitHelper::readPathArgv matches Zend/VM.
+        'phpcompiler\\ext\\standard\\metatagsjithelper::getmetatags' => true,
         // #25345 — helper-runtime unit.o returns "" for method-return / dynamic string args;
         // NestedJIT recursive escapeFrom works (MiniWebApp $appName).
         'phpcompiler\\ext\\standard\\htmlspecialcharsjithelper::htmlspecialchars' => true,
