@@ -30,10 +30,8 @@ final class ContextMinimalStandaloneLazyHtmlspecialcharsRuntimeShrinkTest extend
             'ensureMinimalUserStandaloneBodies must not eagerly StringHtmlspecialchars (#34642)'
         );
 
-        // Essentials for thin echo / error / argv / getenv surface stay.
+        // Essentials for thin argv / getenv / bridges stay (#34695 dropped ObOutput).
         foreach ([
-            'ObOutputRuntime::ensureLinked($this)',
-            'StringTriggerError::ensureStandaloneBodies($this)',
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
@@ -42,6 +40,16 @@ final class ContextMinimalStandaloneLazyHtmlspecialcharsRuntimeShrinkTest extend
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34642)");
         }
+        $this->assertStringNotContainsString(
+            'ObOutputRuntime::ensureLinked($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ObOutputRuntime (#34695)'
+        );
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly StringTriggerError (#34641)'
+        );
     }
 
     public function testCallSiteEnsuresBeforeLookup(): void

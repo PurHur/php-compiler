@@ -30,11 +30,10 @@ final class ContextMinimalStandaloneLazyReturnPendingRuntimeShrinkTest extends T
             'ensureMinimalUserStandaloneBodies must not eagerly JitReturnPending (#34621)'
         );
 
-        // Essentials for thin echo / error / argv / getenv surface stay.
+        // Essentials for thin argv / getenv / bridges stay (#34695 dropped ObOutput;
+        // #34641 dropped StringTriggerError).
         // LastError dropped in #34631 (peer this test).
         foreach ([
-            'ObOutputRuntime::ensureLinked($this)',
-            'StringTriggerError::ensureStandaloneBodies($this)',
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
@@ -43,6 +42,16 @@ final class ContextMinimalStandaloneLazyReturnPendingRuntimeShrinkTest extends T
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34621)");
         }
+        $this->assertStringNotContainsString(
+            'ObOutputRuntime::ensureLinked($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ObOutputRuntime (#34695)'
+        );
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly StringTriggerError (#34641)'
+        );
         $this->assertStringNotContainsString(
             'LastErrorRuntime::ensureStandaloneBodies($this)',
             $minimalBody,

@@ -30,10 +30,9 @@ final class ContextMinimalStandaloneLazyStringTriggerErrorShrinkTest extends Tes
             'ensureMinimalUserStandaloneBodies must not eagerly StringTriggerError (#34641)'
         );
 
-        // Essentials for thin echo / argv / getenv / bridges stay.
+        // Essentials for thin argv / getenv / bridges stay (#34695 dropped ObOutput;
+        // #34642 dropped StringHtmlspecialchars).
         foreach ([
-            'StringHtmlspecialchars::ensureStandaloneBodies($this)',
-            'ObOutputRuntime::ensureLinked($this)',
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
@@ -42,6 +41,16 @@ final class ContextMinimalStandaloneLazyStringTriggerErrorShrinkTest extends Tes
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34641)");
         }
+        $this->assertStringNotContainsString(
+            'ObOutputRuntime::ensureLinked($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ObOutputRuntime (#34695)'
+        );
+        $this->assertStringNotContainsString(
+            'StringHtmlspecialchars::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly StringHtmlspecialchars (#34642)'
+        );
 
         // Full standalone still links StringTriggerError before AssertFail / LastError.
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');

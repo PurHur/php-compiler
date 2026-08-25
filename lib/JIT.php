@@ -11275,6 +11275,8 @@ class JIT {
                             );
                             break;
                         case Variable::TYPE_STRING:
+                            // Lazy ob_* — bare __phpc_ob_echo_* lookups below (#34695).
+                            JIT\Builtin\ObOutputRuntime::ensureLinked($this->context);
                             if ($arg->kind === Variable::KIND_VALUE
                                 && 'i8*' === $this->context->getStringFromType($arg->value->typeOf())
                             ) {
@@ -11329,6 +11331,7 @@ class JIT {
                             );
                             break;
                         case Variable::TYPE_NATIVE_BOOL:
+                            JIT\Builtin\ObOutputRuntime::ensureLinked($this->context);
                             $boolVal = $this->context->helper->loadValue($arg);
                             $charPtr = $this->context->getTypeFromString('char*');
                             $trueBlock = JIT\BasicBlockHelper::append($this->context, 'echo_bool_true');

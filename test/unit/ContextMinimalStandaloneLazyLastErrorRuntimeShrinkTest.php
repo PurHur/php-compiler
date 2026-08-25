@@ -30,9 +30,8 @@ final class ContextMinimalStandaloneLazyLastErrorRuntimeShrinkTest extends TestC
             'ensureMinimalUserStandaloneBodies must not eagerly LastErrorRuntime (#34631)'
         );
 
-        // Essentials for thin echo / error / argv / getenv surface stay.
+        // Essentials for thin argv / getenv / bridges stay (#34695 dropped ObOutput).
         foreach ([
-            'ObOutputRuntime::ensureLinked($this)',
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
@@ -41,6 +40,11 @@ final class ContextMinimalStandaloneLazyLastErrorRuntimeShrinkTest extends TestC
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34631)");
         }
+        $this->assertStringNotContainsString(
+            'ObOutputRuntime::ensureLinked($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ObOutputRuntime (#34695)'
+        );
 
         $this->assertStringNotContainsString(
             'StringTriggerError::ensureStandaloneBodies($this)',
