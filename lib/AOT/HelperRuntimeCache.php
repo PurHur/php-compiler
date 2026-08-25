@@ -235,6 +235,9 @@ final class HelperRuntimeCache
         // re-#26890 — prelinked Base64JitHelper::decodeArgv unit.o SIGSEGVs under thin AOT
         // (encodeArgv prelinked path stays green); NestedJIT decodeArgv into user module.
         'phpcompiler\\ext\\standard\\base64jithelper::decodeargv' => true,
+        // #34800 — prelinked encodeArgv mis-reads `$data[$i+1]` / `<<` on binary; NestedJIT
+        // `$i++` + intdiv encode matches Zend (peer MbMimeheaderJitHelper::b64Encode).
+        'phpcompiler\\ext\\standard\\base64jithelper::encodeargv' => true,
         // re-#26868 — prelinked StrRot13JitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
         // rot13Argv into user module (peer #26890 / #30812).
         'phpcompiler\\ext\\standard\\strrot13jithelper::rot13argv' => true,
