@@ -66,6 +66,8 @@ final class StringFileGetContents
         } catch (\Throwable) {
         }
 
+        // data:// NestedJIT pulls base64_decode from decodeDataUri (#34731).
+        StringBase64Decode::ensureLinked($context);
         JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#29510');
 
         $strPtr = $context->getTypeFromString('__string__*');
