@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -13,8 +14,11 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\NativeDateInvalidTimeZoneException;
+use PHPCompiler\VM\NativeDateMalformedStringException;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -145,6 +149,11 @@ final class unserialize extends Internal
         if (null === $literal) {
             return null;
         }
+        // DateTime / DateTimeImmutable Zend wire — allocate + stamp __dt_* (#34576 / re-#10710).
+        $dateObj = self::tryMaterializeDateTimeWire($context, $literal);
+        if (null !== $dateObj) {
+            return $dateObj;
+        }
         // Object/enum/class wires need runtime materialize (ArrayObject bag #33636) —
         // decodePayload returns ObjectEntry which cannot fold into LLVM scalars.
         if (\preg_match('/(?:^|[{;])[OCE]:/', $literal)) {
@@ -179,6 +188,89 @@ final class unserialize extends Internal
 
         // Non-scalar fold result — defer to runtime (do not throw; peer O: path #33636).
         return null;
+    }
+
+    /**
+     * Fold Zend DateTime / DateTimeImmutable serialize wire into a live object (#34576).
+     *
+     * php-src: ext/date/php_date.c — php_date_unserialize / DateTime::__unserialize
+     */
+    private static function tryMaterializeDateTimeWire(Context $context, string $literal): ?Value
+    {
+        if (!\preg_match(
+            '/^O:\d+:"(DateTime(?:Immutable)?)":3:\{(.*)\}$/s',
+            $literal,
+            $m
+        )) {
+            return null;
+        }
+        $className = $m[1];
+        $bag = $m[2];
+        if (!\preg_match(
+            '/s:4:"date";s:\d+:"([^"]*)";s:13:"timezone_type";i:(\d+);s:8:"timezone";s:\d+:"([^"]*)";/',
+            $bag,
+            $p
+        )) {
+            return null;
+        }
+        $dateWire = $p[1];
+        $timezone = $p[3];
+        try {
+            VmDateTimeNative::validateTimezoneId($timezone);
+            $parsed = VmDateTimeNative::parseDateTime($dateWire, $timezone);
+        } catch (NativeDateInvalidTimeZoneException|NativeDateMalformedStringException) {
+            return null;
+        }
+        $tzName = \is_string($parsed['timezone'] ?? null) ? $parsed['timezone'] : $timezone;
+        $objectType = $context->type->object;
+        $classId = $objectType->classIdByName($className)
+            ?? $objectType->classIdForLowerName(strtolower($className));
+        if (null === $classId) {
+            return null;
+        }
+        $obj = $objectType->allocate($classId);
+        ReflectionSetup::markConstructed($context, $obj);
+        $i64 = $context->getTypeFromString('int64');
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, $className, DateTimeSupport::TS_PROPERTY),
+            new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $i64->constInt((int) $parsed['timestamp'], false)
+            ),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, $className, DateTimeSupport::MICROSECOND_PROPERTY),
+            new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $i64->constInt((int) ($parsed['microsecond'] ?? 0), false)
+            ),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $tzVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $context->builder->load($context->constantStringFromString($tzName))
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, $className, DateTimeSupport::TZ_PROPERTY),
+            $tzVar,
+            JITVariable::TYPE_STRING
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $obj
+        );
+
+        return $ptr;
     }
 
     /**

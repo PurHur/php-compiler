@@ -120,6 +120,9 @@ class Context {
     /** Compile-time json_encode() result for assignCallResultOperand (#24137). */
     public ?string $jitJsonEncodeFoldedString = null;
 
+    /** Compile-time serialize() result for assignCallResultOperand (#34576). */
+    public ?string $jitSerializeFoldedString = null;
+
     /** Operand for iterator_to_array() iterator arg — CFG userType for HT-backed SPL (#26825). */
     public ?Operand $jitIteratorToArrayIteratorOperand = null;
 

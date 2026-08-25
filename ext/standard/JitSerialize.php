@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ArrayObjectJitHelper;
+use PHPCompiler\VM\DateTimeSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -23,6 +24,10 @@ use PHPLLVM\Value;
  *
  * Boxed `__value__*` arrays must use the hashtable ABI; objects use class name +
  * get_object_vars (type-tag, not null HT pointer — peer JitJsonEncode #27020).
+ *
+ * DateTime / DateTimeImmutable: Zend `date`/`timezone_type`/`timezone` wire via compile-time
+ * stamps (peer {@see JitJsonEncode::tryFoldDateTimeFamily} #33752) — thin AOT
+ * get_object_vars strips `__dt_*` (#22445) → empty `O:…:0:{}` (#34576 / re-#10710).
  */
 final class JitSerialize
 {
@@ -129,12 +134,121 @@ final class JitSerialize
 
     private static function encodeObjectOperand(Context $context, JITVariable $arg): Value
     {
+        $dateResult = self::tryFoldDateTimeFamily($context, $arg);
+        if (null !== $dateResult) {
+            return $dateResult;
+        }
         $splResult = self::tryEncodeSplHtObject($context, $arg);
         if (null !== $splResult) {
             return $splResult;
         }
 
         return self::encodePublicObjectProps($context, $arg);
+    }
+
+    /**
+     * Fold DateTime / DateTimeImmutable to Zend serialize wire (#34576 / re-#10710).
+     *
+     * Thin AOT `get_object_vars` strips `__dt_*` storage (#22445) → `O:…:0:{}`.
+     * Reuse construct/modify compile-time stamps ({@see JitDateTimeConstruct} /
+     * {@see JitDateMutation::publishMutableDateTimeInstant}) — same as
+     * {@see JitJsonEncode::tryFoldDateTimeFamily} (#33752).
+     *
+     * php-src: ext/date/php_date.c — php_date_serialize
+     */
+    private static function tryFoldDateTimeFamily(Context $context, JITVariable $arg): ?Value
+    {
+        if (null === $arg->compileTimeDateTimeTimestamp) {
+            return null;
+        }
+        $objectType = $context->type->object;
+        $dtId = $objectType->classIdByName('DateTime')
+            ?? $objectType->classIdForLowerName('datetime');
+        $dtiId = $objectType->classIdByName('DateTimeImmutable')
+            ?? $objectType->classIdForLowerName('datetimeimmutable');
+        if (null === $dtId && null === $dtiId) {
+            return null;
+        }
+
+        $tz = $arg->compileTimeTimezoneName ?? 'UTC';
+        $micro = (int) ($arg->compileTimeDateTimeMicrosecond ?? 0);
+        $props = [
+            'date' => VmDateTimeNative::formatZendDateWire(
+                (int) $arg->compileTimeDateTimeTimestamp,
+                $micro,
+                $tz
+            ),
+            'timezone_type' => DateTimeSupport::zendTimezoneWireType($tz),
+            'timezone' => $tz,
+        ];
+
+        $obj = ArrayObjectJitHelper::loadObjectPtr($context, $arg);
+        $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $id = (string) (++self::$blockSerial);
+        $doneBlock = BasicBlockHelper::append($context, 'serialize_dt_done_'.$id);
+        /** @var list<array{0: Value, 1: mixed}> $phiIncoming */
+        $phiIncoming = [];
+        $continue = $context->builder->getInsertBlock();
+
+        if (null !== $dtId) {
+            $dtBlock = BasicBlockHelper::append($context, 'serialize_dt_'.$id);
+            $notDt = BasicBlockHelper::append($context, 'serialize_not_dt_'.$id);
+            $context->builder->positionAtEnd($continue);
+            $isDt = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($dtId, false)
+            );
+            $context->builder->branchIf($isDt, $dtBlock, $notDt);
+            $context->builder->positionAtEnd($dtBlock);
+            $dtResult = $context->builder->load($context->constantStringFromString(
+                VmSerialize::encodeExportedPropertyBag('DateTime', $props)
+            ));
+            $dtEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+            $phiIncoming[] = [$dtResult, $dtEnd];
+            $continue = $notDt;
+        }
+
+        if (null !== $dtiId) {
+            $dtiBlock = BasicBlockHelper::append($context, 'serialize_dti_'.$id);
+            $notDti = BasicBlockHelper::append($context, 'serialize_not_dti_'.$id);
+            $context->builder->positionAtEnd($continue);
+            $isDti = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $i64->constInt($dtiId, false)
+            );
+            $context->builder->branchIf($isDti, $dtiBlock, $notDti);
+            $context->builder->positionAtEnd($dtiBlock);
+            $dtiResult = $context->builder->load($context->constantStringFromString(
+                VmSerialize::encodeExportedPropertyBag('DateTimeImmutable', $props)
+            ));
+            $dtiEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+            $phiIncoming[] = [$dtiResult, $dtiEnd];
+            $continue = $notDti;
+        }
+
+        $context->builder->positionAtEnd($continue);
+        $pubResult = self::encodePublicObjectProps($context, $objVar);
+        $pubEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+        $phiIncoming[] = [$pubResult, $pubEnd];
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($strPtr, 'serialize_dt_phi_'.$id);
+        foreach ($phiIncoming as [$val, $pred]) {
+            $phi->addIncoming($val, $pred);
+        }
+
+        return $phi;
     }
 
     /**

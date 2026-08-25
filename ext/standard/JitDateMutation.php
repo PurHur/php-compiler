@@ -866,6 +866,9 @@ final class JitDateMutation
         $receiver->compileTimeDateTimeTimestamp = $timestamp;
         $receiver->compileTimeDateTimeMicrosecond = $microsecond;
         $receiver->compileTimeTimezoneName = $timezone;
+        if (null === $receiver->compileTimeDateTimeClassName || '' === $receiver->compileTimeDateTimeClassName) {
+            $receiver->compileTimeDateTimeClassName = 'DateTime';
+        }
         foreach ($context->namedVariableBindings as $boundName => $bound) {
             if (
                 $bound !== $receiver
@@ -879,6 +882,9 @@ final class JitDateMutation
             $bound->compileTimeDateTimeTimestamp = $timestamp;
             $bound->compileTimeDateTimeMicrosecond = $microsecond;
             $bound->compileTimeTimezoneName = $timezone;
+            if (null === $bound->compileTimeDateTimeClassName || '' === $bound->compileTimeDateTimeClassName) {
+                $bound->compileTimeDateTimeClassName = $receiver->compileTimeDateTimeClassName;
+            }
             $context->dateTimeLocalInstants[$boundName] = [
                 'timestamp' => $timestamp,
                 'timezone' => $timezone,

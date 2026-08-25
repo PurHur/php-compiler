@@ -13160,6 +13160,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateSerializeFoldedString(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     break;
                     } finally {
                         // Peer VM clearOutgoingCallState + restorePendingOutboundCall (#15217 / #27242).
@@ -15866,6 +15870,33 @@ class JIT {
         }
         $folded = $this->context->jitJsonEncodeFoldedString;
         $this->context->jitJsonEncodeFoldedString = null;
+        if (null === $folded || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $resultVar->compileTimeString = $folded;
+        $name = JIT\OperandName::resolve($result);
+        if (null === $name || '' === $name) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (isset($this->context->namedVariableBindings[$resolved])) {
+            $this->context->namedVariableBindings[$resolved]->compileTimeString = $folded;
+        }
+    }
+
+    /**
+     * Stamp compile-time serialize() wire on the result CV so unserialize($s) can fold DateTime (#34576).
+     *
+     * @param CoreFunc\Internal|JIT\Call\Native|JIT\Call\ExternalMethod|JIT\Call\NestedClosureInvoke|null $toCall
+     */
+    private function propagateSerializeFoldedString(Operand $result, $toCall): void
+    {
+        if (!$toCall instanceof CoreFunc\Internal || 'serialize' !== strtolower($toCall->getName())) {
+            return;
+        }
+        $folded = $this->context->jitSerializeFoldedString;
+        $this->context->jitSerializeFoldedString = null;
         if (null === $folded || !$this->context->hasVariableOp($result)) {
             return;
         }

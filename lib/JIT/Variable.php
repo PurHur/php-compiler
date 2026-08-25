@@ -207,6 +207,13 @@ final class Variable {
     public ?int $compileTimeDateTimeMicrosecond = null;
 
     /**
+     * `DateTime` / `DateTimeImmutable` class label alongside construct stamps (#34576).
+     *
+     * Needed so serialize() can emit the correct `O:len:"Class":` header at fold time.
+     */
+    public ?string $compileTimeDateTimeClassName = null;
+
+    /**
      * DateInterval::__construct() parse when $duration is a compile-time string (#26772).
      *
      * @var array{y:int,m:int,d:int,h:int,i:int,s:int,f:float,invert:int}|null

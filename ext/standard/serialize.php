@@ -44,6 +44,8 @@ final class serialize extends Internal
 
         $compileTime = self::compileTimeSerialize($context, $args[0]);
         if (null !== $compileTime) {
+            $context->jitSerializeFoldedString = $compileTime;
+
             return $context->builder->load($context->constantStringFromString($compileTime));
         }
 
@@ -70,6 +72,29 @@ final class serialize extends Internal
             if (null !== $literal) {
                 return VmSerializeFormat::encodeStringLiteral($literal);
             }
+        }
+        // DateTime* — Zend date/timezone wire (#34576 / re-#10710). Peer json_encode #33752.
+        if (null !== $arg->compileTimeDateTimeTimestamp) {
+            $className = $arg->compileTimeDateTimeClassName;
+            if (null === $className || '' === $className) {
+                $className = 'DateTime';
+            }
+            if ('DateTime' !== $className && 'DateTimeImmutable' !== $className) {
+                return null;
+            }
+            $tz = $arg->compileTimeTimezoneName ?? 'UTC';
+            $micro = (int) ($arg->compileTimeDateTimeMicrosecond ?? 0);
+            $props = [
+                'date' => VmDateTimeNative::formatZendDateWire(
+                    (int) $arg->compileTimeDateTimeTimestamp,
+                    $micro,
+                    $tz
+                ),
+                'timezone_type' => \PHPCompiler\VM\DateTimeSupport::zendTimezoneWireType($tz),
+                'timezone' => $tz,
+            ];
+
+            return VmSerialize::encodeExportedPropertyBag($className, $props);
         }
 
         return null;
