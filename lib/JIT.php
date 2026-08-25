@@ -9198,7 +9198,10 @@ class JIT {
                     break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
-                    $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
+                    // FETCH_DIM_W for by-ref return even if CFG left TYPE_ARRAY_DIM_FETCH
+                    // (`return $GLOBALS['x']` / `$a[$i]` from function &f — #34733 / re-#34717).
+                    $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type
+                        || $this->varFetchDestUsedAsByRefReturn($block, $i, (int) $op->arg1);
                     $fetchIs = !$forWrite && $op->arrayDimFetchIs;
                     $warnUndefKeyIncDec = $forWrite && (
                         $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)

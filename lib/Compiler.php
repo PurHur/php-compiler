@@ -18985,6 +18985,10 @@ class Compiler {
             if ($this->arrayDimFetchUsedAsByRefYieldValue($fetch, $usage, $block)) {
                 continue;
             }
+            // `return $arr[$i]` / `return $GLOBALS['x']` from `function &f()` (#34733 / re-#34717).
+            if ($this->arrayDimFetchUsedAsByRefReturnValue($fetch, $usage, $block)) {
+                continue;
+            }
             // `[&$s[$i]]` — by-ref array element must FETCH_DIM_W so string offsets raise (#21910).
             if (
                 $usage instanceof Op\Expr\Array_
@@ -19040,6 +19044,10 @@ class Compiler {
             }
             // php-cfg: ArrayDimFetch then Yield from function &gen() (#25877).
             if ($this->arrayDimFetchUsedAsByRefYieldValue($fetch, $next, $block)) {
+                return true;
+            }
+            // php-cfg: ArrayDimFetch then Return from function &f() (#34733).
+            if ($this->arrayDimFetchUsedAsByRefReturnValue($fetch, $next, $block)) {
                 return true;
             }
             // php-cfg: ArrayDimFetch then Expr_Array with byRef element (#21910).
@@ -19219,6 +19227,25 @@ class Compiler {
             return false;
         }
         if ($usage->value !== $fetch->result) {
+            return false;
+        }
+
+        return $this->cfgFunctionReturnsByReference($block);
+    }
+
+    /**
+     * `return $arr[$i]` / `return $GLOBALS['x']` from `function &name()` needs FETCH_DIM_W
+     * (#34733 / re-#34717, zend_execute.c ZEND_FETCH_DIM_W / ZEND_RETURN_BY_REF).
+     */
+    private function arrayDimFetchUsedAsByRefReturnValue(
+        Op\Expr\ArrayDimFetch $fetch,
+        Op $usage,
+        Block $block
+    ): bool {
+        if (!$usage instanceof Op\Terminal\Return_) {
+            return false;
+        }
+        if ($usage->expr !== $fetch->result) {
             return false;
         }
 
