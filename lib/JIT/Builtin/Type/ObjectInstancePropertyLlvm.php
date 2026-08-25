@@ -402,12 +402,25 @@ final class ObjectInstancePropertyLlvm
         $done = $fn->appendBasicBlock('prop_fetch_rt_done');
         $exit = $fn->appendBasicBlock('prop_fetch_rt_exit');
         $fallback = $fn->appendBasicBlock('prop_fetch_rt_fallback');
+        // By-ref return / FETCH_OBJ_W must keep a live void** slot across the class_id
+        // switch — boxing into a stack __value__ alone makes valuePtrForByRefReturn
+        // return a dangling temp after the callee returns (#34721 / re-#34717).
+        $voidPtrPtr = $context->getTypeFromString('void**');
+        $slotAlloca = $forWrite
+            ? BasicBlockHelper::entryAlloca($context, $voidPtrPtr)
+            : null;
         $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
         $valueMap = $context->structFieldMap['__value__'];
         $context->builder->store(
             $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
             $context->builder->structGep($resultSlot, $valueMap['type'])
         );
+        if (null !== $slotAlloca) {
+            $context->builder->store(
+                $voidPtrPtr->constNull(),
+                $slotAlloca
+            );
+        }
         $i64 = $context->getTypeFromString('int64');
         $checkBlock = $entry;
         $lastKey = array_key_last($candidates);
@@ -427,6 +440,15 @@ final class ObjectInstancePropertyLlvm
             $context->builder->branchIf($match, $caseBlock, $nextBlock);
             $context->builder->positionAtEnd($caseBlock);
             $fetched = self::propertyFetchOrdinary($object, $obj, $className, $name, $classId, $forWrite);
+            if (null !== $slotAlloca && null !== $fetched->objectPropertySlot) {
+                $context->builder->store(
+                    $context->builder->pointerCast(
+                        $fetched->objectPropertySlot,
+                        $voidPtrPtr
+                    ),
+                    $slotAlloca
+                );
+            }
             self::boxFetchedPropertyIntoValue($object, $resultSlot, $fetched, $fetched->objectPropertyType ?? $fetched->type);
             $context->builder->branch($done);
             $checkBlock = $nextBlock;
@@ -446,12 +468,22 @@ final class ObjectInstancePropertyLlvm
         $context->builder->branch($exit);
         $context->builder->positionAtEnd($exit);
 
-        return new Variable(
+        $var = new Variable(
             $context,
             Variable::TYPE_VALUE,
             Variable::KIND_VARIABLE,
             $resultSlot
         );
+        if (null !== $slotAlloca) {
+            $liveSlot = $context->builder->load($slotAlloca);
+            $var->objectPropertySlot = $liveSlot;
+            $var->objectPropertyType = Variable::TYPE_VALUE;
+            $var->objectPropertyReceiver = $obj;
+            $var->objectPropertyName = $name;
+            $object->recordSlotReceiver($liveSlot, $obj);
+        }
+
+        return $var;
     }
 
     public static function boxFetchedPropertyIntoValue(

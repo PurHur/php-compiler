@@ -95,11 +95,45 @@ final class JitValueBox
             && Variable::TYPE_VALUE === $var->objectPropertyType
         ) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'byref_return_prop');
-            $slot = ObjectInstancePropertyLlvm::dominatingSlotPtr($context->type->object, $var);
-            $heapPtr = $context->builder->pointerCast(
+            // Use the FETCH_WRITE-time void** — dominatingSlotPtr reloads the receiver via
+            // objectPropertyReceiverOp and rematerializes propertySlotPtr; for value-boxed
+            // untyped/mixed formals that GEP can miss the live cell (#34721 / re-#34717).
+            $slot = $var->objectPropertySlot;
+            $valuePtrTy = $context->getTypeFromString('__value__*');
+            $voidPtr = $context->getTypeFromString('void*');
+            $loaded = $context->builder->pointerCast(
                 $context->builder->load($slot),
-                $context->getTypeFromString('__value__*')
+                $valuePtrTy
             );
+            $isNull = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $loaded,
+                $valuePtrTy->constNull()
+            );
+            $fn = BasicBlockHelper::parentFunction($context);
+            $allocBb = $fn->appendBasicBlock('byref_ret_prop_alloc');
+            $readyBb = $fn->appendBasicBlock('byref_ret_prop_ready');
+            $entryBb = $context->builder->getInsertBlock();
+            $context->builder->branchIf($isNull, $allocBb, $readyBb);
+
+            $context->builder->positionAtEnd($allocBb);
+            $heapVal = $context->memory->malloc($context->getTypeFromString('__value__'));
+            $heapPtrAlloc = $context->builder->pointerCast($heapVal, $valuePtrTy);
+            $valueMap = $context->structFieldMap['__value__'];
+            $context->builder->store(
+                $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                $context->builder->structGep($heapVal, $valueMap['type'])
+            );
+            $context->builder->store(
+                $context->builder->pointerCast($heapPtrAlloc, $voidPtr),
+                $slot
+            );
+            $context->builder->branch($readyBb);
+
+            $context->builder->positionAtEnd($readyBb);
+            $heapPtr = $context->builder->phi($valuePtrTy, 'byref_ret_prop_phi');
+            $heapPtr->addIncoming($heapPtrAlloc, $allocBb);
+            $heapPtr->addIncoming($loaded, $entryBb);
 
             return self::normalizeValuePtr($context, $heapPtr);
         }
