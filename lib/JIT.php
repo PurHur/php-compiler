@@ -15900,8 +15900,48 @@ class JIT {
         if (null === $toCall) {
             return false;
         }
+        // Closure use()/bind wrappers hide the Native proxy; display name is often "{closure}"
+        // while functionReturnsRef is keyed by "{closure}_N" (#34759 / re-#34717).
+        if (
+            $toCall instanceof JIT\Call\ClosureWithCaptures
+            || $toCall instanceof JIT\Call\ClosureWithBinding
+        ) {
+            $toCall = JIT\ClosureBindHelper::unwrapInnerCall($toCall);
+        }
         if ($toCall instanceof JIT\Call\Native || $toCall instanceof JIT\Call\Vararg) {
-            return isset($this->context->functionReturnsRef[strtolower($toCall->name)]);
+            return $this->nativeOrVarargReturnsByRef($toCall);
+        }
+        if ($toCall instanceof JIT\Call\RuntimeIndirectClosureCall) {
+            foreach ($toCall->candidates as $name => $candidate) {
+                if (isset($this->context->functionReturnsRef[strtolower((string) $name)])) {
+                    return true;
+                }
+                $inner = JIT\ClosureBindHelper::unwrapInnerCall($candidate);
+                if (
+                    ($inner instanceof JIT\Call\Native || $inner instanceof JIT\Call\Vararg)
+                    && $this->nativeOrVarargReturnsByRef($inner)
+                ) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($toCall instanceof JIT\Call\NestedClosureInvoke) {
+            foreach (JIT\ClosureHelper::closureCandidates($this->context) as $name => $candidate) {
+                if (isset($this->context->functionReturnsRef[strtolower((string) $name)])) {
+                    return true;
+                }
+                $inner = JIT\ClosureBindHelper::unwrapInnerCall($candidate);
+                if (
+                    ($inner instanceof JIT\Call\Native || $inner instanceof JIT\Call\Vararg)
+                    && $this->nativeOrVarargReturnsByRef($inner)
+                ) {
+                    return true;
+                }
+            }
+
+            return false;
         }
         if (
             $toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
@@ -15909,10 +15949,33 @@ class JIT {
         ) {
             foreach ($toCall->candidatesByClassId as $candidate) {
                 if (
-                    $candidate instanceof JIT\Call\Native
-                    && isset($this->context->functionReturnsRef[strtolower($candidate->name)])
+                    ($candidate instanceof JIT\Call\Native || $candidate instanceof JIT\Call\Vararg)
+                    && $this->nativeOrVarargReturnsByRef($candidate)
                 ) {
                     return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * True when a Native/Vararg callee was registered with FLAG_RETURNS_REF.
+     *
+     * Prefer display-name lookup (named functions), then match the LLVM Value against
+     * {@see Context::$functions} so Closure proxies keyed as `{closure}_N` still hit
+     * when Native::$name is the rich `{closure}` label (#34759).
+     */
+    private function nativeOrVarargReturnsByRef(JIT\Call\Native|JIT\Call\Vararg $toCall): bool
+    {
+        if (isset($this->context->functionReturnsRef[strtolower($toCall->name)])) {
+            return true;
+        }
+        if ($toCall instanceof JIT\Call\Native) {
+            foreach ($this->context->functions as $lc => $fn) {
+                if ($fn === $toCall->function) {
+                    return isset($this->context->functionReturnsRef[$lc]);
                 }
             }
         }
