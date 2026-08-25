@@ -118,6 +118,20 @@ final class JitDomReplaceChildLiveSlots
         // php-src: if newChild already has a different parent, remove it first (#33450).
         JitDomAppendChildLiveSlots::detachFromForeignParentIfNeeded($context, $parent, $newChild);
 
+        // Same-parent move: unlink newChild before splicing into oldChild's place
+        // (php-src dom_zvals_to_fragment xmlUnlinkNode). Without this, replaceChild
+        // of an earlier sibling duplicates the node in InnerXml/sibling links (#34804).
+        $curParent = self::loadSibling($context, $newChild, VmDom::PROP_PARENT_NODE, 'dom_rc_cur_par');
+        $sameParent = $context->builder->icmp(Builder::INT_EQ, $curParent, $parent);
+        $bbUnlinkSame = BasicBlockHelper::append($context, 'dom_rc_unlink_same');
+        $bbAfterUnlink = BasicBlockHelper::append($context, 'dom_rc_after_unlink');
+        $context->builder->branchIf($sameParent, $bbUnlinkSame, $bbAfterUnlink);
+        $context->builder->positionAtEnd($bbUnlinkSame);
+        JitDomRemoveChildLiveSlots::sync($context, $parent, $newChild);
+        $context->builder->branch($bbAfterUnlink);
+        $context->builder->positionAtEnd($bbAfterUnlink);
+
+        // Re-read edges after a possible same-parent unlink of newChild.
         $prev = self::loadSibling($context, $oldChild, VmDom::PROP_PREVIOUS_SIBLING, 'dom_rc_prev');
         $next = self::loadSibling($context, $oldChild, VmDom::PROP_NEXT_SIBLING, 'dom_rc_next');
         $first = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_rc_first');

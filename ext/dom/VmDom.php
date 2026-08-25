@@ -7372,16 +7372,79 @@ final class VmDom
     }
 
     /**
+     * ChildNode::replaceWith(...$nodes) — php-src dom_child_replace_with (#34804).
+     *
+     * Unlink args into a fragment (dom_zvals_to_fragment), skip a second unlink when
+     * the receiver is already in that fragment, then insert before viable_next_sibling.
+     * Identity `$n->replaceWith($n)` therefore re-appends in place (Zend no-op), instead
+     * of insertBefore($n,$n) throwing "previous sibling of refnode".
+     *
      * @param list<\PHPCompiler\VM\Variable> $args
      */
     public static function replaceWithLiveStandardNodes(Context $ctx, ObjectEntry $node, array $args): void
     {
         $parent = self::parentEntryForSiblingMutation($node);
+
+        $resolved = [];
         foreach ($args as $arg) {
-            $child = self::resolveLiveStandardAppendArg($ctx, $parent, $arg, 'DOMNode::replaceWith()');
-            self::insertBeforeSibling($ctx, $parent, $child, $node);
+            $resolved[] = self::resolveLiveStandardAppendArg($ctx, $parent, $arg, 'DOMNode::replaceWith()');
         }
-        self::removeLiveStandard($ctx, $node);
+
+        // Spec step 3: first following sibling not present in $nodes.
+        $inNodes = [];
+        foreach ($resolved as $child) {
+            $inNodes[$child->id] = true;
+        }
+        $parentState = DomRegistry::state($parent);
+        $nodeIndex = self::childIndex($parentState->childIds, $node->id);
+        $viableNext = null;
+        if (null !== $nodeIndex) {
+            $n = \count($parentState->childIds);
+            for ($i = $nodeIndex + 1; $i < $n; ++$i) {
+                $sibId = $parentState->childIds[$i];
+                if (!isset($inNodes[$sibId])) {
+                    $viableNext = DomRegistry::entry($sibId);
+                    break;
+                }
+            }
+        }
+
+        // Spec step 4: convert nodes into a fragment (unlink each from its parent).
+        $fragmentChildren = [];
+        $receiverInFragment = false;
+        foreach ($resolved as $child) {
+            if ($child->id === $node->id) {
+                $receiverInFragment = true;
+            }
+            if (self::isDocumentFragment($child)) {
+                $fragState = DomRegistry::state($child);
+                $childIds = $fragState->childIds;
+                $fragState->childIds = [];
+                foreach ($childIds as $childId) {
+                    $fragChild = DomRegistry::entry($childId);
+                    if (null === $fragChild) {
+                        continue;
+                    }
+                    self::linkChildToParent($fragChild, null);
+                    $fragmentChildren[] = $fragChild;
+                }
+                continue;
+            }
+            self::detachNodeIfAttached($ctx, $child);
+            $fragmentChildren[] = $child;
+        }
+
+        // Spec step 5: unlink receiver unless it already moved into the fragment.
+        if (!$receiverInFragment) {
+            $stillParent = DomRegistry::state($node)->parentId;
+            if (null !== $stillParent && $stillParent === $parent->id) {
+                self::removeLiveStandard($ctx, $node);
+            }
+        }
+
+        foreach ($fragmentChildren as $child) {
+            self::insertBeforeSibling($ctx, $parent, $child, $viableNext);
+        }
         self::syncSubtree($ctx, $parent);
     }
 
@@ -7496,7 +7559,7 @@ final class VmDom
         Context $ctx,
         ObjectEntry $parent,
         ObjectEntry $newChild,
-        ObjectEntry $refNode
+        ?ObjectEntry $refNode
     ): void {
         if (self::isDocumentFragment($newChild)) {
             $fragState = DomRegistry::state($newChild);
