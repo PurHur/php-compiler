@@ -30,12 +30,11 @@ final class ContextMinimalStandaloneLazyReturnPendingRuntimeShrinkTest extends T
             'ensureMinimalUserStandaloneBodies must not eagerly JitReturnPending (#34621)'
         );
 
-        // Essentials for thin argv / getenv / bridges stay (#34695 dropped ObOutput;
+        // Essentials for thin argv / is_superglobal stay (#34807 dropped EnvLocal;
         // #34641 dropped StringTriggerError).
         // LastError dropped in #34631 (peer this test).
         foreach ([
             'CliArgvRuntime::ensureStandaloneBodies($this)',
-            'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34769)");

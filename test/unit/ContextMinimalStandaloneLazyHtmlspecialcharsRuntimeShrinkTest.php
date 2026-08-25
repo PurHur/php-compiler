@@ -30,10 +30,9 @@ final class ContextMinimalStandaloneLazyHtmlspecialcharsRuntimeShrinkTest extend
             'ensureMinimalUserStandaloneBodies must not eagerly StringHtmlspecialchars (#34642)'
         );
 
-        // Essentials for thin argv / getenv / bridges stay (#34695 dropped ObOutput).
+        // Essentials for thin argv / is_superglobal stay (#34807 dropped EnvLocal).
         foreach ([
             'CliArgvRuntime::ensureStandaloneBodies($this)',
-            'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34769)");
