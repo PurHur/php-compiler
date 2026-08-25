@@ -11792,14 +11792,25 @@ class JIT {
                         $this->context->coalesceMergeSlotOperands[$nullsafeMergeSlot] = $nullsafeResult;
                     }
                     $receiver = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $isNull = JIT\NullsafeHelper::isReceiverNull(
-                        $this,
-                        $receiver,
-                        $op->nullsafeMethodCall
-                    );
+                    // Compile-time null: only lower the null arm. Compiling the fetch arm for
+                    // `$o?->m()` still runs METHODCALL_INIT and fatals with
+                    // "Call to undefined method object::m()" under AOT (#34713 /
+                    // ZEND_NULLSAFE_METHODCALL).
+                    $knownNullReceiver = Variable::TYPE_NULL === $receiver->type
+                        || $receiver->isNullConstant;
+                    $isNull = $knownNullReceiver
+                        ? $this->context->getTypeFromString('int1')->constInt(1, false)
+                        : JIT\NullsafeHelper::isReceiverNull(
+                            $this,
+                            $receiver,
+                            $op->nullsafeMethodCall
+                        );
                     // Mirror ?? lowering: branchIf targets entry blocks; merge from branch tails (#3219).
                     $nullTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
-                    $fetchTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
+                    $fetchTail = null;
+                    if (!$knownNullReceiver) {
+                        $fetchTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
+                    }
                     if ($this->context->hasVariableOp($nullsafeResult)) {
                         $nullsafeVar = $this->context->getVariableFromOp($nullsafeResult);
                         $nullsafeVar->compileTimeString = null;
@@ -11815,10 +11826,14 @@ class JIT {
                         $nullsafeVar->objectPropertyDnfArms = null;
                     }
                     $nullEntry = $this->jitBranchEntryBlock($op->block1, $func);
-                    $fetchEntry = $this->jitBranchEntryBlock($op->block2, $func);
                     $builder->positionAtEnd($branchBlock);
                     // Do not free php-cfg "dead" operands here; ?-> temps are used on branch/merge blocks (#3219).
-                    $builder->branchIf($isNull, $nullEntry, $fetchEntry);
+                    if ($knownNullReceiver) {
+                        $builder->branch($nullEntry);
+                    } else {
+                        $fetchEntry = $this->jitBranchEntryBlock($op->block2, $func);
+                        $builder->branchIf($isNull, $nullEntry, $fetchEntry);
+                    }
                     if (null !== $op->block3) {
                         // Fetch arm may have rebound the result to a property-backed Variable;
                         // reseat on a plain merge alloca before merge-block uses (#32988).
@@ -11840,9 +11855,11 @@ class JIT {
                         if (null === $nullTail->getTerminator()) {
                             $builder->branch($mergeBb);
                         }
-                        $builder->positionAtEnd($fetchTail);
-                        if (null === $fetchTail->getTerminator()) {
-                            $builder->branch($mergeBb);
+                        if (null !== $fetchTail) {
+                            $builder->positionAtEnd($fetchTail);
+                            if (null === $fetchTail->getTerminator()) {
+                                $builder->branch($mergeBb);
+                            }
                         }
                         $builder->positionAtEnd($mergeBb);
                         // Mirror ?? : refresh inherited locals; skip in-flight assign targets (#20507).
@@ -25428,6 +25445,17 @@ class JIT {
                         return;
                     }
                 }
+            }
+            // Generic `:object` / empty class (nullsafe `$o?->m()` fetch arm, #34713): do not
+            // abort compile — bind a catchable Error so the dead fetch arm can lower while the
+            // null arm short-circuits at runtime (ZEND_NULLSAFE_METHODCALL).
+            if ('object' === $declaringClassLc || '' === $declaringClassLc) {
+                $this->context->scope->toCall = new JIT\Call\EmitCatchableError(
+                    "Call to undefined method {$className}::{$methodLc}()"
+                );
+                $this->context->scope->args = [$receiverVar];
+
+                return;
             }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
         }
