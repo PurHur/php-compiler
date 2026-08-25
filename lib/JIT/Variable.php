@@ -280,6 +280,14 @@ final class Variable {
      */
     public bool $assignRefLvalueAlias = false;
 
+    /**
+     * HT entry `__value__*` slots that must stay byte-identical to this shared ASSIGN_REF box
+     * when `$a[] =& $x` / `$a[$k] =& $x` aliases the same name more than once (#34685).
+     *
+     * @var list<\PHPLLVM\Value>|null
+     */
+    public ?array $assignRefSyncEntryPtrs = null;
+
     /** CFG receiver operand for {@see $objectPropertySlot} reload at dominating sends (#33760). */
     public ?\PHPCfg\Operand $objectPropertyReceiverOp = null;
 
