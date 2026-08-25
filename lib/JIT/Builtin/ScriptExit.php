@@ -34,25 +34,14 @@ final class ScriptExit
     {
         // ObOutput is lazy after #34695 — float/bool status print __phpc_ob_echo_* (#34756 / peer #34747).
         ObOutputRuntime::ensureLinked($context);
-        switch ($arg->type) {
-            case Variable::TYPE_NULL:
-                // PHP 8.4+ string|int: null → E_DEPRECATED then status 0 (#29575).
-                if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
-                    if ($context->callerStrictTypes) {
-                        self::emitStatusTypeErrorAndAbort($context, 'null');
+        // Literal null is often TYPE_VALUE + isNullConstant (php-cfg); TYPE_NULL-only missed it and
+        // emitBoxed(loadValue) structGep'd a non-pointer → compile SIGSEGV (#34761, peer DomLivingApiRuntime).
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::emitNullStatus($context);
 
-                        return;
-                    }
-                    \PHPCompiler\JIT\JitStringBuiltinArg::emitNullStringParamDeprecation(
-                        $context,
-                        'exit',
-                        0,
-                        'status',
-                        'string|int'
-                    );
-                }
-                self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
-                break;
+            return;
+        }
+        switch ($arg->type) {
             case Variable::TYPE_STRING:
                 self::echoString($context, $context->helper->loadValue($arg));
                 self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
@@ -119,9 +108,11 @@ final class ScriptExit
     {
         // Message long/double/bool echo via __phpc_ob_echo_* — ObOutput lazy (#34756).
         ObOutputRuntime::ensureLinked($context);
+        // Literal null → TYPE_VALUE + isNullConstant; skip emitBoxedMessage (#34761).
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return;
+        }
         switch ($arg->type) {
-            case Variable::TYPE_NULL:
-                return;
             case Variable::TYPE_STRING:
                 self::echoString($context, $context->helper->loadValue($arg));
                 return;
@@ -146,6 +137,27 @@ final class ScriptExit
             default:
                 throw new \LogicException('exit() message must be string-coercible in this compiler build');
         }
+    }
+
+    /** Null status → exit 0 (PHP 8.2); 8.4+ may deprecate then exit 0 (#29575 / #34761). */
+    private static function emitNullStatus(Context $context): void
+    {
+        // PHP 8.4+ string|int: null → E_DEPRECATED then status 0 (#29575).
+        if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
+            if ($context->callerStrictTypes) {
+                self::emitStatusTypeErrorAndAbort($context, 'null');
+
+                return;
+            }
+            \PHPCompiler\JIT\JitStringBuiltinArg::emitNullStringParamDeprecation(
+                $context,
+                'exit',
+                0,
+                'status',
+                'string|int'
+            );
+        }
+        self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
     }
 
     private static function emitBoxedMessage(Context $context, Value $boxedPtr): void
