@@ -18970,6 +18970,12 @@ class Compiler {
      */
     protected function isArrayDimFetchForWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): bool
     {
+        // Nested list by-ref: `[[$x,&$y]]=$a` uses $a[0] as container for both a read slot
+        // and a FETCH_DIM_W/AssignRef slot. A read sibling in usages must not disqualify the
+        // write sibling (#34778 / leftover #34673, zend_execute.c list unpack).
+        if ($this->arrayDimFetchHasNestedWriteUsage($fetch, $block)) {
+            return true;
+        }
         foreach ($fetch->result->usages as $usage) {
             if ($usage instanceof Op\Expr\Assign && $usage->var === $fetch->result) {
                 continue;
@@ -19077,11 +19083,70 @@ class Compiler {
             ) {
                 return true;
             }
+            // php-cfg may emit read list slots before the by-ref write slot (#34778).
+            if ($this->arrayDimFetchHasNestedWriteAmongChildren($fetch, $children, $i + 1, $block)) {
+                return true;
+            }
             if ($this->arrayDimFetchPrecedesByRefBuiltinCall($fetch, $next, $block, $i, $children)) {
                 return true;
             }
 
             return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * True when any usage of $fetch->result is a nested ArrayDimFetch that itself needs write.
+     *
+     * @see #34778 nested list by-ref outer container
+     */
+    private function arrayDimFetchHasNestedWriteUsage(Op\Expr\ArrayDimFetch $fetch, Block $block): bool
+    {
+        foreach ($fetch->result->usages as $usage) {
+            if (
+                $usage instanceof Op\Expr\ArrayDimFetch
+                && $usage->var === $fetch->result
+                && $this->isArrayDimFetchForWrite($usage, $block)
+            ) {
+                return true;
+            }
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+
+        return $this->arrayDimFetchHasNestedWriteAmongChildren(
+            $fetch,
+            $block->orig->children,
+            0,
+            $block
+        );
+    }
+
+    /**
+     * Scan CFG children from $fromIndex for nested write dims on $fetch->result (#34778).
+     *
+     * @param Op[] $children
+     */
+    private function arrayDimFetchHasNestedWriteAmongChildren(
+        Op\Expr\ArrayDimFetch $fetch,
+        array $children,
+        int $fromIndex,
+        Block $block
+    ): bool {
+        $count = count($children);
+        for ($j = $fromIndex; $j < $count; ++$j) {
+            $cand = $children[$j];
+            if (
+                $cand instanceof Op\Expr\ArrayDimFetch
+                && $cand->var === $fetch->result
+                && $cand !== $fetch
+                && $this->isArrayDimFetchForWrite($cand, $block)
+            ) {
+                return true;
+            }
         }
 
         return false;
