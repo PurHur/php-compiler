@@ -33,7 +33,6 @@ final class ContextMinimalStandaloneLazyReturnPendingRuntimeShrinkTest extends T
         // Essentials for thin echo / error / argv / getenv surface stay.
         // LastError dropped in #34631 (peer this test).
         foreach ([
-            'StringHtmlspecialchars::ensureStandaloneBodies($this)',
             'ObOutputRuntime::ensureLinked($this)',
             'StringTriggerError::ensureStandaloneBodies($this)',
             'CliArgvRuntime::ensureStandaloneBodies($this)',

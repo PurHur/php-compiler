@@ -62,21 +62,26 @@ final class HtmlspecialcharsDecodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringHtmlspecialcharsDecode::ensureLinked', $source);
     }
 
-    public function testContextMinimalKeepsEncodeLazyDecode(): void
+    public function testContextMinimalKeepsEncodeAndDecodeLazy(): void
     {
-        // htmlspecialchars stays always-on for thin echo; decode is lazy (#34612 / peer #34605).
+        // htmlspecialchars encode + decode both lazy (#34642 / #34612 / peer #34605).
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $minimalPos = strpos($source, 'private function ensureMinimalUserStandaloneBodies');
         $this->assertNotFalse($minimalPos);
         $minimalEnd = strpos($source, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
         $this->assertNotFalse($minimalEnd);
         $minimalBody = substr($source, $minimalPos, $minimalEnd - $minimalPos);
-        $this->assertStringContainsString('StringHtmlspecialchars::ensureStandaloneBodies', $minimalBody);
+        $this->assertStringNotContainsString(
+            'StringHtmlspecialchars::ensureStandaloneBodies',
+            $minimalBody,
+            'ensureMinimal must not eagerly NestedJIT htmlspecialchars (#34642)'
+        );
         $this->assertStringNotContainsString(
             'StringHtmlspecialcharsDecode::ensureStandaloneBodies',
             $minimalBody,
             'ensureMinimal must not eagerly NestedJIT htmlspecialchars_decode (#34612)'
         );
+        $this->assertStringContainsString('#34642', $source);
         $this->assertStringContainsString('#34612', $source);
     }
 }
