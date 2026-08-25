@@ -83,11 +83,10 @@ final class arsort_ extends Internal
             || StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_LOCALE_STRING === $sortType
         ) {
-            // SORT_FLAG_CASE: length-aware strcasecmp (#34707); LOCALE/NUMERIC ignore case bit here.
+            // SORT_FLAG_CASE: length-aware strcasecmp (#34707); REGULAR/NUMERIC/LOCALE ignore case bit (php-src).
             if (
                 0 !== ($flags & StdlibConstants::SORT_FLAG_CASE)
-                && StdlibConstants::SORT_NUMERIC !== $sortType
-                && StdlibConstants::SORT_LOCALE_STRING !== $sortType
+                && StdlibConstants::SORT_STRING === $sortType
             ) {
                 ValueSortRuntime::arsortByValueCase($context, $array);
             } else {

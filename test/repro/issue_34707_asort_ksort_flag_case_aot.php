@@ -15,3 +15,12 @@ echo 'ksort_case:', json_encode(array_keys($c)), "\n";
 $d = ['B' => 1, 'a' => 2, 'C' => 3];
 krsort($d, SORT_STRING | SORT_FLAG_CASE);
 echo 'krsort_case:', json_encode(array_keys($d)), "\n";
+
+// php-src: SORT_FLAG_CASE is ignored for SORT_REGULAR (#34702).
+$e = ['x' => 'B', 'y' => 'a', 'z' => 'C'];
+asort($e, SORT_REGULAR | SORT_FLAG_CASE);
+echo 'asort_regular:', json_encode(array_values($e)), "\n";
+
+$f = ['B' => 1, 'a' => 2, 'C' => 3];
+ksort($f, SORT_REGULAR | SORT_FLAG_CASE);
+echo 'ksort_regular:', json_encode(array_keys($f)), "\n";

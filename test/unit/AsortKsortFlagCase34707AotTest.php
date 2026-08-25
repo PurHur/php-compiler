@@ -20,7 +20,9 @@ final class AsortKsortFlagCase34707AotTest extends TestCase
             "asort_case:[\"a\",\"B\",\"C\"]\n"
             ."arsort_case:[\"C\",\"B\",\"a\"]\n"
             ."ksort_case:[\"a\",\"B\",\"C\"]\n"
-            ."krsort_case:[\"C\",\"B\",\"a\"]",
+            ."krsort_case:[\"C\",\"B\",\"a\"]\n"
+            ."asort_regular:[\"B\",\"C\",\"a\"]\n"
+            ."ksort_regular:[\"B\",\"C\",\"a\"]",
             $zend
         );
         $aot = $this->runAot($src);

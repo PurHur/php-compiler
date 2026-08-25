@@ -62,10 +62,9 @@ final class VmInternalCompare
                 0 !== $caseFlag ? 'strcasecmp' : 'strcmp'
             ),
             StdlibConstants::SORT_LOCALE_STRING => self::resolveStringCallback('strcoll'),
-            StdlibConstants::SORT_REGULAR,
-            StdlibConstants::SORT_NUMERIC => self::resolveStringCallback(
-                0 !== $caseFlag ? 'strcasecmp' : 'strcmp'
-            ),
+            // php-src: SORT_FLAG_CASE applies to SORT_STRING/SORT_NATURAL only — ignored for SORT_REGULAR (#34702).
+            StdlibConstants::SORT_REGULAR => self::resolveStringCallback('strcmp'),
+            StdlibConstants::SORT_NUMERIC => self::resolveStringCallback('strcmp'),
             default => self::resolveStringCallback(
                 0 !== $caseFlag ? 'strcasecmp' : 'strcmp'
             ),
@@ -401,7 +400,8 @@ final class VmInternalCompare
             );
         }
 
-        return self::compareRegularOperands($a, $b, 0 !== $caseFlag);
+        // SORT_REGULAR and default: php-src ignores SORT_FLAG_CASE on keys (#34702).
+        return self::compareRegularOperands($a, $b, false);
     }
 
     /** Compare array values for asort/arsort packed lists with SORT_NUMERIC (php-src). */
@@ -430,7 +430,8 @@ final class VmInternalCompare
             );
         }
         if (StdlibConstants::SORT_REGULAR === $sortType) {
-            return self::compareRegularOperands($a, $b, 0 !== $caseFlag, $descending);
+            // php-src ignores SORT_FLAG_CASE for SORT_REGULAR (#34702).
+            return self::compareRegularOperands($a, $b, false, $descending);
         }
 
         return self::compareValuesForSort($a, $b);
