@@ -271,6 +271,12 @@ final class Variable {
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
     public ?\PHPLLVM\Value $objectPropertySlot = null;
 
+    /**
+     * True when this Variable is the intentional ASSIGN_REF alias for `$o->p =& $x` —
+     * must not strip objectPropertySlot on later `$x = …` (#34649 / #34465).
+     */
+    public bool $assignRefLvalueAlias = false;
+
     /** CFG receiver operand for {@see $objectPropertySlot} reload at dominating sends (#33760). */
     public ?\PHPCfg\Operand $objectPropertyReceiverOp = null;
 
