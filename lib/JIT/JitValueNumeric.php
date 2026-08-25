@@ -411,8 +411,9 @@ final class JitValueNumeric
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($longBlock);
-        $ll = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
-        $rl = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
+        // Bool boxes are TYPE_NATIVE_BOOL (2); __value__readLong returns 0 — use JitLongArg (#34678).
+        $ll = JitLongArg::lower($context, $left, 'binary op left');
+        $rl = JitLongArg::lower($context, $right, 'binary op right');
         if (JitLongArithOverflow::supportsOpcode($opType)) {
             JitLongArithOverflow::writeBoxedBinary($context, $opType, $ll, $rl, $slotPtr);
         } else {
