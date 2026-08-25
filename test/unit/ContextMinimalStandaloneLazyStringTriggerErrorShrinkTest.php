@@ -7,17 +7,17 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop Context::ensureMinimalUserStandaloneBodies always-on LastErrorRuntime (#34631 / peer #34621).
+ * Drop Context::ensureMinimalUserStandaloneBodies always-on StringTriggerError (#34641 / peer #34631).
  *
- * Thin AOT hello-world must not eagerly NestedJIT last-error ABI; JitErrorGetLast /
- * JitTriggerErrorKernel ensureLinked lazily (#32122 .1 mint class).
+ * Thin AOT hello-world must not eagerly NestedJIT trigger_error ABI; call sites
+ * ensureLinked lazily (#32122 .1 mint class / #33234 Type drop).
  */
-final class ContextMinimalStandaloneLazyLastErrorRuntimeShrinkTest extends TestCase
+final class ContextMinimalStandaloneLazyStringTriggerErrorShrinkTest extends TestCase
 {
-    public function testEnsureMinimalDropsEagerLastError(): void
+    public function testEnsureMinimalDropsEagerStringTriggerError(): void
     {
         $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('#34631', $context);
+        $this->assertStringContainsString('#34641', $context);
         $minimalPos = strpos($context, 'private function ensureMinimalUserStandaloneBodies');
         $this->assertNotFalse($minimalPos);
         $minimalEnd = strpos($context, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
@@ -25,12 +25,12 @@ final class ContextMinimalStandaloneLazyLastErrorRuntimeShrinkTest extends TestC
         $minimalBody = substr($context, $minimalPos, $minimalEnd - $minimalPos);
 
         $this->assertStringNotContainsString(
-            'LastErrorRuntime::ensureStandaloneBodies($this)',
+            'StringTriggerError::ensureStandaloneBodies($this)',
             $minimalBody,
-            'ensureMinimalUserStandaloneBodies must not eagerly LastErrorRuntime (#34631)'
+            'ensureMinimalUserStandaloneBodies must not eagerly StringTriggerError (#34641)'
         );
 
-        // Essentials for thin echo / error / argv / getenv surface stay.
+        // Essentials for thin echo / argv / getenv / bridges stay.
         foreach ([
             'StringHtmlspecialchars::ensureStandaloneBodies($this)',
             'ObOutputRuntime::ensureLinked($this)',
@@ -40,55 +40,51 @@ final class ContextMinimalStandaloneLazyLastErrorRuntimeShrinkTest extends TestC
             'ExceptionBridge::ensureStandaloneBodies($this)',
             'ErrorBridge::ensureStandaloneBodies($this)',
         ] as $keep) {
-            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34631)");
+            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34641)");
         }
 
-        $this->assertStringNotContainsString(
-            'StringTriggerError::ensureStandaloneBodies($this)',
-            $minimalBody,
-            'ensureMinimal must not eagerly StringTriggerError (#34641)'
-        );
-
-        // Full standalone still links LastError after TriggerError.
+        // Full standalone still links StringTriggerError before AssertFail / LastError.
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
         $fullBody = substr($context, $fullPos);
-        $this->assertStringContainsString('LastErrorRuntime::ensureStandaloneBodies($this)', $fullBody);
+        $this->assertStringContainsString('StringTriggerError::ensureStandaloneBodies($this)', $fullBody);
     }
 
     public function testCallSitesEnsureBeforeLookup(): void
     {
         $checks = [
-            'ext/standard/JitErrorGetLast.php' => 'LastErrorRuntime::ensureLinked',
-            'ext/standard/JitTriggerErrorKernel.php' => 'LastErrorRuntime::ensureLinked',
+            'ext/standard/trigger_error_.php' => 'StringTriggerError::ensureLinked',
+            'ext/standard/JitBuiltinWarning.php' => 'StringTriggerError::ensureLinked',
+            'lib/JIT/JitIncDec.php' => 'StringTriggerError::ensureLinked',
+            'lib/JIT/HashTableResourceKeyLlvm.php' => 'StringTriggerError::ensureLinked',
         ];
         foreach ($checks as $rel => $needle) {
             $path = __DIR__.'/../../'.$rel;
             $this->assertFileExists($path, $rel);
             $source = (string) file_get_contents($path);
-            $this->assertStringContainsString($needle, $source, $rel.' must ensure lazily (#34631)');
+            $this->assertStringContainsString($needle, $source, $rel.' must ensure lazily (#34641)');
         }
     }
 
-    public function testLastErrorRuntimeRestoresInsert(): void
+    public function testJitTriggerErrorKernelRestoresInsert(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/LastErrorRuntime.php');
-        $this->assertStringContainsString('#34631', $source);
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitTriggerErrorKernel.php');
+        $this->assertStringContainsString('#34641', $source);
         $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
         $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
         $this->assertStringNotContainsString(
             "\$context->builder->clearInsertionPosition();\n    }",
             $source,
-            'implement() must not always clear insert (#34631)'
+            'implement() must not always clear insert (#34641)'
         );
     }
 
-    public function testNoNewRuntimeCForMinimalLastErrorLazy(): void
+    public function testNoNewRuntimeCForMinimalTriggerErrorLazy(): void
     {
         $runtimeDir = dirname(__DIR__, 2).'/lib/AOT/runtime';
         $this->assertFileDoesNotExist(
-            $runtimeDir.'/last_error.c',
-            'must not add last_error.c for #34631 — PHP JIT bridges only'
+            $runtimeDir.'/trigger_error.c',
+            'must not add trigger_error.c for #34641 — PHP JIT bridges only'
         );
     }
 }

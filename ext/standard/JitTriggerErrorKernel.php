@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorHandlerJitRuntime;
 use PHPCompiler\JIT\Builtin\LastErrorRuntime;
 use PHPCompiler\JIT\Builtin\SilenceRuntime;
@@ -26,6 +27,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Do not re-add Type always-on empty decls — leftover mint trigger_error.1 /
  * undefined_array_key_warning_*.1 (#31894 / #32122 / #33234 / #33249).
+ * Mid-{main} ensureLinked restores builder insert (#34641 / peer LastErrorRuntime #34631).
  *
  * php-src: Zend/zend_execute_API.c, Zend/zend_execute.c, main/php_errors.c
  */
@@ -55,6 +57,8 @@ final class JitTriggerErrorKernel
 
     public static function implement(Context $context): void
     {
+        // Capture before NestedJIT/bridge emit so mid-{main} ensureLinked is safe (#34641).
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
         $probe = $context->module->getNamedFunction('__compiler_trigger_error');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             // trigger_error body present — still ensure undef-key ABIs (#33249 Type drop).
@@ -63,6 +67,7 @@ final class JitTriggerErrorKernel
             self::implementUndefKeyCstrBridge($context);
             self::implementUndefKeyLongBridge($context);
             self::registerLinkedRuntime($context);
+            BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
 
             return;
         }
@@ -82,7 +87,7 @@ final class JitTriggerErrorKernel
         self::implementUndefKeyLongBridge($context);
         self::implementTriggerErrorBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
     }
 
     /**
