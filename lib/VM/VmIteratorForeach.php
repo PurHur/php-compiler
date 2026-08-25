@@ -972,11 +972,19 @@ final class VmIteratorForeach
         $context->builder->branch($done);
         $context->builder->positionAtEnd($str);
         $node = self::stringKeyNodeAt($context, $ht, $map, $nodeMap, $slotKey);
+        // Own a copy of the HT node key before writeString — otherwise the next
+        // iteration's __value__valueDelref frees Bucket->key in place (SIGSEGV /
+        // corrupted keys on string-keyed foreach, #34635). php-src FE_FETCH_R
+        // gives the key zval a proper addref/separate, not a raw HT pointer.
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $ownedKey = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $keyStr
+        );
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $destPtr,
-            $keyStr
+            $ownedKey
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);

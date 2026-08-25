@@ -130,7 +130,7 @@ final class HashTableExportKeyValuePairs implements Call
         $context->builder->positionAtEnd($body);
         // Own a copy of the node key — VarExportArrayLlvm / PrintRArrayLlvm quote paths
         // must not alias the live HT strKeys buffer (var_export then print_r showed every
-        // key as the last key, #34514). Foreach / json_encode keep the direct load (#26367).
+        // key as the last key, #34514). Foreach key fetch uses the same separate (#34635).
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
         $ownedKey = $context->builder->call(
             $context->lookupFunction('__string__separate'),
