@@ -251,6 +251,9 @@ final class Variable {
     /** Hashtable pointer from {@see __value__readHashtable}; do not addref/delref (issue #107). */
     public bool $borrowedHashtable = false;
 
+    /** Container already passed {@see HashTableWriteLlvm::separateContainerForWrite} this compile (#34673). */
+    public bool $containerWriteSeparated = false;
+
     /** Borrowed {@see __value__} entry from foreach by-ref; skip valueDelref (#4364). */
     public bool $borrowedValueEntry = false;
 

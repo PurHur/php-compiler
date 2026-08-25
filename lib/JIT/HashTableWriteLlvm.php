@@ -1634,6 +1634,9 @@ final class HashTableWriteLlvm
         if ($array->type & Variable::IS_NATIVE_ARRAY) {
             return HashTableReadLlvm::loadHashtablePointer($context, $array);
         }
+        if ($array->containerWriteSeparated) {
+            return HashTableReadLlvm::loadHashtablePointer($context, $array);
+        }
 
         $ht = HashTableReadLlvm::loadHashtablePointer($context, $array);
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
@@ -1686,6 +1689,8 @@ final class HashTableWriteLlvm
         $phi->addIncoming($nullHt, $nullBlock);
         $phi->addIncoming($ht, $checkBlock);
         $phi->addIncoming($copy, $dupEnd);
+
+        $array->containerWriteSeparated = true;
 
         return $phi;
     }
