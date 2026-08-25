@@ -10,9 +10,10 @@ namespace PHPCompiler\ext\fileinfo;
  * NestedJIT-self-contained. Sniff mirrors {@see \PHPCompiler\ext\standard\VmMime::detectFromBytes}
  * for magics needed by the Done-when (`text/plain` for `"hello"`).
  *
- * NestedJIT hazards avoided (#27196):
+ * NestedJIT hazards avoided (#27196 / #34797):
  * - `\strncmp` / `\strcasecmp` with needles (false match)
  * - UTF-8 BOM / PNG binary string compares (segfault)
+ * - `is_readable` + libc `@file_get_contents` on `data:` (peer #34731 / #34789)
  *
  * php-src: ext/fileinfo/fileinfo.c — PHP_FUNCTION(finfo_file) / PHP_FUNCTION(finfo_buffer)
  */
@@ -23,6 +24,15 @@ final class FinfoFileJitHelper
      */
     public static function mimeFromPath(string $path): ?string
     {
+        // NestedJIT is_readable/libc open reject data: — peer MimeContentType (#34789 / #34731).
+        if (\is_string($path) && 'data:' === \substr($path, 0, 5)) {
+            $data = self::decodeDataUri($path);
+            if (null === $data) {
+                return null;
+            }
+
+            return self::detectFromBytes($data);
+        }
         if (!\is_readable($path)) {
             return null;
         }
@@ -32,6 +42,26 @@ final class FinfoFileJitHelper
         }
 
         return self::detectFromBytes($data);
+    }
+
+    /**
+     * NestedJIT-safe subset of {@see \PHPCompiler\ext\standard\VmDataUri::decode} (#34731 / #34797).
+     * Same-file only — NestedJIT cannot call cross-helper decode reliably.
+     */
+    private static function decodeDataUri(string $path): ?string
+    {
+        $comma = \strrpos($path, ',');
+        if (false === $comma) {
+            return null;
+        }
+        $data = \substr($path, $comma + 1);
+        if (false !== \stripos($path, ';base64,')) {
+            $decoded = \base64_decode($data, true);
+
+            return false === $decoded ? null : $decoded;
+        }
+
+        return $data;
     }
 
     /**
