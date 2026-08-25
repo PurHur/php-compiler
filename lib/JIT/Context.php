@@ -4206,6 +4206,36 @@ class Context {
         return null;
     }
 
+    /**
+     * File-scope {@code const X = E::A} / define() holding an enum case (#34783).
+     *
+     * Class-const path rematerializes via {@see VmConstantJit} (#31967); global CONST_FETCH
+     * previously only lowered scalars and threw on VM TYPE_OBJECT / TYPE_ENUM_CASE.
+     *
+     * php-src: Zend/zend_constants.c + Zend/zend_enum.c — file consts store case singletons.
+     */
+    private function constantFetchEnumCaseVariable(string $name, VMVariable $phpVar): Variable
+    {
+        if (VMVariable::TYPE_ENUM_CASE === $phpVar->type) {
+            $var = VmConstantJit::toVariable($this, $phpVar);
+            $var->compileTimeConstantName = $name;
+
+            return $var;
+        }
+        $enumClass = \PHPCompiler\VM\EnumCaseSupport::enumClassForCaseVariable($phpVar);
+        $caseName = \PHPCompiler\VM\EnumCaseSupport::enumCaseNameForVariable($phpVar);
+        if (null === $enumClass || '' === $caseName) {
+            throw new \LogicException('Enum case constant missing class/name: '.$name);
+        }
+        $classLc = strtolower(ltrim($enumClass->name, '\\'));
+        $classId = $this->type->object->lookup($classLc);
+        $caseKey = \PHPCompiler\ClassConstName::key($caseName);
+        $var = $this->type->object->jitEnumCaseFromBacking($classId, $caseKey);
+        $var->compileTimeConstantName = $name;
+
+        return $var;
+    }
+
     public function constantFetch(Operand $op): ?Variable {
         if ($op instanceof Operand\Literal) {
             $name = $op->value;
@@ -4224,6 +4254,10 @@ class Context {
             }
             if (is_null($phpVar)) {
                 return null;
+            }
+            // File-scope const / define() with enum case singleton (#34783, peer #31967).
+            if (\PHPCompiler\VM\EnumCaseSupport::isEnumCaseVariable($phpVar)) {
+                return $this->constantFetchEnumCaseVariable($name, $phpVar);
             }
             // convert to PHP variable
             switch ($phpVar->type) {
