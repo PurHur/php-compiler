@@ -30,6 +30,7 @@ use PHPCompiler\JIT\EnumCasesHelper;
 use PHPCompiler\JIT\EnumFromHelper;
 use PHPCompiler\JIT\FiberHelper;
 use PHPCompiler\JIT\GeneratorHelper;
+use PHPCompiler\JIT\Builtin\ObjectHandleRuntime;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\ReflectionMethodQueryConstructHelper;
 use PHPCompiler\JIT\Builtin\Type;
@@ -297,6 +298,7 @@ class Object_ extends Type {
             $this->context->getTypeFromString('int32'),
             $this->context->getTypeFromString('int8'),
             $this->context->getTypeFromString('int32'),
+            $this->context->getTypeFromString('int64'),
         );
         $this->context->structFieldMap['__object__'] = [
             'ref' => 0,
@@ -307,6 +309,7 @@ class Object_ extends Type {
             'lazy_init_index' => 5,
             'dynamic_readonly' => 6,
             'prop_count' => 7,
+            'user_handle' => 8,
         ];
         $this->pointer = $this->context->getTypeFromString('__object__*');
         \PHPCompiler\JIT\ReadonlyBridge::registerDeclarations($this->context);
@@ -643,6 +646,8 @@ class Object_ extends Type {
             $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*')),
             $this->context->constantFromInteger($propCount, 'int32')
         );
+
+        ObjectHandleRuntime::emitAssignHandle($this->context, $obj);
 
         return $obj;
     }

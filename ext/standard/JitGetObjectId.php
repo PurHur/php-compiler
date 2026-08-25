@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
+use PHPCompiler\JIT\Builtin\ObjectHandleRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -110,13 +111,7 @@ final class JitGetObjectId
 
     private static function objectHandle(Context $context, Value $obj): Value
     {
-        $voidp = $context->getTypeFromString('void')->pointerType(0);
-        $i64 = $context->getTypeFromString('int64');
-
-        return $context->builder->ptrToInt(
-            $context->builder->pointerCast($obj, $voidp),
-            $i64
-        );
+        return ObjectHandleRuntime::emitUserVisibleHandle($context, $obj);
     }
 
     private static function emitTypeErrorAndAbort(Context $context, string $message): void

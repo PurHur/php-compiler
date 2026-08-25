@@ -2532,6 +2532,9 @@ class Context {
                 }
             }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_before_php'));
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                $emitInStandaloneMain(fn () => Builtin\ObjectHandleRuntime::emitSnapBaselineForStandaloneMain($this));
+            }
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
                 && !$this->shouldSkipStandaloneMainEnvProbeGate()) {
                 $emitInStandaloneMain(fn () => VmDriverExecuteNative::emitStandaloneMainEnvProbeGate($this, $this->main));
