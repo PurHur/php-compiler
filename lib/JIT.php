@@ -21616,14 +21616,16 @@ class JIT {
             if ($operand instanceof \PHPCfg\Operand) {
                 $n = JIT\OperandName::resolve($operand);
                 $this->applyDateTimeLocalInstantToReceiver($operand, $arg);
-                // Unnamed $this operand (php-cfg temp) — still restore when a unique
-                // dateTimeLocalInstant exists (#34614 unserialize→format).
+                // Unnamed $this operand (php-cfg temp) — restore only the unserialize
+                // target; a lone construct local must not stamp mutation returns (#34651).
+                $lastUnser = $this->context->lastDateTimeUnserializeLocalName;
                 if (
                     null === $arg->compileTimeDateTimeTimestamp
                     && (null === $n || '' === $n)
-                    && 1 === \count($this->context->dateTimeLocalInstants)
+                    && \is_string($lastUnser) && '' !== $lastUnser
+                    && isset($this->context->dateTimeLocalInstants[$lastUnser])
                 ) {
-                    $instant = \reset($this->context->dateTimeLocalInstants);
+                    $instant = $this->context->dateTimeLocalInstants[$lastUnser];
                     if (\is_array($instant) && isset($instant['timestamp'])) {
                         $arg->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
                         $arg->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
@@ -21637,22 +21639,18 @@ class JIT {
             }
             // Instance method $this is often absent from callOperands (opOffset>0). Scope
             // Variable for `$u->format()` can diverge from namedVariableBindings['u'] after
-            // unserialize sync (#34614) — restore from dateTimeLocalInstants when unique.
+            // unserialize sync (#34614) — restore only that target, not any lone construct
+            // local (#34651 DateTimeImmutable mutation returns).
+            $lastUnser = $this->context->lastDateTimeUnserializeLocalName;
             if (
                 0 === $i
                 && $opOffset > 0
                 && null === $arg->compileTimeDateTimeTimestamp
-                && [] !== $this->context->dateTimeLocalInstants
+                && \is_string($lastUnser) && '' !== $lastUnser
+                && isset($this->context->dateTimeLocalInstants[$lastUnser])
             ) {
-                $candidates = [];
-                foreach ($this->context->dateTimeLocalInstants as $localName => $instant) {
-                    if (!\is_array($instant) || !isset($instant['timestamp'])) {
-                        continue;
-                    }
-                    $candidates[$localName] = $instant;
-                }
-                if (1 === \count($candidates)) {
-                    $instant = \reset($candidates);
+                $instant = $this->context->dateTimeLocalInstants[$lastUnser];
+                if (\is_array($instant) && isset($instant['timestamp'])) {
                     $arg->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
                     $arg->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
                     $arg->compileTimeTimezoneName = $instant['timezone'] ?? null;

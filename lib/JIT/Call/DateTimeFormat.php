@@ -55,10 +55,10 @@ final class DateTimeFormat implements Call
         }
         $instant = null;
         $last = $context->lastDateTimeUnserializeLocalName;
+        // Only restore the unserialize target — a single construct local must not stamp
+        // unrelated DateTimeImmutable mutation returns (#34651 / re-#34614).
         if (\is_string($last) && '' !== $last && isset($context->dateTimeLocalInstants[$last])) {
             $instant = $context->dateTimeLocalInstants[$last];
-        } elseif (1 === \count($context->dateTimeLocalInstants)) {
-            $instant = \reset($context->dateTimeLocalInstants);
         }
         if (!\is_array($instant) || !isset($instant['timestamp'])) {
             return;
