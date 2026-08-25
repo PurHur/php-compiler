@@ -4640,6 +4640,55 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('recursivedirectoryiterator' === $lcname) {
+            // Thin AOT: subclass of FilesystemIterator + RecursiveIterator (#34624).
+            // php-src ext/spl/spl_directory.c — RecursiveDirectoryIterator.
+            $this->lookup('FilesystemIterator');
+            $this->setClassParentName($displayName, 'FilesystemIterator');
+            $this->inheritParentInstanceProperties($id, 'filesystemiterator');
+            $this->inheritMethodVisibilityFromParent($id, $lcname);
+            $this->ensureZendBuiltinInterfaces();
+            $this->markInterfaceClass('RecursiveIterator');
+            $this->setInterfaceExtends('RecursiveIterator', ['Iterator', 'Traversable']);
+            $this->markInterfaceClass('SeekableIterator');
+            $this->setInterfaceExtends('SeekableIterator', ['Iterator', 'Traversable']);
+            $this->setClassInterfaces($displayName, [
+                'Stringable',
+                'RecursiveIterator',
+                'SeekableIterator',
+                'Traversable',
+                'Iterator',
+            ]);
+            $this->seedExternalClassConstants($id, [
+                'CURRENT_AS_PATHNAME' => 32,
+                'CURRENT_AS_FILEINFO' => 0,
+                'CURRENT_AS_SELF' => 16,
+                'CURRENT_MODE_MASK' => 0x000000F0,
+                'KEY_AS_PATHNAME' => 0,
+                'KEY_AS_FILENAME' => 256,
+                'KEY_MODE_MASK' => 0x00000F00,
+                'NEW_CURRENT_AND_KEY' => 256,
+                'SKIP_DOTS' => 4096,
+                'UNIX_PATHS' => 8192,
+                'FOLLOW_SYMLINKS' => 0x00004000,
+                'OTHER_MODE_MASK' => 0x00007000,
+            ]);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
+                'isdot', 'getfilename', 'getpathname', 'getpath', 'getsize',
+                'getextension', 'getbasename', 'gettype', 'getrealpath',
+                'getmtime', 'getatime', 'getctime', 'getperms', 'getowner', 'getgroup', 'getinode',
+                '__tostring',
+                'isfile', 'isdir', 'islink', 'getlinktarget', 'isreadable', 'iswritable', 'isexecutable',
+                'getfileinfo', 'getpathinfo', 'openfile',
+                'getflags', 'setflags',
+                'haschildren', 'getchildren', 'getsubpath', 'getsubpathname',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('recursiveiteratoriterator' === $lcname) {
             // Thin AOT: LEAVES_ONLY flatten into `__spl_ht` at construct (#26775).
             // php-src ext/spl/spl_iterators.c — OuterIterator + Iterator.

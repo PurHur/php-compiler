@@ -11,8 +11,8 @@ use PHPCompiler\VM\DirectoryIteratorJitHelper;
 use PHPLLVM\Value;
 
 /**
- * DirectoryIterator / FilesystemIterator / SplFileInfo / SplFileObject thin-AOT methods
- * (#27289 … #33313).
+ * DirectoryIterator / FilesystemIterator / RecursiveDirectoryIterator / SplFileInfo / SplFileObject
+ * thin-AOT methods (#27289 … #33313, #34624).
  *
  * php-src: ext/spl/spl_directory.c — zim_SplFileInfo___construct / getFileInfo / getPathInfo / openFile / …
  */
