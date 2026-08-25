@@ -243,6 +243,9 @@ final class HelperRuntimeCache
         // matches Zend/VM (same algorithm as user-script AOT; peer #34800 / #27077).
         'phpcompiler\\ext\\standard\\crc32jithelper::crc32argv' => true,
         'phpcompiler\\ext\\standard\\crc32jithelper::crc32cargv' => true,
+        // #34829 — prelinked HashCryptoJitHelper unit.o is EVP-only; OpenSSL rejects PHP
+        // non-crypto algos (crc32 family, adler32, fnv). NestedJIT hash() with inlined digests.
+        'phpcompiler\\ext\\standard\\hashcryptojithelper::hash' => true,
         // re-#26868 — prelinked StrRot13JitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
         // rot13Argv into user module (peer #26890 / #30812).
         'phpcompiler\\ext\\standard\\strrot13jithelper::rot13argv' => true,
