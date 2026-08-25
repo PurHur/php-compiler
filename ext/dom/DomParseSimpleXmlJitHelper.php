@@ -350,14 +350,11 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
-     * Attributes from an open-tag string (xmlns* skipped) for user-script AOT (#27275).
+     * xmlns / xmlns:prefix decls on an open-tag ('' key = default xmlns).
      *
-     * Resolves prefixed attrs against xmlns decls on the same open-tag so
-     * get/hasAttributeNS cache keys match Zend (peer rootAttributesArgv #33116).
-     *
-     * @return list<array{qname: string, value: string, namespace: string}>
+     * @return array<string, string> prefix → URI
      */
-    public static function attributesFromOpenTagArgv(string $openTag): array
+    public static function xmlnsDeclsFromOpenTagArgv(string $openTag): array
     {
         if (!preg_match('/^<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)\/?>/', $openTag, $root)) {
             return [];
@@ -379,6 +376,144 @@ final class DomParseSimpleXmlJitHelper
         ) {
             $nsDecl[''] = $def[1];
         }
+
+        return $nsDecl;
+    }
+
+    /**
+     * In-scope xmlns map from ancestor open-tags before {@code $offset} (#34618).
+     *
+     * libxml {@code xmlSearchNs} inherits prefix bindings from ancestors; thin AOT
+     * must mirror that when seeding {@see attributesFromOpenTagArgv}.
+     *
+     * @return array<string, string> prefix → URI
+     */
+    public static function xmlnsScopeBeforeOffsetArgv(string $xml, int $offset): array
+    {
+        if ($offset <= 0) {
+            return [];
+        }
+        $offset = min($offset, \strlen($xml));
+        /** @var list<array<string, string>> $stack */
+        $stack = [[]];
+        $pos = 0;
+        while ($pos < $offset && false !== ($lt = strpos($xml, '<', $pos))) {
+            if ($lt >= $offset) {
+                break;
+            }
+            $next = $xml[$lt + 1] ?? '';
+            if ('!' === $next || '?' === $next) {
+                $gt = strpos($xml, '>', $lt);
+                $pos = false === $gt ? $offset : $gt + 1;
+
+                continue;
+            }
+            if ('/' === $next) {
+                $gt = strpos($xml, '>', $lt);
+                if (\count($stack) > 1) {
+                    array_pop($stack);
+                }
+                $pos = false === $gt ? $offset : $gt + 1;
+
+                continue;
+            }
+            $gt = strpos($xml, '>', $lt);
+            if (false === $gt || $gt >= $offset) {
+                break;
+            }
+            $openTag = substr($xml, $lt, $gt - $lt + 1);
+            $local = self::xmlnsDeclsFromOpenTagArgv($openTag);
+            $merged = $local + $stack[\count($stack) - 1];
+            $selfClosing = str_ends_with(rtrim($openTag, '>'), '/');
+            if (!$selfClosing) {
+                $stack[] = $merged;
+            }
+            $pos = $gt + 1;
+        }
+
+        return $stack[\count($stack) - 1];
+    }
+
+    /**
+     * Byte offset of the Nth (1-based) matching open-tag, or -1 (#34618).
+     */
+    public static function nthTagOpenTagOffsetArgv(string $xml, string $tag, int $position): int
+    {
+        if ($position < 1) {
+            return -1;
+        }
+        $tag = strtolower($tag);
+        if ('*' === $tag) {
+            $seen = 0;
+            $offset = 0;
+            $len = \strlen($xml);
+            while ($offset < $len && false !== ($pos = strpos($xml, '<', $offset))) {
+                $next = $xml[$pos + 1] ?? '';
+                if ('/' === $next || '!' === $next || '?' === $next || '' === $next) {
+                    $offset = $pos + 1;
+                    continue;
+                }
+                $gt = strpos($xml, '>', $pos);
+                if (false === $gt) {
+                    break;
+                }
+                ++$seen;
+                if ($seen === $position) {
+                    return $pos;
+                }
+                $offset = $pos + 1;
+            }
+
+            return -1;
+        }
+        $needle = '<'.$tag;
+        $seen = 0;
+        $offset = 0;
+        while (false !== ($pos = stripos($xml, $needle, $offset))) {
+            $after = $pos + \strlen($needle);
+            if ($after >= \strlen($xml)) {
+                break;
+            }
+            $next = $xml[$after];
+            if ('>' !== $next && '/' !== $next && ' ' !== $next) {
+                $offset = $pos + 1;
+                continue;
+            }
+            $gt = strpos($xml, '>', $pos);
+            if (false === $gt) {
+                break;
+            }
+            ++$seen;
+            if ($seen === $position) {
+                return $pos;
+            }
+            $offset = $pos + 1;
+        }
+
+        return -1;
+    }
+
+    /**
+     * Attributes from an open-tag string (xmlns* skipped) for user-script AOT (#27275).
+     *
+     * Resolves prefixed attrs against xmlns decls on the same open-tag plus an
+     * optional inherited scope (ancestor xmlns) so get/hasAttributeNS cache keys
+     * match Zend xmlHasNsProp (#33116, #34618).
+     *
+     * @param array<string, string> $inheritedNsDecl prefix → URI from ancestors
+     * @return list<array{qname: string, value: string, namespace: string}>
+     */
+    public static function attributesFromOpenTagArgv(string $openTag, array $inheritedNsDecl = []): array
+    {
+        if (!preg_match('/^<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)\/?>/', $openTag, $root)) {
+            return [];
+        }
+        $attrs = $root[2] ?? '';
+        if ('' === trim($attrs)) {
+            return [];
+        }
+        // Local decls override inherited (php-src / libxml xmlSearchNs).
+        $nsDecl = self::xmlnsDeclsFromOpenTagArgv($openTag) + $inheritedNsDecl;
         $out = [];
         if (!preg_match_all('/([A-Za-z_][\w:.-]*)\s*=\s*"([^"]*)"/', $attrs, $pairs, PREG_SET_ORDER)
             && !preg_match_all("/([A-Za-z_][\w:.-]*)\s*=\s*'([^']*)'/", $attrs, $pairs, PREG_SET_ORDER)
@@ -597,44 +732,8 @@ final class DomParseSimpleXmlJitHelper
         if (!preg_match('/<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)\/?>/', $xml, $root)) {
             return [];
         }
-        $attrs = $root[2] ?? '';
-        if ('' === trim($attrs)) {
-            return [];
-        }
-        $nsDecl = [];
-        if (preg_match_all('/xmlns:([A-Za-z_][\w.-]*)\s*=\s*"([^"]*)"/', $attrs, $decls, PREG_SET_ORDER)
-            || preg_match_all("/xmlns:([A-Za-z_][\w.-]*)\s*=\s*'([^']*)'/", $attrs, $decls, PREG_SET_ORDER)
-        ) {
-            foreach ($decls as $d) {
-                $nsDecl[$d[1]] = $d[2];
-            }
-        }
-        if (preg_match('/xmlns\s*=\s*"([^"]*)"/', $attrs, $def)
-            || preg_match("/xmlns\s*=\s*'([^']*)'/", $attrs, $def)
-        ) {
-            $nsDecl[''] = $def[1];
-        }
-        $out = [];
-        if (!preg_match_all('/([A-Za-z_][\w:.-]*)\s*=\s*"([^"]*)"/', $attrs, $pairs, PREG_SET_ORDER)
-            && !preg_match_all("/([A-Za-z_][\w:.-]*)\s*=\s*'([^']*)'/", $attrs, $pairs, PREG_SET_ORDER)
-        ) {
-            return [];
-        }
-        foreach ($pairs as $pair) {
-            $qname = $pair[1];
-            if (0 === stripos($qname, 'xmlns')) {
-                continue;
-            }
-            $pos = strpos($qname, ':');
-            $prefix = false === $pos ? '' : substr($qname, 0, $pos);
-            $out[] = [
-                'qname' => $qname,
-                'value' => $pair[2],
-                'namespace' => $nsDecl[$prefix] ?? '',
-            ];
-        }
-
-        return $out;
+        // Reuse open-tag parser (same-tag xmlns only — document element has no ancestors).
+        return self::attributesFromOpenTagArgv($root[0]);
     }
 
     /**
