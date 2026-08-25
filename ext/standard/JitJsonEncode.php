@@ -165,6 +165,19 @@ final class JitJsonEncode
      */
     private static function compileTimeDateTimeFamilyWire(JITVariable $arg): ?array
     {
+        // DateTimeZone wire is timezone-only — never inherit a DateTime instant (#33752).
+        if (
+            'DateTimeZone' === ($arg->classUserType ?? '')
+            && null !== $arg->compileTimeTimezoneName
+            && '' !== $arg->compileTimeTimezoneName
+        ) {
+            $tz = $arg->compileTimeTimezoneName;
+
+            return [
+                'timezone_type' => DateTimeSupport::zendTimezoneWireType($tz),
+                'timezone' => $tz,
+            ];
+        }
         if (null !== $arg->compileTimeDateTimeTimestamp) {
             $tz = $arg->compileTimeTimezoneName ?? 'UTC';
             $timestamp = (int) $arg->compileTimeDateTimeTimestamp;

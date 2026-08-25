@@ -21301,6 +21301,9 @@ class JIT {
         $stamp = static function (JIT\Variable $bound) use ($first): void {
             $bound->compileTimeTimezoneName = $first->compileTimeTimezoneName;
             $bound->classUserType = $first->classUserType ?? 'DateTimeZone';
+            // DateTimeZone must not inherit a prior DateTime instant (#33752 json_encode wire).
+            $bound->compileTimeDateTimeTimestamp = null;
+            $bound->compileTimeDateTimeMicrosecond = null;
             if (
                 null === $bound->compileTimeString
                 || 'DateTimeZone' === $bound->compileTimeString
@@ -21618,10 +21621,12 @@ class JIT {
                 $this->applyDateTimeLocalInstantToReceiver($operand, $arg);
                 // Unnamed $this operand (php-cfg temp) — still restore when a unique
                 // dateTimeLocalInstant exists (#34614 unserialize→format).
+                // Never stamp DateTime instant onto DateTimeZone $this (#33752 json_encode wire).
                 if (
                     null === $arg->compileTimeDateTimeTimestamp
                     && (null === $n || '' === $n)
                     && 1 === \count($this->context->dateTimeLocalInstants)
+                    && 'DateTimeZone' !== ($arg->classUserType ?? '')
                 ) {
                     $instant = \reset($this->context->dateTimeLocalInstants);
                     if (\is_array($instant) && isset($instant['timestamp'])) {
@@ -21643,6 +21648,7 @@ class JIT {
                 && $opOffset > 0
                 && null === $arg->compileTimeDateTimeTimestamp
                 && [] !== $this->context->dateTimeLocalInstants
+                && 'DateTimeZone' !== ($arg->classUserType ?? '')
             ) {
                 $candidates = [];
                 foreach ($this->context->dateTimeLocalInstants as $localName => $instant) {
