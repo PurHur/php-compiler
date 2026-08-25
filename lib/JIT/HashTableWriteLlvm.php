@@ -1770,7 +1770,12 @@ final class HashTableWriteLlvm
             $context->builder->structGep($ht, $map['numElements'])
         );
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
+        // Mark FETCH_DIM_W / `$a[]=` lvalue so ASSIGN_REF / assignOperand commit into HT (#34645).
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
+        $var->writableHt = $ht;
+        $var->writableIndex = $index;
+
+        return $var;
     }
 
     /**

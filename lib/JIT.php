@@ -8938,9 +8938,6 @@ class JIT {
                     }
                     $destName = JIT\OperandName::resolve($destOp);
                     $srcName = JIT\OperandName::resolve($srcOp);
-                    if (null === $destName) {
-                        throw new \LogicException('Reference assignment requires named destination variable');
-                    }
                     // Zend: `$a =& f()` / non-variable RHS → Notice + value assign (#30015).
                     // Class static properties are lvalues (FETCH_STATIC_PROP_W, #32036).
                     if (
@@ -8953,6 +8950,16 @@ class JIT {
                         JIT\JitReferencableCheck::emitNonVariableAssignRefNotice($this->context);
                         $this->assignOperand($destOp, $this->context->getVariableFromOp($srcOp));
                         break;
+                    }
+                    // `$a[]=&$x` / `$o->p=&$x` / `C::$p=&$x` — FETCH_*_W lvalue dest (#34645, re-#5349/#5370).
+                    if (null === $destName) {
+                        if (
+                            $this->context->hasVariableOp($destOp)
+                            && $this->tryAssignRefIntoWritableLvalue($destOp, $srcOp, $srcName)
+                        ) {
+                            break;
+                        }
+                        throw new \LogicException('Reference assignment requires named destination variable');
                     }
                     if (null === $srcName) {
                         $this->context->foreachByRefLocalNames[$this->context->resolveRefAliasName($destName)] = true;
@@ -18842,6 +18849,7 @@ class JIT {
                     || $boundLv->functionStaticGlobal
                     || null !== $boundLv->objectPropertySlot
                     || null !== $boundLv->valueBoxAliasPtr
+                    || null !== $boundLv->writableHt
                 ) {
                     $this->context->setVariableOp($resultOp, $boundLv);
                 }
@@ -18935,8 +18943,10 @@ class JIT {
         $result = $this->resolveAssignLvalue($resultOp);
         // Locals that still carry a non-hashtable property alias from a prior read assign
         // must rebind — writing through would mutate the previous object (#34465).
+        // Intentional `$o->p =& $x` aliases keep the slot (#34645).
         if (
             null !== $result->objectPropertySlot
+            && !$result->assignRefLvalueAlias
             && $this->isScalarObjectPropertyAliasType($result->objectPropertyType)
             && !(
                 $force
@@ -27435,10 +27445,57 @@ class JIT {
             null === $bound->valueBoxAliasPtr
             && !$bound->borrowedValueEntry
             && null === $bound->foreachByRefPackedArm
+            && null === $bound->writableHt
+            && null === $bound->objectPropertySlot
+            && null === $bound->staticPropertyGlobal
         ) {
             return false;
         }
         $this->context->setVariableOp($resultOp, $bound);
+
+        return true;
+    }
+
+    /**
+     * ASSIGN_REF into FETCH_DIM_W / property / static lvalue (unnamed dest temp).
+     *
+     * Store the RHS into the lvalue, then rebind the source name onto that lvalue so later
+     * `$x = …` writes through the array/property slot (Zend zend_assign_to_variable_reference).
+     *
+     * @see php-src Zend/zend_execute.c zend_assign_to_variable_reference
+     * @see #34645 leftover of #5349 / #5370
+     */
+    private function tryAssignRefIntoWritableLvalue(
+        Operand $destOp,
+        Operand $srcOp,
+        ?string $srcName
+    ): bool {
+        $destVar = $this->context->getVariableFromOp($destOp);
+        $isDim = null !== $destVar->writableHt && (
+            null !== $destVar->writableIndex
+            || null !== $destVar->writableStringKey
+            || null !== $destVar->writableObjectKey
+            || null !== $destVar->writableValueBoxKey
+        );
+        $isProp = null !== $destVar->objectPropertySlot;
+        $isStatic = null !== $destVar->staticPropertyGlobal;
+        $isArrayAccess = null !== $destVar->writableArrayAccessReceiver
+            && null !== $destVar->writableArrayAccessKey;
+        if (!$isDim && !$isProp && !$isStatic && !$isArrayAccess) {
+            return false;
+        }
+        if (!$this->context->hasVariableOp($srcOp)) {
+            throw new \LogicException('Reference assignment requires a bound source variable');
+        }
+        $srcVar = $this->context->getVariableFromOp($srcOp);
+        JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
+        $this->assignOperand($destOp, $srcVar);
+        $destVar = $this->context->getVariableFromOp($destOp);
+        $destVar->assignRefLvalueAlias = true;
+        if (null !== $srcName && '' !== $srcName) {
+            $this->context->bindVariableByName($srcName, $destVar);
+            $this->context->setVariableOp($srcOp, $destVar);
+        }
 
         return true;
     }
