@@ -172,7 +172,26 @@ final class JitValueNumeric
         $strEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
+        // Bool before float: JIT TYPE_NATIVE_BOOL (2) collides with VM TYPE_FLOAT (2).
+        // Matching VM float first made boxed true → readDouble → 0.0 (#34674 / peer #34667).
         $context->builder->positionAtEnd($afterStr);
+        $boolBlock = BasicBlockHelper::append($context, 'vbox_to_d_bool');
+        $afterBool = BasicBlockHelper::append($context, 'vbox_to_d_after_bool');
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
+        $boolDbl = $context->builder->uiToFp($boolByte, $f64);
+        $boolEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        // Only TYPE_NATIVE_DOUBLE (3) — do not OR VM TYPE_FLOAT (2); that steals bools.
+        $context->builder->positionAtEnd($afterBool);
         $dblBlock = BasicBlockHelper::append($context, 'vbox_to_d_dbl');
         $numBlock = BasicBlockHelper::append($context, 'vbox_to_d_num');
         $isNativeDouble = $context->builder->icmp(
@@ -180,13 +199,7 @@ final class JitValueNumeric
             $typeByte,
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
-        $isVmFloat = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
-        );
-        $isFloat = $context->builder->or($isNativeDouble, $isVmFloat);
-        $context->builder->branchIf($isFloat, $dblBlock, $numBlock);
+        $context->builder->branchIf($isNativeDouble, $dblBlock, $numBlock);
 
         $context->builder->positionAtEnd($dblBlock);
         $dblVal = $context->builder->call(
@@ -208,6 +221,7 @@ final class JitValueNumeric
         $context->builder->positionAtEnd($done);
         $phi = $context->builder->phi($f64, 'vbox_to_d_phi');
         $phi->addIncoming($strDbl, $strEnd);
+        $phi->addIncoming($boolDbl, $boolEnd);
         $phi->addIncoming($dblVal, $dblEnd);
         $phi->addIncoming($numDbl, $numEnd);
 
