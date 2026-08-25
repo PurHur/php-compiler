@@ -82,10 +82,10 @@ final class krsort_ extends Internal
             || StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_LOCALE_STRING === $sortType
         ) {
-            // SORT_FLAG_CASE: length-aware strcasecmp on keys (#34707); LOCALE ignores case bit.
+            // SORT_FLAG_CASE: strcasecmp on keys for SORT_STRING only (#34707 / php-src).
             if (
                 0 !== ($flags & StdlibConstants::SORT_FLAG_CASE)
-                && StdlibConstants::SORT_LOCALE_STRING !== $sortType
+                && StdlibConstants::SORT_STRING === $sortType
             ) {
                 KeySortRuntime::krsortByKeyCase($context, $array);
             } else {
