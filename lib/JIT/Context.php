@@ -2271,28 +2271,18 @@ class Context {
         Builtin\AssertFail::ensureStandaloneBodies($this);
         Builtin\JitReturnPending::ensureStandaloneBodies($this);
         Builtin\ObOutputRuntime::ensureLinked($this);
-        Builtin\StringRandomBytes::implement($this);
+        // StringRandomBytes / Utf8Latin1 / RewriteVars / Define / StrContains / StatPath /
+        // FileGetContents / MetaTags / HashCrypto / MbNumericEntity / Readfile / Bin2hex /
+        // Addslashes / Stripslashes / FilePutContents / IniRuntime always-on removed (#34578):
+        // call-site ensureLinked / ensureStandaloneBodies / emit* / invoke* already run before
+        // lookup (peer #34566 SessionStorageGlobals). Thin AOT hello-world must not NestedJIT
+        // those ABIs. Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
+        // Type::register __compiler_ini_* shells are gone (#34474); do not re-add IniRuntime here.
         Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
         Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
         Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
-        Builtin\StringUtf8Latin1::ensureStandaloneBodies($this);
-        Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
-        Builtin\DefineRuntime::ensureStandaloneBodies($this);
-        Builtin\StringStrContains::ensureStandaloneBodies($this);
-        Builtin\StatPathRuntime::ensureStandaloneBodies($this);
-        Builtin\StringFileGetContents::ensureStandaloneBodies($this);
-        Builtin\MetaTagsRuntime::ensureStandaloneBodies($this);
-        Builtin\StringHashCrypto::ensureStandaloneBodies($this);
-        Builtin\MbNumericEntity::ensureStandaloneBodies($this);
-        Builtin\StringReadfile::ensureStandaloneBodies($this);
-        Builtin\StringBin2hex::ensureStandaloneBodies($this);
-        Builtin\StringAddslashes::ensureStandaloneBodies($this);
-        Builtin\StringStripslashes::ensureStandaloneBodies($this);
-        Builtin\StringFilePutContents::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
         Builtin\EnvLocalRuntime::ensureLinked($this);
-        // Thin AOT: NestedJIT IniJitHelper for Type::register __compiler_ini_* shells (#21200).
-        Builtin\IniRuntime::ensureLinked($this);
         // CLI argv: NestedJIT CliArgvJitHelper during thin init (peer IncludePath #20877 / #20904)
         // — must precede {main} $argc/$argv lowering (compileToFile stubs are too late).
         Builtin\CliArgvRuntime::ensureStandaloneBodies($this);

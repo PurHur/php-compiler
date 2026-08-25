@@ -10,14 +10,16 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
 /**
- * filter batch API runtime helpers for JIT/AOT (#3294, #34574).
+ * filter batch API runtime helpers for JIT/AOT (#3294, #34574, #34580).
  *
  * filter_var_array* returns {@see HashTable} (ArrayChunk `__hashtable__*` ABI). Variable
  * returns mis-marshaled as empty VmIni under thin AOT (#34574). Filtering avoids
  * {@see VmFilter} — NestedJIT of that call graph SIGSEGVs under standalone AOT
  * (peer #34572). VM {@see filter_var_array::execute()} still uses VmFilter.
+ * Thin AOT user scripts use {@see \PHPCompiler\JIT\Builtin\FilterVarArrayLlvm}.
  *
- * filter_input_array* keeps Variable returns for {@see FilterInputArrayRuntime}.
+ * filter_input_array* returns {@see HashTable}|null (ArrayChunk `__hashtable__*` ABI).
+ * Variable returns abort under thin AOT (#34580; peer #34574).
  *
  * php-src: ext/filter/filter.c — php_filter_var_array / php_filter_array_handler
  */
@@ -84,38 +86,37 @@ final class FilterBatchJitHelper
         return $out;
     }
 
-    public static function filterInputArray(int $type, HashTable $definition, int $addEmpty): Variable
+    /**
+     * @return HashTable|null null when INPUT_* snapshot missing (CLI → Zend NULL).
+     *
+     * Snapshot miss returns null without NestedJIT of filterVarArray (#34580).
+     * Present table filters via {@see VmFilter::filterVarArray} (?HashTable, not Variable).
+     */
+    public static function filterInputArray(int $type, HashTable $definition, int $addEmpty): ?HashTable
     {
         $ctx = self::requireActiveContext();
+        $src = VmFilter::requestInputTable($ctx, $type);
+        if (null === $src) {
+            return null;
+        }
         $frame = new Frame();
         $frame->vmContext = $ctx;
-        $result = VmFilter::filterInputArray($ctx, $type, $definition, $addEmpty, $frame);
-        $out = new Variable();
-        if (null === $result) {
-            $out->null();
 
-            return $out;
-        }
-        $out->array($result);
-
-        return $out;
+        return VmFilter::filterVarArray($src, $definition, $addEmpty, $frame);
     }
 
-    public static function filterInputArrayByFilterId(int $type, int $filterId, int $addEmpty): Variable
+    /** Int filter-ID overload for filter_input_array() (#21937, #34580). */
+    public static function filterInputArrayByFilterId(int $type, int $filterId, int $addEmpty): ?HashTable
     {
         $ctx = self::requireActiveContext();
+        $src = VmFilter::requestInputTable($ctx, $type);
+        if (null === $src) {
+            return null;
+        }
         $frame = new Frame();
         $frame->vmContext = $ctx;
-        $result = VmFilter::filterInputArray($ctx, $type, $filterId, $addEmpty, $frame);
-        $out = new Variable();
-        if (null === $result) {
-            $out->null();
 
-            return $out;
-        }
-        $out->array($result);
-
-        return $out;
+        return VmFilter::filterVarArray($src, $filterId, $addEmpty, $frame);
     }
 
     private static function applyFilter(Variable $value, int $filterId): Variable

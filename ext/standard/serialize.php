@@ -97,6 +97,57 @@ final class serialize extends Internal
             return VmSerialize::encodeExportedPropertyBag($className, $props);
         }
 
+        // DateInterval — Zend member wire (#34584 / re-#10692). Peer DateTime #34576.
+        if (\is_array($arg->compileTimeDateInterval)) {
+            return self::encodeDateIntervalStamp($arg->compileTimeDateInterval);
+        }
+
+        // DateTimeZone — zone id stamp; compileTimeString holds id not class name (#29732 / #34584).
+        if (
+            null !== $arg->compileTimeTimezoneName
+            && null === $arg->compileTimeDateTimeTimestamp
+            && 'DateTimeZone' === ($arg->classUserType ?? '')
+        ) {
+            $tz = $arg->compileTimeTimezoneName;
+
+            return VmSerialize::encodeExportedPropertyBag('DateTimeZone', [
+                'timezone_type' => \PHPCompiler\VM\DateTimeSupport::zendTimezoneWireType($tz),
+                'timezone' => $tz,
+            ]);
+        }
+
         return null;
+    }
+
+    /**
+     * Zend DateInterval serialize wire from a construct / createFromDateString stamp (#34584).
+     *
+     * @param array<string, mixed> $state
+     */
+    public static function encodeDateIntervalStamp(array $state): string
+    {
+        if (
+            !empty($state['from_string'])
+            && isset($state['date_string'])
+            && \is_string($state['date_string'])
+        ) {
+            return VmSerialize::encodeExportedPropertyBag('DateInterval', [
+                'from_string' => true,
+                'date_string' => $state['date_string'],
+            ]);
+        }
+
+        return VmSerialize::encodeExportedPropertyBag('DateInterval', [
+            'y' => (int) ($state['y'] ?? 0),
+            'm' => (int) ($state['m'] ?? 0),
+            'd' => (int) ($state['d'] ?? 0),
+            'h' => (int) ($state['h'] ?? 0),
+            'i' => (int) ($state['i'] ?? 0),
+            's' => (int) ($state['s'] ?? 0),
+            'f' => (float) ($state['f'] ?? 0.0),
+            'invert' => (int) ($state['invert'] ?? 0),
+            'days' => \array_key_exists('days', $state) ? $state['days'] : false,
+            'from_string' => false,
+        ]);
     }
 }

@@ -28,6 +28,9 @@ use PHPLLVM\Value;
  * DateTime / DateTimeImmutable: Zend `date`/`timezone_type`/`timezone` wire via compile-time
  * stamps (peer {@see JitJsonEncode::tryFoldDateTimeFamily} #33752) — thin AOT
  * get_object_vars strips `__dt_*` (#22445) → empty `O:…:0:{}` (#34576 / re-#10710).
+ *
+ * DateInterval / DateTimeZone: same empty-bag failure when stamps are present but
+ * {@see serialize::compileTimeSerialize} did not fire (#34584 / re-#10692).
  */
 final class JitSerialize
 {
@@ -138,12 +141,60 @@ final class JitSerialize
         if (null !== $dateResult) {
             return $dateResult;
         }
+        $intervalResult = self::tryFoldDateInterval($context, $arg);
+        if (null !== $intervalResult) {
+            return $intervalResult;
+        }
+        $zoneResult = self::tryFoldDateTimeZone($context, $arg);
+        if (null !== $zoneResult) {
+            return $zoneResult;
+        }
         $splResult = self::tryEncodeSplHtObject($context, $arg);
         if (null !== $splResult) {
             return $splResult;
         }
 
         return self::encodePublicObjectProps($context, $arg);
+    }
+
+    /**
+     * Fold DateInterval to Zend serialize wire (#34584 / re-#10692).
+     *
+     * php-src: ext/date/php_date.c — php_date_serialize (DateInterval)
+     */
+    private static function tryFoldDateInterval(Context $context, JITVariable $arg): ?Value
+    {
+        if (!\is_array($arg->compileTimeDateInterval)) {
+            return null;
+        }
+
+        return $context->builder->load($context->constantStringFromString(
+            serialize::encodeDateIntervalStamp($arg->compileTimeDateInterval)
+        ));
+    }
+
+    /**
+     * Fold DateTimeZone to Zend timezone_type/timezone wire (#34584).
+     *
+     * php-src: ext/date/php_date.c — php_date_serialize (DateTimeZone)
+     */
+    private static function tryFoldDateTimeZone(Context $context, JITVariable $arg): ?Value
+    {
+        if (
+            null === $arg->compileTimeTimezoneName
+            || null !== $arg->compileTimeDateTimeTimestamp
+            || 'DateTimeZone' !== ($arg->classUserType ?? '')
+        ) {
+            return null;
+        }
+        $tz = $arg->compileTimeTimezoneName;
+
+        return $context->builder->load($context->constantStringFromString(
+            VmSerialize::encodeExportedPropertyBag('DateTimeZone', [
+                'timezone_type' => DateTimeSupport::zendTimezoneWireType($tz),
+                'timezone' => $tz,
+            ])
+        ));
     }
 
     /**
