@@ -21,6 +21,7 @@ use PHPLLVM\Value;
  *
  * JIT/AOT: compile-time path materializes via {@see VmParseIni::parseString} + {@see JitParseIniMaterializer};
  * runtime path reads then {@see JitParseIni::parseRuntimeFile} (same NestedJIT helper as parse_ini_string).
+ * URL wrappers honor allow_url_include like highlight_file / php_strip_whitespace (#32104 / #34777).
  */
 final class parse_ini_file extends Internal
 {
@@ -141,6 +142,17 @@ final class parse_ini_file extends Internal
             $emptyMsg
         );
         $literal = JitStringArg::compileTimeLiteral($args[0]);
+        // Host fopen succeeds for data:// via allow_url_fopen — do not bake that as script-open (#34777).
+        $blockedEarly = JitStreamIncludeOpen::rejectCompileTimeBlockedScriptOpen(
+            $context,
+            $literal,
+            'parse_ini_file',
+            false,
+            true
+        );
+        if (null !== $blockedEarly) {
+            return $blockedEarly;
+        }
         if (null !== $literal && '' !== $literal) {
             $contents = VmFsReadNative::read($literal);
             if (false !== $contents) {
@@ -170,6 +182,7 @@ final class parse_ini_file extends Internal
             );
         }
 
+        // Runtime / missing compile-time path — libc read (URL script-open already rejected above).
         return JitParseIni::parseRuntimeFile($context, $pathStr, $processSections, $scannerMode);
     }
 

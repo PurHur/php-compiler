@@ -37,5 +37,12 @@ final class StreamIncludeOpenPolicyTest extends TestCase
             'php_strip_whitespace(): data:// wrapper is disabled in the server configuration by allow_url_include=0',
             $msg
         );
+        $this->assertSame(
+            'parse_ini_file(): data:// wrapper is disabled in the server configuration by allow_url_include=0',
+            VmStreamIncludeOpenPolicy::wrapperDisabledMessage(
+                'parse_ini_file',
+                'data://text/plain,a=1'
+            )
+        );
     }
 }

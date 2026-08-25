@@ -46,12 +46,14 @@ final class VmParseIni
 
     public static function parseFile(Frame $frame, string $filename, bool $processSections, int $scannerMode): array|false
     {
-        if (!is_file($filename) || !is_readable($filename)) {
-            self::triggerFileWarning($frame, $filename);
+        // Script-style open — allow_url_include gates URL wrappers (peer #32104 / #34777).
+        if (VmStreamIncludeOpenPolicy::blockedForScriptOpen($filename, $frame->vmContext)) {
+            VmStreamIncludeOpenPolicy::warnScriptOpenBlocked($frame, 'parse_ini_file', $filename, false);
 
             return false;
         }
-        $contents = VmFsReadNative::read($filename);
+        // Wrapper URIs (data://) need stream open, not is_file() (#34777).
+        $contents = VmFs::readPathContentsViaOpen($filename, $frame->vmContext);
         if (false === $contents) {
             self::triggerFileWarning($frame, $filename);
 
