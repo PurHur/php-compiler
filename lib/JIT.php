@@ -8967,6 +8967,14 @@ class JIT {
                         }
                         $srcVar = $this->context->getVariableFromOp($srcOp);
                         JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
+                        // `$o->p =& $v`: point the property slot at $v's value box (Zend IS_REFERENCE).
+                        // Do not rebind $v onto the fetch temp — its alloca is not the heap box
+                        // propertyStore writes (#34649 / re-#5370).
+                        if (null !== $destVar->objectPropertySlot && null !== $srcName) {
+                            $shared = $this->ensureAssignRefSharedValueBox($srcVar, $srcName, $srcOp);
+                            $this->pointObjectPropertySlotAtValueBox($destVar, $shared);
+                            break;
+                        }
                         if (
                             Variable::TYPE_VALUE === $srcVar->type
                             && null === $srcVar->valueBoxAliasPtr
@@ -8984,6 +8992,7 @@ class JIT {
                         $destVar = $this->context->getVariableFromOp($destOp);
                         $destVar->assignRefLvalueAlias = true;
                         if (null !== $srcName) {
+                            $this->markAssignRefLvalueAlias($destVar);
                             $this->context->bindVariableByName($srcName, $destVar);
                             $this->context->setVariableOp($srcOp, $destVar);
                         } elseif (
@@ -8995,6 +9004,7 @@ class JIT {
                             // `$a[] = &$o->p` / `$a[] = &$a[0]`: leave src as canonical
                             // storage and point the dim entry at that box (#5349 compliance).
                             $this->aliasAssignRefDestOntoSourceStorage($destVar, $srcVar);
+                            $this->markAssignRefLvalueAlias($srcVar);
                         }
                         break;
                     }
@@ -9029,6 +9039,7 @@ class JIT {
                                     $srcVar
                                 );
                             }
+                            $this->markAssignRefLvalueAlias($srcVar);
                             $this->context->bindVariableByName($destName, $srcVar);
                             $this->context->setVariableOp($destOp, $srcVar);
                             break;
@@ -9052,6 +9063,8 @@ class JIT {
                             $srcVar
                         );
                     }
+                    // `$r = &$o->p` / `$r = &$a[0]`: named dest aliases the lvalue (#34649).
+                    $this->markAssignRefLvalueAlias($srcVar);
                     $this->context->bindVariableByName($destName, $srcVar);
                     $this->context->setVariableOp($destOp, $srcVar);
                     break;
@@ -11017,7 +11030,29 @@ class JIT {
                         break;
                     }
                     $arg = null;
-                    if (null !== $scriptGlobalEchoName) {
+                    // Prefer ASSIGN_REF / by-ref named bindings over {main} script-global echo
+                    // sidecars — `$o->p =& $v` shares a local box that ensureScriptGlobal misses (#34649).
+                    $echoNameForByRefEarly = JIT\OperandName::resolve($echoOp);
+                    if (
+                        null !== $echoNameForByRefEarly
+                        && '' !== $echoNameForByRefEarly
+                        && isset($this->context->namedVariableBindings[$echoNameForByRefEarly])
+                    ) {
+                        $earlyBound = $this->context->namedVariableBindings[$echoNameForByRefEarly];
+                        if (
+                            Variable::KIND_VARIABLE === $earlyBound->kind
+                            && Variable::TYPE_VALUE === $earlyBound->type
+                            && (
+                                null !== $earlyBound->valueBoxAliasPtr
+                                || $earlyBound->borrowedValueEntry
+                                || $earlyBound->assignRefLvalueAlias
+                            )
+                        ) {
+                            $scriptGlobalEchoName = null;
+                            $arg = $earlyBound;
+                        }
+                    }
+                    if (null === $arg && null !== $scriptGlobalEchoName) {
                         $arg = $this->context->ensureScriptGlobal($scriptGlobalEchoName);
                     }
                     if (null === $arg) {
@@ -11074,10 +11109,10 @@ class JIT {
                     // After ZEND_SEND_REF, namedVariableBindings holds the live boxed lvalue.
                     // Coalesce/ternary echo-phi maps are keyed by SSA slot and can still name the
                     // pre-call constant on the same slot — prefer the by-ref binding (#24162).
+                    // Also covers `$o->p =& $v` shared boxes under {main} echoScriptGlobalName (#34649).
                     $echoNameForByRef = JIT\OperandName::resolve($echoOp);
                     if (
-                        null === $scriptGlobalEchoName
-                        && null !== $echoNameForByRef
+                        null !== $echoNameForByRef
                         && '' !== $echoNameForByRef
                         && isset($this->context->namedVariableBindings[$echoNameForByRef])
                     ) {
@@ -11088,6 +11123,7 @@ class JIT {
                             && (
                                 null !== $byRefEcho->valueBoxAliasPtr
                                 || $byRefEcho->borrowedValueEntry
+                                || $byRefEcho->assignRefLvalueAlias
                             )
                         ) {
                             $arg = $byRefEcho;
@@ -18600,6 +18636,87 @@ class JIT {
     }
 
     /**
+     * Promote ASSIGN_REF source to a stable `__value__` box and bind the name (#34649).
+     */
+    private function ensureAssignRefSharedValueBox(
+        Variable $srcVar,
+        string $srcName,
+        Operand $srcOp
+    ): Variable {
+        if (
+            Variable::TYPE_VALUE === $srcVar->type
+            && Variable::KIND_VARIABLE === $srcVar->kind
+        ) {
+            if (null === $srcVar->valueBoxAliasPtr) {
+                $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
+                    $this->context,
+                    $srcVar
+                );
+            }
+            $srcVar->assignRefLvalueAlias = true;
+            $this->context->bindVariableByName($srcName, $srcVar);
+            $this->context->setVariableOp($srcOp, $srcVar);
+
+            return $srcVar;
+        }
+        $slot = JIT\JitValueBox::alloc($this->context);
+        $slotPtr = JIT\JitValueBox::pointer($this->context, $slot);
+        JIT\JitValueBox::assignToPointer($this->context, $slotPtr, $srcVar);
+        JIT\JitValueBox::publishAfterWrite($this->context, $slotPtr);
+        $boxed = new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $boxed->valueBoxAliasPtr = $slotPtr;
+        $boxed->assignRefLvalueAlias = true;
+        $this->context->bindVariableByName($srcName, $boxed);
+        $this->context->setVariableOp($srcOp, $boxed);
+
+        return $boxed;
+    }
+
+    /**
+     * Store `$v`'s `__value__*` into the object's property void** (Zend ASSIGN_REF).
+     */
+    private function pointObjectPropertySlotAtValueBox(Variable $propVar, Variable $boxVar): void
+    {
+        if (null === $propVar->objectPropertySlot) {
+            return;
+        }
+        $boxPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $boxVar);
+        $slot = JIT\Builtin\Type\ObjectInstancePropertyLlvm::dominatingSlotPtr(
+            $this->context->type->object,
+            $propVar
+        );
+        $voidPtr = $this->context->getTypeFromString('void*');
+        $this->context->builder->store(
+            $this->context->builder->pointerCast($boxPtr, $voidPtr),
+            $slot
+        );
+    }
+
+    /**
+     * Mark ASSIGN_REF lvalue so #34465 does not strip objectPropertySlot on `$v = …` (#34649).
+     */
+    private function markAssignRefLvalueAlias(Variable $var): void
+    {
+        if (
+            null !== $var->objectPropertySlot
+            || null !== $var->staticPropertyGlobal
+            || null !== $var->writableHt
+            || null !== $var->valueBoxAliasPtr
+            || (
+                Variable::TYPE_VALUE === $var->type
+                && Variable::KIND_VARIABLE === $var->kind
+            )
+        ) {
+            $var->assignRefLvalueAlias = true;
+        }
+    }
+
+    /**
      * True when ASSIGN_REF dest is a FETCH_DIM_W / []= / property / static lvalue (#34645).
      *
      * @see php-src Zend/zend_execute.c zend_assign_to_variable_reference
@@ -19088,11 +19205,11 @@ class JIT {
         $result = $this->resolveAssignLvalue($resultOp);
         // Locals that still carry a non-hashtable property alias from a prior read assign
         // must rebind — writing through would mutate the previous object (#34465).
-        // Intentional `$o->p =& $x` aliases keep the slot (#34649).
+        // Intentional ASSIGN_REF aliases (`$o->p =& $v`) must keep the slot (#34649).
         if (
             null !== $result->objectPropertySlot
-            && !$result->assignRefLvalueAlias
             && $this->isScalarObjectPropertyAliasType($result->objectPropertyType)
+            && !$result->assignRefLvalueAlias
             && !(
                 $force
                 && $this->context->retainCoalesceInstancePropertyLvalue
