@@ -8975,6 +8975,9 @@ class JIT {
                             $this->pointObjectPropertySlotAtValueBox($destVar, $shared);
                             break;
                         }
+                        if (null !== $destVar->writableHt) {
+                            $this->finalizeDimFetchAssignRef($destVar);
+                        }
                         if (
                             Variable::TYPE_VALUE === $srcVar->type
                             && null === $srcVar->valueBoxAliasPtr
@@ -9028,7 +9031,9 @@ class JIT {
                         if ($this->context->hasVariableOp($srcOp)) {
                             $srcVar = $this->context->getVariableFromOp($srcOp);
                             JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
-                            if (
+                            if (null !== $srcVar->writableHt) {
+                                $this->finalizeDimFetchAssignRef($srcVar);
+                            } elseif (
                                 Variable::TYPE_VALUE === $srcVar->type
                                 && null === $srcVar->valueBoxAliasPtr
                                 && !$srcVar->borrowedValueEntry
@@ -9042,6 +9047,13 @@ class JIT {
                             $this->markAssignRefLvalueAlias($srcVar);
                             $this->context->bindVariableByName($destName, $srcVar);
                             $this->context->setVariableOp($destOp, $srcVar);
+                            if (null !== $srcVar->writableHtContainer && null !== $srcVar->writableHtContainer->assignRefLiveHt) {
+                                $this->refreshAssignRefDimBindingsForContainer(
+                                    $srcVar->writableHtContainer,
+                                    $srcVar->writableHtContainer->assignRefLiveHt
+                                );
+                            }
+                            $this->recordListUnpackAssignSlot($destOp, $srcVar);
                             break;
                         }
                         $this->context->refAliasNames[$destName] = $this->context->resolveRefAliasName($srcName);
@@ -9052,7 +9064,9 @@ class JIT {
                     }
                     $srcVar = $this->context->getVariableFromOp($srcOp);
                     JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
-                    if (
+                    if (null !== $srcVar->writableHt) {
+                        $this->finalizeDimFetchAssignRef($srcVar);
+                    } elseif (
                         Variable::TYPE_VALUE === $srcVar->type
                         && null === $srcVar->valueBoxAliasPtr
                         && !$srcVar->borrowedValueEntry
@@ -9064,9 +9078,7 @@ class JIT {
                         );
                     }
                     // `$r = &$o->p` / `$r = &$a[0]`: named dest aliases the lvalue (#34649).
-                    $this->markAssignRefLvalueAlias($srcVar);
-                    $this->context->bindVariableByName($destName, $srcVar);
-                    $this->context->setVariableOp($destOp, $srcVar);
+                    $this->bindAssignRefNamedDest($block, $destOp, $destName, $srcVar);
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL:
                     if (!isset($block->constants[$op->arg2])) {
@@ -9187,6 +9199,7 @@ class JIT {
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
+                    $forAssignRef = $forWrite && $this->nextOpIsAssignRefFromDimFetch($block, $i, (int) $op->arg1);
                     $fetchIs = !$forWrite && $op->arrayDimFetchIs;
                     $warnUndefKeyIncDec = $forWrite && (
                         $this->varFetchDestUsedAsIncDec($block, $i, (int) $op->arg1)
@@ -9553,7 +9566,7 @@ class JIT {
                                 break;
                             }
                         }
-                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec);
+                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec, $forAssignRef);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } else {
@@ -9609,7 +9622,7 @@ class JIT {
                                 break;
                             }
                         }
-                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec);
+                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec, $forAssignRef);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } else {
@@ -9651,7 +9664,7 @@ class JIT {
                             Variable::KIND_VALUE,
                             JIT\JitValueBox::alloc($this->context)
                         );
-                        $fetched = $boxed->dimFetch($dim, $resultOp->type, $forWrite, true, $warnUndefKeyIncDec);
+                        $fetched = $boxed->dimFetch($dim, $resultOp->type, $forWrite, true, $warnUndefKeyIncDec, $forAssignRef);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } elseif ($forceBranchMerge) {
@@ -9695,7 +9708,7 @@ class JIT {
                             $this->context->constantFromInteger($value->nextFreeElement)
                         );
                     }
-                    $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, true, $warnUndefKeyIncDec);
+                    $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, true, $warnUndefKeyIncDec, $forAssignRef);
                     if ($forceBranchMerge && !$forWrite) {
                         $this->assignOperand($resultOp, $fetched, true);
                     } else {
@@ -18227,6 +18240,16 @@ class JIT {
      */
     private function resolveAssignLvalue(Operand $resultOp): JIT\Variable
     {
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->listUnpackAssignSlots[$resolved])) {
+                $bound = $this->context->listUnpackAssignSlots[$resolved];
+                $this->context->scope->variables[$resultOp] = $bound;
+
+                return $bound;
+            }
+        }
         $block = $this->context->jitEnclosingBlock;
         if (null !== $block && null !== $block->func) {
             $slot = $block->slotForOperand($resultOp);
@@ -18782,6 +18805,121 @@ class JIT {
                 JIT\JitValueBox::normalizeValuePtr($this->context, $srcVar->valueBoxAliasPtr)
             );
             $srcVar->valueBoxAliasPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $entryPtr);
+        }
+    }
+
+    /**
+     * True when the next opcode is `$named =&` this FETCH_DIM_W temp (#34673).
+     */
+    private function nextOpIsAssignRefFromDimFetch(Block $block, int $opIndex, int $dimFetchDestSlot): bool
+    {
+        $next = $block->opCodes[$opIndex + 1] ?? null;
+        if (!$next instanceof OpCode || OpCode::TYPE_ASSIGN_REF !== $next->type) {
+            return false;
+        }
+        if (null === $next->arg2 || (int) $next->arg2 !== $dimFetchDestSlot) {
+            return false;
+        }
+        if (null === $next->arg1) {
+            return false;
+        }
+        $destOp = $block->getOperand($next->arg1);
+
+        return null !== JIT\OperandName::resolve($destOp);
+    }
+
+    /**
+     * After ASSIGN_REF to a FETCH_DIM_W lvalue: COW once, refresh HT pointer, hydrate entry (#34673).
+     *
+     * @see php-src Zend/zend_execute.c zend_assign_to_variable_reference
+     */
+    private function finalizeDimFetchAssignRef(Variable $dimLvalue): void
+    {
+        if (null === $dimLvalue->writableHt) {
+            return;
+        }
+        $container = $dimLvalue->writableHtContainer;
+        if (null !== $container && null === $container->objectPropertySlot) {
+            if (null === $container->assignRefLiveHt) {
+                JIT\HashTableWriteLlvm::separateContainerForWrite($this->context, $container);
+                $container->assignRefLiveHt = JIT\HashTableHelper::loadHashtablePointer(
+                    $this->context,
+                    $container
+                );
+            }
+            $dimLvalue->writableHt = $container->assignRefLiveHt;
+        }
+        JIT\HashTableWriteLlvm::hydrateDimWriteLvalue($this->context, $dimLvalue);
+        $entryPtr = $this->assignRefDestEntryPointer($dimLvalue);
+        if (null !== $entryPtr) {
+            $dimLvalue->valueBoxAliasPtr = JIT\JitValueBox::normalizeValuePtr(
+                $this->context,
+                $entryPtr
+            );
+        }
+        $dimLvalue->assignRefLvalueAlias = true;
+    }
+
+    private function bindAssignRefNamedDest(
+        Block $block,
+        Operand $destOp,
+        string $destName,
+        Variable $srcVar
+    ): void {
+        $this->markAssignRefLvalueAlias($srcVar);
+        $this->context->bindVariableByName($destName, $srcVar);
+        $this->context->setVariableOp($destOp, $srcVar);
+        if (null !== $srcVar->writableHtContainer && null !== $srcVar->writableHtContainer->assignRefLiveHt) {
+            $this->refreshAssignRefDimBindingsForContainer(
+                $srcVar->writableHtContainer,
+                $srcVar->writableHtContainer->assignRefLiveHt
+            );
+        }
+        $this->recordListUnpackAssignSlot($destOp, $srcVar);
+        $destSlot = $block->slotForOperand($destOp);
+        if (null === $destSlot) {
+            return;
+        }
+        foreach ($block->scopedOperands() as $scopeOp) {
+            if ($block->slotForOperand($scopeOp) === $destSlot) {
+                $this->context->setVariableOp($scopeOp, $srcVar);
+            }
+        }
+    }
+
+    /**
+     * Keep every `[&$…] = $a` slot on the same post-COW hashtable (#34673).
+     */
+    private function refreshAssignRefDimBindingsForContainer(Variable $container, \PHPLLVM\Value $liveHt): void
+    {
+        $seen = [];
+        $refresh = function (Variable $var) use ($container, $liveHt, &$seen): void {
+            if ($var->writableHtContainer !== $container || null === $var->writableHt) {
+                return;
+            }
+            $id = spl_object_id($var);
+            if (isset($seen[$id])) {
+                return;
+            }
+            $seen[$id] = true;
+            $var->writableHt = $liveHt;
+            JIT\HashTableWriteLlvm::hydrateDimWriteLvalue($this->context, $var);
+            $entryPtr = $this->assignRefDestEntryPointer($var);
+            if (null !== $entryPtr) {
+                $var->valueBoxAliasPtr = JIT\JitValueBox::normalizeValuePtr(
+                    $this->context,
+                    $entryPtr
+                );
+            }
+            $var->assignRefLvalueAlias = true;
+        };
+        foreach ($this->context->namedVariableBindings as $bound) {
+            $refresh($bound);
+        }
+        foreach ($this->context->scope->variables as $bound) {
+            if ($bound instanceof Variable) {
+                $refresh($bound);
+            }
         }
     }
 

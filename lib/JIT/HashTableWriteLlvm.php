@@ -2155,8 +2155,12 @@ final class HashTableWriteLlvm
     }
 
     /** Lvalue marker for $arr[0] = … on a native hashtable (#107, #17865). */
-    public static function prepareIndexWrite(Context $context, Value $ht, Value $index): Variable
-    {
+    public static function prepareIndexWrite(
+        Context $context,
+        Value $ht,
+        Value $index,
+        ?Variable $htContainer = null
+    ): Variable {
         $slot = JitValueBox::alloc($context);
         $var = new Variable(
             $context,
@@ -2166,6 +2170,7 @@ final class HashTableWriteLlvm
         );
         $var->writableHt = $ht;
         $var->writableIndex = $index;
+        $var->writableHtContainer = $htContainer;
 
         return $var;
     }

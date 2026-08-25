@@ -195,9 +195,13 @@ final class HashTableHelper
     /**
      * Lvalue marker for $arr[0] = … on a native hashtable (#107).
      */
-    public static function prepareIndexWrite(Context $context, Value $ht, Value $index): Variable
-    {
-        return HashTableWriteLlvm::prepareIndexWrite($context, $ht, $index);
+    public static function prepareIndexWrite(
+        Context $context,
+        Value $ht,
+        Value $index,
+        ?Variable $htContainer = null
+    ): Variable {
+        return HashTableWriteLlvm::prepareIndexWrite($context, $ht, $index, $htContainer);
     }
 
     public static function hydrateIndexWriteLvalue(Context $context, Variable $lvalue): void

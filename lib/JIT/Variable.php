@@ -80,6 +80,21 @@ final class Variable {
     /** @var \PHPLLVM\Value|null */
     public ?\PHPLLVM\Value $writableIndex = null;
 
+    /**
+     * Array Variable that owns {@see $writableHt} for ASSIGN_REF refresh (#34673).
+     *
+     * FETCH_DIM_W captures a possibly-stale HT pointer; by-ref bind must separate/reload
+     * through this container so multi-slot `[&$x, &$y] = $a` shares one live hashtable.
+     */
+    public ?Variable $writableHtContainer = null;
+
+    /**
+     * Live HT after one COW separate for a multi-slot ASSIGN_REF group (#34673).
+     *
+     * Stored on {@see $writableHtContainer} so later `[&$y]` fetches refresh earlier `[&$x]` bindings.
+     */
+    public ?\PHPLLVM\Value $assignRefLiveHt = null;
+
     /** Foreach by-ref: int1 phi selecting packed-index vs string-key writable arm (#4364). */
     public ?\PHPLLVM\Value $foreachByRefPackedArm = null;
 
@@ -1150,7 +1165,8 @@ final class Variable {
         ?Type $expectedType = null,
         bool $forWrite = false,
         bool $emitFloatKeyDeprecation = true,
-        bool $warnUndefinedKeyForIncDec = false
+        bool $warnUndefinedKeyForIncDec = false,
+        bool $forAssignRef = false
     ): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
@@ -1191,7 +1207,8 @@ final class Variable {
                 // Property slots own the hashtable; transient delref would free it (#58).
                 $propertyBacked = null !== $this->objectPropertySlot;
                 // Shared HTs from by-value `$b = $a` must separate before FETCH_DIM_W (#34508).
-                if ($forWrite && !$propertyBacked) {
+                // Skip when this fetch feeds ASSIGN_REF — COW runs once in the bind (#34673).
+                if ($forWrite && !$propertyBacked && !$forAssignRef) {
                     HashTableWriteLlvm::separateContainerForWrite($this->context, $this);
                 }
                 $container = HashTableHelper::asDetachedHashtable($this->context, $this);
@@ -1335,7 +1352,7 @@ final class Variable {
                         HashTableHelper::emitUndefinedArrayKeyWarningIfMissing($this->context, $ht, $dim);
                     }
 
-                    return HashTableHelper::prepareIndexWrite($this->context, $ht, $index);
+                    return HashTableHelper::prepareIndexWrite($this->context, $ht, $index, $this);
                 }
                 if ($forWrite && null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
                     $childHt = HashTableHelper::readIndexedHashtable($this->context, $ht, $index);
@@ -1385,7 +1402,10 @@ final class Variable {
                     return $this->dimFetchValueBoxRead($dim, $expectedType);
                 }
                 // Value-boxed arrays share HTs after by-value assign — separate first (#34508).
-                HashTableWriteLlvm::separateContainerForWrite($this->context, $this);
+                // ASSIGN_REF consumers defer COW to the bind so multi-slot refs stay live (#34673).
+                if (!$forAssignRef) {
+                    HashTableWriteLlvm::separateContainerForWrite($this->context, $this);
+                }
                 $childHt = HashTableHelper::loadHashtablePointer($this->context, $this);
                 $htVar = new Variable(
                     $this->context,
@@ -1395,7 +1415,20 @@ final class Variable {
                 );
                 $htVar->borrowedHashtable = true;
 
-                return $htVar->dimFetch($dim, $expectedType, $forWrite, $emitFloatKeyDeprecation, $warnUndefinedKeyForIncDec);
+                $fetched = $htVar->dimFetch(
+                    $dim,
+                    $expectedType,
+                    $forWrite,
+                    $emitFloatKeyDeprecation,
+                    $warnUndefinedKeyForIncDec,
+                    $forAssignRef
+                );
+                if ($forWrite && null !== $fetched->writableHt) {
+                    // Own container is the value-box `$a`, not the borrowed HT wrapper (#34673).
+                    $fetched->writableHtContainer = $this;
+                }
+
+                return $fetched;
             default:
                 if (!($this->type & self::IS_NATIVE_ARRAY)) {
                     throw new \LogicException("Unsupported dim fetch on " . self::getStringType($this->type));
