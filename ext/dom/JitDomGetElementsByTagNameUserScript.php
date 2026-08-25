@@ -82,10 +82,21 @@ final class JitDomGetElementsByTagNameUserScript
                 return null;
             }
         }
-        $markup = JitDomLoadXMLUserScript::lastCompileTimeXml()
-            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+        // Prefer this document's loadXML binding — never steal lastCompileTimeXml from
+        // another document (importNode destination counted the source tree; #34630 /
+        // peer saveXML #33697).
+        $markup = JitDomLoadXMLUserScript::compileTimeXmlFor($args[0]);
+        if (null === $markup && null === JitDomLoadXMLUserScript::lastCompileTimeXml()) {
+            // HTML-only scripts: no XML literal exists to steal.
+            $markup = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+        }
         if (null === $markup) {
-            return null;
+            // Receiver never loadXML'd (createElement / importNode dest). Seed length
+            // from the live pinned tree so pending+source-count cannot double (#34630).
+            self::$lastTagQuery = $tagLit;
+            DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
+
+            return self::boxNodeList($context, 0);
         }
         self::$lastTagQuery = $tagLit;
         $count = DomParseSimpleXmlJitHelper::countTagArgv($markup, $tagLit);
