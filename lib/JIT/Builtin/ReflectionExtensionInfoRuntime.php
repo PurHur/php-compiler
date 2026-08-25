@@ -137,6 +137,7 @@ final class ReflectionExtensionInfoRuntime
 
     private static function echoBakedText(Context $context, string $text): void
     {
+        ObOutputRuntime::ensureLinked($context);
         $i8p = $context->getTypeFromString('int8*');
         $strMap = $context->structFieldMap['__string__'];
         $infoStr = $context->builder->load($context->constantStringFromString($text));

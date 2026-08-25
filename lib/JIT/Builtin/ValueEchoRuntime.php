@@ -96,6 +96,8 @@ final class ValueEchoRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        // ObOutput before type bridges — Context full/minimal no longer always-on (#34695).
+        ObOutputRuntime::ensureLinked($context);
         self::implement($context);
     }
 

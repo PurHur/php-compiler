@@ -24,9 +24,10 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
         $this->assertStringContainsString('ensureUserScriptRefreshPrerequisites', $refresh);
         $this->assertStringContainsString('ensureUserScriptRefreshEmit', $refresh);
         $this->assertStringContainsString('JitSuperglobalRefreshKernel::implement', $refresh);
-        // StringHtmlspecialchars lazy (#34642); HtmlspecialcharsDecode / HtmlEntities /
-        // ErrorHandler / ExceptionHandler lazy (#34612).
+        // StringHtmlspecialchars lazy (#34642); ObOutput lazy (#34695); HtmlspecialcharsDecode /
+        // HtmlEntities / ErrorHandler / ExceptionHandler lazy (#34612).
         $this->assertStringContainsString('#34642', $source);
+        $this->assertStringContainsString('#34695', $source);
         $this->assertStringContainsString('#34612', $source);
         $minimalPos = strpos($source, 'private function ensureMinimalUserStandaloneBodies');
         $this->assertNotFalse($minimalPos);
@@ -37,6 +38,11 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
             'StringHtmlspecialchars::ensureStandaloneBodies',
             $minimalBody,
             'thin hello-world must not eagerly NestedJIT htmlspecialchars (#34642)'
+        );
+        $this->assertStringNotContainsString(
+            'ObOutputRuntime::ensureLinked($this)',
+            $minimalBody,
+            'thin hello-world must not eagerly NestedJIT ObOutput (#34695)'
         );
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
         $this->assertStringNotContainsString('SuperglobalRefreshUserScriptLlvm', $refresh);

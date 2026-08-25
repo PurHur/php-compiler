@@ -46,6 +46,7 @@ final class StringFormat
 
     public static function ensureLinked(Context $context): void
     {
+        ObOutputRuntime::ensureLinked($context);
         self::implement($context);
     }
 

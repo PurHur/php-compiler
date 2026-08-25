@@ -37,11 +37,9 @@ final class ContextMinimalStandaloneLazyHtmlErrorHandlerRuntimeShrinkTest extend
             );
         }
 
-        // Essentials for thin echo / error / argv / getenv surface stay.
-        // LastError dropped in #34631 (peer this test).
+        // Essentials for thin argv / getenv stay.
+        // LastError dropped in #34631; ObOutput / TriggerError in #34695 / #34641.
         foreach ([
-            'ObOutputRuntime::ensureLinked($this)',
-            'StringTriggerError::ensureStandaloneBodies($this)',
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
@@ -52,6 +50,16 @@ final class ContextMinimalStandaloneLazyHtmlErrorHandlerRuntimeShrinkTest extend
             'LastErrorRuntime::ensureStandaloneBodies($this)',
             $minimalBody,
             'ensureMinimal must not eagerly LastErrorRuntime (#34631)'
+        );
+        $this->assertStringNotContainsString(
+            'ObOutputRuntime::ensureLinked($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ObOutputRuntime (#34695)'
+        );
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly StringTriggerError (#34641)'
         );
     }
 

@@ -75,10 +75,26 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testContextStillEnsureLinksObOutputForStandalone(): void
+    public function testContextDropsAlwaysOnObOutputForMinimalStandalone(): void
     {
         $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('ObOutputRuntime::ensureLinked($this)', $ctx);
+        $this->assertStringContainsString('#34695', $ctx);
+        $minimalPos = strpos($ctx, 'private function ensureMinimalUserStandaloneBodies');
+        $this->assertNotFalse($minimalPos);
+        $minimalEnd = strpos($ctx, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
+        $this->assertNotFalse($minimalEnd);
+        $minimalBody = substr($ctx, $minimalPos, $minimalEnd - $minimalPos);
+        $this->assertStringNotContainsString(
+            'ObOutputRuntime::ensureLinked($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ObOutputRuntime (#34695)'
+        );
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ValueEchoHelper.php');
+        $this->assertStringContainsString(
+            'ObOutputRuntime::ensureLinked($context)',
+            $helper,
+            'ValueEchoHelper must ensureLinked before __phpc_ob_echo_* (#34695)'
+        );
     }
 
     public function testNoRuntimeCForObOutputAbi(): void

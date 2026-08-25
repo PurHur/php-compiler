@@ -23,6 +23,8 @@ final class ValueEchoHelper
 
     public static function echoLiteral(Context $context, string $literal): void
     {
+        // Call-site ensure — Context ensureMinimal no longer always-on ObOutput (#34695 / peer #34642).
+        Builtin\ObOutputRuntime::ensureLinked($context);
         $charPtr = $context->getTypeFromString('char*');
         $context->builder->call(
             $context->lookupFunction('__phpc_ob_echo_cstr'),
@@ -42,6 +44,7 @@ final class ValueEchoHelper
         ?Operand $sourceOperand = null
     ): void
     {
+        Builtin\ObOutputRuntime::ensureLinked($context);
         Builtin\StringDir::ensureLinked($context);
         $tag = 'enl'.(string) ++self::$seq;
         $i64 = $context->getTypeFromString('int64');
@@ -189,6 +192,7 @@ final class ValueEchoHelper
 
     public static function echoStringVariable(Context $context, Variable $stringVar): void
     {
+        Builtin\ObOutputRuntime::ensureLinked($context);
         $argValue = $context->helper->loadValue($stringVar);
         $offset = $context->structFieldIndex($argValue, 'length');
         $__str__length = $context->builder->load(

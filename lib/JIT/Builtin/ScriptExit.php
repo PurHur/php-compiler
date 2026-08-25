@@ -32,6 +32,7 @@ final class ScriptExit
 
     private static function emitStatusOnly(Context $context, Variable $arg): void
     {
+        ObOutputRuntime::ensureLinked($context);
         switch ($arg->type) {
             case Variable::TYPE_NULL:
                 // PHP 8.4+ string|int: null → E_DEPRECATED then status 0 (#29575).
@@ -115,6 +116,7 @@ final class ScriptExit
 
     private static function emitMessage(Context $context, Variable $arg): void
     {
+        ObOutputRuntime::ensureLinked($context);
         switch ($arg->type) {
             case Variable::TYPE_NULL:
                 return;

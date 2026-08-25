@@ -11009,6 +11009,8 @@ class JIT {
                 case OpCode::TYPE_PRINT:
                     JIT\JitNativeString::ensureInsertBlock($this->context);
                     $this->context->intrinsic->builder = $this->context->builder;
+                    // Call-site ensure — thin minimal init no longer always-on ObOutput (#34695).
+                    JIT\Builtin\ObOutputRuntime::ensureLinked($this->context);
                     $this->context->callSiteLine = OpCode::TYPE_ECHO === $op->type
                         ? (int) ($op->arg2 ?? 0)
                         : (int) ($op->arg3 ?? 0);

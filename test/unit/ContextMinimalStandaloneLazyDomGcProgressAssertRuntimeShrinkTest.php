@@ -38,12 +38,10 @@ final class ContextMinimalStandaloneLazyDomGcProgressAssertRuntimeShrinkTest ext
             );
         }
 
-        // Essentials for thin echo / error / argv / getenv surface stay.
+        // Essentials for thin argv / getenv stay.
         // HtmlEntities / Decode / ErrorHandler / ExceptionHandler dropped in #34612 (peer this test).
-        // LastError dropped in #34631 (peer this test).
+        // LastError dropped in #34631; ObOutput / TriggerError in #34695 / #34641.
         foreach ([
-            'ObOutputRuntime::ensureLinked($this)',
-            'StringTriggerError::ensureStandaloneBodies($this)',
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
@@ -54,6 +52,16 @@ final class ContextMinimalStandaloneLazyDomGcProgressAssertRuntimeShrinkTest ext
             'LastErrorRuntime::ensureStandaloneBodies($this)',
             $minimalBody,
             'ensureMinimal must not eagerly LastErrorRuntime (#34631)'
+        );
+        $this->assertStringNotContainsString(
+            'ObOutputRuntime::ensureLinked($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ObOutputRuntime (#34695)'
+        );
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly StringTriggerError (#34641)'
         );
         foreach ([
             'HtmlEntitiesJit::ensureStandaloneBodies($this)',
