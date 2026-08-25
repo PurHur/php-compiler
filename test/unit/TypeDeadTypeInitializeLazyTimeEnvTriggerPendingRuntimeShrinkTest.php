@@ -52,7 +52,8 @@ final class TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest ext
         $checks = [
             'lib/JIT/Builtin/StringTime.php' => 'self::ensureLinked($context)',
             'lib/JIT/Builtin/TouchLibcRuntime.php' => 'StringTime::ensureLinked',
-            'lib/JIT/Context.php' => 'EnvLocalRuntime::ensureLinked',
+            'lib/JIT/Context.php' => 'EnvLocalRuntime::ensureBootstrapAotStubLinked',
+            'lib/JIT/Builtin/EnvLocalRuntime.php' => 'JitEnvLocalKernel::ensureLinked',
             'ext/standard/trigger_error_.php' => 'StringTriggerError::ensureLinked',
             'ext/standard/JitBuiltinWarning.php' => 'StringTriggerError::ensureLinked',
             'ext/standard/header_.php' => 'PendingHeadersRuntime::ensureLinked',
