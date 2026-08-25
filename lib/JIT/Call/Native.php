@@ -496,7 +496,12 @@ class Native implements Call {
                 }
                 switch ($arg->type) {
                     case Variable::TYPE_HASHTABLE:
-                        $context->refcount->addref($value);
+                        // Pair with borrowedHashtable on `&...$args` formals (#34790): skip
+                        // addref so FETCH_DIM_W COW (#34508) is less likely to detach from the
+                        // pack syncByRefVariadicCallers reads (re-#27407 / #34684).
+                        if (!isset($this->paramByRefByArg[$argNum])) {
+                            $context->refcount->addref($value);
+                        }
 
                         return $value;
                     case Variable::TYPE_OBJECT:
