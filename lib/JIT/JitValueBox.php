@@ -99,20 +99,21 @@ final class JitValueBox
 
             return self::normalizeValuePtr($context, $heapPtr);
         }
-        // Return-by-ref from `$this->prop` must alias the heap property slot, not the
-        // stack copy materialized by propertyFetch (issue #4054, Zend ZEND_RETURN_BY_REF).
+        // Return-by-ref from `$this->prop` must alias the heap property `__value__*`, not a
+        // stack copy (#4054 / #34717, Zend ZEND_RETURN_BY_REF). #33837 switched this to
+        // load_value_slot→alloca for ??= dominance, which broke aliasing (SIGSEGV / lost writes).
+        // Keep dominatingSlotPtr (re-#33760) but load the live heap box pointer from the slot.
         if (
             null !== $var->objectPropertySlot
             && Variable::TYPE_VALUE === $var->objectPropertyType
         ) {
-            $storage = self::alloc($context);
-            $context->builder->call(
-                $context->lookupFunction('__object__load_value_slot'),
-                ObjectInstancePropertyLlvm::dominatingSlotPtr($context->type->object, $var),
-                $storage
+            $slotPtr = ObjectInstancePropertyLlvm::dominatingSlotPtr($context->type->object, $var);
+            $heapPtr = $context->builder->pointerCast(
+                $context->builder->load($slotPtr),
+                $context->getTypeFromString('__value__*')
             );
 
-            return self::normalizeValuePtr($context, self::pointer($context, $storage));
+            return self::normalizeValuePtr($context, $heapPtr);
         }
         if (self::isValueOperand($var) && Variable::TYPE_VALUE !== $var->type) {
             $storage = BasicBlockHelper::entryAllocaValueBox($context);
