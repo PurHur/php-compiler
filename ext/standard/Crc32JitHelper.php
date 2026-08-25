@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * crc32()/crc32c() for compiled JIT/AOT modules (#15759, #27077, php-in-PHP).
+ * crc32()/crc32c() for compiled JIT/AOT modules (#15759, #27077, #34824, php-in-PHP).
  *
  * NestedJIT-safe CRC32B / CRC32C (peer {@see Bin2hexJitHelper} / {@see StrrevJitHelper}).
  * Avoid Vm* CRC SSOT call sites and native ord/strlen — NestedJIT stubs those to 0 under thin AOT
  * (#16075 / #20452 / #15759 helper-bridge wrong-0). Bit-by-bit poly (no lookup table) —
  * NestedJIT AOT array-table updates miscomputed CRC (#27077).
+ *
+ * NestedJIT also mis-binds `update(..., byteOrd($data[$i]), ...)` as a nested call arg (#34824):
+ * equal-length strings shared one wrong digest. Bind the ordinal to a local first. Prefer
+ * {@see intdiv} over `$state >> 1` for the poly half-step (peer Base64JitHelper).
  * php-src: ext/standard/crc32.c, ext/standard/hash_crc32.c
  */
 final class Crc32JitHelper
@@ -28,10 +32,12 @@ final class Crc32JitHelper
         $state = self::u32(((int) $seed) ^ self::UINT32_MASK);
         $len = self::byteLength($data);
         for ($i = 0; $i < $len; ++$i) {
-            $state = self::update($state, self::byteOrd($data[$i]), self::POLY_CRC32B);
+            // Local binding — NestedJIT corrupts nested byteOrd($data[$i]) as a call arg (#34824).
+            $byte = self::byteOrd($data[$i]);
+            $state = self::update($state, $byte, self::POLY_CRC32B);
         }
 
-        return self::u32(~$state);
+        return self::u32($state ^ self::UINT32_MASK);
     }
 
     public static function crc32cArgv(string $data): int
@@ -39,20 +45,22 @@ final class Crc32JitHelper
         $state = self::UINT32_MASK;
         $len = self::byteLength($data);
         for ($i = 0; $i < $len; ++$i) {
-            $state = self::update($state, self::byteOrd($data[$i]), self::POLY_CRC32C);
+            $byte = self::byteOrd($data[$i]);
+            $state = self::update($state, $byte, self::POLY_CRC32C);
         }
 
-        return self::u32(~$state);
+        return self::u32($state ^ self::UINT32_MASK);
     }
 
     private static function update(int $state, int $byte, int $poly): int
     {
         $state = self::u32($state ^ $byte);
         for ($j = 0; $j < 8; ++$j) {
-            if (($state & 1) !== 0) {
-                $state = self::u32(($state >> 1) ^ $poly);
-            } else {
-                $state = self::u32($state >> 1);
+            $odd = ($state & 1) !== 0;
+            // Logical >>1 for 0..2^32-1 — NestedJIT miscomputes `$state >> 1` (#34824).
+            $state = \intdiv($state, 2);
+            if ($odd) {
+                $state = self::u32($state ^ $poly);
             }
         }
 
