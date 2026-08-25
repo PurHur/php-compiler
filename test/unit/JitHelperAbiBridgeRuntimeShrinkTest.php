@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * JitHelperAbiBridge NestedJIT via JitVmHelperLink::ensureCompiled (#26347 / peer #26333).
+ * Mid-{main} insert restore for lazy ReturnPending (#34621 / peer #34612).
  */
 final class JitHelperAbiBridgeRuntimeShrinkTest extends TestCase
 {
@@ -21,6 +22,9 @@ final class JitHelperAbiBridgeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
+        $this->assertStringContainsString('#34621', $source);
     }
 
     public function testExceptionAndReturnPendingStillRouteThroughBridge(): void
