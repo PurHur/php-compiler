@@ -128,37 +128,39 @@ final class ArrayPushRuntime
 
     private static function implementAppendBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('array_push_append_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $dest = $fn->getParam(0);
-        $valuesHt = $fn->getParam(1);
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $one = $sizeT->constInt(1, false);
-        $count = $context->builder->truncOrBitCast(
-            ArrayBuiltinHelper::getNumElements($context, $valuesHt),
-            $sizeT
-        );
-        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $context->builder->store($zero, $idxSlot);
-        $head = BasicBlockHelper::append($context, 'array_push_append_head');
-        $body = BasicBlockHelper::append($context, 'array_push_append_body');
-        $done = BasicBlockHelper::append($context, 'array_push_append_done');
-        $context->builder->branch($head);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, '__array_push__append', static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_push_append_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $dest = $fn->getParam(0);
+            $valuesHt = $fn->getParam(1);
+            $sizeT = $context->getTypeFromString('size_t');
+            $zero = $sizeT->constInt(0, false);
+            $one = $sizeT->constInt(1, false);
+            $count = $context->builder->truncOrBitCast(
+                ArrayBuiltinHelper::getNumElements($context, $valuesHt),
+                $sizeT
+            );
+            $idxSlot = BasicBlockHelper::entryAllocaForFunction($context, $fn, $sizeT);
+            $context->builder->store($zero, $idxSlot);
+            $head = $fn->appendBasicBlock('array_push_append_head');
+            $body = $fn->appendBasicBlock('array_push_append_body');
+            $done = $fn->appendBasicBlock('array_push_append_done');
+            $context->builder->branch($head);
 
-        $context->builder->positionAtEnd($head);
-        $idx = $context->builder->load($idxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
-        $context->builder->branchIf($atEnd, $done, $body);
+            $context->builder->positionAtEnd($head);
+            $idx = $context->builder->load($idxSlot);
+            $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+            $context->builder->branchIf($atEnd, $done, $body);
 
-        $context->builder->positionAtEnd($body);
-        $value = HashTableHelper::readIndexedToValueBox($context, $valuesHt, $idx);
-        ArrayBuiltinHelper::appendElement($context, $dest, $value);
-        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
-        $context->builder->branch($head);
+            $context->builder->positionAtEnd($body);
+            $value = HashTableHelper::readIndexedToValueBox($context, $valuesHt, $idx);
+            ArrayBuiltinHelper::appendElement($context, $dest, $value);
+            $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+            $context->builder->branch($head);
 
-        $context->builder->positionAtEnd($done);
-        $context->builder->returnValue(ArrayBuiltinHelper::getNumElements($context, $dest));
+            $context->builder->positionAtEnd($done);
+            $context->builder->returnValue(ArrayBuiltinHelper::getNumElements($context, $dest));
+        });
     }
 
     private static function registerLinkedRuntime(Context $context): void

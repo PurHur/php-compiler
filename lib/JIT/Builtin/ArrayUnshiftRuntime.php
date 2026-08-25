@@ -142,87 +142,89 @@ final class ArrayUnshiftRuntime
 
     private static function implementPrependBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('array_unshift_prepend_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $dest = $fn->getParam(0);
-        $valuesHt = $fn->getParam(1);
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $one = $sizeT->constInt(1, false);
-        $k = $context->builder->truncOrBitCast(
-            ArrayBuiltinHelper::getNumElements($context, $valuesHt),
-            $sizeT
-        );
-        $n = $context->builder->call($context->lookupFunction('__hashtable__getNumElements'), $dest);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, '__array_unshift__prepend', static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_unshift_prepend_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            $dest = $fn->getParam(0);
+            $valuesHt = $fn->getParam(1);
+            $sizeT = $context->getTypeFromString('size_t');
+            $zero = $sizeT->constInt(0, false);
+            $one = $sizeT->constInt(1, false);
+            $k = $context->builder->truncOrBitCast(
+                ArrayBuiltinHelper::getNumElements($context, $valuesHt),
+                $sizeT
+            );
+            $n = $context->builder->call($context->lookupFunction('__hashtable__getNumElements'), $dest);
 
-        $isEmptyValues = $context->builder->icmp(Builder::INT_EQ, $k, $zero);
-        $retBb = BasicBlockHelper::append($context, 'array_unshift_prepend_ret');
-        $workBb = BasicBlockHelper::append($context, 'array_unshift_prepend_work');
-        $context->builder->branchIf($isEmptyValues, $retBb, $workBb);
+            $isEmptyValues = $context->builder->icmp(Builder::INT_EQ, $k, $zero);
+            $retBb = $fn->appendBasicBlock('array_unshift_prepend_ret');
+            $workBb = $fn->appendBasicBlock('array_unshift_prepend_work');
+            $context->builder->branchIf($isEmptyValues, $retBb, $workBb);
 
-        $context->builder->positionAtEnd($workBb);
-        $need = $context->builder->addNoSignedWrap($n, $k);
-        $context->builder->call($context->lookupFunction('__hashtable__grow'), $dest, $need);
+            $context->builder->positionAtEnd($workBb);
+            $need = $context->builder->addNoSignedWrap($n, $k);
+            $context->builder->call($context->lookupFunction('__hashtable__grow'), $dest, $need);
 
-        $indexSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $context->builder->store($context->builder->subNoSignedWrap($n, $one), $indexSlot);
-        $sHead = BasicBlockHelper::append($context, 'array_unshift_prepend_shift_head');
-        $sBody = BasicBlockHelper::append($context, 'array_unshift_prepend_shift_body');
-        $sDone = BasicBlockHelper::append($context, 'array_unshift_prepend_shift_done');
-        $skipShift = $context->builder->icmp(Builder::INT_EQ, $n, $zero);
-        $context->builder->branchIf($skipShift, $sDone, $sHead);
+            $indexSlot = BasicBlockHelper::entryAllocaForFunction($context, $fn, $sizeT);
+            $context->builder->store($context->builder->subNoSignedWrap($n, $one), $indexSlot);
+            $sHead = $fn->appendBasicBlock('array_unshift_prepend_shift_head');
+            $sBody = $fn->appendBasicBlock('array_unshift_prepend_shift_body');
+            $sDone = $fn->appendBasicBlock('array_unshift_prepend_shift_done');
+            $skipShift = $context->builder->icmp(Builder::INT_EQ, $n, $zero);
+            $context->builder->branchIf($skipShift, $sDone, $sHead);
 
-        $context->builder->positionAtEnd($sHead);
-        $idx = $context->builder->load($indexSlot);
-        $past = $context->builder->icmp(Builder::INT_SLT, $idx, $zero);
-        $context->builder->branchIf($past, $sDone, $sBody);
-        $context->builder->positionAtEnd($sBody);
-        $srcVal = HashTableHelper::readIndexedToValueBox($context, $dest, $idx);
-        HashTableHelper::setAtIndex(
-            $context,
-            $dest,
-            $context->builder->addNoSignedWrap($idx, $k),
-            $srcVal
-        );
-        $context->builder->store($context->builder->subNoSignedWrap($idx, $one), $indexSlot);
-        $context->builder->branch($sHead);
-
-        $context->builder->positionAtEnd($sDone);
-        $wIdx = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $context->builder->store($zero, $wIdx);
-        $wHead = BasicBlockHelper::append($context, 'array_unshift_prepend_write_head');
-        $wBody = BasicBlockHelper::append($context, 'array_unshift_prepend_write_body');
-        $context->builder->branch($wHead);
-        $context->builder->positionAtEnd($wHead);
-        $wi = $context->builder->load($wIdx);
-        $wDone = $context->builder->icmp(Builder::INT_SGE, $wi, $k);
-        $context->builder->branchIf($wDone, $retBb, $wBody);
-        $context->builder->positionAtEnd($wBody);
-        HashTableHelper::setAtIndex(
-            $context,
-            $dest,
-            $wi,
-            HashTableHelper::readIndexedToValueBox($context, $valuesHt, $wi)
-        );
-        $context->builder->store($context->builder->addNoSignedWrap($wi, $one), $wIdx);
-        $context->builder->branch($wHead);
-
-        $context->builder->positionAtEnd($retBb);
-        $map = $context->structFieldMap['__hashtable__'];
-        $finalN = $context->builder->addNoSignedWrap($n, $k);
-        $context->builder->store($finalN, $context->builder->structGep($dest, $map['nextFreeElement']));
-        $context->builder->store($finalN, $context->builder->structGep($dest, $map['numElements']));
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::i64ToScalar(
+            $context->builder->positionAtEnd($sHead);
+            $idx = $context->builder->load($indexSlot);
+            $past = $context->builder->icmp(Builder::INT_SLT, $idx, $zero);
+            $context->builder->branchIf($past, $sDone, $sBody);
+            $context->builder->positionAtEnd($sBody);
+            $srcVal = HashTableHelper::readIndexedToValueBox($context, $dest, $idx);
+            HashTableHelper::setAtIndex(
                 $context,
-                JitNestedHelperCoerce::scalarToI64(
+                $dest,
+                $context->builder->addNoSignedWrap($idx, $k),
+                $srcVal
+            );
+            $context->builder->store($context->builder->subNoSignedWrap($idx, $one), $indexSlot);
+            $context->builder->branch($sHead);
+
+            $context->builder->positionAtEnd($sDone);
+            $wIdx = BasicBlockHelper::entryAllocaForFunction($context, $fn, $sizeT);
+            $context->builder->store($zero, $wIdx);
+            $wHead = $fn->appendBasicBlock('array_unshift_prepend_write_head');
+            $wBody = $fn->appendBasicBlock('array_unshift_prepend_write_body');
+            $context->builder->branch($wHead);
+            $context->builder->positionAtEnd($wHead);
+            $wi = $context->builder->load($wIdx);
+            $wDone = $context->builder->icmp(Builder::INT_SGE, $wi, $k);
+            $context->builder->branchIf($wDone, $retBb, $wBody);
+            $context->builder->positionAtEnd($wBody);
+            HashTableHelper::setAtIndex(
+                $context,
+                $dest,
+                $wi,
+                HashTableHelper::readIndexedToValueBox($context, $valuesHt, $wi)
+            );
+            $context->builder->store($context->builder->addNoSignedWrap($wi, $one), $wIdx);
+            $context->builder->branch($wHead);
+
+            $context->builder->positionAtEnd($retBb);
+            $map = $context->structFieldMap['__hashtable__'];
+            $finalN = $context->builder->addNoSignedWrap($n, $k);
+            $context->builder->store($finalN, $context->builder->structGep($dest, $map['nextFreeElement']));
+            $context->builder->store($finalN, $context->builder->structGep($dest, $map['numElements']));
+            $context->builder->returnValue(
+                JitNestedHelperCoerce::i64ToScalar(
                     $context,
-                    $finalN,
+                    JitNestedHelperCoerce::scalarToI64(
+                        $context,
+                        $finalN,
+                        $context->getTypeFromString('int64')
+                    ),
                     $context->getTypeFromString('int64')
-                ),
-                $context->getTypeFromString('int64')
-            )
-        );
+                )
+            );
+        });
     }
 
     private static function registerLinkedRuntime(Context $context): void
