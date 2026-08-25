@@ -405,25 +405,42 @@ final class JitDomLiveElementsByTagWalk
 
         $context->builder->positionAtEnd($bbElem);
         $tagLc = strtolower($tag);
+        // php-src nodelist.c: getElementsByTagName returns ELEMENT nodes only — thin-AOT
+        // #text/#comment stand-ins use DOMElement allocations (#33918 deep importNode).
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NODE_NAME)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_NODE_NAME, JITVariable::TYPE_STRING);
+        }
+        $nameVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            VmDom::PROP_NODE_NAME,
+            $elementClassId
+        );
+        $nameStr = $context->helper->loadValue($nameVar);
+        $isRealElement = self::emitNodeNameIsElement($context, $nameStr);
+        $bbReal = BasicBlockHelper::append($context, 'dom_live_tag_match_real');
+        $context->builder->branchIf($isRealElement, $bbReal, $bbDone);
+        $context->builder->positionAtEnd($bbReal);
         if ('*' === $tagLc || '' === $tagLc) {
             $context->builder->store($i1->constInt(1, false), $outSlot);
             $context->builder->branch($bbDone);
         } else {
-            $elementClassId = $objectType->lookup('DOMElement');
-            $nameVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $tagStr = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
                 $objectType,
                 $node,
                 'DOMElement',
                 VmDom::PROP_TAG_NAME,
                 $elementClassId
             );
-            $tagStr = $context->helper->loadValue($nameVar);
-            $tagNull = $context->builder->icmp(Builder::INT_EQ, $tagStr, $strPtr->constNull());
+            $tagStrVal = $context->helper->loadValue($tagStr);
+            $tagNull = $context->builder->icmp(Builder::INT_EQ, $tagStrVal, $strPtr->constNull());
             $bbCmp = BasicBlockHelper::append($context, 'dom_live_tag_match_cmp');
             $context->builder->branchIf($tagNull, $bbDone, $bbCmp);
             $context->builder->positionAtEnd($bbCmp);
             $want = $context->builder->load($context->constantStringFromString($tagLc));
-            $cmp = JitStringCompare::strcmp($context, $tagStr, $want);
+            $cmp = JitStringCompare::strcmp($context, $tagStrVal, $want);
             $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
             $context->builder->store($eq, $outSlot);
             $context->builder->branch($bbDone);
@@ -432,5 +449,33 @@ final class JitDomLiveElementsByTagWalk
         $context->builder->positionAtEnd($bbDone);
 
         return $context->builder->load($outSlot);
+    }
+
+    /**
+     * i1: {@code nodeName} is an Element node, not a #text/#comment stand-in (#33918).
+     */
+    private static function emitNodeNameIsElement(Context $context, Value $nameStr): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $i1->constInt(0, false);
+        $one = $i1->constInt(1, false);
+        $nonElements = [
+            '#text',
+            '#comment',
+            '#cdata-section',
+            '#document-fragment',
+            '#document-type',
+            '#entity-ref',
+        ];
+        $isNon = $zero;
+        foreach ($nonElements as $lit) {
+            $want = $context->builder->load($context->constantStringFromString($lit));
+            $cmp = JitStringCompare::strcmp($context, $nameStr, $want);
+            $match = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+            $isNon = $context->builder->or($isNon, $match);
+        }
+
+        return $context->builder->select($isNon, $zero, $one);
     }
 }

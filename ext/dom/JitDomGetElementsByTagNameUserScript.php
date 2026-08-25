@@ -119,6 +119,12 @@ final class JitDomGetElementsByTagNameUserScript
         }
         self::$lastTagQuery = $tagLit;
         self::$liveItemTagQuery = $tagLit;
+        // LiveSlots mutations after loadXML leave compile-time markup stale (#33918).
+        if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()) {
+            DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
+
+            return self::boxNodeList($context, 0);
+        }
         $count = DomParseSimpleXmlJitHelper::countTagArgv($markup, $tagLit);
         // Preserve live appendChild increments when re-querying the same tag (#28605).
         DomUserScriptLiveTagListLlvm::initCount($context, $tagLit, $count);

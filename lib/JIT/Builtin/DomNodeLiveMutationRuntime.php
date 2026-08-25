@@ -11,7 +11,9 @@ use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
 use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
+use PHPCompiler\ext\dom\JitDomCloneNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\dom\JitDomImportNode;
 use PHPCompiler\ext\dom\JitDomInsertBeforeLiveSlots;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\ext\dom\JitDomNodeChildProperty;
@@ -329,6 +331,7 @@ final class DomNodeLiveMutationRuntime
                 // importNode #32987). Merging compile-time delta onto the slot again
                 // duplicated deep importNode subtrees in saveXML (#33918 regression).
                 self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind, true);
+                JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
 
                 return self::nullValuePtr($context);
             }
@@ -1058,9 +1061,15 @@ final class DomNodeLiveMutationRuntime
      */
     private static function compileTimeChildElementMarkup(Variable $arg): ?string
     {
-        $tag = $arg->compileTimeDomTagName ?? null;
+        $tag = $arg->compileTimeDomTagName
+            ?? JitDomImportNode::$lastMaterializedTagName
+            ?? JitDomCloneNode::$lastResultTagName
+            ?? null;
         if (null !== $tag && '' !== $tag) {
-            $inner = $arg->compileTimeDomInnerXml ?? '';
+            $inner = $arg->compileTimeDomInnerXml ?? null;
+            if (null === $inner || '' === $inner) {
+                $inner = JitDomImportNode::$lastMaterializedInnerXml ?? '';
+            }
             $attrSuffix = '';
             if (null !== $arg->compileTimeDomAttributes && [] !== $arg->compileTimeDomAttributes) {
                 $parts = [];
@@ -1133,6 +1142,10 @@ final class DomNodeLiveMutationRuntime
             }
             $markup = self::compileTimeChildElementMarkup($arg);
             if (null === $markup) {
+                if ($skipInnerXmlSlotMerge) {
+                    DomUserScriptLiveTagListLlvm::clearPending($context);
+                }
+
                 return;
             }
             $pieces[] = $markup;
