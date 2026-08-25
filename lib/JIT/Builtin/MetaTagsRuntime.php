@@ -9,16 +9,19 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_get_meta_tags via MetaTagsJitHelper PHP (#9338, #26568, #33051).
+ * JIT/AOT link for __compiler_get_meta_tags via MetaTagsJitHelper PHP (#9338, #26568, #33051, #34787).
  *
  * Owns the ABI module-locally: {@see getNamedFunction} first, then {@see addFunction}
  * if absent. Do not re-add empty always-on shells in {@see Type} — leftover decls mint
  * get_meta_tags.1 (#31894 / #32122).
  * Thin standalone AOT links via {@see ensureStandaloneBodies} (peer StringFileGetContents
  * #33030 / #13571) — Type::initialize returns early for STANDALONE/EMBED.
+ * Bridge reads via {@see __compiler_file_get_contents} (data:// NestedJIT-safe — #34731)
+ * then NestedJIT {@see MetaTagsJitHelper::parseHtmlToNativeHt} (#34787).
  * Helper returns native HT i64 (not NestedJIT HashTable — #27551 / #26942); bridge converts
  * via {@see JitNestedHelperCoerce::i64ToTypedPtr}.
  * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
@@ -33,11 +36,11 @@ final class MetaTagsRuntime
 
     private const HELPER_PATH = '/ext/standard/MetaTagsJitHelper.php';
 
-    private const GET_META_TAGS_HELPER = 'PHPCompiler\\ext\\standard\\MetaTagsJitHelper::getMetaTags';
+    private const PARSE_HTML_HELPER = 'PHPCompiler\\ext\\standard\\MetaTagsJitHelper::parseHtmlToNativeHt';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::GET_META_TAGS_HELPER,
+        self::PARSE_HTML_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -65,6 +68,10 @@ final class MetaTagsRuntime
 
         // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit (#27317 / #27088).
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        // data:// via __compiler_file_get_contents (#34787 / peer #34731).
+        StringBase64Decode::ensureLinked($context);
+        StringFileGetContents::ensureLinked($context);
+        IncludePathRuntime::ensureLinked($context);
         self::ensureNativeHtInternalProxies($context);
         self::ensureJitHelperCompiled($context);
         self::implementGetMetaTagsBridge($context);
@@ -94,11 +101,51 @@ final class MetaTagsRuntime
             : $context->module->addFunction(self::ABI_NAME, $ft);
 
         $entry = $fn->appendBasicBlock('meta_tags_bridge_entry');
+        $resolveBb = $fn->appendBasicBlock('meta_tags_bridge_resolve_inc');
+        $readBb = $fn->appendBasicBlock('meta_tags_bridge_read');
+        $failBb = $fn->appendBasicBlock('meta_tags_bridge_fail');
+        $parseBb = $fn->appendBasicBlock('meta_tags_bridge_parse');
         $context->builder->positionAtEnd($entry);
+
+        $path = $fn->getParam(0);
+        $useInc = $fn->getParam(1);
+        $nullStr = $strPtr->constNull();
+        $context->builder->branchIf($useInc, $resolveBb, $readBb);
+
+        $context->builder->positionAtEnd($resolveBb);
+        $resolved = $context->builder->call(
+            $context->lookupFunction('__compiler_stream_resolve_include_path'),
+            $path
+        );
+        $hasResolved = $context->builder->icmp(Builder::INT_NE, $resolved, $nullStr);
+        $useResolvedBb = $fn->appendBasicBlock('meta_tags_bridge_use_resolved');
+        $context->builder->branchIf($hasResolved, $useResolvedBb, $readBb);
+
+        $context->builder->positionAtEnd($useResolvedBb);
+        $context->builder->branch($readBb);
+
+        $context->builder->positionAtEnd($readBb);
+        $pathPhi = $context->builder->phi($strPtr, 'meta_tags_path');
+        $pathPhi->addIncoming($path, $entry);
+        $pathPhi->addIncoming($path, $resolveBb);
+        $pathPhi->addIncoming($resolved, $useResolvedBb);
+
+        // Always __compiler_file_get_contents — data:// NestedJIT-safe (#34787 / peer #34731).
+        $contents = $context->builder->call(
+            $context->lookupFunction('__compiler_file_get_contents'),
+            $pathPhi
+        );
+        $readFailed = $context->builder->icmp(Builder::INT_EQ, $contents, $nullStr);
+        $context->builder->branchIf($readFailed, $failBb, $parseBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($htPtr->constNull());
+
+        $context->builder->positionAtEnd($parseBb);
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::GET_META_TAGS_HELPER),
-            [$fn->getParam(0), $fn->getParam(1)]
+            self::helperFunction($context, self::PARSE_HTML_HELPER),
+            [$contents]
         );
         // Native HT helpers return i64 ptr (0 = false) — peer parse_str / getenv (#13827).
         $i64 = $context->getTypeFromString('int64');

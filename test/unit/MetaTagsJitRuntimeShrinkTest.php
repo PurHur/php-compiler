@@ -19,7 +19,8 @@ final class MetaTagsJitRuntimeShrinkTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/MetaTagsJitHelper.php');
         $this->assertStringContainsString('phpc_native_ht_alloc', $source);
         $this->assertStringContainsString('phpc_native_ht_set_string_key', $source);
-        $this->assertStringContainsString('@file_get_contents', $source);
+        $this->assertStringContainsString('parseHtmlToNativeHt', $source);
+        $this->assertStringNotContainsString('@file_get_contents', $source);
         $this->assertStringContainsString('\'\' === $ch', $source);
         $this->assertStringNotContainsString('isset($html', $source);
         $this->assertStringContainsString(': int', $source);
@@ -33,11 +34,13 @@ final class MetaTagsJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MetaTagsJitHelper', $source);
         $this->assertStringContainsString('i64ToTypedPtr', $source);
         $this->assertStringContainsString('ensureNativeHtInternalProxies', $source);
+        $this->assertStringContainsString('__compiler_file_get_contents', $source);
+        $this->assertStringContainsString('StringFileGetContents::ensureLinked', $source);
         $this->assertStringNotContainsString('implementParseMetaTagsHtml', $source);
         $this->assertStringNotContainsString('coerceToHashtablePtr', $source);
 
         $lineCount = \substr_count($source, "\n");
-        $this->assertLessThan(180, $lineCount, 'MetaTagsRuntime must be a thin bridge');
+        $this->assertLessThan(220, $lineCount, 'MetaTagsRuntime must stay a bridge (read+parse, #34787)');
     }
 
     public function testMetaTagsRuntimeUsesJitVmHelperLink(): void

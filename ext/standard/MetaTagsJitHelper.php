@@ -5,44 +5,37 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * get_meta_tags() for compiled JIT/AOT modules (#9338, #33051, php-in-PHP).
+ * get_meta_tags() HTML parse for compiled JIT/AOT modules (#9338, #33051, #34787, php-in-PHP).
  *
  * Thin AOT: NestedJIT must not return {@see \PHPCompiler\VM\HashTable} (#27551 / #26942).
  * Materialize via {@see phpc_native_ht_alloc} + {@see phpc_native_ht_set_string_key}
  * (peer parse_str #13827). {@see \PHPCompiler\JIT\Builtin\MetaTagsRuntime} converts i64 →
  * `__hashtable__*`.
  *
+ * File/URI reads happen in the LLVM bridge via {@see __compiler_file_get_contents}
+ * (data:// NestedJIT-safe — peer #34731). This helper is parse-only so NestedJIT never
+ * hits libc open on the filename (#34787).
+ *
  * NestedJIT thin-AOT traps this helper avoids:
- * - `strlen()` / `isset($s[$i])` on `@file_get_contents` results are wrong — end when `$s[$i]===""`
+ * - `strlen()` / `isset($s[$i])` on string results are wrong — end when `$s[$i]===""`
  * - `substr($s, $strpos)` / `$i+$j` offsets miscompile — char state machines only
- * - PCRE / VmFs NestedJIT — `@file_get_contents` + literal scanners
+ * - PCRE / VmFs NestedJIT — literal scanners only
  * - Keep scanners inline (private helpers / larger CFGs NestedJIT-OOM under thin init)
  *
  * Limitation: first `name="…"` / `content="…"` pair in the document (double-quoted). Enough
  * for php-src-shaped single-meta fixtures; multi-tag HTML is a follow-up.
  *
- * SSOT semantics: {@see VmMetaTags::getMetaTags()} / php-src php_meta_tags.c
+ * SSOT semantics: {@see VmMetaTags::parseFromHtml()} / php-src php_meta_tags.c
  * php-src: ext/standard/php_meta_tags.c — PHP_FUNCTION(get_meta_tags)
  */
 final class MetaTagsJitHelper
 {
     /**
-     * NestedJIT-safe native hashtable pointer (0 = false / read failure).
+     * NestedJIT-safe native hashtable pointer (0 = empty / alloc failure).
+     * Caller already read HTML (incl. data://) via __compiler_file_get_contents (#34787).
      */
-    public static function getMetaTags(string $filename, bool $useIncludePath): int
+    public static function parseHtmlToNativeHt(string $html): int
     {
-        if ($useIncludePath) {
-            $resolved = VmFs::resolveIncludePath($filename);
-            if (false !== $resolved) {
-                $filename = $resolved;
-            }
-        }
-
-        $html = @file_get_contents($filename);
-        if (false === $html) {
-            return 0;
-        }
-
         $htPtr = (int) phpc_native_ht_alloc();
         if ($htPtr <= 0) {
             return 0;
