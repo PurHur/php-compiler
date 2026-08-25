@@ -364,8 +364,6 @@ final class JitValueNumeric
         Variable $left,
         Variable $right
     ): Variable {
-        $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
-        $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
 
@@ -411,8 +409,8 @@ final class JitValueNumeric
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($longBlock);
-        $ll = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
-        $rl = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
+        $ll = JitLongArg::lower($context, $left, 'binary op boxed operand');
+        $rl = JitLongArg::lower($context, $right, 'binary op boxed operand');
         if (JitLongArithOverflow::supportsOpcode($opType)) {
             JitLongArithOverflow::writeBoxedBinary($context, $opType, $ll, $rl, $slotPtr);
         } else {
