@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\VM\HashTable;
 
 /**
  * password_* / crypt() for compiled JIT/AOT modules (#9908, #29545, php-in-PHP).
@@ -66,9 +65,104 @@ final class PasswordJitHelper
         return VmPassword::crypt($password, $salt);
     }
 
-    public static function getInfoHashtable(string $hash): HashTable
+    /**
+     * password_get_info() bag for JIT/AOT bridges (#3649, #34639).
+     *
+     * Return type is `array` (not {@see HashTable}): NestedJIT maps class HashTable to
+     * object ABI and yields an empty bag under thin AOT (#20652 / algosArgv peer).
+     * NestedJIT leaf parses the hash inline — {@see VmPassword::getInfo} is outside the
+     * helper translation unit and stubs to empty under thin AOT (#34639).
+     * {@see \PHPCompiler\JIT\Builtin\PasswordCryptoRuntime} coerces via coerceToHashtablePtr.
+     *
+     * @return array{algo: ?string, algoName: string, options: array<string, mixed>}
+     */
+    public static function getInfoHashtable(string $hash): array
     {
-        return VmPassword::infoToHashTable(VmPassword::getInfo($hash));
+        if (NestedJitCompileScope::isActive()) {
+            return self::getInfoThin($hash);
+        }
+
+        return VmPassword::getInfo($hash);
+    }
+
+    /**
+     * NestedJIT-safe password_get_info parse (php-src password.c php_password_algo / get_info).
+     *
+     * @return array{algo: ?string, algoName: string, options: array<string, int>}
+     */
+    private static function getInfoThin(string $hash): array
+    {
+        $len = \strlen($hash);
+        if ($len < 3 || '$' !== $hash[0]) {
+            return ['algo' => null, 'algoName' => 'unknown', 'options' => []];
+        }
+        // bcrypt: $2y$CC$… (60 chars) — php-src PASSWORD_BCRYPT
+        if ($len >= 7 && '$' === $hash[0] && '2' === $hash[1] && 'y' === $hash[2] && '$' === $hash[3]) {
+            if (60 === $len) {
+                $cost = ((int) $hash[4]) * 10 + ((int) $hash[5]);
+                if ($cost < 4) {
+                    $cost = 10;
+                }
+
+                return [
+                    'algo' => '2y',
+                    'algoName' => 'bcrypt',
+                    'options' => ['cost' => $cost],
+                ];
+            }
+
+            return ['algo' => null, 'algoName' => 'unknown', 'options' => []];
+        }
+        // argon2i$ / argon2id$ — parse m=,t=,p= from the param segment (password.c)
+        if ($len > 9 && \str_starts_with($hash, '$argon2i$')) {
+            return self::getInfoArgon2Thin(\substr($hash, 9), 'argon2i');
+        }
+        if ($len > 10 && \str_starts_with($hash, '$argon2id$')) {
+            return self::getInfoArgon2Thin(\substr($hash, 10), 'argon2id');
+        }
+
+        return ['algo' => null, 'algoName' => 'unknown', 'options' => []];
+    }
+
+    /**
+     * @return array{algo: string, algoName: string, options: array{memory_cost: int, time_cost: int, threads: int}}
+     */
+    private static function getInfoArgon2Thin(string $params, string $name): array
+    {
+        $memoryCost = 65536;
+        $timeCost = 4;
+        $threads = 1;
+        // NestedJIT: avoid sscanf — scan m=/t=/p= tokens by hand.
+        $parts = \explode('$', $params);
+        foreach ($parts as $part) {
+            if (\str_starts_with($part, 'm=')) {
+                $memoryCost = (int) \substr($part, 2);
+            } elseif (\str_starts_with($part, 't=')) {
+                $timeCost = (int) \substr($part, 2);
+            } elseif (\str_starts_with($part, 'p=')) {
+                $threads = (int) \substr($part, 2);
+            } elseif (\str_contains($part, ',')) {
+                foreach (\explode(',', $part) as $kv) {
+                    if (\str_starts_with($kv, 'm=')) {
+                        $memoryCost = (int) \substr($kv, 2);
+                    } elseif (\str_starts_with($kv, 't=')) {
+                        $timeCost = (int) \substr($kv, 2);
+                    } elseif (\str_starts_with($kv, 'p=')) {
+                        $threads = (int) \substr($kv, 2);
+                    }
+                }
+            }
+        }
+
+        return [
+            'algo' => $name,
+            'algoName' => $name,
+            'options' => [
+                'memory_cost' => $memoryCost,
+                'time_cost' => $timeCost,
+                'threads' => $threads,
+            ],
+        ];
     }
 
     public static function needsRehashArgv(string $hash, int $algo, int $cost): int
