@@ -913,11 +913,17 @@ final class Variable {
                         }
                         break;
                     case self::TYPE_NATIVE_BOOL:
+                        // zend convert_to_long: true→1 / false→0. Must zext the *loaded* i1 —
+                        // trunc(raw value) poisons KIND_VARIABLE (i1*) and trunc i1→i64 fails
+                        // module verify (#34667, Module.php:180).
                         return new self(
-                            $this->context, 
+                            $this->context,
                             $type,
                             self::KIND_VALUE,
-                            $this->context->builder->trunc($this->value, $this->context->getTypeFromString('bool'))
+                            $this->context->builder->zExt(
+                                $this->context->helper->loadValue($this),
+                                $this->context->getTypeFromString('long long')
+                            )
                         );
                 }
                 break;
@@ -1436,6 +1442,15 @@ final class Variable {
                 : $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
 
             return $context->builder->truncOrBitCast($truncated, $sizeT);
+        }
+        if (self::TYPE_NATIVE_BOOL === $dim->type) {
+            // convert_to_long: true→1 / false→0; zext i1 — trunc i1→size_t is invalid IR (#34667).
+            $asLong = $context->builder->zExt(
+                $context->helper->loadValue($dim),
+                $context->getTypeFromString('int64')
+            );
+
+            return $context->builder->truncOrBitCast($asLong, $sizeT);
         }
         $indexVal = $context->builder->truncOrBitCast(
             $context->helper->loadValue($dim),
