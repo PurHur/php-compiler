@@ -34,7 +34,6 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * SPL ArrayObject family: bag restore into `__spl_ht` (#33636) — not firstIntProp→slot0.
  * SplFixedArray: integer-keyed elements into `__spl_ht` (#33640) — same slot-0 trap.
  * SplObjectStorage: object-key pairs (#33876); SplDoublyLinkedList/Queue/Stack bag (#33966).
- * DateTime / DateTimeImmutable: Zend date wire → __dt_* NestedJIT (#34594).
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -351,17 +350,6 @@ final class StringUnserialize
                     $context,
                     $objVal,
                     $payloadString
-                );
-            } elseif (
-                'datetime' === $classLc
-                || 'datetimeimmutable' === $classLc
-            ) {
-                // Zend date wire → __dt_* (#34594) — not firstIntProp→slot0.
-                \PHPCompiler\VM\DateTimeUnserializeJitHelper::compileUnserializeRestore(
-                    $context,
-                    $objVal,
-                    $payloadString,
-                    $className
                 );
             } else {
                 $voidPtr = $context->getTypeFromString('void*');
