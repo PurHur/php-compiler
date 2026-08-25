@@ -183,4 +183,9 @@ final class FinfoSetFlagsMethod extends VmClassMethod
             $frame->returnVar->bool($ok);
         }
     }
+
+    public function call(JitContext $context, JITVariable ...$args): Value
+    {
+        return finfo_set_flags::lowerSetFlags($context, true, ...$args);
+    }
 }

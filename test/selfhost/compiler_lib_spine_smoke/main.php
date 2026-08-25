@@ -6275,6 +6275,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ExternalMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/FinfoConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/FinfoFile.php';
 require_once __DIR__.'/../../../lib/JIT/Call/FinfoBuffer.php';
+require_once __DIR__.'/../../../lib/JIT/Call/FinfoSetFlags.php';
 require_once __DIR__.'/../../../lib/JIT/Call/NumberFormatterCreate.php';
 require_once __DIR__.'/../../../lib/JIT/Call/NumberFormatterFormat.php';
 require_once __DIR__.'/../../../lib/JIT/Call/IntlDateFormatterCreate.php';

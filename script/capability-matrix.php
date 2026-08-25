@@ -126,11 +126,13 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('mime_content_type' === $fn->getName() && preg_match('/MimeContentTypeRuntime/i', $source)) {
         $notes[] = 'file MIME sniff (VM host fileinfo + AOT byte sniff) (#6196)';
     }
-    if (str_starts_with($fn->getName(), 'finfo_') && preg_match('/VmFinfo|VmMime|JitFinfoFile|JitFinfoBuffer|FinfoFileRuntime|FinfoBufferRuntime/i', $source)) {
+    if (str_starts_with($fn->getName(), 'finfo_') && preg_match('/VmFinfo|VmMime|JitFinfoFile|JitFinfoBuffer|FinfoFileRuntime|FinfoBufferRuntime|ReflectionSetup/i', $source)) {
         if (preg_match('/JitFinfoFile|JitFinfoBuffer|FinfoFileRuntime|FinfoBufferRuntime/i', $source)) {
             $notes[] = 'ext/fileinfo MIME sniff via VmMime + FinfoFileRuntime/FinfoBufferRuntime AOT (#3366,#27196,#28660; FILEINFO_NONE/RAW still VM-rich)';
+        } elseif (preg_match('/ReflectionSetup|__value__writeObject/i', $source)) {
+            $notes[] = 'ext/fileinfo thin AOT handle open/close/set_flags (#3366,#34688; MIME via #27196)';
         } else {
-            $notes[] = 'ext/fileinfo VM sniff via VmMime + FILEINFO_NONE/RAW human desc (#3366,#19247; JIT deferred)';
+            $notes[] = 'ext/fileinfo VM sniff via VmMime + FILEINFO_NONE/RAW human desc (#3366,#19247)';
         }
     }
     if ('openssl_cipher_key_length' === $fn->getName()

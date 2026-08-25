@@ -6,12 +6,17 @@ namespace PHPCompiler\ext\fileinfo;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * finfo_close() — release finfo handle (php-src ext/fileinfo/fileinfo.c; #3366).
+ * finfo_close() — release finfo handle (php-src ext/fileinfo/fileinfo.c; #3366, #34688).
+ *
+ * Thin AOT: load the receiver (type-ish use) and return true — VM side-table close is
+ * not needed for the MIME_TYPE path that already ignores flags (#27196).
  *
  * @see https://github.com/php/php-src/blob/master/ext/fileinfo/fileinfo.c PHP_FUNCTION(finfo_close)
  */
@@ -40,6 +45,19 @@ final class finfo_close extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('finfo_close() is not implemented for JIT in this compiler build (issue #3366)');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'finfo_close() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        ReflectionSetup::loadObjectFromArg($context, $args[0]);
+
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(1, false));
+
+        return JitValueBox::pointer($context, $slot);
     }
 }
