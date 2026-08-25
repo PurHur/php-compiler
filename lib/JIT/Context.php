@@ -2302,7 +2302,10 @@ class Context {
             Builtin\StreamReadRuntime::ensureLinked($this);
             Builtin\StreamBucket::ensureLinked($this);
         }
-        Builtin\StringTriggerError::ensureStandaloneBodies($this);
+        // StringTriggerError always-on removed (#34641): trigger_error_.php / JitBuiltinWarning /
+        // JitIncDec / HashTableResourceKeyLlvm / JitTriggerErrorKernel already ensureLinked before
+        // lookup (peer #34631 / #33234). JitTriggerErrorKernel restores builder insert mid-{main}.
+        // Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
         // AssertFail always-on removed (#34605): JitAssert already ensureLinked before lookup
         // (peer #34578). Full standalone still ensureStandaloneBodies below.
         // JitReturnPending always-on removed (#34621): TryCatchHelper / emitPendingReturnResume
@@ -2322,8 +2325,7 @@ class Context {
         // LastError always-on removed (#34631): JitErrorGetLast / JitTriggerErrorKernel already
         // ensureLinked before lookup (peer #34621). LastErrorRuntime restores builder insert
         // mid-{main}. Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
-        // Full standalone still ensureStandaloneBodies below; StringTriggerError always-on still
-        // pulls LastError when trigger_error ABI is linked during thin init.
+        // Full standalone still ensureStandaloneBodies below (StringTriggerError then LastError).
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
         Builtin\EnvLocalRuntime::ensureLinked($this);
         // CLI argv: NestedJIT CliArgvJitHelper during thin init (peer IncludePath #20877 / #20904)
