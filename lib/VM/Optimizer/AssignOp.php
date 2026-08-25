@@ -61,7 +61,9 @@ class AssignOp extends Optimizer
                     $cvSlot = $op->arg2;
                     // ($g .= 'A') && … — JumpIf / (bool) cast read the concat temp; retarget to
                     // the CV after in-place fusion (#34558 / leftover #24506).
+                    // Ternary arms also write the ?: result from the same temp (#34561).
                     $this->retargetShortCircuitReadersFromBinaryResult($block, $binaryDest, $cvSlot);
+                    $this->retargetSiblingAssignExprFromBinaryResult($block, $binaryDest, $cvSlot, $key);
                     $prior->arg1 = $cvSlot;
                     // Compound assign ($x += 1): arg2 is the in-place lvalue — redirect both (#13083).
                     // Do not clobber additive/concat operands on ??/?: deferred RHS (#11801, #13104, #13105).
@@ -99,7 +101,8 @@ class AssignOp extends Optimizer
 
     /**
      * Fuse when the binary temp is only used by the following ASSIGN, or by that ASSIGN
-     * plus short-circuit JUMPIF / (bool) cast on the same temp (`($g .= 'A') && …`, #34558).
+     * plus short-circuit JUMPIF / (bool) cast on the same temp (`($g .= 'A') && …`, #34558),
+     * or plus sibling ASSIGNs that also copy the temp (ternary CV + ?: result, #34561).
      */
     private function assignOpCanFuseInPlace(
         Block $block,
@@ -108,6 +111,9 @@ class AssignOp extends Optimizer
     ): bool {
         $binaryDest = (int) $binary->arg1;
         $binaryOpResult = $block->getOperand($binaryDest);
+        if (null === $binaryOpResult) {
+            return false;
+        }
         $usageCount = count($binaryOpResult->usages);
         if (1 === $usageCount) {
             return true;
@@ -122,9 +128,14 @@ class AssignOp extends Optimizer
             if (!$this->opReadsValueSlot($block, $later, $binaryDest)) {
                 continue;
             }
-            if (!$this->isShortCircuitBinaryResultReader($later, $binaryDest)) {
-                return false;
+            if ($this->isShortCircuitBinaryResultReader($later, $binaryDest)) {
+                continue;
             }
+            if ($this->isSiblingAssignOfBinaryResult($later, $binaryDest)) {
+                continue;
+            }
+
+            return false;
         }
 
         return true;
@@ -149,6 +160,14 @@ class AssignOp extends Optimizer
         return false;
     }
 
+    /** Sibling ASSIGN whose expr (arg3) is the concat temp — ternary ?: result (#34561). */
+    private function isSiblingAssignOfBinaryResult(OpCode $op, int $binaryDest): bool
+    {
+        return OpCode::TYPE_ASSIGN === $op->type
+            && null !== $op->arg3
+            && (int) $op->arg3 === $binaryDest;
+    }
+
     /** Retarget JUMPIF / CAST_BOOL from concat temp to the in-place CV (#34558). */
     private function retargetShortCircuitReadersFromBinaryResult(Block $block, int $binaryDest, $cvSlot): void
     {
@@ -166,6 +185,27 @@ class AssignOp extends Optimizer
             if (OpCode::TYPE_CAST_BOOL === $later->type && (int) $later->arg2 === $binaryDest) {
                 $later->arg2 = $cvSlot;
             }
+        }
+    }
+
+    /**
+     * Retarget sibling ASSIGN expr slots from the dead concat temp to the CV (#34561).
+     * Skips the assign being fused (handled by remove / in-place rewrite).
+     */
+    private function retargetSiblingAssignExprFromBinaryResult(
+        Block $block,
+        int $binaryDest,
+        $cvSlot,
+        int|string $fusedAssignKey
+    ): void {
+        foreach ($block->opCodes as $laterKey => $later) {
+            if ((int) $laterKey === (int) $fusedAssignKey) {
+                continue;
+            }
+            if (!$this->isSiblingAssignOfBinaryResult($later, $binaryDest)) {
+                continue;
+            }
+            $later->arg3 = $cvSlot;
         }
     }
 
