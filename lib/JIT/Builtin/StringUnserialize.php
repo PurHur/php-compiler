@@ -34,8 +34,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * SPL ArrayObject family: bag restore into `__spl_ht` (#33636) — not firstIntProp→slot0.
  * SplFixedArray: integer-keyed elements into `__spl_ht` (#33640) — same slot-0 trap.
  * SplObjectStorage: object-key pairs (#33876); SplDoublyLinkedList/Queue/Stack bag (#33966).
- * DateTime, DateTimeImmutable, DateTimeZone, DateInterval: Zend date wire via NestedJIT
- * (#34599 / peer #34594).
+ * DateTime / DateTimeImmutable / DateTimeZone: Zend date wire via NestedJIT (#34599 / #34601).
+ * DateInterval: compileTimeString fold + format stamp (#34599 follow-up); skip firstIntProp.
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -367,6 +367,9 @@ final class StringUnserialize
                     $objVal,
                     $payloadString
                 );
+            } elseif ('dateinterval' === $classLc || 'dateperiod' === $classLc) {
+                // DateInterval assigned-serialize folds via compileTimeString (#34599);
+                // never firstIntProp→slot0 (SIGSEGV on format). NestedJIT bag TBD.
             } else {
                 $voidPtr = $context->getTypeFromString('void*');
                 foreach ($object->instancePropertySets($id) as $propset) {

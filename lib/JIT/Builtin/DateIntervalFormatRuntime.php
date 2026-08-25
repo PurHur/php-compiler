@@ -15,6 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * getNamedFunction-first so leftover Type decls cannot mint date_interval_format.1 (#31894 / #32122).
  * Save/restore insert block around ensureLinked — mid-main format after DateTime::diff (#33912).
+ * NestedJIT scalar args coerced via {@see JitNestedHelperCoerce} (#34599).
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_interval_format)
  */
 final class DateIntervalFormatRuntime
@@ -97,23 +98,21 @@ final class DateIntervalFormatRuntime
             ? $probe
             : $context->module->addFunction(self::ABI_NAME, $ft);
 
+        $helperFn = self::helperFunction($context, self::FORMAT_HELPER);
         $entry = $fn->appendBasicBlock('di_fmt_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::FORMAT_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2),
-            $fn->getParam(3),
-            $fn->getParam(4),
-            $fn->getParam(5),
-            $fn->getParam(6),
-            $fn->getParam(7),
-            $fn->getParam(8),
-            $fn->getParam(9),
-            $fn->getParam(10)
-        );
-        $context->builder->returnValue($result);
+        // NestedJIT may box scalars as __value__* — coerce every ABI arg (#34599 / peer DomLoad).
+        $bridgeArgs = [];
+        for ($i = 0; $i < 11; ++$i) {
+            $bridgeArgs[] = \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i)->typeOf()
+            );
+        }
+        $result = $context->builder->call($helperFn, ...$bridgeArgs);
+        $ret = \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $result, $strPtr);
+        $context->builder->returnValue($ret);
         $context->registerFunction(self::ABI_NAME, $fn);
         $context->builder->clearInsertionPosition();
     }

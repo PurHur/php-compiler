@@ -21522,11 +21522,16 @@ class JIT {
     }
 
     /**
-     * Publish compile-time DateTime::diff state onto the result local for format() (#33912).
+     * Publish compile-time DateInterval state onto the result local for format() (#33912 / #34599).
+     *
+     * Sources: DateTime::diff stamp, or unserialize() DateInterval wire fold.
      */
     private function syncDateTimeDiffMetaToResult(?JIT\Call $toCall, Operand $resultOp): void
     {
-        if (!$toCall instanceof JIT\Call\DateTimeDiff) {
+        $fromDiff = $toCall instanceof JIT\Call\DateTimeDiff;
+        $fromUnserialize = $toCall instanceof CoreFunc\Internal
+            && 'unserialize' === $toCall->getName();
+        if (!$fromDiff && !$fromUnserialize) {
             return;
         }
         $state = $this->context->lastDateIntervalDiffState;
