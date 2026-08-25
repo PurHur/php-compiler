@@ -5,7 +5,7 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: removeAttributeNode must clear saveXML attr suffix (#33577).
+ * AOT: removeAttributeNode must clear saveXML attr suffix (#33577 / #34579).
  *
  * @group llvm
  */
@@ -14,6 +14,14 @@ final class DomRemoveAttributeNodeSaveXml33577AotTest extends TestCase
     public function testRemoveAttributeNodeClearsSaveXml(): void
     {
         $this->assertAotMatchesZend(__DIR__.'/../repro/issue_33577_dom_removeattributenode_savexml_aot.php');
+    }
+
+    /** loadXML + getAttributeNode path — leftover of #34257 (#34579). */
+    public function testLoadXmlRemoveAttributeNodeClearsSaveXml(): void
+    {
+        $this->assertAotMatchesZend(
+            __DIR__.'/../repro/issue_34579_dom_loadxml_removeattributenode_savexml_aot.php'
+        );
     }
 
     private function assertAotMatchesZend(string $src): void

@@ -12,7 +12,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** DOMElement::removeAttributeNode() — user-script AOT (php-src element.c; #33577). */
+/**
+ * DOMElement::removeAttributeNode() — user-script AOT (php-src element.c; #33577 / #34579).
+ *
+ * saveXML sync covers createAttribute (#33577) and loadXML+getAttributeNode (#34579 / #34257).
+ */
 final class DomElementRemoveAttributeNode implements Call
 {
     public function call(Context $context, Variable ...$args): Value
@@ -35,7 +39,7 @@ final class DomElementRemoveAttributeNode implements Call
 
         $result = JitDomAttributeNodeNS::invokeRemoveAttributeNode($context, ...$args);
 
-        // Drop attr from saveXML open-tag suffix (peer removeAttribute #33509 / #33577).
+        // Drop attr from saveXML open-tag suffix (peer removeAttribute #33509 / #33577 / #34579).
         if (\count($args) >= 1) {
             JitDomAttributeNodeNS::syncSaveXmlAttrSuffixAfterRemoveAttributeNode($context, $args[0]);
         }
