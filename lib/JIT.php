@@ -9224,6 +9224,16 @@ class JIT {
                     }
                     $resultOp = $block->getOperand($op->arg1);
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($resultOp);
+                    // Nested FETCH_DIM_W (`$a[0][1]` / by-ref return): outer must yield the live
+                    // child HT (#24011), not prepareIndexWrite orphan — CFG often types the
+                    // intermediate as mixed (#34745 / re-#34740).
+                    $dimExpectedType = $this->dimFetchExpectedType(
+                        $block,
+                        $i,
+                        (int) $op->arg1,
+                        $resultOp->type,
+                        $forWrite
+                    );
                     // ZEND_FETCH_DIM_W: null/false containers auto-vivify (#21992, #22650).
                     if ($forWrite && Variable::TYPE_NULL === $value->type) {
                         JIT\HashTableHelper::initArray($this->context, $value);
@@ -9568,7 +9578,7 @@ class JIT {
                                 break;
                             }
                         }
-                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec);
+                        $fetched = $value->dimFetch($dim, $dimExpectedType, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } else {
@@ -9624,7 +9634,7 @@ class JIT {
                                 break;
                             }
                         }
-                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec);
+                        $fetched = $value->dimFetch($dim, $dimExpectedType, $forWrite, $emitFloatKeyDeprecation, $warnUndefKeyIncDec);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } else {
@@ -9710,7 +9720,7 @@ class JIT {
                             $this->context->constantFromInteger($value->nextFreeElement)
                         );
                     }
-                    $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, true, $warnUndefKeyIncDec);
+                    $fetched = $value->dimFetch($dim, $dimExpectedType, $forWrite, true, $warnUndefKeyIncDec);
                     if ($forceBranchMerge && !$forWrite) {
                         $this->assignOperand($resultOp, $fetched, true);
                     } else {
@@ -29653,6 +29663,51 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * True when fetch dest is the container of a later FETCH_DIM_W (`$a[i][j]` / #34745).
+     *
+     * @see php-src Zend/zend_execute.c ZEND_FETCH_DIM_W (nested dimension address)
+     */
+    private function varFetchDestUsedAsNestedDimWriteContainer(Block $block, int $opIndex, int $destSlot): bool
+    {
+        $ops = $block->opCodes;
+        $n = \count($ops);
+        for ($i = $opIndex + 1; $i < $n; ++$i) {
+            $next = $ops[$i];
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+                && (int) $next->arg2 === $destSlot
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Expected type for dimFetch: force TYPE_ARRAY on nested FETCH_DIM_W intermediates (#24011 / #34745).
+     *
+     * CFG often leaves `$a[0]` as mixed when `$a` is a by-ref formal; without TYPE_ARRAY the outer
+     * write returns a prepareIndexWrite orphan and the inner write mutates a detached HT.
+     */
+    private function dimFetchExpectedType(
+        Block $block,
+        int $opIndex,
+        int $destSlot,
+        ?\PHPTypes\Type $resultType,
+        bool $forWrite
+    ): ?\PHPTypes\Type {
+        if (
+            $forWrite
+            && $this->varFetchDestUsedAsNestedDimWriteContainer($block, $opIndex, $destSlot)
+        ) {
+            return \PHPTypes\Type::fromDecl('array');
+        }
+
+        return $resultType;
     }
 
     /**
