@@ -1,5 +1,5 @@
 <?php
-// #34602 — AOT unserialize(DateInterval) via runtime / literal wire (residual of #34599 fold).
+// #34602 — AOT unserialize(DateInterval) via runtime / literal / file-backed wire.
 declare(strict_types=1);
 
 $i = new DateInterval('P1Y2M3DT4H5M6S');
@@ -12,3 +12,11 @@ $lit = 'O:12:"DateInterval":10:{s:1:"y";i:1;s:1:"m";i:2;s:1:"d";i:3;s:1:"h";i:4;
 $ul = unserialize($lit);
 echo $ul->format('%Y-%M-%D %H:%I:%S'), PHP_EOL;
 echo $ul->y, ',', $ul->m, ',', $ul->d, PHP_EOL;
+
+// True runtime payload (no compileTimeString) — file-backed residual (#34602).
+$path = sys_get_temp_dir() . '/di_34602_residual.ser';
+file_put_contents($path, serialize(new DateInterval('P1Y2M3DT4H5M6S')));
+$uf = unserialize(file_get_contents($path));
+echo get_class($uf), PHP_EOL;
+echo $uf->y, '-', $uf->m, '-', $uf->d, ' ', $uf->h, ':', $uf->i, ':', $uf->s, PHP_EOL;
+echo $uf->format('%Y-%M-%D %H:%I:%S'), PHP_EOL;

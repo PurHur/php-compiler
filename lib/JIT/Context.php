@@ -176,6 +176,12 @@ class Context {
     public ?array $lastDateIntervalDiffState = null;
 
     /**
+     * Concrete class stamped onto the last `unserialize()` result when the payload
+     * class is known at compile time (literal / serializePayloadClass) (#34602).
+     */
+    public ?string $lastUnserializeObjectClassUserType = null;
+
+    /**
      * New DateTimeZone result operand/var — construct stamps zone id onto the local (#29732).
      */
     public ?Operand $lastDateTimeZoneNewResultOp = null;

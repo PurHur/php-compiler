@@ -16,6 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * getNamedFunction-first so leftover Type decls cannot mint date_interval_format.1 (#31894 / #32122).
  * Save/restore insert block around ensureLinked — mid-main format after DateTime::diff (#33912).
  * NestedJIT scalar args coerced via {@see JitNestedHelperCoerce} (#34599).
+ * Float `$f` is passed as integer microseconds — NestedJIT float args SIGSEGV (#34602).
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_interval_format)
  */
 final class DateIntervalFormatRuntime
@@ -77,7 +78,6 @@ final class DateIntervalFormatRuntime
         }
 
         $i64 = $context->getTypeFromString('int64');
-        $dbl = $context->getTypeFromString('double');
         $strPtr = $context->getTypeFromString('__string__*');
         $ft = $context->context->functionType(
             $strPtr,
@@ -88,7 +88,7 @@ final class DateIntervalFormatRuntime
             $i64,
             $i64,
             $i64,
-            $dbl,
+            $i64,
             $i64,
             $i64,
             $i64,

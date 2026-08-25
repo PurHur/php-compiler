@@ -26,6 +26,16 @@ final class Issue34602DateIntervalUnserializeAotTest extends TestCase
         );
     }
 
+    public function testAotMatchesZendFileBackedRuntimeWire(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(
+            __DIR__.'/../repro/issue_34602_dateinterval_file_unserialize_aot.php'
+        );
+    }
+
     public function testNestedJitRestoreWired(): void
     {
         $root = dirname(__DIR__, 2);
@@ -36,9 +46,14 @@ final class Issue34602DateIntervalUnserializeAotTest extends TestCase
         $this->assertStringContainsString('#34602', $helper);
         $bridge = (string) file_get_contents($root.'/lib/JIT/Builtin/StringUnserialize.php');
         $this->assertStringContainsString('compileDateIntervalRestore', $bridge);
+        $this->assertStringContainsString('DateInterval', $bridge);
         $jit = (string) file_get_contents($root.'/lib/VM/DateUnserializeJitHelper.php');
         $this->assertStringContainsString('compileDateIntervalRestore', $jit);
         $this->assertStringContainsString('#34602', $jit);
+        $fmt = (string) file_get_contents($root.'/ext/standard/JitDateIntervalFormat.php');
+        $this->assertStringContainsString('emitRuntimeFormatFromLiteral', $fmt);
+        $var = (string) file_get_contents($root.'/lib/JIT/Variable.php');
+        $this->assertStringContainsString('fromUnserializeObject', $var);
     }
 
     private function assertAotMatchesZend(string $src): void

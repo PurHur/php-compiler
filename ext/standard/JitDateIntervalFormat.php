@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -22,6 +23,8 @@ use PHPLLVM\Value;
  *
  * Calls DateIntervalFormatRuntime::ensureLinked before ABI lookup (Type no longer
  * always-declares __compiler_date_interval_format — #33203 / #32122 class).
+ * Compile-time format literals use libc snprintf (NestedJIT string/float args
+ * SIGSEGV under thin AOT — #34602 / peer #31963).
  */
 final class JitDateIntervalFormat
 {
@@ -68,15 +71,7 @@ final class JitDateIntervalFormat
             return $baked;
         }
 
-        DateIntervalFormatRuntime::ensureLinked($context);
-
-        $format = JitStringBuiltinArg::lower(
-            $context,
-            $formatArg,
-            'date_interval_format',
-            2,
-            'format'
-        );
+        $fmtLit = JitStringBuiltinArg::compileTimeLiteral($formatArg) ?? $formatArg->compileTimeString;
         $objPtr = self::requireDateIntervalObject($context, $intervalArg);
         /** @var ObjectBuiltin $object */
         $object = $context->type->object;
@@ -91,6 +86,48 @@ final class JitDateIntervalFormat
         $invert = self::readLongProp($context, $object, $objPtr, 'invert');
         [$daysIsInt, $daysInt] = self::readDaysProp($context, $object, $objPtr);
 
+        // NestedJIT formatFromScalars SIGSEGVs on thin AOT (string/float args; #34602 / #34599).
+        // Compile-time format literals: walk specs with libc snprintf (peer #31963).
+        if (\is_string($fmtLit)) {
+            $result = self::emitRuntimeFormatFromLiteral(
+                $context,
+                $fmtLit,
+                $y,
+                $m,
+                $d,
+                $h,
+                $i,
+                $s,
+                $f,
+                $invert,
+                $daysIsInt,
+                $daysInt
+            );
+            $slot = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                JitValueBox::pointer($context, $slot),
+                $result
+            );
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        DateIntervalFormatRuntime::ensureLinked($context);
+        $format = JitStringBuiltinArg::lower(
+            $context,
+            $formatArg,
+            'date_interval_format',
+            2,
+            'format'
+        );
+        // NestedJIT float params SIGSEGV — pass micros as i64 (#34602).
+        $i64 = $context->getTypeFromString('int64');
+        $f64 = $context->getTypeFromString('double');
+        $fMicros = $context->builder->fpToSi(
+            $context->builder->fmul($f, $f64->constReal(1000000.0)),
+            $i64
+        );
         $result = $context->builder->call(
             $context->lookupFunction('__compiler_date_interval_format'),
             $y,
@@ -99,7 +136,7 @@ final class JitDateIntervalFormat
             $h,
             $i,
             $s,
-            $f,
+            $fMicros,
             $invert,
             $daysIsInt,
             $daysInt,
@@ -114,6 +151,181 @@ final class JitDateIntervalFormat
         );
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * Emit DateInterval::format for a compile-time format string without NestedJIT (#34602).
+     *
+     * php-src: ext/date/php_date.c — zim_DateInterval_format / date_format
+     */
+    private static function emitRuntimeFormatFromLiteral(
+        Context $context,
+        string $format,
+        Value $y,
+        Value $m,
+        Value $d,
+        Value $h,
+        Value $i,
+        Value $s,
+        Value $f,
+        Value $invert,
+        Value $daysIsInt,
+        Value $daysInt
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $f64 = $context->getTypeFromString('double');
+        $fMicros = $context->builder->fpToSi(
+            $context->builder->fmul($f, $f64->constReal(1000000.0)),
+            $i64
+        );
+        $pieces = [];
+        $len = \strlen($format);
+        $lit = '';
+        for ($p = 0; $p < $len; ++$p) {
+            $ch = $format[$p];
+            if ('%' !== $ch) {
+                $lit .= $ch;
+
+                continue;
+            }
+            if ($lit !== '') {
+                $pieces[] = $context->builder->load($context->constantStringFromString($lit));
+                $lit = '';
+            }
+            if ($p + 1 >= $len) {
+                $pieces[] = $context->builder->load($context->constantStringFromString('%'));
+
+                break;
+            }
+            $code = $format[++$p];
+            $pieces[] = match ($code) {
+                'y' => self::snprintfLong($context, $y, '%lld'),
+                'Y' => self::snprintfLong($context, $y, '%02lld'),
+                'm' => self::snprintfLong($context, $m, '%lld'),
+                'M' => self::snprintfLong($context, $m, '%02lld'),
+                'd' => self::snprintfLong($context, $d, '%lld'),
+                'D' => self::snprintfLong($context, $d, '%02lld'),
+                'h' => self::snprintfLong($context, $h, '%lld'),
+                'H' => self::snprintfLong($context, $h, '%02lld'),
+                'i' => self::snprintfLong($context, $i, '%lld'),
+                'I' => self::snprintfLong($context, $i, '%02lld'),
+                's' => self::snprintfLong($context, $s, '%lld'),
+                'S' => self::snprintfLong($context, $s, '%02lld'),
+                'f' => self::snprintfLong($context, $fMicros, '%lld'),
+                'a' => self::emitDaysSpec($context, $daysIsInt, $daysInt),
+                'R' => self::emitSignSpec($context, $invert, true),
+                'r' => self::emitSignSpec($context, $invert, false),
+                '%' => $context->builder->load($context->constantStringFromString('%')),
+                default => $context->builder->load($context->constantStringFromString('%'.$code)),
+            };
+        }
+        if ($lit !== '') {
+            $pieces[] = $context->builder->load($context->constantStringFromString($lit));
+        }
+        if ([] === $pieces) {
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+        $acc = $pieces[0];
+        $n = \count($pieces);
+        for ($j = 1; $j < $n; ++$j) {
+            $acc = JitStringConcat::concat($context, $acc, $pieces[$j], false);
+        }
+
+        return $acc;
+    }
+
+    private static function snprintfLong(Context $context, Value $value, string $fmt): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $i64 = $context->getTypeFromString('int64');
+        try {
+            $context->lookupFunction('__mm__malloc');
+        } catch (\Throwable) {
+            $context->type->memorymanager->register();
+        }
+        LibcExtern::ensureSnprintf($context);
+        $bufSize = $sizeT->constInt(64, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmtPtr = $context->builder->pointerCast($context->constantFromString($fmt), $charPtr);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmtPtr,
+            $value
+        );
+        $len = $context->builder->zExt($written, $i64);
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $bufChar
+        );
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+
+        return $str;
+    }
+
+    private static function emitDaysSpec(Context $context, Value $daysIsInt, Value $daysInt): Value
+    {
+        $fn = BasicBlockHelper::parentFunction($context);
+        $bbInt = $fn->appendBasicBlock('di_fmt_a_int');
+        $bbUnk = $fn->appendBasicBlock('di_fmt_a_unk');
+        $bbMerge = $fn->appendBasicBlock('di_fmt_a_merge');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $slot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $isInt = $context->builder->icmp(
+            Builder::INT_NE,
+            $daysIsInt,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($isInt, $bbInt, $bbUnk);
+        $context->builder->positionAtEnd($bbInt);
+        $context->builder->store(self::snprintfLong($context, $daysInt, '%lld'), $slot);
+        $context->builder->branch($bbMerge);
+        $context->builder->positionAtEnd($bbUnk);
+        $context->builder->store(
+            $context->builder->load($context->constantStringFromString('(unknown)')),
+            $slot
+        );
+        $context->builder->branch($bbMerge);
+        $context->builder->positionAtEnd($bbMerge);
+
+        return $context->builder->load($slot);
+    }
+
+    private static function emitSignSpec(Context $context, Value $invert, bool $always): Value
+    {
+        $fn = BasicBlockHelper::parentFunction($context);
+        $bbNeg = $fn->appendBasicBlock('di_fmt_sign_neg');
+        $bbPos = $fn->appendBasicBlock('di_fmt_sign_pos');
+        $bbMerge = $fn->appendBasicBlock('di_fmt_sign_merge');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $slot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $isNeg = $context->builder->icmp(
+            Builder::INT_NE,
+            $invert,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($isNeg, $bbNeg, $bbPos);
+        $context->builder->positionAtEnd($bbNeg);
+        $context->builder->store(
+            $context->builder->load($context->constantStringFromString('-')),
+            $slot
+        );
+        $context->builder->branch($bbMerge);
+        $context->builder->positionAtEnd($bbPos);
+        $context->builder->store(
+            $context->builder->load($context->constantStringFromString($always ? '+' : '')),
+            $slot
+        );
+        $context->builder->branch($bbMerge);
+        $context->builder->positionAtEnd($bbMerge);
+
+        return $context->builder->load($slot);
     }
 
     /** @return Value|null */

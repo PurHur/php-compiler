@@ -63,10 +63,12 @@ final class RuntimeIndirectInstanceMethodCall implements Call
             )
         );
         $i8 = $context->getTypeFromString('int8');
+        // AOT boxes TYPE_OBJECT|IS_REFCOUNTED (0x85); compare low 7 bits (#32688 / #34602).
+        $typeMasked = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $typeMasked,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_OBJECT, false)
         );
         $failBlock = BasicBlockHelper::append($context, 'indirect_method_not_object');
         $okBlock = BasicBlockHelper::append($context, 'indirect_method_is_object');

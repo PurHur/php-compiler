@@ -278,6 +278,12 @@ final class StringUnserialize
         $context->builder->positionAtEnd($bbPropsOk);
         /** @var \PHPCompiler\JIT\Builtin\Type\Object_ $object */
         $object = $context->type->object;
+        // User-script AOT only declares classes seen so far in this TU. `unserialize(load())`
+        // can run before `new DateInterval` is compiled — seed date layouts so NestedJIT
+        // restore cases exist (#34602 residual / peer DOMNodeList #24422).
+        foreach (['DateInterval', 'DateTime', 'DateTimeImmutable', 'DateTimeZone'] as $dateClass) {
+            $object->lookup($dateClass);
+        }
         $bbMatchFail = $fn->appendBasicBlock('unser_obj_class_miss');
         $bbMatched = $fn->appendBasicBlock('unser_obj_matched');
         $objSlot = BasicBlockHelper::entryAlloca($context, $objPtr);

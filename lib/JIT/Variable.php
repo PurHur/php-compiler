@@ -370,6 +370,12 @@ final class Variable {
      */
     public ?string $serializePayloadClass = null;
 
+    /**
+     * `unserialize()` of a runtime O: payload without a compile-time class hint.
+     * Property/method lowering must use runtime class_id (#34602 file-backed residual).
+     */
+    public bool $fromUnserializeObject = false;
+
     /** MCJIT/AOT foreach over a {@see Generator} object (#3074, #3115). */
     public bool $isJitGenerator = false;
 

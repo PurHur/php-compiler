@@ -19,12 +19,13 @@ final class DateIntervalFormatJitHelper
         int $h,
         int $i,
         int $s,
-        float $f,
+        int $fMicros,
         int $invert,
         int $daysIsInt,
         int $daysInt,
         string $format
     ): string {
+        // NestedJIT float args SIGSEGV under thin AOT (#34602 / #34599); pass micros as i64.
         $days = 0 !== $daysIsInt ? $daysInt : false;
 
         return VmDateInterval::format(
@@ -35,7 +36,7 @@ final class DateIntervalFormatJitHelper
                 'h' => $h,
                 'i' => $i,
                 's' => $s,
-                'f' => $f,
+                'f' => $fMicros / 1000000.0,
                 'invert' => $invert,
                 'days' => $days,
             ],
