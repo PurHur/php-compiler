@@ -34,6 +34,12 @@ final class JitStringCompare
         return VmStringCompare::strcmp($context, $leftStr, $rightStr);
     }
 
+    /** ASCII case-insensitive strcmp for length-prefixed {@see __string__*} (#34702). */
+    public static function strcasecmp(Context $context, Value $leftStr, Value $rightStr): Value
+    {
+        return VmStringCompare::strcasecmp($context, $leftStr, $rightStr);
+    }
+
     public static function identical(Context $context, Value $leftStr, Value $rightStr): Value
     {
         return VmStringCompare::identical($context, $leftStr, $rightStr);

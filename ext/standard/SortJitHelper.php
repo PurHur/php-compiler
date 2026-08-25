@@ -35,8 +35,20 @@ final class SortJitHelper
         VmArray::sortPackedInPlace($ht, StdlibConstants::SORT_NATURAL | StdlibConstants::SORT_FLAG_CASE);
     }
 
+    /** SORT_STRING|SORT_FLAG_CASE (also covers SORT_REGULAR|CASE on string lists) — #34702. */
+    public static function sortPackedCase(HashTable $ht): void
+    {
+        VmArray::sortPackedInPlace($ht, StdlibConstants::SORT_STRING | StdlibConstants::SORT_FLAG_CASE);
+    }
+
     public static function sortPackedReverse(HashTable $ht): void
     {
         VmArray::sortPackedReverseInPlace($ht, StdlibConstants::SORT_REGULAR);
+    }
+
+    /** rsort() SORT_STRING|SORT_FLAG_CASE — #34702. */
+    public static function sortPackedReverseCase(HashTable $ht): void
+    {
+        VmArray::sortPackedReverseInPlace($ht, StdlibConstants::SORT_STRING | StdlibConstants::SORT_FLAG_CASE);
     }
 }

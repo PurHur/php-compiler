@@ -249,6 +249,84 @@ final class VmStringCompare
         return $context->builder->select($cmpNeZero, $prefixResult, $lenDiff);
     }
 
+    /**
+     * ASCII case-insensitive strcmp for length-prefixed {@see __string__*} (#34702).
+     *
+     * Do not route through {@see __compiler_strcasecmp}: that bridge strlen()s C strings and
+     * mis-reads non-NUL-terminated payloads (peer {@see asciiCaseInsensitiveIdentical}).
+     */
+    public static function strcasecmp(Context $context, Value $leftStr, Value $rightStr): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'jit_strcasecmp_entry');
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $nullStr = $context->getTypeFromString('__string__*')->constNull();
+        $emptyStr = $context->builder->load($context->constantStringFromString(''));
+        $leftNull = $context->builder->icmp(Builder::INT_EQ, $leftStr, $nullStr);
+        $rightNull = $context->builder->icmp(Builder::INT_EQ, $rightStr, $nullStr);
+        $leftStr = $context->builder->select($leftNull, $emptyStr, $leftStr);
+        $rightStr = $context->builder->select($rightNull, $emptyStr, $rightStr);
+        $leftLen = $context->builder->load(
+            $context->builder->structGep($leftStr, $map['length'])
+        );
+        $rightLen = $context->builder->load(
+            $context->builder->structGep($rightStr, $map['length'])
+        );
+        $leftLtRight = $context->builder->icmp(Builder::INT_SLT, $leftLen, $rightLen);
+        $minLen = $context->builder->select($leftLtRight, $leftLen, $rightLen);
+        $leftBytes = $context->builder->structGep($leftStr, $map['value']);
+        $rightBytes = $context->builder->structGep($rightStr, $map['value']);
+
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $preHeader = $context->builder->getInsertBlock();
+        $header = BasicBlockHelper::append($context, 'jit_strcasecmp_header');
+        $body = BasicBlockHelper::append($context, 'jit_strcasecmp_body');
+        $nextBb = BasicBlockHelper::append($context, 'jit_strcasecmp_next');
+        $diffBb = BasicBlockHelper::append($context, 'jit_strcasecmp_diff');
+        $lenBb = BasicBlockHelper::append($context, 'jit_strcasecmp_len');
+        $doneBb = BasicBlockHelper::append($context, 'jit_strcasecmp_done');
+        $context->builder->branch($header);
+
+        $context->builder->positionAtEnd($header);
+        $j = $context->builder->phi($i64);
+        $j->addIncoming($zero, $preHeader);
+        $inRange = $context->builder->icmp(Builder::INT_SLT, $j, $minLen);
+        $context->builder->branchIf($inRange, $body, $lenBb);
+
+        $context->builder->positionAtEnd($body);
+        $ca = $context->builder->load($context->builder->gep($leftBytes, $j));
+        $cb = $context->builder->load($context->builder->gep($rightBytes, $j));
+        $la = self::emitAsciiToLowerI8($context, $ca);
+        $lb = self::emitAsciiToLowerI8($context, $cb);
+        $la32 = $context->builder->zExt($la, $context->getTypeFromString('int32'));
+        $lb32 = $context->builder->zExt($lb, $context->getTypeFromString('int32'));
+        $same = $context->builder->icmp(Builder::INT_EQ, $la32, $lb32);
+        $context->builder->branchIf($same, $nextBb, $diffBb);
+
+        $context->builder->positionAtEnd($nextBb);
+        $jn = $context->builder->add($j, $one);
+        $j->addIncoming($jn, $nextBb);
+        $context->builder->branch($header);
+
+        $context->builder->positionAtEnd($diffBb);
+        $byteDiff = $context->builder->sub($la32, $lb32);
+        $byteDiff64 = $context->builder->sExt($byteDiff, $i64);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($lenBb);
+        $lenDiff = $context->builder->sub($leftLen, $rightLen);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($byteDiff64, $diffBb);
+        $phi->addIncoming($lenDiff, $lenBb);
+
+        return $phi;
+    }
+
     public static function identical(Context $context, Value $leftStr, Value $rightStr): Value
     {
         self::ensureMemcmp($context);

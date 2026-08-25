@@ -175,7 +175,12 @@ final class sort_ extends Internal
             || StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_NUMERIC === $sortType
         ) {
-            SortRuntime::sortPacked($context, $array);
+            // SORT_FLAG_CASE: NestedJIT strcasecmp path (#34702); NUMERIC ignores the case bit.
+            if (0 !== $caseFlag && StdlibConstants::SORT_NUMERIC !== $sortType) {
+                SortRuntime::sortPackedCase($context, $array);
+            } else {
+                SortRuntime::sortPacked($context, $array);
+            }
 
             return;
         }
