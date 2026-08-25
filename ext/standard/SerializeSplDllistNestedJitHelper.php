@@ -15,6 +15,9 @@ use PHPCompiler\VM\HashTable;
  * Wire: `O:len:"Class":3:{i:0;flags;i:1;a:N:{…}i:2;a:0:{}}` (php-src spl_dllist.c).
  * Default flags: DLL=0, SplQueue=IT_MODE_FIX(4), SplStack=IT_MODE_FIX|LIFO(6).
  * AOT HT export uses JIT tags (bool=2, double=3) — not VM float=2 / bool=3 (#33520).
+ *
+ * Thin-AOT `compileSerialize` no longer calls this — non-empty HT SIGABRTed (#34592 / peer #34491).
+ * Kept for spine / helper-runtime inventory; live path is `__compiler_serialize_hashtable` + LLVM bag.
  */
 final class SerializeSplDllistNestedJitHelper
 {
