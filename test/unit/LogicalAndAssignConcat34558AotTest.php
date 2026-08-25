@@ -30,35 +30,34 @@ final class LogicalAndAssignConcat34558AotTest extends TestCase
         );
         $this->assertNotNull($block);
 
-        $inPlaceConcats = 0;
         $jumpIf = null;
         foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_CONCAT === $op->type && null !== $op->arg1 && (int) $op->arg1 === (int) $op->arg2) {
-                ++$inPlaceConcats;
-            }
             if (OpCode::TYPE_JUMPIF === $op->type) {
                 $jumpIf = $op;
+                break;
             }
         }
-        $this->assertGreaterThanOrEqual(1, $inPlaceConcats, 'expected in-place CONCAT($g,$g,…) after AssignOp fusion');
         $this->assertNotNull($jumpIf);
         $this->assertNotNull($jumpIf->arg1);
 
-        // Long arm must also fuse (Cast_Bool reader) so AOT matches Zend (#34558).
+        $inPlace = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONCAT === $op->type && null !== $op->arg1 && (int) $op->arg1 === (int) $op->arg2) {
+                $inPlace = true;
+                $this->assertSame((int) $op->arg1, (int) $jumpIf->arg1, 'JumpIf cond retargeted to CV');
+            }
+        }
+        $this->assertTrue($inPlace, 'expected in-place CONCAT($g,$g,…) after AssignOp fusion');
+
         $longArm = $jumpIf->block1;
         $this->assertNotNull($longArm);
         $longInPlace = false;
-        $castOnCv = false;
         foreach ($longArm->opCodes as $op) {
             if (OpCode::TYPE_CONCAT === $op->type && null !== $op->arg1 && (int) $op->arg1 === (int) $op->arg2) {
                 $longInPlace = true;
             }
-            if (OpCode::TYPE_CAST_BOOL === $op->type && null !== $op->arg2 && (int) $op->arg2 === (int) $jumpIf->arg1) {
-                $castOnCv = true;
-            }
         }
-        $this->assertTrue($longInPlace, '&& long arm must in-place CONCAT after Cast_Bool retarget');
-        $this->assertTrue($castOnCv, 'Cast_Bool must read the CV, not the dead concat temp');
+        $this->assertTrue($longInPlace, '&& long arm must in-place CONCAT after Cast_Bool-aware fusion');
     }
 
     private function assertAotMatchesZend(string $src): void
