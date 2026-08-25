@@ -358,7 +358,7 @@ class Type extends Builtin {
         // then addFunction if absent via implementStreamGetLineBridge; Type::initialize still
         // StreamRead::ensureLinked). Leftover Type empty decls vs Runtime ABI drift mint
         // stream_get_line.1 (#31894 / #32122). User-script stream_get_line() stays
-        // JitStreamGetLine / StreamReadJitHelper (libc force peer #33133).
+        // JitStreamGetLine / StreamReadJitHelper (libc force peer #33133 / #34835).
         // __compiler_fseek always-on shell removed (#33176): StreamRead /
         // StreamReadRuntime / JitStreamReadBridgeKernel owns the ABI (getNamedFunction first,
         // then addFunction if absent via implementI64Bridge; Type::initialize still

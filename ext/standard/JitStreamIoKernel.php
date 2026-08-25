@@ -88,6 +88,7 @@ final class JitStreamIoKernel
         self::implementIfMissing($context, '__compiler_tmpfile', self::emitTmpfile(...));
         self::implementIfMissing($context, '__compiler_fread', self::emitFread(...));
         self::implementFgetsForce($context);
+        self::implementStreamGetLineForce($context);
         self::implementFseekForce($context);
         self::implementFtellForce($context);
         self::implementStreamGetContentsForce($context);
@@ -214,6 +215,10 @@ final class JitStreamIoKernel
                 $name,
                 $context->context->functionType($strPtr, false, $i64, $i64)
             ),
+            '__compiler_stream_get_line' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($strPtr, false, $i64, $i64, $strPtr)
+            ),
             '__compiler_fseek' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i64, false, $i64, $i64, $i64)
@@ -327,6 +332,8 @@ final class JitStreamIoKernel
             ['ftruncate', $i32, [$i32, $i64]],
             ['fflush', $i32, [$i8p]],
             ['feof', $i32, [$i8p]],
+            // memcmp(3) for stream_get_line ending match (#34835).
+            ['memcmp', $i32, [$i8p, $i8p, $sizeT]],
             ['__compiler_stream_filter_apply_write', $strPtr, [$i64, $strPtr]],
             ['__compiler_stream_filter_apply_read', $strPtr, [$i64, $strPtr]],
         ] as [$name, $ret, $params]) {
@@ -1475,6 +1482,270 @@ final class JitStreamIoKernel
                 $context->lookupFunction('__compiler_stream_filter_apply_read'),
                 $handle,
                 $result
+            )
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullStr);
+    }
+
+    /**
+     * Idempotent libc stream_get_line for thin AOT (#34835).
+     *
+     * NestedJIT StreamReadJitHelper→VmFs cannot see JitStreamIoKernel FILE* handles
+     * (peer fgets #27663 / stream_get_contents #27437). Call from forceLibcStreamPositionAbis.
+     * php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_get_line)
+     */
+    public static function implementStreamGetLineForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_stream_get_line');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('sgl_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_stream_get_line', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_stream_get_line');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_stream_get_line');
+        }
+        self::emitStreamGetLine($context, $fn);
+        $context->registerFunction('__compiler_stream_get_line', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /**
+     * libc FILE* stream_get_line — ending stripped; null/empty ending → fread (php-src).
+     *
+     * maxLength 0 → DEFAULT_BUFFER_SIZE; maxLength < 0 → null. Ending match via memcmp.
+     */
+    private static function emitStreamGetLine(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('sgl_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $maxLength = $fn->getParam(1);
+        $ending = $fn->getParam(2);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $nullPtr = $i8p->constNull();
+        $zeroI64 = $i64->constInt(0, false);
+        $zeroI32 = $i32->constInt(0, false);
+        $minusOne = $i32->constInt(-1, true);
+        $defaultLen = $i64->constInt(self::DEFAULT_BUFFER_SIZE, false);
+
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('sgl_fail');
+        $lenBb = $fn->appendBasicBlock('sgl_len');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr),
+            $failBb,
+            $lenBb
+        );
+
+        $context->builder->positionAtEnd($lenBb);
+        $negLen = $context->builder->icmp(Builder::INT_SLT, $maxLength, $zeroI64);
+        $normBb = $fn->appendBasicBlock('sgl_norm');
+        $context->builder->branchIf($negLen, $failBb, $normBb);
+
+        $context->builder->positionAtEnd($normBb);
+        $isZero = $context->builder->icmp(Builder::INT_EQ, $maxLength, $zeroI64);
+        $limit = $context->builder->select($isZero, $defaultLen, $maxLength);
+
+        $endingNull = $context->builder->icmp(Builder::INT_EQ, $ending, $nullStr);
+        $endingLenBb = $fn->appendBasicBlock('sgl_ending_len');
+        $noEndingBb = $fn->appendBasicBlock('sgl_no_ending');
+        $withEndingBb = $fn->appendBasicBlock('sgl_with_ending');
+        $context->builder->branchIf($endingNull, $noEndingBb, $endingLenBb);
+
+        $context->builder->positionAtEnd($endingLenBb);
+        $endingLenRaw = $context->builder->call($context->lookupFunction('__string__strlen'), $ending);
+        $endingEmpty = $context->builder->icmp(Builder::INT_EQ, $endingLenRaw, $zeroI64);
+        $context->builder->branchIf($endingEmpty, $noEndingBb, $withEndingBb);
+
+        // null/empty ending: fread up to $limit (php-src streamsfuncs.c).
+        $context->builder->positionAtEnd($noEndingBb);
+        $allocNo = $fn->appendBasicBlock('sgl_no_alloc');
+        $context->builder->branch($allocNo);
+
+        $context->builder->positionAtEnd($allocNo);
+        $readLen = $context->builder->trunc($limit, $sizeT);
+        $bufNo = $context->builder->call($context->lookupFunction('malloc'), $readLen);
+        $bufNoNull = $context->builder->icmp(Builder::INT_EQ, $bufNo, $nullPtr);
+        $readNoBb = $fn->appendBasicBlock('sgl_no_read');
+        $context->builder->branchIf($bufNoNull, $failBb, $readNoBb);
+
+        $context->builder->positionAtEnd($readNoBb);
+        $gotNo = $context->builder->call(
+            $context->lookupFunction('fread'),
+            $bufNo,
+            $sizeT->constInt(1, false),
+            $readLen,
+            $fp
+        );
+        $gotNoI64 = $context->builder->zExt($gotNo, $i64);
+        $gotNoZero = $context->builder->icmp(Builder::INT_EQ, $gotNoI64, $zeroI64);
+        $noEofBb = $fn->appendBasicBlock('sgl_no_eof');
+        $noMakeBb = $fn->appendBasicBlock('sgl_no_make');
+        $context->builder->branchIf($gotNoZero, $noEofBb, $noMakeBb);
+
+        $context->builder->positionAtEnd($noEofBb);
+        $context->builder->call($context->lookupFunction('free'), $bufNo);
+        $context->builder->branch($failBb);
+
+        $context->builder->positionAtEnd($noMakeBb);
+        $resultNo = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $gotNoI64,
+            $bufNo
+        );
+        $context->builder->call($context->lookupFunction('free'), $bufNo);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $resultNo
+            )
+        );
+
+        // Ending present: fgetc loop; strip ending on match (VmPhpFdStream::streamGetLine).
+        $context->builder->positionAtEnd($withEndingBb);
+        $endingData = self::stringData($context, $ending);
+        $endingLen = $endingLenRaw;
+        $allocYes = $fn->appendBasicBlock('sgl_yes_alloc');
+        $context->builder->branch($allocYes);
+
+        $context->builder->positionAtEnd($allocYes);
+        $bufYes = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $context->builder->trunc($limit, $sizeT)
+        );
+        $bufYesNull = $context->builder->icmp(Builder::INT_EQ, $bufYes, $nullPtr);
+        $loopInit = $fn->appendBasicBlock('sgl_loop_init');
+        $context->builder->branchIf($bufYesNull, $failBb, $loopInit);
+
+        $context->builder->positionAtEnd($loopInit);
+        $lenSlot = $context->builder->alloca($i64, 1, 'sgl_len');
+        $context->builder->store($zeroI64, $lenSlot);
+        $loopHead = $fn->appendBasicBlock('sgl_loop_head');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $curLen = $context->builder->load($lenSlot);
+        $atLimit = $context->builder->icmp(Builder::INT_SGE, $curLen, $limit);
+        $loopFull = $fn->appendBasicBlock('sgl_loop_full');
+        $loopRead = $fn->appendBasicBlock('sgl_loop_read');
+        $context->builder->branchIf($atLimit, $loopFull, $loopRead);
+
+        $context->builder->positionAtEnd($loopRead);
+        $ch = $context->builder->call($context->lookupFunction('fgetc'), $fp);
+        $isEof = $context->builder->icmp(Builder::INT_EQ, $ch, $minusOne);
+        $loopEof = $fn->appendBasicBlock('sgl_loop_eof');
+        $loopStore = $fn->appendBasicBlock('sgl_loop_store');
+        $context->builder->branchIf($isEof, $loopEof, $loopStore);
+
+        $context->builder->positionAtEnd($loopStore);
+        $bytePtr = $context->builder->gep($bufYes, $curLen);
+        $context->builder->store($context->builder->trunc($ch, $i8), $bytePtr);
+        $nextLen = $context->builder->add($curLen, $i64->constInt(1, false));
+        $context->builder->store($nextLen, $lenSlot);
+        $enough = $context->builder->icmp(Builder::INT_SGE, $nextLen, $endingLen);
+        $matchCheck = $fn->appendBasicBlock('sgl_match_check');
+        $context->builder->branchIf($enough, $matchCheck, $loopHead);
+
+        $context->builder->positionAtEnd($matchCheck);
+        $suffix = $context->builder->gep(
+            $bufYes,
+            $context->builder->sub($nextLen, $endingLen)
+        );
+        LibcExtern::ensureMemcmpDecl($context);
+        $cmp = $context->builder->call(
+            $context->lookupFunction('memcmp'),
+            $suffix,
+            $endingData,
+            $context->builder->trunc($endingLen, $sizeT)
+        );
+        $matched = $context->builder->icmp(Builder::INT_EQ, $cmp, $zeroI32);
+        $matchedBb = $fn->appendBasicBlock('sgl_matched');
+        $context->builder->branchIf($matched, $matchedBb, $loopHead);
+
+        $context->builder->positionAtEnd($matchedBb);
+        $stripped = $context->builder->sub($nextLen, $endingLen);
+        $resultMatch = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $stripped,
+            $bufYes
+        );
+        $context->builder->call($context->lookupFunction('free'), $bufYes);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $resultMatch
+            )
+        );
+
+        $context->builder->positionAtEnd($loopFull);
+        $fullLen = $context->builder->load($lenSlot);
+        $resultFull = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $fullLen,
+            $bufYes
+        );
+        $context->builder->call($context->lookupFunction('free'), $bufYes);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $resultFull
+            )
+        );
+
+        $context->builder->positionAtEnd($loopEof);
+        $eofLen = $context->builder->load($lenSlot);
+        $eofEmpty = $context->builder->icmp(Builder::INT_EQ, $eofLen, $zeroI64);
+        $eofFail = $fn->appendBasicBlock('sgl_eof_fail');
+        $eofMake = $fn->appendBasicBlock('sgl_eof_make');
+        $context->builder->branchIf($eofEmpty, $eofFail, $eofMake);
+
+        $context->builder->positionAtEnd($eofFail);
+        $context->builder->call($context->lookupFunction('free'), $bufYes);
+        $context->builder->branch($failBb);
+
+        $context->builder->positionAtEnd($eofMake);
+        $resultEof = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $eofLen,
+            $bufYes
+        );
+        $context->builder->call($context->lookupFunction('free'), $bufYes);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $resultEof
             )
         );
 
