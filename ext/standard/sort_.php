@@ -170,6 +170,13 @@ final class sort_ extends Internal
 
             return;
         }
+        // SORT_STRING|SORT_FLAG_CASE — NestedJIT helper (LLVM path is case-sensitive) (#34702).
+        // SORT_REGULAR|SORT_FLAG_CASE: php-src only pairs CASE with STRING/NATURAL; keep LLVM.
+        if (StdlibConstants::SORT_STRING === $sortType && 0 !== $caseFlag) {
+            SortRuntime::sortPackedStringCase($context, $array);
+
+            return;
+        }
         if (
             StdlibConstants::SORT_REGULAR === $sortType
             || StdlibConstants::SORT_STRING === $sortType
