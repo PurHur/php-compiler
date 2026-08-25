@@ -43,6 +43,11 @@ final class DomNodeChildNodeMutationRuntime
 
     public static function invokeReplaceWith(Context $context, int $extraArgCount, Variable $receiver, Variable ...$extraArgs): Value
     {
+        // ChildNode::replaceWith() with no args ≡ remove (php-src / #34804).
+        if (0 === $extraArgCount) {
+            return self::invokeRemove($context, $receiver);
+        }
+
         return self::invokeSiblingMutation($context, 'replacewith', $extraArgCount, $receiver, ...$extraArgs);
     }
 
@@ -139,15 +144,30 @@ final class DomNodeChildNodeMutationRuntime
                 // and left held childNodes pins on the old node.
                 // Multi-arg: ReplaceChild for arg0, then after() for arg1..N — peer
                 // after/before multi LiveSlots (#32848 / #32887).
+                // Thin-AOT rematerializes $c as distinct __object__* for receiver vs arg,
+                // so pointer-eq identity is unreliable — use compile-time child index
+                // (#34804 / php-src dom_child_replace_with identity-in-fragment).
+                if (1 === \count($extraArgs)
+                    && self::isCompileTimeSameDomNode($receiver, $extraArgs[0])
+                ) {
+                    return self::nullValuePtr($context);
+                }
                 $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
+                $firstIsSelf = self::isCompileTimeSameDomNode($receiver, $extraArgs[0]);
                 $firstNode = self::coerceNodeOrStringArg($context, $extraArgs[0]);
-                JitDomReplaceChild::syncUserScriptReplaceSlotsPublic(
-                    $context,
-                    $parentVar,
-                    $firstNode,
-                    $receiver
-                );
-                $afterAnchor = $firstNode;
+                if (!$firstIsSelf) {
+                    JitDomReplaceChild::syncUserScriptReplaceSlotsPublic(
+                        $context,
+                        $parentVar,
+                        $firstNode,
+                        $receiver
+                    );
+                    $afterAnchor = $firstNode;
+                } else {
+                    // First arg is the receiver: leave it in place (fragment skip-unlink);
+                    // only insert the tail after it (#34804).
+                    $afterAnchor = $receiver;
+                }
                 $tail = \array_slice($extraArgs, 1);
                 foreach ($tail as $newChildVar) {
                     $nodeVar = self::coerceNodeOrStringArg($context, $newChildVar);
@@ -161,7 +181,8 @@ final class DomNodeChildNodeMutationRuntime
                 }
                 // Same-parent move: LiveSlots already rebuilt INNER_XML; compile-time
                 // chunk replace duplicates the moved sibling (#34806).
-                $skipInner = null !== ($firstNode->compileTimeDomChildIndex ?? null);
+                $skipInner = $firstIsSelf
+                    || null !== ($firstNode->compileTimeDomChildIndex ?? null);
                 if (!$skipInner) {
                     foreach ($extraArgs as $arg) {
                         if (null !== ($arg->compileTimeDomChildIndex ?? null)) {
@@ -373,6 +394,32 @@ final class DomNodeChildNodeMutationRuntime
         }
 
         return implode('', $pieces);
+    }
+
+    /**
+     * Thin-AOT: receiver and arg may be distinct __object__* stand-ins for the same
+     * loadXML child — pointer-eq is not enough (#34804).
+     */
+    private static function isCompileTimeSameDomNode(Variable $a, Variable $b): bool
+    {
+        if ($a === $b) {
+            return true;
+        }
+        if (Variable::TYPE_STRING === $a->type || Variable::TYPE_STRING === $b->type) {
+            return false;
+        }
+        $ai = $a->compileTimeDomChildIndex ?? null;
+        $bi = $b->compileTimeDomChildIndex ?? null;
+        if (null === $ai || $ai !== $bi) {
+            return false;
+        }
+        $at = $a->compileTimeDomTagName ?? null;
+        $bt = $b->compileTimeDomTagName ?? null;
+        if (null !== $at && null !== $bt && strtolower($at) !== strtolower($bt)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
