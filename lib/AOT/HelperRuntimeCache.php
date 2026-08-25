@@ -238,6 +238,11 @@ final class HelperRuntimeCache
         // #34800 — prelinked encodeArgv mis-reads `$data[$i+1]` / `<<` on binary; NestedJIT
         // `$i++` + intdiv encode matches Zend (peer MbMimeheaderJitHelper::b64Encode).
         'phpcompiler\\ext\\standard\\base64jithelper::encodeargv' => true,
+        // #34824 — prelinked Crc32JitHelper unit.o (and NestedJIT of the old private u32()
+        // helper) collapses equal-length strings to the same digest; NestedJIT of the
+        // inline-mask bit-by-bit helper into the user module matches Zend/VM.
+        'phpcompiler\\ext\\standard\\crc32jithelper::crc32argv' => true,
+        'phpcompiler\\ext\\standard\\crc32jithelper::crc32cargv' => true,
         // re-#26868 — prelinked StrRot13JitHelper unit.o SIGSEGVs under thin AOT; NestedJIT
         // rot13Argv into user module (peer #26890 / #30812).
         'phpcompiler\\ext\\standard\\strrot13jithelper::rot13argv' => true,

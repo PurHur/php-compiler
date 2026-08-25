@@ -40,6 +40,25 @@ final class Crc32RuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('VmString::', $source);
         $this->assertStringNotContainsString('\\ord(', $source);
         $this->assertStringNotContainsString('\\strlen(', $source);
+        // #34824 — NestedJIT of private u32()/byteLength() collapses digests; keep inlined.
+        $this->assertStringNotContainsString('function u32(', $source);
+        $this->assertStringNotContainsString('function byteLength(', $source);
+        $this->assertStringContainsString('#34824', $source);
+    }
+
+    public function testCrc32HelperForcedUserScriptInline(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString(
+            "crc32jithelper::crc32argv",
+            $source,
+            'USER_SCRIPT_INLINE_ONLY must NestedJIT crc32Argv — prelinked unit.o wrong (#34824)'
+        );
+        $this->assertStringContainsString(
+            "crc32jithelper::crc32cargv",
+            $source,
+            'USER_SCRIPT_INLINE_ONLY must NestedJIT crc32cArgv — prelinked unit.o wrong (#34824)'
+        );
     }
 
     public function testCrc32JitHelperMatchesVmSsot(): void

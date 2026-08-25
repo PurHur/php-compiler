@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * crc32()/crc32c() for compiled JIT/AOT modules (#15759, #27077, php-in-PHP).
+ * crc32()/crc32c() for compiled JIT/AOT modules (#15759, #27077, #34824, php-in-PHP).
  *
  * NestedJIT-safe CRC32B / CRC32C (peer {@see Bin2hexJitHelper} / {@see StrrevJitHelper}).
  * Avoid Vm* CRC SSOT call sites and native ord/strlen — NestedJIT stubs those to 0 under thin AOT
  * (#16075 / #20452 / #15759 helper-bridge wrong-0). Bit-by-bit poly (no lookup table) —
  * NestedJIT AOT array-table updates miscomputed CRC (#27077).
+ *
+ * NestedJIT of private `u32()` / `byteLength()` helpers, or passing `self::POLY_*` directly
+ * into `update()`, collapses equal-length strings to the same wrong digest (#34824). Hoist
+ * consts to locals, inline the u32 mask and length scan, keep byteOrd match tables.
+ *
  * php-src: ext/standard/crc32.c, ext/standard/hash_crc32.c
  */
 final class Crc32JitHelper
@@ -25,53 +30,48 @@ final class Crc32JitHelper
 
     public static function crc32Argv(string $data, int $seed): int
     {
-        $state = self::u32(((int) $seed) ^ self::UINT32_MASK);
-        $len = self::byteLength($data);
-        for ($i = 0; $i < $len; ++$i) {
-            $state = self::update($state, self::byteOrd($data[$i]), self::POLY_CRC32B);
-        }
-
-        return self::u32(~$state);
-    }
-
-    public static function crc32cArgv(string $data): int
-    {
-        $state = self::UINT32_MASK;
-        $len = self::byteLength($data);
-        for ($i = 0; $i < $len; ++$i) {
-            $state = self::update($state, self::byteOrd($data[$i]), self::POLY_CRC32C);
-        }
-
-        return self::u32(~$state);
-    }
-
-    private static function update(int $state, int $byte, int $poly): int
-    {
-        $state = self::u32($state ^ $byte);
-        for ($j = 0; $j < 8; ++$j) {
-            if (($state & 1) !== 0) {
-                $state = self::u32(($state >> 1) ^ $poly);
-            } else {
-                $state = self::u32($state >> 1);
-            }
-        }
-
-        return $state;
-    }
-
-    private static function u32(int $value): int
-    {
-        return $value & self::UINT32_MASK;
-    }
-
-    private static function byteLength(string $data): int
-    {
+        $mask = self::UINT32_MASK;
+        $poly = self::POLY_CRC32B;
+        $state = (((int) $seed) ^ $mask) & $mask;
         $len = 0;
         while (isset($data[$len])) {
             ++$len;
         }
+        for ($i = 0; $i < $len; ++$i) {
+            $state = self::update($state, self::byteOrd($data[$i]), $poly, $mask);
+        }
 
-        return $len;
+        return (~$state) & $mask;
+    }
+
+    public static function crc32cArgv(string $data): int
+    {
+        $mask = self::UINT32_MASK;
+        $poly = self::POLY_CRC32C;
+        $state = $mask;
+        $len = 0;
+        while (isset($data[$len])) {
+            ++$len;
+        }
+        for ($i = 0; $i < $len; ++$i) {
+            $state = self::update($state, self::byteOrd($data[$i]), $poly, $mask);
+        }
+
+        return (~$state) & $mask;
+    }
+
+    private static function update(int $state, int $byte, int $poly, int $mask): int
+    {
+        $state = ($state ^ $byte) & $mask;
+        for ($j = 0; $j < 8; ++$j) {
+            if (($state & 1) !== 0) {
+                $state = (($state >> 1) ^ $poly) & $mask;
+            } else {
+                $state = ($state >> 1) & $mask;
+            }
+        }
+
+        return $state;
     }
 
     /** NestedJIT-safe byte ordinal (#20452). */
