@@ -8415,6 +8415,13 @@ class JIT {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $param->result);
                         }
                         $this->assignOperand($param->result, $packed, true);
+                        // `&...$args` prologue: same no-COW marker as ARG_RECV (#34790).
+                        if (
+                            isset($block->paramByRef[$idx])
+                            && $this->context->hasVariableOp($param->result)
+                        ) {
+                            $this->context->getVariableFromOp($param->result)->borrowedHashtable = true;
+                        }
                         break;
                     }
                     if ($argIdx >= count($args)) {
@@ -8525,7 +8532,16 @@ class JIT {
                         // `...$args` / `&...$args` emit parentless `__value__readObject` IR
                         // (#34684) and broke by-ref element write-back (#27407). Array builtins
                         // that need a value-box coerce at the call site (ArraySumLlvm / #24167).
-                        $this->assignOperand($block->getOperand($op->arg1), $packed, true);
+                        $recvOp = $block->getOperand($op->arg1);
+                        $this->assignOperand($recvOp, $packed, true);
+                        // `&...$args`: dim writes must hit the same HT syncByRefVariadicCallers
+                        // reads — FETCH_DIM_W COW would leave the pack stale (#34790 / #34508).
+                        if (
+                            isset($block->paramByRef[(int) $op->arg2])
+                            && $this->context->hasVariableOp($recvOp)
+                        ) {
+                            $this->context->getVariableFromOp($recvOp)->borrowedHashtable = true;
+                        }
                         break;
                     }
                     if (!isset($args[$recvSlot])) {
