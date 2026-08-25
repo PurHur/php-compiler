@@ -3731,12 +3731,21 @@ class Context {
             if ($block->slotForOperand($scopeOp) !== $slot) {
                 continue;
             }
+            // ?: merge Temporary and FUNCCALL name Literal share a numeric slot after
+            // bindScopeSlot (#34818). Aliasing the phi onto LITERAL('strlen') makes
+            // `true ? strlen($s) : "bad"` echo the function name.
+            if ($op instanceof Operand\Temporary && $scopeOp instanceof Operand\Literal) {
+                continue;
+            }
             $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
 
             return true;
         }
         foreach ($block->scopedOperands() as $scopeOp) {
             if ($block->slotForOperand($scopeOp) !== $slot || !$this->scope->variables->contains($scopeOp)) {
+                continue;
+            }
+            if ($op instanceof Operand\Temporary && $scopeOp instanceof Operand\Literal) {
                 continue;
             }
             $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
