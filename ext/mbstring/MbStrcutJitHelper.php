@@ -48,6 +48,58 @@ final class MbSubstrJitHelper
         string $encoding
     ): string {
         $byteLen = \strlen($string);
+        $charLen = 0;
+        $bytePos = 0;
+        $g = $byteLen + 1;
+        while ($bytePos < $byteLen && $g > 0) {
+            $g = $g - 1;
+            $b = \ord(\substr($string, $bytePos, 1));
+            $w = 1;
+            if ($b >= 192) {
+                if ($b < 224) {
+                    if ($bytePos + 1 < $byteLen) {
+                        $w = 2;
+                    }
+                }
+            }
+            if ($b >= 224) {
+                if ($b < 240) {
+                    if ($bytePos + 2 < $byteLen) {
+                        $w = 3;
+                    }
+                }
+            }
+            if ($b >= 240) {
+                if ($b < 248) {
+                    if ($bytePos + 3 < $byteLen) {
+                        $w = 4;
+                    }
+                }
+            }
+            $bytePos = $bytePos + $w;
+            $charLen = $charLen + 1;
+        }
+        if ($start < 0) {
+            $start = $charLen + $start;
+        }
+        if ($start < 0) {
+            $start = 0;
+        }
+        if ($start >= $charLen) {
+            return '';
+        }
+        // -1 = omitted length sentinel from JitMbSubstr (#34256).
+        if (-1 === $length) {
+            $length = $charLen - $start;
+        } elseif ($length < 0) {
+            $length = $charLen - $start + $length;
+            if ($length < 0) {
+                return '';
+            }
+        }
+        if ($length <= 0) {
+            return '';
+        }
         $endAt = $start + $length;
         $charIndex = 0;
         $bytePos = 0;
