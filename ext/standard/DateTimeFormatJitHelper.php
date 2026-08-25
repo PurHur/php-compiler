@@ -16,11 +16,22 @@ final class DateTimeFormatJitHelper
 {
     public static function formatStateArgv(string $format, int $timestamp, int $microsecond, string $tzName): string
     {
+        // Bare T/e/O/P before civil offset adjust — formatTokensScalar NestedJIT aborts (#34610).
+        // Peer DefaultTimezoneCivilJitHelper::formatTimezoneToken (#33956) for free date().
+        if ('T' === $format || 'e' === $format || 'O' === $format || 'P' === $format) {
+            return self::formatObjectTimezoneToken($format, $timestamp, $tzName);
+        }
+
+        $unixTs = $timestamp;
         $offset = self::parseNumericTimezoneOffsetSeconds($tzName);
         if (0 === $offset) {
             // Named IANA zones: apply active-zone offset when host date() exists (#27142).
             // NestedJIT without date() stays UTC civil (peer #26900).
             $offset = self::namedTimezoneOffsetSeconds($tzName, $timestamp);
+            if (0 === $offset) {
+                // NestedJIT AOT: host date() unavailable — use the same zone table as T/O/P (#34610).
+                $offset = self::tableOffsetSeconds($tzName, $unixTs);
+            }
         }
         if (0 !== $offset) {
             $timestamp += $offset;
@@ -79,6 +90,15 @@ final class DateTimeFormatJitHelper
         if ('Ymd' === $format) {
             return self::digits4($year).self::digits2($month).self::digits2($day);
         }
+        // Composite wall + abbr — NestedJIT formatTokensScalar aborts (#34610).
+        // Prefer stepwise concat (LLVM path also bakes this literal in DateTimeFormatJitHelper).
+        if ('Y-m-d H:i:s T' === $format) {
+            $ymd = self::digits4($year).'-'.self::digits2($month).'-'.self::digits2($day);
+            $his = self::digits2($hour).':'.self::digits2($minute).':'.self::digits2($second);
+            $abbr = self::formatObjectTimezoneToken('T', $unixTs, $tzName);
+
+            return $ymd.' '.$his.' '.$abbr;
+        }
         // en_US IntlDateFormatter SHORT date (ICU M/d/yy → PHP n/j/y) (#27361).
         // Avoid `$year % 100` / digits2 under NestedJIT — `%` has miscompiled to 0 (#27361).
         if ('n/j/y' === $format) {
@@ -104,6 +124,149 @@ final class DateTimeFormatJitHelper
             $minute,
             $second
         );
+    }
+
+    /**
+     * Object-zone T/e/O/P — NestedJIT-safe table (peer DefaultTimezoneCivilJitHelper, #34610).
+     *
+     * php-src: ext/date/php_date.c — php_format_date tokens T/e/O/P
+     */
+    private static function formatObjectTimezoneToken(string $token, int $timestamp, string $tzName): string
+    {
+        if ('e' === $token) {
+            if ('Etc/UTC' === $tzName || 'GMT' === $tzName || 'Z' === $tzName) {
+                return 'UTC';
+            }
+
+            return $tzName;
+        }
+        if ('T' === $token) {
+            return self::abbreviationForZone($tzName, $timestamp);
+        }
+        $off = self::tableOffsetSeconds($tzName, $timestamp);
+        if ('O' === $token) {
+            return self::formatOffsetO($off);
+        }
+        if ('P' === $token) {
+            return self::formatOffsetP($off);
+        }
+
+        return '';
+    }
+
+    private static function abbreviationForZone(string $tzName, int $timestamp): string
+    {
+        if ('UTC' === $tzName || 'Etc/UTC' === $tzName || 'GMT' === $tzName || 'Z' === $tzName) {
+            return 'UTC';
+        }
+        if ('Europe/Berlin' === $tzName || 'Europe/Paris' === $tzName || 'Europe/Amsterdam' === $tzName) {
+            return self::inEuSummer2022to2027($timestamp) ? 'CEST' : 'CET';
+        }
+        if ('Europe/London' === $tzName) {
+            return self::inEuSummer2022to2027($timestamp) ? 'BST' : 'GMT';
+        }
+        if ('America/New_York' === $tzName) {
+            return self::inUsEasternSummer2022to2027($timestamp) ? 'EDT' : 'EST';
+        }
+        if ('Asia/Tokyo' === $tzName) {
+            return 'JST';
+        }
+
+        return $tzName;
+    }
+
+    private static function tableOffsetSeconds(string $tzName, int $timestamp): int
+    {
+        if ('UTC' === $tzName || 'Etc/UTC' === $tzName || 'GMT' === $tzName || 'Z' === $tzName) {
+            return 0;
+        }
+        $numeric = self::parseNumericTimezoneOffsetSeconds($tzName);
+        if (0 !== $numeric) {
+            return $numeric;
+        }
+        if ('Europe/Berlin' === $tzName || 'Europe/Paris' === $tzName || 'Europe/Amsterdam' === $tzName) {
+            return self::inEuSummer2022to2027($timestamp) ? 7200 : 3600;
+        }
+        if ('Europe/London' === $tzName) {
+            return self::inEuSummer2022to2027($timestamp) ? 3600 : 0;
+        }
+        if ('America/New_York' === $tzName) {
+            return self::inUsEasternSummer2022to2027($timestamp) ? -14400 : -18000;
+        }
+        if ('Asia/Tokyo' === $tzName) {
+            return 32400;
+        }
+
+        return 0;
+    }
+
+    private static function formatOffsetO(int $off): string
+    {
+        if (0 === $off) {
+            return '+0000';
+        }
+        if (3600 === $off) {
+            return '+0100';
+        }
+        if (7200 === $off) {
+            return '+0200';
+        }
+        if (-14400 === $off) {
+            return '-0400';
+        }
+        if (-18000 === $off) {
+            return '-0500';
+        }
+        if (32400 === $off) {
+            return '+0900';
+        }
+
+        return '+0000';
+    }
+
+    private static function formatOffsetP(int $off): string
+    {
+        if (0 === $off) {
+            return '+00:00';
+        }
+        if (3600 === $off) {
+            return '+01:00';
+        }
+        if (7200 === $off) {
+            return '+02:00';
+        }
+        if (-14400 === $off) {
+            return '-04:00';
+        }
+        if (-18000 === $off) {
+            return '-05:00';
+        }
+        if (32400 === $off) {
+            return '+09:00';
+        }
+
+        return '+00:00';
+    }
+
+    /** Absolute unix windows — NestedJIT large `%` is unreliable (#33956). */
+    private static function inEuSummer2022to2027(int $timestamp): bool
+    {
+        return ($timestamp >= 1648771200 && $timestamp < 1666872000)
+            || ($timestamp >= 1680220800 && $timestamp < 1698321600)
+            || ($timestamp >= 1711843200 && $timestamp < 1729994400)
+            || ($timestamp >= 1743292800 && $timestamp < 1761444000)
+            || ($timestamp >= 1774742400 && $timestamp < 1792893600)
+            || ($timestamp >= 1806192000 && $timestamp < 1824343200);
+    }
+
+    private static function inUsEasternSummer2022to2027(int $timestamp): bool
+    {
+        return ($timestamp >= 1647158400 && $timestamp < 1667718000)
+            || ($timestamp >= 1678608000 && $timestamp < 1699167600)
+            || ($timestamp >= 1710057600 && $timestamp < 1730617200)
+            || ($timestamp >= 1741507200 && $timestamp < 1762066800)
+            || ($timestamp >= 1772956800 && $timestamp < 1793516400)
+            || ($timestamp >= 1804406400 && $timestamp < 1824966000);
     }
 
     /**

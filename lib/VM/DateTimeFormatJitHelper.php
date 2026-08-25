@@ -128,6 +128,25 @@ final class DateTimeFormatJitHelper
             'format'
         );
 
+        // Composite wall+abbr: NestedJIT formatTokensScalar aborts (#34610).
+        // Civil IR for wall + NestedJIT bare T + memcpy concat (no __string__concat ABI).
+        if (\is_string($fmtLit) && 'Y-m-d H:i:s T' === $fmtLit) {
+            $wall = JitDate::tryFormatCivilLiteral($context, 'Y-m-d H:i:s', $timestamp, $microsecond);
+            if (null !== $wall) {
+                $tokT = DateTimeFormatRuntime::invoke(
+                    $context,
+                    $context->builder->load($context->constantStringFromString('T')),
+                    $timestamp,
+                    $microsecond,
+                    $tzPtr
+                );
+                $space = $context->builder->load($context->constantStringFromString(' '));
+                $mid = self::concatStringValues($context, $wall, $space);
+
+                return self::concatStringValues($context, $mid, $tokT);
+            }
+        }
+
         // Runtime / unknown format: civil IR dispatch before NestedJIT (#34482).
         return JitDate::emitRuntimeCivilFormatDispatch(
             $context,
@@ -139,5 +158,24 @@ final class DateTimeFormatJitHelper
                 return DateTimeFormatRuntime::invoke($context, $formatPtr, $timestamp, $microsecond, $tzPtr);
             }
         );
+    }
+
+    /** Memcpy concat of two `__string__*` values (peer StringSerialize::concatStr). */
+    private static function concatStringValues(Context $context, Value $left, Value $right): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $leftSize = $context->builder->load($context->builder->structGep($left, $map['length']));
+        $rightSize = $context->builder->load($context->builder->structGep($right, $map['length']));
+        $size = $context->builder->add($leftSize, $rightSize);
+        $result = $context->builder->call($context->lookupFunction('__string__alloc'), $size);
+        $context->intrinsic->builder = $context->builder;
+        $dest = $context->builder->structGep($result, $map['value']);
+        $leftChar = $context->builder->structGep($left, $map['value']);
+        $context->intrinsic->memcpy($dest, $leftChar, $leftSize, false);
+        $dest2 = $context->builder->gep($dest, $leftSize);
+        $rightChar = $context->builder->structGep($right, $map['value']);
+        $context->intrinsic->memcpy($dest2, $rightChar, $rightSize, false);
+
+        return $result;
     }
 }
