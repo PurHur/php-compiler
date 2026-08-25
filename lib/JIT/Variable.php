@@ -183,6 +183,22 @@ final class Variable {
     public ?string $compileTimeDatePeriodTimezone = null;
 
     /**
+     * DatePeriod::__construct serialize bag for AOT fold (#34585 / peer #34576).
+     *
+     * Thin AOT get_object_vars strips DatePeriod storage → empty `O:…:0:{}`.
+     *
+     * @var array{
+     *   start: array{timestamp: int, micro: int, tz: string, class: string},
+     *   end: ?array{timestamp: int, micro: int, tz: string, class: string},
+     *   interval: array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int},
+     *   recurrences: int,
+     *   include_start_date: bool,
+     *   include_end_date: bool
+     * }|null
+     */
+    public ?array $compileTimeDatePeriodSerialize = null;
+
+    /**
      * IANA / offset id from DateTimeZone::__construct (not class name).
      *
      * Distinct from {@see $compileTimeString}: `new DateTimeZone` stamps the class name on

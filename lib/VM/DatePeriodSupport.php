@@ -583,6 +583,83 @@ final class DatePeriodSupport
     }
 
     /**
+     * Build Zend serialize wire from compile-time construct stamps (#34585 / peer #34576).
+     *
+     * Nested DateTime / DateInterval bags are embedded as `O:…` (not `a:…`) — php-src
+     * date_period_object_to_hash / DatePeriod::__serialize.
+     *
+     * @param array{
+     *   start: array{timestamp: int, micro: int, tz: string, class: string},
+     *   end: ?array{timestamp: int, micro: int, tz: string, class: string},
+     *   interval: array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int},
+     *   recurrences: int,
+     *   include_start_date: bool,
+     *   include_end_date: bool
+     * } $bag
+     */
+    public static function encodeZendSerializeWireFromCompileTimeBag(array $bag): string
+    {
+        $start = self::encodeDateTimeLikeWireFromStamp($bag['start']);
+        $end = null === $bag['end']
+            ? 'N;'
+            : self::encodeDateTimeLikeWireFromStamp($bag['end']);
+        $intervalState = $bag['interval'];
+        $interval = \PHPCompiler\ext\standard\VmSerialize::encodeExportedPropertyBag('DateInterval', [
+            'y' => (int) $intervalState['y'],
+            'm' => (int) $intervalState['m'],
+            'd' => (int) $intervalState['d'],
+            'h' => (int) $intervalState['h'],
+            'i' => (int) $intervalState['i'],
+            's' => (int) $intervalState['s'],
+            'f' => (float) $intervalState['f'],
+            'invert' => (int) $intervalState['invert'],
+            'days' => false,
+            'from_string' => false,
+        ]);
+
+        $body = '';
+        $body .= self::encodeSerializePropKey('start').$start;
+        $body .= self::encodeSerializePropKey('current').'N;';
+        $body .= self::encodeSerializePropKey('end').$end;
+        $body .= self::encodeSerializePropKey('interval').$interval;
+        $body .= self::encodeSerializePropKey('recurrences')
+            .\PHPCompiler\ext\standard\VmSerializeFormat::encodeExported((int) $bag['recurrences']);
+        $body .= self::encodeSerializePropKey('include_start_date')
+            .\PHPCompiler\ext\standard\VmSerializeFormat::encodeExported((bool) $bag['include_start_date']);
+        $body .= self::encodeSerializePropKey('include_end_date')
+            .\PHPCompiler\ext\standard\VmSerializeFormat::encodeExported((bool) $bag['include_end_date']);
+
+        return 'O:10:"DatePeriod":7:{'.$body.'}';
+    }
+
+    /**
+     * @param array{timestamp: int, micro: int, tz: string, class: string} $stamp
+     */
+    private static function encodeDateTimeLikeWireFromStamp(array $stamp): string
+    {
+        $class = $stamp['class'];
+        if ('DateTime' !== $class && 'DateTimeImmutable' !== $class) {
+            $class = 'DateTime';
+        }
+        $tz = $stamp['tz'] !== '' ? $stamp['tz'] : 'UTC';
+
+        return \PHPCompiler\ext\standard\VmSerialize::encodeExportedPropertyBag($class, [
+            'date' => \PHPCompiler\ext\standard\VmDateTimeNative::formatZendDateWire(
+                (int) $stamp['timestamp'],
+                (int) $stamp['micro'],
+                $tz
+            ),
+            'timezone_type' => DateTimeSupport::zendTimezoneWireType($tz),
+            'timezone' => $tz,
+        ]);
+    }
+
+    private static function encodeSerializePropKey(string $name): string
+    {
+        return \PHPCompiler\ext\standard\VmSerializeFormat::encodeStringLiteral($name);
+    }
+
+    /**
      * php-src zend_get_properties_for(ZEND_PROP_PURPOSE_VAR_EXPORT) — DatePeriod bag (#22407).
      *
      * @return array<string, Variable>

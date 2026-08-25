@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ArrayObjectJitHelper;
+use PHPCompiler\VM\DatePeriodSupport;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -31,6 +32,7 @@ use PHPLLVM\Value;
  *
  * DateInterval / DateTimeZone: same empty-bag failure when stamps are present but
  * {@see serialize::compileTimeSerialize} did not fire (#34584 / re-#10692).
+ * DatePeriod: same empty-bag failure for period storage (#34585).
  */
 final class JitSerialize
 {
@@ -149,6 +151,10 @@ final class JitSerialize
         if (null !== $zoneResult) {
             return $zoneResult;
         }
+        $periodResult = self::tryFoldDatePeriod($context, $arg);
+        if (null !== $periodResult) {
+            return $periodResult;
+        }
         $splResult = self::tryEncodeSplHtObject($context, $arg);
         if (null !== $splResult) {
             return $splResult;
@@ -195,6 +201,65 @@ final class JitSerialize
                 'timezone' => $tz,
             ])
         ));
+    }
+
+    /**
+     * Fold DatePeriod to Zend serialize wire (#34585 / peer #34576).
+     *
+     * Thin AOT `get_object_vars` strips DatePeriod storage → `O:…:0:{}`.
+     * Reuse construct compile-time bag ({@see JitDatePeriodConstruct}).
+     *
+     * php-src: ext/date/php_date.c — date_period_object_to_hash / __serialize
+     */
+    private static function tryFoldDatePeriod(Context $context, JITVariable $arg): ?Value
+    {
+        if (!\is_array($arg->compileTimeDatePeriodSerialize)) {
+            return null;
+        }
+        $periodId = $context->type->object->classIdByName('DatePeriod')
+            ?? $context->type->object->classIdForLowerName('dateperiod');
+        if (null === $periodId) {
+            return null;
+        }
+
+        $wire = DatePeriodSupport::encodeZendSerializeWireFromCompileTimeBag(
+            $arg->compileTimeDatePeriodSerialize
+        );
+        $obj = ArrayObjectJitHelper::loadObjectPtr($context, $arg);
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $id = (string) (++self::$blockSerial);
+        $matchBlock = BasicBlockHelper::append($context, 'serialize_dp_'.$id);
+        $missBlock = BasicBlockHelper::append($context, 'serialize_dp_miss_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'serialize_dp_done_'.$id);
+        $isPeriod = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i64->constInt($periodId, false)
+        );
+        $context->builder->branchIf($isPeriod, $matchBlock, $missBlock);
+
+        $context->builder->positionAtEnd($matchBlock);
+        $matchResult = $context->builder->load($context->constantStringFromString($wire));
+        $matchEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
+        $missResult = self::encodePublicObjectProps($context, $objVar);
+        $missEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($strPtr, 'serialize_dp_phi_'.$id);
+        $phi->addIncoming($matchResult, $matchEnd);
+        $phi->addIncoming($missResult, $missEnd);
+
+        return $phi;
     }
 
     /**
