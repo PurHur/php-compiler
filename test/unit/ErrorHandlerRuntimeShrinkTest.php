@@ -37,10 +37,21 @@ final class ErrorHandlerRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testContextStillEnsureLinksErrorHandlerForStandalone(): void
+    public function testContextMinimalDoesNotEagerlyLinkErrorHandler(): void
     {
+        // Lazy at JitErrorHandler / JitTriggerErrorKernel (#34612 / peer #34605).
         $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('ErrorHandlerJitRuntime::ensureStandaloneBodies($this)', $ctx);
+        $minimalPos = strpos($ctx, 'private function ensureMinimalUserStandaloneBodies');
+        $this->assertNotFalse($minimalPos);
+        $minimalEnd = strpos($ctx, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
+        $this->assertNotFalse($minimalEnd);
+        $minimalBody = substr($ctx, $minimalPos, $minimalEnd - $minimalPos);
+        $this->assertStringNotContainsString(
+            'ErrorHandlerJitRuntime::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly NestedJIT error-handler (#34612)'
+        );
+        $this->assertStringContainsString('#34612', $ctx);
     }
 
     public function testNoStandaloneThinAbiFork(): void

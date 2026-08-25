@@ -25,7 +25,8 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
         $this->assertStringContainsString('ensureUserScriptRefreshEmit', $refresh);
         $this->assertStringContainsString('JitSuperglobalRefreshKernel::implement', $refresh);
         $this->assertStringContainsString('StringHtmlspecialchars::ensureStandaloneBodies', $source);
-        $this->assertStringContainsString('StringHtmlspecialcharsDecode::ensureStandaloneBodies', $source);
+        // HtmlspecialcharsDecode / HtmlEntities / ErrorHandler / ExceptionHandler lazy (#34612).
+        $this->assertStringContainsString('#34612', $source);
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
         $this->assertStringNotContainsString('SuperglobalRefreshUserScriptLlvm', $refresh);
         $userScript = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/JitSuperglobalRefreshKernel.php');
