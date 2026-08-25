@@ -87,7 +87,10 @@ final class strval extends Internal
 
     public function valueToString(Context $context, Value $valuePtr): Value
     {
-        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        // TYPE_NULL tag at entry — copyFromPointer → writeString delrefs the prior
+        // payload; raw entryAlloca left stack garbage and SIGSEGVd after encapsed
+        // ConcatList coerce of script-global value boxes (#34564 / peer #23472).
+        $slot = BasicBlockHelper::entryAllocaValueBox($context);
         if ('__value__' === $context->getStringFromType($valuePtr->typeOf())) {
             $context->builder->store($valuePtr, $slot);
         } else {
