@@ -2311,13 +2311,15 @@ class Context {
         // ErrorHandler / ExceptionHandler always-on removed (#34612): JitErrorHandler /
         // JitTriggerErrorKernel / JitExceptionHandler / TryCatchHelper already ensureLinked
         // before lookup (peer #34605). implement() paths restore builder insert mid-{main}.
-        if (!$this->isUserScriptAot()) {
-            // NestedJIT StreamLifecycle/StreamRead/StreamBucket helpers during thin init
-            // (peer StreamIo #20943 / #20966 / #20982 / #20998).
-            Builtin\StreamLifecycleRuntime::ensureLinked($this);
-            Builtin\StreamReadRuntime::ensureLinked($this);
-            Builtin\StreamBucket::ensureLinked($this);
-        }
+        // StreamLifecycle / StreamRead / StreamBucket always-on removed (#34836): call-site
+        // StreamLifecycleRuntime::ensureLinked(ForUserScriptLowering) / StreamReadRuntime::
+        // ensureLinked / StreamBucket::ensureLinked already run before lookup (JitFclose /
+        // JitFeof / JitFflush / JitFgetc / JitFgets / JitStreamBucket / JitIsResource /
+        // StringVarDump / StringPrintR / SilenceRuntime — peer Type::initialize #34439 /
+        // #20966 / #20982 / #20998). ensureMinimal is reached for user-script AOT and via
+        // bootstrap-aot ensureBootstrapAotStandaloneBodies; the old `!$isUserScriptAot`
+        // guard only NestedJIT Stream* on the bootstrap path and still risked feof.1 /
+        // stream_bucket_*.1 (#31894 / #32122). Full standalone still ensureLinked below.
         // StringTriggerError always-on removed (#34641): trigger_error_.php / JitBuiltinWarning /
         // JitIncDec / HashTableResourceKeyLlvm / JitTriggerErrorKernel already ensureLinked before
         // lookup (peer #34631 / #33234). JitTriggerErrorKernel restores builder insert mid-{main}.
