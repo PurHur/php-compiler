@@ -2216,10 +2216,11 @@ class Context {
         // Transliterator::create / transliterate — avoid ExternalMethod silent NULL on thin AOT (#28657).
         $this->functionProxies['transliterator::create'] = new Call\TransliteratorCreate();
         $this->functionProxies['transliterator::transliterate'] = new Call\TransliteratorTransliterate();
-        // finfo::__construct / finfo::file / finfo::buffer — thin AOT MIME sniff (#27196, #28660).
+        // finfo::__construct / finfo::file / finfo::buffer / finfo::set_flags — thin AOT (#27196, #28660, #34688).
         $this->functionProxies['finfo::__construct'] = new Call\FinfoConstruct();
         $this->functionProxies['finfo::file'] = new Call\FinfoFile();
         $this->functionProxies['finfo::buffer'] = new Call\FinfoBuffer();
+        $this->functionProxies['finfo::set_flags'] = new Call\FinfoSetFlags();
         // PDO — avoid ExternalMethod silent NULL / fake connect (#27619).
         $this->functionProxies['pdo::__construct'] = new Call\PdoConstruct();
         $this->functionProxies['pdo::getavailabledrivers'] = new Call\PdoGetAvailableDrivers();
