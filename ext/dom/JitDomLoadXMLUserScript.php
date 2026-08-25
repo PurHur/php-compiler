@@ -883,22 +883,31 @@ final class JitDomLoadXMLUserScript
         array $attrs
     ): void {
         $idVal = null;
+        // Attr name whose libxml atype becomes XML_ATTRIBUTE_ID (for isId; #34821).
+        $idAttrName = null;
         $idAttr = self::$loadXmlIdAttrsByElement[$tag]
             ?? self::$loadXmlIdAttrsByElement[strtolower($tag)]
             ?? null;
         if (null !== $idAttr && isset($attrs[$idAttr]) && '' !== $attrs[$idAttr]) {
             $idVal = $attrs[$idAttr];
+            $idAttrName = $idAttr;
         } elseif (isset($attrs['xml:id']) && '' !== $attrs['xml:id']) {
             $idVal = $attrs['xml:id'];
+            $idAttrName = 'xml:id';
         }
         if (null === $idVal || '' === $idVal) {
             return;
         }
         if (isset(self::$loadXmlRegisteredIds[$idVal])) {
-            // xmlAddID first-wins (#25274).
+            // xmlAddID first-wins — duplicate leaves atype unset / isId false (#25274).
             return;
         }
         self::$loadXmlRegisteredIds[$idVal] = true;
+        // Thin-AOT isId() reads Attr-cache idBearing flags (peer setIdAttribute #29884),
+        // not DomRegistry — stamp when DTD / xml:id actually registers (#34821).
+        if (null !== $idAttrName) {
+            DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', $idAttrName, true);
+        }
         self::storeElementInIdMap($context, $document, $idVal, $element);
         $idStr = $context->builder->load($context->constantStringFromString($idVal));
         // First registrant keeps the single-slot cache; later IDs live in the map (#34696).
