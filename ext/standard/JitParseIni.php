@@ -56,6 +56,7 @@ final class JitParseIni
     /**
      * Runtime filename: libc/helper file read then {@see parseNativeStringIntoValue} (#30756).
      *
+     * URL wrappers are rejected by {@see JitStreamIncludeOpen} before this runs (#34777).
      * Missing path: php-src `parse_ini_file(%s): Failed to open stream` Warning + false.
      */
     public static function parseRuntimeFile(

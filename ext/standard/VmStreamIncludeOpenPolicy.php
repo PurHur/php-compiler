@@ -11,8 +11,8 @@ use PHPCompiler\VM\ErrorReporter;
 /**
  * Script/include stream opens — allow_url_include gate (php-src main/streams/streams.c).
  *
- * php_strip_whitespace(), highlight_file(), show_source(), and include() use this policy;
- * fopen/file_get_contents use allow_url_fopen only (#32104).
+ * php_strip_whitespace(), highlight_file(), show_source(), parse_ini_file(), and include()
+ * use this policy; fopen/file_get_contents use allow_url_fopen only (#32104, #34777).
  */
 final class VmStreamIncludeOpenPolicy
 {
