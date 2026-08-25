@@ -38,12 +38,12 @@ final class ContextMinimalStandaloneLazyDomGcProgressAssertRuntimeShrinkTest ext
             );
         }
 
-        // CLI argv still NestedJIT before {main} (#34812 dropped SuperglobalName).
-        foreach ([
+        // CliArgv always-on removed (#34822): compileToFile + CliArgvGlobalInit ensureLinked.
+        $this->assertStringNotContainsString(
             'CliArgvRuntime::ensureStandaloneBodies($this)',
-        ] as $keep) {
-            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34605)");
-        }
+            $minimalBody,
+            'ensureMinimalUserStandaloneBodies must not eagerly CliArgvRuntime (#34822)'
+        );
         $this->assertStringNotContainsString(
             'ObOutputRuntime::ensureLinked($this)',
             $minimalBody,

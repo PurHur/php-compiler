@@ -13,12 +13,16 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for CLI $argc/$argv via honest refresh + VmCliArgv PHP (#9439, #20904).
+ * JIT/AOT link for CLI $argc/$argv via honest refresh + VmCliArgv PHP (#9439, #20904, #34822).
  *
  * Embed + thin standalone AOT: ABI stubs then real `__phpc_cli_refresh_argv_global`
  * (no void-refresh fork). Empty argv tables use `__hashtable__alloc` (DefineRuntime /
  * SuperglobalInit shape) — NestedJIT `new HashTable()` segfaults in user-script AOT.
- * Thin init links via {@see Context::ensureMinimalUserStandaloneBodies} before {main} $argc lowering.
+ * Context ensureMinimalUserStandaloneBodies must not eagerly link this during thin
+ * hello-world init (#34822) — {@see Context::compileToFile} thin path +
+ * {@see \PHPCompiler\JIT\CliArgvGlobalInit} / JitGetopt already ensureLinked before lookup.
+ * Call-site ensureLinked restores the caller insert block after ABI emit (thin AOT:
+ * parentless call / module verify — peer MetaTagsRuntime #27317 / #34812).
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmCliArgv} / {@see \PHPCompiler\ext\standard\CliArgvJitHelper}
  * php-src: ext/standard/basic_functions.c — $argc / $argv in CLI SAPI
  */
@@ -57,6 +61,8 @@ final class CliArgvRuntime
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit (#34822 / #27317).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureGlobals($context);
         self::ensureExternals($context);
 
@@ -91,7 +97,11 @@ final class CliArgvRuntime
         )));
 
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /** Packed argv list from phpc_cli_* globals (getopt JIT, #3251). */

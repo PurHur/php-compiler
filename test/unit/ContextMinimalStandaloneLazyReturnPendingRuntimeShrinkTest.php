@@ -30,13 +30,12 @@ final class ContextMinimalStandaloneLazyReturnPendingRuntimeShrinkTest extends T
             'ensureMinimalUserStandaloneBodies must not eagerly JitReturnPending (#34621)'
         );
 
-        // CLI argv still NestedJIT before {main} (#34812 dropped SuperglobalName).
-        // LastError dropped in #34631 (peer this test).
-        foreach ([
+        // CliArgv always-on removed (#34822): compileToFile + CliArgvGlobalInit ensureLinked.
+        $this->assertStringNotContainsString(
             'CliArgvRuntime::ensureStandaloneBodies($this)',
-        ] as $keep) {
-            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34769)");
-        }
+            $minimalBody,
+            'ensureMinimalUserStandaloneBodies must not eagerly CliArgvRuntime (#34822)'
+        );
         $this->assertStringNotContainsString(
             'ErrorBridge::ensureStandaloneBodies($this)',
             $minimalBody,

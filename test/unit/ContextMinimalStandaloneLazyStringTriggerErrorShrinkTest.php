@@ -30,12 +30,12 @@ final class ContextMinimalStandaloneLazyStringTriggerErrorShrinkTest extends Tes
             'ensureMinimalUserStandaloneBodies must not eagerly StringTriggerError (#34641)'
         );
 
-        // CLI argv still NestedJIT before {main} (#34812 dropped SuperglobalName).
-        foreach ([
+        // CliArgv always-on removed (#34822): compileToFile + CliArgvGlobalInit ensureLinked.
+        $this->assertStringNotContainsString(
             'CliArgvRuntime::ensureStandaloneBodies($this)',
-        ] as $keep) {
-            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34769)");
-        }
+            $minimalBody,
+            'ensureMinimalUserStandaloneBodies must not eagerly CliArgvRuntime (#34822)'
+        );
         $this->assertStringNotContainsString(
             'ErrorBridge::ensureStandaloneBodies($this)',
             $minimalBody,

@@ -52,6 +52,8 @@ final class CliArgvRuntimeStandaloneTest extends TestCase
         try {
             $runtime = new Runtime(Runtime::MODE_AOT);
             $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+            // Thin ensureMinimal no longer eagerly links CliArgv (#34822); compileToFile does.
+            CliArgvRuntime::ensureStandaloneBodies($ctx);
             $this->assertAbiBodies($ctx);
             $refresh = $ctx->lookupFunction('__phpc_cli_refresh_argv_global');
             $this->assertGreaterThan(1, $refresh->countBasicBlocks(), 'refresh must be honest bridge, not void stub');
