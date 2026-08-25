@@ -8332,7 +8332,8 @@ class JIT {
                     $func->getParam(0)
                 );
             }
-        } elseif ([] !== $args) {
+        } else {
+            // Static/file-scope/main must not reuse a prior method's LLVM $this param (#31902 AOT).
             $this->context->implicitThisArgument = null;
         }
         // Handle hoisted variables
@@ -13886,6 +13887,9 @@ class JIT {
                         $stale->objectPropertyDnfArms = null;
                     }
                     $obj = $block->getOperand($op->arg2);
+                    if (JIT\UnboundThisGuard::emitPropertyAccessIfUnbound($this->context, $this, $block, $obj, $result)) {
+                        break;
+                    }
                     $name = $block->getOperand($op->arg3);
                     $nameSlot = $op->arg3;
                     // inheritUndefinedLocals freshLiteralConstantSlot can leave the first

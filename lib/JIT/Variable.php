@@ -635,6 +635,7 @@ final class Variable {
         if (
             null !== $name
             && '' !== $name
+            && 'this' !== $name
             && !Superglobals::isSuperglobalName($name)
             && $block->isMainScript()
             && !$context->isForeachByRefLocalName($name, $block)

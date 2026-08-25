@@ -32,6 +32,13 @@ final class UnboundThisGuard
         Block $block,
         ?Operand $op
     ): bool {
+        if (null === $op || !self::operandIsThis($block, $op)) {
+            return false;
+        }
+        // Inlined eval from an instance method inherits caller $this (#31902).
+        if ($context->inlineIncludeDepth > 0 && null !== $context->findThisVariable()) {
+            return false;
+        }
         if (!self::isProvenUnboundThis($block, $op)) {
             return false;
         }
@@ -68,6 +75,40 @@ final class UnboundThisGuard
         return true;
     }
 
+    /**
+     * @return true when the fetch/write must be skipped (catchable Error emitted)
+     */
+    public static function emitPropertyAccessIfUnbound(
+        Context $context,
+        \PHPCompiler\JIT $jit,
+        Block $block,
+        ?Operand $obj,
+        Operand $result
+    ): bool {
+        if (null === $obj || !self::operandIsThis($block, $obj)) {
+            return false;
+        }
+        if (null !== $context->findThisVariable()) {
+            return false;
+        }
+
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            ErrorRaise::ensureStandaloneBodies($context);
+        }
+        NonObjectPropertyFetchHelper::lowerNullPropertyDest($context, $result);
+        if ([] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, self::ERROR_MESSAGE);
+        } else {
+            ErrorRaise::emitRaise($context, self::ERROR_MESSAGE);
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->clearInsertionPosition();
+        }
+
+        return true;
+    }
+
     public static function isProvenUnboundThis(Block $block, ?Operand $op): bool
     {
         if (null === $op) {
@@ -98,6 +139,9 @@ final class UnboundThisGuard
 
     private static function operandIsThis(Block $block, Operand $op): bool
     {
+        if ($op instanceof Operand\BoundVariable && Operand\BoundVariable::SCOPE_OBJECT === $op->scope) {
+            return true;
+        }
         if ('this' === OperandName::resolve($op)) {
             return true;
         }
