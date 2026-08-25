@@ -6,15 +6,20 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** TryCatch catch-arm type matching routes through TryCatchJitHelper PHP (#16247, #9663). */
+/**
+ * Catch-arm type matching: AOT uses LLVM instanceof (#34597); VM keeps VmTryCatch (#9663).
+ * TryCatchRuntime NestedJIT bridge remains for reference but is not used from buildDispatch.
+ */
 final class TryCatchRuntimeShrinkTest extends TestCase
 {
-    public function testTryCatchHelperUsesRuntimeNotEmitInstanceOfLoop(): void
+    public function testTryCatchHelperUsesLlvmInstanceOfForCatchArms(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/TryCatchHelper.php');
-        $this->assertStringContainsString('TryCatchRuntime::callEncodedTypesMatch', $source);
+        $this->assertStringContainsString('emitCatchTypesMatchI1', $source);
+        $this->assertStringContainsString('emitInstanceOf($thrownVar, $typeName)', $source);
+        $this->assertStringNotContainsString('TryCatchRuntime::callEncodedTypesMatch', $source);
+        $this->assertStringNotContainsString('$singleArm', $source);
         $this->assertStringNotContainsString('try_catch_type_next_', $source);
-        $this->assertStringNotContainsString('emitInstanceOf($context, $thrownVar, $typeName)', $source);
     }
 
     public function testTryCatchRuntimeLinksTryCatchJitHelper(): void
