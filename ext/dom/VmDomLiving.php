@@ -812,7 +812,10 @@ final class VmDomLiving
     public static function htmlRootElement(ObjectEntry $document): ?ObjectEntry
     {
         VmDom::ensureDocument($document);
-        $rootVar = $document->getProperty(VmDom::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        $slots = $document->propertiesWithNames();
+        $rootVar = isset($slots[VmDom::PROP_DOCUMENT_ELEMENT])
+            ? $slots[VmDom::PROP_DOCUMENT_ELEMENT]->resolveIndirect()
+            : $document->getProperty(VmDom::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $rootVar->type) {
             return null;
         }

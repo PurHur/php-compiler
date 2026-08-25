@@ -52,6 +52,14 @@ final class JitDomDocumentDoctype
 
         $docClass = JitDomLoadXMLUserScript::lastDocumentClass() ?? $className;
         $docClassId = $objectType->lookup($docClass);
+        if (JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            $cfsSource = JitDomHtmlDocumentSaveHtml::lastCreateFromStringSource();
+            if (null !== $cfsSource
+                && null === DomParseSimpleHtmlJitHelper::doctypeNameArgv($cfsSource)
+            ) {
+                return self::boxNull($context);
+            }
+        }
         if ($objectType->hasProperty($docClassId, self::PROP_DOCTYPE)
             || JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
         ) {
