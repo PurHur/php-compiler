@@ -171,6 +171,63 @@ final class UnserializeDateWireNestedJitHelper
         return 0;
     }
 
+    /**
+     * Parse DateInterval member wire into outY..outDays (#34602).
+     *
+     * from_string + date_string bags are fold-only (VmDateInterval::parseFromDateString).
+     *
+     * @return int 1 on success
+     */
+    public static function parseDateInterval(string $payload): int
+    {
+        $len = \strlen($payload);
+        if ($len < 20) {
+            return 0;
+        }
+        // Reject from_string wire — NestedJIT cannot call parseFromDateString safely.
+        $pos = 0;
+        while ($pos + 21 < $len) {
+            if ('s' === $payload[$pos] && ':' === $payload[$pos + 1]
+                && '1' === $payload[$pos + 2] && '1' === $payload[$pos + 3]
+                && ':' === $payload[$pos + 4] && '"' === $payload[$pos + 5]
+                && 'f' === $payload[$pos + 6] && 'r' === $payload[$pos + 7]
+                && 'o' === $payload[$pos + 8] && 'm' === $payload[$pos + 9]
+                && '_' === $payload[$pos + 10] && 's' === $payload[$pos + 11]
+                && 't' === $payload[$pos + 12] && 'r' === $payload[$pos + 13]
+                && 'i' === $payload[$pos + 14] && 'n' === $payload[$pos + 15]
+                && 'g' === $payload[$pos + 16] && '"' === $payload[$pos + 17]
+                && ';' === $payload[$pos + 18] && 'b' === $payload[$pos + 19]
+                && ':' === $payload[$pos + 20] && '1' === $payload[$pos + 21]) {
+                return 0;
+            }
+            ++$pos;
+        }
+        self::$outY = self::findS1Int($payload, $len, \ord('y'));
+        self::$outM = self::findS1Int($payload, $len, \ord('m'));
+        self::$outD = self::findS1Int($payload, $len, \ord('d'));
+        self::$outH = self::findS1Int($payload, $len, \ord('h'));
+        self::$outI = self::findS1Int($payload, $len, \ord('i'));
+        self::$outS = self::findS1Int($payload, $len, \ord('s'));
+        self::$outF = self::findS1FloatF($payload, $len);
+        self::$outInvert = self::findInvert($payload, $len);
+        $daysBool = self::findDaysBool($payload, $len);
+        if ($daysBool >= 0) {
+            self::$outDaysIsFalse = 1;
+            self::$outDays = 0;
+        } else {
+            $daysAt = self::findDaysIntAfter($payload, $len);
+            if ($daysAt < 0) {
+                self::$outDaysIsFalse = 1;
+                self::$outDays = 0;
+            } else {
+                self::$outDaysIsFalse = 0;
+                self::$outDays = self::readIntAt($payload, $len, $daysAt);
+            }
+        }
+
+        return 1;
+    }
+
     public static function outTimestamp(): int
     {
         return self::$outTimestamp;
