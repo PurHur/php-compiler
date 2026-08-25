@@ -20667,6 +20667,9 @@ class JIT {
             $dest->compileTimeDatePeriodTimestamps = $src->compileTimeDatePeriodTimestamps;
             $dest->compileTimeDatePeriodTimezone = $src->compileTimeDatePeriodTimezone;
         }
+        if ($force || \is_array($src->compileTimeDatePeriodSerialize)) {
+            $dest->compileTimeDatePeriodSerialize = $src->compileTimeDatePeriodSerialize;
+        }
         if ($force || null !== $src->compileTimeDateInterval) {
             $dest->compileTimeDateInterval = $src->compileTimeDateInterval;
         }
@@ -21425,12 +21428,15 @@ class JIT {
         if (is_array($first)) {
             $first = $first['unpack'] ?? null;
         }
-        if (!$first instanceof JIT\Variable || null === $first->compileTimeDatePeriodTimestamps) {
+        if (!$first instanceof JIT\Variable
+            || (null === $first->compileTimeDatePeriodTimestamps
+                && !\is_array($first->compileTimeDatePeriodSerialize))) {
             return;
         }
         $stamp = static function (JIT\Variable $bound) use ($first): void {
             $bound->compileTimeDatePeriodTimestamps = $first->compileTimeDatePeriodTimestamps;
             $bound->compileTimeDatePeriodTimezone = $first->compileTimeDatePeriodTimezone;
+            $bound->compileTimeDatePeriodSerialize = $first->compileTimeDatePeriodSerialize;
             $bound->classUserType = $first->classUserType ?? 'DatePeriod';
         };
         $stamp($first);

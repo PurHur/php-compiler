@@ -55,6 +55,15 @@ final class JitDatePeriodConstruct
             $includeStart,
             $includeEnd
         );
+        self::stampCompileTimeSerializeBag(
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3],
+            $recurrences,
+            $includeStart,
+            $includeEnd
+        );
 
         return self::returnNullSlot($context);
     }
@@ -101,6 +110,15 @@ final class JitDatePeriodConstruct
             $args[2],
             $userRecurrences,
             $includeStart
+        );
+        self::stampCompileTimeSerializeBag(
+            $args[0],
+            $args[1],
+            $args[2],
+            null,
+            $userRecurrences + 1,
+            $includeStart,
+            false
         );
 
         return self::returnNullSlot($context);
@@ -329,5 +347,75 @@ final class JitDatePeriodConstruct
         }
 
         return $delta;
+    }
+
+    /**
+     * Stamp serialize bag for thin-AOT fold (#34585 / peer #34576 DateTime wire).
+     */
+    private static function stampCompileTimeSerializeBag(
+        JITVariable $periodVar,
+        JITVariable $startVar,
+        JITVariable $intervalVar,
+        ?JITVariable $endVar,
+        int $recurrences,
+        bool $includeStart,
+        bool $includeEnd
+    ): void {
+        $startStamp = self::dateTimeSerializeStamp($startVar);
+        $interval = $intervalVar->compileTimeDateInterval;
+        if (null === $startStamp || !\is_array($interval)) {
+            return;
+        }
+        $endStamp = null;
+        if (null !== $endVar) {
+            $endStamp = self::dateTimeSerializeStamp($endVar);
+            if (null === $endStamp) {
+                return;
+            }
+        }
+        $periodVar->compileTimeDatePeriodSerialize = [
+            'start' => $startStamp,
+            'end' => $endStamp,
+            'interval' => [
+                'y' => (int) $interval['y'],
+                'm' => (int) $interval['m'],
+                'd' => (int) $interval['d'],
+                'h' => (int) $interval['h'],
+                'i' => (int) $interval['i'],
+                's' => (int) $interval['s'],
+                'f' => (float) $interval['f'],
+                'invert' => (int) $interval['invert'],
+            ],
+            'recurrences' => $recurrences,
+            'include_start_date' => $includeStart,
+            'include_end_date' => $includeEnd,
+        ];
+    }
+
+    /**
+     * @return array{timestamp: int, micro: int, tz: string, class: string}|null
+     */
+    private static function dateTimeSerializeStamp(JITVariable $arg): ?array
+    {
+        if (null === $arg->compileTimeDateTimeTimestamp) {
+            return null;
+        }
+        $class = $arg->compileTimeDateTimeClassName;
+        if (null === $class || '' === $class) {
+            $class = $arg->classUserType;
+        }
+        if (null === $class || '' === $class) {
+            $class = 'DateTime';
+        }
+        if ('DateTime' !== $class && 'DateTimeImmutable' !== $class) {
+            $class = 'DateTime';
+        }
+
+        return [
+            'timestamp' => (int) $arg->compileTimeDateTimeTimestamp,
+            'micro' => (int) ($arg->compileTimeDateTimeMicrosecond ?? 0),
+            'tz' => self::compileTimeTz($arg),
+            'class' => $class,
+        ];
     }
 }
