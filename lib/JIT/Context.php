@@ -2297,7 +2297,12 @@ class Context {
         // HtmlEntities / HtmlspecialcharsDecode always-on removed (#34612): htmlentities.php /
         // JitHtmlspecialcharsDecode already ensureLinked before lookup (peer #34605). Leftover
         // Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
-        ExceptionBridge::ensureStandaloneBodies($this);
+        // ExceptionBridge always-on removed (#34732): TypeErrorRaise::ensureLinked /
+        // ExceptionBridge::emitTypeError* / emitClear+emitAbort already implement standalone
+        // bodies before lookup (peer #34695). Thin hello-world must not NestedJIT TypeErrorRaise
+        // / JitThrow during init — thin {main} skips ExceptionBridge clear/abort anyway.
+        // Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
+        // Full standalone still ensureStandaloneBodies below.
         ErrorBridge::ensureStandaloneBodies($this);
         // ErrorHandler / ExceptionHandler always-on removed (#34612): JitErrorHandler /
         // JitTriggerErrorKernel / JitExceptionHandler / TryCatchHelper already ensureLinked

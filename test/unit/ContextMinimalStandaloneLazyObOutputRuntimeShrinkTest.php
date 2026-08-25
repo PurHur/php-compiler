@@ -35,11 +35,15 @@ final class ContextMinimalStandaloneLazyObOutputRuntimeShrinkTest extends TestCa
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
-            'ExceptionBridge::ensureStandaloneBodies($this)',
             'ErrorBridge::ensureStandaloneBodies($this)',
         ] as $keep) {
-            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34695)");
+            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34732)");
         }
+        $this->assertStringNotContainsString(
+            'ExceptionBridge::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ExceptionBridge (#34732)'
+        );
 
         // ensureFull must not re-add ObOutput before ValueEcho (ValueEcho → ObOutput).
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');

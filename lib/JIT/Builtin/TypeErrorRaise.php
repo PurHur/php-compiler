@@ -35,9 +35,10 @@ final class TypeErrorRaise
     {
         self::registerPendingGlobals($context);
         self::registerDeclarations($context);
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            self::implementBodies($context);
-        }
+        // Standalone too — Context ensureMinimal no longer eagerly ExceptionBridge (#34732 /
+        // peer #34695). Call-site ensureLinked must implement bodies or thin AOT mints
+        // declaration-only *.1 / link-fail (#31894 / #32122).
+        self::implementBodies($context);
     }
 
     /** Standalone AOT: emit pending helpers into the module once builtins are registered. */
@@ -55,27 +56,37 @@ final class TypeErrorRaise
             return;
         }
 
-        self::registerPendingGlobals($context);
-        self::implementRaiseFunction($context, '__compiler_jit_raise_type_error', self::PENDING_TYPE_ERROR);
-        self::implementRaiseFunction($context, '__compiler_jit_raise_argument_count_error', self::PENDING_ARGUMENT_COUNT_ERROR);
-        self::implementRaiseFunction($context, '__compiler_jit_raise_value_error', self::PENDING_VALUE_ERROR);
-        self::implementPendingHelpers($context);
-        self::implementPendingKindGet($context);
-        self::implementAbortIfPending($context);
+        // Body emission clears the insert block; restore so mid-{main} TypeError sites
+        // (HashTable illegal offset, ExceptionBridge::emitTypeError*) stay well-formed (#34732).
+        $restore = BasicBlockHelper::tryGetInsertBlock($context);
+        try {
+            self::registerPendingGlobals($context);
+            self::implementRaiseFunction($context, '__compiler_jit_raise_type_error', self::PENDING_TYPE_ERROR);
+            self::implementRaiseFunction($context, '__compiler_jit_raise_argument_count_error', self::PENDING_ARGUMENT_COUNT_ERROR);
+            self::implementRaiseFunction($context, '__compiler_jit_raise_value_error', self::PENDING_VALUE_ERROR);
+            self::implementPendingHelpers($context);
+            self::implementPendingKindGet($context);
+            self::implementAbortIfPending($context);
+        } finally {
+            BasicBlockHelper::restoreInsertBlock($context, $restore);
+        }
     }
 
     public static function emitRaise(Context $context, string $message): void
     {
+        self::ensureLinked($context);
         self::emitPendingMessage($context, $message, '__compiler_jit_raise_type_error');
     }
 
     public static function emitArgumentCountError(Context $context, string $message): void
     {
+        self::ensureLinked($context);
         self::emitPendingMessage($context, $message, '__compiler_jit_raise_argument_count_error');
     }
 
     public static function emitValueError(Context $context, string $message): void
     {
+        self::ensureLinked($context);
         self::emitPendingMessage($context, $message, '__compiler_jit_raise_value_error');
     }
 
@@ -494,7 +505,8 @@ final class TypeErrorRaise
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        self::registerDeclarations($context);
+        // Lazy bodies — ensureMinimal no longer ExceptionBridge (#34732).
+        self::ensureLinked($context);
         $context->builder->call($context->lookupFunction('phpc_jit_type_error_clear_pending'));
     }
 
@@ -503,7 +515,7 @@ final class TypeErrorRaise
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        self::registerDeclarations($context);
+        self::ensureLinked($context);
         $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
     }
 
