@@ -538,6 +538,9 @@ final class JitDate
             'Y-m-d' => ['%04lld-%02lld-%02lld', ['year', 'month', 'day'], 16],
             'Ymd' => ['%04lld%02lld%02lld', ['year', 'month', 'day'], 12],
             'H:i:s' => ['%02lld:%02lld:%02lld', ['hour', 'minute', 'second'], 12],
+            // Bare H:i — without this, unstamped setTime()/modify() returns fall through to
+            // NestedJIT DateTimeFormatRuntime and SIGABRT under thin AOT (#34651).
+            'H:i' => ['%02lld:%02lld', ['hour', 'minute'], 8],
             // Composite literals — NestedJIT FormatDatetime segfaults (#27157).
             'Y-m-d H:i' => [
                 '%04lld-%02lld-%02lld %02lld:%02lld',
@@ -620,6 +623,7 @@ final class JitDate
             's',
             'Y-m-d',
             'Ymd',
+            'H:i',
             'H:i:s',
             'Y-m-d H:i',
             'Y-m-d H:i:s',

@@ -47,19 +47,22 @@ final class DateTimeFormat implements Call
 
     /**
      * Copy compile-time instant onto $this when scope Variable lost unserialize stamps (#34614).
+     *
+     * Only restore from {@see Context::$lastDateTimeUnserializeLocalName}. The old
+     * "unique dateTimeLocalInstants entry" fallback stamped Immutable mutate returns
+     * (and fluent `$d->modify()->format()` temps) with the original construct instant
+     * — silent wrong output (#34651).
      */
     private static function restoreDateTimeInstantStamps(Context $context, Variable $receiver): void
     {
         if (null !== $receiver->compileTimeDateTimeTimestamp) {
             return;
         }
-        $instant = null;
         $last = $context->lastDateTimeUnserializeLocalName;
-        if (\is_string($last) && '' !== $last && isset($context->dateTimeLocalInstants[$last])) {
-            $instant = $context->dateTimeLocalInstants[$last];
-        } elseif (1 === \count($context->dateTimeLocalInstants)) {
-            $instant = \reset($context->dateTimeLocalInstants);
+        if (!\is_string($last) || '' === $last || !isset($context->dateTimeLocalInstants[$last])) {
+            return;
         }
+        $instant = $context->dateTimeLocalInstants[$last];
         if (!\is_array($instant) || !isset($instant['timestamp'])) {
             return;
         }
@@ -67,7 +70,8 @@ final class DateTimeFormat implements Call
         $receiver->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
         $receiver->compileTimeTimezoneName = $instant['timezone'] ?? null;
         if (null === $receiver->classUserType || '' === $receiver->classUserType) {
-            $receiver->classUserType = 'DateTime';
+            $class = $instant['className'] ?? $receiver->compileTimeDateTimeClassName ?? 'DateTime';
+            $receiver->classUserType = \is_string($class) && '' !== $class ? $class : 'DateTime';
         }
     }
 }
