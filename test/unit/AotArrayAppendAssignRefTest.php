@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * AOT: $a[] =& $x and $a['k'] =& $x must alias after mutation (#34645).
  * Double `$a[] =& $x` must update every slot (#34685).
+ * Packed `$a[0]=&$x` on empty HT must materialise the slot (#34689).
  *
  * @see php-src Zend/zend_execute.c zend_assign_to_variable_reference
  *
@@ -17,7 +18,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class AotArrayAppendAssignRefTest extends TestCase
 {
-    private const EXPECT = "9\n7\n9,9\n";
+    private const EXPECT = "9\n7\n9,9\n9\n";
 
     public function testVmArrayAppendAssignRef(): void
     {

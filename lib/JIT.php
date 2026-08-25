@@ -18710,7 +18710,8 @@ class JIT {
     }
 
     /**
-     * `$a[] =& $x`: copy the shared box into the HT entry and register it for write-through (#34685).
+     * `$a[] =& $x` / `$a[0] =& $x`: copy the shared box into the HT entry and register it for
+     * write-through (#34685 / #34689).
      *
      * @see php-src Zend/zend_execute.c zend_assign_to_variable_reference
      */
@@ -18852,10 +18853,19 @@ class JIT {
 
     /**
      * Live `__value__*` for an ASSIGN_REF dim dest (append entry or packed writableHt).
+     *
+     * Packed `$a[0]=&$x` on an empty HT must materialise the slot first — a bare GEP into
+     * `values` does not bump `used`, so later `$x=9` never appears in the array (#34689).
+     *
+     * @see php-src Zend/zend_execute.c zend_fetch_dimension_address / zend_assign_to_variable_reference
+     * @see JIT\HashTableWriteLlvm::hydrateIndexWriteLvalue
      */
     private function assignRefDestEntryPointer(Variable $destVar): ?\PHPLLVM\Value
     {
         if (null !== $destVar->writableHt && null !== $destVar->writableIndex) {
+            // Same miss path as FETCH_DIM_W ++/--: setNullAt grows used before we copy the box.
+            JIT\HashTableWriteLlvm::hydrateIndexWriteLvalue($this->context, $destVar);
+
             return JIT\HashTableReadLlvm::listEntryPointer(
                 $this->context,
                 $destVar->writableHt,
