@@ -1044,6 +1044,13 @@ final class ObStorageLlvm
         );
     }
 
+    /**
+     * fflush(3) libc stdout — must load FILE* from the external global (#34737).
+     *
+     * Passing the global's address (i8**) as FILE* corrupts stdio when StreamGlobalsJit
+     * has declared @stdout (any fopen). Peer: StreamGlobalsJit::implementResolveStream /
+     * JitTriggerErrorKernel::stderrFilePtr.
+     */
     private static function emitFflushStdout(Context $context): void
     {
         try {
@@ -1056,7 +1063,10 @@ final class ObStorageLlvm
             return;
         }
         $i8p = $context->getTypeFromString('int8*');
-        $context->builder->call($fflush, $context->builder->pointerCast($stdout, $i8p));
+        $stdoutFp = $context->builder->load(
+            $context->builder->pointerCast($stdout, $i8p->pointerType(0))
+        );
+        $context->builder->call($fflush, $stdoutFp);
     }
 
     private static function levelPtr(Context $context): Value
