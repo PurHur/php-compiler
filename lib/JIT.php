@@ -21395,6 +21395,10 @@ class JIT {
         if (!$toCall instanceof JIT\Call\DatePeriodConstruct) {
             return;
         }
+        // Same $this-vs-user-arg offset as applyDateTimeLocalInstantsToCallArgs (#34591).
+        // Without it, callOperands[0] (start) is applied onto $this → DatePeriod inherits a
+        // DateTime timestamp and serialize folds as O:8:"DateTime" instead of DatePeriod.
+        $opOffset = \count($callArgs) - \count($callOperands);
         foreach ($callArgs as $i => $arg) {
             if (is_array($arg)) {
                 $arg = $arg['value'] ?? $arg['unpack'] ?? null;
@@ -21402,7 +21406,7 @@ class JIT {
             if (!$arg instanceof JIT\Variable) {
                 continue;
             }
-            $operand = $callOperands[$i] ?? null;
+            $operand = $callOperands[$i - $opOffset] ?? null;
             if (!$operand instanceof \PHPCfg\Operand) {
                 continue;
             }
@@ -21438,6 +21442,10 @@ class JIT {
             $bound->compileTimeDatePeriodTimezone = $first->compileTimeDatePeriodTimezone;
             $bound->compileTimeDatePeriodSerialize = $first->compileTimeDatePeriodSerialize;
             $bound->classUserType = $first->classUserType ?? 'DatePeriod';
+            // Do not retain a start-local DateTime instant on the period result (#34591).
+            $bound->compileTimeDateTimeTimestamp = null;
+            $bound->compileTimeDateTimeMicrosecond = null;
+            $bound->compileTimeDateTimeClassName = null;
         };
         $stamp($first);
         $resultVar = $this->context->lastDatePeriodNewResultVar;

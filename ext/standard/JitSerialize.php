@@ -139,6 +139,11 @@ final class JitSerialize
 
     private static function encodeObjectOperand(Context $context, JITVariable $arg): Value
     {
+        // DatePeriod before DateTime — leaked start instant on period must not win (#34591).
+        $periodResult = self::tryFoldDatePeriod($context, $arg);
+        if (null !== $periodResult) {
+            return $periodResult;
+        }
         $dateResult = self::tryFoldDateTimeFamily($context, $arg);
         if (null !== $dateResult) {
             return $dateResult;
@@ -150,10 +155,6 @@ final class JitSerialize
         $zoneResult = self::tryFoldDateTimeZone($context, $arg);
         if (null !== $zoneResult) {
             return $zoneResult;
-        }
-        $periodResult = self::tryFoldDatePeriod($context, $arg);
-        if (null !== $periodResult) {
-            return $periodResult;
         }
         $splResult = self::tryEncodeSplHtObject($context, $arg);
         if (null !== $splResult) {
@@ -274,6 +275,9 @@ final class JitSerialize
      */
     private static function tryFoldDateTimeFamily(Context $context, JITVariable $arg): ?Value
     {
+        if (\is_array($arg->compileTimeDatePeriodSerialize)) {
+            return null;
+        }
         if (null === $arg->compileTimeDateTimeTimestamp) {
             return null;
         }

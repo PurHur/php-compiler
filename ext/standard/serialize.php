@@ -74,6 +74,12 @@ final class serialize extends Internal
                 return VmSerializeFormat::encodeStringLiteral($literal);
             }
         }
+        // DatePeriod before DateTime — a leaked start instant on $this must not win (#34591 / #34585).
+        if (\is_array($arg->compileTimeDatePeriodSerialize)) {
+            return DatePeriodSupport::encodeZendSerializeWireFromCompileTimeBag(
+                $arg->compileTimeDatePeriodSerialize
+            );
+        }
         // DateTime* — Zend date/timezone wire (#34576 / re-#10710). Peer json_encode #33752.
         if (null !== $arg->compileTimeDateTimeTimestamp) {
             $className = $arg->compileTimeDateTimeClassName;
@@ -96,12 +102,6 @@ final class serialize extends Internal
             ];
 
             return VmSerialize::encodeExportedPropertyBag($className, $props);
-        }
-        // DatePeriod — Zend start/interval/recurrences wire (#34585 / peer #34576).
-        if (\is_array($arg->compileTimeDatePeriodSerialize)) {
-            return DatePeriodSupport::encodeZendSerializeWireFromCompileTimeBag(
-                $arg->compileTimeDatePeriodSerialize
-            );
         }
 
         // DateInterval — Zend member wire (#34584 / re-#10692). Peer DateTime #34576.

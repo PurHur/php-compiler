@@ -390,6 +390,14 @@ final class JitDatePeriodConstruct
             'include_start_date' => $includeStart,
             'include_end_date' => $includeEnd,
         ];
+        // Drop any DateTime instant leaked onto $this via mis-indexed local restore (#34591).
+        $periodVar->compileTimeDateTimeTimestamp = null;
+        $periodVar->compileTimeDateTimeMicrosecond = null;
+        $periodVar->compileTimeDateTimeClassName = null;
+        if ('DateTime' === ($periodVar->classUserType ?? '')
+            || 'DateTimeImmutable' === ($periodVar->classUserType ?? '')) {
+            $periodVar->classUserType = self::CLASS_PERIOD;
+        }
     }
 
     /**
