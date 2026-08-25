@@ -16,7 +16,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMNode::replaceChild() (#19240, #22678, #27216, #28671, #34590).
+ * LLVM lowering for DOMNode::replaceChild() (#19240, #22678, #27216, #28671, #34590, #34709).
  *
  * Thin standalone AOT materializes createElement nodes without DomRegistry
  * ({@see JitDomCreateElement::materializeElementFromLiteral}). The NestedJIT
@@ -24,6 +24,7 @@ use PHPLLVM\Value;
  * ParentNode::append LLVM slot sync instead (php-src ext/dom/node.c).
  * Attr as newChild: Hierarchy Request Error — Attr is not content (#33587).
  * Live getElementsByTagName count: dec old + inc new (#34590 / peer #33679).
+ * Identity replace (new==old): no-op — must not clear parent/sibling (#34709).
  */
 final class JitDomReplaceChild
 {
@@ -91,17 +92,33 @@ final class JitDomReplaceChild
         $parent = self::loadObjectArg($context, $args[0]);
         $newChild = self::loadObjectArg($context, $args[1]);
         $oldChild = self::loadObjectArg($context, $args[2]);
+        // Identity no-op: VmDom short-circuits; do not clearDetachedLinkSlots (#34709 / #22678).
+        $bbSame = BasicBlockHelper::append($context, 'dom_rc_nj_identity');
+        $bbDiff = BasicBlockHelper::append($context, 'dom_rc_nj_diff');
+        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_nj_end');
+        $resultSlot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__value__*')
+        );
+        $isSame = $context->builder->icmp(Builder::INT_EQ, $newChild, $oldChild);
+        $context->builder->branchIf($isSame, $bbSame, $bbDiff);
+        $context->builder->positionAtEnd($bbSame);
+        $context->builder->store(self::boxObjectResult($context, $oldChild), $resultSlot);
+        $context->builder->branch($bbEnd);
+        $context->builder->positionAtEnd($bbDiff);
         $context->builder->call(
             $context->lookupFunction(DomNodeTreeMutationRuntime::ABI_REPLACE_CHILD),
             $parent,
             $newChild,
             $oldChild
         );
-        // Null AOT property slots on the replaced node (#19240). Identity no-op still hits this
-        // path today (pointer compare unreliable); VmDom short-circuit keeps the live tree (#22678).
+        // Null AOT property slots on the replaced node (#19240).
         self::clearDetachedLinkSlots($context, $oldChild);
+        $context->builder->store(self::boxObjectResult($context, $oldChild), $resultSlot);
+        $context->builder->branch($bbEnd);
+        $context->builder->positionAtEnd($bbEnd);
 
-        return self::boxObjectResult($context, $oldChild);
+        return $context->builder->load($resultSlot);
     }
 
     /**
@@ -118,15 +135,31 @@ final class JitDomReplaceChild
     ): Value {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_doc_rc_cont');
 
-        DomNodeLiveMutationRuntime::assertTreeMutationChildBeforeLiveSlots(
-            $context,
-            self::loadObjectArg($context, $documentVar),
-            self::loadObjectArg($context, $newChildVar)
-        );
-
         $document = self::loadObjectArg($context, $documentVar);
         $newChild = self::loadObjectArg($context, $newChildVar);
         $oldChild = self::loadObjectArg($context, $oldChildVar);
+
+        // Identity no-op before documentElement rewiring (#34709 / re-#22678).
+        $bbSame = BasicBlockHelper::append($context, 'dom_doc_rc_identity');
+        $bbDiff = BasicBlockHelper::append($context, 'dom_doc_rc_diff');
+        $bbEnd = BasicBlockHelper::append($context, 'dom_doc_rc_end');
+        $resultSlot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__value__*')
+        );
+        $isSame = $context->builder->icmp(Builder::INT_EQ, $newChild, $oldChild);
+        $context->builder->branchIf($isSame, $bbSame, $bbDiff);
+        $context->builder->positionAtEnd($bbSame);
+        $context->builder->store(self::boxObjectResult($context, $oldChild), $resultSlot);
+        $context->builder->branch($bbEnd);
+
+        $context->builder->positionAtEnd($bbDiff);
+        DomNodeLiveMutationRuntime::assertTreeMutationChildBeforeLiveSlots(
+            $context,
+            $document,
+            $newChild
+        );
+
         $objectType = $context->type->object;
         $newJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $newChild);
         $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $document);
@@ -198,8 +231,11 @@ final class JitDomReplaceChild
         JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_doc_rc_post');
+        $context->builder->store(self::boxObjectResult($context, $oldChild), $resultSlot);
+        $context->builder->branch($bbEnd);
+        $context->builder->positionAtEnd($bbEnd);
 
-        return self::boxObjectResult($context, $oldChild);
+        return $context->builder->load($resultSlot);
     }
 
     /** Runtime: parent object class_id is a Document (#33379). */
@@ -273,6 +309,17 @@ final class JitDomReplaceChild
         $newChild = self::loadObjectArg($context, $newChildVar);
         $oldChild = self::loadObjectArg($context, $oldChildVar);
 
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rc_usr_slots');
+        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_usr_end');
+        // Identity no-op before Attr / LiveSlots / tag-list churn (#34709 / VmDom #22678).
+        $bbSame = BasicBlockHelper::append($context, 'dom_rc_usr_identity');
+        $bbDiff = BasicBlockHelper::append($context, 'dom_rc_usr_diff');
+        $isSame = $context->builder->icmp(Builder::INT_EQ, $newChild, $oldChild);
+        $context->builder->branchIf($isSame, $bbSame, $bbDiff);
+        $context->builder->positionAtEnd($bbSame);
+        $context->builder->branch($bbEnd);
+
+        $context->builder->positionAtEnd($bbDiff);
         // php-src: Attr is not a content child — Hierarchy Request before LiveSlots (#33587).
         // Peer insertBefore throws Error for Attr+ref; replaceChild uses DOMException.
         self::rejectAttrAsContentBeforeLiveSlots($context, $newChild);
@@ -355,6 +402,9 @@ final class JitDomReplaceChild
         }
 
         self::syncUserScriptInnerXml($context, $parentVar, $parent, $newChildVar, $oldChildVar, $xml);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rc_usr_diff_done');
+        $context->builder->branch($bbEnd);
+        $context->builder->positionAtEnd($bbEnd);
     }
 
     /**

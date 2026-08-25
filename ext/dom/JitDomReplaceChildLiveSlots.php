@@ -26,6 +26,7 @@ use PHPLLVM\Value;
  * Cross-parent reparent must unlink the old parent first (php-src
  * dom_node_replace_child) — peer appendChild #33404 / #33450.
  * Attr newChild: Hierarchy Request before sibling slots (#33587).
+ * Identity replace (new==old): php-src no-op — must not null parent/sibling (#34709 / re-#22678).
  *
  * Reference: php-src ext/dom/node.c dom_node_replace_child.
  */
@@ -45,10 +46,20 @@ final class JitDomReplaceChildLiveSlots
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rc_live_slots');
         self::ensureLayout($context);
 
+        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_end');
+        // php-src dom_node_replace_child — replacing a node with itself is a no-op (#34709).
+        // Without this, syncNonFragment nulls parent/sibling on the same pointer.
+        $bbSame = BasicBlockHelper::append($context, 'dom_rc_identity_nop');
+        $bbNotSame = BasicBlockHelper::append($context, 'dom_rc_not_identity');
+        $isSame = $context->builder->icmp(Builder::INT_EQ, $newChild, $oldChild);
+        $context->builder->branchIf($isSame, $bbSame, $bbNotSame);
+        $context->builder->positionAtEnd($bbSame);
+        $context->builder->branch($bbEnd);
+
+        $context->builder->positionAtEnd($bbNotSame);
         // php-src: Attr is not content — Hierarchy Request before sibling splice (#33587).
         $bbAttr = BasicBlockHelper::append($context, 'dom_rc_ls_attr');
         $bbNotAttr = BasicBlockHelper::append($context, 'dom_rc_ls_not_attr');
-        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_end');
         $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
         $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
 
