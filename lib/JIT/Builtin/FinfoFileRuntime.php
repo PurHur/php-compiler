@@ -11,10 +11,11 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for finfo_file() / finfo::file() via FinfoFileJitHelper (#27196).
+ * JIT/AOT link for finfo_file() / finfo::file() via FinfoFileJitHelper (#27196 / #34797).
  *
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringHtmlspecialchars #20487).
  * Avoids MimeContentTypeRuntime mid-function bridge emit (basic-block parent gap under thin AOT).
+ * data:// NestedJIT pulls base64_decode from decodeDataUri (#34797 / peer #34789 / #34731).
  * SSOT sniff: {@see \PHPCompiler\ext\standard\VmMime::detectFromBytes}
  * php-src: ext/fileinfo/fileinfo.c — PHP_FUNCTION(finfo_file)
  */
@@ -67,6 +68,8 @@ final class FinfoFileRuntime
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        // data:// NestedJIT pulls base64_decode from decodeDataUri (#34797 / peer #34789).
+        StringBase64Decode::ensureLinked($context);
         $strPtr = $context->getTypeFromString('__string__*');
         JitVmHelperLink::ensureBridge(
             $context,
