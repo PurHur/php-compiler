@@ -4207,11 +4207,18 @@ class Context {
             // convert to PHP variable
             switch ($phpVar->type) {
                 case VMVariable::TYPE_NULL:
+                    // Match Variable::fromLiteral TYPE_NULL — a real boxed null, not a nullptr
+                    // __value__* (#34659: catch-body loads from address 0 and SIGSEGVs).
+                    $slot = JitValueBox::alloc($this);
+                    $this->builder->call(
+                        $this->lookupFunction('__value__writeNull'),
+                        JitValueBox::pointer($this, $slot)
+                    );
                     $nullVar = new Variable(
                         $this,
-                        Variable::TYPE_NULL,
-                        Variable::KIND_VALUE,
-                        $this->getTypeFromString('__value__*')->constNull()
+                        Variable::TYPE_VALUE,
+                        Variable::KIND_VARIABLE,
+                        $slot
                     );
                     $nullVar->isNullConstant = true;
 
