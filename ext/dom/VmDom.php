@@ -7550,6 +7550,13 @@ final class VmDom
         $refChild = isset($parentState->childIds[$nextIndex])
             ? DomRegistry::entry($parentState->childIds[$nextIndex])
             : null;
+        // php-src dom_parent_node_after: viable_next_sibling skips nodes already in the
+        // insertion set. Sequential after() therefore becomes insertBefore(n, n) when
+        // newChild is already immediately after the anchor — that must be a no-op, not
+        // the insertBefore identity Error (#34791 / WHATWG ChildNode.after).
+        if (null !== $refChild && $newChild->id === $refChild->id) {
+            return;
+        }
         self::insertBeforeLiveStandard($ctx, $parent, $newChild, $refChild);
     }
 
