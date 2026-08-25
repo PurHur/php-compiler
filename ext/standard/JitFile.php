@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\IncludePathRuntime;
+use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
@@ -16,6 +17,8 @@ use PHPLLVM\Value;
  * LLVM lowering for file() — file_get_contents + line split (issue #3765).
  *
  * Missing paths use {@see __compiler_file_get_contents} null (same as readfile false path).
+ * data:// goes through FileGetContentsJitHelper NestedJIT decode (#34772 / peer #34731) —
+ * do not gate on {@see JitStat::pathExists} (URIs are not filesystem paths).
  */
 final class JitFile
 {
@@ -26,6 +29,8 @@ final class JitFile
     public static function invoke(Context $context, Value $pathStr, Value $flagsI64): Value
     {
         IncludePathRuntime::ensureLinked($context);
+        // Lazy ABI after Type always-on drop (#33030) — without this, file() compile-fails (#34772).
+        StringFileGetContents::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $i1 = $context->getTypeFromString('int1');
@@ -62,15 +67,9 @@ final class JitFile
         $pathPhi->addIncoming($pathStr, $resolveBlock);
         $pathPhi->addIncoming($resolved, $useResolvedBlock);
 
-        $exists = JitStat::pathExists($context, $pathPhi);
-        $missing = $context->builder->icmp(Builder::INT_EQ, $exists, $i1->constInt(0, false));
-
+        // Always read via __compiler_file_get_contents — pathExists rejects data:// (#34772).
         $failBlock = BasicBlockHelper::append($context, 'file_fail');
-        $readBlock = BasicBlockHelper::append($context, 'file_read');
         $doneBlock = BasicBlockHelper::append($context, 'file_done');
-        $context->builder->branchIf($missing, $failBlock, $readBlock);
-
-        $context->builder->positionAtEnd($readBlock);
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $pathPhi
