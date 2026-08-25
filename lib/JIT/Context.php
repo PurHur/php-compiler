@@ -2504,7 +2504,11 @@ class Context {
 
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isThinStandaloneAotMain()) {
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
-            Builtin\IniRuntime::ensureLinked($this);
+            // IniRuntime always-on removed (#34848): JitIni / IniGet / IniSet / ErrorReporting /
+            // ZendDoubleStringRuntime / ExceptionThrowToStringSeed already ensureLinked before
+            // lookup (peer #34578 / #34822). Thin hello-world must not NestedJIT ini ABI during
+            // compileToFile pre-main — leftover Context NestedJIT vs Runtime ABI drift mints
+            // ini_get.1 / phpc_ini_*.1 (#31894 / #32122).
             Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshEmit($this);
         }
 
