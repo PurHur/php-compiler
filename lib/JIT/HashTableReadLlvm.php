@@ -242,6 +242,31 @@ final class HashTableReadLlvm
         );
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($afterLong);
+        $boolBlock = $fn->appendBasicBlock('ht_isset_vk_bool');
+        $afterBool = $fn->appendBasicBlock('ht_isset_vk_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+            ),
+            $boolBlock,
+            $afterBool
+        );
+        $context->builder->positionAtEnd($boolBlock);
+        // Boxed bool → convert_to_long (true→1 / false→0); do not use readLong (#21892 / #34667).
+        $boolByte = JitValueBox::readBoolByte($context, $valPtr);
+        $boolIndex = $context->builder->truncOrBitCast(
+            $context->builder->zExt($boolByte, $context->getTypeFromString('int64')),
+            $sizeT
+        );
+        $boolResult = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $boolIndex
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterBool);
         $floatBlock = $fn->appendBasicBlock('ht_isset_vk_float');
         $afterFloat = $fn->appendBasicBlock('ht_isset_vk_after_float');
         $isNativeDouble = $context->builder->icmp(
@@ -316,6 +341,7 @@ final class HashTableReadLlvm
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($strResult, $stringBlock);
         $phi->addIncoming($longResult, $longBlock);
+        $phi->addIncoming($boolResult, $boolBlock);
         $phi->addIncoming($floatResult, $floatPred);
         $phi->addIncoming($objResResult, $objResPred);
         $phi->addIncoming($objIllegalResult, $objIllegal);
@@ -395,6 +421,31 @@ final class HashTableReadLlvm
         );
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($afterLong);
+        $boolKeyBlock = $fn->appendBasicBlock('ht_read_vk_bool');
+        $afterBoolKey = $fn->appendBasicBlock('ht_read_vk_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+            ),
+            $boolKeyBlock,
+            $afterBoolKey
+        );
+        $context->builder->positionAtEnd($boolKeyBlock);
+        $boolByte = JitValueBox::readBoolByte($context, $valPtr);
+        $boolIndex = $context->builder->truncOrBitCast(
+            $context->builder->zExt($boolByte, $context->getTypeFromString('int64')),
+            $context->getTypeFromString('size_t')
+        );
+        $boolBox = self::readIndexedToValueBox($context, $ht, $boolIndex);
+        JitValueBox::copyFromPointer(
+            $context,
+            $destPtr,
+            JitValueBox::pointer($context, $boolBox->value)
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterBoolKey);
         $floatKeyBlock = $fn->appendBasicBlock('ht_read_vk_float');
         $afterFloatKey = $fn->appendBasicBlock('ht_read_vk_after_float');
         $isNativeDouble = $context->builder->icmp(
@@ -554,6 +605,22 @@ final class HashTableReadLlvm
         if (Variable::TYPE_NATIVE_LONG === $dim->type) {
             $index = $context->builder->truncOrBitCast(
                 $context->helper->loadValue($dim),
+                $context->getTypeFromString('size_t')
+            );
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
+            );
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $dim->type) {
+            // zend_isset_dim: convert_to_long on bool (#34667).
+            $index = $context->builder->truncOrBitCast(
+                $context->builder->zExt(
+                    $context->helper->loadValue($dim),
+                    $context->getTypeFromString('int64')
+                ),
                 $context->getTypeFromString('size_t')
             );
 
@@ -783,6 +850,18 @@ final class HashTableReadLlvm
         if (Variable::TYPE_NATIVE_LONG === $dim->type) {
             $index = $context->builder->truncOrBitCast(
                 $context->helper->loadValue($dim),
+                $context->getTypeFromString('size_t')
+            );
+
+            return self::readIndexedToValueBox($context, $ht, $index);
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $dim->type) {
+            // zend_fetch_dimension: convert_to_long on bool (#34667).
+            $index = $context->builder->truncOrBitCast(
+                $context->builder->zExt(
+                    $context->helper->loadValue($dim),
+                    $context->getTypeFromString('int64')
+                ),
                 $context->getTypeFromString('size_t')
             );
 
