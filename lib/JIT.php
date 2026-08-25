@@ -8521,12 +8521,10 @@ class JIT {
                         $packed = isset($args[$recvSlot])
                             ? $args[$recvSlot]
                             : JIT\HashTableHelper::emptyVariable($this->context);
-                        if (Variable::TYPE_HASHTABLE === $packed->type) {
-                            $packed = JIT\HashTableHelper::boxedArrayFromHashtable(
-                                $this->context,
-                                $packed
-                            );
-                        }
+                        // Keep TYPE_HASHTABLE — do not box here. Boxing made foreach over
+                        // `...$args` / `&...$args` emit parentless `__value__readObject` IR
+                        // (#34684) and broke by-ref element write-back (#27407). Array builtins
+                        // that need a value-box coerce at the call site (ArraySumLlvm / #24167).
                         $this->assignOperand($block->getOperand($op->arg1), $packed, true);
                         break;
                     }
