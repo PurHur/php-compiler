@@ -27,6 +27,7 @@ use PHPLLVM\Value;
  * Cross-parent reparent must unlink the old parent first (php-src
  * dom_node_insert_before) — peer appendChild #33404 / #33450.
  * Attr newChild: Error before sibling slots (php-src / #33587).
+ * Identity insert (new==ref): Error — must not self-cycle sibling links (#34709 / re-#22686).
  *
  * Reference: php-src ext/dom/node.c dom_node_insert_before.
  */
@@ -42,12 +43,26 @@ final class JitDomInsertBeforeLiveSlots
         self::ensureLayout($context);
         JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
 
+        $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
+        // php-src: xmlAddPrevSibling fails when new == ref → Error (#34709 / re-#22686).
+        // Without this, syncNonFragment builds new.next=new and InnerXml walks forever.
+        $bbSame = BasicBlockHelper::append($context, 'dom_ib_identity_err');
+        $bbNotSame = BasicBlockHelper::append($context, 'dom_ib_not_identity');
+        $isSame = $context->builder->icmp(Builder::INT_EQ, $newChild, $refChild);
+        $context->builder->branchIf($isSame, $bbSame, $bbNotSame);
+        $context->builder->positionAtEnd($bbSame);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'Error',
+            'Cannot add newnode as the previous sibling of refnode'
+        );
+
+        $context->builder->positionAtEnd($bbNotSame);
         // php-src: Attr is not content — insertBefore must not touch Element sibling slots (#33587).
         // Zend/libxml: Error "Cannot add newnode as the previous sibling of refnode".
         // Peer appendChild installs Attr via the attribute map (#33570).
         $bbAttr = BasicBlockHelper::append($context, 'dom_ib_attr');
         $bbNotAttr = BasicBlockHelper::append($context, 'dom_ib_not_attr');
-        $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
         $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
         $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
 
