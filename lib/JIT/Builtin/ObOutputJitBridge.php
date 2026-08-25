@@ -670,6 +670,22 @@ final class ObOutputJitBridge
         }
     }
 
+    /**
+     * Module-local body for {@see \PHPCompiler\ext\standard\JitRegisterShutdown} when
+     * register_shutdown_function() is used without ob_* (#3120).
+     */
+    public static function ensureShutdownMarkRegistered(Context $context): void
+    {
+        $restore = self::captureInsertBlock($context);
+        self::ensureExtraGlobals($context);
+        self::implementShutdownMarkRegistered($context);
+        $fn = $context->module->getNamedFunction('__phpc_shutdown_mark_registered');
+        if (null !== $fn && $fn->countBasicBlocks() > 0) {
+            $context->registerFunction('__phpc_shutdown_mark_registered', $fn);
+        }
+        self::restoreInsertBlock($context, $restore);
+    }
+
     /** @internal Shared preamble for exec-capture / echo emit (#13822, #19422). */
     public static function prepareUserScriptEmit(Context $context): void
     {

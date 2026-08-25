@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\ObOutputJitBridge;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithCaptures;
 use PHPCompiler\JIT\Call\Native;
@@ -51,6 +52,7 @@ final class JitRegisterShutdown
                 $context->builder->positionAtEnd($saved);
             }
         }
+        ObOutputJitBridge::ensureShutdownMarkRegistered($context);
         $context->builder->call($context->lookupFunction('__phpc_shutdown_mark_registered'));
 
         return $context->getTypeFromString('int32')->constInt(0, false);
