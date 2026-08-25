@@ -855,7 +855,7 @@ class Context {
             }
             // Closure use() snapshot reads must not rebind enclosing locals to MCJIT rvalues (#72).
             // `$r = &Class::$prop` must rebind onto the static global lvalue (#32036).
-            // `$o->p =& $x` must rebind `$x` onto the FETCH_PROP_W lvalue (#34649).
+            // `$o->p =& $v` / `$a[] =& $v` must rebind onto property/dim KIND_VALUE lvalues (#34649).
             if (
                 Variable::KIND_VARIABLE === $existing->kind
                 && Variable::KIND_VALUE === $var->kind

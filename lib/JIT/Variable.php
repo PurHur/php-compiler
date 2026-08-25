@@ -272,8 +272,8 @@ final class Variable {
     public ?\PHPLLVM\Value $objectPropertySlot = null;
 
     /**
-     * True when this Variable is the intentional ASSIGN_REF alias for `$o->p =& $x` —
-     * must not strip objectPropertySlot on later `$x = …` (#34649 / #34465).
+     * ASSIGN_REF rebound a name onto this property/dim/static lvalue (#34649 / peer #34645).
+     * Skip #34465 scalar-property detach on later `$v = …` so writes go through the slot.
      */
     public bool $assignRefLvalueAlias = false;
 

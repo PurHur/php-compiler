@@ -8714,21 +8714,45 @@ class Object_ extends Type {
 
         // Heap-box a generic __value__ only with an open insert BB. Parentless
         // malloc/GEP fails module verify on untyped ctor promotion (#32349).
+        // Reuse a non-null slot box so `$o->p =& $v` aliases survive later stores (#34649).
         BasicBlockHelper::ensureOpenInsertBlock($this->context, 'property_store_value_box');
         if (null === BasicBlockHelper::tryGetInsertBlock($this->context)) {
             return;
         }
 
+        $valuePtrTy = $this->context->getTypeFromString('__value__*');
+        $loaded = $this->context->builder->load($slot);
+        $loadedValuePtr = $this->context->builder->pointerCast($loaded, $valuePtrTy);
+        $nullPtr = $valuePtrTy->constNull();
+        $isNull = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $loadedValuePtr, $nullPtr);
+        $fn = BasicBlockHelper::parentFunction($this->context);
+        $allocBlock = $fn->appendBasicBlock('prop_store_box_alloc');
+        $doneBlock = $fn->appendBasicBlock('prop_store_box_ready');
+        $entryBlock = $this->context->builder->getInsertBlock();
+        $this->context->builder->branchIf($isNull, $allocBlock, $doneBlock);
+
+        $this->context->builder->positionAtEnd($allocBlock);
         $valueType = $this->context->getTypeFromString('__value__');
-        $heapVal = $this->context->memory->malloc($valueType);
-        $heapPtr = $this->context->builder->pointerCast(
-            $heapVal,
-            $this->context->getTypeFromString('__value__*')
-        );
+        $heapValAlloc = $this->context->memory->malloc($valueType);
+        $heapPtrAlloc = $this->context->builder->pointerCast($heapValAlloc, $valuePtrTy);
         $valueMap = $this->context->structFieldMap['__value__'];
         $this->context->builder->store(
             $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
-            $this->context->builder->structGep($heapVal, $valueMap['type'])
+            $this->context->builder->structGep($heapValAlloc, $valueMap['type'])
+        );
+        $this->context->builder->store(
+            $this->context->builder->pointerCast($heapPtrAlloc, $voidPtr),
+            $slot
+        );
+        $this->context->builder->branch($doneBlock);
+
+        $this->context->builder->positionAtEnd($doneBlock);
+        $heapPtr = $this->context->builder->phi($valuePtrTy, 'prop_store_box_phi');
+        $heapPtr->addIncoming($heapPtrAlloc, $allocBlock);
+        $heapPtr->addIncoming($loadedValuePtr, $entryBlock);
+        $heapVal = $this->context->builder->pointerCast(
+            $heapPtr,
+            $this->context->getTypeFromString('__value__*')
         );
 
         if (Variable::TYPE_VALUE === $value->type) {
@@ -8742,11 +8766,6 @@ class Object_ extends Type {
             }
             JitValueBox::copyFromPointer($this->context, $heapVal, $valuePtr);
             $value->addref();
-
-            $this->context->builder->store(
-                $this->context->builder->pointerCast($heapPtr, $voidPtr),
-                $slot
-            );
 
             return;
         }
@@ -8763,10 +8782,6 @@ class Object_ extends Type {
                 $owned
             );
             $value->addref();
-            $this->context->builder->store(
-                $this->context->builder->pointerCast($heapPtr, $voidPtr),
-                $slot
-            );
 
             return;
         }
@@ -8778,10 +8793,6 @@ class Object_ extends Type {
                 $this->context->helper->loadValue($value)
             );
             $value->addref();
-            $this->context->builder->store(
-                $this->context->builder->pointerCast($heapPtr, $voidPtr),
-                $slot
-            );
 
             return;
         }
@@ -8795,10 +8806,6 @@ class Object_ extends Type {
                     $ht
                 );
                 $this->context->refcount->addref($ht);
-                $this->context->builder->store(
-                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
-                    $slot
-                );
 
                 return;
             }
@@ -8809,10 +8816,6 @@ class Object_ extends Type {
                     $this->context->helper->loadValue($value)
                 );
                 $value->addref();
-                $this->context->builder->store(
-                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
-                    $slot
-                );
 
                 return;
             }
@@ -8821,10 +8824,6 @@ class Object_ extends Type {
                     $this->context->lookupFunction('__value__writeLong'),
                     $heapPtr,
                     $this->context->helper->loadValue($value)
-                );
-                $this->context->builder->store(
-                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
-                    $slot
                 );
 
                 return;
@@ -8835,10 +8834,6 @@ class Object_ extends Type {
                     $heapPtr,
                     $this->context->helper->loadValue($value)
                 );
-                $this->context->builder->store(
-                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
-                    $slot
-                );
 
                 return;
             }
@@ -8848,10 +8843,6 @@ class Object_ extends Type {
                     $heapVal,
                     $this->context->helper->loadValue($value)
                 );
-                $this->context->builder->store(
-                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
-                    $slot
-                );
 
                 return;
             }
@@ -8859,10 +8850,6 @@ class Object_ extends Type {
                 $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeNull'),
                     $heapPtr
-                );
-                $this->context->builder->store(
-                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
-                    $slot
                 );
 
                 return;
