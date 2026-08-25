@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -14,6 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Shared LLVM ABI trampolines into compiled php-in-PHP JIT helpers (#9679, #26347).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GcCollectCycles #26333).
+ * Mid-{main} ensureLinked restores builder insert (#34621 / peer ErrorHandlerJitRuntime #34612).
  */
 final class JitHelperAbiBridge
 {
@@ -38,6 +40,8 @@ final class JitHelperAbiBridge
             return;
         }
 
+        // Capture before NestedJIT/bridge emit so try/finally mid-{main} ensureLinked is safe (#34621).
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context, $helperPath, $issueTag, $compiledHelpers);
         foreach ($bridges as $bridge) {
             match ($bridge['kind']) {
@@ -51,7 +55,7 @@ final class JitHelperAbiBridge
             };
         }
         self::registerLinkedRuntime($context, $abiFunctions, $issueTag);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
     }
 
     private static function implementVoidBridge(Context $context, string $abiName, string $helperLogical, string $issueTag): void

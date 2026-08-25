@@ -2303,7 +2303,9 @@ class Context {
         Builtin\StringTriggerError::ensureStandaloneBodies($this);
         // AssertFail always-on removed (#34605): JitAssert already ensureLinked before lookup
         // (peer #34578). Full standalone still ensureStandaloneBodies below.
-        Builtin\JitReturnPending::ensureStandaloneBodies($this);
+        // JitReturnPending always-on removed (#34621): TryCatchHelper / emitPendingReturnResume
+        // already ensureLinked before lookup (peer #34612). JitHelperAbiBridge restores insert
+        // mid-{main}. Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
         Builtin\ObOutputRuntime::ensureLinked($this);
         // StringRandomBytes / Utf8Latin1 / RewriteVars / Define / StrContains / StatPath /
         // FileGetContents / MetaTags / HashCrypto / MbNumericEntity / Readfile / Bin2hex /
