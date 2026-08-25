@@ -249,6 +249,50 @@ final class VmStringCompare
         return $context->builder->select($cmpNeZero, $prefixResult, $lenDiff);
     }
 
+    /**
+     * Zend strcasecmp / zend_binary_strcasecmp ordering on native {@see __string__} (#34702).
+     *
+     * Length-tracked (not NUL-terminated) — ASCII fold per byte, then length diff.
+     * Do not route through {@see __compiler_strcasecmp}.
+     */
+    public static function strcasecmp(Context $context, Value $leftStr, Value $rightStr): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'jit_strcasecmp_entry');
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $nullStr = $context->getTypeFromString('__string__*')->constNull();
+        $emptyStr = $context->builder->load($context->constantStringFromString(''));
+        $leftNull = $context->builder->icmp(Builder::INT_EQ, $leftStr, $nullStr);
+        $rightNull = $context->builder->icmp(Builder::INT_EQ, $rightStr, $nullStr);
+        $leftStr = $context->builder->select($leftNull, $emptyStr, $leftStr);
+        $rightStr = $context->builder->select($rightNull, $emptyStr, $rightStr);
+        $leftLen = $context->builder->load(
+            $context->builder->structGep($leftStr, $map['length'])
+        );
+        $rightLen = $context->builder->load(
+            $context->builder->structGep($rightStr, $map['length'])
+        );
+        $leftLtRight = $context->builder->icmp(Builder::INT_SLT, $leftLen, $rightLen);
+        $minLen = $context->builder->select($leftLtRight, $leftLen, $rightLen);
+        $leftChars = $context->builder->pointerCast(
+            $context->builder->structGep($leftStr, $map['value']),
+            $context->getTypeFromString('int8*')
+        );
+        $rightChars = $context->builder->pointerCast(
+            $context->builder->structGep($rightStr, $map['value']),
+            $context->getTypeFromString('int8*')
+        );
+        $prefixCmp = self::emitAsciiCiCmp($context, $leftChars, $rightChars, $minLen);
+        $cmpNeZero = $context->builder->icmp(
+            Builder::INT_NE,
+            $prefixCmp,
+            $i64->constInt(0, false)
+        );
+        $lenDiff = $context->builder->sub($leftLen, $rightLen);
+
+        return $context->builder->select($cmpNeZero, $prefixCmp, $lenDiff);
+    }
+
     public static function identical(Context $context, Value $leftStr, Value $rightStr): Value
     {
         self::ensureMemcmp($context);
@@ -660,6 +704,65 @@ final class VmStringCompare
         $phi->addIncoming($emptyResult, $emptyBb);
         $phi->addIncoming($idx, $foundBb);
         $phi->addIncoming($notFound, $missBb);
+
+        return $phi;
+    }
+
+    /**
+     * ASCII case-insensitive ordering of $len bytes at $a / $b (signed int64: <0 / 0 / >0).
+     */
+    private static function emitAsciiCiCmp(
+        Context $context,
+        Value $a,
+        Value $b,
+        Value $len
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+
+        $preHeader = $context->builder->getInsertBlock();
+        $header = BasicBlockHelper::append($context, 'jit_ci_cmp_header');
+        $body = BasicBlockHelper::append($context, 'jit_ci_cmp_body');
+        $nextBb = BasicBlockHelper::append($context, 'jit_ci_cmp_next');
+        $diffBb = BasicBlockHelper::append($context, 'jit_ci_cmp_diff');
+        $doneBb = BasicBlockHelper::append($context, 'jit_ci_cmp_done');
+        $context->builder->branch($header);
+
+        $context->builder->positionAtEnd($header);
+        $j = $context->builder->phi($i64);
+        $j->addIncoming($zero, $preHeader);
+        $inRange = $context->builder->icmp(Builder::INT_SLT, $j, $len);
+        $context->builder->branchIf($inRange, $body, $doneBb);
+
+        $context->builder->positionAtEnd($body);
+        $ca = $context->builder->load($context->builder->gep($a, $j));
+        $cb = $context->builder->load($context->builder->gep($b, $j));
+        $la = self::emitAsciiToLowerI8($context, $ca);
+        $lb = self::emitAsciiToLowerI8($context, $cb);
+        $same = $context->builder->icmp(Builder::INT_EQ, $la, $lb);
+        $context->builder->branchIf($same, $nextBb, $diffBb);
+
+        $context->builder->positionAtEnd($nextBb);
+        $jn = $context->builder->add($j, $one);
+        $j->addIncoming($jn, $nextBb);
+        $context->builder->branch($header);
+
+        $context->builder->positionAtEnd($diffBb);
+        // Unsigned byte order after fold (zend_binary_strcasecmp).
+        $diff = $context->builder->sub(
+            $context->builder->zExt($la, $i32),
+            $context->builder->zExt($lb, $i32)
+        );
+        $diffI64 = $context->builder->sExt($diff, $i64);
+        $diffEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($zero, $header);
+        $phi->addIncoming($diffI64, $diffEnd);
 
         return $phi;
     }

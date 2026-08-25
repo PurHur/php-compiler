@@ -11,10 +11,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 /**
- * JIT/AOT link for sort()/rsort() (#12769, #24010).
+ * JIT/AOT link for sort()/rsort() (#12769, #24010, #34702).
  *
- * SORT_REGULAR / reverse use LLVM `__hashtable__sortPacked*` (walks packed
- * nextFreeElement slots). Locale/natural bridge SortJitHelper PHP.
+ * SORT_REGULAR / reverse / SORT_STRING|SORT_FLAG_CASE use LLVM
+ * `__hashtable__sortPacked*` (NestedJIT SortJitHelper is a no-op under thin AOT —
+ * #24010). Locale/natural still bridge SortJitHelper PHP.
  * Associative-key reindex for n<2 is handled on the VM execute path (#25385);
  * NestedJIT helpers cannot yet rewrite string-key hashtables under thin AOT.
  *
@@ -27,6 +28,10 @@ final class SortRuntime
     private const ABI_SORT_PACKED = '__hashtable__sortPacked';
 
     private const ABI_SORT_PACKED_REVERSE = '__hashtable__sortPackedReverse';
+
+    private const ABI_SORT_PACKED_STRING_CASE = '__hashtable__sortPackedStringCase';
+
+    private const ABI_SORT_PACKED_REVERSE_STRING_CASE = '__hashtable__sortPackedReverseStringCase';
 
     private const ABI_SORT_PACKED_LOCALE = '__sort__packed_locale';
 
@@ -69,9 +74,21 @@ final class SortRuntime
         self::invokeHelperPackedSort($context, $array, self::ABI_SORT_PACKED_NATURAL_CASE);
     }
 
+    /** SORT_STRING|SORT_FLAG_CASE — LLVM (NestedJIT SortJitHelper no-op under thin AOT) (#34702). */
+    public static function sortPackedStringCase(Context $context, JITVariable $array): void
+    {
+        self::invokeLlvmPackedSort($context, $array, self::ABI_SORT_PACKED_STRING_CASE);
+    }
+
     public static function sortPackedReverse(Context $context, JITVariable $array): void
     {
         self::invokeLlvmPackedSort($context, $array, self::ABI_SORT_PACKED_REVERSE);
+    }
+
+    /** rsort() SORT_STRING|SORT_FLAG_CASE (#34702). */
+    public static function sortPackedReverseStringCase(Context $context, JITVariable $array): void
+    {
+        self::invokeLlvmPackedSort($context, $array, self::ABI_SORT_PACKED_REVERSE_STRING_CASE);
     }
 
     private static function invokeLlvmPackedSort(Context $context, JITVariable $array, string $abi): void
@@ -91,7 +108,7 @@ final class SortRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        // Regular/reverse paths use Type\HashTable builtins registered at context init.
+        // Regular/reverse/string-case paths use Type\HashTable builtins registered at context init.
     }
 
     public static function ensureLocaleNaturalLinked(Context $context): void

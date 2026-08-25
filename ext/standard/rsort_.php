@@ -156,6 +156,12 @@ final class rsort_ extends Internal
         if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
             throw new \LogicException('rsort() flags are not supported in JIT/AOT in this compiler build');
         }
+        // SORT_STRING|SORT_FLAG_CASE — NestedJIT helper (LLVM reverse path is case-sensitive) (#34702).
+        if (StdlibConstants::SORT_STRING === $sortType && 0 !== $caseFlag) {
+            SortRuntime::sortPackedReverseStringCase($context, $array);
+
+            return;
+        }
         if (
             StdlibConstants::SORT_REGULAR === $sortType
             || StdlibConstants::SORT_STRING === $sortType

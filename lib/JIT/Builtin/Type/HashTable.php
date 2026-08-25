@@ -134,6 +134,9 @@ class HashTable extends Type
         // Packed-list sort()/rsort() — NestedJIT SortJitHelper stubs were no-ops (#24010).
         $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortPackedReverse', 'void', ['__hashtable__*']);
+        // SORT_STRING|SORT_FLAG_CASE — length-aware ASCII strcasecmp (#34702).
+        $this->registerFn('__hashtable__sortPackedStringCase', 'void', ['__hashtable__*']);
+        $this->registerFn('__hashtable__sortPackedReverseStringCase', 'void', ['__hashtable__*']);
         // Packed natsort()/natcasesort() — NestedJIT NaturalSortJitHelper aborts under thin AOT (#26975).
         $this->registerFn('__hashtable__sortPackedNatural', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortPackedNaturalCase', 'void', ['__hashtable__*']);
@@ -208,8 +211,10 @@ class HashTable extends Type
         $this->implementSortStringKeyValuesNatural();
         $this->implementSortStringKeyValuesNaturalCase();
         $this->implementSortStringKeyValuesReverse();
-        $this->implementSortPacked(false);
-        $this->implementSortPacked(true);
+        $this->implementSortPacked(false, false);
+        $this->implementSortPacked(true, false);
+        $this->implementSortPacked(false, true);
+        $this->implementSortPacked(true, true);
         $this->implementSortPackedNatural(false);
         $this->implementSortPackedNatural(true);
         $this->implementMultisortPacked();
@@ -3239,15 +3244,23 @@ class HashTable extends Type
 
 
     /**
-     * Bubble-sort packed list values in place (sort / rsort SORT_REGULAR) (#24010).
+     * Bubble-sort packed list values in place (sort / rsort SORT_REGULAR / STRING|CASE) (#24010, #34702).
      *
      * NestedJIT {@see \PHPCompiler\ext\standard\SortJitHelper} currently lowers to a no-op
      * stub; this LLVM path matches the asort string-key bubble sort but walks `values[]`.
+     * `$caseInsensitive` → SORT_STRING|SORT_FLAG_CASE via {@see JitStringCompare::strcasecmp}.
      */
-    private function implementSortPacked(bool $reverse): void
+    private function implementSortPacked(bool $reverse, bool $caseInsensitive = false): void
     {
-        $abi = $reverse ? '__hashtable__sortPackedReverse' : '__hashtable__sortPacked';
-        $tag = $reverse ? 'rsort' : 'sort';
+        if ($caseInsensitive) {
+            $abi = $reverse
+                ? '__hashtable__sortPackedReverseStringCase'
+                : '__hashtable__sortPackedStringCase';
+            $tag = $reverse ? 'rsort_strcase' : 'sort_strcase';
+        } else {
+            $abi = $reverse ? '__hashtable__sortPackedReverse' : '__hashtable__sortPacked';
+            $tag = $reverse ? 'rsort' : 'sort';
+        }
         $fn = $this->context->lookupFunction($abi);
         $main = $fn->appendBasicBlock('main');
         $this->context->builder->positionAtEnd($main);
@@ -3256,7 +3269,6 @@ class HashTable extends Type
         $valueMap = $this->context->structFieldMap['__value__'];
         $sizeT = $this->context->getTypeFromString('size_t');
         $i1 = $this->context->getTypeFromString('int1');
-        $i32 = $this->context->getTypeFromString('int32');
         $i8 = $this->context->getTypeFromString('int8');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
@@ -3314,7 +3326,9 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($cmpStr);
         $strCur = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valCur);
         $strNext = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valNext);
-        $cmp = JitStringCompare::strcmp($this->context, $strCur, $strNext);
+        $cmp = $caseInsensitive
+            ? JitStringCompare::strcasecmp($this->context, $strCur, $strNext)
+            : JitStringCompare::strcmp($this->context, $strCur, $strNext);
         $i64 = $this->context->getTypeFromString('int64');
         $strOutOfOrder = $reverse
             ? $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i64->constInt(0, false))
