@@ -21,9 +21,17 @@ use PHPLLVM\Value;
  */
 final class ValueSortKeyedLlvm
 {
-    public static function sortValuesPreserveKeys(Context $context, Value $ht, bool $reverse): void
-    {
-        $prefix = $reverse ? 'arsort_keyed_llvm' : 'asort_keyed_llvm';
+    /**
+     * @param bool $caseInsensitive SORT_STRING|SORT_FLAG_CASE / SORT_REGULAR|SORT_FLAG_CASE (#34707)
+     */
+    public static function sortValuesPreserveKeys(
+        Context $context,
+        Value $ht,
+        bool $reverse,
+        bool $caseInsensitive = false
+    ): void {
+        $prefix = ($reverse ? 'arsort_keyed_llvm' : 'asort_keyed_llvm')
+            .($caseInsensitive ? '_case' : '');
         BasicBlockHelper::ensureOpenInsertBlock($context, $prefix.'_cont');
 
         $map = $context->structFieldMap['__hashtable__'];
@@ -94,7 +102,7 @@ final class ValueSortKeyedLlvm
         $j = $context->builder->addNoSignedWrap($i, $one);
         $leftBox = self::pairCompareOperand($context, $pairs, $i, $valueIndex);
         $rightBox = self::pairCompareOperand($context, $pairs, $j, $valueIndex);
-        $cmpLong = self::compareValueBoxes($context, $leftBox, $rightBox);
+        $cmpLong = self::compareValueBoxes($context, $leftBox, $rightBox, $caseInsensitive);
         $needsSwap = $reverse
             ? $context->builder->icmp(Builder::INT_SLT, $cmpLong, $i64->constInt(0, false))
             : $context->builder->icmp(Builder::INT_SGT, $cmpLong, $i64->constInt(0, false));
@@ -206,8 +214,12 @@ final class ValueSortKeyedLlvm
     }
 
     /** @return Value int64 */
-    private static function compareValueBoxes(Context $context, Variable $left, Variable $right): Value
-    {
+    private static function compareValueBoxes(
+        Context $context,
+        Variable $left,
+        Variable $right,
+        bool $caseInsensitive = false
+    ): Value {
         $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
         $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
         $valueMap = $context->structFieldMap['__value__'];
@@ -218,9 +230,10 @@ final class ValueSortKeyedLlvm
             $i8->constInt(0x7f, false)
         );
         $fn = $context->builder->getInsertBlock()->getParent();
-        $strBb = $fn->appendBasicBlock('vsort_cmp_str');
-        $longBb = $fn->appendBasicBlock('vsort_cmp_long');
-        $join = $fn->appendBasicBlock('vsort_cmp_join');
+        $tag = $caseInsensitive ? 'vsort_case' : 'vsort';
+        $strBb = $fn->appendBasicBlock($tag.'_cmp_str');
+        $longBb = $fn->appendBasicBlock($tag.'_cmp_long');
+        $join = $fn->appendBasicBlock($tag.'_cmp_join');
         $resultSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $zero = $i64->constInt(0, false);
 
@@ -234,7 +247,11 @@ final class ValueSortKeyedLlvm
         $context->builder->positionAtEnd($strBb);
         $lStr = $context->builder->call($context->lookupFunction('__value__readString'), $leftPtr);
         $rStr = $context->builder->call($context->lookupFunction('__value__readString'), $rightPtr);
-        $context->builder->store(JitStringCompare::strcmp($context, $lStr, $rStr), $resultSlot);
+        // Length-aware ASCII strcasecmp — peer sort()/rsort() #34702 (#34707).
+        $strCmp = $caseInsensitive
+            ? JitStringCompare::strcasecmp($context, $lStr, $rStr)
+            : JitStringCompare::strcmp($context, $lStr, $rStr);
+        $context->builder->store($strCmp, $resultSlot);
         $context->builder->branch($join);
 
         $context->builder->positionAtEnd($longBb);

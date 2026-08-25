@@ -14,7 +14,7 @@ use PHPCompiler\ext\standard\JitArrayIsList;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for ksort()/krsort() (#12770, #18381, #27227).
+ * JIT/AOT link for ksort()/krsort() (#12770, #18381, #27227, #34707).
  *
  * NestedJIT {@see \PHPCompiler\ext\standard\KeySortJitHelper} aborts under thin
  * standalone AOT (VmArray / HashTable method stubs — peer NaturalSort #26975).
@@ -29,13 +29,23 @@ final class KeySortRuntime
 {
     private const ABI_KSORT = '__hashtable__sortStringKeys';
 
+    private const ABI_KSORT_CASE = '__hashtable__sortStringKeysCase';
+
     private const ABI_KSORT_LOCALE = '__hashtable__sortStringKeysLocale';
 
     private const ABI_KRSORT = '__hashtable__sortStringKeysReverse';
 
+    private const ABI_KRSORT_CASE = '__hashtable__sortStringKeysReverseCase';
+
     public static function ksortByKey(Context $context, JITVariable $array): void
     {
         self::invokeKeySortSkipList($context, $array, self::ABI_KSORT);
+    }
+
+    /** SORT_STRING|SORT_FLAG_CASE / SORT_REGULAR|SORT_FLAG_CASE (#34707). */
+    public static function ksortByKeyCase(Context $context, JITVariable $array): void
+    {
+        self::invokeKeySortSkipList($context, $array, self::ABI_KSORT_CASE);
     }
 
     public static function ksortByKeyLocale(Context $context, JITVariable $array): void
@@ -45,16 +55,28 @@ final class KeySortRuntime
 
     public static function krsortByKey(Context $context, JITVariable $array): void
     {
+        self::krsortByKeyWithAbi($context, $array, self::ABI_KRSORT);
+    }
+
+    /** krsort() SORT_*|SORT_FLAG_CASE (#34707). */
+    public static function krsortByKeyCase(Context $context, JITVariable $array): void
+    {
+        self::krsortByKeyWithAbi($context, $array, self::ABI_KRSORT_CASE);
+    }
+
+    private static function krsortByKeyWithAbi(Context $context, JITVariable $array, string $abi): void
+    {
         self::ensureLinked($context);
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             throw new \LogicException(
                 'krsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
             );
         }
+        $tag = self::ABI_KRSORT_CASE === $abi ? 'krsort_case' : 'krsort';
         $isList = JitArrayIsList::invoke($context, $array);
-        $done = BasicBlockHelper::append($context, 'krsort_done');
-        $sortList = BasicBlockHelper::append($context, 'krsort_sort_list');
-        $sort = BasicBlockHelper::append($context, 'krsort_sort');
+        $done = BasicBlockHelper::append($context, $tag.'_done');
+        $sortList = BasicBlockHelper::append($context, $tag.'_sort_list');
+        $sort = BasicBlockHelper::append($context, $tag.'_sort');
         $context->builder->branchIf($isList, $sortList, $sort);
 
         $context->builder->positionAtEnd($sortList);
@@ -63,7 +85,7 @@ final class KeySortRuntime
 
         $context->builder->positionAtEnd($sort);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction(self::ABI_KRSORT), $ht);
+        $context->builder->call($context->lookupFunction($abi), $ht);
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
         }
@@ -80,9 +102,12 @@ final class KeySortRuntime
                 'ksort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
             );
         }
+        $tag = self::ABI_KSORT_CASE === $abi ? 'ksort_case' : (
+            self::ABI_KSORT_LOCALE === $abi ? 'ksort_locale' : 'ksort'
+        );
         $isList = JitArrayIsList::invoke($context, $array);
-        $done = BasicBlockHelper::append($context, 'ksort_done');
-        $sort = BasicBlockHelper::append($context, 'ksort_sort');
+        $done = BasicBlockHelper::append($context, $tag.'_done');
+        $sort = BasicBlockHelper::append($context, $tag.'_sort');
         $context->builder->branchIf($isList, $done, $sort);
 
         $context->builder->positionAtEnd($sort);
@@ -155,8 +180,10 @@ final class KeySortRuntime
     public static function ensureLinked(Context $context): void
     {
         self::assertAbi($context, self::ABI_KSORT);
+        self::assertAbi($context, self::ABI_KSORT_CASE);
         self::assertAbi($context, self::ABI_KSORT_LOCALE);
         self::assertAbi($context, self::ABI_KRSORT);
+        self::assertAbi($context, self::ABI_KRSORT_CASE);
     }
 
     private static function assertAbi(Context $context, string $name): void

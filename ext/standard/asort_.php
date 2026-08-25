@@ -89,7 +89,15 @@ final class asort_ extends Internal
             || StdlibConstants::SORT_NUMERIC === $sortType
             || StdlibConstants::SORT_STRING === $sortType
         ) {
-            ValueSortRuntime::asortByValue($context, $array);
+            // SORT_FLAG_CASE: length-aware strcasecmp (#34707); NUMERIC ignores the case bit.
+            if (
+                0 !== ($flags & StdlibConstants::SORT_FLAG_CASE)
+                && StdlibConstants::SORT_NUMERIC !== $sortType
+            ) {
+                ValueSortRuntime::asortByValueCase($context, $array);
+            } else {
+                ValueSortRuntime::asortByValue($context, $array);
+            }
 
             return;
         }
