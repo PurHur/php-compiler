@@ -2192,6 +2192,35 @@ final class HashTableWriteLlvm
     }
 
     /**
+     * Grow / materialise a packed index so listEntryPointer is a live HT slot (#34689).
+     *
+     * ASSIGN_REF `$a[0] =& $x` on an empty array must call `__hashtable__setNullAt` before
+     * syncing the shared box — otherwise used stays 0 and the write is invisible.
+     *
+     * @see php-src Zend/zend_execute.c zend_fetch_dimension_address (W)
+     */
+    public static function ensureIndexSlotExists(Context $context, Value $ht, Value $index): void
+    {
+        $tag = 'idxens'.(string) self::nextSeq();
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
+        $miss = BasicBlockHelper::append($context, 'ht_idx_ens_miss_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_idx_ens_done_'.$tag);
+        $context->builder->branchIf($isSet, $done, $miss);
+        $context->builder->positionAtEnd($miss);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setNullAt'),
+            $ht,
+            $index
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
      * Copy the packed slot into a FETCH_DIM_W lvalue box so ++/-- sees the current long (#32305).
      *
      * @see php-src Zend/zend_vm_def.h ZEND_FETCH_DIM_W / ZEND_POST_INC
@@ -2203,23 +2232,7 @@ final class HashTableWriteLlvm
         }
         $ht = $lvalue->writableHt;
         $index = $lvalue->writableIndex;
-        $tag = 'idxhyd'.(string) self::nextSeq();
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $ht,
-            $index
-        );
-        $miss = BasicBlockHelper::append($context, 'ht_idx_hyd_miss_'.$tag);
-        $fill = BasicBlockHelper::append($context, 'ht_idx_hyd_fill_'.$tag);
-        $context->builder->branchIf($isSet, $fill, $miss);
-        $context->builder->positionAtEnd($miss);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setNullAt'),
-            $ht,
-            $index
-        );
-        $context->builder->branch($fill);
-        $context->builder->positionAtEnd($fill);
+        self::ensureIndexSlotExists($context, $ht, $index);
         $entry = HashTableReadLlvm::listEntryPointer($context, $ht, $index);
         JitValueBox::copyFromPointer($context, $lvalue->value, $entry);
     }

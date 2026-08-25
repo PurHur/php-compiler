@@ -18710,12 +18710,23 @@ class JIT {
     }
 
     /**
-     * `$a[] =& $x`: copy the shared box into the HT entry and register it for write-through (#34685).
+     * `$a[] =& $x` / `$a[0] =& $x`: copy the shared box into the HT entry and register
+     * it for write-through (#34685, #34689).
+     *
+     * Packed `$a[i] =& $x` on a missing index must materialise the slot first — otherwise
+     * listEntryPointer GEPs an unallocated values[] row and `used` stays 0 (#34689).
      *
      * @see php-src Zend/zend_execute.c zend_assign_to_variable_reference
      */
     private function syncAssignRefDimEntryFromShared(Variable $destVar, Variable $shared): bool
     {
+        if (null !== $destVar->writableHt && null !== $destVar->writableIndex) {
+            JIT\HashTableWriteLlvm::ensureIndexSlotExists(
+                $this->context,
+                $destVar->writableHt,
+                $destVar->writableIndex
+            );
+        }
         $entryPtr = $this->assignRefDestEntryPointer($destVar);
         if (null === $entryPtr) {
             return false;
