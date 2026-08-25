@@ -143,7 +143,12 @@ final class unserialize extends Internal
             );
         }
         if (JITVariable::TYPE_STRING !== $arg->type) {
-            return null;
+            // Assign of serialize() often yields a VALUE box that still carries the
+            // folded Zend wire on compileTimeString (#34594 / peer #34576).
+            if (null === ($arg->compileTimeString ?? null)
+                || JITVariable::TYPE_OBJECT === $arg->type) {
+                return null;
+            }
         }
         $literal = JitStringArg::compileTimeLiteral($arg);
         if (null === $literal) {
