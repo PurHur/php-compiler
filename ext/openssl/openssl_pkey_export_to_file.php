@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkey_export_to_file() — write private key PEM to path (php-src ext/openssl/openssl.c; #20287 VM, JIT/AOT #32705).
+ * openssl_pkey_export_to_file() — write private key PEM to path (php-src ext/openssl/openssl.c; #20287 VM, JIT/AOT #32705 bake, #34755 runtime key).
  *
  * Reflection / named-arg params match Zend stub `key,output_filename,passphrase,options`
  * (not InternalArgInfo `outfilename`/`config_args`; #24492).
