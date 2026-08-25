@@ -1375,6 +1375,22 @@ final class SplFileObjectJitHelper
         $context->builder->branch($loopBb);
 
         $context->builder->positionAtEnd($loopBb);
+        // Peer plain emitPlainReadLineToValueBox — sticky EOF before fgets (#34776 / #33453).
+        $atEof = self::loadLongProp($context, $obj, self::PROP_AT_EOF);
+        $alreadyEof = $context->builder->icmp(Builder::INT_NE, $atEof, $i64->constInt(0, false));
+        $stickyEofBb = $fn->appendBasicBlock('splfo_csv_rd_sticky_eof');
+        $tryReadBb = $fn->appendBasicBlock('splfo_csv_rd_try');
+        $context->builder->branchIf($alreadyEof, $stickyEofBb, $tryReadBb);
+
+        $context->builder->positionAtEnd($stickyEofBb);
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $i1Sticky = $context->getTypeFromString('int1');
+        $falseSticky = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $falseSticky, $i1Sticky->constInt(0, false));
+        $context->builder->store($falseSticky, $slotAlloca);
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($tryReadBb);
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_fgets'),
             $handle,
@@ -1383,9 +1399,26 @@ final class SplFileObjectJitHelper
         $isNull = $context->builder->icmp(Builder::INT_EQ, $raw, $strPtr->constNull());
         $context->builder->branchIf($isNull, $eofBb, $okBb);
 
-        // feof sticky after failed get_line while !eof → empty CSV row [null] (VM #24331 / Zend).
+        // fgets null: without SKIP_EMPTY → empty CSV row [null] (#24331); with SKIP_EMPTY →
+        // sticky EOF + false (php-src skips empty CSV null-field then valid/current fail) (#34776).
         $context->builder->positionAtEnd($eofBb);
         self::storeLongProp($context, $obj, self::PROP_AT_EOF, $i64->constInt(1, false));
+        $flagsEof = self::loadLongProp($context, $obj, self::PROP_FLAGS);
+        $skipEofMasked = $context->builder->and($flagsEof, $i64->constInt(self::FLAG_SKIP_EMPTY, false));
+        $wantSkipEof = $context->builder->icmp(Builder::INT_NE, $skipEofMasked, $i64->constInt(0, false));
+        $eofSkipBb = $fn->appendBasicBlock('splfo_csv_rd_eof_skip');
+        $eofRowBb = $fn->appendBasicBlock('splfo_csv_rd_eof_row');
+        $context->builder->branchIf($wantSkipEof, $eofSkipBb, $eofRowBb);
+
+        $context->builder->positionAtEnd($eofSkipBb);
+        self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(0, false));
+        $i1Eof = $context->getTypeFromString('int1');
+        $falseEof = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $falseEof, $i1Eof->constInt(0, false));
+        $context->builder->store($falseEof, $slotAlloca);
+        $context->builder->branch($joinBb);
+
+        $context->builder->positionAtEnd($eofRowBb);
         self::storeLongProp($context, $obj, self::PROP_HAS, $i64->constInt(1, false));
         $empty = $context->builder->load($context->constantStringFromString(''));
         $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
