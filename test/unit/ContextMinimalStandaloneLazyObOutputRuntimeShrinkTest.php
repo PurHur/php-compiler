@@ -75,6 +75,22 @@ final class ContextMinimalStandaloneLazyObOutputRuntimeShrinkTest extends TestCa
         }
     }
 
+    public function testJitEchoOpcodeEnsuresBeforeBareObLookup(): void
+    {
+        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+        // Concat/string echo uses bare __phpc_ob_echo_substr in the ECHO opcode switch (#34695).
+        $this->assertMatchesRegularExpression(
+            '/case Variable::TYPE_STRING:\s*\/\/ Lazy ob_\* — bare __phpc_ob_echo_\* lookups below \(#34695\)\.\s*JIT\\\\Builtin\\\\ObOutputRuntime::ensureLinked/s',
+            $jit,
+            'JIT ECHO TYPE_STRING must ensureLinked before bare __phpc_ob_echo_* (#34695)'
+        );
+        $this->assertMatchesRegularExpression(
+            '/case Variable::TYPE_NATIVE_BOOL:\s*JIT\\\\Builtin\\\\ObOutputRuntime::ensureLinked/s',
+            $jit,
+            'JIT ECHO TYPE_NATIVE_BOOL must ensureLinked before bare __phpc_ob_echo_cstr (#34695)'
+        );
+    }
+
     public function testNoNewRuntimeCForMinimalObOutputLazy(): void
     {
         $runtimeDir = dirname(__DIR__, 2).'/lib/AOT/runtime';
