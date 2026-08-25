@@ -75,7 +75,9 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
         $this->assertSame(0, PasswordJitHelper::verifyArgv('wrong', $hash));
 
         $info = PasswordJitHelper::getInfoHashtable($hash);
-        $this->assertSame('bcrypt', $info->find('algoName')->resolveIndirect()->toString());
+        $this->assertIsArray($info);
+        $this->assertSame('bcrypt', $info['algoName']);
+        $this->assertSame('2y', $info['algo']);
 
         $this->assertSame(VmPasswordNative::passwordAlgos(), PasswordJitHelper::algosArgv());
 
