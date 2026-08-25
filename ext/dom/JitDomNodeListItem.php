@@ -86,16 +86,31 @@ final class JitDomNodeListItem
         if (null === $index || $index < 0) {
             return;
         }
-        self::$lastFetchedChildIndex = $index;
-        JitDomNodeChildProperty::$lastFetchedChildIndex = $index;
 
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (
             null === $xml
             || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
         ) {
+            self::$lastFetchedChildIndex = $index;
+            JitDomNodeChildProperty::$lastFetchedChildIndex = $index;
+
             return;
         }
+
+        // getElementsByTagName NodeList: item($N) is the Nth tag match in document
+        // order, not parent->childNodes[$N]. Using $N as a direct-child index made
+        // replaceChild InnerXml replace the wrong sibling (#34780).
+        $tagQuery = JitDomGetElementsByTagNameUserScript::lastTagQuery()
+            ?? JitDomGetElementsByTagNameUserScript::liveItemTagQuery();
+        if (null !== $tagQuery) {
+            self::rememberTagListItemChildIndex($xml, $tagQuery, $index);
+
+            return;
+        }
+
+        self::$lastFetchedChildIndex = $index;
+        JitDomNodeChildProperty::$lastFetchedChildIndex = $index;
         $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
         if (!isset($nodes[$index]) || 'element' !== ($nodes[$index]['kind'] ?? null)) {
             return;
@@ -106,6 +121,71 @@ final class JitDomNodeListItem
         }
         self::$lastFetchedTagName = $tag;
         JitDomNodeChildProperty::$lastFetchedTagName = $tag;
+    }
+
+    /**
+     * Map getElementsByTagName()->item($N) to a direct-child index for InnerXml (#34780).
+     */
+    private static function rememberTagListItemChildIndex(string $xml, string $tagQuery, int $index): void
+    {
+        $fromElement = JitDomGetElementsByTagNameUserScript::lastTagQueryFromElement();
+        $want = strtolower($tagQuery);
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+
+        // Document::getElementsByTagName('*'): item(0) is the documentElement.
+        if (!$fromElement && ('*' === $want || '' === $want) && 0 === $index) {
+            self::$lastFetchedChildIndex = null;
+            JitDomNodeChildProperty::$lastFetchedChildIndex = null;
+            $rootTag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
+            self::$lastFetchedTagName = $rootTag;
+            JitDomNodeChildProperty::$lastFetchedTagName = $rootTag;
+
+            return;
+        }
+
+        $effectiveIndex = $index;
+        // Document '*': item(1..) are documentElement's descendants in order.
+        if (!$fromElement && ('*' === $want || '' === $want) && $index > 0) {
+            $effectiveIndex = $index - 1;
+        }
+
+        $matchPos = 0;
+        $resolved = null;
+        $resolvedTag = null;
+        foreach ($nodes as $i => $node) {
+            if ('element' !== ($node['kind'] ?? null)) {
+                continue;
+            }
+            $t = strtolower((string) ($node['data'] ?? ''));
+            if ('*' === $want || '' === $want || $t === $want) {
+                if ($matchPos === $effectiveIndex) {
+                    $resolved = $i;
+                    $resolvedTag = (string) $node['data'];
+                    break;
+                }
+                ++$matchPos;
+            }
+        }
+
+        if (null !== $resolved) {
+            self::$lastFetchedChildIndex = $resolved;
+            JitDomNodeChildProperty::$lastFetchedChildIndex = $resolved;
+            self::$lastFetchedTagName = $resolvedTag;
+            JitDomNodeChildProperty::$lastFetchedTagName = $resolvedTag;
+
+            return;
+        }
+
+        // Nested match (not a direct child) — do not poison child index with item($N).
+        self::$lastFetchedChildIndex = null;
+        JitDomNodeChildProperty::$lastFetchedChildIndex = null;
+        if ('*' === $want || '' === $want) {
+            self::$lastFetchedTagName = null;
+            JitDomNodeChildProperty::$lastFetchedTagName = null;
+        } else {
+            self::$lastFetchedTagName = $tagQuery;
+            JitDomNodeChildProperty::$lastFetchedTagName = $tagQuery;
+        }
     }
 
     private static function invokeOwnerAware(

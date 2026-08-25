@@ -53,8 +53,15 @@ final class JitDomNodeListItemUserScript
             ? JitDomGetElementsByTagNameUserScript::liveItemTagQuery()
             : null;
         $tagQuery = $activeTagQuery ?? $recoveredTagQuery;
+        $fromElement = JitDomGetElementsByTagNameUserScript::lastTagQueryFromElement();
         $markup = JitDomLoadXMLUserScript::lastCompileTimeXml()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+        // Element::getElementsByTagName is descendants-only — compile-time nth must
+        // skip the document element (#34780 / php-src element.c).
+        $itemMarkup = $markup;
+        if ($fromElement && null !== $markup) {
+            $itemMarkup = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($markup);
+        }
 
         // Dynamic index: live walk when pinned root exists (#33659); else compile-time ladder (#33063).
         if (null === $index) {
@@ -71,11 +78,17 @@ final class JitDomNodeListItemUserScript
                 }
                 if (null !== $indexVal) {
                     $pinned = DomUserScriptPinnedRootLlvm::load($context);
-                    $live = JitDomLiveElementsByTagWalk::itemAt($context, $pinned, $tagQuery, $indexVal);
-                    if (null !== $markup) {
+                    $live = JitDomLiveElementsByTagWalk::itemAt(
+                        $context,
+                        $pinned,
+                        $tagQuery,
+                        $indexVal,
+                        $fromElement
+                    );
+                    if (null !== $itemMarkup) {
                         $compileTime = self::materializeDynamicIndexQueryMatch(
                             $context,
-                            $markup,
+                            $itemMarkup,
                             $tagQuery,
                             $arg
                         );
@@ -103,8 +116,8 @@ final class JitDomNodeListItemUserScript
             if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
                 return self::materializeDynamicIndexQueryMatch($context, $xml, $queryTag, $arg);
             }
-            if (null !== $tagQuery && null !== $markup) {
-                $tagResult = self::materializeDynamicIndexQueryMatch($context, $markup, $tagQuery, $arg);
+            if (null !== $tagQuery && null !== $itemMarkup) {
+                $tagResult = self::materializeDynamicIndexQueryMatch($context, $itemMarkup, $tagQuery, $arg);
 
                 return null !== $recoveredTagQuery
                     ? self::selectTagWalkUnlessChildNodesOwner(
@@ -144,17 +157,18 @@ final class JitDomNodeListItemUserScript
             }
         }
 
-        // getElementsByTagName live list — prefer pinned-root walk (#33659 / #26752 / #33063).
-        if (null !== $tagQuery && null !== $markup) {
+        // getElementsByTagName live list — prefer pinned-root walk (#33659 / #26752 / #33063 / #34780).
+        if (null !== $tagQuery && null !== $itemMarkup) {
             $pinned = DomUserScriptPinnedRootLlvm::load($context);
             $i64 = $context->getTypeFromString('int64');
             $live = JitDomLiveElementsByTagWalk::itemAt(
                 $context,
                 $pinned,
                 $tagQuery,
-                $i64->constInt($index, false)
+                $i64->constInt($index, false),
+                $fromElement
             );
-            $compileTime = self::materializeNthQueryMatch($context, $markup, $tagQuery, $index);
+            $compileTime = self::materializeNthQueryMatch($context, $itemMarkup, $tagQuery, $index);
             $objPtrTy = $context->getTypeFromString('__object__*');
             $pinNull = $context->builder->icmp(
                 Builder::INT_EQ,

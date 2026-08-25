@@ -31,6 +31,12 @@ final class JitDomGetElementsByTagNameUserScript
      */
     private static ?string $liveItemTagQuery = null;
 
+    /**
+     * Last tag query was DOMElement::getElementsByTagName — descendants only,
+     * exclude the context element (#34780 / php-src element.c).
+     */
+    private static bool $lastTagQueryFromElement = false;
+
     public static function lastTagQuery(): ?string
     {
         return self::$lastTagQuery;
@@ -45,11 +51,18 @@ final class JitDomGetElementsByTagNameUserScript
         return self::$liveItemTagQuery;
     }
 
+    /** True when the active tag list is Element::getElementsByTagName (#34780). */
+    public static function lastTagQueryFromElement(): bool
+    {
+        return self::$lastTagQueryFromElement;
+    }
+
     /** Clear tag query so childNodes/attributes foreach does not reuse a stale tag (#33082/#33099). */
     public static function clearTagQueryState(): void
     {
         self::$lastTagQuery = null;
-        // Keep $liveItemTagQuery — held getElementsByTagName lists must still item() (#34646).
+        // Keep $liveItemTagQuery / $lastTagQueryFromElement — held Element/Document
+        // getElementsByTagName lists must still item() (#34646 / #34780).
         self::$lastNsUri = null;
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
@@ -82,6 +95,7 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastNsFromElement = false;
         self::$lastTagQuery = null;
         self::$liveItemTagQuery = null;
+        self::$lastTagQueryFromElement = false;
         JitDomNodeListForeachSnapshot::clearChildNodesFetch();
         JitDomNodeListForeachSnapshot::clearAttributesFetch();
         if (\count($args) < 2) {
@@ -176,6 +190,13 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastNsUri = null;
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
+        // Peer Document tryInvoke: seed tag so NodeList::item() does not fall through
+        // to pinned-root firstChild (#34780).
+        self::$lastTagQuery = null;
+        self::$liveItemTagQuery = null;
+        self::$lastTagQueryFromElement = false;
+        JitDomNodeListForeachSnapshot::clearChildNodesFetch();
+        JitDomNodeListForeachSnapshot::clearAttributesFetch();
         if (\count($args) < 2) {
             return null;
         }
@@ -196,6 +217,9 @@ final class JitDomGetElementsByTagNameUserScript
         }
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $count = DomParseSimpleXmlJitHelper::countDescendantTagArgv($inner, $tagLit);
+        self::$lastTagQuery = $tagLit;
+        self::$liveItemTagQuery = $tagLit;
+        self::$lastTagQueryFromElement = true;
         DomUserScriptLiveTagListLlvm::initCount($context, $tagLit, $count);
 
         return self::boxNodeList($context, $count);
