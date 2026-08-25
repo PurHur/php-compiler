@@ -74,6 +74,16 @@ final class HashTableWriteLlvm
 
             return $element->compileTimeLong;
         }
+        // FILTER_* / int literals as KIND_CONSTANT_INT without compileTimeLong still fold
+        // for filter_var_array definition arrays (#34574).
+        if ((Variable::TYPE_NATIVE_LONG === $element->type || Variable::TYPE_VALUE === $element->type)
+            && Variable::KIND_VALUE === $element->kind
+            && null !== $element->value) {
+            $lib = $element->context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($element->value->value)) {
+                return (int) $lib->LLVMConstIntGetZExtValue($element->value->value);
+            }
+        }
         if (null !== $element->compileTimeFloat
             && (Variable::TYPE_NATIVE_DOUBLE === $element->type || Variable::TYPE_VALUE === $element->type)) {
             return $element->compileTimeFloat;

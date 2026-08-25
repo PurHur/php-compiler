@@ -30,6 +30,14 @@ final class FilterVarArray34574AotTest extends TestCase
         );
     }
 
+    public function testRuntimeArrayFilterIdMatchesZend(): void
+    {
+        $this->assertAotExport(
+            "<?php \$d=['a'=>'1','b'=>'x']; var_export(filter_var_array(\$d, FILTER_VALIDATE_INT));",
+            "array (\n  'a' => 1,\n  'b' => false,\n)"
+        );
+    }
+
     private function assertAotExport(string $code, string $expected): void
     {
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
@@ -45,7 +53,6 @@ final class FilterVarArray34574AotTest extends TestCase
             $env = [];
         }
         $env['PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR'] = $dir.'/helper-cache';
-        $env['PHP_COMPILER_HELPER_RUNTIME_O'] = '0';
         mkdir($env['PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR']);
         $cmd = [
             PHP_BINARY,

@@ -5510,6 +5510,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ExceptionThrowRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ExecutionLimitsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FilterInputArrayRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FilterInputTypeJit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/FilterVarArrayLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FilterVarArrayRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FinfoFileRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FinfoBufferRuntime.php';
