@@ -44,7 +44,15 @@ final class JitDomNodeListItemUserScript
 
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         $queryTag = JitDomXPathQueryUserScript::lastQueryTag();
-        $tagQuery = JitDomGetElementsByTagNameUserScript::lastTagQuery();
+        $activeTagQuery = JitDomGetElementsByTagNameUserScript::lastTagQuery();
+        // After childNodes/attributes fetch, lastTagQuery is cleared (#33082) but
+        // liveItemTagQuery survives so held getElementsByTagName lists still work.
+        // Must not apply the recovered tag to childNodes lists (they have an owner) —
+        // emit a runtime owner guard (#34646).
+        $recoveredTagQuery = null === $activeTagQuery
+            ? JitDomGetElementsByTagNameUserScript::liveItemTagQuery()
+            : null;
+        $tagQuery = $activeTagQuery ?? $recoveredTagQuery;
         $markup = JitDomLoadXMLUserScript::lastCompileTimeXml()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
 
@@ -77,18 +85,35 @@ final class JitDomNodeListItemUserScript
                             $pinned,
                             $objPtrTy->constNull()
                         );
-
-                        return $context->builder->select($pinNull, $compileTime, $live);
+                        $tagResult = $context->builder->select($pinNull, $compileTime, $live);
+                    } else {
+                        $tagResult = $live;
                     }
 
-                    return $live;
+                    return null !== $recoveredTagQuery
+                        ? self::selectTagWalkUnlessChildNodesOwner(
+                            $context,
+                            $args[0],
+                            $args[1],
+                            $tagResult
+                        )
+                        : $tagResult;
                 }
             }
             if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
                 return self::materializeDynamicIndexQueryMatch($context, $xml, $queryTag, $arg);
             }
             if (null !== $tagQuery && null !== $markup) {
-                return self::materializeDynamicIndexQueryMatch($context, $markup, $tagQuery, $arg);
+                $tagResult = self::materializeDynamicIndexQueryMatch($context, $markup, $tagQuery, $arg);
+
+                return null !== $recoveredTagQuery
+                    ? self::selectTagWalkUnlessChildNodesOwner(
+                        $context,
+                        $args[0],
+                        $args[1],
+                        $tagResult
+                    )
+                    : $tagResult;
             }
 
             return null;
@@ -136,8 +161,16 @@ final class JitDomNodeListItemUserScript
                 $pinned,
                 $objPtrTy->constNull()
             );
+            $tagResult = $context->builder->select($pinNull, $compileTime, $live);
 
-            return $context->builder->select($pinNull, $compileTime, $live);
+            return null !== $recoveredTagQuery
+                ? self::selectTagWalkUnlessChildNodesOwner(
+                    $context,
+                    $args[0],
+                    $args[1],
+                    $tagResult
+                )
+                : $tagResult;
         }
         if (0 !== $index) {
             return null;
@@ -170,6 +203,63 @@ final class JitDomNodeListItemUserScript
         );
 
         return self::boxObject($context, $firstObj);
+    }
+
+    /**
+     * When recovering a tag query after childNodes fetch, childNodes lists still
+     * have {@see VmDom::PROP_CHILD_NODES_OWNER} — prefer owner-aware item() for
+     * those; tag lists have a null owner and keep the live tag walk (#34646).
+     */
+    private static function selectTagWalkUnlessChildNodesOwner(
+        Context $context,
+        JITVariable $listVar,
+        JITVariable $indexVar,
+        Value $tagWalkResult
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nli_us_owner_guard');
+        $objectType = $context->type->object;
+        $listClassId = $objectType->lookup('DOMNodeList');
+        if (!$objectType->hasProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER)) {
+            $objectType->defineProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
+        }
+        $list = JitDomNodeListItem::loadObjectArgForUserScript($context, $listVar);
+        $voidPtr = $context->getTypeFromString('void*');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $ownerSlot = $objectType->propertySlotFor($list, 'DOMNodeList', VmDom::PROP_CHILD_NODES_OWNER);
+        $ownerPtr = $context->builder->load($ownerSlot);
+        // Match JitDomNodeListLength (#28605): tag lists get an empty __value__ box
+        // (slot non-null, readObject null); only a real owner object means childNodes.
+        $slotNull = $context->builder->icmp(Builder::INT_EQ, $ownerPtr, $voidPtr->constNull());
+        $bbReadOwner = BasicBlockHelper::append($context, 'dom_nli_us_guard_read');
+        $bbTag = BasicBlockHelper::append($context, 'dom_nli_us_guard_tag');
+        $bbOwner = BasicBlockHelper::append($context, 'dom_nli_us_guard_owner');
+        $bbMerge = BasicBlockHelper::append($context, 'dom_nli_us_guard_merge');
+        $context->builder->branchIf($slotNull, $bbTag, $bbReadOwner);
+
+        $context->builder->positionAtEnd($bbReadOwner);
+        $ownerObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($ownerPtr, $valuePtrTy)
+        );
+        $hasOwner = $context->builder->icmp(Builder::INT_NE, $ownerObj, $objPtrTy->constNull());
+        $context->builder->branchIf($hasOwner, $bbOwner, $bbTag);
+
+        $context->builder->positionAtEnd($bbTag);
+        $tagPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbOwner);
+        $ownerVal = JitDomNodeListItem::invokeOwnerAwareForUserScript($context, $listVar, $indexVar);
+        $ownerPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbMerge);
+        $phi = $context->builder->phi($valuePtrTy);
+        $phi->addIncoming($tagWalkResult, $tagPred);
+        $phi->addIncoming($ownerVal, $ownerPred);
+
+        return $phi;
     }
 
     /**

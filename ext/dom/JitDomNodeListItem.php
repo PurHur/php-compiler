@@ -113,6 +113,31 @@ final class JitDomNodeListItem
         JITVariable $listVar,
         JITVariable $indexVar
     ): Value {
+        return self::invokeOwnerAwareBody($context, $listVar, $indexVar);
+    }
+
+    /** @internal Called from {@see JitDomNodeListItemUserScript} owner guard (#34646). */
+    public static function invokeOwnerAwareForUserScript(
+        Context $context,
+        JITVariable $listVar,
+        JITVariable $indexVar
+    ): Value {
+        return self::invokeOwnerAwareBody($context, $listVar, $indexVar);
+    }
+
+    /** @internal Called from {@see JitDomNodeListItemUserScript} owner guard (#34646). */
+    public static function loadObjectArgForUserScript(Context $context, JITVariable $arg): Value
+    {
+        return self::loadObjectArg($context, $arg);
+    }
+
+    private static function invokeOwnerAwareBody(
+        Context $context,
+        JITVariable $listVar,
+        JITVariable $indexVar
+    ): Value {
+        DomNodeListItemRuntime::ensureLinked($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nli_owner_aware_cont');
         $objectType = $context->type->object;
         $list = self::loadObjectArg($context, $listVar);
         $index = self::loadIntArg($context, $indexVar);
