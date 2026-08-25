@@ -30,6 +30,13 @@ final class VmJsonFlags
     /** @see JSON_FORCE_OBJECT */
     public const FORCE_OBJECT = 16;
 
+    /**
+     * Internal: force **this** HT container as a JSON object (empty `{}` / object props / ArrayObject
+     * wire) without implying user {@see FORCE_OBJECT} for nested array values (#34559 / #34522).
+     * Not a Zend json flag — never expose via {@see constants()}.
+     */
+    public const CONTAINER_AS_OBJECT = 1 << 30;
+
     /** @see JSON_NUMERIC_CHECK */
     public const NUMERIC_CHECK = 32;
 

@@ -5,25 +5,26 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: json_encode(object) must not leak JSON_FORCE_OBJECT into nested array values (#34522).
+ * AOT: caller JSON_FORCE_OBJECT must reach nested arrays (#34559); object overlay must not (#34522).
  *
  * @group llvm
  * @group aot
  */
-final class JsonEncodeObjectNestedArray34522AotTest extends TestCase
+final class JsonEncodeForceObjectNested34559AotTest extends TestCase
 {
-    public function testJsonEncodeMatchesZend(): void
+    public function testJsonEncodeForceObjectNestedMatchesZend(): void
     {
-        $this->assertAotMatchesZend(__DIR__.'/../repro/issue_34522_json_encode_object_nested_array_aot.php');
+        $this->assertAotMatchesZend(__DIR__.'/../repro/issue_34559_json_force_object_nested_aot.php');
     }
 
     public function testChildFlagsStripContainerOverlayOnly(): void
     {
         $root = dirname(__DIR__, 2);
         $llvm = (string) file_get_contents($root.'/lib/JIT/JsonEncodeArrayLlvm.php');
-        $this->assertStringContainsString('#34522', $llvm);
+        $this->assertStringContainsString('#34559', $llvm);
         $this->assertStringContainsString('CONTAINER_AS_OBJECT', $llvm);
         $this->assertStringContainsString('~VmJsonFlags::CONTAINER_AS_OBJECT', $llvm);
+        $this->assertStringNotContainsString('~VmJsonFlags::FORCE_OBJECT', $llvm);
     }
 
     private function assertAotMatchesZend(string $src): void
@@ -45,7 +46,7 @@ final class JsonEncodeObjectNestedArray34522AotTest extends TestCase
     private function runAot(string $src): string
     {
         $root = dirname(__DIR__, 2);
-        $bin = sys_get_temp_dir().'/json_34522_'.getmypid().'_'.md5($src);
+        $bin = sys_get_temp_dir().'/json_34559_'.getmypid().'_'.md5($src);
         $cmd = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src);
