@@ -23567,6 +23567,31 @@ class JIT {
                     return;
                 }
             }
+            // try{} widens $doc past TYPE_OBJECT — RuntimeIndirect(saveXML) also emits
+            // SimpleXMLElement::asXML (FALIAS) which throws at compile time (#34567 / re-#31396).
+            if (
+                ('savexml' === $methodLcEarly || 'savehtml' === $methodLcEarly)
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                $hint = strtolower(ltrim(
+                    (string) ($receiverVar->classUserType ?? $receiverVar->compileTimeString ?? ''),
+                    '\\'
+                ));
+                $isSxe = 'simplexmlelement' === $hint || str_contains($hint, 'simplexml');
+                if (!$isSxe) {
+                    $proxy = 'savehtml' === $methodLcEarly
+                        ? 'domdocument::savehtml'
+                        : 'domdocument::savexml';
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, $proxy);
+                    if ($this->context->functionIsRegistered($proxy)) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxy);
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
+                }
+            }
             // ?-> fetch blocks compile against a null-typed receiver slot; at runtime the
             // branch is only taken when the receiver is a real object (zend_compile.c).
             $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLcEarly);
