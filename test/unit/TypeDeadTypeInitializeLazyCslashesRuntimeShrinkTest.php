@@ -31,11 +31,7 @@ final class TypeDeadTypeInitializeLazyCslashesRuntimeShrinkTest extends TestCase
             $initBody,
             'Type::initialize must not eagerly StringCslashes::ensureLinked (#34534)'
         );
-        $this->assertStringContainsString(
-            'SessionStorageGlobals::ensureGlobals($this->context)',
-            $type,
-            'SessionStorageGlobals::ensureGlobals stays (#34534)'
-        );
+        // SessionStorageGlobals::ensureGlobals also lazy as of #34566 (peer).
     }
 
     public function testCallSitesEnsureLinkBeforeLookup(): void
