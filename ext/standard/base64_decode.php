@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringBase64Decode;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
@@ -14,12 +15,20 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\InternalStrictArg;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** base64_decode() — RFC 4648 decode with optional $strict (php-src ext/standard/base64.c). */
+/**
+ * base64_decode() — RFC 4648 decode with optional $strict (php-src ext/standard/base64.c).
+ *
+ * Two-arg form returns string|false. Bare `__string__*` / int1 under AOT mis-lower in
+ * `$x === false ? '' : $x` (SIGSEGV / empty) — box like {@see JitLocale} / #34802.
+ * Fold `$strict` via ConstFetch / native i1 (no JIT Variable::$compileTimeBool).
+ */
 final class base64_decode extends Internal
 {
     public function __construct()
@@ -76,9 +85,9 @@ final class base64_decode extends Internal
             }
             // Soft-null DEP+coerce outside strict; helper ABI is non-strict-only (#26890).
             JitBoolArg::lowerCoerceZParamBool($context, $args[1], 'base64_decode', 'strict', 2);
-            $ct = $args[1]->compileTimeBool ?? null;
+            $ct = self::compileTimeBool($context, $args[1]);
             if (null !== $ct) {
-                $strictConst = (bool) $ct;
+                $strictConst = $ct;
             } elseif (self::isCompileTimeNull($args[1])) {
                 $strictConst = false;
             }
@@ -98,12 +107,17 @@ final class base64_decode extends Internal
         if (JITVariable::TYPE_VALUE !== $args[0]->type) {
             $literal = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
         }
-        if (null !== $literal && (
-            1 === $argc
-            || null !== ($args[1]->compileTimeBool ?? null)
-            || self::isCompileTimeNull($args[1])
-        )) {
+        $strictKnown = 1 === $argc
+            || (2 === $argc && (
+                null !== self::compileTimeBool($context, $args[1])
+                || self::isCompileTimeNull($args[1])
+            ));
+        if (null !== $literal && $strictKnown) {
             $result = VmString::base64_decode($literal, $strictConst);
+            // 2-arg: string|false must be a `__value__*` for === false / ?: (#34802).
+            if (2 === $argc) {
+                return self::boxStringOrFalse($context, $result);
+            }
             if (false === $result) {
                 return $context->constantFromBool(false);
             }
@@ -114,11 +128,69 @@ final class base64_decode extends Internal
         }
 
         StringBase64Decode::ensureLinked($context);
-
-        return $context->builder->call(
+        $decoded = $context->builder->call(
             $context->lookupFunction('__compiler_base64_decode'),
             self::jitStringArg($context, $args[0])
         );
+        // Runtime helper is non-strict (decodeArgv); still box when argc==2 so
+        // string|false call sites do not treat `__string__*` as a value box (#34802).
+        if (2 === $argc) {
+            return self::boxStringPtrOrFalse($context, $decoded);
+        }
+
+        return $decoded;
+    }
+
+    /** @param string|false $result */
+    private static function boxStringOrFalse(Context $context, $result): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        if (false === $result) {
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return $ptr;
+        }
+        $str = $context->builder->load($context->constantStringFromString($result));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $str
+        );
+
+        return $ptr;
+    }
+
+    /**
+     * Box a non-null `__string__*` as string (2-arg call site typed string|false).
+     * Helper never returns null today; keep a null→false edge for ABI honesty.
+     */
+    private static function boxStringPtrOrFalse(Context $context, Value $strOrNull): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $strOrNull, $strPtr->constNull());
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $fail = BasicBlockHelper::append($context, 'base64_dec_box_false');
+        $ok = BasicBlockHelper::append($context, 'base64_dec_box_str');
+        $done = BasicBlockHelper::append($context, 'base64_dec_box_done');
+        $context->builder->branchIf($isNull, $fail, $ok);
+
+        $context->builder->positionAtEnd($fail);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($ok);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $strOrNull
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $ptr;
     }
 
     /** Soft-null — coerce+deprecate on forward profile (#21188, ext/standard/base64.c). */
@@ -162,11 +234,47 @@ final class base64_decode extends Internal
         return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
     }
 
+    /**
+     * Fold true/false / ConstFetch / native i1 — peer json_decode (#24137).
+     * There is no JIT Variable::$compileTimeBool; that property never existed.
+     */
+    private static function compileTimeBool(Context $context, JITVariable $var): ?bool
+    {
+        if (null !== $var->compileTimeConstantName) {
+            $name = strtolower($var->compileTimeConstantName);
+            if ('true' === $name) {
+                return true;
+            }
+            if ('false' === $name) {
+                return false;
+            }
+        }
+        if (null !== $var->compileTimeLong) {
+            return 0 !== $var->compileTimeLong;
+        }
+        if (null === $var->value) {
+            return null;
+        }
+        $lib = $context->llvm->lib;
+        if (JITVariable::TYPE_NATIVE_BOOL === $var->type
+            && null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+            return 0 !== (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+        }
+
+        return null;
+    }
+
     /** Compile-time operand that cannot satisfy Z_PARAM_BOOL under strict_types. */
     private static function isCompileTimeNonBoolStrict(JITVariable $arg): bool
     {
-        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type || null !== ($arg->compileTimeBool ?? null)) {
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
             return false;
+        }
+        if (null !== $arg->compileTimeConstantName) {
+            $name = strtolower($arg->compileTimeConstantName);
+            if ('true' === $name || 'false' === $name) {
+                return false;
+            }
         }
         if (JITVariable::TYPE_VALUE === $arg->type && !self::isCompileTimeNull($arg)) {
             return false;
