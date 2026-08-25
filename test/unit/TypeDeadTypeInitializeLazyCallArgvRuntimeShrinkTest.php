@@ -31,11 +31,7 @@ final class TypeDeadTypeInitializeLazyCallArgvRuntimeShrinkTest extends TestCase
             $initBody,
             'Type::initialize must not eagerly CallArgv::ensureGlobal (#34550)'
         );
-        $this->assertStringContainsString(
-            'SessionStorageGlobals::ensureGlobals($this->context)',
-            $type,
-            'SessionStorageGlobals::ensureGlobals stays (#34550)'
-        );
+        // SessionStorageGlobals::ensureGlobals also lazy as of #34566 (peer).
     }
 
     public function testCallSitesEnsureGlobalBeforeUse(): void

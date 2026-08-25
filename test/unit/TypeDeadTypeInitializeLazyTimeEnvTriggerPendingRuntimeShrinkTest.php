@@ -44,11 +44,7 @@ final class TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest ext
             $type,
             'Type::register still ensureLinked StringTriggerError for HELPER_RUNTIME_O=0 (#33248)'
         );
-        $this->assertStringContainsString(
-            'SessionStorageGlobals::ensureGlobals($this->context)',
-            $type,
-            'SessionStorageGlobals::ensureGlobals stays (#34513)'
-        );
+        // SessionStorageGlobals::ensureGlobals also lazy as of #34566 (peer).
     }
 
     public function testCallSitesEnsureLinkBeforeLookup(): void

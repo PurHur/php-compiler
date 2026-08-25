@@ -980,7 +980,14 @@ class Type extends Builtin {
         // remaining implement() call sites (SessionGcRuntime / ObGzhandlerJitRuntime).
         // Scripts that never touch func_get_args/func_num_args skip the module global
         // on the full load path (peer #34534). php-src Zend/zend_builtin_functions.c.
-        // SessionStorageGlobals::ensureGlobals stays.
+        // SessionStorageGlobals::ensureGlobals always-on removed (#34566): call sites
+        // JitSessionStorageKernel / JitSessionLifecycleKernel / JitSessionStatus /
+        // JitSessionCacheExpire / SessionId / SessionName / SessionModuleName /
+        // SessionGcRuntime / SessionEncodeRuntime / SessionCreateIdRuntime /
+        // emitCallEnsureDefaults already ensureGlobals before use (peer #34550).
+        // Scripts that never touch session_* skip the LLVM session module globals
+        // on the full load path. Leftover Type always-on vs Runtime ABI drift class
+        // (#31894 / #32122). php-src ext/session/session.c — PS(id)/PS(session_name).
         // __phpc_error_handler_* / __phpc_exception_handler_* always-on shells removed
         // (#33842): ErrorHandlerJitRuntime / ExceptionHandlerJitRuntime own the ABI
         // (getNamedFunction first via implement*Bridge). Do not re-add
@@ -1001,7 +1008,6 @@ class Type extends Builtin {
         // (#32989). Leftover Type NestedJIT on every full load path vs Runtime ABI
         // drift mints session_id_apply.1 (#31894 / #32122). User-script
         // session_id()/session_name()/session_module_name() stay ext/session/session.c.
-        SessionStorageGlobals::ensureGlobals($this->context);
     }
 
 }
