@@ -38,6 +38,7 @@ final class ContextMinimalStandaloneLazyHtmlErrorHandlerRuntimeShrinkTest extend
         }
 
         // Essentials for thin echo / error / argv / getenv surface stay.
+        // LastError dropped in #34631 (peer this test).
         foreach ([
             'StringHtmlspecialchars::ensureStandaloneBodies($this)',
             'ObOutputRuntime::ensureLinked($this)',
@@ -45,10 +46,14 @@ final class ContextMinimalStandaloneLazyHtmlErrorHandlerRuntimeShrinkTest extend
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
-            'LastErrorRuntime::ensureStandaloneBodies($this)',
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34612)");
         }
+        $this->assertStringNotContainsString(
+            'LastErrorRuntime::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly LastErrorRuntime (#34631)'
+        );
     }
 
     public function testCallSitesEnsureBeforeLookup(): void

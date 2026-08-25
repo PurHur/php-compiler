@@ -2319,7 +2319,11 @@ class Context {
         // ProgressNote / GcCollectCycles always-on removed (#34605): tryResolveProgressStaticCall /
         // JitGcCollectCycles / Object_ / GcStatusRuntime already ensureLinked before lookup
         // (peer #34578). Full standalone still ensureStandaloneBodies below.
-        Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
+        // LastError always-on removed (#34631): JitErrorGetLast / JitTriggerErrorKernel already
+        // ensureLinked before lookup (peer #34621). LastErrorRuntime restores builder insert
+        // mid-{main}. Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
+        // Full standalone still ensureStandaloneBodies below; StringTriggerError always-on still
+        // pulls LastError when trigger_error ABI is linked during thin init.
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
         Builtin\EnvLocalRuntime::ensureLinked($this);
         // CLI argv: NestedJIT CliArgvJitHelper during thin init (peer IncludePath #20877 / #20904)
