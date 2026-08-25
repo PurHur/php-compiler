@@ -159,9 +159,22 @@ final class DomNodeChildNodeMutationRuntime
                     );
                     $afterAnchor = $nodeVar;
                 }
-                // Overwrite single-arg InnerXml from ReplaceChild with the full
-                // replacement markup (keeps non-replaced siblings for saveXML).
-                self::trySyncReplaceWithInnerXml($context, $receiver, $parent, $extraArgs);
+                // Same-parent move: LiveSlots already rebuilt INNER_XML; compile-time
+                // chunk replace duplicates the moved sibling (#34806).
+                $skipInner = null !== ($firstNode->compileTimeDomChildIndex ?? null);
+                if (!$skipInner) {
+                    foreach ($extraArgs as $arg) {
+                        if (null !== ($arg->compileTimeDomChildIndex ?? null)) {
+                            $skipInner = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$skipInner) {
+                    // Overwrite single-arg InnerXml from ReplaceChild with the full
+                    // replacement markup (keeps non-replaced siblings for saveXML).
+                    self::trySyncReplaceWithInnerXml($context, $receiver, $parent, $extraArgs);
+                }
             }
 
             return self::nullValuePtr($context);
@@ -264,6 +277,30 @@ final class DomNodeChildNodeMutationRuntime
         $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks($parentInner);
         if ($index < 0 || $index >= \count($chunks)) {
             return false;
+        }
+        // Same-parent move: an arg is already among the parent's children. Replacing
+        // the receiver chunk with <arg/> leaves a duplicate while LiveSlots already
+        // rebuilt INNER_XML (#34806 / peer replaceChild).
+        foreach ($extraArgs as $arg) {
+            if (null !== ($arg->compileTimeDomChildIndex ?? null)
+                && $arg->compileTimeDomChildIndex !== $index
+            ) {
+                return false;
+            }
+            $argTag = $arg->compileTimeDomTagName ?? null;
+            if (null === $argTag || '' === $argTag) {
+                continue;
+            }
+            $argLc = strtolower($argTag);
+            foreach ($chunks as $i => $chunk) {
+                if ($i === $index) {
+                    continue;
+                }
+                $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($chunk);
+                if (null !== $parsed && strtolower($parsed['tag']) === $argLc) {
+                    return false;
+                }
+            }
         }
         $chunks[$index] = $markup;
         JitDomCreateElement::storeUserScriptInnerXml($context, $parent, implode('', $chunks));
