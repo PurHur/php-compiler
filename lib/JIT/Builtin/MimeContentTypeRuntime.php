@@ -23,6 +23,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Save/restore insert block on first-use link so thin AOT call sites are not left parentless
  * (peer StringReadfile / StringFileGetContents; STANDALONE Type::initialize returns before
  * ensureLinked — #12910).
+ * data:// NestedJIT pulls base64_decode from decodeDataUri (#34789 / peer #34731).
  */
 final class MimeContentTypeRuntime
 {
@@ -68,6 +69,8 @@ final class MimeContentTypeRuntime
         } catch (\Throwable) {
         }
 
+        // data:// NestedJIT pulls base64_decode from decodeDataUri (#34789 / peer #34731).
+        StringBase64Decode::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
 
         $strPtr = $context->getTypeFromString('__string__*');

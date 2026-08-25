@@ -21,6 +21,9 @@ final class MimeContentTypeRuntimeShrinkTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/MimeContentTypeJitHelper.php');
         $this->assertStringContainsString('@\\file_get_contents', $source);
         $this->assertStringContainsString('self::detectFromBytes', $source);
+        $this->assertStringContainsString('decodeDataUri', $source);
+        $this->assertStringContainsString("'data:'", $source);
+        $this->assertStringContainsString('#34789', $source);
         $this->assertStringContainsString('#33039', $source);
         $this->assertStringNotContainsString('VmMime::detectFromBytes(', $source);
         $this->assertStringNotContainsString('VmFs::fileGetContents', $source);
@@ -32,6 +35,8 @@ final class MimeContentTypeRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MimeContentTypeRuntime.php');
         $this->assertStringContainsString('#33034', $source);
+        $this->assertStringContainsString('StringBase64Decode::ensureLinked', $source);
+        $this->assertStringContainsString('#34789', $source);
         $this->assertStringContainsString('MimeContentTypeJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
@@ -60,6 +65,14 @@ final class MimeContentTypeRuntimeShrinkTest extends TestCase
 
         $this->assertSame('text/x-php', MimeContentTypeJitHelper::mimeContentType($path));
         $this->assertSame('text/plain', MimeContentTypeJitHelper::mimeContentType('/etc/hosts'));
+        $this->assertSame(
+            'text/plain',
+            MimeContentTypeJitHelper::mimeContentType('data://text/plain,hello world')
+        );
+        $this->assertSame(
+            'text/x-php',
+            MimeContentTypeJitHelper::mimeContentType('data://text/plain;base64,'.\base64_encode('<?php echo 1;'))
+        );
         $this->assertNull(MimeContentTypeJitHelper::mimeContentType('/no/such/phpc-mime-'.bin2hex(random_bytes(4))));
 
         @\unlink($path);

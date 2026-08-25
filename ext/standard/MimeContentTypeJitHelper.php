@@ -22,12 +22,41 @@ final class MimeContentTypeJitHelper
      */
     public static function mimeContentType(string $path): ?string
     {
+        // NestedJIT libc open rejects data: — peer FileGetContentsJitHelper (#34731 / #34789).
+        if (\is_string($path) && 'data:' === \substr($path, 0, 5)) {
+            $data = self::decodeDataUri($path);
+            if (null === $data) {
+                return null;
+            }
+
+            return self::detectFromBytes($data);
+        }
         $data = @\file_get_contents($path);
         if (false === $data) {
             return null;
         }
 
         return self::detectFromBytes($data);
+    }
+
+    /**
+     * NestedJIT-safe subset of {@see VmDataUri::decode} (#34731 / #34789).
+     * Same-file only — NestedJIT cannot call cross-helper decode reliably.
+     */
+    private static function decodeDataUri(string $path): ?string
+    {
+        $comma = \strrpos($path, ',');
+        if (false === $comma) {
+            return null;
+        }
+        $data = \substr($path, $comma + 1);
+        if (false !== \stripos($path, ';base64,')) {
+            $decoded = \base64_decode($data, true);
+
+            return false === $decoded ? null : $decoded;
+        }
+
+        return $data;
     }
 
     /** Mirror VmMime detectFromBytes — NestedJIT same-file only (#33034 / #33039). */
