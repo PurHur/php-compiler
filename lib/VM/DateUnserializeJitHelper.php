@@ -230,6 +230,8 @@ final class DateUnserializeJitHelper
         Value $payloadString
     ): void {
         \PHPCompiler\JIT\Builtin\StringUnserialize::ensureLinked($context);
+        // Pre-link format ABI so mid-main `$u->format()` does not ensureLinked (#34602).
+        \PHPCompiler\JIT\Builtin\DateIntervalFormatRuntime::ensureLinked($context);
         $payloadOwned = self::nestedJitOwnedString($context, $payloadString);
         self::ensureHelpers($context, [
             self::PARSE_DI,
@@ -239,7 +241,6 @@ final class DateUnserializeJitHelper
             self::OUT_H,
             self::OUT_I,
             self::OUT_S,
-            self::OUT_F,
             self::OUT_INVERT,
             self::OUT_DAYS,
             self::OUT_DAYS_FALSE,
@@ -251,12 +252,10 @@ final class DateUnserializeJitHelper
         $outHFn = JitVmHelperLink::lookupCompiled($context, self::OUT_H, '#34602');
         $outIFn = JitVmHelperLink::lookupCompiled($context, self::OUT_I, '#34602');
         $outSFn = JitVmHelperLink::lookupCompiled($context, self::OUT_S, '#34602');
-        $outFFn = JitVmHelperLink::lookupCompiled($context, self::OUT_F, '#34602');
         $outInvertFn = JitVmHelperLink::lookupCompiled($context, self::OUT_INVERT, '#34602');
         $outDaysFn = JitVmHelperLink::lookupCompiled($context, self::OUT_DAYS, '#34602');
         $outDaysFalseFn = JitVmHelperLink::lookupCompiled($context, self::OUT_DAYS_FALSE, '#34602');
         $i64 = $context->getTypeFromString('int64');
-        $f64 = $context->getTypeFromString('double');
         $okRaw = $context->builder->call(
             $parseFn,
             JitNestedHelperCoerce::coerceArgForHelper(
@@ -286,8 +285,8 @@ final class DateUnserializeJitHelper
             $context->builder->call($outInvertFn),
             $i64
         );
-        $fRaw = $context->builder->call($outFFn);
-        $f = JitNestedHelperCoerce::coerceBridgeResult($context, $fRaw, $f64);
+        // NestedJIT float outs are unsafe under thin AOT — common wires have f=0 (#34602).
+        $f = $context->constantFromFloat(0.0);
         $days = JitNestedHelperCoerce::coerceBridgeResult(
             $context,
             $context->builder->call($outDaysFn),

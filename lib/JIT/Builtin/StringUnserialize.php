@@ -36,7 +36,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * SplObjectStorage: object-key pairs (#33876); SplDoublyLinkedList/Queue/Stack bag (#33966).
  * DateTime / DateTimeImmutable / DateTimeZone: Zend date wire via NestedJIT (#34599 / #34601).
  * DateInterval: compileTimeString fold (#34599) + NestedJIT member-wire restore (#34602).
- * DatePeriod: skip firstIntProp (NestedJIT bag TBD).
+ * DatePeriod: compileTimeString fold + foreach snapshot (#34608); NestedJIT bag TBD.
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -381,8 +381,12 @@ final class StringUnserialize
                     $objVal,
                     $payloadString
                 );
+                // True runtime payloads (file_get_contents) need classUserType or `$u->y`
+                // resolves as stdClass and format() SIGSEGVs (#34602 residual of #34604).
+                $context->lastUnserializeObjectClassUserType = 'DateInterval';
             } elseif ('dateperiod' === $classLc) {
-                // DatePeriod NestedJIT bag TBD; skip firstIntProp (SIGSEGV).
+                // Fold path covers assigned serialize→unserialize (#34608). NestedJIT bag TBD —
+                // skip firstIntProp (empty alloc still SIGSEGVs on foreach without timestamps).
             } else {
                 $voidPtr = $context->getTypeFromString('void*');
                 foreach ($object->instancePropertySets($id) as $propset) {

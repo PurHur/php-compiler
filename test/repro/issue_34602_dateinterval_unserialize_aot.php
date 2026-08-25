@@ -1,5 +1,5 @@
 <?php
-// #34602 — AOT unserialize(DateInterval) via runtime / literal / file-backed wire.
+// #34602 — AOT unserialize(DateInterval): assign fold, literal NestedJIT, file-backed runtime.
 declare(strict_types=1);
 
 $i = new DateInterval('P1Y2M3DT4H5M6S');
@@ -14,9 +14,10 @@ echo $ul->format('%Y-%M-%D %H:%I:%S'), PHP_EOL;
 echo $ul->y, ',', $ul->m, ',', $ul->d, PHP_EOL;
 
 // True runtime payload (no compileTimeString) — file-backed residual (#34602).
-$path = sys_get_temp_dir() . '/di_34602_residual.ser';
-file_put_contents($path, serialize(new DateInterval('P1Y2M3DT4H5M6S')));
-$uf = unserialize(file_get_contents($path));
+$tmp = sys_get_temp_dir().'/phpc_34602_di_'.getmypid().'.ser';
+file_put_contents($tmp, $s);
+$uf = unserialize(file_get_contents($tmp));
+@unlink($tmp);
 echo get_class($uf), PHP_EOL;
 echo $uf->y, '-', $uf->m, '-', $uf->d, ' ', $uf->h, ':', $uf->i, ':', $uf->s, PHP_EOL;
 echo $uf->format('%Y-%M-%D %H:%I:%S'), PHP_EOL;

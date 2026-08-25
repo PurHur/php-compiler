@@ -145,9 +145,21 @@ final class DomActiveContextAotTest extends TestCase
 
     public function testUserScriptStandaloneInitLinksDomExtensionOnly(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('DomStandaloneAotInitRuntime::ensureLinked', $source);
-        $this->assertStringNotContainsString('DomLoadHTMLRuntime::ensureLinked', $source);
+        // Lazy at thin-init seal (#34605) — not always-on ensureMinimal NestedJIT.
+        $init = (string) file_get_contents(__DIR__.'/../../lib/JIT/VmActiveContextInitLlvm.php');
+        $this->assertStringContainsString('DomStandaloneAotInitRuntime::ensureLinked', $init);
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $minimalPos = strpos($context, 'private function ensureMinimalUserStandaloneBodies');
+        $this->assertNotFalse($minimalPos);
+        $minimalEnd = strpos($context, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
+        $this->assertNotFalse($minimalEnd);
+        $minimalBody = substr($context, $minimalPos, $minimalEnd - $minimalPos);
+        $this->assertStringNotContainsString(
+            'DomStandaloneAotInitRuntime::ensureLinked($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly NestedJIT DomStandaloneAotInit (#34605)'
+        );
+        $this->assertStringNotContainsString('DomLoadHTMLRuntime::ensureLinked', $context);
     }
 
     public function testDomGetElementByIdResolvesScriptGlobalReceiverAfterLoadHTML(): void

@@ -54,6 +54,13 @@ final class Issue34602DateIntervalUnserializeAotTest extends TestCase
         $this->assertStringContainsString('emitRuntimeFormatFromLiteral', $fmt);
         $var = (string) file_get_contents($root.'/lib/JIT/Variable.php');
         $this->assertStringContainsString('fromUnserializeObject', $var);
+        $this->assertStringContainsString(
+            'lastUnserializeObjectClassUserType',
+            (string) file_get_contents($root.'/lib/JIT/Builtin/StringUnserialize.php')
+        );
+        $fmtHelper = (string) file_get_contents($root.'/ext/standard/DateIntervalFormatJitHelper.php');
+        $this->assertStringContainsString('int $fMicros', $fmtHelper);
+        $this->assertStringNotContainsString('float $f,', $fmtHelper);
     }
 
     private function assertAotMatchesZend(string $src): void
