@@ -27,6 +27,9 @@ final class JitSimpleXmlUserScript
     /** Runtime-readable string cast on foreach-snapshot SXE objects (#27535). */
     private const BAKED_TEXT_PROP = '__phpc_sxe_text';
 
+    /** Attr + numeric dim map for runtime isset/empty (#34555). */
+    private const BAKED_DIMS_PROP = '__phpc_sxe_dims';
+
     /** @var \SplObjectStorage<JITVariable, \SimpleXMLElement>|null */
     private static ?\SplObjectStorage $trees = null;
 
@@ -579,6 +582,234 @@ final class JitSimpleXmlUserScript
         return self::materializeElement($context, $child);
     }
 
+    /**
+     * isset($sxe[$dim]) — host has_dimension (php-src sxe_object_has_dimension; #34555).
+     *
+     * Thin AOT boxes SXE as TYPE_VALUE so ArrayAccess isset is skipped and HT probe
+     * always returns false; fold when the host tree + dim are known (peer tryOffsetGet).
+     * Runtime dims (foreach $k) use baked `__phpc_sxe_dims`.
+     */
+    public static function tryFoldDimIsset(Context $context, JITVariable $container, JITVariable $dim): ?Value
+    {
+        $exists = self::hostDimExists($container, $dim, $context);
+        if (null !== $exists) {
+            return $context->getTypeFromString('int1')->constInt($exists ? 1 : 0, false);
+        }
+
+        return self::tryCompileRuntimeDimIsset($context, $container, $dim);
+    }
+
+    /**
+     * empty($sxe[$dim]) — Zend empty uses has_dimension then value emptiness (#34555).
+     */
+    public static function tryFoldDimEmpty(Context $context, JITVariable $container, JITVariable $dim): ?Value
+    {
+        $empty = self::hostDimEmpty($container, $dim, $context);
+        if (null !== $empty) {
+            return $context->getTypeFromString('int1')->constInt($empty ? 1 : 0, false);
+        }
+
+        return self::tryCompileRuntimeDimEmpty($context, $container, $dim);
+    }
+
+    /**
+     * Runtime isset via baked dim HT when the host tree is known but $dim is not constant.
+     */
+    public static function tryCompileRuntimeDimIsset(
+        Context $context,
+        JITVariable $container,
+        JITVariable $dim
+    ): ?Value {
+        $htVar = self::bakedDimsHashtableVar($context, $container);
+        if (null === $htVar) {
+            return null;
+        }
+
+        return HashTableHelper::offsetIsSetDim(
+            $context,
+            HashTableHelper::loadHashtablePointer($context, $htVar),
+            $dim
+        );
+    }
+
+    /**
+     * Runtime empty via baked dim HT (missing key ⇒ empty; else stored empty flag).
+     *
+     * Note: empty($sxe[0]) can be false even when (string)$sxe[0] === '' (element with
+     * children) — bake host empty() as int1, do not use string emptiness (#34555).
+     */
+    public static function tryCompileRuntimeDimEmpty(
+        Context $context,
+        JITVariable $container,
+        JITVariable $dim
+    ): ?Value {
+        $htVar = self::bakedDimsHashtableVar($context, $container);
+        if (null === $htVar) {
+            return null;
+        }
+        $ht = HashTableHelper::loadHashtablePointer($context, $htVar);
+        $isset = HashTableHelper::offsetIsSetDim($context, $ht, $dim);
+        $tag = 'sxe_empty_'.(string) spl_object_id($context).'_'.(string) spl_object_id($dim);
+        $missingBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, $tag.'_missing');
+        $presentBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, $tag.'_present');
+        $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, $tag.'_done');
+        $i1 = $context->getTypeFromString('int1');
+
+        $context->builder->branchIf($isset, $presentBlock, $missingBlock);
+
+        $context->builder->positionAtEnd($missingBlock);
+        $missingEmpty = $i1->constInt(1, false);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($presentBlock);
+        // Values are int64 flags: 1 = empty, 0 = non-empty (host empty() at bake time).
+        $fetched = $htVar->dimFetch($dim);
+        $flag = $context->helper->loadValue($fetched);
+        $i64 = $context->getTypeFromString('int64');
+        if (JITVariable::TYPE_NATIVE_LONG !== $fetched->type) {
+            // dimFetch may box — compare via boolval/intval path
+            $flagLong = (new \PHPCompiler\ext\standard\intval())->call($context, $fetched);
+            $valueEmpty = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_NE,
+                $flagLong,
+                $i64->constInt(0, false)
+            );
+        } else {
+            $valueEmpty = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_NE,
+                $flag,
+                $i64->constInt(0, false)
+            );
+        }
+        $presentEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($missingEmpty, $missingBlock);
+        $phi->addIncoming($valueEmpty, $presentEnd);
+
+        return $phi;
+    }
+
+    /** @return JITVariable|null TYPE_HASHTABLE view of baked dims */
+    private static function bakedDimsHashtableVar(Context $context, JITVariable $container): ?JITVariable
+    {
+        if (!\extension_loaded('simplexml')) {
+            return null;
+        }
+        // Only when this Variable was materialized from a host tree (attrs were baked).
+        if (null === self::lookup($container)) {
+            return null;
+        }
+        if (JITVariable::TYPE_HASHTABLE === $container->type
+            || 0 !== ($container->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            return null;
+        }
+        $obj = self::objectPtrForBakedProps($context, $container);
+        if (null === $obj) {
+            return null;
+        }
+        try {
+            $slot = $context->type->object->propertySlotFor($obj, 'SimpleXMLElement', self::BAKED_DIMS_PROP);
+        } catch (\Throwable) {
+            return null;
+        }
+        $raw = $context->builder->load($slot);
+        $htPtr = $context->builder->pointerCast($raw, $context->getTypeFromString('__hashtable__*'));
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
+            $htPtr
+        );
+    }
+
+    private static function objectPtrForBakedProps(Context $context, JITVariable $container): ?Value
+    {
+        if (JITVariable::TYPE_OBJECT === $container->type) {
+            return JITVariable::KIND_VALUE === $container->kind
+                ? $container->value
+                : $context->builder->load($container->value);
+        }
+        if (JITVariable::TYPE_VALUE !== $container->type) {
+            return null;
+        }
+        try {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
+
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $valuePtr
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @return bool|null null when not foldable */
+    private static function hostDimExists(JITVariable $container, JITVariable $dim, Context $context): ?bool
+    {
+        // Match tryOffsetGet: no UserScriptAotEnv gate — trees are live during dim lowering (#34555).
+        if (!\extension_loaded('simplexml')) {
+            return null;
+        }
+        $token = $container->compileTimeString;
+        if (null !== $token && isset(self::$xpathListsByToken[$token])) {
+            return null;
+        }
+        if (JITVariable::TYPE_HASHTABLE === $container->type
+            || 0 !== ($container->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            return null;
+        }
+        $tree = self::lookup($container);
+        if (null === $tree) {
+            return null;
+        }
+        $key = self::compileTimeDim($context, $dim);
+        if (null === $key) {
+            return null;
+        }
+        try {
+            return isset($tree[$key]);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @return bool|null null when not foldable */
+    private static function hostDimEmpty(JITVariable $container, JITVariable $dim, Context $context): ?bool
+    {
+        if (!\extension_loaded('simplexml')) {
+            return null;
+        }
+        $token = $container->compileTimeString;
+        if (null !== $token && isset(self::$xpathListsByToken[$token])) {
+            return null;
+        }
+        if (JITVariable::TYPE_HASHTABLE === $container->type
+            || 0 !== ($container->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            return null;
+        }
+        $tree = self::lookup($container);
+        if (null === $tree) {
+            return null;
+        }
+        $key = self::compileTimeDim($context, $dim);
+        if (null === $key) {
+            return null;
+        }
+        try {
+            return empty($tree[$key]);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     /** SimpleXMLElement::count / count($sxe) fold (#26863, #27413). */
     public static function tryCount(Context $context, JITVariable ...$args): ?Value
     {
@@ -1087,6 +1318,59 @@ final class JitSimpleXmlUserScript
             : $context->builder->load($receiver->value);
         self::storeBakedStringProp($context, $obj, self::BAKED_NAME_PROP, $tree->getName());
         self::storeBakedStringProp($context, $obj, self::BAKED_TEXT_PROP, (string) $tree);
+        self::storeBakedDimsMap($context, $obj, $tree);
+    }
+
+    /**
+     * Bake attribute + numeric dims into one HT for runtime isset/empty (#34555).
+     * php-src sxe_object_has_dimension — string keys are attrs; int keys are element offsets.
+     * Values are int64 empty-flags from host empty() (not string cast — elements with
+     * children can be non-empty while (string) is '').
+     */
+    private static function storeBakedDimsMap(Context $context, Value $obj, \SimpleXMLElement $tree): void
+    {
+        $ht = HashTableHelper::alloc($context);
+        $setStringKeyLong = $context->lookupFunction('__hashtable__setStringKeyLong');
+        $i64 = $context->getTypeFromString('int64');
+        $attrs = $tree->attributes();
+        if ($attrs instanceof \SimpleXMLElement || $attrs instanceof \Traversable) {
+            foreach ($attrs as $name => $attr) {
+                $key = $context->builder->load($context->constantStringFromString((string) $name));
+                $emptyFlag = empty($tree[(string) $name]) ? 1 : 0;
+                $context->builder->call(
+                    $setStringKeyLong,
+                    $ht,
+                    $key,
+                    $i64->constInt($emptyFlag, false)
+                );
+            }
+        }
+        for ($i = 0; isset($tree[$i]); ++$i) {
+            $emptyFlag = empty($tree[$i]) ? 1 : 0;
+            $flagVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $i64->constInt($emptyFlag, false)
+            );
+            HashTableHelper::setAtIndex(
+                $context,
+                $ht,
+                $i64->constInt($i, false),
+                $flagVar
+            );
+        }
+        $dimsVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
+            $ht
+        );
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, 'SimpleXMLElement', self::BAKED_DIMS_PROP),
+            $dimsVar,
+            JITVariable::TYPE_HASHTABLE
+        );
     }
 
     private static function storeBakedStringProp(Context $context, Value $obj, string $prop, string $text): void

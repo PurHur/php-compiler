@@ -25,6 +25,15 @@ final class EmptyDimensionLlvm
         if (VmIsset::issetOnPropertyRejectsArrayContainer($container, $containerOp, false)) {
             return $context->constantFromBool(true);
         }
+        // Peer isset fold — TYPE_VALUE SXE never reaches ArrayAccess empty (#34555).
+        $sxeEmpty = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldDimEmpty(
+            $context,
+            $container,
+            $dim
+        );
+        if (null !== $sxeEmpty) {
+            return $sxeEmpty;
+        }
         if (Variable::TYPE_OBJECT === $container->type) {
             $arrayAccessEmpty = ArrayAccessHelper::tryCompileOffsetIsEmpty(
                 $context,
