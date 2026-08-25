@@ -1063,6 +1063,7 @@ final class HashTableWriteLlvm
 
         return match ($key->type) {
             Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_BOOL,
             Variable::TYPE_NATIVE_DOUBLE => false,
             default => true,
         };
@@ -1096,7 +1097,10 @@ final class HashTableWriteLlvm
         $array->valueBoxHashtable = true;
     }
 
-    /** php-src: float array keys truncate toward zero (zend_dval_to_lval); warn on write (#19730). */
+    /**
+     * php-src: float array keys truncate toward zero (zend_dval_to_lval); warn on write (#19730).
+     * Bool keys use convert_to_long (zext i1→i64) — trunc i1→size_t is invalid IR (#34667 residual).
+     */
     private static function arrayKeyToIndex(Context $context, Variable $key): Value
     {
         $sizeT = $context->getTypeFromString('size_t');
@@ -1107,6 +1111,15 @@ final class HashTableWriteLlvm
             );
 
             return $context->builder->truncOrBitCast($truncated, $sizeT);
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $key->type) {
+            // zend_hash_index / array lit: true→1 / false→0; never trunc i1→i64.
+            $asLong = $context->builder->zExt(
+                $context->helper->loadValue($key),
+                $context->getTypeFromString('int64')
+            );
+
+            return $context->builder->truncOrBitCast($asLong, $sizeT);
         }
 
         return $context->builder->truncOrBitCast(
