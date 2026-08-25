@@ -1051,12 +1051,17 @@ final class ObStorageLlvm
         } catch (\Throwable) {
             return;
         }
-        $stdout = $context->module->getNamedGlobal('stdout');
-        if (null === $stdout) {
+        // @stdout is a FILE** global; fflush(3) needs the FILE* (php-src main/output.c).
+        // Passing the global's address aborts at exit once StreamGlobalsJit created @stdout (#34737).
+        $stdoutGlobal = $context->module->getNamedGlobal('stdout');
+        if (null === $stdoutGlobal) {
             return;
         }
         $i8p = $context->getTypeFromString('int8*');
-        $context->builder->call($fflush, $context->builder->pointerCast($stdout, $i8p));
+        $stdoutPtr = $context->builder->load(
+            $context->builder->pointerCast($stdoutGlobal, $i8p->pointerType(0))
+        );
+        $context->builder->call($fflush, $stdoutPtr);
     }
 
     private static function levelPtr(Context $context): Value
