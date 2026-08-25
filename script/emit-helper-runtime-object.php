@@ -257,8 +257,9 @@ if (null !== $unitPath) {
         }
     }
     // Solo-unit emit does not go through *Runtime::implement first. Helpers that NestedJIT
-    // builtins (preg_match / json_decode) need those ABI bridges linked before ensureCompiled,
-    // or lookupFunction throws / the unit stays fingerprint-stale forever (#26825, iconv mime).
+    // builtins (preg_match / json_decode / base64_decode) need those ABI bridges linked before
+    // ensureCompiled, or lookupFunction throws / the unit stays fingerprint-stale forever
+    // (#26825 iconv mime; #34731 FileGetContents/Readfile data://).
     if (str_contains($unitPath, 'RegexIteratorFilterJitHelper')
         || str_contains($unitPath, 'PregEmptyPatternReplaceJitHelper')
         || str_contains($unitPath, 'PregQuoteJitHelper')
@@ -267,6 +268,11 @@ if (null !== $unitPath) {
     }
     if (str_contains($unitPath, 'IconvMimeJitHelper')) {
         \PHPCompiler\JIT\Builtin\StringJsonDecode::ensureLinked($context);
+    }
+    if (str_contains($unitPath, 'FileGetContentsJitHelper')
+        || str_contains($unitPath, 'ReadfileJitHelper')
+    ) {
+        \PHPCompiler\JIT\Builtin\StringBase64Decode::ensureLinked($context);
     }
     $bundle = $bundles[$unitPath] ?? [$unitPath];
     if (\count($bundle) > 1) {
