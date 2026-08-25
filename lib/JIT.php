@@ -11102,7 +11102,11 @@ class JIT {
                         }
                     }
                     if (null === $arg && null !== $scriptGlobalEchoName) {
-                        $arg = $this->context->ensureScriptGlobal($scriptGlobalEchoName);
+                        if ($this->shouldDeferScriptGlobalForInlineIncludeBinding($scriptGlobalEchoName, $echoOp, $block)) {
+                            $scriptGlobalEchoName = null;
+                        } else {
+                            $arg = $this->context->ensureScriptGlobal($scriptGlobalEchoName);
+                        }
                     }
                     if (null === $arg) {
                         if ($echoOp instanceof Operand\Literal && null !== $argOffset) {
@@ -11142,6 +11146,10 @@ class JIT {
                         }
                         if ($echoNeedsRefresh) {
                             JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
+                            $refreshed = $this->context->getVariableFromOpInScopes($echoOp);
+                            if ($refreshed->includeBinding) {
+                                $arg = $refreshed;
+                            }
                         }
                     }
                     JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
@@ -18376,6 +18384,10 @@ class JIT {
             return null;
         }
         if ($block->isMainScript() && !$this->context->isForeachByRefLocalName($name, $block)) {
+            if ($this->shouldDeferScriptGlobalForInlineIncludeBinding($name, $op, $block)) {
+                return null;
+            }
+
             return $this->context->ensureScriptGlobal($name);
         }
         if ($block->declaresGlobalName($name) || isset($this->context->jitImportedGlobalNames[$name])) {
@@ -18392,6 +18404,34 @@ class JIT {
         }
 
         return null;
+    }
+
+    /**
+     * Inlined {main} includes inherit caller locals — never route those names through the
+     * standalone script-global sidecar (#866, coalesce_then_inherited_local).
+     */
+    private function shouldDeferScriptGlobalForInlineIncludeBinding(
+        string $name,
+        ?Operand $op = null,
+        ?Block $block = null
+    ): bool {
+        if ($this->context->inlineIncludeDepth <= 0) {
+            return false;
+        }
+        // Inlined {main} units share the caller's LLVM function — locals live in
+        // include-binding allocas, not standalone script-global sidecars (#866).
+        $block ??= $this->context->jitEnclosingBlock ?? $this->context->jitFunctionRootBlock;
+        if (null !== $block && $block->isMainScript()) {
+            return !\PHPCompiler\Web\Superglobals::isSuperglobalName($name);
+        }
+        if (JIT\IncludeBindingEmitHelper::refreshFrameDeclaresName($this->context, $name)) {
+            return true;
+        }
+        if (null !== $op && $this->context->hasVariableOp($op)) {
+            return $this->context->getVariableFromOp($op)->includeBinding;
+        }
+
+        return false;
     }
 
     /** Scope operand for value reads that may emit undefined-variable E_WARNING (#10358, #10360, #26147). */
