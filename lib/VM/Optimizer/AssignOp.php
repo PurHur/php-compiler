@@ -47,7 +47,7 @@ class AssignOp extends Optimizer
                 // replace
                 $binaryOpResult = $block->getOperand($prior->arg1);
                 if (
-                    count($binaryOpResult->usages) === 1
+                    $this->binaryResultUsagesAllowAssignOpFusion($binaryOpResult)
                     && !$this->assignOpMustSkipConcatChainPeephole($prior, $priorPrior, $op)
                 ) {
                     // We can safely replace it with an assign op
@@ -58,12 +58,16 @@ class AssignOp extends Optimizer
                         $prior = $op;
                         continue;
                     }
-                    $prior->arg1 = $op->arg2;
+                    $lvalue = $op->arg2;
+                    $prior->arg1 = $lvalue;
                     // Compound assign ($x += 1): arg2 is the in-place lvalue — redirect both (#13083).
                     // Do not clobber additive/concat operands on ??/?: deferred RHS (#11801, #13104, #13105).
                     if (null === $prior->arg2 || (int) $prior->arg2 === (int) $binaryDest) {
-                        $prior->arg2 = $op->arg2;
+                        $prior->arg2 = $lvalue;
                     }
+                    // `($g .= 'A') && …`: JumpIf / Cast_Bool may still read the concat temp;
+                    // retarget them to the CV after in-place fusion (#34558).
+                    $this->retargetCondReadersFromTempToLvalue($block, (int) $binaryDest, (int) $lvalue);
                     $assignResult = $block->getOperand($op->arg1);
                     if ((int) $op->arg3 === (int) $binaryDest || empty($assignResult->usages)) {
                         // Binary result was only copied into the assign dest; redirect makes assign dead (#11801).
@@ -113,5 +117,65 @@ class AssignOp extends Optimizer
         }
 
         return null !== $priorPrior->arg1 && (int) $priorPrior->arg1 === (int) $prior->arg1;
+    }
+
+    /**
+     * Fuse Concat+Assign when the concat temp is only read by that Assign and optional
+     * JumpIf / Cast_Bool readers (`($g .= 'A') && …`). AOT mis-handles the
+     * temp+assign+JumpIf shape (CV ends up empty / overwritten); in-place
+     * CONCAT($g,$g,lit) + JumpIf($g) matches Zend (#34558, Zend/zend_compile.c
+     * ZEND_ASSIGN_CONCAT). Cast_Bool on the concat temp is the same shape on the
+     * long arm of `&&` (bool result phi).
+     */
+    private function binaryResultUsagesAllowAssignOpFusion(\PHPCfg\Operand $binaryOpResult): bool
+    {
+        // Original gate: concat/result temp has a single reader (the following Assign).
+        if (1 === \count($binaryOpResult->usages)) {
+            return true;
+        }
+        // `($g .= 'A') && …`: JumpIf / Cast_Bool also read the concat temp (#34558).
+        $assignCount = 0;
+        foreach ($binaryOpResult->usages as $usage) {
+            if ($usage instanceof \PHPCfg\Op\Expr\Assign) {
+                ++$assignCount;
+                continue;
+            }
+            if ($usage instanceof \PHPCfg\Op\Stmt\JumpIf) {
+                continue;
+            }
+            if ($usage instanceof \PHPCfg\Op\Expr\Cast\Bool_) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return 1 === $assignCount;
+    }
+
+    /**
+     * After in-place fusion, JumpIf / Cast_Bool must read the CV — not the dead concat temp (#34558).
+     */
+    private function retargetCondReadersFromTempToLvalue(Block $block, int $tempSlot, int $lvalueSlot): void
+    {
+        if ($tempSlot === $lvalueSlot) {
+            return;
+        }
+        foreach ($block->opCodes as $op) {
+            if (
+                OpCode::TYPE_JUMPIF === $op->type
+                && null !== $op->arg1
+                && (int) $op->arg1 === $tempSlot
+            ) {
+                $op->arg1 = $lvalueSlot;
+            }
+            if (
+                OpCode::TYPE_CAST_BOOL === $op->type
+                && null !== $op->arg2
+                && (int) $op->arg2 === $tempSlot
+            ) {
+                $op->arg2 = $lvalueSlot;
+            }
+        }
     }
 }
