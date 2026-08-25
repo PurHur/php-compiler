@@ -71,7 +71,8 @@ final class JitDatePeriodConstruct
     /**
      * DatePeriod(DateTimeInterface, DateInterval, int $recurrences [, int $options]) (#26852).
      *
-     * php-src stores userRecurrences+1 in the recurrences property (includes start slot).
+     * php-src stores userRecurrences+1 in the recurrences property when include_start
+     * (includes start slot); EXCLUDE_START_DATE keeps property == ctor arg (#34626 / #26852).
      */
     public static function invokeFromRecurrenceCount(Context $context, JITVariable ...$args): Value
     {
@@ -89,6 +90,9 @@ final class JitDatePeriodConstruct
         }
         $options = self::compileTimeOptions($args[4] ?? null);
         $includeStart = 0 === ($options & DatePeriodSupport::OPTION_EXCLUDE_START_DATE);
+        // php-src: include_start → property = userRecurrences+1; EXCLUDE_START → property =
+        // userRecurrences (wire/public prop already equals foreach count — #34626 / #26852).
+        $storedRecurrences = $includeStart ? ($userRecurrences + 1) : $userRecurrences;
 
         $period = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $start = ReflectionSetup::loadObjectFromArg($context, $args[1]);
@@ -98,7 +102,7 @@ final class JitDatePeriodConstruct
         self::storeNullProperty($context, $period, 'current');
         self::storeNullProperty($context, $period, 'end');
         self::storeObjectProperty($context, $period, 'interval', $interval);
-        self::storeLongProperty($context, $period, 'recurrences', $userRecurrences + 1);
+        self::storeLongProperty($context, $period, 'recurrences', $storedRecurrences);
         self::storeBoolProperty($context, $period, 'include_start_date', $includeStart);
         self::storeBoolProperty($context, $period, 'include_end_date', false);
         self::storeLongProperty($context, $period, '__dp_iter_key', 0);
@@ -116,7 +120,7 @@ final class JitDatePeriodConstruct
             $args[1],
             $args[2],
             null,
-            $userRecurrences + 1,
+            $storedRecurrences,
             $includeStart,
             false
         );

@@ -173,8 +173,12 @@ final class DatePeriodSupport
         self::setNullProperty($period, 'current');
         self::setNullProperty($period, 'end');
         self::setObjectProperty($period, 'interval', self::cloneIntervalForStorage($interval, $ctx));
-        self::requireIntProperty($period, 'recurrences')->int($recurrences + 1);
-        self::requireBoolProperty($period, 'include_start_date')->bool(0 === ($options & self::OPTION_EXCLUDE_START_DATE));
+        // php-src: include_start → property = ctor+1; EXCLUDE_START → property == ctor (#34626).
+        $includeStart = 0 === ($options & self::OPTION_EXCLUDE_START_DATE);
+        self::requireIntProperty($period, 'recurrences')->int(
+            $includeStart ? ($recurrences + 1) : $recurrences
+        );
+        self::requireBoolProperty($period, 'include_start_date')->bool($includeStart);
         self::requireBoolProperty($period, 'include_end_date')->bool(false);
         $period->constructed = true;
         $period->datePeriodIterator = null;
