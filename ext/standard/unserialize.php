@@ -213,9 +213,10 @@ final class unserialize extends Internal
     /**
      * Fold Zend DatePeriod serialize wire into a live object + foreach snapshot (#34608).
      *
-     * Peer DateInterval/DateTime folds (#34599 / #34576). NestedJIT DatePeriod bag remains
-     * TBD for true runtime payloads; assigned serialize() stamps compileTimeString so this
-     * path covers the common round-trip. php-src: php_date_period_initialize_from_hash.
+     * Peer DateInterval/DateTime folds (#34599 / #34576). Uses Object_::lookup() so
+     * literal-only scripts (no prior `new DatePeriod`) still fold (#34611).
+     * NestedJIT DatePeriod bag remains TBD for true runtime payloads (file_get_contents).
+     * php-src: php_date_period_initialize_from_hash.
      */
     private static function tryMaterializeDatePeriodWire(Context $context, string $literal): ?Value
     {
@@ -332,11 +333,11 @@ final class unserialize extends Internal
 
         $className = 'DatePeriod';
         $objectType = $context->type->object;
+        // lookup() registerExternalClass seeds DatePeriod props — classIdByName is null
+        // when the unit never `new DatePeriod` (literal-only unserialize, #34611 / re-#34608).
         $classId = $objectType->classIdByName($className)
-            ?? $objectType->classIdForLowerName('dateperiod');
-        if (null === $classId) {
-            return null;
-        }
+            ?? $objectType->classIdForLowerName('dateperiod')
+            ?? $objectType->lookup($className);
         $period = $objectType->allocate($classId);
         ReflectionSetup::markConstructed($context, $period);
 
@@ -498,11 +499,10 @@ final class unserialize extends Internal
         }
         $tzName = \is_string($parsed['timezone'] ?? null) ? $parsed['timezone'] : $timezone;
         $objectType = $context->type->object;
+        // Peer DatePeriod fold — literal DateTime wire without prior `new` (#34611).
         $classId = $objectType->classIdByName($className)
-            ?? $objectType->classIdForLowerName(strtolower($className));
-        if (null === $classId) {
-            return null;
-        }
+            ?? $objectType->classIdForLowerName(strtolower($className))
+            ?? $objectType->lookup($className);
         $obj = $objectType->allocate($classId);
         ReflectionSetup::markConstructed($context, $obj);
         $i64 = $context->getTypeFromString('int64');
@@ -603,11 +603,10 @@ final class unserialize extends Internal
     {
         $className = 'DateInterval';
         $objectType = $context->type->object;
+        // Nested DateInterval inside DatePeriod literal wire (#34611).
         $classId = $objectType->classIdByName($className)
-            ?? $objectType->classIdForLowerName('dateinterval');
-        if (null === $classId) {
-            return null;
-        }
+            ?? $objectType->classIdForLowerName('dateinterval')
+            ?? $objectType->lookup($className);
         $obj = $objectType->allocate($classId);
         $i64 = $context->getTypeFromString('int64');
         foreach (['y', 'm', 'd', 'h', 'i', 's', 'invert'] as $name) {
@@ -707,11 +706,10 @@ final class unserialize extends Internal
         }
         $className = 'DateTimeZone';
         $objectType = $context->type->object;
+        // Literal DateTimeZone wire without prior `new` (#34611).
         $classId = $objectType->classIdByName($className)
-            ?? $objectType->classIdForLowerName('datetimezone');
-        if (null === $classId) {
-            return null;
-        }
+            ?? $objectType->classIdForLowerName('datetimezone')
+            ?? $objectType->lookup($className);
         $obj = $objectType->allocate($classId);
         $tzVar = new JITVariable(
             $context,
