@@ -10784,12 +10784,15 @@ class JIT {
                         // the module slot (zend_execute.c ZEND_FETCH_STATIC_PROP_RW). FETCH_R
                         // by-value copies (zend_array_dup) so `$b = A::$a` does not share
                         // storage (#32307). Untyped `self::$x++` was FETCH_R and lost the store
-                        // (#32313, #31968 group 3).
+                        // (#32313, #31968 group 3). By-ref return (`function &f(){ return C::$x; }`)
+                        // is ZEND_FETCH_STATIC_PROP_W too — FETCH_R copies drop staticPropertyGlobal
+                        // and the caller’s reference dangles (#34727 / re-#34717).
                         $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, $destSlot)
                             || $this->varFetchDestUsedAsIncDec($block, $i, $destSlot)
                             || $this->varFetchDestUsedAsCompoundAssign($block, $i, $destSlot)
                             || $this->varFetchDestUsedAsDimWriteContainer($block, $i, $destSlot)
-                            || $this->varFetchDestUsedAsDimRwContainer($block, $i, $destSlot);
+                            || $this->varFetchDestUsedAsDimRwContainer($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsByRefReturn($block, $i, $destSlot);
                         if (!$forWrite) {
                             $hookFetched = JIT\PropertyHookDispatch::tryEmitStaticPropertyGet(
                                 $this->context,
@@ -29535,6 +29538,23 @@ class JIT {
         }
 
         return true;
+    }
+
+    /**
+     * True when fetch dest is the operand of an immediate TYPE_RETURN in a by-ref function
+     * (`function &f(){ return C::$x; }` → ZEND_FETCH_STATIC_PROP_W, #34727).
+     */
+    private function varFetchDestUsedAsByRefReturn(Block $block, int $opIndex, int $destSlot): bool
+    {
+        if (!$this->cfgFunctionReturnsByRef($block->func)) {
+            return false;
+        }
+        $next = $block->opCodes[$opIndex + 1] ?? null;
+        if (null === $next || OpCode::TYPE_RETURN !== $next->type) {
+            return false;
+        }
+
+        return (int) $next->arg1 === $destSlot;
     }
 
     /**
