@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
+use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomChildNodeSiblingInsert;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
@@ -12,6 +13,7 @@ use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\dom\JitDomGetNodePath;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\ext\dom\JitDomNodeChildProperty;
+use PHPCompiler\ext\dom\JitDomParentChildLinkLayout;
 use PHPCompiler\ext\dom\JitDomRemoveChild;
 use PHPCompiler\ext\dom\JitDomReplaceChild;
 use PHPCompiler\ext\dom\JitDomRequireDomNodeArg;
@@ -43,6 +45,11 @@ final class DomNodeChildNodeMutationRuntime
 
     public static function invokeReplaceWith(Context $context, int $extraArgCount, Variable $receiver, Variable ...$extraArgs): Value
     {
+        // php-src: replaceWith() with no nodes ≡ remove (dom_child_replace_with empty fragment).
+        if (0 === $extraArgCount) {
+            return self::invokeRemove($context, $receiver);
+        }
+
         return self::invokeSiblingMutation($context, 'replacewith', $extraArgCount, $receiver, ...$extraArgs);
     }
 
@@ -139,41 +146,41 @@ final class DomNodeChildNodeMutationRuntime
                 // and left held childNodes pins on the old node.
                 // Multi-arg: ReplaceChild for arg0, then after() for arg1..N — peer
                 // after/before multi LiveSlots (#32848 / #32887).
+                // Identity-only `$n->replaceWith($n)`: php-src fragment unlink+reinsert
+                // is a no-op; skip LiveSlots so sibling walks do not hang (#34804).
                 $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
                 $firstNode = self::coerceNodeOrStringArg($context, $extraArgs[0]);
-                JitDomReplaceChild::syncUserScriptReplaceSlotsPublic(
-                    $context,
-                    $parentVar,
-                    $firstNode,
-                    $receiver
-                );
-                $afterAnchor = $firstNode;
-                $tail = \array_slice($extraArgs, 1);
-                foreach ($tail as $newChildVar) {
-                    $nodeVar = self::coerceNodeOrStringArg($context, $newChildVar);
-                    JitDomChildNodeSiblingInsert::invokeAfter(
+                if (1 === $extraArgCount && Variable::TYPE_OBJECT === $firstNode->type) {
+                    BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_cn_replacewith_maybe_id');
+                    $recvObj = self::receiverObject($context, $receiver);
+                    $firstObj = $context->helper->loadValue($firstNode);
+                    $isSame = $context->builder->icmp(Builder::INT_EQ, $recvObj, $firstObj);
+                    $bbIdentity = BasicBlockHelper::append($context, 'dom_cn_replacewith_identity');
+                    $bbMutate = BasicBlockHelper::append($context, 'dom_cn_replacewith_mutate');
+                    $bbDone = BasicBlockHelper::append($context, 'dom_cn_replacewith_done');
+                    $context->builder->branchIf($isSame, $bbIdentity, $bbMutate);
+                    $context->builder->positionAtEnd($bbIdentity);
+                    $context->builder->branch($bbDone);
+                    $context->builder->positionAtEnd($bbMutate);
+                    self::emitReplaceWithLiveSlots(
                         $context,
+                        $parent,
                         $parentVar,
-                        $nodeVar,
-                        $afterAnchor
+                        $receiver,
+                        $firstNode,
+                        $extraArgs
                     );
-                    $afterAnchor = $nodeVar;
-                }
-                // Same-parent move: LiveSlots already rebuilt INNER_XML; compile-time
-                // chunk replace duplicates the moved sibling (#34806).
-                $skipInner = null !== ($firstNode->compileTimeDomChildIndex ?? null);
-                if (!$skipInner) {
-                    foreach ($extraArgs as $arg) {
-                        if (null !== ($arg->compileTimeDomChildIndex ?? null)) {
-                            $skipInner = true;
-                            break;
-                        }
-                    }
-                }
-                if (!$skipInner) {
-                    // Overwrite single-arg InnerXml from ReplaceChild with the full
-                    // replacement markup (keeps non-replaced siblings for saveXML).
-                    self::trySyncReplaceWithInnerXml($context, $receiver, $parent, $extraArgs);
+                    $context->builder->branch($bbDone);
+                    $context->builder->positionAtEnd($bbDone);
+                } else {
+                    self::emitReplaceWithLiveSlots(
+                        $context,
+                        $parent,
+                        $parentVar,
+                        $receiver,
+                        $firstNode,
+                        $extraArgs
+                    );
                 }
             }
 
@@ -181,6 +188,63 @@ final class DomNodeChildNodeMutationRuntime
         }
 
         return DomInstanceMethodRuntime::invoke($context, $extraArgCount, $kind, $receiver, ...$extraArgs);
+    }
+
+    /**
+     * LiveSlots ReplaceChild(arg0) + after(arg1..N) + InnerXml (#32822 / #32887 / #34804).
+     *
+     * @param list<Variable> $extraArgs
+     */
+    private static function emitReplaceWithLiveSlots(
+        Context $context,
+        Value $parent,
+        Variable $parentVar,
+        Variable $receiver,
+        Variable $firstNode,
+        array $extraArgs
+    ): void {
+        JitDomReplaceChild::syncUserScriptReplaceSlotsPublic(
+            $context,
+            $parentVar,
+            $firstNode,
+            $receiver
+        );
+        $afterAnchor = $firstNode;
+        $tail = \array_slice($extraArgs, 1);
+        foreach ($tail as $newChildVar) {
+            $nodeVar = self::coerceNodeOrStringArg($context, $newChildVar);
+            JitDomChildNodeSiblingInsert::invokeAfter(
+                $context,
+                $parentVar,
+                $nodeVar,
+                $afterAnchor
+            );
+            $afterAnchor = $nodeVar;
+        }
+        // Compile-time chunk splice duplicates nodes that LiveSlots moved (#34804
+        // self_a / a_self). Rebuild InnerXml from the LiveSlots child chain instead.
+        $isDoc = JitDomParentChildLinkLayout::isDocumentObject(
+            $context,
+            $parent,
+            'dom_cn_rw_rebuild_doc'
+        );
+        $bbSkip = BasicBlockHelper::append($context, 'dom_cn_rw_skip_rebuild');
+        $bbRebuild = BasicBlockHelper::append($context, 'dom_cn_rw_rebuild');
+        $bbDone = BasicBlockHelper::append($context, 'dom_cn_rw_rebuild_done');
+        $context->builder->branchIf($isDoc, $bbSkip, $bbRebuild);
+        $context->builder->positionAtEnd($bbRebuild);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren(
+            $context,
+            $parent
+        );
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward(
+            $context,
+            $parent
+        );
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbSkip);
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbDone);
     }
 
     /** @param list<Variable> $extraArgs */

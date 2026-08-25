@@ -16,6 +16,7 @@ use PHPLLVM\Value;
  *
  * php-src: ext/dom/parentnode.c dom_parent_node_after/before (viable_next skip #34791);
  * libxml xmlAddPrevSibling / xmlAddNextSibling for the insert path.
+ * Same-parent append-tail moves use AppendChildLiveSlots (#34804).
  */
 final class JitDomChildNodeSiblingInsert
 {
@@ -61,9 +62,6 @@ final class JitDomChildNodeSiblingInsert
         $context->builder->branchIf($nextNull, $bbAppend, $bbMaybeInsert);
 
         // Already immediately after the anchor → no-op (php-src viable_next skip; #34791).
-        // insertBefore(new, next) with new===next would throw identity Error.
-        // Still rebuild INNER_XML: trySyncSiblingInsertInnerXml may have spliced a
-        // duplicate compile-time tag before LiveSlots ran.
         $context->builder->positionAtEnd($bbMaybeInsert);
         $alreadyNext = $context->builder->icmp(Builder::INT_EQ, $next, $newChild);
         $context->builder->branchIf($alreadyNext, $bbAlreadyNext, $bbInsert);
@@ -89,8 +87,6 @@ final class JitDomChildNodeSiblingInsert
             $nextJit
         );
         DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $newChildVar);
-        // Must terminate bbInsert — previously fell through by repositioning only,
-        // so subsequent user-script IR was unreachable (#32817).
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbAppend);
@@ -101,12 +97,38 @@ final class JitDomChildNodeSiblingInsert
         $context->builder->positionAtEnd($bbDone);
     }
 
+    /**
+     * Append after last child (anchor.next == null).
+     *
+     * Fresh nodes keep the historic sibling-store path (text + InnerXml; #34791).
+     * Same-parent moves go through AppendChildLiveSlots so the node is unlinked
+     * first (#34804) — hand-rolled stores left a duplicate in the tree.
+     */
     private static function insertAfterLast(
         Context $context,
         Value $parent,
         Value $newChild,
         Value $anchor
     ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_cn_after_last');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $oldParent = JitDomParentChildLinkLayout::loadSibling(
+            $context,
+            $newChild,
+            VmDom::PROP_PARENT_NODE,
+            'dom_cn_after_old_par'
+        );
+        $hasParent = $context->builder->icmp(Builder::INT_NE, $oldParent, $objPtrTy->constNull());
+        $bbMove = BasicBlockHelper::append($context, 'dom_cn_after_move');
+        $bbFresh = BasicBlockHelper::append($context, 'dom_cn_after_fresh');
+        $bbDone = BasicBlockHelper::append($context, 'dom_cn_after_last_done');
+        $context->builder->branchIf($hasParent, $bbMove, $bbFresh);
+
+        $context->builder->positionAtEnd($bbMove);
+        JitDomAppendChildLiveSlots::syncNonFragment($context, $parent, $newChild);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbFresh);
         JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
         $newJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $newChild);
         $anchorJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $anchor);
@@ -119,24 +141,20 @@ final class JitDomChildNodeSiblingInsert
         JitDomParentChildLinkLayout::storeParentNode($context, $newChild, $parentJit);
 
         JitDomInsertBefore::bumpChildNodesLengthPublic($context, $parent, $anchor, $newChild);
-        // Append-tail (anchor.next was null) previously only bumped LiveSlots length.
-        // saveXML still reads PROP_USER_SCRIPT_INNER_XML — without a rebuild the new
-        // sibling is dropped from markup while childNodes->item() sees it (peer
-        // insertBefore LiveSlots #33450 / #32940). Middle after() already rebuilds
-        // via syncUserScriptInsertBeforeSlotsPublic.
-        // Document parents: skip Element INNER_XML rebuild (#33584 / #32611) — Element
-        // GEPs on Document layout SIGSEGV.
         $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, 'dom_cn_after_parent');
         $bbSkipRebuild = BasicBlockHelper::append($context, 'dom_cn_after_skip_rebuild');
         $bbRebuild = BasicBlockHelper::append($context, 'dom_cn_after_rebuild');
-        $bbDone = BasicBlockHelper::append($context, 'dom_cn_after_rebuild_done');
+        $bbRebuildDone = BasicBlockHelper::append($context, 'dom_cn_after_rebuild_done');
         $context->builder->branchIf($isDoc, $bbSkipRebuild, $bbRebuild);
         $context->builder->positionAtEnd($bbRebuild);
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
-        $context->builder->branch($bbDone);
+        $context->builder->branch($bbRebuildDone);
         $context->builder->positionAtEnd($bbSkipRebuild);
+        $context->builder->branch($bbRebuildDone);
+        $context->builder->positionAtEnd($bbRebuildDone);
         $context->builder->branch($bbDone);
+
         $context->builder->positionAtEnd($bbDone);
     }
 

@@ -191,6 +191,7 @@ final class JitDomReplaceChildLiveSlots
 
         $context->builder->positionAtEnd($bbAfterUnlink);
         // Re-read oldChild edges after possible unlink (new may have been old's neighbor).
+
         $prev = self::loadSibling($context, $oldChild, VmDom::PROP_PREVIOUS_SIBLING, 'dom_rc_prev');
         $next = self::loadSibling($context, $oldChild, VmDom::PROP_NEXT_SIBLING, 'dom_rc_next');
         $first = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, 'dom_rc_first');
