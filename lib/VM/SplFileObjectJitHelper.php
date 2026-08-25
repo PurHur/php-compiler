@@ -1429,17 +1429,31 @@ final class SplFileObjectJitHelper
 
         $context->builder->positionAtEnd($okBb);
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $raw);
-        $stripped = self::emitRtrimLineTerminators($context, $owned);
+        // php-src is_line_empty on the pre-rtrim buffer (#34786 / spl_directory.c).
+        // CSV read_ex does not DROP_NEW_LINE on the buffer; SKIP_EMPTY only skips len==0 or
+        // (DROP_NEW_LINE && lone "\n"/"\r\n"). Mid-file "\n" without DROP_NEW_LINE → [null].
         $flags = self::loadLongProp($context, $obj, self::PROP_FLAGS);
-        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $stripped);
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(0, false));
+        $rawLen = $context->builder->call($context->lookupFunction('__string__strlen'), $owned);
+        $isLen0 = $context->builder->icmp(Builder::INT_EQ, $rawLen, $i64->constInt(0, false));
+        $nlLit = $context->builder->load($context->constantStringFromString("\n"));
+        $crlfLit = $context->builder->load($context->constantStringFromString("\r\n"));
+        $cmpNl = JitStringCompare::strcmp($context, $owned, $nlLit);
+        $cmpCrlf = JitStringCompare::strcmp($context, $owned, $crlfLit);
+        $isNl = $context->builder->icmp(Builder::INT_EQ, $cmpNl, $i64->constInt(0, false));
+        $isCrlf = $context->builder->icmp(Builder::INT_EQ, $cmpCrlf, $i64->constInt(0, false));
+        $isOnlyNl = $context->builder->or($isNl, $isCrlf);
+        $dropMasked = $context->builder->and($flags, $i64->constInt(self::FLAG_DROP_NEW_LINE, false));
+        $wantDrop = $context->builder->icmp(Builder::INT_NE, $dropMasked, $i64->constInt(0, false));
+        $emptyViaDrop = $context->builder->and($wantDrop, $isOnlyNl);
+        $isEmptyLine = $context->builder->or($isLen0, $emptyViaDrop);
         $skipMasked = $context->builder->and($flags, $i64->constInt(self::FLAG_SKIP_EMPTY, false));
         $wantSkip = $context->builder->icmp(Builder::INT_NE, $skipMasked, $i64->constInt(0, false));
-        $skipEmpty = $context->builder->and($isEmpty, $wantSkip);
+        $skipEmpty = $context->builder->and($isEmptyLine, $wantSkip);
         $acceptBb = $fn->appendBasicBlock('splfo_csv_rd_accept');
         $context->builder->branchIf($skipEmpty, $loopBb, $acceptBb);
 
         $context->builder->positionAtEnd($acceptBb);
+        $stripped = self::emitRtrimLineTerminators($context, $owned);
         $separator = self::loadStringProp($context, $obj, self::PROP_CSV_SEP);
         $csvBox = self::emitCsvFieldsValueBox($context, $stripped, $separator);
         // Successful get_line — refresh EOF latch from stream feof (#33555).
