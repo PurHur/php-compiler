@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
 use PHPCompiler\ext\dom\JitDomChildNodeSiblingInsert;
 use PHPCompiler\ext\dom\JitDomCreateElement;
+use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\dom\JitDomGetNodePath;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
@@ -104,28 +105,32 @@ final class DomNodeChildNodeMutationRuntime
                 // InnerXml splice is best-effort for saveXML (#26752). It must not
                 // short-circuit LiveSlots — otherwise held `$parent->childNodes`
                 // stays stale and item(N) SIGSEGVs (#32817 / peer #32801).
+                // Keep original $extraArgs here so string literals still splice markup;
+                // LiveSlots below needs objects (#34760).
                 self::trySyncSiblingInsertInnerXml($context, $kind, $receiver, $parent, $extraArgs);
                 $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
                 // Multi-arg: LiveSlots each node (peer ParentNode append #32838).
                 // before(...$nodes): each inserts before the original receiver → b,c,a.
                 // after(...$nodes): advance anchor to the last inserted → a,b,c (#32848).
+                // php-src childnode.c: string arms become text nodes before link (#34760).
                 $afterAnchor = $receiver;
                 foreach ($extraArgs as $newChildVar) {
+                    $nodeVar = self::coerceNodeOrStringArg($context, $newChildVar);
                     if ('before' === $kind) {
                         JitDomChildNodeSiblingInsert::invokeBefore(
                             $context,
                             $parentVar,
-                            $newChildVar,
+                            $nodeVar,
                             $receiver
                         );
                     } else {
                         JitDomChildNodeSiblingInsert::invokeAfter(
                             $context,
                             $parentVar,
-                            $newChildVar,
+                            $nodeVar,
                             $afterAnchor
                         );
-                        $afterAnchor = $newChildVar;
+                        $afterAnchor = $nodeVar;
                     }
                 }
             } else {
@@ -135,22 +140,24 @@ final class DomNodeChildNodeMutationRuntime
                 // Multi-arg: ReplaceChild for arg0, then after() for arg1..N — peer
                 // after/before multi LiveSlots (#32848 / #32887).
                 $parentVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $parent);
+                $firstNode = self::coerceNodeOrStringArg($context, $extraArgs[0]);
                 JitDomReplaceChild::syncUserScriptReplaceSlotsPublic(
                     $context,
                     $parentVar,
-                    $extraArgs[0],
+                    $firstNode,
                     $receiver
                 );
-                $afterAnchor = $extraArgs[0];
+                $afterAnchor = $firstNode;
                 $tail = \array_slice($extraArgs, 1);
                 foreach ($tail as $newChildVar) {
+                    $nodeVar = self::coerceNodeOrStringArg($context, $newChildVar);
                     JitDomChildNodeSiblingInsert::invokeAfter(
                         $context,
                         $parentVar,
-                        $newChildVar,
+                        $nodeVar,
                         $afterAnchor
                     );
-                    $afterAnchor = $newChildVar;
+                    $afterAnchor = $nodeVar;
                 }
                 // Overwrite single-arg InnerXml from ReplaceChild with the full
                 // replacement markup (keeps non-replaced siblings for saveXML).
@@ -329,6 +336,77 @@ final class DomNodeChildNodeMutationRuntime
         }
 
         return implode('', $pieces);
+    }
+
+    /**
+     * php-src ChildNode string arms → text nodes before LiveSlots link (#34760).
+     *
+     * TYPE_STRING / boxed string must not reach {@see JitDomParentChildLinkLayout::loadObjectArg}.
+     */
+    private static function coerceNodeOrStringArg(Context $context, Variable $arg): Variable
+    {
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            return $arg;
+        }
+        if (Variable::TYPE_STRING === $arg->type) {
+            $obj = JitDomCreateTextNode::fromStringArg($context, $arg);
+
+            return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            $obj = self::runtimeValueToNodeObject($context, $arg);
+
+            return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+        }
+
+        return $arg;
+    }
+
+    /**
+     * Runtime DOMNode|string value box → object (text stand-in or node).
+     *
+     * Uses a stack slot instead of a PHI so helpers that split the insert block
+     * (string materialize) cannot leave mismatched PHI predecessors (#34760).
+     */
+    private static function runtimeValueToNodeObject(Context $context, Variable $arg): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_cn_val_to_node');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $slot = BasicBlockHelper::entryAlloca($context, $objPtrTy);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
+        $bbStr = BasicBlockHelper::append($context, 'dom_cn_val_str');
+        $bbObj = BasicBlockHelper::append($context, 'dom_cn_val_obj');
+        $bbMerge = BasicBlockHelper::append($context, 'dom_cn_val_merge');
+        $context->builder->branchIf($isString, $bbStr, $bbObj);
+
+        $context->builder->positionAtEnd($bbStr);
+        $textObj = JitDomCreateTextNode::fromStringArg($context, $arg);
+        // fromStringArg may leave the insert block past $bbStr — store/branch there.
+        $context->builder->store($textObj, $slot);
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbObj);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $context->builder->store($obj, $slot);
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbMerge);
+
+        return $context->builder->load($slot);
     }
 
     private static function loadParentObject(Context $context, Variable $receiver): Value
