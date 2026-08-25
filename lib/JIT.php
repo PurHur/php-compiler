@@ -14016,13 +14016,29 @@ class JIT {
                         break;
                     }
                     if (!$nullsafeRuntimeObjectReceiver) {
-                        assert(null !== $obj->type && $obj->type->type === Type::TYPE_OBJECT);
+                        $recvIsValueBoxed = false;
+                        if ($this->context->hasVariableOpInScopes($obj)) {
+                            $recvIsValueBoxed = Variable::TYPE_VALUE
+                                === $this->context->getVariableFromOpInScopes($obj)->type;
+                        }
+                        // Untyped / mixed formals are TYPE_VALUE boxes; CFG may say UNION/mixed
+                        // rather than TYPE_OBJECT (#34721).
+                        if (!$recvIsValueBoxed) {
+                            assert(null !== $obj->type && $obj->type->type === Type::TYPE_OBJECT);
+                        }
                     }
                     $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
                     // Lost userType after $c = $obj->prop / nested ?-> yields generic "object".
                     // Prefer stdClass when that layout owns the property (object casts) (#26818).
-                    $forWritePreview = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
-                    if ('object' === strtolower(ltrim($declaringClass, '\\'))) {
+                    // PROPERTY_FETCH_WRITE (by-ref return / SEND_REF) must NOT rewrite to stdClass —
+                    // the real ClassEntry is only known at runtime for untyped/mixed `$o` (#34721).
+                    $opcodeIsPropertyWrite = OpCode::TYPE_PROPERTY_FETCH_WRITE === $op->type;
+                    $forWritePreview = $opcodeIsPropertyWrite
+                        || $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
+                    if (
+                        'object' === strtolower(ltrim($declaringClass, '\\'))
+                        && !$opcodeIsPropertyWrite
+                    ) {
                         $stdClassId = $this->context->type->object->lookup('stdClass');
                         $nullsafeEnumPseudoProp = $nullsafeRuntimeObjectReceiver
                             && null !== $propName
@@ -14091,16 +14107,28 @@ class JIT {
                             );
                         }
                     }
-                    $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
+                    // Honor CFG PROPERTY_FETCH_WRITE even when the next op is TYPE_RETURN
+                    // (by-ref return) — varFetchDestUsedAsAssignLvalue only sees ASSIGN (#34721).
+                    $forWrite = $opcodeIsPropertyWrite
+                        || $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                     $forDimWrite = $this->varFetchDestUsedAsDimWriteContainer($block, $i, (int) $op->arg1);
+                    $propFetchForWrite = $forWrite
+                        || $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1);
                     if ($name instanceof Operand\Literal) {
                         // PHPCfg types `new static()` receivers as static — skip declaring-class
                         // guards that target a bogus "static" ClassEntry (#31937).
                         // Also: unserialize() runtime O: results lack classUserType — use
                         // __object__.class_id (#34602 file-backed DateInterval residual).
+                        // Untyped/mixed `$o` keeps CFG userType "object" — resolve via class_id
+                        // so by-ref return aliases the real heap slot (#34721 / re-#34717).
+                        $declLcForRuntime = strtolower(ltrim($declaringClass, '\\'));
                         if (
-                            'static' === strtolower(ltrim($declaringClass, '\\'))
+                            'static' === $declLcForRuntime
                             || $this->receiverIsFromUnserializeObject($obj)
+                            || (
+                                $opcodeIsPropertyWrite
+                                && \in_array($declLcForRuntime, ['object', 'stdclass', ''], true)
+                            )
                         ) {
                             JIT\LazyObjectHelper::emitEnsureInitialized(
                                 $this->context,
@@ -14109,8 +14137,14 @@ class JIT {
                             $fetched = $this->context->type->object->propertyFetchByRuntimeReceiverClass(
                                 $receiver,
                                 $name->value,
-                                $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1)
+                                $propFetchForWrite
                             );
+                            if (null === $fetched) {
+                                throw new \LogicException(
+                                    'PROPERTY_FETCH_WRITE could not resolve runtime class for property '
+                                    .$name->value
+                                );
+                            }
                             $this->stampPropertyFetchReceiverOp($fetched, $obj);
                             JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
                             if ($forDimWrite) {
@@ -14493,7 +14527,7 @@ class JIT {
                             $receiver,
                             $declaringClass,
                             $name->value,
-                            $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1),
+                            $propFetchForWrite,
                             $this->context->getVariableFromOp($obj)
                         );
                         $this->stampPropertyFetchReceiverOp($fetched, $obj);
@@ -15472,6 +15506,12 @@ class JIT {
         $declaringClass = $obj->type->userType ?? null;
         if (null !== $declaringClass && '' !== $declaringClass) {
             $pseudoLc = strtolower(ltrim($declaringClass, '\\'));
+            // Explicit `mixed $o` stamps userType "mixed" — same runtime object dispatch as
+            // untyped params (#34721). Do not look up a ClassEntry named "mixed".
+            if ('mixed' === $pseudoLc) {
+                $declaringClass = 'object';
+                $pseudoLc = 'object';
+            }
             // self/parent: compile-time scope is enough. static: scope->calledClassName is the
             // declaring class at JIT time, not get_called_class() — leave "static" for runtime
             // property dispatch by __object__.class_id (#31937).
