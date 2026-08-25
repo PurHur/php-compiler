@@ -342,10 +342,9 @@ final class JitValueNumeric
     ): void {
         $f64 = $context->getTypeFromString('double');
         $nativeDouble = $context->builder->siToFp($nativeLong, $f64);
-        $boxedDouble = $context->builder->call(
-            $context->lookupFunction('__value__readDouble'),
-            JitValueBox::valuePtrFromVariable($context, $boxed)
-        );
+        // valueBoxToDouble: bool before float (TYPE_NATIVE_BOOL=2 steals VM TYPE_FLOAT).
+        // __value__readDouble on a bool box yields 0.0 → true/2=0 and 5/true Division by zero (#34682).
+        $boxedDouble = self::valueBoxToDouble($context, $boxed);
         if ('left' === $nativeSide) {
             $fres = self::emitDoubleOp($context, $opType, $nativeDouble, $boxedDouble);
         } else {
