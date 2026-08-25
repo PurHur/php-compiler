@@ -410,6 +410,34 @@ final class DomUserScriptLiveTagListLlvm
         $context->builder->store($i64->constInt(0, false), $pendingGlobal);
     }
 
+    /**
+     * Seed GLOBAL_TAG / GLOBAL_COUNT from a live pinned-tree walk (#34630).
+     *
+     * Used when the getElementsByTagName receiver never loadXML'd — folding
+     * {@see GLOBAL_PENDING} onto another document's compile-time tag count
+     * inflated length (importNode destination). Always rewrites (force); clears
+     * pending so a later same-tag re-query keeps appendChild increments only.
+     */
+    public static function resyncCountFromLiveTree(Context $context, string $tag): void
+    {
+        self::ensureGlobals($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_us_live_tag_resync');
+        $pinned = DomUserScriptPinnedRootLlvm::load($context);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $root = $pinned ?? $objPtrTy->constNull();
+        [, $countSz] = JitDomLiveElementsByTagWalk::snapshotToHashtable($context, $root, $tag);
+        $i64 = $context->getTypeFromString('int64');
+        $countI64 = $context->builder->intCast($countSz, $i64);
+        $tagStr = $context->builder->load($context->constantStringFromString(strtolower($tag)));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $tagStr
+        );
+        $context->builder->store($owned, $context->module->getNamedGlobal(self::GLOBAL_TAG));
+        $context->builder->store($countI64, $context->module->getNamedGlobal(self::GLOBAL_COUNT));
+        self::clearPending($context);
+    }
+
     private static function ensureGlobals(Context $context): void
     {
         $strPtr = $context->getTypeFromString('__string__*');

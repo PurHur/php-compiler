@@ -169,6 +169,11 @@ final class JitDomLoadXMLUserScript
         if (null !== self::$xmlByReceiver && isset(self::$xmlByReceiver[$document])) {
             return self::$xmlByReceiver[$document];
         }
+        // Named aliases stamped by rememberCompileTimeXmlFor / propagate (#32978).
+        // Prefer this over lastCompileTimeXml so a second document does not steal (#34630).
+        if (null !== ($document->compileTimeDomLoadXml ?? null) && '' !== $document->compileTimeDomLoadXml) {
+            return $document->compileTimeDomLoadXml;
+        }
         $token = $document->compileTimeString;
         if (null !== $token && isset(self::$xmlByToken[$token])) {
             return self::$xmlByToken[$token];
