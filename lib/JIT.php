@@ -14089,7 +14089,8 @@ class JIT {
                             );
                         }
                     }
-                    $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
+                    $forWrite = OpCode::TYPE_PROPERTY_FETCH_WRITE === $op->type
+                        || $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                     $forDimWrite = $this->varFetchDestUsedAsDimWriteContainer($block, $i, (int) $op->arg1);
                     if ($name instanceof Operand\Literal) {
                         // PHPCfg types `new static()` receivers as static — skip declaring-class
@@ -14098,6 +14099,8 @@ class JIT {
                         // __object__.class_id (#34602 file-backed DateInterval residual).
                         if (
                             'static' === strtolower(ltrim($declaringClass, '\\'))
+                            || 'object' === strtolower(ltrim($declaringClass, '\\'))
+                            || '' === ltrim($declaringClass, '\\')
                             || $this->receiverIsFromUnserializeObject($obj)
                         ) {
                             JIT\LazyObjectHelper::emitEnsureInitialized(
@@ -14108,7 +14111,13 @@ class JIT {
                                 $receiver,
                                 $name->value,
                                 $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1)
+                                    || OpCode::TYPE_PROPERTY_FETCH_WRITE === $op->type
+                                    || $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1)
                             );
+                            if (null === $fetched) {
+                                // No candidate yet (user class props registered later) — fall through
+                                // to ordinary lookup / dynamic define (#34717).
+                            } else {
                             $this->stampPropertyFetchReceiverOp($fetched, $obj);
                             JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
                             if ($forDimWrite) {
@@ -14121,9 +14130,14 @@ class JIT {
                             if ($forceBranchMerge) {
                                 $this->assignOperand($result, $fetched, true);
                             } else {
-                                $this->bindPropertyFetchResult($result, $fetched, $forWrite);
+                                $this->bindPropertyFetchResult(
+                                    $result,
+                                    $fetched,
+                                    $forWrite || OpCode::TYPE_PROPERTY_FETCH_WRITE === $op->type
+                                );
                             }
                             break;
+                            }
                         }
                         $classId = $this->context->type->object->lookup($declaringClass);
                         // Static via -> / ?->: visibility Error for inaccessible statics (#30017).
@@ -16866,9 +16880,9 @@ class JIT {
 
             return;
         }
-        if (empty($result->usages) && !$this->context->scope->variables->contains($result)) {
-            return;
-        }
+        // Always bind by-ref returns — same force as by-value (#8561). php-cfg marks
+        // `var_dump(f())` / nested call-arg temps dead while ARG_SEND still remaps to the
+        // EXEC_RETURN slot; skipping left ARG_SEND on a null box (#34717).
         $refVar = new Variable(
             $this->context,
             Variable::TYPE_VALUE,
@@ -17164,8 +17178,21 @@ class JIT {
                             !str_starts_with($lcClass, 'phpcfg\\')
                             && !str_starts_with($lcClass, 'phpcompiler\\')
                         ) {
-                            // User classes: native slots for declared scalars (VALUE-box fetch segfaults MCJIT, #5111).
+                            // User classes: boxed __value__ slots for scalars so return-by-ref /
+                            // `$a = &$o->prop` aliases the live cell (#34717 / #4054). Native
+                            // int64* slots cannot be returned as `__value__*` without dangling
+                            // stack boxes (SIGSEGV / SIGILL). String/array already use VALUE
+                            // (#4598); extend to int/float/bool. #5111 MCJIT VALUE-box crashes
+                            // were on undeclared dynamic props, not declared user scalars.
                             $jitType = $declaredJitType;
+                            if (\in_array($declaredJitType, [
+                                Variable::TYPE_NATIVE_LONG,
+                                Variable::TYPE_NATIVE_BOOL,
+                                Variable::TYPE_NATIVE_DOUBLE,
+                                Variable::TYPE_OBJECT,
+                            ], true)) {
+                                $jitType = Variable::TYPE_VALUE;
+                            }
                             $propType = $block->getOperand($op->arg3)->type;
                             $userType = is_object($propType) ? ($propType->userType ?? null) : null;
                             if (is_string($userType) && 0 === strcasecmp($userType, 'SplObjectStorage')) {

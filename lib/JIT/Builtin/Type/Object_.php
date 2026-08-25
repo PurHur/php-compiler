@@ -6250,10 +6250,11 @@ class Object_ extends Type {
             if ($this->hasProperty($classId, $propName)) {
                 continue;
             }
-            // User classes: native slots avoid VALUE-box propertyStore IR that segfaults MCJIT (#5111).
+            // User classes: boxed VALUE slots so by-ref return / ASSIGN_REF alias live cells
+            // (#34717). Native slots cannot participate in `__value__*` return-by-ref ABI.
             $jitType = $this->isExternalOnlyClass($classId)
                 ? $this->externalPropertyJitType($className, $propName)
-                : Variable::TYPE_NATIVE_LONG;
+                : Variable::TYPE_VALUE;
             $this->defineProperty($classId, $propName, $jitType);
         }
     }

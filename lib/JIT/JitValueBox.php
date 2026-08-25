@@ -99,20 +99,38 @@ final class JitValueBox
 
             return self::normalizeValuePtr($context, $heapPtr);
         }
-        // Return-by-ref from `$this->prop` must alias the heap property slot, not the
-        // stack copy materialized by propertyFetch (issue #4054, Zend ZEND_RETURN_BY_REF).
+        // Return-by-ref from `$this->prop` must alias the heap property slot, not a
+        // stack copy (#4054 / #34717, Zend ZEND_RETURN_BY_REF).
+        // Prefer the fetch-time slot pointer. dominatingSlotPtr reloads the receiver via
+        // valuePtrFromVariable; untyped `__value__` formals then materialize a fresh null
+        // box and GEP a null object (SIGSEGV on `function &f($o){ return $o->x; }`, #34717).
+        // Object-typed receivers ($this / C $o) may re-resolve when metadata is complete so
+        // ??= fetch-arm GEPs still dominate later ARG_SEND (#33760).
         if (
             null !== $var->objectPropertySlot
             && Variable::TYPE_VALUE === $var->objectPropertyType
         ) {
-            $storage = self::alloc($context);
-            $context->builder->call(
-                $context->lookupFunction('__object__load_value_slot'),
-                ObjectInstancePropertyLlvm::dominatingSlotPtr($context->type->object, $var),
-                $storage
+            $slot = $var->objectPropertySlot;
+            $recvIsObject = false;
+            if (null !== $var->objectPropertyReceiverOp && $context->hasVariableOpInScopes($var->objectPropertyReceiverOp)) {
+                $recvIsObject = Variable::TYPE_OBJECT
+                    === $context->getVariableFromOpInScopes($var->objectPropertyReceiverOp)->type;
+            } elseif (null !== $var->objectPropertyReceiver) {
+                $recvIsObject = true;
+            }
+            if (
+                $recvIsObject
+                && null !== $var->objectPropertyClassName
+                && null !== $var->objectPropertyName
+            ) {
+                $slot = ObjectInstancePropertyLlvm::dominatingSlotPtr($context->type->object, $var);
+            }
+            $heapPtr = $context->builder->pointerCast(
+                $context->builder->load($slot),
+                $context->getTypeFromString('__value__*')
             );
 
-            return self::normalizeValuePtr($context, self::pointer($context, $storage));
+            return self::normalizeValuePtr($context, $heapPtr);
         }
         if (self::isValueOperand($var) && Variable::TYPE_VALUE !== $var->type) {
             $storage = BasicBlockHelper::entryAllocaValueBox($context);

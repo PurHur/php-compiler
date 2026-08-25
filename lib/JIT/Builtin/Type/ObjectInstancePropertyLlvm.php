@@ -379,7 +379,146 @@ final class ObjectInstancePropertyLlvm
             return self::propertyFetchOrdinary($object, $obj, $className, $name, $classId, $forWrite);
         }
 
+        // By-ref return / FETCH_OBJ_W need a live objectPropertySlot. The read path boxes into
+        // a stack alloca and drops the slot — that dangles across `function &f($o){ return $o->x; }`
+        // when many classes declare `$x` (#34717). Prefer a single non-internal user class; else
+        // dispatch while retaining the heap slot pointer.
+        if ($forWrite) {
+            $userCandidates = [];
+            foreach ($candidates as $id => $className) {
+                if ($object->isExternalOnlyClass((int) $id)) {
+                    continue;
+                }
+                $classLc = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
+                if (
+                    str_starts_with($classLc, 'phpcompiler\\')
+                    || str_starts_with($classLc, 'phpcfg\\')
+                ) {
+                    continue;
+                }
+                $userCandidates[(int) $id] = $className;
+            }
+            if (1 === \count($userCandidates)) {
+                $classId = array_key_first($userCandidates);
+                $className = $userCandidates[$classId];
+
+                return self::propertyFetchOrdinary($object, $obj, $className, $name, $classId, true);
+            }
+            if ([] !== $userCandidates) {
+                return self::propertyFetchByRuntimeClassDispatchWrite(
+                    $object,
+                    $obj,
+                    $name,
+                    $userCandidates
+                );
+            }
+
+            // User class may not be registered yet while internals already declare `$x`.
+            // Still keep a live slot via write dispatch over all candidates (#34717).
+            return self::propertyFetchByRuntimeClassDispatchWrite(
+                $object,
+                $obj,
+                $name,
+                $candidates
+            );
+        }
+
         return self::propertyFetchByRuntimeClassDispatch($object, $obj, $name, $candidates, $forWrite);
+    }
+
+    /**
+     * Multi-class FETCH_OBJ_W / return-by-ref: keep {@see Variable::$objectPropertySlot} so
+     * the caller aliases the live heap cell (#34717, Zend ZEND_RETURN_BY_REF).
+     *
+     * @param array<int, string> $candidates class_id => class name
+     */
+    private static function propertyFetchByRuntimeClassDispatchWrite(
+        Object_ $object,
+        Value $obj,
+        string $name,
+        array $candidates
+    ): Variable {
+        $context = $object->jitContext();
+        $map = $context->structFieldMap['__object__'];
+        $runtimeClassId = $context->builder->load(
+            $context->builder->structGep($obj, $map['class_id'])
+        );
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('prop_fetch_rt_w_done');
+        $fallback = $fn->appendBasicBlock('prop_fetch_rt_w_fallback');
+        $voidPtrPtr = $context->getTypeFromString('void**');
+        $slotHolder = BasicBlockHelper::entryAlloca($context, $voidPtrPtr);
+        $context->builder->store($voidPtrPtr->constNull(), $slotHolder);
+        $i64 = $context->getTypeFromString('int64');
+        $checkBlock = $entry;
+        $lastKey = array_key_last($candidates);
+        $propType = Variable::TYPE_VALUE;
+        $propName = $name;
+        $propClassName = null;
+        foreach ($candidates as $classId => $className) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $runtimeClassId,
+                $i64->constInt($classId, false)
+            );
+            $caseBlock = $fn->appendBasicBlock('prop_fetch_rt_w_class_'.$classId);
+            $nextBlock = $classId === $lastKey
+                ? $fallback
+                : $fn->appendBasicBlock('prop_fetch_rt_w_try_'.$classId);
+            $context->builder->branchIf($match, $caseBlock, $nextBlock);
+            $context->builder->positionAtEnd($caseBlock);
+            $fetched = self::propertyFetchOrdinary($object, $obj, $className, $name, $classId, true);
+            if (null === $fetched->objectPropertySlot) {
+                throw new \LogicException(
+                    'runtime write property fetch missing objectPropertySlot (#34717)'
+                );
+            }
+            $propType = $fetched->objectPropertyType ?? $fetched->type;
+            $propName = $fetched->objectPropertyName ?? $name;
+            $propClassName = $fetched->objectPropertyClassName ?? $className;
+            $context->builder->store(
+                $context->builder->pointerCast($fetched->objectPropertySlot, $voidPtrPtr),
+                $slotHolder
+            );
+            $context->builder->branch($done);
+            $checkBlock = $nextBlock;
+        }
+        if ($checkBlock !== $fallback) {
+            $context->builder->positionAtEnd($checkBlock);
+            $context->builder->branch($fallback);
+        }
+        $context->builder->positionAtEnd($fallback);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $slot = $context->builder->load($slotHolder);
+        $valueType = $context->getTypeFromString('__value__');
+        $storage = $context->builder->alloca($valueType);
+        $valueMap = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($storage, $valueMap['type'])
+        );
+        $context->builder->call(
+            $context->lookupFunction('__object__load_value_slot'),
+            $slot,
+            $storage
+        );
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE === $propType ? Variable::TYPE_VALUE : $propType,
+            Variable::KIND_VARIABLE,
+            $storage
+        );
+        $var->objectPropertySlot = $slot;
+        $var->objectPropertyType = Variable::TYPE_VALUE === $propType ? Variable::TYPE_VALUE : $propType;
+        $var->objectPropertyReceiver = $obj;
+        $var->objectPropertyName = $propName;
+        $var->objectPropertyClassName = $propClassName;
+        $object->recordSlotReceiver($slot, $obj);
+
+        return $var;
     }
 
     /**
