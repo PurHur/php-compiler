@@ -2255,8 +2255,72 @@ final class HashTableWriteLlvm
                 $keyStr
             );
         }
+        // Boxed dim keys (`count($a)-1`, runtime ints): prepareValueBoxKeyWrite orphans
+        // without writableIndex — by-ref return must still alias the live entry (#34768).
+        if (null !== $lvalue->writableValueBoxKey) {
+            return self::liveEntryPointerForValueBoxKey($context, $lvalue);
+        }
 
         return null;
+    }
+
+    /**
+     * Live HT entry for FETCH_DIM_W when the key is a `__value__` box (#34768 / re-#34740).
+     *
+     * Runtime int keys (`count($a)-1`) stay TYPE_VALUE; resolve via readLong + packed
+     * listEntryPointer (same as {@see prepareIndexWrite}).
+     *
+     * @see php-src Zend/zend_execute.c ZEND_FETCH_DIM_W / ZEND_RETURN_BY_REF
+     */
+    private static function liveEntryPointerForValueBoxKey(Context $context, Variable $lvalue): ?Value
+    {
+        $ht = $lvalue->writableHt;
+        $dim = $lvalue->writableValueBoxKey;
+        if (null === $ht || null === $dim) {
+            return null;
+        }
+        // Prefer string-key live path when the boxed key is known to be a string.
+        if (null !== $dim->compileTimeString) {
+            $keyStr = $context->builder->load(
+                $context->constantStringFromString($dim->compileTimeString)
+            );
+            $tag = (string) self::nextSeq();
+            $isSet = $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                $ht,
+                $keyStr
+            );
+            $create = BasicBlockHelper::append($context, 'ht_dim_live_vk_cts_create_'.$tag);
+            $ready = BasicBlockHelper::append($context, 'ht_dim_live_vk_cts_ready_'.$tag);
+            $context->builder->branchIf($isSet, $ready, $create);
+            $context->builder->positionAtEnd($create);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyNull'),
+                $ht,
+                $keyStr
+            );
+            $context->builder->branch($ready);
+            $context->builder->positionAtEnd($ready);
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__readStringKeyValue'),
+                $ht,
+                $keyStr
+            );
+        }
+        // Runtime / compile-time int key (count()-1, $i from arithmetic).
+        $valPtr = HashTableReadLlvm::valuePtrFromDim($context, $dim);
+        $index = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr),
+            $context->getTypeFromString('size_t')
+        );
+        $prevIndex = $lvalue->writableIndex;
+        $lvalue->writableIndex = $index;
+        self::hydrateIndexWriteLvalue($context, $lvalue);
+        $entry = HashTableReadLlvm::listEntryPointer($context, $ht, $index);
+        $lvalue->writableIndex = $prevIndex;
+
+        return $entry;
     }
 
     /**
