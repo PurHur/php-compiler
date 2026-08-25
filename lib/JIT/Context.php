@@ -3511,6 +3511,8 @@ class Context {
 
                     return;
                 }
+                // Static/file-scope eval must not materialize $this as script global/alloca (#31902 AOT).
+                return;
             }
         }
         if (null !== $name && Superglobals::isSuperglobalName($name)) {
@@ -3519,7 +3521,8 @@ class Context {
             return;
         }
         if (null !== $name && $block->isMainScript()) {
-            if (!$this->isForeachByRefLocalName($name, $block)) {
+            // Inlined eval {main} without a bound caller $this must not become a script global (#31902 AOT).
+            if ('this' !== $name && !$this->isForeachByRefLocalName($name, $block)) {
                 $global = $this->ensureScriptGlobal($name);
                 $this->scope->variables[$op] = $global;
                 $this->bindVariableByName($name, $global);

@@ -13,10 +13,12 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
+use PHPCompiler\JIT\UnboundThisGuard;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\OpCode;
 use PHPCompiler\Runtime;
@@ -72,6 +74,11 @@ final class EvalRuntime
             // Expression-only literal: inline when compile succeeds (#26032 filename shape).
             $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal, $evalFile, $evalClassScope);
             if ($evalBlock instanceof Block) {
+                if (self::literalUsesThis($literal) && !self::evalCallerHasBoundThis($jit, $callerBlock)) {
+                    self::emitUnboundThisEvalError($jit, $resultOp);
+
+                    return;
+                }
                 $evalBlock->setScriptPath($evalFile);
                 \PHPCompiler\JIT\IncludeHelper::compileInlinedBlock(
                     $jit,
@@ -370,5 +377,47 @@ final class EvalRuntime
         }
 
         return JitStringArg::compileTimeLiteral($jit->context->getVariableFromOp($codeOp));
+    }
+
+    /** @return bool Whether a compile-time eval source references $this. */
+    private static function literalUsesThis(string $literal): bool
+    {
+        return 1 === preg_match('/(?<![\\w\$])\\$this\\b/', $literal);
+    }
+
+    /**
+     * Zend binds EX(This) for instance-method eval only (#31902 / zend_eval_string).
+     */
+    private static function evalCallerHasBoundThis(JIT $jit, Block $callerBlock): bool
+    {
+        $func = $callerBlock->func;
+        if (null !== $func && (($func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return false;
+        }
+        if (null !== $func && null !== $func->class && !$callerBlock->isMainScript()) {
+            return true;
+        }
+        if (null !== $jit->context->findThisVariable()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function emitUnboundThisEvalError(JIT $jit, Operand $resultOp): void
+    {
+        ErrorRaise::registerDeclarations($jit->context);
+        ErrorRaise::ensureLinked($jit->context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $jit->context->loadType) {
+            ErrorRaise::ensureStandaloneBodies($jit->context);
+        }
+        if ([] !== $jit->context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($jit->context, $jit, UnboundThisGuard::ERROR_MESSAGE);
+        } else {
+            ErrorRaise::emitRaise($jit->context, UnboundThisGuard::ERROR_MESSAGE);
+            $jit->context->builder->call($jit->context->lookupFunction('abort'));
+            $jit->context->builder->clearInsertionPosition();
+        }
+        self::emitFalse($jit, $resultOp);
     }
 }
