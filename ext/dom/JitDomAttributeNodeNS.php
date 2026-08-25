@@ -659,17 +659,22 @@ final class JitDomAttributeNodeNS
     }
 
     /**
-     * After removeAttributeNode: drop createAttribute key from saveXML suffix (#33577).
+     * After removeAttributeNode: drop attr from saveXML open-tag suffix (#33577 / #34579).
      *
      * Mirror {@see \PHPCompiler\JIT\Call\DomElementRemoveAttribute} — pin/cache clear alone
      * leaves PROP_USER_SCRIPT_XMLNS_ATTR stale so saveXML still emits the attr.
+     *
+     * Prefer {@see JitDomAttrRename::lastFetchedKey()} from getAttributeNode so loadXML
+     * attrs (no createAttribute) still refresh compile-time XML (#34579 leftover of #34257;
+     * peer Attr value write #34305).
      */
     public static function syncSaveXmlAttrSuffixAfterRemoveAttributeNode(
         Context $context,
         JITVariable $elementArg
     ): void {
-        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
-        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        $fetched = JitDomAttrRename::lastFetchedKey();
+        $ns = $fetched[0] ?? DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+        $local = $fetched[1] ?? DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
         if (null === $local || 'xmlns' === $local) {
             return;
         }
@@ -690,6 +695,29 @@ final class JitDomAttributeNodeNS
         if ('' === $ns) {
             DomUserScriptAttributeCacheLlvm::clearLiteral($context, $ns, $local);
         }
+
+        // loadXML seeds open-tag attrs into PROP_USER_SCRIPT_XMLNS_ATTR; createElement bag
+        // is empty — bag-only sync never updates saveXML (#34257 / #34579).
+        $hadLoadXml = null !== JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if ($hadLoadXml) {
+            $path = $elementArg->compileTimeDomNodePath ?? null;
+            $nested = null !== $path && '' !== $path
+                && substr_count(trim($path, '/'), '/') >= 1;
+            if ($nested) {
+                JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+            } elseif ('' !== $ns) {
+                JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeRemoveNS($ns, $local);
+                JitDomLoadXMLUserScript::syncElementXmlnsAttrFromCompileTimeXml($context, $elementArg);
+
+                return;
+            } else {
+                JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeRemove($local);
+                JitDomLoadXMLUserScript::syncElementXmlnsAttrFromCompileTimeXml($context, $elementArg);
+
+                return;
+            }
+        }
+
         self::syncSaveXmlAttrSuffix($context, $elementArg, $attrs);
     }
 
