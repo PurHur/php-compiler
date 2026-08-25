@@ -9052,6 +9052,7 @@ class JIT {
                     }
                     $srcVar = $this->context->getVariableFromOp($srcOp);
                     JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
+                    $this->aliasAssignRefNamedDestToDimEntry($srcVar);
                     if (
                         Variable::TYPE_VALUE === $srcVar->type
                         && null === $srcVar->valueBoxAliasPtr
@@ -18783,6 +18784,23 @@ class JIT {
             );
             $srcVar->valueBoxAliasPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $entryPtr);
         }
+    }
+
+    /**
+     * `$r = &$a[0]` / `[&$x] = $a`: point the named dest at the live HT entry (Zend IS_REFERENCE).
+     *
+     * FETCH_DIM_W orphan boxes are empty until hydrated; ref binds must alias the slot (#34673).
+     *
+     * @see php-src Zend/zend_execute.c zend_assign_to_variable_reference
+     */
+    private function aliasAssignRefNamedDestToDimEntry(Variable $dimLvalue): void
+    {
+        $entryPtr = $this->assignRefDestEntryPointer($dimLvalue);
+        if (null === $entryPtr) {
+            return;
+        }
+        $dimLvalue->valueBoxAliasPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $entryPtr);
+        $dimLvalue->borrowedValueEntry = true;
     }
 
     /**
