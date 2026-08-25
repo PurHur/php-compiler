@@ -36,10 +36,14 @@ final class ContextMinimalStandaloneLazyStringTriggerErrorShrinkTest extends Tes
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
-            'ErrorBridge::ensureStandaloneBodies($this)',
         ] as $keep) {
-            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34732)");
+            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34769)");
         }
+        $this->assertStringNotContainsString(
+            'ErrorBridge::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ErrorBridge (#34769)'
+        );
         $this->assertStringNotContainsString(
             'ExceptionBridge::ensureStandaloneBodies($this)',
             $minimalBody,

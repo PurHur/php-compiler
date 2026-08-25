@@ -25,9 +25,10 @@ final class ErrorRaise
     {
         self::registerPendingGlobals($context);
         self::registerDeclarations($context);
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            self::implementBodies($context);
-        }
+        // Standalone too — Context ensureMinimal no longer eagerly ErrorBridge (#34769 /
+        // peer #34732). Call-site ensureLinked must implement bodies or thin AOT mints
+        // declaration-only *.1 / link-fail (#31894 / #32122).
+        self::implementBodies($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -59,6 +60,7 @@ final class ErrorRaise
 
     public static function emitRaise(Context $context, string $message): void
     {
+        self::ensureLinked($context);
         self::emitPendingMessage($context, $message);
     }
 
@@ -304,7 +306,8 @@ final class ErrorRaise
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        self::registerDeclarations($context);
+        // Lazy bodies — ensureMinimal no longer ErrorBridge (#34769).
+        self::ensureLinked($context);
         $context->builder->call($context->lookupFunction('phpc_jit_error_clear_pending'));
     }
 
@@ -313,7 +316,7 @@ final class ErrorRaise
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        self::registerDeclarations($context);
+        self::ensureLinked($context);
         $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
     }
 

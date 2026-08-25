@@ -30,15 +30,19 @@ final class ContextMinimalStandaloneLazyExceptionBridgeRuntimeShrinkTest extends
             'ensureMinimalUserStandaloneBodies must not eagerly ExceptionBridge (#34732)'
         );
 
-        // Essentials for thin argv / getenv / Error pending stay.
+        // Essentials for thin argv / getenv stay (#34769 dropped ErrorBridge).
         foreach ([
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
-            'ErrorBridge::ensureStandaloneBodies($this)',
         ] as $keep) {
-            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34732)");
+            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34769)");
         }
+        $this->assertStringNotContainsString(
+            'ErrorBridge::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ErrorBridge (#34769)'
+        );
 
         // ensureFull still eagerly ExceptionBridge (full AOT fixture surface).
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');

@@ -2302,8 +2302,12 @@ class Context {
         // bodies before lookup (peer #34695). Thin hello-world must not NestedJIT TypeErrorRaise
         // / JitThrow during init — thin {main} skips ExceptionBridge clear/abort anyway.
         // Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
+        // ErrorBridge always-on removed (#34769): ErrorRaise / AssertionErrorRaise /
+        // ReadonlyRaise ensureLinked + emitClear/emitAbort/emitRaise already implement
+        // standalone bodies before lookup (peer #34732). Thin hello-world must not NestedJIT
+        // pending-Error ABI during init — thin {main} skips ErrorBridge clear/abort when unused.
+        // Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
         // Full standalone still ensureStandaloneBodies below.
-        ErrorBridge::ensureStandaloneBodies($this);
         // ErrorHandler / ExceptionHandler always-on removed (#34612): JitErrorHandler /
         // JitTriggerErrorKernel / JitExceptionHandler / TryCatchHelper already ensureLinked
         // before lookup (peer #34605). implement() paths restore builder insert mid-{main}.

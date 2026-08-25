@@ -440,7 +440,8 @@ final class ReadonlyRaise
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        self::registerDeclarations($context);
+        // Lazy bodies — ensureMinimal no longer ErrorBridge (#34769).
+        self::ensureLinked($context);
         $context->builder->call($context->lookupFunction('phpc_jit_clear_pending_exception'));
     }
 
@@ -449,7 +450,7 @@ final class ReadonlyRaise
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        self::registerDeclarations($context);
+        self::ensureLinked($context);
         $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_logic_exception'));
     }
 

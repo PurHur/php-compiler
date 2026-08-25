@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM;
 
@@ -23,9 +23,10 @@ final class AssertionErrorRaise
     {
         self::registerPendingGlobals($context);
         self::registerDeclarations($context);
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            self::implementBodies($context);
-        }
+        // Standalone too — Context ensureMinimal no longer eagerly ErrorBridge (#34769 /
+        // peer #34732). Call-site ensureLinked must implement bodies or thin AOT mints
+        // declaration-only *.1 / link-fail (#31894 / #32122).
+        self::implementBodies($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -37,6 +38,7 @@ final class AssertionErrorRaise
 
     public static function emitRaise(Context $context, string $message): void
     {
+        self::ensureLinked($context);
         $msgLen = $context->constantFromInteger(\strlen($message), 'size_t');
         $msgCStr = $context->builder->pointerCast(
             $context->constantFromString($message),
@@ -58,10 +60,17 @@ final class AssertionErrorRaise
             return;
         }
 
-        self::registerPendingGlobals($context);
-        self::registerDeclarations($context);
-        self::implementRaiseFunction($context);
-        self::implementPendingHelpers($context);
+        // Body emission clears the insert block; restore so mid-{main} assert sites stay
+        // well-formed (#34769 / peer ErrorRaise #26826).
+        $restore = BasicBlockHelper::tryGetInsertBlock($context);
+        try {
+            self::registerPendingGlobals($context);
+            self::registerDeclarations($context);
+            self::implementRaiseFunction($context);
+            self::implementPendingHelpers($context);
+        } finally {
+            BasicBlockHelper::restoreInsertBlock($context, $restore);
+        }
     }
 
     private static function registerPendingGlobals(Context $context): void
