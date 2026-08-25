@@ -188,6 +188,16 @@ final class JitDomDocumentElement
                     $child,
                     DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open'], $inScopeNs)
                 );
+                // DTD ID / xml:id → live tree node in document id map (#34696).
+                if (null !== $ownerDocument) {
+                    JitDomLoadXMLUserScript::registerLiveElementIdFromOpenTag(
+                        $context,
+                        $ownerDocument,
+                        $child,
+                        $node['data'],
+                        $node['open']
+                    );
+                }
             }
             self::ensureLinkProps($context);
             $parentJit = new JITVariable(

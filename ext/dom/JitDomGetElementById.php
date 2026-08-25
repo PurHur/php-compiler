@@ -114,8 +114,31 @@ final class JitDomGetElementById
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $hitBoxed), $resultSlot);
             $context->builder->branch($doneBlock);
 
-            // Cache active but id miss — DomRegistry may still have setIdAttribute (#33957).
+            // Cache active but id miss — PROP_ELEMENT_ID_MAP holds other loadXML
+            // DTD IDs (single-slot cache is first-wins only; #34696). NestedJIT covers
+            // setIdAttribute DomRegistry updates when the map has no entry (#33957).
             $context->builder->positionAtEnd($cacheMiss);
+            $mapHit = self::lookupElementIdMapBoxed($context, $document, $idStr);
+            $mapValPtr = JitValueBox::normalizeValuePtr($context, $mapHit);
+            $valueMap = $context->structFieldMap['__value__'];
+            $i8 = $context->getTypeFromString('int8');
+            $mapType = $context->builder->load(
+                $context->builder->structGep($mapValPtr, $valueMap['type'])
+            );
+            $mapIsObject = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $mapType,
+                $i8->constInt(JITVariable::TYPE_OBJECT, false)
+            );
+            $mapOk = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_miss_map');
+            $mapNested = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_miss_nested');
+            $context->builder->branchIf($mapIsObject, $mapOk, $mapNested);
+
+            $context->builder->positionAtEnd($mapOk);
+            $context->builder->store($mapValPtr, $resultSlot);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($mapNested);
             $context->builder->store(
                 JitValueBox::normalizeValuePtr(
                     $context,
@@ -159,6 +182,32 @@ final class JitDomGetElementById
     private static function strcmpStringPtrs(Context $context, Value $leftStr, Value $rightStr): Value
     {
         return JitStringCompare::strcmp($context, $leftStr, $rightStr);
+    }
+
+    /**
+     * PROP_ELEMENT_ID_MAP lookup — empty HT when unset (ensureHashtablePointer; #34696).
+     *
+     * @return Value {@see __value__*} object box or null box
+     */
+    private static function lookupElementIdMapBoxed(
+        Context $context,
+        Value $document,
+        Value $idStr
+    ): Value {
+        self::ensureDocumentPropertyLayout($context);
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_DOCUMENT);
+        $mapVar = ObjectInstancePropertyLlvm::propertyFetchOrdinary(
+            $objectType,
+            $document,
+            self::CLASS_DOCUMENT,
+            VmDom::PROP_ELEMENT_ID_MAP,
+            $classId
+        );
+        $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
+        $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
+
+        return JitValueBox::valuePtrFromVariable($context, $foundVar);
     }
 
     /**
