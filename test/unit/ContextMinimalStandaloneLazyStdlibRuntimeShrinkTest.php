@@ -49,16 +49,25 @@ final class ContextMinimalStandaloneLazyStdlibRuntimeShrinkTest extends TestCase
             );
         }
 
-        // Essentials for thin echo / error / argv / getenv surface stay.
+        // Essentials for thin argv / getenv surface stay (#34695 dropped ObOutput;
+        // #34641 dropped StringTriggerError).
         foreach ([
-            'ObOutputRuntime::ensureLinked($this)',
-            'StringTriggerError::ensureStandaloneBodies($this)',
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34578)");
         }
+        $this->assertStringNotContainsString(
+            'ObOutputRuntime::ensureLinked($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly ObOutputRuntime (#34695)'
+        );
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly StringTriggerError (#34641)'
+        );
     }
 
     public function testCallSitesEnsureBeforeLookup(): void

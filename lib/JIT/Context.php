@@ -2317,7 +2317,10 @@ class Context {
         // JitReturnPending always-on removed (#34621): TryCatchHelper / emitPendingReturnResume
         // already ensureLinked before lookup (peer #34612). JitHelperAbiBridge restores insert
         // mid-{main}. Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
-        Builtin\ObOutputRuntime::ensureLinked($this);
+        // ObOutput always-on removed (#34695): ValueEchoHelper / ValueEchoRuntime /
+        // StringVarDump / ObOutput / StreamReadRuntime already ensureLinked before
+        // __phpc_ob_echo_* lookup (peer #34642). Leftover Context NestedJIT vs Runtime ABI
+        // drift mints ob_*.1 (#31894 / #32122). Thin hello-world must not NestedJIT ob during init.
         // StringRandomBytes / Utf8Latin1 / RewriteVars / Define / StrContains / StatPath /
         // FileGetContents / MetaTags / HashCrypto / MbNumericEntity / Readfile / Bin2hex /
         // Addslashes / Stripslashes / FilePutContents / IniRuntime always-on removed (#34578):
@@ -2367,7 +2370,8 @@ class Context {
             Builtin\AssertFail::ensureStandaloneBodies($this);
             Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
             Builtin\JitReturnPending::ensureStandaloneBodies($this);
-            Builtin\ObOutputRuntime::ensureLinked($this);
+            // ObOutput always-on removed (#34695): ValueEchoRuntime::ensureLinked → ObOutput
+            // (and ValueEchoHelper call sites). Do not re-add before ValueEcho here.
             Builtin\ValueEchoRuntime::ensureLinked($this);
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
             // Nested-JIT string helpers: lazy via ensureLinked during spine/thin init (#14472, #20571).

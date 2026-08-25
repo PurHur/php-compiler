@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\ObOutputRuntime;
 use PHPCompiler\JIT\Builtin\ValueEchoRuntime;
 use PHPCompiler\JIT\IncDecResourceProvenance;
 use PHPCfg\Operand;
@@ -23,6 +24,8 @@ final class ValueEchoHelper
 
     public static function echoLiteral(Context $context, string $literal): void
     {
+        // Lazy ob_* ABI — Context ensureMinimal must not NestedJIT ObOutput (#34695 / peer #34642).
+        ObOutputRuntime::ensureLinked($context);
         $charPtr = $context->getTypeFromString('char*');
         $context->builder->call(
             $context->lookupFunction('__phpc_ob_echo_cstr'),
@@ -42,6 +45,7 @@ final class ValueEchoHelper
         ?Operand $sourceOperand = null
     ): void
     {
+        ObOutputRuntime::ensureLinked($context);
         Builtin\StringDir::ensureLinked($context);
         $tag = 'enl'.(string) ++self::$seq;
         $i64 = $context->getTypeFromString('int64');
@@ -189,6 +193,7 @@ final class ValueEchoHelper
 
     public static function echoStringVariable(Context $context, Variable $stringVar): void
     {
+        ObOutputRuntime::ensureLinked($context);
         $argValue = $context->helper->loadValue($stringVar);
         $offset = $context->structFieldIndex($argValue, 'length');
         $__str__length = $context->builder->load(
