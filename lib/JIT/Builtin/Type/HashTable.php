@@ -126,6 +126,9 @@ class HashTable extends Type
         $this->registerFn('__hashtable__sortStringKeys', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeysLocale', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeysReverse', 'void', ['__hashtable__*']);
+        // SORT_STRING|SORT_FLAG_CASE — length-aware ASCII strcasecmp on keys (#34707).
+        $this->registerFn('__hashtable__sortStringKeysCase', 'void', ['__hashtable__*']);
+        $this->registerFn('__hashtable__sortStringKeysReverseCase', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValues', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValuesLocale', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValuesNatural', 'void', ['__hashtable__*']);
@@ -203,9 +206,11 @@ class HashTable extends Type
         $this->implementValueReadHashtable();
         $this->implementValueWriteHashtable();
         $this->implementHashtablePtrIsNonEmpty();
-        $this->implementSortStringKeys();
+        $this->implementSortStringKeys(false, false);
         $this->implementSortStringKeysLocale();
-        $this->implementSortStringKeysReverse();
+        $this->implementSortStringKeys(true, false);
+        $this->implementSortStringKeys(false, true);
+        $this->implementSortStringKeys(true, true);
         $this->implementSortStringKeyValues();
         $this->implementSortStringKeyValuesLocale();
         $this->implementSortStringKeyValuesNatural();
@@ -2199,9 +2204,23 @@ class HashTable extends Type
         return $this->context->builder->select($isEmpty, $this->context->constantFromBool(false), $consumedAll);
     }
 
-    private function implementSortStringKeys(): void
+    /**
+     * Bubble-sort string-key chain by key (ksort / krsort) (#27227, #34707).
+     *
+     * `$caseInsensitive` → SORT_STRING|SORT_FLAG_CASE via {@see JitStringCompare::strcasecmp}.
+     */
+    private function implementSortStringKeys(bool $reverse, bool $caseInsensitive = false): void
     {
-        $fn = $this->context->lookupFunction('__hashtable__sortStringKeys');
+        if ($caseInsensitive) {
+            $abi = $reverse
+                ? '__hashtable__sortStringKeysReverseCase'
+                : '__hashtable__sortStringKeysCase';
+            $tag = $reverse ? 'krsort_strcase' : 'ksort_strcase';
+        } else {
+            $abi = $reverse ? '__hashtable__sortStringKeysReverse' : '__hashtable__sortStringKeys';
+            $tag = $reverse ? 'krsort_str' : 'ksort_str';
+        }
+        $fn = $this->context->lookupFunction($abi);
         $main = $fn->appendBasicBlock('main');
         $this->context->builder->positionAtEnd($main);
         $ht = $fn->getParam(0);
@@ -2211,27 +2230,26 @@ class HashTable extends Type
         $nodePtrType = $this->context->getTypeFromString('__strkey_node__*');
         $nullNode = $nodePtrType->constNull();
         $i1 = $this->context->getTypeFromString('int1');
-        $i32 = $this->context->getTypeFromString('int32');
 
         $head = $this->context->builder->load($headSlot);
-        $done = $fn->appendBasicBlock('ksort_str_done');
-        $work = $fn->appendBasicBlock('ksort_str_work');
+        $done = $fn->appendBasicBlock($tag.'_done');
+        $work = $fn->appendBasicBlock($tag.'_work');
         $headIsNull = $this->context->builder->icmp(Builder::INT_EQ, $head, $nullNode);
         $this->context->builder->branchIf($headIsNull, $done, $work);
 
         $this->context->builder->positionAtEnd($work);
         $headNext = $this->context->builder->load($this->context->builder->structGep($head, $nodeMap['next']));
         $singleNode = $this->context->builder->icmp(Builder::INT_EQ, $headNext, $nullNode);
-        $passStart = $fn->appendBasicBlock('ksort_str_pass');
+        $passStart = $fn->appendBasicBlock($tag.'_pass');
         $this->context->builder->branchIf($singleNode, $done, $passStart);
 
         $this->context->builder->positionAtEnd($passStart);
-        $swappedSlot = $this->context->builder->alloca($i1, 1, 'ksort_str_swapped');
+        $swappedSlot = $this->context->builder->alloca($i1, 1, $tag.'_swapped');
         $this->context->builder->store($i1->constInt(1, false), $swappedSlot);
 
-        $passHead = $fn->appendBasicBlock('ksort_str_pass_head');
-        $passBody = $fn->appendBasicBlock('ksort_str_pass_body');
-        $passExit = $fn->appendBasicBlock('ksort_str_pass_exit');
+        $passHead = $fn->appendBasicBlock($tag.'_pass_head');
+        $passBody = $fn->appendBasicBlock($tag.'_pass_body');
+        $passExit = $fn->appendBasicBlock($tag.'_pass_exit');
         $this->context->builder->branch($passHead);
 
         $this->context->builder->positionAtEnd($passHead);
@@ -2240,13 +2258,13 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($passBody);
         $this->context->builder->store($i1->constInt(0, false), $swappedSlot);
-        $prevSlot = $this->context->builder->alloca($nodePtrType, 1, 'ksort_str_prev');
-        $curSlot = $this->context->builder->alloca($nodePtrType, 1, 'ksort_str_cur');
+        $prevSlot = $this->context->builder->alloca($nodePtrType, 1, $tag.'_prev');
+        $curSlot = $this->context->builder->alloca($nodePtrType, 1, $tag.'_cur');
         $this->context->builder->store($nullNode, $prevSlot);
         $this->context->builder->store($this->loadStrKeysHead($headSlot), $curSlot);
 
-        $walkHead = $fn->appendBasicBlock('ksort_str_walk_head');
-        $walkBody = $fn->appendBasicBlock('ksort_str_walk_body');
+        $walkHead = $fn->appendBasicBlock($tag.'_walk_head');
+        $walkBody = $fn->appendBasicBlock($tag.'_walk_body');
         $this->context->builder->branch($walkHead);
 
         $this->context->builder->positionAtEnd($walkHead);
@@ -2257,25 +2275,29 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($walkBody);
         $next = $this->context->builder->load($this->context->builder->structGep($cur, $nodeMap['next']));
         $nextIsNull = $this->context->builder->icmp(Builder::INT_EQ, $next, $nullNode);
-        $advance = $fn->appendBasicBlock('ksort_str_advance');
-        $compare = $fn->appendBasicBlock('ksort_str_compare');
+        $advance = $fn->appendBasicBlock($tag.'_advance');
+        $compare = $fn->appendBasicBlock($tag.'_compare');
         $this->context->builder->branchIf($nextIsNull, $passExit, $compare);
 
         $this->context->builder->positionAtEnd($compare);
         $keyCur = $this->context->builder->load($this->context->builder->structGep($cur, $nodeMap['key']));
         $keyNext = $this->context->builder->load($this->context->builder->structGep($next, $nodeMap['key']));
-        $cmp = JitStringCompare::strcmp($this->context, $keyCur, $keyNext);
+        $cmp = $caseInsensitive
+            ? JitStringCompare::strcasecmp($this->context, $keyCur, $keyNext)
+            : JitStringCompare::strcmp($this->context, $keyCur, $keyNext);
         $i64 = $this->context->getTypeFromString('int64');
-        $needsSwap = $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i64->constInt(0, false));
-        $swapBlock = $fn->appendBasicBlock('ksort_str_swap');
+        $needsSwap = $reverse
+            ? $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i64->constInt(0, false))
+            : $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i64->constInt(0, false));
+        $swapBlock = $fn->appendBasicBlock($tag.'_swap');
         $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);
 
         $this->context->builder->positionAtEnd($swapBlock);
         $prev = $this->context->builder->load($prevSlot);
         $hasPrev = $this->context->builder->icmp(Builder::INT_NE, $prev, $nullNode);
-        $updateHead = $fn->appendBasicBlock('ksort_str_update_head');
-        $updatePrev = $fn->appendBasicBlock('ksort_str_update_prev');
-        $afterLink = $fn->appendBasicBlock('ksort_str_after_link');
+        $updateHead = $fn->appendBasicBlock($tag.'_update_head');
+        $updatePrev = $fn->appendBasicBlock($tag.'_update_prev');
+        $afterLink = $fn->appendBasicBlock($tag.'_after_link');
         $this->context->builder->branchIf($hasPrev, $updatePrev, $updateHead);
 
         $this->context->builder->positionAtEnd($updateHead);
@@ -2421,117 +2443,6 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
     }
-
-    private function implementSortStringKeysReverse(): void
-    {
-        $fn = $this->context->lookupFunction('__hashtable__sortStringKeysReverse');
-        $main = $fn->appendBasicBlock('main');
-        $this->context->builder->positionAtEnd($main);
-        $ht = $fn->getParam(0);
-        $htMap = $this->context->structFieldMap['__hashtable__'];
-        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
-        $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
-        $nodePtrType = $this->context->getTypeFromString('__strkey_node__*');
-        $nullNode = $nodePtrType->constNull();
-        $i1 = $this->context->getTypeFromString('int1');
-        $i32 = $this->context->getTypeFromString('int32');
-
-        $head = $this->context->builder->load($headSlot);
-        $done = $fn->appendBasicBlock('krsort_str_done');
-        $work = $fn->appendBasicBlock('krsort_str_work');
-        $headIsNull = $this->context->builder->icmp(Builder::INT_EQ, $head, $nullNode);
-        $this->context->builder->branchIf($headIsNull, $done, $work);
-
-        $this->context->builder->positionAtEnd($work);
-        $headNext = $this->context->builder->load($this->context->builder->structGep($head, $nodeMap['next']));
-        $singleNode = $this->context->builder->icmp(Builder::INT_EQ, $headNext, $nullNode);
-        $passStart = $fn->appendBasicBlock('krsort_str_pass');
-        $this->context->builder->branchIf($singleNode, $done, $passStart);
-
-        $this->context->builder->positionAtEnd($passStart);
-        $swappedSlot = $this->context->builder->alloca($i1, 1, 'krsort_str_swapped');
-        $this->context->builder->store($i1->constInt(1, false), $swappedSlot);
-
-        $passHead = $fn->appendBasicBlock('krsort_str_pass_head');
-        $passBody = $fn->appendBasicBlock('krsort_str_pass_body');
-        $passExit = $fn->appendBasicBlock('krsort_str_pass_exit');
-        $this->context->builder->branch($passHead);
-
-        $this->context->builder->positionAtEnd($passHead);
-        $didSwap = $this->context->builder->load($swappedSlot);
-        $this->context->builder->branchIf($didSwap, $passBody, $done);
-
-        $this->context->builder->positionAtEnd($passBody);
-        $this->context->builder->store($i1->constInt(0, false), $swappedSlot);
-        $prevSlot = $this->context->builder->alloca($nodePtrType, 1, 'krsort_str_prev');
-        $curSlot = $this->context->builder->alloca($nodePtrType, 1, 'krsort_str_cur');
-        $this->context->builder->store($nullNode, $prevSlot);
-        $this->context->builder->store($this->loadStrKeysHead($headSlot), $curSlot);
-
-        $walkHead = $fn->appendBasicBlock('krsort_str_walk_head');
-        $walkBody = $fn->appendBasicBlock('krsort_str_walk_body');
-        $this->context->builder->branch($walkHead);
-
-        $this->context->builder->positionAtEnd($walkHead);
-        $cur = $this->context->builder->load($curSlot);
-        $curIsNull = $this->context->builder->icmp(Builder::INT_EQ, $cur, $nullNode);
-        $this->context->builder->branchIf($curIsNull, $passExit, $walkBody);
-
-        $this->context->builder->positionAtEnd($walkBody);
-        $next = $this->context->builder->load($this->context->builder->structGep($cur, $nodeMap['next']));
-        $nextIsNull = $this->context->builder->icmp(Builder::INT_EQ, $next, $nullNode);
-        $advance = $fn->appendBasicBlock('krsort_str_advance');
-        $compare = $fn->appendBasicBlock('krsort_str_compare');
-        $this->context->builder->branchIf($nextIsNull, $passExit, $compare);
-
-        $this->context->builder->positionAtEnd($compare);
-        $keyCur = $this->context->builder->load($this->context->builder->structGep($cur, $nodeMap['key']));
-        $keyNext = $this->context->builder->load($this->context->builder->structGep($next, $nodeMap['key']));
-        $cmp = JitStringCompare::strcmp($this->context, $keyCur, $keyNext);
-        $i64 = $this->context->getTypeFromString('int64');
-        $needsSwap = $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i64->constInt(0, false));
-        $swapBlock = $fn->appendBasicBlock('krsort_str_swap');
-        $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);
-
-        $this->context->builder->positionAtEnd($swapBlock);
-        $prev = $this->context->builder->load($prevSlot);
-        $hasPrev = $this->context->builder->icmp(Builder::INT_NE, $prev, $nullNode);
-        $updateHead = $fn->appendBasicBlock('krsort_str_update_head');
-        $updatePrev = $fn->appendBasicBlock('krsort_str_update_prev');
-        $afterLink = $fn->appendBasicBlock('krsort_str_after_link');
-        $this->context->builder->branchIf($hasPrev, $updatePrev, $updateHead);
-
-        $this->context->builder->positionAtEnd($updateHead);
-        $this->context->builder->store($next, $headSlot);
-        $this->context->builder->branch($afterLink);
-
-        $this->context->builder->positionAtEnd($updatePrev);
-        $this->context->builder->store(
-            $next,
-            $this->context->builder->structGep($prev, $nodeMap['next'])
-        );
-        $this->context->builder->branch($afterLink);
-
-        $this->context->builder->positionAtEnd($afterLink);
-        $nextNext = $this->context->builder->load($this->context->builder->structGep($next, $nodeMap['next']));
-        $this->context->builder->store($nextNext, $this->context->builder->structGep($cur, $nodeMap['next']));
-        $this->context->builder->store($cur, $this->context->builder->structGep($next, $nodeMap['next']));
-        $this->context->builder->store($i1->constInt(1, false), $swappedSlot);
-        $this->context->builder->store($next, $curSlot);
-        $this->context->builder->branch($walkHead);
-
-        $this->context->builder->positionAtEnd($advance);
-        $this->context->builder->store($cur, $prevSlot);
-        $this->context->builder->store($next, $curSlot);
-        $this->context->builder->branch($walkHead);
-
-        $this->context->builder->positionAtEnd($passExit);
-        $this->context->builder->branch($passHead);
-
-        $this->context->builder->positionAtEnd($done);
-        $this->context->builder->returnVoid();
-    }
-
 
     private function implementSortStringKeyValues(): void
     {

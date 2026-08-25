@@ -13,11 +13,12 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * asort() — sort by value ascending, preserve keys (subset of PHP; issue #2290, #4118, #11991).
+ * asort() — sort by value ascending, preserve keys (subset of PHP; issue #2290, #4118, #11991, #34707).
  *
  * VM: key-preserving value sort via {@see VmArray::asortCopy()}.
  * JIT/AOT: packed list via ValueSortKeyedLlvm (#33620); string-key via __hashtable__sortStringKeyValues.
  * SORT_NATURAL / SORT_NATURAL|SORT_FLAG_CASE reuse natsort LLVM (#32295 / #26975).
+ * SORT_STRING|SORT_FLAG_CASE uses ValueSortKeyedLlvm strcasecmp (#34707).
  */
 final class asort_ extends Internal
 {
@@ -79,8 +80,15 @@ final class asort_ extends Internal
     private static function jitSortByValueWithFlags(Context $context, JITVariable $array, int $flags): void
     {
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
         if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
             ValueSortRuntime::asortByValueLocale($context, $array);
+
+            return;
+        }
+        // SORT_STRING|SORT_FLAG_CASE — ValueSortKeyedLlvm strcmp is case-sensitive (#34707).
+        if (StdlibConstants::SORT_STRING === $sortType && 0 !== $caseFlag) {
+            ValueSortRuntime::asortByValueStringCase($context, $array);
 
             return;
         }
@@ -95,7 +103,7 @@ final class asort_ extends Internal
         }
         if (StdlibConstants::SORT_NATURAL === $sortType) {
             // php-src php_array_data_compare PHP_SORT_NATURAL ≡ php_natsort (#32295).
-            if (0 !== ($flags & StdlibConstants::SORT_FLAG_CASE)) {
+            if (0 !== $caseFlag) {
                 NaturalSortRuntime::natcasesortByValue($context, $array);
             } else {
                 NaturalSortRuntime::natsortByValue($context, $array);

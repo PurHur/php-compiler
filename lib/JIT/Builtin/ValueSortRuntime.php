@@ -11,14 +11,15 @@ use PHPCompiler\JIT\ValueSortKeyedLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 /**
- * JIT/AOT link for asort()/arsort() (#12771, #27227, #33620).
+ * JIT/AOT link for asort()/arsort() (#12771, #27227, #33620, #34707).
  *
  * NestedJIT {@see \PHPCompiler\ext\standard\ValueSortJitHelper} aborts under thin
  * standalone AOT (same HashTable-method stub class as KeySort / NaturalSort #26975).
  *
- * SORT_REGULAR / reverse: always {@see ValueSortKeyedLlvm} (export pairs → value sort →
- * reorderKeyedPairs). The older `__hashtable__sortStringKeyValues*` ABIs only walk
- * `strKeys` and no-op on packed `0..n-1` lists — silent wrong keys (#33620).
+ * SORT_REGULAR / reverse / SORT_STRING|SORT_FLAG_CASE: always {@see ValueSortKeyedLlvm}
+ * (export pairs → value sort → reorderKeyedPairs). The older
+ * `__hashtable__sortStringKeyValues*` ABIs only walk `strKeys` and no-op on packed
+ * `0..n-1` lists — silent wrong keys (#33620).
  *
  * SORT_LOCALE_STRING: keep the strKey locale ABI (string-key maps).
  *
@@ -36,7 +37,13 @@ final class ValueSortRuntime
 
     public static function asortByValue(Context $context, JITVariable $array): void
     {
-        self::sortPreserveKeys($context, $array, false);
+        self::sortPreserveKeys($context, $array, false, false);
+    }
+
+    /** SORT_STRING|SORT_FLAG_CASE — ASCII strcasecmp via ValueSortKeyedLlvm (#34707). */
+    public static function asortByValueStringCase(Context $context, JITVariable $array): void
+    {
+        self::sortPreserveKeys($context, $array, false, true);
     }
 
     public static function asortByValueLocale(Context $context, JITVariable $array): void
@@ -46,11 +53,21 @@ final class ValueSortRuntime
 
     public static function arsortByValue(Context $context, JITVariable $array): void
     {
-        self::sortPreserveKeys($context, $array, true);
+        self::sortPreserveKeys($context, $array, true, false);
     }
 
-    private static function sortPreserveKeys(Context $context, JITVariable $array, bool $reverse): void
+    /** arsort() SORT_STRING|SORT_FLAG_CASE (#34707). */
+    public static function arsortByValueStringCase(Context $context, JITVariable $array): void
     {
+        self::sortPreserveKeys($context, $array, true, true);
+    }
+
+    private static function sortPreserveKeys(
+        Context $context,
+        JITVariable $array,
+        bool $reverse,
+        bool $caseInsensitive
+    ): void {
         self::ensureLinked($context);
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             throw new \LogicException(
@@ -58,7 +75,7 @@ final class ValueSortRuntime
             );
         }
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        ValueSortKeyedLlvm::sortValuesPreserveKeys($context, $ht, $reverse);
+        ValueSortKeyedLlvm::sortValuesPreserveKeys($context, $ht, $reverse, $caseInsensitive);
         // In-place mutation via HT pointer; store only native slots (peer NaturalSort #26975).
         // Unconditional store corrupts thin-standalone value-boxed arrays (#27227).
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {

@@ -77,6 +77,13 @@ final class krsort_ extends Internal
     private static function jitSortByKeyWithFlags(Context $context, JITVariable $array, int $flags): void
     {
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
+        // SORT_STRING|SORT_FLAG_CASE (#34707).
+        if (StdlibConstants::SORT_STRING === $sortType && 0 !== $caseFlag) {
+            KeySortRuntime::krsortByKeyStringCase($context, $array);
+
+            return;
+        }
         if (
             StdlibConstants::SORT_REGULAR === $sortType
             || StdlibConstants::SORT_STRING === $sortType

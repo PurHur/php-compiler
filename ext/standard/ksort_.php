@@ -77,8 +77,15 @@ final class ksort_ extends Internal
     private static function jitSortByKeyWithFlags(Context $context, JITVariable $array, int $flags): void
     {
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
         if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
             KeySortRuntime::ksortByKeyLocale($context, $array);
+
+            return;
+        }
+        // SORT_STRING|SORT_FLAG_CASE — LLVM strcmp path is case-sensitive (#34707).
+        if (StdlibConstants::SORT_STRING === $sortType && 0 !== $caseFlag) {
+            KeySortRuntime::ksortByKeyStringCase($context, $array);
 
             return;
         }

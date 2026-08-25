@@ -10,20 +10,30 @@ use PHPLLVM\Type;
 use PHPLLVM\Value;
 
 /**
- * Pure LLVM asort()/arsort() for thin standalone AOT (#33620).
+ * Pure LLVM asort()/arsort() for thin standalone AOT (#33620, #34707).
  *
  * Export key/value pairs, bubble-sort by value, stringify integer keys, then
  * {@see HashTableMutateNestedLlvm::reorderKeyedPairs}. Integer keys must become
  * string keys on writeback: packed `values[index]` cannot express non-ascending
  * key order (peer {@see KeySortRuntime::krsortPackedListByKey} / #10836).
  *
+ * SORT_STRING|SORT_FLAG_CASE uses {@see JitStringCompare::strcasecmp}.
+ *
  * php-src: ext/standard/array.c — php_array_asort / php_array_arsort
  */
 final class ValueSortKeyedLlvm
 {
-    public static function sortValuesPreserveKeys(Context $context, Value $ht, bool $reverse): void
-    {
-        $prefix = $reverse ? 'arsort_keyed_llvm' : 'asort_keyed_llvm';
+    /**
+     * @param bool $caseInsensitive SORT_STRING|SORT_FLAG_CASE — ASCII strcasecmp (#34707)
+     */
+    public static function sortValuesPreserveKeys(
+        Context $context,
+        Value $ht,
+        bool $reverse,
+        bool $caseInsensitive = false
+    ): void {
+        $prefix = ($reverse ? 'arsort_keyed_llvm' : 'asort_keyed_llvm')
+            .($caseInsensitive ? '_strcase' : '');
         BasicBlockHelper::ensureOpenInsertBlock($context, $prefix.'_cont');
 
         $map = $context->structFieldMap['__hashtable__'];
@@ -94,7 +104,7 @@ final class ValueSortKeyedLlvm
         $j = $context->builder->addNoSignedWrap($i, $one);
         $leftBox = self::pairCompareOperand($context, $pairs, $i, $valueIndex);
         $rightBox = self::pairCompareOperand($context, $pairs, $j, $valueIndex);
-        $cmpLong = self::compareValueBoxes($context, $leftBox, $rightBox);
+        $cmpLong = self::compareValueBoxes($context, $leftBox, $rightBox, $caseInsensitive);
         $needsSwap = $reverse
             ? $context->builder->icmp(Builder::INT_SLT, $cmpLong, $i64->constInt(0, false))
             : $context->builder->icmp(Builder::INT_SGT, $cmpLong, $i64->constInt(0, false));
@@ -206,8 +216,12 @@ final class ValueSortKeyedLlvm
     }
 
     /** @return Value int64 */
-    private static function compareValueBoxes(Context $context, Variable $left, Variable $right): Value
-    {
+    private static function compareValueBoxes(
+        Context $context,
+        Variable $left,
+        Variable $right,
+        bool $caseInsensitive = false
+    ): Value {
         $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
         $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
         $valueMap = $context->structFieldMap['__value__'];
@@ -218,9 +232,10 @@ final class ValueSortKeyedLlvm
             $i8->constInt(0x7f, false)
         );
         $fn = $context->builder->getInsertBlock()->getParent();
-        $strBb = $fn->appendBasicBlock('vsort_cmp_str');
-        $longBb = $fn->appendBasicBlock('vsort_cmp_long');
-        $join = $fn->appendBasicBlock('vsort_cmp_join');
+        $tag = $caseInsensitive ? 'vsort_cmp_strcase' : 'vsort_cmp';
+        $strBb = $fn->appendBasicBlock($tag.'_str');
+        $longBb = $fn->appendBasicBlock($tag.'_long');
+        $join = $fn->appendBasicBlock($tag.'_join');
         $resultSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $zero = $i64->constInt(0, false);
 
@@ -234,7 +249,10 @@ final class ValueSortKeyedLlvm
         $context->builder->positionAtEnd($strBb);
         $lStr = $context->builder->call($context->lookupFunction('__value__readString'), $leftPtr);
         $rStr = $context->builder->call($context->lookupFunction('__value__readString'), $rightPtr);
-        $context->builder->store(JitStringCompare::strcmp($context, $lStr, $rStr), $resultSlot);
+        $strCmp = $caseInsensitive
+            ? JitStringCompare::strcasecmp($context, $lStr, $rStr)
+            : JitStringCompare::strcmp($context, $lStr, $rStr);
+        $context->builder->store($strCmp, $resultSlot);
         $context->builder->branch($join);
 
         $context->builder->positionAtEnd($longBb);

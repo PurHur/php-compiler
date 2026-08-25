@@ -77,6 +77,13 @@ final class arsort_ extends Internal
     private static function jitSortByValueWithFlags(Context $context, JITVariable $array, int $flags): void
     {
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
+        // SORT_STRING|SORT_FLAG_CASE (#34707).
+        if (StdlibConstants::SORT_STRING === $sortType && 0 !== $caseFlag) {
+            ValueSortRuntime::arsortByValueStringCase($context, $array);
+
+            return;
+        }
         if (
             StdlibConstants::SORT_REGULAR === $sortType
             || StdlibConstants::SORT_NUMERIC === $sortType
