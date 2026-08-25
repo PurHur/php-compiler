@@ -12,7 +12,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT LLVM slot sync for DOMNode::replaceChild() (#28671, #32784).
+ * Thin-AOT LLVM slot sync for DOMNode::replaceChild() (#28671, #32784, #34709).
  *
  * Peer {@see JitDomAppendChildLiveSlots} / {@see JitDomRemoveChildLiveSlots}:
  * splice newChild into oldChild's sibling chain; update first/last only when
@@ -26,6 +26,7 @@ use PHPLLVM\Value;
  * Cross-parent reparent must unlink the old parent first (php-src
  * dom_node_replace_child) — peer appendChild #33404 / #33450.
  * Attr newChild: Hierarchy Request before sibling slots (#33587).
+ * Identity replace (new==old): no-op — do not clear parent/sibling (#34709 / #22678).
  *
  * Reference: php-src ext/dom/node.c dom_node_replace_child.
  */
@@ -45,10 +46,22 @@ final class JitDomReplaceChildLiveSlots
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_rc_live_slots');
         self::ensureLayout($context);
 
+        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_end');
+        // php-src / VmDom: replacing a node with itself is a no-op (#22678 / #34709).
+        // Without this, syncNonFragment nulls parent/sibling on the live child.
+        $bbSame = BasicBlockHelper::append($context, 'dom_rc_ls_same');
+        $bbDiff = BasicBlockHelper::append($context, 'dom_rc_ls_diff');
+        $same = $context->builder->icmp(Builder::INT_EQ, $newChild, $oldChild);
+        $context->builder->branchIf($same, $bbSame, $bbDiff);
+
+        $context->builder->positionAtEnd($bbSame);
+        $context->builder->branch($bbEnd);
+
+        $context->builder->positionAtEnd($bbDiff);
+
         // php-src: Attr is not content — Hierarchy Request before sibling splice (#33587).
         $bbAttr = BasicBlockHelper::append($context, 'dom_rc_ls_attr');
         $bbNotAttr = BasicBlockHelper::append($context, 'dom_rc_ls_not_attr');
-        $bbEnd = BasicBlockHelper::append($context, 'dom_rc_end');
         $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
         $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
 

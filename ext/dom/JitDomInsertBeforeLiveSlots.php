@@ -14,7 +14,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT LLVM slot sync for DOMNode::insertBefore() (#32801, #33312).
+ * Thin-AOT LLVM slot sync for DOMNode::insertBefore() (#32801, #33312, #34709).
  *
  * Peer {@see JitDomAppendChildLiveSlots} / {@see JitDomReplaceChildLiveSlots} /
  * {@see JitDomRemoveChildLiveSlots}: splice newChild before refChild; refresh the
@@ -27,6 +27,8 @@ use PHPLLVM\Value;
  * Cross-parent reparent must unlink the old parent first (php-src
  * dom_node_insert_before) — peer appendChild #33404 / #33450.
  * Attr newChild: Error before sibling slots (php-src / #33587).
+ * Identity insert (new==ref): Error before splice — peer VmDom #22686 / #34709
+ * (avoids self-cycle hang in InnerXml sibling walks).
  *
  * Reference: php-src ext/dom/node.c dom_node_insert_before.
  */
@@ -42,12 +44,28 @@ final class JitDomInsertBeforeLiveSlots
         self::ensureLayout($context);
         JitDomParentChildLinkLayout::ensureChildEdgeProperties($context);
 
+        $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
+        // php-src / VmDom: new==ref → Error before unlink/splice (#22686 / #34709).
+        // Without this, LiveSlots builds a self-cycle and InnerXml walks hang.
+        $bbSame = BasicBlockHelper::append($context, 'dom_ib_same');
+        $bbDiff = BasicBlockHelper::append($context, 'dom_ib_diff');
+        $same = $context->builder->icmp(Builder::INT_EQ, $newChild, $refChild);
+        $context->builder->branchIf($same, $bbSame, $bbDiff);
+
+        $context->builder->positionAtEnd($bbSame);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'Error',
+            'Cannot add newnode as the previous sibling of refnode'
+        );
+
+        $context->builder->positionAtEnd($bbDiff);
+
         // php-src: Attr is not content — insertBefore must not touch Element sibling slots (#33587).
         // Zend/libxml: Error "Cannot add newnode as the previous sibling of refnode".
         // Peer appendChild installs Attr via the attribute map (#33570).
         $bbAttr = BasicBlockHelper::append($context, 'dom_ib_attr');
         $bbNotAttr = BasicBlockHelper::append($context, 'dom_ib_not_attr');
-        $bbSyncEnd = BasicBlockHelper::append($context, 'dom_ib_sync_end');
         $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $newChild);
         $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
 

@@ -97,9 +97,16 @@ final class JitDomReplaceChild
             $newChild,
             $oldChild
         );
-        // Null AOT property slots on the replaced node (#19240). Identity no-op still hits this
-        // path today (pointer compare unreliable); VmDom short-circuit keeps the live tree (#22678).
+        // Null AOT property slots on the replaced node (#19240). Skip identity no-op
+        // so parent/sibling links stay (#22678 / #34709) — peer VmDom / LiveSlots.
+        $bbClear = BasicBlockHelper::append($context, 'dom_rc_abi_clear');
+        $bbSkipClear = BasicBlockHelper::append($context, 'dom_rc_abi_skip_clear');
+        $same = $context->builder->icmp(Builder::INT_EQ, $newChild, $oldChild);
+        $context->builder->branchIf($same, $bbSkipClear, $bbClear);
+        $context->builder->positionAtEnd($bbClear);
         self::clearDetachedLinkSlots($context, $oldChild);
+        $context->builder->branch($bbSkipClear);
+        $context->builder->positionAtEnd($bbSkipClear);
 
         return self::boxObjectResult($context, $oldChild);
     }
@@ -127,6 +134,23 @@ final class JitDomReplaceChild
         $document = self::loadObjectArg($context, $documentVar);
         $newChild = self::loadObjectArg($context, $newChildVar);
         $oldChild = self::loadObjectArg($context, $oldChildVar);
+
+        // php-src / VmDom: identity replace is a no-op (#22678 / #34709).
+        $resultSlot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__value__*')
+        );
+        $bbSame = BasicBlockHelper::append($context, 'dom_doc_rc_same');
+        $bbDiff = BasicBlockHelper::append($context, 'dom_doc_rc_diff');
+        $bbEnd = BasicBlockHelper::append($context, 'dom_doc_rc_end');
+        $same = $context->builder->icmp(Builder::INT_EQ, $newChild, $oldChild);
+        $context->builder->branchIf($same, $bbSame, $bbDiff);
+
+        $context->builder->positionAtEnd($bbSame);
+        $context->builder->store(self::boxObjectResult($context, $oldChild), $resultSlot);
+        $context->builder->branch($bbEnd);
+
+        $context->builder->positionAtEnd($bbDiff);
         $objectType = $context->type->object;
         $newJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $newChild);
         $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $document);
@@ -198,8 +222,12 @@ final class JitDomReplaceChild
         JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_doc_rc_post');
+        $context->builder->store(self::boxObjectResult($context, $oldChild), $resultSlot);
+        $context->builder->branch($bbEnd);
 
-        return self::boxObjectResult($context, $oldChild);
+        $context->builder->positionAtEnd($bbEnd);
+
+        return $context->builder->load($resultSlot);
     }
 
     /** Runtime: parent object class_id is a Document (#33379). */
@@ -272,6 +300,18 @@ final class JitDomReplaceChild
         $parent = self::loadObjectArg($context, $parentVar);
         $newChild = self::loadObjectArg($context, $newChildVar);
         $oldChild = self::loadObjectArg($context, $oldChildVar);
+
+        // php-src / VmDom: identity replace is a no-op — skip LiveSlots + tag/InnerXml (#34709).
+        $bbSame = BasicBlockHelper::append($context, 'dom_rc_uss_same');
+        $bbDiff = BasicBlockHelper::append($context, 'dom_rc_uss_diff');
+        $bbDone = BasicBlockHelper::append($context, 'dom_rc_uss_done');
+        $same = $context->builder->icmp(Builder::INT_EQ, $newChild, $oldChild);
+        $context->builder->branchIf($same, $bbSame, $bbDiff);
+
+        $context->builder->positionAtEnd($bbSame);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDiff);
 
         // php-src: Attr is not a content child — Hierarchy Request before LiveSlots (#33587).
         // Peer insertBefore throws Error for Attr+ref; replaceChild uses DOMException.
@@ -355,6 +395,9 @@ final class JitDomReplaceChild
         }
 
         self::syncUserScriptInnerXml($context, $parentVar, $parent, $newChildVar, $oldChildVar, $xml);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     /**
