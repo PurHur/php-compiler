@@ -32,6 +32,8 @@ final class ScriptExit
 
     private static function emitStatusOnly(Context $context, Variable $arg): void
     {
+        // ObOutput is lazy after #34695 — float/bool status print __phpc_ob_echo_* (#34756 / peer #34747).
+        ObOutputRuntime::ensureLinked($context);
         switch ($arg->type) {
             case Variable::TYPE_NULL:
                 // PHP 8.4+ string|int: null → E_DEPRECATED then status 0 (#29575).
@@ -115,6 +117,8 @@ final class ScriptExit
 
     private static function emitMessage(Context $context, Variable $arg): void
     {
+        // Message long/double/bool echo via __phpc_ob_echo_* — ObOutput lazy (#34756).
+        ObOutputRuntime::ensureLinked($context);
         switch ($arg->type) {
             case Variable::TYPE_NULL:
                 return;
