@@ -46,6 +46,8 @@ final class StringFormat
 
     public static function ensureLinked(Context $context): void
     {
+        // printf bridge echoes via __phpc_ob_echo_substr — ObOutput is lazy (#34695 / #34747).
+        ObOutputRuntime::ensureLinked($context);
         self::implement($context);
     }
 
@@ -94,6 +96,9 @@ final class StringFormat
         $sprintfProbe = $context->module->getNamedFunction('__compiler_sprintf');
         $printfProbe = $context->module->getNamedFunction('__compiler_printf');
         $numberProbe = $context->module->getNamedFunction('__compiler_number_format');
+        // Helper-cache / NestedJIT bridges still call __phpc_ob_echo_substr (#34747).
+        ObOutputRuntime::ensureLinked($context);
+
         if (JitVmHelperLink::hasNamedBridgeEntry($sprintfProbe, self::SPRINTF_BRIDGE_ENTRY)
             && JitVmHelperLink::hasNamedBridgeEntry($printfProbe, self::PRINTF_BRIDGE_ENTRY)
             && JitVmHelperLink::hasNamedBridgeEntry($numberProbe, self::NUMBER_FORMAT_BRIDGE_ENTRY)) {
@@ -278,25 +283,18 @@ final class StringFormat
 
     private static function ensureRuntimeHelpers(Context $context): void
     {
+        // Real ObStorageLlvm body — empty addFunction decls link-fail (#34747 / peer #31894).
+        ObOutputRuntime::ensureLinked($context);
+
         $strPtr = $context->getTypeFromString('__string__*');
-        foreach (
-            [
-                ['__string__separate', $strPtr, [$strPtr]],
-                ['__phpc_ob_echo_substr', $context->getTypeFromString('void'), [
-                    $context->getTypeFromString('int8*'),
-                    $context->getTypeFromString('size_t'),
-                ]],
-            ] as [$name, $ret, $params]
-        ) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable) {
-                $fn = $context->module->addFunction(
-                    $name,
-                    $context->context->functionType($ret, false, ...$params)
-                );
-                $context->registerFunction($name, $fn);
-            }
+        try {
+            $context->lookupFunction('__string__separate');
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction(
+                '__string__separate',
+                $context->context->functionType($strPtr, false, $strPtr)
+            );
+            $context->registerFunction('__string__separate', $fn);
         }
     }
 
