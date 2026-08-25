@@ -20,14 +20,16 @@ final class SuperglobalNameRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('SuperglobalNameJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString("lookupFunction('memcmp')", $source);
         $this->assertStringNotContainsString('identicalToAsciiLiteral', $source);
-        $this->assertLessThan(120, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(160, \substr_count($source, "\n") + 1);
     }
 
     public function testSuperglobalNameJitHelperDelegatesToSuperglobalNames(): void

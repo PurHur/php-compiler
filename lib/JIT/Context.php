@@ -2350,7 +2350,12 @@ class Context {
         // up __compiler_env_local_* — NestedJIT of EnvLocalJitHelper during thin init only
         // risked env_local_lookup.1 (#31894 / #32122). bootstrap-aot still
         // ensureBootstrapAotStubLinked below. EnvLocalRuntime::ensureLinked stays callable.
-        Builtin\SuperglobalNameRuntime::ensureLinked($this);
+        // SuperglobalName always-on removed (#34812): JitSuperglobalName / JIT.php
+        // compileSuperglobalNameNative already StringSuperglobalName::ensureLinked before lookup
+        // (peer #34807 / #33235). Compile-time paths use Web\Superglobals::isSuperglobalName —
+        // not the LLVM ABI. Thin hello-world must not NestedJIT SuperglobalNameJitHelper during
+        // init. Leftover Context NestedJIT vs Runtime ABI drift mints is_superglobal_name.1
+        // (#31894 / #32122). Full standalone still ensureLinked below.
         // CLI argv: NestedJIT CliArgvJitHelper during thin init (peer IncludePath #20877 / #20904)
         // — must precede {main} $argc/$argv lowering (compileToFile stubs are too late).
         Builtin\CliArgvRuntime::ensureStandaloneBodies($this);

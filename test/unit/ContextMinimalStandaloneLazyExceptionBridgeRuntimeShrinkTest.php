@@ -30,10 +30,9 @@ final class ContextMinimalStandaloneLazyExceptionBridgeRuntimeShrinkTest extends
             'ensureMinimalUserStandaloneBodies must not eagerly ExceptionBridge (#34732)'
         );
 
-        // Essentials for thin argv / is_superglobal stay (#34807 dropped EnvLocal).
+        // CLI argv still NestedJIT before {main} (#34812 dropped SuperglobalName).
         foreach ([
             'CliArgvRuntime::ensureStandaloneBodies($this)',
-            'SuperglobalNameRuntime::ensureLinked($this)',
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34769)");
         }

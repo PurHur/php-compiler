@@ -4,17 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_is_superglobal_name via SuperglobalNameJitHelper PHP (#9271, #25091, #33235).
+ * JIT/AOT link for __compiler_is_superglobal_name via SuperglobalNameJitHelper PHP (#9271, #25091, #33235, #34812).
  *
  * Owns `__compiler_is_superglobal_name` ABI module-locally: {@see getNamedFunction} first, then
  * {@see implementBridge}. Do not re-add empty always-on shells in {@see Type} — leftover decls
- * mint is_superglobal_name.1 (#31894 / #32122 / #33235).
+ * mint is_superglobal_name.1 (#31894 / #32122 / #33235). Context ensureMinimalUserStandaloneBodies
+ * must not NestedJIT this during thin hello-world init (#34812) — call sites
+ * {@see StringSuperglobalName::ensureLinked} / {@see \PHPCompiler\ext\standard\JitSuperglobalName}
+ * already ensureLinked before lookup. Call-site ensureLinked restores the caller insert block
+ * after bridge emit (thin AOT: parentless call / module verify — peer MetaTagsRuntime #27317).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer TimezoneOffset #25042).
  * Replaces memcmp LLVM loop; SSOT {@see \PHPCompiler\ext\standard\SuperglobalNames}.
@@ -38,6 +44,10 @@ final class SuperglobalNameRuntime
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_is_superglobal_name');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -45,10 +55,16 @@ final class SuperglobalNameRuntime
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit (#34812 / #27317).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context, $probe);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context, ?LlvmFunction $probe): void
