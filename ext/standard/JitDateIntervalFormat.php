@@ -88,6 +88,12 @@ final class JitDateIntervalFormat
         $i = self::readLongProp($context, $object, $objPtr, 'i');
         $s = self::readLongProp($context, $object, $objPtr, 's');
         $f = self::readDoubleProp($context, $object, $objPtr, 'f');
+        // NestedJIT formatFromScalars takes f as int micros (#34602).
+        $i64 = $context->getTypeFromString('int64');
+        $fMicros = $context->builder->fpToSi(
+            $context->builder->fmul($f, $context->constantFromFloat(1000000.0)),
+            $i64
+        );
         $invert = self::readLongProp($context, $object, $objPtr, 'invert');
         [$daysIsInt, $daysInt] = self::readDaysProp($context, $object, $objPtr);
 
@@ -99,7 +105,7 @@ final class JitDateIntervalFormat
             $h,
             $i,
             $s,
-            $f,
+            $fMicros,
             $invert,
             $daysIsInt,
             $daysInt,

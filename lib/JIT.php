@@ -21535,31 +21535,55 @@ class JIT {
             return;
         }
         $state = $this->context->lastDateIntervalDiffState;
-        if (!\is_array($state)) {
-            return;
-        }
-        if (!$this->context->hasVariableOp($resultOp)) {
+        if (\is_array($state)) {
+            if (!$this->context->hasVariableOp($resultOp)) {
+                $this->context->lastDateIntervalDiffState = null;
+                $this->context->lastUnserializeObjectClassUserType = null;
+
+                return;
+            }
+            $resultVar = $this->context->getVariableFromOp($resultOp);
+            $resultVar->compileTimeDateInterval = $state;
+            $resultVar->classUserType = 'DateInterval';
+            $name = JIT\OperandName::resolve($resultOp);
+            if (null !== $name && '' !== $name) {
+                $resolved = $this->context->resolveRefAliasName($name);
+                $this->context->bindVariableByName($resolved, $resultVar);
+                $this->context->dateIntervalLocalStates[$resolved] = $state;
+            }
+            foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+                if ($bound === $resultVar) {
+                    $bound->compileTimeDateInterval = $state;
+                    $bound->classUserType = 'DateInterval';
+                    $this->context->dateIntervalLocalStates[$boundName] = $state;
+                }
+            }
             $this->context->lastDateIntervalDiffState = null;
+            $this->context->lastUnserializeObjectClassUserType = null;
 
             return;
         }
+        // file_get_contents / true runtime O:DateInterval — classUserType only (#34602).
+        $hint = $this->context->lastUnserializeObjectClassUserType;
+        if (!$fromUnserialize || !\is_string($hint) || '' === $hint) {
+            return;
+        }
+        $this->context->lastUnserializeObjectClassUserType = null;
+        if (!$this->context->hasVariableOp($resultOp)) {
+            return;
+        }
         $resultVar = $this->context->getVariableFromOp($resultOp);
-        $resultVar->compileTimeDateInterval = $state;
-        $resultVar->classUserType = 'DateInterval';
+        $resultVar->classUserType = $hint;
         $name = JIT\OperandName::resolve($resultOp);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
             $this->context->bindVariableByName($resolved, $resultVar);
-            $this->context->dateIntervalLocalStates[$resolved] = $state;
         }
         foreach ($this->context->namedVariableBindings as $boundName => $bound) {
             if ($bound === $resultVar) {
-                $bound->compileTimeDateInterval = $state;
-                $bound->classUserType = 'DateInterval';
-                $this->context->dateIntervalLocalStates[$boundName] = $state;
+                $bound->classUserType = $hint;
             }
         }
-        $this->context->lastDateIntervalDiffState = null;
     }
 
     /** Copy construct stamp onto `$z->getLocation()` receivers (#33727 / peer #29732). */
