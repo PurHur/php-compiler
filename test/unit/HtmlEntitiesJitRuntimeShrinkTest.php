@@ -63,9 +63,22 @@ final class HtmlEntitiesJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('HtmlEntitiesJit::encode', $source);
     }
 
-    public function testContextRegistersHtmlEntitiesStandaloneBodies(): void
+    public function testContextMinimalDoesNotEagerlyLinkHtmlEntities(): void
     {
+        // Lazy at ext/standard/htmlentities.php (#34612 / peer #34605).
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('HtmlEntitiesJit::ensureStandaloneBodies', $source);
+        $minimalPos = strpos($source, 'private function ensureMinimalUserStandaloneBodies');
+        $this->assertNotFalse($minimalPos);
+        $minimalEnd = strpos($source, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
+        $this->assertNotFalse($minimalEnd);
+        $minimalBody = substr($source, $minimalPos, $minimalEnd - $minimalPos);
+        $this->assertStringNotContainsString(
+            'HtmlEntitiesJit::ensureStandaloneBodies',
+            $minimalBody,
+            'ensureMinimal must not eagerly NestedJIT htmlentities (#34612)'
+        );
+        $this->assertStringContainsString('#34612', $source);
+        $html = (string) file_get_contents(__DIR__.'/../../ext/standard/htmlentities.php');
+        $this->assertStringContainsString('HtmlEntitiesJit::ensureLinked', $html);
     }
 }

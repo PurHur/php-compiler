@@ -39,6 +39,7 @@ final class ContextMinimalStandaloneLazyDomGcProgressAssertRuntimeShrinkTest ext
         }
 
         // Essentials for thin echo / error / argv / getenv surface stay.
+        // HtmlEntities / Decode / ErrorHandler / ExceptionHandler dropped in #34612 (peer this test).
         foreach ([
             'StringHtmlspecialchars::ensureStandaloneBodies($this)',
             'ObOutputRuntime::ensureLinked($this)',
@@ -49,6 +50,18 @@ final class ContextMinimalStandaloneLazyDomGcProgressAssertRuntimeShrinkTest ext
             'LastErrorRuntime::ensureStandaloneBodies($this)',
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34605)");
+        }
+        foreach ([
+            'HtmlEntitiesJit::ensureStandaloneBodies($this)',
+            'StringHtmlspecialcharsDecode::ensureStandaloneBodies($this)',
+            'ErrorHandlerJitRuntime::ensureStandaloneBodies($this)',
+            'ExceptionHandlerJitRuntime::ensureStandaloneBodies($this)',
+        ] as $dropped) {
+            $this->assertStringNotContainsString(
+                $dropped,
+                $minimalBody,
+                "ensureMinimal must not eagerly {$dropped} (#34612)"
+            );
         }
 
         // Full standalone still links AssertFail / ProgressNote / Gc after TriggerError (#33234).

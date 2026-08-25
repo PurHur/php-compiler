@@ -2269,12 +2269,14 @@ class Context {
     private function ensureMinimalUserStandaloneBodies(): void
     {
         Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
-        Builtin\HtmlEntitiesJit::ensureStandaloneBodies($this);
-        Builtin\StringHtmlspecialcharsDecode::ensureStandaloneBodies($this);
+        // HtmlEntities / HtmlspecialcharsDecode always-on removed (#34612): htmlentities.php /
+        // JitHtmlspecialcharsDecode already ensureLinked before lookup (peer #34605). Leftover
+        // Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
         ExceptionBridge::ensureStandaloneBodies($this);
         ErrorBridge::ensureStandaloneBodies($this);
-        Builtin\ErrorHandlerJitRuntime::ensureStandaloneBodies($this);
-        Builtin\ExceptionHandlerJitRuntime::ensureStandaloneBodies($this);
+        // ErrorHandler / ExceptionHandler always-on removed (#34612): JitErrorHandler /
+        // JitTriggerErrorKernel / JitExceptionHandler / TryCatchHelper already ensureLinked
+        // before lookup (peer #34605). implement() paths restore builder insert mid-{main}.
         if (!$this->isUserScriptAot()) {
             // NestedJIT StreamLifecycle/StreamRead/StreamBucket helpers during thin init
             // (peer StreamIo #20943 / #20966 / #20982 / #20998).
