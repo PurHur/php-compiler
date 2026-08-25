@@ -973,10 +973,15 @@ final class VmIteratorForeach
         $context->builder->positionAtEnd($str);
         $node = self::stringKeyNodeAt($context, $ht, $map, $nodeMap, $slotKey);
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        // Own a copy — writeString delrefs the previous $k; borrowing the HT key UAF's the bag (#34635).
+        $ownedKey = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $keyStr
+        );
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $destPtr,
-            $keyStr
+            $ownedKey
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
