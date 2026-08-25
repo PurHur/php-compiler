@@ -23,8 +23,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT DirectoryIterator / FilesystemIterator / SplFileInfo — snapshot + path props
- * (#27289, #33263, #33274, #33276, #33280, #33289, #33290, #33298, #33304, #33305).
+ * Thin-AOT DirectoryIterator / FilesystemIterator / RecursiveDirectoryIterator / SplFileInfo —
+ * snapshot + path props (#27289, #33263, #33274, #33276, #33280, #33289, #33290, #33298, #33304,
+ * #33305, #34624).
  *
  * DirectoryIterator construct lists entries via {@see \PHPCompiler\ext\spl\DirectoryIteratorSnapshotJitHelper}.
  * SplFileInfo construct splits pathname via {@see SplFileInfoStorage::splitPathComponents} (#33304).

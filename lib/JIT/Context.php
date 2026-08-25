@@ -1613,11 +1613,13 @@ class Context {
                 $dirMethod
             );
         }
-        // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289 … #33298).
+        // DirectoryIterator / FilesystemIterator / RecursiveDirectoryIterator / SplFileInfo —
+        // dir snapshot + Iterator (#27289 … #33298, #34624).
         $this->type->object->lookup('SplFileInfo');
         $this->type->object->lookup('DirectoryIterator');
         $this->type->object->lookup('FilesystemIterator');
-        foreach (['DirectoryIterator', 'FilesystemIterator'] as $diClass) {
+        $this->type->object->lookup('RecursiveDirectoryIterator');
+        foreach (['DirectoryIterator', 'FilesystemIterator', 'RecursiveDirectoryIterator'] as $diClass) {
             $diLc = strtolower($diClass);
             foreach ([
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next',
