@@ -1096,7 +1096,11 @@ class Object_ extends Type {
     }
 
     /**
-     * SplObjectStorage stores entries in a backing __hashtable__ (issue #601).
+     * SplObjectStorage / ArrayObject family backing `__hashtable__` (issue #601, #34748).
+     *
+     * Attach {@see Variable::$objectPropertySlot} so zend_array_separate on `$o[]=` can
+     * rebind `__spl_ht` after COW (php-src spl_array_write_dimension / zend_array_dup).
+     * Without the slot, separateContainerForWrite duplicates then writes an orphan table.
      */
     public function splBackingHashtable(Variable $obj): Variable
     {
@@ -1104,18 +1108,26 @@ class Object_ extends Type {
             throw new \LogicException('splBackingHashtable requires __object__*');
         }
         $objPtr = $this->context->helper->loadValue($obj);
-        $loaded = $this->context->builder->load($this->propertySlotPtr($objPtr, 0));
+        $slot = $this->propertySlotPtr($objPtr, 0);
+        $loaded = $this->context->builder->load($slot);
         $htPtr = $this->context->builder->pointerCast(
             $loaded,
             $this->context->getTypeFromString('__hashtable__*')
         );
 
-        return new Variable(
+        $var = new Variable(
             $this->context,
             Variable::TYPE_HASHTABLE,
             Variable::KIND_VALUE,
             $htPtr
         );
+        // Match ObjectInstancePropertyLlvm HASHTABLE fetch — COW rebind needs the void** (#34748).
+        $var->objectPropertySlot = $slot;
+        $var->objectPropertyType = Variable::TYPE_HASHTABLE;
+        $var->objectPropertyReceiver = $objPtr;
+        $this->recordSlotReceiver($slot, $objPtr);
+
+        return $var;
     }
 
     private function initPropertySlots(PHPLLVM\Value $obj, int $propCount): void
