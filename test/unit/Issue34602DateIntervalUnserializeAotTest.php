@@ -39,6 +39,13 @@ final class Issue34602DateIntervalUnserializeAotTest extends TestCase
         $jit = (string) file_get_contents($root.'/lib/VM/DateUnserializeJitHelper.php');
         $this->assertStringContainsString('compileDateIntervalRestore', $jit);
         $this->assertStringContainsString('#34602', $jit);
+        $this->assertStringContainsString(
+            'lastUnserializeObjectClassUserType',
+            (string) file_get_contents($root.'/lib/JIT/Builtin/StringUnserialize.php')
+        );
+        $fmtHelper = (string) file_get_contents($root.'/ext/standard/DateIntervalFormatJitHelper.php');
+        $this->assertStringContainsString('int $fMicros', $fmtHelper);
+        $this->assertStringNotContainsString('float $f,', $fmtHelper);
     }
 
     private function assertAotMatchesZend(string $src): void

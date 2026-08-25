@@ -208,7 +208,7 @@ final class UnserializeDateWireNestedJitHelper
         self::$outH = self::findS1Int($payload, $len, \ord('h'));
         self::$outI = self::findS1Int($payload, $len, \ord('i'));
         self::$outS = self::findS1Int($payload, $len, \ord('s'));
-        self::$outF = self::findS1FloatF($payload, $len);
+        // Do not assign float in NestedJIT (thin-AOT SIGSEGV); LLVM stores f=0 (#34602).
         self::$outInvert = self::findInvert($payload, $len);
         $daysBool = self::findDaysBool($payload, $len);
         if ($daysBool >= 0) {

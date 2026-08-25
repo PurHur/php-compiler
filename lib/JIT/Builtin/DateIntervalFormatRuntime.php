@@ -77,7 +77,6 @@ final class DateIntervalFormatRuntime
         }
 
         $i64 = $context->getTypeFromString('int64');
-        $dbl = $context->getTypeFromString('double');
         $strPtr = $context->getTypeFromString('__string__*');
         $ft = $context->context->functionType(
             $strPtr,
@@ -88,7 +87,7 @@ final class DateIntervalFormatRuntime
             $i64,
             $i64,
             $i64,
-            $dbl,
+            $i64,
             $i64,
             $i64,
             $i64,
