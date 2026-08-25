@@ -313,20 +313,21 @@ final class unserialize extends Internal
                 $t += $delta;
             }
         } else {
-            // Recurrence form (end is null) — php-src include_start → userRecurrences+1 (#26852).
+            // Recurrence form (end is null). Wire stores the public `recurrences` property,
+            // which already equals foreach count (ctor arg + 1 when include_start — #26852).
+            // Do not add +1 again (#34626 / re-#34608).
             if (!\preg_match('/s:11:"recurrences";i:(\d+);/', $bag, $recM)) {
                 return null;
             }
-            $userRecurrences = (int) $recM[1];
-            if ($userRecurrences < 1 || 0 === $delta) {
+            $wireRecurrences = (int) $recM[1];
+            if ($wireRecurrences < 1 || 0 === $delta) {
                 return null;
             }
             $t = $startTs;
             if (!$includeStart) {
                 $t += $delta;
             }
-            $limit = $includeStart ? ($userRecurrences + 1) : $userRecurrences;
-            for ($i = 0; $i < $limit; ++$i) {
+            for ($i = 0; $i < $wireRecurrences; ++$i) {
                 $timestamps[] = $t;
                 $t += $delta;
             }
