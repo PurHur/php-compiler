@@ -82,6 +82,31 @@ final class JitValueBox
     /**
      * {@see __value__*} for a boxed {@see Variable::TYPE_VALUE} (by-value or alloca slot).
      */
+    /**
+     * `__value__*` for `function &f()` / method by-ref return (Zend ZEND_RETURN_BY_REF).
+     *
+     * Unlike {@see valuePtrFromVariable}, property lvalues alias the live heap box in the
+     * object's void** slot — a stack snapshot would dangle after the callee returns (#34717).
+     */
+    public static function valuePtrForByRefReturn(Context $context, Variable $var): Value
+    {
+        if (
+            null !== $var->objectPropertySlot
+            && Variable::TYPE_VALUE === $var->objectPropertyType
+        ) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'byref_return_prop');
+            $slot = ObjectInstancePropertyLlvm::dominatingSlotPtr($context->type->object, $var);
+            $heapPtr = $context->builder->pointerCast(
+                $context->builder->load($slot),
+                $context->getTypeFromString('__value__*')
+            );
+
+            return self::normalizeValuePtr($context, $heapPtr);
+        }
+
+        return self::valuePtrFromVariable($context, $var);
+    }
+
     public static function valuePtrFromVariable(Context $context, Variable $var): Value
     {
         if (null !== $var->valueBoxAliasPtr && null === $var->staticPropertyGlobal) {
@@ -99,8 +124,8 @@ final class JitValueBox
 
             return self::normalizeValuePtr($context, $heapPtr);
         }
-        // Return-by-ref from `$this->prop` must alias the heap property slot, not the
-        // stack copy materialized by propertyFetch (issue #4054, Zend ZEND_RETURN_BY_REF).
+        // By-value read of a property: copy into a stack box so casual stores do not
+        // mutate the instance. By-ref return uses {@see valuePtrForByRefReturn} (#4054).
         if (
             null !== $var->objectPropertySlot
             && Variable::TYPE_VALUE === $var->objectPropertyType

@@ -12355,8 +12355,10 @@ class JIT {
                         $this->context->builder->returnVoid();
                     } elseif ($this->cfgFunctionReturnsByRef($block->func)) {
                         $return->addref();
+                        // Alias the live cell (static/global/property heap box), not a
+                        // stack snapshot — Zend ZEND_RETURN_BY_REF (#34717 / #4054).
                         $this->context->builder->returnValue(
-                            JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
+                            JIT\JitValueBox::valuePtrForByRefReturn($this->context, $return)
                         );
                     } else {
                         $return->addref();
@@ -16866,25 +16868,30 @@ class JIT {
 
             return;
         }
-        if (empty($result->usages) && !$this->context->scope->variables->contains($result)) {
-            return;
+        // By-ref FUNCCALL_EXEC_RETURN must materialize even when php-cfg dropped result
+        // usages — otherwise ARG_SEND / var_dump(f()) dumps a fresh null box while the
+        // call's __value__* is dead (#34717; peer by-value path #8561).
+        $ptr = '__value__*' === $this->context->getStringFromType($llvmResult->typeOf())
+            ? JIT\JitValueBox::normalizeValuePtr($this->context, $llvmResult)
+            : JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
+        if ($this->context->hasVariableOp($result)) {
+            $this->context->getVariableFromOp($result)->free();
         }
         $refVar = new Variable(
             $this->context,
             Variable::TYPE_VALUE,
             Variable::KIND_VALUE,
-            $llvmResult
+            $ptr
         );
-        if ('__value__*' === $this->context->getStringFromType($llvmResult->typeOf())) {
-            $refVar->valueBoxAliasPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $llvmResult);
-        }
+        $refVar->valueBoxAliasPtr = $ptr;
+        $refVar->assignRefLvalueAlias = true;
         $refVar->addref();
-        if (!$this->context->hasVariableOp($result)) {
-            $this->context->setVariableOp($result, $refVar);
-
-            return;
-        }
         $this->context->setVariableOp($result, $refVar);
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            $this->context->bindVariableByName($resolved, $refVar);
+        }
     }
 
     /**
