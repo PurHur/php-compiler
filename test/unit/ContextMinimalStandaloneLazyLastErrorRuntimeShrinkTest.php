@@ -7,17 +7,17 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop Context::ensureMinimalUserStandaloneBodies always-on JitReturnPending (#34621 / peer #34612).
+ * Drop Context::ensureMinimalUserStandaloneBodies always-on LastErrorRuntime (#34631 / peer #34621).
  *
- * Thin AOT hello-world must not NestedJIT return-through-finally ABI; TryCatchHelper /
- * emitPendingReturnResume ensureLinked lazily (#32122 .1 mint class).
+ * Thin AOT hello-world must not eagerly NestedJIT last-error ABI; JitErrorGetLast /
+ * JitTriggerErrorKernel ensureLinked lazily (#32122 .1 mint class).
  */
-final class ContextMinimalStandaloneLazyReturnPendingRuntimeShrinkTest extends TestCase
+final class ContextMinimalStandaloneLazyLastErrorRuntimeShrinkTest extends TestCase
 {
-    public function testEnsureMinimalDropsEagerJitReturnPending(): void
+    public function testEnsureMinimalDropsEagerLastError(): void
     {
         $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('#34621', $context);
+        $this->assertStringContainsString('#34631', $context);
         $minimalPos = strpos($context, 'private function ensureMinimalUserStandaloneBodies');
         $this->assertNotFalse($minimalPos);
         $minimalEnd = strpos($context, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
@@ -25,13 +25,12 @@ final class ContextMinimalStandaloneLazyReturnPendingRuntimeShrinkTest extends T
         $minimalBody = substr($context, $minimalPos, $minimalEnd - $minimalPos);
 
         $this->assertStringNotContainsString(
-            'JitReturnPending::ensureStandaloneBodies($this)',
+            'LastErrorRuntime::ensureStandaloneBodies($this)',
             $minimalBody,
-            'ensureMinimalUserStandaloneBodies must not eagerly JitReturnPending (#34621)'
+            'ensureMinimalUserStandaloneBodies must not eagerly LastErrorRuntime (#34631)'
         );
 
         // Essentials for thin echo / error / argv / getenv surface stay.
-        // LastError dropped in #34631 (peer this test).
         foreach ([
             'StringHtmlspecialchars::ensureStandaloneBodies($this)',
             'ObOutputRuntime::ensureLinked($this)',
@@ -42,54 +41,49 @@ final class ContextMinimalStandaloneLazyReturnPendingRuntimeShrinkTest extends T
             'ExceptionBridge::ensureStandaloneBodies($this)',
             'ErrorBridge::ensureStandaloneBodies($this)',
         ] as $keep) {
-            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34621)");
+            $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34631)");
         }
-        $this->assertStringNotContainsString(
-            'LastErrorRuntime::ensureStandaloneBodies($this)',
-            $minimalBody,
-            'ensureMinimal must not eagerly LastErrorRuntime (#34631)'
-        );
 
-        // Full standalone still links return-pending after TriggerError.
+        // Full standalone still links LastError after TriggerError.
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
         $fullBody = substr($context, $fullPos);
-        $this->assertStringContainsString('JitReturnPending::ensureStandaloneBodies($this)', $fullBody);
+        $this->assertStringContainsString('LastErrorRuntime::ensureStandaloneBodies($this)', $fullBody);
     }
 
     public function testCallSitesEnsureBeforeLookup(): void
     {
         $checks = [
-            'lib/JIT/TryCatchHelper.php' => 'JitReturnPending::ensureLinked',
-            'lib/JIT.php' => 'JitReturnPending::ensureLinked',
+            'ext/standard/JitErrorGetLast.php' => 'LastErrorRuntime::ensureLinked',
+            'ext/standard/JitTriggerErrorKernel.php' => 'LastErrorRuntime::ensureLinked',
         ];
         foreach ($checks as $rel => $needle) {
             $path = __DIR__.'/../../'.$rel;
             $this->assertFileExists($path, $rel);
             $source = (string) file_get_contents($path);
-            $this->assertStringContainsString($needle, $source, $rel.' must ensure lazily (#34621)');
+            $this->assertStringContainsString($needle, $source, $rel.' must ensure lazily (#34631)');
         }
     }
 
-    public function testJitHelperAbiBridgeRestoresInsert(): void
+    public function testLastErrorRuntimeRestoresInsert(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/JitHelperAbiBridge.php');
-        $this->assertStringContainsString('#34621', $source);
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/LastErrorRuntime.php');
+        $this->assertStringContainsString('#34631', $source);
         $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
         $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
         $this->assertStringNotContainsString(
             "\$context->builder->clearInsertionPosition();\n    }",
             $source,
-            'implement() must not always clear insert (#34621)'
+            'implement() must not always clear insert (#34631)'
         );
     }
 
-    public function testNoNewRuntimeCForMinimalReturnPendingLazy(): void
+    public function testNoNewRuntimeCForMinimalLastErrorLazy(): void
     {
         $runtimeDir = dirname(__DIR__, 2).'/lib/AOT/runtime';
         $this->assertFileDoesNotExist(
-            $runtimeDir.'/return_pending.c',
-            'must not add return_pending.c for #34621 — PHP JIT bridges only'
+            $runtimeDir.'/last_error.c',
+            'must not add last_error.c for #34631 — PHP JIT bridges only'
         );
     }
 }

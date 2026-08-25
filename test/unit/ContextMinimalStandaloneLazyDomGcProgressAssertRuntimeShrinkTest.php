@@ -40,6 +40,7 @@ final class ContextMinimalStandaloneLazyDomGcProgressAssertRuntimeShrinkTest ext
 
         // Essentials for thin echo / error / argv / getenv surface stay.
         // HtmlEntities / Decode / ErrorHandler / ExceptionHandler dropped in #34612 (peer this test).
+        // LastError dropped in #34631 (peer this test).
         foreach ([
             'StringHtmlspecialchars::ensureStandaloneBodies($this)',
             'ObOutputRuntime::ensureLinked($this)',
@@ -47,10 +48,14 @@ final class ContextMinimalStandaloneLazyDomGcProgressAssertRuntimeShrinkTest ext
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             'EnvLocalRuntime::ensureLinked($this)',
             'SuperglobalNameRuntime::ensureLinked($this)',
-            'LastErrorRuntime::ensureStandaloneBodies($this)',
         ] as $keep) {
             $this->assertStringContainsString($keep, $minimalBody, "keep {$keep} in minimal (#34605)");
         }
+        $this->assertStringNotContainsString(
+            'LastErrorRuntime::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly LastErrorRuntime (#34631)'
+        );
         foreach ([
             'HtmlEntitiesJit::ensureStandaloneBodies($this)',
             'StringHtmlspecialcharsDecode::ensureStandaloneBodies($this)',

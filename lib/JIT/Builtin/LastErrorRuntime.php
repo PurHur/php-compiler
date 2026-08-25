@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\LibcExtern;
@@ -15,7 +16,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __phpc_last_error_* via ErrorLastJitHelper PHP (#9454, #9607, #25318).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ExecutionLimits #25269).
- * Thin LLVM bridges forward the __phpc_last_error_* ABI. php-src: ext/standard/basic_functions.c
+ * Thin LLVM bridges forward the __phpc_last_error_* ABI. Mid-{main} ensureLinked restores
+ * builder insert (#34631 / peer JitHelperAbiBridge #34621). php-src: ext/standard/basic_functions.c
  */
 final class LastErrorRuntime
 {
@@ -73,6 +75,8 @@ final class LastErrorRuntime
             return;
         }
 
+        // Capture before NestedJIT/bridge emit so mid-{main} ensureLinked is safe (#34631).
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::ensureHashtableHelpers($context);
         self::implementRecordBridge($context);
@@ -80,7 +84,7 @@ final class LastErrorRuntime
         self::implementActiveBridge($context);
         self::implementHashtableBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
     }
 
     private static function implementRecordBridge(Context $context): void
