@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\IncludePathRuntime;
+use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
@@ -16,6 +17,8 @@ use PHPLLVM\Value;
  * LLVM lowering for file() — file_get_contents + line split (issue #3765).
  *
  * Missing paths use {@see __compiler_file_get_contents} null (same as readfile false path).
+ * Stream URIs (e.g. data://) must not be rejected by pathExists — NestedJIT decodes via
+ * {@see FileGetContentsJitHelper} (#34772 / peer #34731).
  */
 final class JitFile
 {
@@ -23,9 +26,24 @@ final class JitFile
     private const FILE_IGNORE_NEW_LINES = 2;
     private const FILE_SKIP_EMPTY_LINES = 4;
 
+    private static function ensureCompilerAbi(Context $context): void
+    {
+        $savedInsert = null;
+        try {
+            $savedInsert = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        StringFileGetContents::ensureLinked($context);
+        if (null !== $savedInsert) {
+            $context->builder->positionAtEnd($savedInsert);
+        }
+    }
+
     public static function invoke(Context $context, Value $pathStr, Value $flagsI64): Value
     {
         IncludePathRuntime::ensureLinked($context);
+        // Call-site link — Type no longer eagerly declares __compiler_file_get_contents (#34423 / #34772).
+        self::ensureCompilerAbi($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $i1 = $context->getTypeFromString('int1');
@@ -62,15 +80,10 @@ final class JitFile
         $pathPhi->addIncoming($pathStr, $resolveBlock);
         $pathPhi->addIncoming($resolved, $useResolvedBlock);
 
-        $exists = JitStat::pathExists($context, $pathPhi);
-        $missing = $context->builder->icmp(Builder::INT_EQ, $exists, $i1->constInt(0, false));
-
+        // Do not pathExists-reject stream URIs (data:// etc.) — libc open is wrong; the
+        // __compiler_file_get_contents NestedJIT leaf decodes RFC2397 (#34772 / peer #34731).
         $failBlock = BasicBlockHelper::append($context, 'file_fail');
-        $readBlock = BasicBlockHelper::append($context, 'file_read');
         $doneBlock = BasicBlockHelper::append($context, 'file_done');
-        $context->builder->branchIf($missing, $failBlock, $readBlock);
-
-        $context->builder->positionAtEnd($readBlock);
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $pathPhi
