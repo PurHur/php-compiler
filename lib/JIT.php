@@ -12361,7 +12361,9 @@ class JIT {
                         $this->context->builder->returnVoid();
                     } elseif ($this->cfgFunctionReturnsByRef($block->func)) {
                         $return->addref();
-                        // Alias the live cell (static/global/property heap box), not a
+                        // FETCH_DIM_W orphan → live HT entry before return (#34740 / re-#34733).
+                        $this->aliasAssignRefNamedDestToDimEntry($return);
+                        // Alias the live cell (static/global/property/HT heap box), not a
                         // stack snapshot — Zend ZEND_RETURN_BY_REF (#34717 / #4054).
                         $this->context->builder->returnValue(
                             JIT\JitValueBox::valuePtrForByRefReturn($this->context, $return)
@@ -18935,18 +18937,11 @@ class JIT {
      */
     private function assignRefDestEntryPointer(Variable $destVar): ?\PHPLLVM\Value
     {
-        if (null !== $destVar->writableHt && null !== $destVar->writableIndex) {
-            // Same miss path as FETCH_DIM_W ++/--: setNullAt grows used before we copy the box.
-            JIT\HashTableWriteLlvm::hydrateIndexWriteLvalue($this->context, $destVar);
-
-            return JIT\HashTableReadLlvm::listEntryPointer(
-                $this->context,
-                $destVar->writableHt,
-                $destVar->writableIndex
-            );
+        // Packed index + string-key FETCH_DIM_W orphans (#34740 / #34673 / #34689).
+        $dimEntry = JIT\HashTableWriteLlvm::liveEntryPointerForWritableDim($this->context, $destVar);
+        if (null !== $dimEntry) {
+            return $dimEntry;
         }
-        // String-key dims: entry may not exist until assignOperand writes (#34645 path).
-        // Keep those on copy+rebind; multi-alias sync is for append / packed index (#34685).
         if (
             Variable::TYPE_VALUE === $destVar->type
             && Variable::KIND_VARIABLE === $destVar->kind

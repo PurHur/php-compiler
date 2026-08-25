@@ -2205,6 +2205,61 @@ final class HashTableWriteLlvm
     }
 
     /**
+     * Live `__value__*` inside a FETCH_DIM_W orphan lvalue (ASSIGN_REF / by-ref return).
+     *
+     * {@see prepareIndexWrite} / {@see prepareStringKeyWrite} allocate an empty stack box and
+     * stash writableHt+key; Zend ZEND_RETURN_BY_REF / zend_assign_to_variable_reference must
+     * alias the hashtable entry, not that snapshot (#34740 / #34673 / re-#34733).
+     *
+     * @see php-src Zend/zend_execute.c ZEND_FETCH_DIM_W / ZEND_RETURN_BY_REF
+     */
+    public static function liveEntryPointerForWritableDim(Context $context, Variable $lvalue): ?Value
+    {
+        if (null === $lvalue->writableHt) {
+            return null;
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_dim_live_entry');
+        if (null !== $lvalue->writableIndex) {
+            self::hydrateIndexWriteLvalue($context, $lvalue);
+
+            return HashTableReadLlvm::listEntryPointer(
+                $context,
+                $lvalue->writableHt,
+                $lvalue->writableIndex
+            );
+        }
+        if (null !== $lvalue->writableStringKey) {
+            $ht = $lvalue->writableHt;
+            $keyStr = $lvalue->writableStringKey;
+            $tag = (string) self::nextSeq();
+            $isSet = $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                $ht,
+                $keyStr
+            );
+            $create = BasicBlockHelper::append($context, 'ht_dim_live_sk_create_'.$tag);
+            $ready = BasicBlockHelper::append($context, 'ht_dim_live_sk_ready_'.$tag);
+            $context->builder->branchIf($isSet, $ready, $create);
+            $context->builder->positionAtEnd($create);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyNull'),
+                $ht,
+                $keyStr
+            );
+            $context->builder->branch($ready);
+            $context->builder->positionAtEnd($ready);
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__readStringKeyValue'),
+                $ht,
+                $keyStr
+            );
+        }
+
+        return null;
+    }
+
+    /**
      * Copy the packed slot into a FETCH_DIM_W lvalue box so ++/-- sees the current long (#32305).
      *
      * @see php-src Zend/zend_vm_def.h ZEND_FETCH_DIM_W / ZEND_POST_INC
