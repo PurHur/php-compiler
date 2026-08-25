@@ -79,6 +79,9 @@ final class JitStreamIoKernel
         self::implementIfMissing($context, '__compiler_fwrite', self::emitFwrite(...));
         self::implementIfMissing($context, '__phpc_try_fopen_stdio', self::emitTryFopenStdio(...));
         self::implementIfMissing($context, '__phpc_try_fopen_php_memory', self::emitTryFopenPhpMemory(...));
+        // RFC2397 data:// before plain libc fopen (#34744 / peer #34731 file_get_contents).
+        \PHPCompiler\JIT\Builtin\StringBase64Decode::ensureLinked($context);
+        self::implementIfMissing($context, '__phpc_try_fopen_data_uri', self::emitTryFopenDataUri(...));
         self::implementIfMissing($context, '__phpc_php_fopen_plain', self::emitPhpFopenPlain(...));
         self::implementIfMissing($context, '__compiler_fopen', self::emitFopen(...));
         self::implementIfMissing($context, '__compiler_popen', self::emitPopen(...));
@@ -259,6 +262,10 @@ final class JitStreamIoKernel
                 $name,
                 $context->context->functionType($i8p, false, $i8p, $i8p)
             ),
+            '__phpc_try_fopen_data_uri' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i8p, false, $i8p, $i8p)
+            ),
             '__phpc_php_fopen_plain' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i8p, false, $i8p, $i8p)
@@ -308,6 +315,8 @@ final class JitStreamIoKernel
             ['ferror', $i32, [$i8p]],
             ['strcmp', $i32, [$i8p, $i8p]],
             ['strchr', $i8p, [$i8p, $i32]],
+            // strstr(3) for data:// ;base64 marker (#34744).
+            ['strstr', $i8p, [$i8p, $i8p]],
             ['dup', $i32, [$i32]],
             ['fdopen', $i8p, [$i32, $i8p]],
             ['close', $i32, [$i32]],
@@ -738,6 +747,186 @@ final class JitStreamIoKernel
         $context->builder->returnValue($nullPtr);
     }
 
+    /**
+     * __phpc_try_fopen_data_uri(path, mode) — RFC2397 data:// as tmpfile + payload (#34744).
+     *
+     * php-src: ext/standard/php_data_wrapper.c — php_stream_data_wrapper (read-only).
+     * Peer: VmDataStream::open / FileGetContentsJitHelper::decodeDataUri (#34731).
+     * Shape matches php://memory (tmpfile) so existing libc fread/stream_get_contents work.
+     */
+    private static function emitTryFopenDataUri(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('data_uri_try_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $path = $fn->getParam(0);
+        $mode = $fn->getParam(1);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullPtr = $i8p->constNull();
+        $nullStr = $strPtr->constNull();
+        $zero = $i32->constInt(0, false);
+        $zeroI64 = $i64->constInt(0, false);
+        $oneSize = $sizeT->constInt(1, false);
+
+        $missBb = $fn->appendBasicBlock('data_uri_try_miss');
+        $modeOkBb = $fn->appendBasicBlock('data_uri_try_mode_ok');
+        $prefixOkBb = $fn->appendBasicBlock('data_uri_try_prefix_ok');
+        $commaOkBb = $fn->appendBasicBlock('data_uri_try_comma_ok');
+        $b64CheckBb = $fn->appendBasicBlock('data_uri_try_b64_check');
+        $plainBb = $fn->appendBasicBlock('data_uri_try_plain');
+        $b64Bb = $fn->appendBasicBlock('data_uri_try_b64');
+        $openBb = $fn->appendBasicBlock('data_uri_try_open');
+        $writeBb = $fn->appendBasicBlock('data_uri_try_write');
+        $rewindBb = $fn->appendBasicBlock('data_uri_try_rewind');
+        $failBb = $fn->appendBasicBlock('data_uri_try_fail');
+        $failCloseBb = $fn->appendBasicBlock('data_uri_try_fail_close');
+
+        // Zend opens data:// for any non-empty fopen mode (stream not writable — php_data_wrapper.c).
+        $mode0 = $context->builder->load($mode);
+        $modeEmpty = $context->builder->icmp(Builder::INT_EQ, $mode0, $i8->constInt(0, false));
+        $context->builder->branchIf($modeEmpty, $missBb, $modeOkBb);
+
+        $context->builder->positionAtEnd($modeOkBb);
+        $prefixCmp = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $path,
+            self::literalCstr($context, 'data:'),
+            $sizeT->constInt(5, false)
+        );
+        $isData = $context->builder->icmp(Builder::INT_EQ, $prefixCmp, $zero);
+        $context->builder->branchIf($isData, $prefixOkBb, $missBb);
+
+        $context->builder->positionAtEnd($prefixOkBb);
+        $comma = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $path,
+            $i32->constInt(\ord(','), false)
+        );
+        $hasComma = $context->builder->icmp(Builder::INT_NE, $comma, $nullPtr);
+        $context->builder->branchIf($hasComma, $commaOkBb, $missBb);
+
+        $context->builder->positionAtEnd($commaOkBb);
+        $payload = $context->builder->gep($comma, $i64->constInt(1, false));
+        $context->builder->branch($b64CheckBb);
+
+        $context->builder->positionAtEnd($b64CheckBb);
+        // NestedJIT-safe marker match (#34731 uses stripos ';base64,'); cover common casings.
+        $b64Needle = $context->builder->call(
+            $context->lookupFunction('strstr'),
+            $path,
+            self::literalCstr($context, ';base64')
+        );
+        $b64Needle2 = $context->builder->call(
+            $context->lookupFunction('strstr'),
+            $path,
+            self::literalCstr($context, ';Base64')
+        );
+        $b64Needle3 = $context->builder->call(
+            $context->lookupFunction('strstr'),
+            $path,
+            self::literalCstr($context, ';BASE64')
+        );
+        $isB64 = $context->builder->or(
+            $context->builder->icmp(Builder::INT_NE, $b64Needle, $nullPtr),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_NE, $b64Needle2, $nullPtr),
+                $context->builder->icmp(Builder::INT_NE, $b64Needle3, $nullPtr)
+            )
+        );
+        $context->builder->branchIf($isB64, $b64Bb, $plainBb);
+
+        $context->builder->positionAtEnd($plainBb);
+        $plainLen = $context->builder->call($context->lookupFunction('strlen'), $payload);
+        $plainLenI64 = $context->builder->zExt($plainLen, $i64);
+        $plainTail = $context->builder->getInsertBlock();
+        $context->builder->branch($openBb);
+
+        $context->builder->positionAtEnd($b64Bb);
+        $rawLen = $context->builder->call($context->lookupFunction('strlen'), $payload);
+        $rawLenI64 = $context->builder->zExt($rawLen, $i64);
+        $rawStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $rawLenI64,
+            $payload
+        );
+        $decoded = $context->builder->call(
+            $context->lookupFunction('__compiler_base64_decode'),
+            $rawStr
+        );
+        $decodedOkBb = $fn->appendBasicBlock('data_uri_try_b64_ok');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $decoded, $nullStr),
+            $missBb,
+            $decodedOkBb
+        );
+        $context->builder->positionAtEnd($decodedOkBb);
+        $b64Ptr = self::stringData($context, $decoded);
+        $b64LenI64 = $context->builder->call(
+            $context->lookupFunction('__string__strlen'),
+            $decoded
+        );
+        $b64Tail = $context->builder->getInsertBlock();
+        $context->builder->branch($openBb);
+
+        $context->builder->positionAtEnd($openBb);
+        $dataPtrPhi = $context->builder->phi($i8p, 'data_uri_ptr');
+        $dataPtrPhi->addIncoming($payload, $plainTail);
+        $dataPtrPhi->addIncoming($b64Ptr, $b64Tail);
+        $dataLenPhi = $context->builder->phi($i64, 'data_uri_len');
+        $dataLenPhi->addIncoming($plainLenI64, $plainTail);
+        $dataLenPhi->addIncoming($b64LenI64, $b64Tail);
+
+        $fp = $context->builder->call($context->lookupFunction('tmpfile'));
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $context->builder->branchIf($fpNull, $failBb, $writeBb);
+
+        $context->builder->positionAtEnd($writeBb);
+        $lenZero = $context->builder->icmp(Builder::INT_EQ, $dataLenPhi, $zeroI64);
+        $doWriteBb = $fn->appendBasicBlock('data_uri_try_do_write');
+        $context->builder->branchIf($lenZero, $rewindBb, $doWriteBb);
+
+        $context->builder->positionAtEnd($doWriteBb);
+        $wrote = $context->builder->call(
+            $context->lookupFunction('fwrite'),
+            $dataPtrPhi,
+            $oneSize,
+            $context->builder->trunc($dataLenPhi, $sizeT),
+            $fp
+        );
+        $wroteI64 = $context->builder->zExt($wrote, $i64);
+        $short = $context->builder->icmp(Builder::INT_NE, $wroteI64, $dataLenPhi);
+        $context->builder->branchIf($short, $failCloseBb, $rewindBb);
+
+        $context->builder->positionAtEnd($rewindBb);
+        $seekRc = $context->builder->call(
+            $context->lookupFunction('fseek'),
+            $fp,
+            $zeroI64,
+            $zero
+        );
+        $seekFail = $context->builder->icmp(Builder::INT_NE, $seekRc, $zero);
+        $okBb = $fn->appendBasicBlock('data_uri_try_ok');
+        $context->builder->branchIf($seekFail, $failCloseBb, $okBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->returnValue($fp);
+
+        $context->builder->positionAtEnd($failCloseBb);
+        $context->builder->call($context->lookupFunction('fclose'), $fp);
+        $context->builder->branch($failBb);
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->returnValue($nullPtr);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullPtr);
+    }
+
     private static function fdopenDupStdio(
         Context $context,
         LlvmFunction $fn,
@@ -919,11 +1108,26 @@ final class JitStreamIoKernel
                 self::stringData($context, $mode)
             );
             $phpMemOkBb = $fn->appendBasicBlock($prefix.'_php_mem_ok');
+            $dataUriBb = $fn->appendBasicBlock($prefix.'_data_uri');
             $phpMemNull = $context->builder->icmp(Builder::INT_EQ, $phpMemFp, $nullPtr);
-            $context->builder->branchIf($phpMemNull, $plainBb, $phpMemOkBb);
+            $context->builder->branchIf($phpMemNull, $dataUriBb, $phpMemOkBb);
 
             $context->builder->positionAtEnd($phpMemOkBb);
             $phpMemTail = $context->builder->getInsertBlock();
+            $context->builder->branch($mergeBb);
+
+            $context->builder->positionAtEnd($dataUriBb);
+            $dataUriFp = $context->builder->call(
+                $context->lookupFunction('__phpc_try_fopen_data_uri'),
+                self::stringData($context, $path),
+                self::stringData($context, $mode)
+            );
+            $dataUriOkBb = $fn->appendBasicBlock($prefix.'_data_uri_ok');
+            $dataUriNull = $context->builder->icmp(Builder::INT_EQ, $dataUriFp, $nullPtr);
+            $context->builder->branchIf($dataUriNull, $plainBb, $dataUriOkBb);
+
+            $context->builder->positionAtEnd($dataUriOkBb);
+            $dataUriTail = $context->builder->getInsertBlock();
             $context->builder->branch($mergeBb);
 
             $context->builder->positionAtEnd($plainBb);
@@ -940,6 +1144,7 @@ final class JitStreamIoKernel
             $fpPhi = $context->builder->phi($i8p, $prefix.'_fp');
             $fpPhi->addIncoming($stdioFp, $openBb);
             $fpPhi->addIncoming($phpMemFp, $phpMemOkBb);
+            $fpPhi->addIncoming($dataUriFp, $dataUriOkBb);
             $fpPhi->addIncoming($plainFp, $plainTail);
             $fp = $fpPhi;
         } else {

@@ -18,7 +18,9 @@ final class VmDataStream
 
     public static function open(string $uri, string $mode): int|false
     {
-        if (!self::isReadMode($mode)) {
+        // Zend opens data:// for write modes too (stream remains non-writable) — php_data_wrapper.c.
+        // Reject only invalid fopen modes (#34744).
+        if (!VmPhpMemoryStream::isValidMode($mode)) {
             return false;
         }
         $payload = VmDataUri::decode($uri);
@@ -27,18 +29,5 @@ final class VmDataStream
         }
 
         return VmPhpMemoryStream::openWithBuffer($uri, $payload, $mode);
-    }
-
-    private static function isReadMode(string $mode): bool
-    {
-        if (!VmPhpMemoryStream::isValidMode($mode)) {
-            return false;
-        }
-        $normalized = \strtolower(\strtr($mode, ['b' => '', 't' => '']));
-        if ('' === $normalized) {
-            return false;
-        }
-
-        return 'r' === $normalized[0];
     }
 }
