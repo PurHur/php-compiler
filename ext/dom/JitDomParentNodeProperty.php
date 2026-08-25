@@ -17,7 +17,7 @@ use PHPLLVM\Value;
 
 /**
  * DOMNode::$parentNode for user-script AOT — honor textContent free-list stale markers (#23892)
- * and only-child replaceChild detach (#27411).
+ * and replaceChild detach (#27411 / #34590).
  *
  * Freed wrappers point parentNode at a module-level sentinel object; reading that
  * raises php-src's dom_objects_not_found() message. Kept-but-detached wrappers
@@ -26,7 +26,11 @@ use PHPLLVM\Value;
  * Thin AOT replaceChild updates the parent's firstChild/lastChild but cannot safely
  * null the replaced node's parentNode slot when that node came from appendChild()'s
  * boxed return (heap corruption / #27216). Instead, parentNode reads treat a node as
- * orphaned when its claimed parent has synced first/last children that do not include it.
+ * orphaned when its claimed parent has synced children that do not include it.
+ *
+ * Attachment must walk firstChild→nextSibling — first/last alone falsely orphans
+ * middle children (`item(1)` / `nextSibling` in 3+ lists) so `$n->parentNode` is
+ * null and `$n->parentNode->replaceChild(...)` aborts (#34590).
  *
  * Reference: php-src ext/dom/php_dom.c / ext/dom/node.c dom_node_replace_child.
  */
@@ -115,8 +119,10 @@ final class JitDomParentNodeProperty
         }
 
         $context->builder->positionAtEnd($afterFreed);
-        // #27411: synced first/last that exclude this node ⇒ stale parentNode (replaceChild).
-        // Unsynced null first+last ⇒ trust parentNode (appendChild may not write firstChild).
+        // #27411 / #34590: synced children that exclude this node ⇒ stale parentNode
+        // (replaceChild). Unsynced null first+last ⇒ trust parentNode (appendChild may
+        // not write firstChild). Walk the sibling chain — first/last alone orphans
+        // middle children (#34590).
         $firstSlot = $objectType->propertySlotFor($parentObj, self::CLASS_ELEMENT, VmDom::PROP_FIRST_CHILD);
         $lastSlot = $objectType->propertySlotFor($parentObj, self::CLASS_ELEMENT, VmDom::PROP_LAST_CHILD);
         $firstPtr = $context->builder->load($firstSlot);
@@ -134,8 +140,13 @@ final class JitDomParentNodeProperty
         $lastObj = self::loadChildObjectOrNull($context, $lastPtr, $lastMissing, 'dom_pn_last');
         $isFirst = $context->builder->icmp(Builder::INT_EQ, $firstObj, $obj);
         $isLast = $context->builder->icmp(Builder::INT_EQ, $lastObj, $obj);
-        $attached = $context->builder->or($isFirst, $isLast);
-        $context->builder->branchIf($attached, $live, $stale);
+        $ends = $context->builder->or($isFirst, $isLast);
+        $walk = BasicBlockHelper::append($context, 'dom_parent_walk');
+        $context->builder->branchIf($ends, $live, $walk);
+
+        $context->builder->positionAtEnd($walk);
+        $inChain = self::emitIsInChildChain($context, $objectType, $firstObj, $obj);
+        $context->builder->branchIf($inChain, $live, $stale);
 
         $context->builder->positionAtEnd($stale);
         $context->builder->branch($merge);
@@ -168,6 +179,76 @@ final class JitDomParentNodeProperty
         $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    /**
+     * True when {@code $needle} appears in {@code $first}→nextSibling chain (#34590).
+     *
+     * Bounded by a compile-time cap so a corrupt cycle cannot hang AOT.
+     */
+    private static function emitIsInChildChain(
+        Context $context,
+        Object_ $objectType,
+        Value $first,
+        Value $needle
+    ): Value {
+        self::ensureChildLinkProps($objectType);
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NEXT_SIBLING)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_NEXT_SIBLING, JITVariable::TYPE_VALUE);
+        }
+
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $voidPtr = $context->getTypeFromString('void*');
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $curSlot = BasicBlockHelper::entryAlloca($context, $objPtrTy);
+        $foundSlot = BasicBlockHelper::entryAlloca($context, $i1);
+        $guardSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($first, $curSlot);
+        $context->builder->store($i1->constInt(0, false), $foundSlot);
+        $context->builder->store($i64->constInt(0, false), $guardSlot);
+
+        $bbHdr = BasicBlockHelper::append($context, 'dom_pn_chain_hdr');
+        $bbBody = BasicBlockHelper::append($context, 'dom_pn_chain_body');
+        $bbNext = BasicBlockHelper::append($context, 'dom_pn_chain_next');
+        $bbEnd = BasicBlockHelper::append($context, 'dom_pn_chain_end');
+        $context->builder->branch($bbHdr);
+
+        $context->builder->positionAtEnd($bbHdr);
+        $cur = $context->builder->load($curSlot);
+        $curNull = $context->builder->icmp(Builder::INT_EQ, $cur, $objPtrTy->constNull());
+        $guard = $context->builder->load($guardSlot);
+        // Cap: real DOM trees rarely need >4k sibling walks; prevents hang on cycles.
+        $tooMany = $context->builder->icmp(Builder::INT_SGE, $guard, $i64->constInt(4096, false));
+        $stop = $context->builder->or($curNull, $tooMany);
+        $context->builder->branchIf($stop, $bbEnd, $bbBody);
+
+        $context->builder->positionAtEnd($bbBody);
+        $hit = $context->builder->icmp(Builder::INT_EQ, $cur, $needle);
+        $bbHit = BasicBlockHelper::append($context, 'dom_pn_chain_hit');
+        $context->builder->branchIf($hit, $bbHit, $bbNext);
+
+        $context->builder->positionAtEnd($bbHit);
+        $context->builder->store($i1->constInt(1, false), $foundSlot);
+        $context->builder->branch($bbEnd);
+
+        $context->builder->positionAtEnd($bbNext);
+        $context->builder->store(
+            $context->builder->add($guard, $i64->constInt(1, false)),
+            $guardSlot
+        );
+        $nextRaw = $context->builder->load(
+            $objectType->propertySlotFor($cur, self::CLASS_ELEMENT, VmDom::PROP_NEXT_SIBLING)
+        );
+        $nextMissing = $context->builder->icmp(Builder::INT_EQ, $nextRaw, $voidPtr->constNull());
+        $nextObj = self::loadChildObjectOrNull($context, $nextRaw, $nextMissing, 'dom_pn_chain_nx');
+        $context->builder->store($nextObj, $curSlot);
+        $context->builder->branch($bbHdr);
+
+        $context->builder->positionAtEnd($bbEnd);
+
+        return $context->builder->load($foundSlot);
     }
 
     /** Load __object__* from a firstChild/lastChild VALUE slot, or null when missing. */

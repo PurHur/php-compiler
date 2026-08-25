@@ -16,13 +16,14 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMNode::replaceChild() (#19240, #22678, #27216, #28671).
+ * LLVM lowering for DOMNode::replaceChild() (#19240, #22678, #27216, #28671, #34590).
  *
  * Thin standalone AOT materializes createElement nodes without DomRegistry
  * ({@see JitDomCreateElement::materializeElementFromLiteral}). The NestedJIT
  * DomRegistry bridge then sees unregistered objects and segfaults — mirror the
  * ParentNode::append LLVM slot sync instead (php-src ext/dom/node.c).
  * Attr as newChild: Hierarchy Request Error — Attr is not content (#33587).
+ * Live getElementsByTagName count: dec old + inc new (#34590 / peer #33679).
  */
 final class JitDomReplaceChild
 {
@@ -294,6 +295,10 @@ final class JitDomReplaceChild
         // Drop thin-AOT getElementById cache after detach — single-slot cache may still
         // hold a sibling while xmlAddID keeps the detached node's ID (#29694).
         DomUserScriptElementCacheLlvm::clearId($context);
+        // #33659 bumped live tag pending/count on append; remove undoes (#33679).
+        // replaceChild must both (#34590) so held getElementsByTagName length matches Zend.
+        DomUserScriptLiveTagListLlvm::decrementForChildArg($context, $oldChildVar);
+        DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $newChildVar);
 
         // Element nav slots — only-child replace collapses to newChild (#27216).
         $objectType = $context->type->object;
