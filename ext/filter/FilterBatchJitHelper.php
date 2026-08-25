@@ -10,7 +10,10 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
 /**
- * filter batch API runtime helpers for JIT/AOT (#3294).
+ * filter batch API runtime helpers for JIT/AOT (#3294, #34580).
+ *
+ * filter_input_array* returns {@see HashTable}|null (ArrayChunk / GraphemeStrSplit
+ * `__hashtable__*` ABI). Variable returns abort under thin AOT (#34580).
  *
  * php-src: ext/filter/filter.c — php_filter_has_var, php_filter_input_array, php_filter_var_array
  */
@@ -56,39 +59,36 @@ final class FilterBatchJitHelper
         return $out;
     }
 
-    public static function filterInputArray(int $type, HashTable $definition, int $addEmpty): Variable
+    public static function filterInputArray(int $type, HashTable $definition, int $addEmpty): ?HashTable
     {
-        $ctx = self::requireActiveContext();
+        // Thin AOT: early-null via static VmFilter (instance methods NestedJIT poorly; #34580).
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            return null;
+        }
+        if (null === VmFilter::requestInputTable($ctx, $type)) {
+            return null;
+        }
         $frame = new Frame();
         $frame->vmContext = $ctx;
-        $result = VmFilter::filterInputArray($ctx, $type, $definition, $addEmpty, $frame);
-        $out = new Variable();
-        if (null === $result) {
-            $out->null();
 
-            return $out;
-        }
-        $out->array($result);
-
-        return $out;
+        return VmFilter::filterInputArray($ctx, $type, $definition, $addEmpty, $frame);
     }
 
-    /** Int filter-ID overload for filter_input_array() (#21937). */
-    public static function filterInputArrayByFilterId(int $type, int $filterId, int $addEmpty): Variable
+    /** Int filter-ID overload for filter_input_array() (#21937, #34580). */
+    public static function filterInputArrayByFilterId(int $type, int $filterId, int $addEmpty): ?HashTable
     {
-        $ctx = self::requireActiveContext();
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            return null;
+        }
+        if (null === VmFilter::requestInputTable($ctx, $type)) {
+            return null;
+        }
         $frame = new Frame();
         $frame->vmContext = $ctx;
-        $result = VmFilter::filterInputArray($ctx, $type, $filterId, $addEmpty, $frame);
-        $out = new Variable();
-        if (null === $result) {
-            $out->null();
 
-            return $out;
-        }
-        $out->array($result);
-
-        return $out;
+        return VmFilter::filterInputArray($ctx, $type, $filterId, $addEmpty, $frame);
     }
 
     private static function requireActiveContext(): \PHPCompiler\VM\Context

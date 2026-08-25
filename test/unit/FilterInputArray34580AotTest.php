@@ -1,0 +1,74 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPUnit\Framework\TestCase;
+
+/**
+ * AOT filter_input_array must return NULL on CLI, not abort (#34580).
+ *
+ * @group llvm
+ * @group aot
+ */
+final class FilterInputArray34580AotTest extends TestCase
+{
+    public function testFilterIdFormMatchesZendCliNull(): void
+    {
+        $this->assertAotExport(
+            '<?php var_export(filter_input_array(INPUT_GET, FILTER_DEFAULT));',
+            'NULL'
+        );
+    }
+
+    public function testDefinitionArrayFormMatchesZendCliNull(): void
+    {
+        $this->assertAotExport(
+            "<?php var_export(filter_input_array(INPUT_GET, ['x'=>FILTER_VALIDATE_INT]));",
+            'NULL'
+        );
+    }
+
+    private function assertAotExport(string $code, string $expected): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $dir = sys_get_temp_dir().'/phpc-fia-34580-'.getmypid().'-'.mt_rand();
+        mkdir($dir);
+        $src = $dir.'/t.php';
+        $bin = $dir.'/t.bin';
+        file_put_contents($src, $code);
+        $env = getenv();
+        if (!\is_array($env)) {
+            $env = [];
+        }
+        $env['PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR'] = $dir.'/helper-cache';
+        $env['PHP_COMPILER_HELPER_RUNTIME_O'] = '0';
+        mkdir($env['PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR']);
+        $cmd = [
+            PHP_BINARY,
+            '-d', 'memory_limit=512M',
+            dirname(__DIR__, 2).'/bin/compile.php',
+            '-o', $bin,
+            $src,
+        ];
+        $desc = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proc = proc_open($cmd, $desc, $pipes, dirname(__DIR__, 2), $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $rc = proc_close($proc);
+        $this->assertSame(0, $rc, "compile failed: $stdout$stderr");
+        $this->assertFileExists($bin);
+        $out = [];
+        $runRc = 0;
+        exec(escapeshellarg($bin).' 2>&1', $out, $runRc);
+        $this->assertSame(0, $runRc, 'run failed: '.implode("\n", $out));
+        $this->assertSame($expected, implode("\n", $out));
+    }
+}
