@@ -8938,8 +8938,64 @@ class JIT {
                     }
                     $destName = JIT\OperandName::resolve($destOp);
                     $srcName = JIT\OperandName::resolve($srcOp);
+                    // Unnamed dest: FETCH_DIM_W / []= / property / static (#34645, re-#5349).
+                    // Inverted `$r = &$a[0]` (#32669): store into the lvalue then rebind the
+                    // named source onto that lvalue so later `$x = 9` commits into the HT/prop.
                     if (null === $destName) {
-                        throw new \LogicException('Reference assignment requires named destination variable');
+                        if (
+                            !$this->context->hasVariableOp($destOp)
+                            || !$this->isAssignRefWritableDest(
+                                $this->context->getVariableFromOp($destOp)
+                            )
+                        ) {
+                            throw new \LogicException('Reference assignment requires named destination variable');
+                        }
+                        $destVar = $this->context->getVariableFromOp($destOp);
+                        if (
+                            $this->context->hasVariableOp($srcOp)
+                            && !JIT\JitReferencableCheck::isOperandReferenceable(
+                                $srcOp,
+                                $this->context->getVariableFromOp($srcOp)
+                            )
+                        ) {
+                            JIT\JitReferencableCheck::emitNonVariableAssignRefNotice($this->context);
+                            $this->assignOperand($destOp, $this->context->getVariableFromOp($srcOp));
+                            break;
+                        }
+                        if (!$this->context->hasVariableOp($srcOp)) {
+                            throw new \LogicException('Reference assignment requires a bound source variable');
+                        }
+                        $srcVar = $this->context->getVariableFromOp($srcOp);
+                        JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
+                        if (
+                            Variable::TYPE_VALUE === $srcVar->type
+                            && null === $srcVar->valueBoxAliasPtr
+                            && !$srcVar->borrowedValueEntry
+                            && null === $srcVar->writableHt
+                            && null === $srcVar->objectPropertySlot
+                            && null === $srcVar->staticPropertyGlobal
+                        ) {
+                            $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
+                                $this->context,
+                                $srcVar
+                            );
+                        }
+                        $this->assignOperand($destOp, $srcVar);
+                        $destVar = $this->context->getVariableFromOp($destOp);
+                        if (null !== $srcName) {
+                            $this->context->bindVariableByName($srcName, $destVar);
+                            $this->context->setVariableOp($srcOp, $destVar);
+                        } elseif (
+                            null !== $srcVar->objectPropertySlot
+                            || null !== $srcVar->staticPropertyGlobal
+                            || null !== $srcVar->writableHt
+                            || null !== $srcVar->valueBoxAliasPtr
+                        ) {
+                            // `$a[] = &$o->p` / `$a[] = &$a[0]`: leave src as canonical
+                            // storage and point the dim entry at that box (#5349 compliance).
+                            $this->aliasAssignRefDestOntoSourceStorage($destVar, $srcVar);
+                        }
+                        break;
                     }
                     // Zend: `$a =& f()` / non-variable RHS → Notice + value assign (#30015).
                     // Class static properties are lvalues (FETCH_STATIC_PROP_W, #32036).
@@ -18540,6 +18596,100 @@ class JIT {
         $orphanPtr = JIT\JitValueBox::pointer($this->context, $dimLvalue->value);
         JIT\JitValueBox::assignToPointer($this->context, $orphanPtr, $value);
         JIT\JitValueBox::publishAfterWrite($this->context, $orphanPtr);
+    }
+
+    /**
+     * True when ASSIGN_REF dest is a FETCH_DIM_W / []= / property / static lvalue (#34645).
+     *
+     * @see php-src Zend/zend_execute.c zend_assign_to_variable_reference
+     */
+    private function isAssignRefWritableDest(Variable $var): bool
+    {
+        if (null !== $var->objectPropertySlot || null !== $var->staticPropertyGlobal) {
+            return true;
+        }
+        if (null !== $var->writableHt) {
+            return null !== $var->writableIndex
+                || null !== $var->writableStringKey
+                || null !== $var->writableObjectKey
+                || null !== $var->writableValueBoxKey;
+        }
+        if (null !== $var->writableArrayAccessReceiver && null !== $var->writableArrayAccessKey) {
+            return true;
+        }
+        // reserveAppendSlot: KIND_VARIABLE pointing at the HT entry (no writableHt markers).
+        return Variable::TYPE_VALUE === $var->type
+            && Variable::KIND_VARIABLE === $var->kind
+            && null === $var->valueBoxAliasPtr
+            && !$var->functionStaticGlobal
+            && null === $var->objectPropertySlot
+            && null === $var->staticPropertyGlobal;
+    }
+
+    /**
+     * `$a[] = &$o->p`: after the value is copied into the dim entry, redirect the source
+     * lvalue onto that entry so later property/static writes update the array (#5349).
+     */
+    private function aliasAssignRefDestOntoSourceStorage(Variable $destVar, Variable $srcVar): void
+    {
+        $entryPtr = $this->assignRefDestEntryPointer($destVar);
+        if (null === $entryPtr) {
+            return;
+        }
+        if (null !== $srcVar->objectPropertySlot) {
+            $voidPtr = $this->context->getTypeFromString('void*');
+            $this->context->builder->store(
+                $this->context->builder->pointerCast($entryPtr, $voidPtr),
+                $srcVar->objectPropertySlot
+            );
+            if (Variable::TYPE_VALUE === $srcVar->type) {
+                $srcVar->value = $entryPtr;
+            }
+
+            return;
+        }
+        if (null !== $srcVar->staticPropertyGlobal) {
+            $srcVar->valueBoxAliasPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $entryPtr);
+            if (Variable::TYPE_VALUE === $srcVar->type && Variable::KIND_VARIABLE === $srcVar->kind) {
+                $srcVar->value = $entryPtr;
+            }
+
+            return;
+        }
+        if (null !== $srcVar->valueBoxAliasPtr) {
+            // Named locals already rebound; leftover aliases (dim→dim) share the entry box.
+            JIT\JitValueBox::copyFromPointer(
+                $this->context,
+                $entryPtr,
+                JIT\JitValueBox::normalizeValuePtr($this->context, $srcVar->valueBoxAliasPtr)
+            );
+            $srcVar->valueBoxAliasPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $entryPtr);
+        }
+    }
+
+    /**
+     * Live `__value__*` for an ASSIGN_REF dim dest (append entry or packed writableHt).
+     */
+    private function assignRefDestEntryPointer(Variable $destVar): ?\PHPLLVM\Value
+    {
+        if (null !== $destVar->writableHt && null !== $destVar->writableIndex) {
+            return JIT\HashTableReadLlvm::listEntryPointer(
+                $this->context,
+                $destVar->writableHt,
+                $destVar->writableIndex
+            );
+        }
+        if (
+            Variable::TYPE_VALUE === $destVar->type
+            && Variable::KIND_VARIABLE === $destVar->kind
+            && null === $destVar->writableHt
+            && null === $destVar->objectPropertySlot
+            && null === $destVar->staticPropertyGlobal
+        ) {
+            return JIT\JitValueBox::valuePtrFromVariable($this->context, $destVar);
+        }
+
+        return null;
     }
 
     /**
