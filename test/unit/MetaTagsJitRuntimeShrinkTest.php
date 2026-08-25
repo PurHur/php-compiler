@@ -19,12 +19,24 @@ final class MetaTagsJitRuntimeShrinkTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/MetaTagsJitHelper.php');
         $this->assertStringContainsString('phpc_native_ht_alloc', $source);
         $this->assertStringContainsString('phpc_native_ht_set_string_key', $source);
-        $this->assertStringContainsString('@file_get_contents', $source);
+        $this->assertStringContainsString('@\\file_get_contents', $source);
+        $this->assertStringContainsString("'data:'", $source);
+        $this->assertStringContainsString('FileGetContentsJitHelper::readPathArgv', $source);
         $this->assertStringContainsString('\'\' === $ch', $source);
         $this->assertStringNotContainsString('isset($html', $source);
         $this->assertStringContainsString(': int', $source);
         $this->assertStringNotContainsString('getMetaTagsHashTable', $source);
         $this->assertStringNotContainsString('new HashTable', $source);
+    }
+
+    public function testUserScriptInlineOnlyForcesMetaTagsDataUriNestedJit(): void
+    {
+        $cache = (string) \file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString(
+            'metatagsjithelper::getmetatags',
+            $cache,
+            'USER_SCRIPT_INLINE_ONLY must NestedJIT getMetaTags — prelinked unit.o skips data:// (#34787)'
+        );
     }
 
     public function testMetaTagsRuntimeRoutesThroughMetaTagsJitHelper(): void
@@ -33,11 +45,14 @@ final class MetaTagsJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MetaTagsJitHelper', $source);
         $this->assertStringContainsString('i64ToTypedPtr', $source);
         $this->assertStringContainsString('ensureNativeHtInternalProxies', $source);
+        $this->assertStringContainsString('ensureCompiledBundle', $source);
+        $this->assertStringContainsString('FileGetContentsJitHelper.php', $source);
+        $this->assertStringContainsString('StringBase64Decode::ensureLinked', $source);
         $this->assertStringNotContainsString('implementParseMetaTagsHtml', $source);
         $this->assertStringNotContainsString('coerceToHashtablePtr', $source);
 
         $lineCount = \substr_count($source, "\n");
-        $this->assertLessThan(180, $lineCount, 'MetaTagsRuntime must be a thin bridge');
+        $this->assertLessThan(200, $lineCount, 'MetaTagsRuntime must be a thin bridge');
     }
 
     public function testMetaTagsRuntimeUsesJitVmHelperLink(): void
@@ -47,7 +62,7 @@ final class MetaTagsJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('ensureStandaloneBodies', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
     }
 

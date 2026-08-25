@@ -18,6 +18,11 @@ namespace PHPCompiler\ext\standard;
  * - PCRE / VmFs NestedJIT — `@file_get_contents` + literal scanners
  * - Keep scanners inline (private helpers / larger CFGs NestedJIT-OOM under thin init)
  *
+ * `data:` URIs must not hit libc open — NestedJIT-safe decode via
+ * {@see FileGetContentsJitHelper::readPathArgv} (peer #34731 / #34787, php_data_wrapper.c).
+ * php-src opens with php_stream_open_wrapper (not STREAM_OPEN_FOR_INCLUDE) so allow_url_fopen
+ * applies and data:// is allowed by default.
+ *
  * Limitation: first `name="…"` / `content="…"` pair in the document (double-quoted). Enough
  * for php-src-shaped single-meta fixtures; multi-tag HTML is a follow-up.
  *
@@ -38,9 +43,17 @@ final class MetaTagsJitHelper
             }
         }
 
-        $html = @file_get_contents($filename);
-        if (false === $html) {
-            return 0;
+        // NestedJIT strncmp() mis-compares prefixes (#34731); substr === is reliable.
+        if (\is_string($filename) && 'data:' === \substr($filename, 0, 5)) {
+            $html = FileGetContentsJitHelper::readPathArgv($filename);
+            if (null === $html) {
+                return 0;
+            }
+        } else {
+            $html = @\file_get_contents($filename);
+            if (false === $html) {
+                return 0;
+            }
         }
 
         $htPtr = (int) phpc_native_ht_alloc();
