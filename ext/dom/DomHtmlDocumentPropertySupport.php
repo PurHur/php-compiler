@@ -101,9 +101,24 @@ final class DomHtmlDocumentPropertySupport
         $state = DomRegistry::state($object);
 
         if (VmDomLiving::PROP_DOCUMENT_ELEMENT === $lc) {
-            return $object->getProperty(VmDom::PROP_DOCUMENT_ELEMENT);
+            $slot = self::declaredObjectSlot($object, $lc);
+            if (null !== $slot) {
+                return $slot;
+            }
+            $root = VmDomLiving::htmlRootElement($object);
+            if (null === $root) {
+                $var->null();
+            } else {
+                $var->object($root);
+            }
+
+            return $var;
         }
         if (VmDomLiving::PROP_BODY === $lc) {
+            $slot = self::declaredObjectSlot($object, $lc);
+            if (null !== $slot) {
+                return $slot;
+            }
             $body = VmDomLiving::htmlBodyElement($object);
             if (null === $body) {
                 $var->null();
@@ -114,6 +129,10 @@ final class DomHtmlDocumentPropertySupport
             return $var;
         }
         if (VmDomLiving::PROP_HEAD === $lc) {
+            $slot = self::declaredObjectSlot($object, $lc);
+            if (null !== $slot) {
+                return $slot;
+            }
             $head = VmDomLiving::htmlHeadElement($object);
             if (null === $head) {
                 $var->null();
@@ -326,5 +345,29 @@ final class DomHtmlDocumentPropertySupport
         }
 
         return true;
+    }
+
+    /**
+     * User-script AOT pins body/documentElement on ClassProperty slots (#27300, #28958).
+     * Read the slot without re-entering managed-property dispatch (would recurse / walk
+     * empty DomRegistry on thin materialize).
+     */
+    private static function declaredObjectSlot(ObjectEntry $object, string $lc): ?Variable
+    {
+        $slots = $object->propertiesWithNames();
+        if (!isset($slots[$lc])) {
+            return null;
+        }
+        $resolved = $slots[$lc]->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $resolved->type) {
+            $var = new Variable();
+            $var->objectPropertyOwner = $object;
+            $var->objectPropertyName = $lc;
+            $var->object($resolved->toObject());
+
+            return $var;
+        }
+
+        return null;
     }
 }

@@ -146,6 +146,7 @@ final class JitDomHtmlDocumentCreateFromString
         }
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_html_cfs_us_materialize');
+        JitDomHtmlDocumentSaveHtml::rememberCreateFromString($source, 0);
         // textContent fetch reads property slots when last load was pure user-script (#24121 / #27300).
         JitDomLoadXMLUserScript::markLastLoadPureUserScript();
         JitDomLoadXMLUserScript::rememberLivingDocumentClass(self::CLASS_DOCUMENT);
@@ -229,27 +230,10 @@ final class JitDomHtmlDocumentCreateFromString
         }
 
         $doctypeName = DomParseSimpleHtmlJitHelper::doctypeNameArgv($source);
-        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCTYPE)) {
-            $objectType->defineProperty($docClassId, VmDom::PROP_DOCTYPE, JITVariable::TYPE_VALUE);
-        }
         if (null === $doctypeName) {
-            $nullSlot = JitValueBox::alloc($context);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeNull'),
-                JitValueBox::pointer($context, $nullSlot)
-            );
-            $nullVar = new JITVariable(
-                $context,
-                JITVariable::TYPE_VALUE,
-                JITVariable::KIND_VARIABLE,
-                $nullSlot
-            );
-            $objectType->propertyStore(
-                $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCTYPE),
-                $nullVar,
-                JITVariable::TYPE_NULL
-            );
-
+            // Fragment parse — php-src leaves doctype null (#26924). Declaring the class
+            // slot is enough; writing a runtime null __value__ into the instance segfaults
+            // on thin-AOT materialize (#27300 / re-#28940).
             return;
         }
 
@@ -278,7 +262,10 @@ final class JitDomHtmlDocumentCreateFromString
         if (!$objectType->hasProperty($docClassId, VmDomLiving::PROP_BODY)) {
             $objectType->defineProperty($docClassId, VmDomLiving::PROP_BODY, JITVariable::TYPE_OBJECT);
         }
-        // doctype type chosen in storeDoctypeProperty (OBJECT when present, VALUE when null).
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCTYPE)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCTYPE, JITVariable::TYPE_VALUE);
+        }
+        // doctype instance value set in storeDoctypeProperty when explicit <!DOCTYPE>.
     }
 
     private static function ensureElementLayout(

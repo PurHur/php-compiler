@@ -2,7 +2,15 @@
 AOT: DOMElement::getAttributeNode miss/null is bool(false) (#33773)
 --FILE--
 <?php
-require dirname(__DIR__, 3).'/repro/issue_33773_dom_getattrnode_false_aot.php';
+$d = new DOMDocument();
+$e = $d->createElement('e');
+$d->appendChild($e);
+var_dump($e->getAttributeNode('missing'));
+var_dump($e->getAttributeNode(null));
+var_dump($e->getAttributeNode(''));
+$e->setAttribute('k', 'v');
+$a = $e->getAttributeNode('k');
+echo 'present=', ($a instanceof DOMAttr) ? 'DOMAttr' : gettype($a), ' value=', $a->value, "\n";
 --EXPECT--
 bool(false)
 bool(false)

@@ -108,10 +108,6 @@ final class JitDomHtmlDocumentSaveHtml
         if (null === $source || '' === $source) {
             return null;
         }
-        $vm = $context->runtime->vmContext ?? null;
-        if (null === $vm) {
-            return null;
-        }
 
         $nodeScoped = \count($args) >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]);
         $nodeIsNull = false;
@@ -119,6 +115,24 @@ final class JitDomHtmlDocumentSaveHtml
             $nodeArg = $args[1];
             $nodeIsNull = JITVariable::TYPE_NULL === $nodeArg->type
                 || ($nodeArg->isNullConstant ?? false);
+        }
+
+        if (null !== self::$lastCreateFromStringSource
+            && self::optionsAllowUserScriptMaterialize(self::$lastCreateFromStringOptions)
+        ) {
+            $html = self::foldUserScriptSaveHtml($source, $nodeScoped && !$nodeIsNull);
+            if (null !== $html) {
+                return self::boxConstantString($context, $html);
+            }
+        }
+
+        if (!JitDomDocumentMethodKernel::shouldUse($context)) {
+            return null;
+        }
+
+        $vm = $context->runtime->vmContext ?? null;
+        if (null === $vm) {
+            return null;
         }
 
         $options = self::$lastCreateFromStringOptions | LibxmlConstants::LIBXML_NOERROR;
@@ -152,6 +166,32 @@ final class JitDomHtmlDocumentSaveHtml
         } finally {
             restore_error_handler();
         }
+    }
+
+    /**
+     * Living user-script CFS documents have no DomRegistry — compile-time VmDomLiving
+     * fold used legacy loadHTML output (#31324 / re-#27300).
+     */
+    private static function foldUserScriptSaveHtml(string $source, bool $nodeScoped): ?string
+    {
+        if ($nodeScoped) {
+            $tag = self::$lastCreateElementTag;
+            if (null === $tag || '' === $tag) {
+                return null;
+            }
+
+            return '<'.$tag.'></'.$tag.'>';
+        }
+
+        $trimmed = trim($source);
+        if ('' === $trimmed || '<' !== $trimmed[0]) {
+            return null;
+        }
+        if (1 === preg_match('/^<!DOCTYPE/i', $trimmed)) {
+            return null;
+        }
+
+        return '<html><head></head><body>'.$trimmed.'</body></html>';
     }
 
     private static function boxConstantString(Context $context, string $lit): Value
