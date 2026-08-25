@@ -38,34 +38,50 @@ final class HashNonCryptoJitHelper
     public static function digest(string $algo, string $data, bool $raw): string
     {
         $id = self::algoId($algo);
-        if (0 === $id) {
-            return '';
-        }
         if (7 === $id) {
             $bin = self::fnv64Bytes($data, false);
-        } elseif (8 === $id) {
-            $bin = self::fnv64Bytes($data, true);
-        } elseif (9 === $id) {
-            $bin = self::u32ToBytes(self::joaat($data));
-        } else {
-            $u = 0;
-            if (1 === $id) {
-                // crc32b — IEEE / same as crc32()
-                $u = self::crc32b($data);
-            } elseif (2 === $id) {
-                // crc32 — non-reflected then swap endian for digest bytes
-                $u = self::swapEndian32(self::crc32NonReflected($data));
-            } elseif (3 === $id) {
-                $u = self::crc32c($data);
-            } elseif (4 === $id) {
-                $u = self::adler32($data);
-            } elseif (5 === $id) {
-                $u = self::fnv132($data);
-            } else {
-                $u = self::fnv1a32($data);
+            if ($raw) {
+                return $bin;
             }
-            $bin = self::u32ToBytes($u);
+
+            return self::binToHex($bin);
         }
+        if (8 === $id) {
+            $bin = self::fnv64Bytes($data, true);
+            if ($raw) {
+                return $bin;
+            }
+
+            return self::binToHex($bin);
+        }
+        if (9 === $id) {
+            $bin = self::u32ToBytes(self::joaat($data));
+            if ($raw) {
+                return $bin;
+            }
+
+            return self::binToHex($bin);
+        }
+        // #34828 flat if/elseif — NestedJIT/AOT regresses when nested inside else (#34834).
+        $u = 0;
+        if (1 === $id) {
+            // crc32b — IEEE / same as crc32()
+            $u = self::crc32b($data);
+        } elseif (2 === $id) {
+            // crc32 — non-reflected then swap endian for digest bytes
+            $u = self::swapEndian32(self::crc32NonReflected($data));
+        } elseif (3 === $id) {
+            $u = self::crc32c($data);
+        } elseif (4 === $id) {
+            $u = self::adler32($data);
+        } elseif (5 === $id) {
+            $u = self::fnv132($data);
+        } elseif (6 === $id) {
+            $u = self::fnv1a32($data);
+        } else {
+            return '';
+        }
+        $bin = self::u32ToBytes($u);
         if ($raw) {
             return $bin;
         }
