@@ -81,9 +81,13 @@ final class JitOpensslPkeyGetPublic
 
     /**
      * String / value-box string / OpenSSLAsymmetricKey::__osslPem → __string__*.
-     * Non-string material yields an empty string so DETAILS_PUB soft-fails to false.
+     * Non-key material yields an empty string so callers soft-fail (DETAILS_PUB / EVP sign).
+     *
+     * Shared with {@see JitOpensslSign} (openssl_sign/verify key args; #34715).
+     * Value-boxed OpenSSLAsymmetricKey from openssl_pkey_new() is TYPE_VALUE at the
+     * call site — must read the object tag, not only compile-time TYPE_OBJECT.
      */
-    private static function resolvePemString(Context $context, JITVariable $arg): Value
+    public static function resolvePemString(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_STRING === $arg->type) {
             return $context->helper->loadValue($arg);
@@ -93,43 +97,82 @@ final class JitOpensslPkeyGetPublic
             $class = $arg->classUserType;
             if (null === $class || '' === $class
                 || 0 === \strcasecmp($class, OpensslPkeyNewJitSupport::CLASS_NAME)) {
-                $obj = $context->builder->call(
-                    $context->lookupFunction('__value__readObject'),
-                    JitValueBox::valuePtrFromVariable($context, $arg)
-                );
-                $strVar = $context->type->object->propertyFetch(
-                    $obj,
-                    OpensslPkeyNewJitSupport::CLASS_NAME,
-                    OpensslPkeyNewJitSupport::PROP_PEM
-                );
-
-                return $context->helper->loadValue($strVar);
+                return self::loadPemFromObjectValue($context, $arg);
             }
         }
 
-        // Hashtable dim fetch / mixed value-box from openssl_pkey_get_details()['key'] (#34038).
-        // __value__readString returns null for non-string tags — map to empty so DETAILS_PUB fails soft.
-        $fromBox = JitValueBox::readStringOrNull($context, $arg);
+        // Runtime value-box: string PEM or OpenSSLAsymmetricKey (#34038 / #34715).
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $stringTy = $i8->constInt(JITVariable::TYPE_STRING & 0x7f, false);
+        $objectTy = $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false);
+
         $strPtrTy = $context->getTypeFromString('__string__*');
         $id = (string) (++self::$blockSerial);
         $empty = $context->builder->load($context->constantStringFromString(''));
-        $nullBlock = BasicBlockHelper::append($context, 'ossl_pkey_gp_pem_null_'.$id);
-        $okBlock = BasicBlockHelper::append($context, 'ossl_pkey_gp_pem_ok_'.$id);
-        $doneBlock = BasicBlockHelper::append($context, 'ossl_pkey_gp_pem_done_'.$id);
         $phiSlot = $context->builder->alloca($strPtrTy);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $fromBox, $strPtrTy->constNull());
-        $context->builder->branchIf($isNull, $nullBlock, $okBlock);
 
-        $context->builder->positionAtEnd($nullBlock);
-        $context->builder->store($empty, $phiSlot);
+        $stringBlock = BasicBlockHelper::append($context, 'ossl_pkey_pem_str_'.$id);
+        $objectBlock = BasicBlockHelper::append($context, 'ossl_pkey_pem_obj_'.$id);
+        $emptyBlock = BasicBlockHelper::append($context, 'ossl_pkey_pem_empty_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'ossl_pkey_pem_done_'.$id);
+        $afterStringCheck = BasicBlockHelper::append($context, 'ossl_pkey_pem_after_str_'.$id);
+
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeKind, $stringTy);
+        $context->builder->branchIf($isString, $stringBlock, $afterStringCheck);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $fromStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $context->builder->store($fromStr, $phiSlot);
         $context->builder->branch($doneBlock);
 
-        $context->builder->positionAtEnd($okBlock);
-        $context->builder->store($fromBox, $phiSlot);
+        $context->builder->positionAtEnd($afterStringCheck);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeKind, $objectTy);
+        $context->builder->branchIf($isObject, $objectBlock, $emptyBlock);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $strVar = $context->type->object->propertyFetch(
+            $obj,
+            OpensslPkeyNewJitSupport::CLASS_NAME,
+            OpensslPkeyNewJitSupport::PROP_PEM
+        );
+        $pem = $context->helper->loadValue($strVar);
+        $context->builder->store($pem, $phiSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->store($empty, $phiSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
 
         return $context->builder->load($phiSlot);
+    }
+
+    private static function loadPemFromObjectValue(Context $context, JITVariable $arg): Value
+    {
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $arg)
+        );
+        $strVar = $context->type->object->propertyFetch(
+            $obj,
+            OpensslPkeyNewJitSupport::CLASS_NAME,
+            OpensslPkeyNewJitSupport::PROP_PEM
+        );
+
+        return $context->helper->loadValue($strVar);
     }
 }

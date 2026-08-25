@@ -14,7 +14,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM helpers for openssl_sign()/openssl_verify() — OpensslSignJitHelper PHP (#3324). */
+/**
+ * LLVM helpers for openssl_sign()/openssl_verify() — OpensslSignJitHelper PHP (#3324).
+ *
+ * Key args accept OpenSSLAsymmetricKey|string like {@see VmOpenssl::coercePkeyPem} (#34715).
+ */
 final class JitOpensslSign
 {
     private static int $blockSerial = 0;
@@ -32,7 +36,8 @@ final class JitOpensslSign
         $digest = $context->builder->call(
             $context->lookupFunction('__compiler_openssl_sign'),
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $data, 'openssl_sign', 0, 'data'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $privateKey, 'openssl_sign', 2, 'private_key'),
+            // OpenSSLAsymmetricKey::__osslPem — not JitStringBuiltinArg (SEGV; #34715).
+            JitOpensslPkeyGetPublic::resolvePemString($context, $privateKey),
             $algo
         );
 
@@ -79,7 +84,8 @@ final class JitOpensslSign
             $context->lookupFunction('__compiler_openssl_verify'),
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $data, 'openssl_verify', 0, 'data'),
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $signature, 'openssl_verify', 1, 'signature'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $publicKey, 'openssl_verify', 2, 'public_key'),
+            // OpenSSLAsymmetricKey|string — peer openssl_sign (#34715).
+            JitOpensslPkeyGetPublic::resolvePemString($context, $publicKey),
             $algo
         );
 
