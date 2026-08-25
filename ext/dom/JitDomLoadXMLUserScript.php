@@ -43,6 +43,16 @@ final class JitDomLoadXMLUserScript
     /** True when loadXML used the compile-time user-script path (no DomLoadXMLRuntime tree). */
     private static bool $lastLoadWasPureUserScript = false;
 
+    /**
+     * DTD element → ID attr qName for the in-flight loadXML (#34696).
+     *
+     * @var array<string, string>
+     */
+    private static array $loadXmlIdAttrsByElement = [];
+
+    /** @var array<string, true> xmlAddID first-wins set for the in-flight loadXML (#34696). */
+    private static array $loadXmlRegisteredIds = [];
+
     /** Context from the last {@see rememberCompileTimeXmlFor} — for mutation refresh (#32978). */
     private static ?Context $lastRememberContext = null;
 
@@ -641,11 +651,13 @@ final class JitDomLoadXMLUserScript
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_STRING);
             }
         }
-        foreach (DomParseSimpleXmlIdsJitHelper::parseIndexedElementIds($lit) as $parsed) {
-            self::materializeIndexedElement($context, $args[0], $parsed);
-        }
+        // Register DTD / xml:id on the live syncChildren tree — not orphan map nodes (#34696).
+        self::$loadXmlIdAttrsByElement = DomParseSimpleXmlIdsJitHelper::parseDoctypeIdAttributes($lit);
+        self::$loadXmlRegisteredIds = [];
         // Stable documentElement + inner markup so saveXML($node)/appendChild see children (#26757).
         self::materializeAndStoreDocumentElement($context, $args[0], $lit);
+        self::$loadXmlIdAttrsByElement = [];
+        self::$loadXmlRegisteredIds = [];
 
         $slot = JitValueBox::alloc($context);
         $i1 = $context->getTypeFromString('int1');
@@ -742,6 +754,13 @@ final class JitDomLoadXMLUserScript
             DomParseSimpleXmlJitHelper::rootAttributesArgv($xml)
         );
         JitDomDocumentElement::syncChildrenFromXmlPublic($context, $element, $xml, '/'.$tag, $document);
+        self::registerLiveElementIdFromMarkup(
+            $context,
+            $document,
+            $element,
+            $tag,
+            null !== $rootMarkup ? $rootMarkup['attrs'] : ''
+        );
 
         $objectType = $context->type->object;
         $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
@@ -815,26 +834,90 @@ final class JitDomLoadXMLUserScript
     }
 
     /**
+     * Register a live loadXML tree node in the document id map (#34696).
+     *
+     * Called from {@see JitDomDocumentElement::syncChildrenFromXml} / documentElement
+     * materialize so getElementById returns the same object as childNodes (Zend/VM).
+     */
+    public static function registerLiveElementIdFromOpenTag(
+        Context $context,
+        ?Value $document,
+        Value $element,
+        string $tag,
+        string $openTag
+    ): void {
+        if (null === $document || '' === $openTag) {
+            return;
+        }
+        $suffix = DomParseSimpleXmlJitHelper::attrSuffixFromOpenTagArgv($openTag);
+        $attrs = '' === $suffix ? [] : VmDom::parseMarkupAttributes($suffix);
+        self::registerLiveElementIdFromAttrMap($context, $document, $element, $tag, $attrs);
+    }
+
+    /**
+     * @param array<string, string> $attrs
+     */
+    public static function registerLiveElementIdFromMarkup(
+        Context $context,
+        Value $document,
+        Value $element,
+        string $tag,
+        string $attrSuffix
+    ): void {
+        if ('' === $attrSuffix) {
+            $attrs = [];
+        } else {
+            $attrs = VmDom::parseMarkupAttributes($attrSuffix);
+        }
+        self::registerLiveElementIdFromAttrMap($context, $document, $element, $tag, $attrs);
+    }
+
+    /**
+     * @param array<string, string> $attrs
+     */
+    private static function registerLiveElementIdFromAttrMap(
+        Context $context,
+        Value $document,
+        Value $element,
+        string $tag,
+        array $attrs
+    ): void {
+        $idVal = null;
+        $idAttr = self::$loadXmlIdAttrsByElement[$tag]
+            ?? self::$loadXmlIdAttrsByElement[strtolower($tag)]
+            ?? null;
+        if (null !== $idAttr && isset($attrs[$idAttr]) && '' !== $attrs[$idAttr]) {
+            $idVal = $attrs[$idAttr];
+        } elseif (isset($attrs['xml:id']) && '' !== $attrs['xml:id']) {
+            $idVal = $attrs['xml:id'];
+        }
+        if (null === $idVal || '' === $idVal) {
+            return;
+        }
+        if (isset(self::$loadXmlRegisteredIds[$idVal])) {
+            // xmlAddID first-wins (#25274).
+            return;
+        }
+        self::$loadXmlRegisteredIds[$idVal] = true;
+        self::storeElementInIdMap($context, $document, $idVal, $element);
+        $idStr = $context->builder->load($context->constantStringFromString($idVal));
+        // First registrant keeps the single-slot cache; later IDs live in the map (#34696).
+        DomUserScriptElementCacheLlvm::storeFirstWins($context, $document, $idStr, $element);
+        self::pinUserScriptLoadSideEffects($context);
+    }
+
+    /**
      * @param array{tag: string, id: string, text: string} $parsed
+     *
+     * @deprecated Orphan id-map materialize removed — live tree registration (#34696).
      */
     private static function materializeIndexedElement(
         Context $context,
         JITVariable $receiver,
         array $parsed
     ): void {
-        $document = self::loadObjectArg($context, $receiver);
-        // Raw __object__* — invoke() boxes for call ABI (#29638) and must not feed id-map /
-        // __phpc_dom_us_elem (#25119 / #29736).
-        $element = JitDomCreateElement::materializeForUserScriptDocument(
-            $context,
-            $receiver,
-            $parsed['tag'],
-            $parsed['text']
-        );
-        self::storeElementInIdMap($context, $document, $parsed['id'], $element);
-        $idStr = $context->builder->load($context->constantStringFromString($parsed['id']));
-        DomUserScriptElementCacheLlvm::store($context, $document, $idStr, $element);
-        self::pinUserScriptLoadSideEffects($context);
+        unset($context, $receiver, $parsed);
+        throw new \LogicException('materializeIndexedElement retired — use registerLiveElementIdFromOpenTag (#34696)');
     }
 
     /** Keep id-map/cache writes when loadXML() return is discarded (#19211). */
@@ -887,7 +970,6 @@ final class JitDomLoadXMLUserScript
         );
         $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
         $objectType->propertyStore($propSlot, $propVar, JITVariable::TYPE_VALUE);
-        DomUserScriptElementCacheLlvm::store($context, $document, $idStr, $element);
     }
 
     private static function storeElementTextContent(Context $context, Value $element, string $textLit): void
