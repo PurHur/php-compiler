@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * base64_encode()/base64_decode() for compiled JIT/AOT modules (#17234, #17249, #26890).
+ * base64_encode()/base64_decode() for compiled JIT/AOT modules (#17234, #17249, #26890, #34800).
  *
  * Logic mirrors {@see VmString}::base64_encode / base64_decode — self-contained (no VmString call)
  * so NestedJIT helper units are not ExternalMethod-stubbed (#16075 / peer Bin2hexJitHelper #20452,
  * StrRot13 #26868). Byte ordinal / emit via match tables (no native ord()/chr()/strlen()).
+ *
+ * Encode walks with `$i++` only (not `$data[$i+1]`) and multiply/intdiv — NestedJIT mis-reads
+ * computed indexes / `<<` packing on binary (#34800 / peer MbMimeheaderJitHelper::b64Encode).
  *
  * php-src: ext/standard/base64.c
  */
@@ -28,20 +31,36 @@ final class Base64JitHelper
         }
         $alphabet = self::ALPHABET;
         $out = '';
-        for ($i = 0; $i < $len; $i += 3) {
+        // NestedJIT-safe: walk with `$i++` only (not `$data[$i+1]`) and multiply/intdiv
+        // instead of `<<` — peer MbMimeheaderJitHelper::b64Encode / #26890 / #34800.
+        $i = 0;
+        while ($i < $len) {
             $b0 = self::byteOrd($data[$i]);
-            $b1 = ($i + 1 < $len) ? self::byteOrd($data[$i + 1]) : 0;
-            $b2 = ($i + 2 < $len) ? self::byteOrd($data[$i + 2]) : 0;
-            $n = ($b0 << 16) | ($b1 << 8) | $b2;
-            $out .= $alphabet[($n >> 18) & 63];
-            $out .= $alphabet[($n >> 12) & 63];
-            if ($i + 1 < $len) {
-                $out .= $alphabet[($n >> 6) & 63];
+            ++$i;
+            $have1 = 0;
+            $have2 = 0;
+            $b1 = 0;
+            $b2 = 0;
+            if ($i < $len) {
+                $b1 = self::byteOrd($data[$i]);
+                ++$i;
+                $have1 = 1;
+            }
+            if ($i < $len) {
+                $b2 = self::byteOrd($data[$i]);
+                ++$i;
+                $have2 = 1;
+            }
+            $n = ($b0 * 65536) + ($b1 * 256) + $b2;
+            $out .= $alphabet[intdiv($n, 262144) % 64];
+            $out .= $alphabet[intdiv($n, 4096) % 64];
+            if (1 === $have1) {
+                $out .= $alphabet[intdiv($n, 64) % 64];
             } else {
                 $out .= '=';
             }
-            if ($i + 2 < $len) {
-                $out .= $alphabet[$n & 63];
+            if (1 === $have2) {
+                $out .= $alphabet[$n % 64];
             } else {
                 $out .= '=';
             }
