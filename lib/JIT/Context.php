@@ -182,6 +182,15 @@ class Context {
     public ?string $lastUnserializeObjectClassUserType = null;
 
     /**
+     * Folded DatePeriod unserialize — foreach snapshot for thin AOT (#34608 / peer #26772).
+     *
+     * @var list<int>|null
+     */
+    public ?array $lastDatePeriodUnserializeTimestamps = null;
+
+    public ?string $lastDatePeriodUnserializeTimezone = null;
+
+    /**
      * New DateTimeZone result operand/var — construct stamps zone id onto the local (#29732).
      */
     public ?Operand $lastDateTimeZoneNewResultOp = null;
