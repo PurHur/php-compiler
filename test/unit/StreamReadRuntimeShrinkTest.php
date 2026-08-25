@@ -24,6 +24,7 @@ final class StreamReadRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('forceLibcStreamPositionAbis', $source);
         $this->assertStringContainsString('implementStreamGetContentsForce', $source);
+        $this->assertStringContainsString('implementStreamGetLineForce', $source);
         $this->assertStringContainsString('implementFgetcForce', $source);
         $this->assertStringContainsString('implementFtruncateForce', $source);
         $this->assertStringNotContainsString('isStandaloneInitPhase', $source);
