@@ -13073,6 +13073,10 @@ class JIT {
                         $result,
                         $this->calleeReturnsByRef($this->context->scope->toCall)
                     );
+                    $this->syncDateTimeUnserializeMetaToResult(
+                        $this->context->scope->toCall,
+                        $block->getOperand($op->arg1)
+                    );
                     $this->syncDateTimeDiffMetaToResult(
                         $this->context->scope->toCall,
                         $block->getOperand($op->arg1)
@@ -18860,13 +18864,18 @@ class JIT {
                     $slot
                 );
                 $var->addref();
+                $this->syncCompileTimeDatePeriod($var, $value, true);
+                $this->syncCompileTimeString($var, $value, true);
+                if (null !== $value->classUserType && '' !== $value->classUserType) {
+                    $var->classUserType = $value->classUserType;
+                }
+                $var->fromUnserializeObject = $value->fromUnserializeObject;
                 $this->context->setVariableOp($resultOp, $var);
                 $resolved = JIT\OperandName::resolve($resultOp);
                 if (null !== $resolved && '' !== $resolved) {
                     $this->context->bindVariableByName($resolved, $var);
                 }
-                // Method formals with `__value__` ABI (e.g. Router::dispatch $route) bind here
-                // without falling through to the markAssigned path (#31101 MiniWebApp stderr).
+                $this->noteDateTimeLocal($resultOp, $var);
                 $this->markScopeVariableAssignedIfTracked($resultOp, $var);
 
                 return;
@@ -18889,11 +18898,20 @@ class JIT {
                     $slot
                 );
                 $var->addref();
+                // Preserve DateTime/DateInterval unserialize stamps across `$u = unserialize(...)`
+                // first-bind (#34614) — previously dropped here so format('c') UTC-baked.
+                $this->syncCompileTimeDatePeriod($var, $value, true);
+                $this->syncCompileTimeString($var, $value, true);
+                if (null !== $value->classUserType && '' !== $value->classUserType) {
+                    $var->classUserType = $value->classUserType;
+                }
+                $var->fromUnserializeObject = $value->fromUnserializeObject;
                 $this->context->setVariableOp($resultOp, $var);
                 $resolved = JIT\OperandName::resolve($resultOp);
                 if (null !== $resolved && '' !== $resolved) {
                     $this->context->bindVariableByName($resolved, $var);
                 }
+                $this->noteDateTimeLocal($resultOp, $var);
                 $this->markScopeVariableAssignedIfTracked($resultOp, $var);
 
                 return;
@@ -20769,6 +20787,19 @@ class JIT {
     /** Record that a named local holds a DateTime instant (#32691). */
     private function noteDateTimeLocal(Operand $resultOp, Variable $value): void
     {
+        // Unserialize fold often stamps an unnamed EXEC_RETURN temp; the following
+        // `$u = <temp>` assign is where the named local appears (#34614).
+        if (null === $value->compileTimeDateTimeTimestamp) {
+            $pending = $this->context->lastDateTimeUnserializeInstant;
+            if (\is_array($pending)) {
+                $value->compileTimeDateTimeTimestamp = (int) $pending['timestamp'];
+                $value->compileTimeDateTimeMicrosecond = (int) ($pending['microsecond'] ?? 0);
+                $value->compileTimeTimezoneName = (string) $pending['timezone'];
+                $value->classUserType = (string) ($pending['class'] ?? 'DateTime');
+                $value->fromUnserializeObject = false;
+                $this->context->lastDateTimeUnserializeInstant = null;
+            }
+        }
         if (null === $value->compileTimeDateTimeTimestamp) {
             return;
         }
@@ -21534,26 +21565,63 @@ class JIT {
     }
 
     /** Copy compile-time instant onto `$dt->format()` / getTimestamp receivers (#32691). */
-    private function applyDateTimeLocalInstantToReceiver(Operand $receiverOp, JIT\Variable $receiverVar): void
-    {
+    private function applyDateTimeLocalInstantToReceiver(
+        Operand $receiverOp,
+        JIT\Variable $receiverVar,
+        ?string $methodLc = null
+    ): void {
         $recvName = JIT\OperandName::resolve($receiverOp);
-        if (null === $recvName || '' === $recvName) {
-            return;
-        }
-        $resolved = $this->context->resolveRefAliasName($recvName);
-        $instant = $this->context->dateTimeLocalInstants[$resolved] ?? null;
+        $resolved = null !== $recvName && '' !== $recvName
+            ? $this->context->resolveRefAliasName($recvName)
+            : null;
+        $instant = null !== $resolved
+            ? ($this->context->dateTimeLocalInstants[$resolved] ?? null)
+            : null;
         if (null === $instant) {
             // Fall back to the named binding — dateTimeLocalInstants can stay empty when
             // New_/construct sync misses the local, while the binding still carries the
             // dedicated #32691 stamp (re-#27309 DateTime::diff).
-            $bound = $this->context->namedVariableBindings[$resolved] ?? null;
-            if ($bound instanceof JIT\Variable && null !== $bound->compileTimeDateTimeTimestamp) {
+            if (null !== $resolved) {
+                $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+                if ($bound instanceof JIT\Variable && null !== $bound->compileTimeDateTimeTimestamp) {
+                    $instant = [
+                        'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
+                        'timezone' => $bound->compileTimeTimezoneName,
+                        'microsecond' => (int) ($bound->compileTimeDateTimeMicrosecond ?? 0),
+                    ];
+                    $this->context->dateTimeLocalInstants[$resolved] = $instant;
+                }
+            }
+        }
+        // Unserialize fold result operands often have no CFG name (#34614). Publish the
+        // pending instant onto DateTime zone-sensitive methods before format('c') UTC-bakes.
+        if (null === $instant) {
+            $pending = $this->context->lastDateTimeUnserializeInstant;
+            if (null === $methodLc) {
+                $toCall = $this->context->scope->toCall ?? null;
+                if ($toCall instanceof JIT\Call\DateTimeFormat) {
+                    $methodLc = 'format';
+                } elseif ($toCall instanceof JIT\Call\DateTimeGetOffset) {
+                    $methodLc = 'getoffset';
+                }
+            }
+            $dateTimeMethod = null !== $methodLc && \in_array(
+                $methodLc,
+                ['format', 'getoffset', 'gettimestamp', 'gettimezone', 'modify', 'settime', 'setdate', 'add', 'sub', 'diff'],
+                true
+            );
+            if ($dateTimeMethod) {
+            }
+            if (\is_array($pending) && $dateTimeMethod) {
                 $instant = [
-                    'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
-                    'timezone' => $bound->compileTimeTimezoneName,
-                    'microsecond' => (int) ($bound->compileTimeDateTimeMicrosecond ?? 0),
+                    'timestamp' => (int) $pending['timestamp'],
+                    'timezone' => (string) $pending['timezone'],
+                    'microsecond' => (int) ($pending['microsecond'] ?? 0),
                 ];
-                $this->context->dateTimeLocalInstants[$resolved] = $instant;
+                if (null !== $resolved) {
+                    $this->context->dateTimeLocalInstants[$resolved] = $instant;
+                }
+                // Keep pending so `$u->format(); $u->getOffset()` both see the same stamp.
             }
         }
         if (null === $instant) {
@@ -21563,7 +21631,10 @@ class JIT {
         $receiverVar->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
         $receiverVar->compileTimeTimezoneName = $instant['timezone'];
         if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
-            $receiverVar->classUserType = 'DateTime';
+            $pendingClass = $this->context->lastDateTimeUnserializeInstant['class'] ?? null;
+            $receiverVar->classUserType = \is_string($pendingClass) && '' !== $pendingClass
+                ? $pendingClass
+                : 'DateTime';
         }
     }
 
@@ -21647,6 +21718,103 @@ class JIT {
             if ($bound === $resultVar) {
                 $bound->classUserType = $hint;
             }
+        }
+    }
+
+    /**
+     * Publish folded DateTime unserialize stamps onto the result local (#34614 / peer #33939).
+     *
+     * tryMaterializeDateTimeWire stores __dt_* on the object, but format('c') /
+     * getOffset() prefer compileTimeDateTimeTimestamp + compileTimeTimezoneName.
+     */
+    private function syncDateTimeUnserializeMetaToResult(?JIT\Call $toCall, Operand $resultOp): void
+    {
+        if (!($toCall instanceof CoreFunc\Internal) || 'unserialize' !== $toCall->getName()) {
+            return;
+        }
+        $instant = $this->context->lastDateTimeUnserializeInstant;
+        if (!\is_array($instant)) {
+            return;
+        }
+        // Keep lastDateTimeUnserializeInstant for applyDateTimeLocalInstantToReceiver when
+        // the result operand is unnamed / assign rebases the Variable (#34614).
+        $className = (string) ($instant['class'] ?? 'DateTime');
+        if (
+            $className === ($this->context->lastUnserializeObjectClassUserType ?? '')
+            || \in_array(
+                $this->context->lastUnserializeObjectClassUserType,
+                ['DateTime', 'DateTimeImmutable'],
+                true
+            )
+        ) {
+            $this->context->lastUnserializeObjectClassUserType = null;
+        }
+        if (!$this->context->hasVariableOp($resultOp)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($resultOp);
+        $stamp = static function (JIT\Variable $bound) use ($instant, $className): void {
+            $bound->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
+            $bound->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
+            $bound->compileTimeTimezoneName = (string) $instant['timezone'];
+            $bound->classUserType = $className;
+            $bound->fromUnserializeObject = false;
+        };
+        $stamp($resultVar);
+        $localInstant = [
+            'timestamp' => (int) $instant['timestamp'],
+            'timezone' => (string) $instant['timezone'],
+            'microsecond' => (int) ($instant['microsecond'] ?? 0),
+        ];
+        $name = JIT\OperandName::resolve($resultOp);
+        $publishNames = [];
+        if (null !== $name && '' !== $name) {
+            $publishNames[] = $this->context->resolveRefAliasName($name);
+        }
+        // Unnamed FUNCCALL_EXEC_RETURN temps — only bind locals already tagged DateTime*
+        // (propagateUnserializeSplFixedArrayResultType). Do not steal plain TYPE_VALUE
+        // slots (#34461 / #34614).
+        if ([] === $publishNames) {
+            foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+                if (!$bound instanceof JIT\Variable) {
+                    continue;
+                }
+                if ($bound === $resultVar) {
+                    $publishNames[] = $boundName;
+                    continue;
+                }
+                if (null !== $bound->compileTimeDateTimeTimestamp) {
+                    continue;
+                }
+                $hint = strtolower(ltrim((string) ($bound->classUserType ?? ''), '\\'));
+                if (!\in_array($hint, ['datetime', 'datetimeimmutable'], true)) {
+                    continue;
+                }
+                $publishNames[] = $boundName;
+                $stamp($bound);
+                break;
+            }
+        }
+        foreach ($publishNames as $publishName) {
+            $resolved = $this->context->resolveRefAliasName($publishName);
+            $this->context->bindVariableByName($resolved, $resultVar);
+            $this->context->dateTimeLocalInstants[$resolved] = $localInstant;
+            $existing = $this->context->namedVariableBindings[$resolved] ?? null;
+            if ($existing instanceof JIT\Variable) {
+                $stamp($existing);
+            }
+        }
+        foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+            if ($bound === $resultVar) {
+                $stamp($bound);
+                $this->context->dateTimeLocalInstants[$boundName] = $localInstant;
+                $publishNames[] = $boundName;
+            }
+        }
+        // Only consume pending when a named local was published; otherwise ASSIGN's
+        // noteDateTimeLocal picks it up (#34614).
+        if ([] !== $publishNames) {
+            $this->context->lastDateTimeUnserializeInstant = null;
         }
     }
 
@@ -23543,7 +23711,7 @@ class JIT {
         }
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
         $methodLcEarlyDispatch = strtolower($methodName);
-        $this->applyDateTimeLocalInstantToReceiver($receiverOp, $receiverVar);
+        $this->applyDateTimeLocalInstantToReceiver($receiverOp, $receiverVar, $methodLcEarlyDispatch);
         $this->applyDateIntervalStateToReceiver($receiverOp, $receiverVar);
         $this->applyDateTimeZoneLocalToReceiver($receiverOp, $receiverVar);
         $recvHintLc = strtolower(ltrim(

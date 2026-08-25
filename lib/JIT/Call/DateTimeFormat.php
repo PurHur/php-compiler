@@ -38,6 +38,20 @@ final class DateTimeFormat implements Call
             return JitValueBox::pointer($context, $slot);
         }
 
+        // Unserialize fold often leaves stamps on a different Variable than `$this`
+        // (unnamed EXEC_RETURN / assign rebase). Pull the pending instant here (#34614).
+        if (null === $args[0]->compileTimeDateTimeTimestamp) {
+            $pending = $context->lastDateTimeUnserializeInstant;
+            if (\is_array($pending)) {
+                $args[0]->compileTimeDateTimeTimestamp = (int) $pending['timestamp'];
+                $args[0]->compileTimeDateTimeMicrosecond = (int) ($pending['microsecond'] ?? 0);
+                $args[0]->compileTimeTimezoneName = (string) $pending['timezone'];
+                if (null === $args[0]->classUserType || '' === $args[0]->classUserType) {
+                    $args[0]->classUserType = (string) ($pending['class'] ?? 'DateTime');
+                }
+            }
+        }
+
         return DateTimeFormatJitHelper::compileFormat($context, $args[0], $args[1]);
     }
 }

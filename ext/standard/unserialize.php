@@ -537,6 +537,15 @@ final class unserialize extends Internal
             $tzVar,
             JITVariable::TYPE_STRING
         );
+        // Publish construct-style stamps onto the unserialize result local (#34614).
+        // Without these, format('c') / getOffset() UTC-bake the unix instant (#33939).
+        $context->lastDateTimeUnserializeInstant = [
+            'timestamp' => (int) $parsed['timestamp'],
+            'timezone' => $tzName,
+            'microsecond' => (int) ($parsed['microsecond'] ?? 0),
+            'class' => $className,
+        ];
+        $context->lastUnserializeObjectClassUserType = $className;
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(

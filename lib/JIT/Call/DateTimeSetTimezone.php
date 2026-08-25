@@ -264,6 +264,18 @@ final class DateTimeGetOffset implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
+        if ([] !== $args && null === $args[0]->compileTimeDateTimeTimestamp) {
+            $pending = $context->lastDateTimeUnserializeInstant;
+            if (\is_array($pending)) {
+                $args[0]->compileTimeDateTimeTimestamp = (int) $pending['timestamp'];
+                $args[0]->compileTimeDateTimeMicrosecond = (int) ($pending['microsecond'] ?? 0);
+                $args[0]->compileTimeTimezoneName = (string) $pending['timezone'];
+                if (null === $args[0]->classUserType || '' === $args[0]->classUserType) {
+                    $args[0]->classUserType = (string) ($pending['class'] ?? 'DateTime');
+                }
+            }
+        }
+
         return JitDateOffsetGet::invokeMethod($context, ...$args);
     }
 }

@@ -191,6 +191,14 @@ class Context {
     public ?string $lastDatePeriodUnserializeTimezone = null;
 
     /**
+     * Folded DateTime / DateTimeImmutable unserialize — construct-style stamps for
+     * format('c') / getOffset() (#34614 / peer #33939 construct path).
+     *
+     * @var array{timestamp: int, timezone: string, microsecond: int, class: string}|null
+     */
+    public ?array $lastDateTimeUnserializeInstant = null;
+
+    /**
      * New DateTimeZone result operand/var — construct stamps zone id onto the local (#29732).
      */
     public ?Operand $lastDateTimeZoneNewResultOp = null;

@@ -67,6 +67,7 @@ final class DateTimeFormatJitHelper
                 return $context->builder->load($context->constantStringFromString($folded));
             }
         }
+        $skipUtcCivil = false;
         if (\is_string($fmtLit)) {
             $needsMicro = ('u' === $fmtLit || str_contains($fmtLit, '.u') || str_contains($fmtLit, 'u'));
             // Bare 'U' is unix seconds — not microseconds.
@@ -90,7 +91,18 @@ final class DateTimeFormatJitHelper
                     );
                 }
             }
-            $civil = JitDate::tryFormatCivilLiteral($context, $fmtLit, $timestamp, $microForCivil);
+            // UTC civil IR for 'c'/'r' hardcodes +00:00. When the receiver already has a
+            // named-zone stamp, skip so the compile-time VmDateTimeNative fold above
+            // (or zone-aware NestedJIT) can win (#34614). If neither stamp is present,
+            // civil remains the thin-AOT safe path (NestedJIT format SIGSEGVs).
+            $tzHint = $receiver->compileTimeTimezoneName;
+            $skipUtcCivil = \in_array($fmtLit, ['c', 'r'], true)
+                && null !== $receiver->compileTimeDateTimeTimestamp
+                && \is_string($tzHint) && '' !== $tzHint
+                && 0 !== \strcasecmp($tzHint, 'UTC');
+            $civil = $skipUtcCivil
+                ? null
+                : JitDate::tryFormatCivilLiteral($context, $fmtLit, $timestamp, $microForCivil);
             if (null !== $civil) {
                 return $civil;
             }
@@ -145,6 +157,12 @@ final class DateTimeFormatJitHelper
 
                 return self::concatStringValues($context, $mid, $tokT);
             }
+        }
+
+        // Named-zone 'c'/'r': emitRuntimeCivilFormatDispatch still matches the UTC +00:00
+        // snprintf ladder (#34614). Prefer zone-aware NestedJIT when tz is known.
+        if ($skipUtcCivil) {
+            return DateTimeFormatRuntime::invoke($context, $formatPtr, $timestamp, $microsecond, $tzPtr);
         }
 
         // Runtime / unknown format: civil IR dispatch before NestedJIT (#34482).
