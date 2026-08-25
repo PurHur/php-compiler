@@ -375,6 +375,9 @@ final class StringUnserialize
                     $objVal,
                     $payloadString
                 );
+                // True runtime payloads (file_get_contents) need classUserType or `$u->y`
+                // resolves as stdClass and format() SIGSEGVs (#34602 residual of #34604).
+                $context->lastUnserializeObjectClassUserType = 'DateInterval';
             } elseif ('dateperiod' === $classLc) {
                 // DatePeriod NestedJIT bag TBD; skip firstIntProp (SIGSEGV).
             } else {

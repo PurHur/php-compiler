@@ -176,6 +176,12 @@ class Context {
     public ?array $lastDateIntervalDiffState = null;
 
     /**
+     * Runtime unserialize() O: class hint for result locals (#34602 residual).
+     * Sets classUserType without baking compileTimeDateInterval (wire values are runtime).
+     */
+    public ?string $lastUnserializeObjectClassUserType = null;
+
+    /**
      * New DateTimeZone result operand/var — construct stamps zone id onto the local (#29732).
      */
     public ?Operand $lastDateTimeZoneNewResultOp = null;
