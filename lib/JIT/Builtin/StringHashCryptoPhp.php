@@ -10,11 +10,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for hash crypto via HashCryptoJitHelper PHP (#9164, #21026, #32876).
+ * JIT/AOT link for hash crypto via HashCryptoJitHelper PHP (#9164, #21026, #32876, #34828).
  *
  * Embed + thin standalone AOT: {@see HashCryptoJitHelper} via {@see JitVmHelperLink}
  * (HashEquals #20469 / HashAlgos #20652 shape — no thin-standalone libcrypto ABI fork).
  * NestedJIT leaf: {@see \phpc_hash_crypto_hash} → {@see \PHPCompiler\ext\hash\JitHashCryptoKernel} EVP.
+ * Non-crypto digests: bundled {@see HashNonCryptoJitHelper} (#34828).
  *
  * Module-local ABI owner (getNamedFunction first via ensureBridge): Builtin\Type no longer
  * always-declares empty shells for hash/hmac/pbkdf2/hkdf (#32876) — leftover Type decls
@@ -24,6 +25,8 @@ final class StringHashCryptoPhp
 {
     private const HELPER_PATH = '/ext/standard/HashCryptoJitHelper.php';
 
+    private const NONCRYPTO_HELPER_PATH = '/ext/standard/HashNonCryptoJitHelper.php';
+
     private const HASH_HELPER = 'PHPCompiler\\ext\\standard\\HashCryptoJitHelper::hash';
 
     private const HMAC_HELPER = 'PHPCompiler\\ext\\standard\\HashCryptoJitHelper::hashHmac';
@@ -32,12 +35,18 @@ final class StringHashCryptoPhp
 
     private const HKDF_HELPER = 'PHPCompiler\\ext\\standard\\HashCryptoJitHelper::hashHkdf';
 
+    private const NONCRYPTO_SUPPORTS = 'PHPCompiler\\ext\\standard\\HashNonCryptoJitHelper::supports';
+
+    private const NONCRYPTO_DIGEST = 'PHPCompiler\\ext\\standard\\HashNonCryptoJitHelper::digest';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::HASH_HELPER,
         self::HMAC_HELPER,
         self::PBKDF2_HELPER,
         self::HKDF_HELPER,
+        self::NONCRYPTO_SUPPORTS,
+        self::NONCRYPTO_DIGEST,
     ];
 
     private const HASH_BRIDGE = 'hc_hash_bridge_entry';
@@ -72,6 +81,13 @@ final class StringHashCryptoPhp
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         \PHPCompiler\ext\hash\JitHashCryptoKernel::ensureEvpLeaves($context);
+        // NonCrypto before HashCrypto — HashCrypto::hash calls supports/digest (#34828).
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            [self::NONCRYPTO_HELPER_PATH, self::HELPER_PATH],
+            self::COMPILED_HELPERS,
+            '#34828'
+        );
         self::implementHashBridge($context);
         self::implementHmacBridge($context);
         self::implementPbkdf2Bridge($context);
