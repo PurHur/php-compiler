@@ -14,7 +14,8 @@ use PHPLLVM\Value;
 /**
  * Thin-AOT ChildNode::before/after when parent may be DOMDocument (#32611).
  *
- * php-src: ext/dom/php_dom.c dom_add_prev_sibling / dom_add_next_sibling
+ * php-src: ext/dom/parentnode.c dom_parent_node_after/before (viable_next skip #34791);
+ * libxml xmlAddPrevSibling / xmlAddNextSibling for the insert path.
  */
 final class JitDomChildNodeSiblingInsert
 {
@@ -53,9 +54,31 @@ final class JitDomChildNodeSiblingInsert
         );
         $nextNull = $context->builder->icmp(Builder::INT_EQ, $next, $objPtrTy->constNull());
         $bbAppend = BasicBlockHelper::append($context, 'dom_cn_after_append');
+        $bbMaybeInsert = BasicBlockHelper::append($context, 'dom_cn_after_maybe_insert');
+        $bbAlreadyNext = BasicBlockHelper::append($context, 'dom_cn_after_already_next');
         $bbInsert = BasicBlockHelper::append($context, 'dom_cn_after_insert');
         $bbDone = BasicBlockHelper::append($context, 'dom_cn_after_done');
-        $context->builder->branchIf($nextNull, $bbAppend, $bbInsert);
+        $context->builder->branchIf($nextNull, $bbAppend, $bbMaybeInsert);
+
+        // Already immediately after the anchor → no-op (php-src viable_next skip; #34791).
+        // insertBefore(new, next) with new===next would throw identity Error.
+        // Still rebuild INNER_XML: trySyncSiblingInsertInnerXml may have spliced a
+        // duplicate compile-time tag before LiveSlots ran.
+        $context->builder->positionAtEnd($bbMaybeInsert);
+        $alreadyNext = $context->builder->icmp(Builder::INT_EQ, $next, $newChild);
+        $context->builder->branchIf($alreadyNext, $bbAlreadyNext, $bbInsert);
+
+        $context->builder->positionAtEnd($bbAlreadyNext);
+        $isDocAlready = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, 'dom_cn_after_already_doc');
+        $bbSkipAlreadyRebuild = BasicBlockHelper::append($context, 'dom_cn_after_already_skip_rebuild');
+        $bbAlreadyRebuild = BasicBlockHelper::append($context, 'dom_cn_after_already_rebuild');
+        $context->builder->branchIf($isDocAlready, $bbSkipAlreadyRebuild, $bbAlreadyRebuild);
+        $context->builder->positionAtEnd($bbAlreadyRebuild);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbSkipAlreadyRebuild);
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbInsert);
         $nextJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $next);
