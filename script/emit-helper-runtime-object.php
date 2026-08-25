@@ -256,6 +256,18 @@ if (null !== $unitPath) {
             }
         }
     }
+    // Solo-unit emit does not go through *Runtime::implement first. Helpers that NestedJIT
+    // builtins (preg_match / json_decode) need those ABI bridges linked before ensureCompiled,
+    // or lookupFunction throws / the unit stays fingerprint-stale forever (#26825, iconv mime).
+    if (str_contains($unitPath, 'RegexIteratorFilterJitHelper')
+        || str_contains($unitPath, 'PregEmptyPatternReplaceJitHelper')
+        || str_contains($unitPath, 'PregQuoteJitHelper')
+    ) {
+        \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
+    }
+    if (str_contains($unitPath, 'IconvMimeJitHelper')) {
+        \PHPCompiler\JIT\Builtin\StringJsonDecode::ensureLinked($context);
+    }
     $bundle = $bundles[$unitPath] ?? [$unitPath];
     if (\count($bundle) > 1) {
         JitVmHelperLink::ensureCompiledBundle($context, $bundle, $names, 'helper-runtime-emit');
