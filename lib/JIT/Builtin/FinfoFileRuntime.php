@@ -16,6 +16,7 @@ use PHPLLVM\Value;
  * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer StringHtmlspecialchars #20487).
  * Avoids MimeContentTypeRuntime mid-function bridge emit (basic-block parent gap under thin AOT).
  * SSOT sniff: {@see \PHPCompiler\ext\standard\VmMime::detectFromBytes}
+ * data:// NestedJIT pulls base64_decode from decodeDataUri (#34797 / peer #34731 / #34789).
  * php-src: ext/fileinfo/fileinfo.c — PHP_FUNCTION(finfo_file)
  */
 final class FinfoFileRuntime
@@ -67,6 +68,8 @@ final class FinfoFileRuntime
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        // data:// NestedJIT pulls base64_decode from decodeDataUri (#34797 / peer #34731).
+        StringBase64Decode::ensureLinked($context);
         $strPtr = $context->getTypeFromString('__string__*');
         JitVmHelperLink::ensureBridge(
             $context,

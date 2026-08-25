@@ -33,6 +33,8 @@ final class FinfoFileJitShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/FinfoFileRuntime.php');
         $this->assertStringContainsString('FinfoFileJitHelper', $runtime);
         $this->assertStringContainsString('phpc_finfo_file_mime', $runtime);
+        $this->assertStringContainsString('StringBase64Decode::ensureLinked', $runtime);
+        $this->assertStringContainsString('#34797', $runtime);
 
         $bufferRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/FinfoBufferRuntime.php');
         $this->assertStringContainsString('mimeFromBuffer', $bufferRuntime);
@@ -42,6 +44,17 @@ final class FinfoFileJitShrinkTest extends TestCase
         $this->assertStringContainsString('detectFromBytes', $helper);
         $this->assertStringContainsString('mimeFromBuffer', $helper);
         $this->assertStringContainsString('file_get_contents', $helper);
+        $this->assertStringContainsString('decodeDataUri', $helper);
+        $this->assertStringContainsString("'data:'", $helper);
+        $this->assertStringContainsString('#34797', $helper);
+        $this->assertStringContainsString('looksLikePngWithIhdr', $helper);
+
+        $cache = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString(
+            'finfofilejithelper::mimefrompath',
+            $cache,
+            'USER_SCRIPT_INLINE_ONLY must NestedJIT mimeFromPath — prelinked unit.o skips data:// (#34797)'
+        );
 
         $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringContainsString("functionProxies['finfo::file']", $ctx);
@@ -61,6 +74,24 @@ final class FinfoFileJitShrinkTest extends TestCase
             $this->assertSame(
                 'image/jpeg',
                 \PHPCompiler\ext\fileinfo\FinfoFileJitHelper::detectFromBytes("\xff\xd8\xff\xe0")
+            );
+            $this->assertSame(
+                'text/plain',
+                \PHPCompiler\ext\fileinfo\FinfoFileJitHelper::mimeFromPath('data://text/plain,hello world')
+            );
+            $this->assertSame(
+                'text/plain',
+                \PHPCompiler\ext\fileinfo\FinfoFileJitHelper::mimeFromPath(
+                    'data://text/plain;base64,'.\base64_encode('hello world')
+                )
+            );
+            $png = \base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+            $this->assertNotFalse($png);
+            $this->assertSame('image/png', \PHPCompiler\ext\fileinfo\FinfoFileJitHelper::detectFromBytes($png));
+            // Host PHP decode is fine; NestedJIT base64_decode corrupts binary (AOT residual).
+            $this->assertSame(
+                'image/png',
+                \PHPCompiler\ext\fileinfo\FinfoFileJitHelper::mimeFromPath('data://image/png;base64,'.\base64_encode($png))
             );
         } finally {
             @\unlink($path);
