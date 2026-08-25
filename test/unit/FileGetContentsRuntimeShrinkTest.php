@@ -59,6 +59,8 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FileGetContentsJitHelper.php');
         $this->assertMatchesRegularExpression('/@\\\\file_get_contents\s*\(/', $source);
+        $this->assertStringContainsString("'data:'", $source);
+        $this->assertStringContainsString('decodeDataUri', $source);
         $this->assertStringNotContainsString('phpc_file_get_contents_kernel', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/phpc_file_get_contents_kernel.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitFileGetContentsLibc.php');
@@ -76,8 +78,25 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
 
         $this->assertSame('jit-helper-ok', FileGetContentsJitHelper::readPathArgv($path));
         $this->assertNull(FileGetContentsJitHelper::readPathArgv($path.'/missing-15309'));
+        $this->assertSame('hi', FileGetContentsJitHelper::readPathArgv('data://text/plain,hi'));
+        $this->assertSame('hi', FileGetContentsJitHelper::readPathArgv('data://text/plain;base64,aGk='));
 
         @unlink($path);
+    }
+
+    public function testUserScriptInlineOnlyForcesDataUriHelperNestedJit(): void
+    {
+        $cache = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString(
+            'filegetcontentsjithelper::readpathargv',
+            $cache,
+            'USER_SCRIPT_INLINE_ONLY must NestedJIT readPathArgv — prelinked unit.o skips data:// (#34731)'
+        );
+        $this->assertStringContainsString(
+            'readfilejithelper::readfile',
+            $cache,
+            'USER_SCRIPT_INLINE_ONLY must NestedJIT readfile — prelinked unit.o skips data:// (#34731)'
+        );
     }
 
     public function testSpineBundleIncludesFileGetContentsPhpPath(): void

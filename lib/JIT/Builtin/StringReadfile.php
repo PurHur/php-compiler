@@ -65,7 +65,17 @@ final class StringReadfile
         } catch (\Throwable) {
         }
 
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#19966');
+        // data:// via FileGetContentsJitHelper::readPathArgv NestedJIT (#34731).
+        StringBase64Decode::ensureLinked($context);
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            [
+                '/ext/standard/FileGetContentsJitHelper.php',
+                self::HELPER_PATH,
+            ],
+            self::COMPILED_HELPERS,
+            '#19966'
+        );
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');

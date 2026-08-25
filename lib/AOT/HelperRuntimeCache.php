@@ -74,6 +74,10 @@ final class HelperRuntimeCache
         // #27564 / re-#26827 — helper-runtime PregQuoteJitHelper unit.o returns "" under
         // default cache hit; NestedJIT of the inline-escape helper matches VM/JIT (O=0 OK).
         'phpcompiler\\ext\\standard\\pregquotejithelper::pregquoteargv' => true,
+        // #34731 — prelinked FileGetContents/Readfile units lack VmDataUri data:// decode;
+        // NestedJIT of the helper (+ VmDataUri bundle) matches Zend/VM.
+        'phpcompiler\\ext\\standard\\filegetcontentsjithelper::readpathargv' => true,
+        'phpcompiler\\ext\\standard\\readfilejithelper::readfile' => true,
         // #25345 — helper-runtime unit.o returns "" for method-return / dynamic string args;
         // NestedJIT recursive escapeFrom works (MiniWebApp $appName).
         'phpcompiler\\ext\\standard\\htmlspecialcharsjithelper::htmlspecialchars' => true,
