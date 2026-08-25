@@ -1091,7 +1091,11 @@ class JIT {
                     continue;
                 }
 
-                return $branch->getOperand($branchOp->arg1);
+                // Prefer the shared phi lvalue (arg2) over the per-arm Assign result temp
+                // (arg1). Both ?: arms write arg2; only one arm's arg1 matches the first
+                // hit — FuncCall arms then never forceCoalesce into the echo slot and AOT
+                // echoes a stale name literal (#34814 / peer #18052 alias redirect).
+                return $branch->getOperand($branchOp->arg2);
             }
         }
 
@@ -11206,6 +11210,11 @@ class JIT {
                                 JIT\JitValueBox::valuePtrFromVariable($this->context, $arg),
                                 $echoClassHint
                             );
+                            break;
+                        }
+                        // FuncCall ?: arms may leave the coalesce slot as TYPE_STRING (#34814).
+                        if (Variable::TYPE_STRING === $arg->type) {
+                            JIT\ValueEchoHelper::echoStringVariable($this->context, $arg);
                             break;
                         }
                     }

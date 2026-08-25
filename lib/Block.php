@@ -387,6 +387,12 @@ class Block {
             if ($operand instanceof VarOperand) {
                 return $operand;
             }
+            // ?: arm FuncCall name literals can collide with the recorded ternary phi
+            // slot index (#34814). Prefer the Temporary phi over a Literal at the same
+            // slot so ASSIGN writes the call result into the merge ECHO operand.
+            if ($operand instanceof Temporary) {
+                return $operand;
+            }
             if ($operand instanceof Operand\Literal) {
                 // Keep the first Literal at this slot. inheritScopeFrom appends parent
                 // Literals after the callee's; overwriting would make CONST_FETCH resolve
