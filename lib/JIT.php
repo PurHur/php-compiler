@@ -13081,6 +13081,10 @@ class JIT {
                         $this->context->scope->toCall,
                         $block->getOperand($op->arg1)
                     );
+                    $this->syncDateTimeUnserializeMetaToResult(
+                        $this->context->scope->toCall,
+                        $block->getOperand($op->arg1)
+                    );
                     $this->syncDateTimeConstructMetaToAliases(
                         $this->context->scope->toCall,
                         $callArgs
@@ -21381,10 +21385,54 @@ class JIT {
                 continue;
             }
             $operand = $callOperands[$i - $opOffset] ?? null;
-            if (!$operand instanceof \PHPCfg\Operand) {
+            if ($operand instanceof \PHPCfg\Operand) {
+                $n = JIT\OperandName::resolve($operand);
+                $this->applyDateTimeLocalInstantToReceiver($operand, $arg);
+                // Unnamed $this operand (php-cfg temp) — still restore when a unique
+                // dateTimeLocalInstant exists (#34614 unserialize→format).
+                if (
+                    null === $arg->compileTimeDateTimeTimestamp
+                    && (null === $n || '' === $n)
+                    && 1 === \count($this->context->dateTimeLocalInstants)
+                ) {
+                    $instant = \reset($this->context->dateTimeLocalInstants);
+                    if (\is_array($instant) && isset($instant['timestamp'])) {
+                        $arg->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
+                        $arg->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
+                        $arg->compileTimeTimezoneName = $instant['timezone'] ?? null;
+                        if (null === $arg->classUserType || '' === $arg->classUserType) {
+                            $arg->classUserType = 'DateTime';
+                        }
+                    }
+                }
                 continue;
             }
-            $this->applyDateTimeLocalInstantToReceiver($operand, $arg);
+            // Instance method $this is often absent from callOperands (opOffset>0). Scope
+            // Variable for `$u->format()` can diverge from namedVariableBindings['u'] after
+            // unserialize sync (#34614) — restore from dateTimeLocalInstants when unique.
+            if (
+                0 === $i
+                && $opOffset > 0
+                && null === $arg->compileTimeDateTimeTimestamp
+                && [] !== $this->context->dateTimeLocalInstants
+            ) {
+                $candidates = [];
+                foreach ($this->context->dateTimeLocalInstants as $localName => $instant) {
+                    if (!\is_array($instant) || !isset($instant['timestamp'])) {
+                        continue;
+                    }
+                    $candidates[$localName] = $instant;
+                }
+                if (1 === \count($candidates)) {
+                    $instant = \reset($candidates);
+                    $arg->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
+                    $arg->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
+                    $arg->compileTimeTimezoneName = $instant['timezone'] ?? null;
+                    if (null === $arg->classUserType || '' === $arg->classUserType) {
+                        $arg->classUserType = 'DateTime';
+                    }
+                }
+            }
         }
     }
 
@@ -21627,6 +21675,140 @@ class JIT {
         // Consume class hint if fold also set it (#34602 / #34608).
         if ('DatePeriod' === ($this->context->lastUnserializeObjectClassUserType ?? '')) {
             $this->context->lastUnserializeObjectClassUserType = null;
+        }
+    }
+
+    /**
+     * Publish folded DateTime / DateTimeImmutable unserialize stamps onto the result local (#34614).
+     *
+     * Without these, format('c') hits the UTC civil bake and getOffset() returns 0 while
+     * getTimezone()->getName() still shows the IANA id (peer construct stamps #33939).
+     *
+     * FUNCCALL result operands are often unnamed temps; mirror
+     * {@see syncDateTimeConstructMetaToAliases} publish-to-named-local so `$u = unserialize(...)`
+     * receives the stamps (not only the temp).
+     */
+    private function syncDateTimeUnserializeMetaToResult(?JIT\Call $toCall, Operand $resultOp): void
+    {
+        if (!($toCall instanceof CoreFunc\Internal) || 'unserialize' !== $toCall->getName()) {
+            return;
+        }
+        $instantIn = $this->context->lastDateTimeUnserializeInstant;
+        if (!\is_array($instantIn)) {
+            return;
+        }
+        $this->context->lastDateTimeUnserializeInstant = null;
+        $ts = (int) $instantIn['timestamp'];
+        $micro = (int) ($instantIn['microsecond'] ?? 0);
+        $tz = (string) $instantIn['timezone'];
+        $className = (string) ($instantIn['className'] ?? 'DateTime');
+        if ('' === $tz) {
+            $tz = 'UTC';
+        }
+        $instant = [
+            'timestamp' => $ts,
+            'timezone' => $tz,
+            'microsecond' => $micro,
+        ];
+        $stamp = static function (JIT\Variable $bound) use ($ts, $micro, $tz, $className): void {
+            $bound->compileTimeDateTimeTimestamp = $ts;
+            $bound->compileTimeDateTimeMicrosecond = $micro;
+            $bound->compileTimeTimezoneName = $tz;
+            $bound->compileTimeDateTimeClassName = $className;
+            $bound->classUserType = $className;
+        };
+
+        $resultVar = null;
+        if ($this->context->hasVariableOp($resultOp)) {
+            $resultVar = $this->context->getVariableFromOp($resultOp);
+            $stamp($resultVar);
+        }
+
+        $publishName = JIT\OperandName::resolve($resultOp);
+        if (null === $publishName || '' === $publishName) {
+            foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+                if ($bound === $resultVar) {
+                    $publishName = $boundName;
+                    break;
+                }
+            }
+        }
+        if (null === $publishName || '' === $publishName) {
+            // Prefer a DateTime-shaped local that still lacks a stamp (peer #32691 / #34461).
+            foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+                if (!$bound instanceof JIT\Variable) {
+                    continue;
+                }
+                if (null !== $bound->compileTimeDateTimeTimestamp) {
+                    continue;
+                }
+                $hint = strtolower(ltrim((string) ($bound->classUserType ?? ''), '\\'));
+                $legacy = (string) ($bound->compileTimeString ?? '');
+                $dateTimeTagged = \in_array($hint, ['datetime', 'datetimeimmutable'], true)
+                    || \in_array($legacy, ['DateTime', 'DateTimeImmutable'], true);
+                if ($dateTimeTagged) {
+                    if (
+                        JIT\Variable::TYPE_OBJECT !== $bound->type
+                        && JIT\Variable::TYPE_VALUE !== $bound->type
+                    ) {
+                        continue;
+                    }
+                } elseif (JIT\Variable::TYPE_OBJECT === $bound->type && '' === $hint && '' === $legacy) {
+                    // pending object slot
+                } elseif (JIT\Variable::TYPE_VALUE === $bound->type && '' === $hint && '' === $legacy) {
+                    // unserialize often yields TYPE_VALUE box into a pending local
+                } else {
+                    continue;
+                }
+                $publishName = $boundName;
+                $stamp($bound);
+                break;
+            }
+        }
+        if (null !== $publishName && '' !== $publishName) {
+            $resolved = $this->context->resolveRefAliasName($publishName);
+            $existing = $this->context->namedVariableBindings[$resolved] ?? null;
+            $existingIsArray = $existing instanceof JIT\Variable && (
+                JIT\Variable::TYPE_HASHTABLE === $existing->type
+                || !empty($existing->compileTimeEmptyArrayLiteral)
+                || !empty($existing->valueBoxHashtable)
+            );
+            $publishVar = $resultVar ?? $existing;
+            if ($publishVar instanceof JIT\Variable
+                && (!$existingIsArray || $existing === $resultVar)
+            ) {
+                $stamp($publishVar);
+                $this->context->bindVariableByName($resolved, $publishVar);
+                $this->context->dateTimeLocalInstants[$resolved] = $instant;
+                $this->context->lastDateTimeUnserializeLocalName = $resolved;
+                if ($resultOp instanceof \PHPCfg\Operand) {
+                    $this->context->scope->variables[$resultOp] = $publishVar;
+                }
+                // Method $this is loaded from scope->variables[named operand], which can be a
+                // different Variable than namedVariableBindings (#34614). Stamp every scope
+                // entry whose name resolves to this local so format()/getOffset() see the zone.
+                foreach ($this->context->scope->variables as $scopeOp => $scopeVar) {
+                    if (!$scopeVar instanceof JIT\Variable) {
+                        continue;
+                    }
+                    $scopeName = JIT\OperandName::resolve($scopeOp);
+                    if (null === $scopeName || '' === $scopeName) {
+                        continue;
+                    }
+                    if ($this->context->resolveRefAliasName($scopeName) !== $resolved) {
+                        continue;
+                    }
+                    $stamp($scopeVar);
+                }
+            }
+        }
+        if ($resultVar instanceof JIT\Variable) {
+            foreach ($this->context->namedVariableBindings as $boundName => $bound) {
+                if ($bound === $resultVar) {
+                    $stamp($bound);
+                    $this->context->dateTimeLocalInstants[$boundName] = $instant;
+                }
+            }
         }
     }
 

@@ -191,6 +191,22 @@ class Context {
     public ?string $lastDatePeriodUnserializeTimezone = null;
 
     /**
+     * Folded DateTime / DateTimeImmutable unserialize — stamp for format()/getOffset() (#34614).
+     *
+     * Peer construct stamps (#33939) and DateInterval {@see $lastDateIntervalDiffState}.
+     * Nested DatePeriod start/end materialize must clear this before return (#34608).
+     *
+     * @var array{timestamp: int, microsecond: int, timezone: string, className: string}|null
+     */
+    public ?array $lastDateTimeUnserializeInstant = null;
+
+    /**
+     * Named local last published by DateTime unserialize sync (#34614).
+     * format()/getOffset() restore onto divergent method-$this Variables.
+     */
+    public ?string $lastDateTimeUnserializeLocalName = null;
+
+    /**
      * New DateTimeZone result operand/var — construct stamps zone id onto the local (#29732).
      */
     public ?Operand $lastDateTimeZoneNewResultOp = null;

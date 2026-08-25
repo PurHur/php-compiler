@@ -78,6 +78,22 @@ final class JitDateOffsetGet
             return $slot;
         }
 
+        // Peer DateTime::format (#34614) — restore unserialize stamps onto divergent $this.
+        if (null === $args[0]->compileTimeDateTimeTimestamp) {
+            $last = $context->lastDateTimeUnserializeLocalName;
+            $instant = null;
+            if (\is_string($last) && '' !== $last && isset($context->dateTimeLocalInstants[$last])) {
+                $instant = $context->dateTimeLocalInstants[$last];
+            } elseif (1 === \count($context->dateTimeLocalInstants)) {
+                $instant = \reset($context->dateTimeLocalInstants);
+            }
+            if (\is_array($instant) && isset($instant['timestamp'])) {
+                $args[0]->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
+                $args[0]->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
+                $args[0]->compileTimeTimezoneName = $instant['timezone'] ?? null;
+            }
+        }
+
         $folded = self::tryCompileTimeOffset($args[0]);
         if (null !== $folded) {
             $slot = JitValueBox::alloc($context);

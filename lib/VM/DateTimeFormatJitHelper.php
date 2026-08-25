@@ -46,14 +46,19 @@ final class DateTimeFormatJitHelper
         // Thin AOT under PROFILE=8.4: NestedJIT formatStateArgv civil digests segfault
         // (#27192). Prefer full compile-time fold (zone-aware) when construct stamped the
         // instant — UTC civil IR alone miscompiles named zones and T/e/O/P SIGABRT (#33939).
+        // Missing zone must NOT default to UTC (#34614): that made unserialize(named-zone)
+        // format as +00:00 while getOffset() (which falls through) stayed correct.
         $fmtLit = JitStringBuiltinArg::compileTimeLiteral($formatArg) ?? $formatArg->compileTimeString;
         if (\is_string($fmtLit) && null !== $receiver->compileTimeDateTimeTimestamp) {
             $tzName = $receiver->compileTimeTimezoneName;
             if (null === $tzName || '' === $tzName) {
-                $tzName = 'UTC';
+                // Peer getOffset (#33939) — legacy string stamp, ignore class-name collisions.
+                $tzName = $receiver->compileTimeString;
             }
             if (
-                0 !== \strcasecmp($tzName, 'DateTime')
+                \is_string($tzName)
+                && '' !== $tzName
+                && 0 !== \strcasecmp($tzName, 'DateTime')
                 && 0 !== \strcasecmp($tzName, 'DateTimeImmutable')
                 && 0 !== \strcasecmp($tzName, 'DateTimeZone')
             ) {
@@ -67,32 +72,40 @@ final class DateTimeFormatJitHelper
                 return $context->builder->load($context->constantStringFromString($folded));
             }
         }
+
         if (\is_string($fmtLit)) {
-            $needsMicro = ('u' === $fmtLit || str_contains($fmtLit, '.u') || str_contains($fmtLit, 'u'));
-            // Bare 'U' is unix seconds — not microseconds.
-            if ('U' === $fmtLit) {
-                $needsMicro = false;
-            }
-            $microForCivil = null;
-            if ($needsMicro) {
-                if (null !== $compileTimeMicro) {
-                    $microForCivil = $i64->constInt($compileTimeMicro, false);
-                } else {
-                    if (null === $obj) {
-                        $obj = ReflectionSetup::loadObjectFromArg($context, $receiver);
-                    }
-                    $microForCivil = $context->helper->loadValue(
-                        $objectType->propertyFetch(
-                            $obj,
-                            self::CLASS_DATETIME,
-                            DateTimeSupport::MICROSECOND_PROPERTY
-                        )
-                    );
+            // Zone-aware tokens must not use the UTC-baked civil 'c'/'e'/… specs (#34614).
+            // Those exist for date()/gmdate() under UTC; DateTime::format with a named
+            // zone needs the #33939 fold (above) or DateTimeFormatRuntime (below).
+            $zoneAwareFmt = \in_array($fmtLit, ['c', 'r', 'e', 'O', 'P', 'T'], true)
+                || 'D, d M Y H:i:s O' === $fmtLit;
+            if (!$zoneAwareFmt) {
+                $needsMicro = ('u' === $fmtLit || str_contains($fmtLit, '.u') || str_contains($fmtLit, 'u'));
+                // Bare 'U' is unix seconds — not microseconds.
+                if ('U' === $fmtLit) {
+                    $needsMicro = false;
                 }
-            }
-            $civil = JitDate::tryFormatCivilLiteral($context, $fmtLit, $timestamp, $microForCivil);
-            if (null !== $civil) {
-                return $civil;
+                $microForCivil = null;
+                if ($needsMicro) {
+                    if (null !== $compileTimeMicro) {
+                        $microForCivil = $i64->constInt($compileTimeMicro, false);
+                    } else {
+                        if (null === $obj) {
+                            $obj = ReflectionSetup::loadObjectFromArg($context, $receiver);
+                        }
+                        $microForCivil = $context->helper->loadValue(
+                            $objectType->propertyFetch(
+                                $obj,
+                                self::CLASS_DATETIME,
+                                DateTimeSupport::MICROSECOND_PROPERTY
+                            )
+                        );
+                    }
+                }
+                $civil = JitDate::tryFormatCivilLiteral($context, $fmtLit, $timestamp, $microForCivil);
+                if (null !== $civil) {
+                    return $civil;
+                }
             }
         }
 

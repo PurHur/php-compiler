@@ -38,6 +38,36 @@ final class DateTimeFormat implements Call
             return JitValueBox::pointer($context, $slot);
         }
 
+        // Unserialize sync stamps named bindings / dateTimeLocalInstants; method $this may
+        // be a divergent scope Variable (#34614). Restore before format fold.
+        self::restoreDateTimeInstantStamps($context, $args[0]);
+
         return DateTimeFormatJitHelper::compileFormat($context, $args[0], $args[1]);
+    }
+
+    /**
+     * Copy compile-time instant onto $this when scope Variable lost unserialize stamps (#34614).
+     */
+    private static function restoreDateTimeInstantStamps(Context $context, Variable $receiver): void
+    {
+        if (null !== $receiver->compileTimeDateTimeTimestamp) {
+            return;
+        }
+        $instant = null;
+        $last = $context->lastDateTimeUnserializeLocalName;
+        if (\is_string($last) && '' !== $last && isset($context->dateTimeLocalInstants[$last])) {
+            $instant = $context->dateTimeLocalInstants[$last];
+        } elseif (1 === \count($context->dateTimeLocalInstants)) {
+            $instant = \reset($context->dateTimeLocalInstants);
+        }
+        if (!\is_array($instant) || !isset($instant['timestamp'])) {
+            return;
+        }
+        $receiver->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
+        $receiver->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
+        $receiver->compileTimeTimezoneName = $instant['timezone'] ?? null;
+        if (null === $receiver->classUserType || '' === $receiver->classUserType) {
+            $receiver->classUserType = 'DateTime';
+        }
     }
 }
