@@ -85,10 +85,18 @@ final class JitDomLiveElementsByTagWalk
     }
 
     /**
-     * Return the Nth matching element under {@code $root} (inclusive), or null box.
+     * Return the Nth matching element under {@code $root}, or null box.
+     *
+     * @param bool $descendantsOnly when true (Element::getElementsByTagName), skip
+     *        {@code $root} itself and walk from firstChild (#34780 / php-src element.c).
      */
-    public static function itemAt(Context $context, Value $root, string $tag, Value $indexI64): Value
-    {
+    public static function itemAt(
+        Context $context,
+        Value $root,
+        string $tag,
+        Value $indexI64,
+        bool $descendantsOnly = false
+    ): Value {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_live_tag_item');
         self::ensureLayout($context);
         $objPtrTy = $context->getTypeFromString('__object__*');
@@ -105,7 +113,15 @@ final class JitDomLiveElementsByTagWalk
         $context->builder->branchIf($bad, $bbDone, $bbWalk);
 
         $context->builder->positionAtEnd($bbWalk);
-        $found = self::emitPreorderFind($context, $root, $tag, $indexI64);
+        $start = $root;
+        if ($descendantsOnly) {
+            $start = self::loadFirstChildObject($context, $root);
+            $startNull = $context->builder->icmp(Builder::INT_EQ, $start, $objPtrTy->constNull());
+            $bbFind = BasicBlockHelper::append($context, 'dom_live_tag_item_find');
+            $context->builder->branchIf($startNull, $bbDone, $bbFind);
+            $context->builder->positionAtEnd($bbFind);
+        }
+        $found = self::emitPreorderFind($context, $start, $root, $tag, $indexI64);
         $foundNull = $context->builder->icmp(Builder::INT_EQ, $found, $objPtrTy->constNull());
         $bbWrite = BasicBlockHelper::append($context, 'dom_live_tag_item_write');
         $context->builder->branchIf($foundNull, $bbDone, $bbWrite);
@@ -120,6 +136,34 @@ final class JitDomLiveElementsByTagWalk
         $context->builder->positionAtEnd($bbDone);
 
         return JitValueBox::normalizeValuePtr($context, $resultPtr);
+    }
+
+    /** Load PROP_FIRST_CHILD as __object__* or null. */
+    private static function loadFirstChildObject(Context $context, Value $parent): Value
+    {
+        $objectType = $context->type->object;
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $voidPtr = $context->getTypeFromString('void*');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $outSlot = BasicBlockHelper::entryAlloca($context, $objPtrTy);
+        $context->builder->store($objPtrTy->constNull(), $outSlot);
+        $raw = $context->builder->load(
+            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_FIRST_CHILD)
+        );
+        $slotNull = $context->builder->icmp(Builder::INT_EQ, $raw, $voidPtr->constNull());
+        $bbRead = BasicBlockHelper::append($context, 'dom_live_tag_first_read');
+        $bbDone = BasicBlockHelper::append($context, 'dom_live_tag_first_done');
+        $context->builder->branchIf($slotNull, $bbDone, $bbRead);
+        $context->builder->positionAtEnd($bbRead);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($raw, $valuePtrTy)
+        );
+        $context->builder->store($obj, $outSlot);
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbDone);
+
+        return $context->builder->load($outSlot);
     }
 
     private static function ensureLayout(Context $context): void
@@ -210,10 +254,14 @@ final class JitDomLiveElementsByTagWalk
 
     /**
      * Preorder find: return object at matching index, or null.
+     *
+     * @param Value $start first node to visit
+     * @param Value $boundary climb stop (context element / documentElement)
      */
     private static function emitPreorderFind(
         Context $context,
-        Value $root,
+        Value $start,
+        Value $boundary,
         string $tag,
         Value $indexI64
     ): Value {
@@ -223,7 +271,7 @@ final class JitDomLiveElementsByTagWalk
         $curSlot = BasicBlockHelper::entryAlloca($context, $objPtrTy);
         $idxSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $foundSlot = BasicBlockHelper::entryAlloca($context, $objPtrTy);
-        $context->builder->store($root, $curSlot);
+        $context->builder->store($start, $curSlot);
         $context->builder->store($i64->constInt(0, false), $idxSlot);
         $context->builder->store($objPtrTy->constNull(), $foundSlot);
 
@@ -262,7 +310,7 @@ final class JitDomLiveElementsByTagWalk
         $context->builder->branch($bbNext);
 
         $context->builder->positionAtEnd($bbNext);
-        $next = self::emitNextPreorder($context, $cur, $root);
+        $next = self::emitNextPreorder($context, $cur, $boundary);
         $context->builder->store($next, $curSlot);
         $context->builder->branch($bbHdr);
 
