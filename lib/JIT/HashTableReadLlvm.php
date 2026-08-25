@@ -846,7 +846,10 @@ final class HashTableReadLlvm
                 Variable::KIND_VALUE,
                 $newHt
             );
+            // propertyStore(TYPE_VALUE) may split into prop_store_box_* (#34649);
+            // PHI predecessors must be the block that actually branches to $done (#34658).
             $context->type->object->propertyStore($slot, $emptyHt, Variable::TYPE_VALUE);
+            $initSlotEnd = $context->builder->getInsertBlock();
             $context->builder->branch($done);
 
             $context->builder->positionAtEnd($useSlot);
@@ -874,16 +877,18 @@ final class HashTableReadLlvm
                 $valPtr,
                 $boxHt
             );
+            $initBoxEnd = $context->builder->getInsertBlock();
             $context->builder->branch($done);
 
             $context->builder->positionAtEnd($ready);
+            $readyEnd = $context->builder->getInsertBlock();
             $context->builder->branch($done);
 
             $context->builder->positionAtEnd($done);
             $htPhi = $context->builder->phi($newHt->typeOf());
-            $htPhi->addIncoming($newHt, $initSlot);
-            $htPhi->addIncoming($boxHt, $initBox);
-            $htPhi->addIncoming($existing, $ready);
+            $htPhi->addIncoming($newHt, $initSlotEnd);
+            $htPhi->addIncoming($boxHt, $initBoxEnd);
+            $htPhi->addIncoming($existing, $readyEnd);
 
             return $htPhi;
         }
