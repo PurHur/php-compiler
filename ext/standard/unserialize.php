@@ -154,6 +154,11 @@ final class unserialize extends Internal
         if (null === $literal) {
             return null;
         }
+        // DatePeriod before DateTime — nested start O:DateTime must not win (#34608 / peer #34591).
+        $periodObj = self::tryMaterializeDatePeriodWire($context, $literal);
+        if (null !== $periodObj) {
+            return $periodObj;
+        }
         // DateTime / DateTimeImmutable Zend wire — allocate + stamp __dt_* (#34576 / re-#10710).
         $dateObj = self::tryMaterializeDateTimeWire($context, $literal);
         if (null !== $dateObj) {
@@ -203,6 +208,261 @@ final class unserialize extends Internal
 
         // Non-scalar fold result — defer to runtime (do not throw; peer O: path #33636).
         return null;
+    }
+
+    /**
+     * Fold Zend DatePeriod serialize wire into a live object + foreach snapshot (#34608).
+     *
+     * Peer DateInterval/DateTime folds (#34599 / #34576). NestedJIT DatePeriod bag remains
+     * TBD for true runtime payloads; assigned serialize() stamps compileTimeString so this
+     * path covers the common round-trip. php-src: php_date_period_initialize_from_hash.
+     */
+    private static function tryMaterializeDatePeriodWire(Context $context, string $literal): ?Value
+    {
+        if (!\preg_match('/^O:\d+:"DatePeriod":(\d+):\{(.*)\}$/s', $literal, $m)) {
+            return null;
+        }
+        $bag = $m[2];
+        if (!\preg_match(
+            '/s:5:"start";O:\d+:"(DateTime(?:Immutable)?)":3:\{'
+            .'s:4:"date";s:\d+:"([^"]*)";s:13:"timezone_type";i:\d+;s:8:"timezone";s:\d+:"([^"]*)";\}/',
+            $bag,
+            $startM
+        )) {
+            return null;
+        }
+        $startClass = $startM[1];
+        $startDateWire = $startM[2];
+        $startTz = $startM[3];
+        $endClass = null;
+        $endDateWire = null;
+        $endTz = null;
+        $hasEnd = false;
+        if (\preg_match('/s:3:"end";N;/', $bag)) {
+            $hasEnd = false;
+        } elseif (\preg_match(
+            '/s:3:"end";O:\d+:"(DateTime(?:Immutable)?)":3:\{'
+            .'s:4:"date";s:\d+:"([^"]*)";s:13:"timezone_type";i:\d+;s:8:"timezone";s:\d+:"([^"]*)";\}/',
+            $bag,
+            $endM
+        )) {
+            $hasEnd = true;
+            $endClass = $endM[1];
+            $endDateWire = $endM[2];
+            $endTz = $endM[3];
+        } else {
+            return null;
+        }
+        if (!\preg_match(
+            '/s:8:"interval";O:\d+:"DateInterval":\d+:\{(.*)\}s:11:"recurrences";/s',
+            $bag,
+            $intM
+        )) {
+            return null;
+        }
+        $intervalBag = $intM[1];
+        $includeStart = 1 === \preg_match('/s:18:"include_start_date";b:1;/', $bag);
+        $includeEnd = 1 === \preg_match('/s:16:"include_end_date";b:1;/', $bag);
+        try {
+            VmDateTimeNative::validateTimezoneId($startTz);
+            $startParsed = VmDateTimeNative::parseDateTime($startDateWire, $startTz);
+        } catch (NativeDateInvalidTimeZoneException|NativeDateMalformedStringException) {
+            return null;
+        }
+        $startTs = (int) $startParsed['timestamp'];
+        $startTzName = \is_string($startParsed['timezone'] ?? null) ? $startParsed['timezone'] : $startTz;
+        $endTs = null;
+        if ($hasEnd) {
+            try {
+                VmDateTimeNative::validateTimezoneId((string) $endTz);
+                $endParsed = VmDateTimeNative::parseDateTime((string) $endDateWire, (string) $endTz);
+            } catch (NativeDateInvalidTimeZoneException|NativeDateMalformedStringException) {
+                return null;
+            }
+            $endTs = (int) $endParsed['timestamp'];
+        }
+        $delta = ((int) (self::wireBagInt($intervalBag, 'd') ?? 0)) * 86400
+            + ((int) (self::wireBagInt($intervalBag, 'h') ?? 0)) * 3600
+            + ((int) (self::wireBagInt($intervalBag, 'i') ?? 0)) * 60
+            + ((int) (self::wireBagInt($intervalBag, 's') ?? 0));
+        if (0 !== (int) (self::wireBagInt($intervalBag, 'invert') ?? 0)) {
+            $delta = -$delta;
+        }
+        if (0 === $delta && null !== $endTs) {
+            return null;
+        }
+        $timestamps = [];
+        if (null !== $endTs) {
+            $t = $startTs;
+            if (!$includeStart) {
+                $t += $delta;
+            }
+            $guard = 0;
+            while ($guard < 100000) {
+                ++$guard;
+                if ($includeEnd) {
+                    if ($t > $endTs) {
+                        break;
+                    }
+                } elseif ($t >= $endTs) {
+                    break;
+                }
+                $timestamps[] = $t;
+                $t += $delta;
+            }
+        } else {
+            // Recurrence form (end is null) — php-src include_start → userRecurrences+1 (#26852).
+            if (!\preg_match('/s:11:"recurrences";i:(\d+);/', $bag, $recM)) {
+                return null;
+            }
+            $userRecurrences = (int) $recM[1];
+            if ($userRecurrences < 1 || 0 === $delta) {
+                return null;
+            }
+            $t = $startTs;
+            if (!$includeStart) {
+                $t += $delta;
+            }
+            $limit = $includeStart ? ($userRecurrences + 1) : $userRecurrences;
+            for ($i = 0; $i < $limit; ++$i) {
+                $timestamps[] = $t;
+                $t += $delta;
+            }
+        }
+
+        $className = 'DatePeriod';
+        $objectType = $context->type->object;
+        $classId = $objectType->classIdByName($className)
+            ?? $objectType->classIdForLowerName('dateperiod');
+        if (null === $classId) {
+            return null;
+        }
+        $period = $objectType->allocate($classId);
+        ReflectionSetup::markConstructed($context, $period);
+
+        $startWire = 'O:'.\strlen($startClass).':"'.$startClass.'":3:{'
+            .'s:4:"date";s:'.\strlen($startDateWire).':"'.$startDateWire.'";'
+            .'s:13:"timezone_type";i:3;'
+            .'s:8:"timezone";s:'.\strlen($startTz).':"'.$startTz.'";}';
+        $startVal = self::tryMaterializeDateTimeWire($context, $startWire);
+        if (null === $startVal) {
+            return null;
+        }
+        $startObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $startVal
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($period, $className, 'start'),
+            new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $startObj),
+            JITVariable::TYPE_OBJECT
+        );
+
+        // current is null on fresh unserialize.
+        $nullObj = $context->getTypeFromString('__object__*')->constNull();
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($period, $className, 'current'),
+            new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $nullObj),
+            JITVariable::TYPE_OBJECT
+        );
+
+        if ($hasEnd) {
+            $endWire = 'O:'.\strlen((string) $endClass).':"'.$endClass.'":3:{'
+                .'s:4:"date";s:'.\strlen((string) $endDateWire).':"'.$endDateWire.'";'
+                .'s:13:"timezone_type";i:3;'
+                .'s:8:"timezone";s:'.\strlen((string) $endTz).':"'.$endTz.'";}';
+            $endVal = self::tryMaterializeDateTimeWire($context, $endWire);
+            if (null === $endVal) {
+                return null;
+            }
+            $endObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $endVal
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($period, $className, 'end'),
+                new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $endObj),
+                JITVariable::TYPE_OBJECT
+            );
+        } else {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($period, $className, 'end'),
+                new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $nullObj),
+                JITVariable::TYPE_OBJECT
+            );
+        }
+
+        $intervalState = [
+            'y' => self::wireBagInt($intervalBag, 'y') ?? 0,
+            'm' => self::wireBagInt($intervalBag, 'm') ?? 0,
+            'd' => self::wireBagInt($intervalBag, 'd') ?? 0,
+            'h' => self::wireBagInt($intervalBag, 'h') ?? 0,
+            'i' => self::wireBagInt($intervalBag, 'i') ?? 0,
+            's' => self::wireBagInt($intervalBag, 's') ?? 0,
+            'f' => self::wireBagFloat($intervalBag, 'f') ?? 0.0,
+            'invert' => self::wireBagInt($intervalBag, 'invert') ?? 0,
+            'days' => self::wireBagDays($intervalBag),
+            'from_string' => false,
+        ];
+        $intervalVal = self::allocateDateIntervalFromState($context, $intervalState);
+        if (null === $intervalVal) {
+            return null;
+        }
+        // allocateDateIntervalFromState publishes lastDateIntervalDiffState — clear so
+        // unserialize sync does not stamp DateInterval onto the DatePeriod result (#34608).
+        $context->lastDateIntervalDiffState = null;
+        $intervalObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $intervalVal
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($period, $className, 'interval'),
+            new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $intervalObj),
+            JITVariable::TYPE_OBJECT
+        );
+
+        $i64 = $context->getTypeFromString('int64');
+        $recurrences = 1;
+        if (\preg_match('/s:11:"recurrences";i:(\d+);/', $bag, $recM2)) {
+            $recurrences = (int) $recM2[1];
+        }
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($period, $className, 'recurrences'),
+            new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $i64->constInt($recurrences, false)
+            ),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $i1 = $context->getTypeFromString('int1');
+        foreach (['include_start_date' => $includeStart, 'include_end_date' => $includeEnd] as $prop => $flag) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($period, $className, $prop),
+                new JITVariable(
+                    $context,
+                    JITVariable::TYPE_NATIVE_BOOL,
+                    JITVariable::KIND_VALUE,
+                    $i1->constInt($flag ? 1 : 0, false)
+                ),
+                JITVariable::TYPE_NATIVE_BOOL
+            );
+        }
+
+        $context->lastDatePeriodUnserializeTimestamps = $timestamps;
+        $context->lastDatePeriodUnserializeTimezone = $startTzName;
+        $context->lastUnserializeObjectClassUserType = 'DatePeriod';
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $period
+        );
+
+        return $ptr;
     }
 
     /**
