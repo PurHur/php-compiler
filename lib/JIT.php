@@ -21609,53 +21609,47 @@ class JIT {
             }
             $operand = $callOperands[$i - $opOffset] ?? null;
             if ($operand instanceof \PHPCfg\Operand) {
-                $n = JIT\OperandName::resolve($operand);
                 $this->applyDateTimeLocalInstantToReceiver($operand, $arg);
-                // Unnamed $this operand (php-cfg temp) — still restore when a unique
-                // dateTimeLocalInstant exists (#34614 unserialize→format).
-                if (
-                    null === $arg->compileTimeDateTimeTimestamp
-                    && (null === $n || '' === $n)
-                    && 1 === \count($this->context->dateTimeLocalInstants)
-                ) {
-                    $instant = \reset($this->context->dateTimeLocalInstants);
-                    if (\is_array($instant) && isset($instant['timestamp'])) {
-                        $arg->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
-                        $arg->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
-                        $arg->compileTimeTimezoneName = $instant['timezone'] ?? null;
-                        if (null === $arg->classUserType || '' === $arg->classUserType) {
-                            $arg->classUserType = 'DateTime';
-                        }
-                    }
+                // Unnamed $this (php-cfg temp): restore only the last unserialize local
+                // (#34614). Do NOT use "unique dateTimeLocalInstants" — that stamped
+                // DateTimeImmutable mutate/fluent returns with the construct instant (#34651).
+                if (null === $arg->compileTimeDateTimeTimestamp) {
+                    $this->restoreUnserializeDateTimeInstantOnto($arg);
                 }
                 continue;
             }
             // Instance method $this is often absent from callOperands (opOffset>0). Scope
             // Variable for `$u->format()` can diverge from namedVariableBindings['u'] after
-            // unserialize sync (#34614) — restore from dateTimeLocalInstants when unique.
+            // unserialize sync (#34614) — restore that local only, never an unrelated stamp.
             if (
                 0 === $i
                 && $opOffset > 0
                 && null === $arg->compileTimeDateTimeTimestamp
-                && [] !== $this->context->dateTimeLocalInstants
             ) {
-                $candidates = [];
-                foreach ($this->context->dateTimeLocalInstants as $localName => $instant) {
-                    if (!\is_array($instant) || !isset($instant['timestamp'])) {
-                        continue;
-                    }
-                    $candidates[$localName] = $instant;
-                }
-                if (1 === \count($candidates)) {
-                    $instant = \reset($candidates);
-                    $arg->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
-                    $arg->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
-                    $arg->compileTimeTimezoneName = $instant['timezone'] ?? null;
-                    if (null === $arg->classUserType || '' === $arg->classUserType) {
-                        $arg->classUserType = 'DateTime';
-                    }
-                }
+                $this->restoreUnserializeDateTimeInstantOnto($arg);
             }
+        }
+    }
+
+    /**
+     * Stamp method $this from {@see Context::$lastDateTimeUnserializeLocalName} only (#34614 / #34651).
+     */
+    private function restoreUnserializeDateTimeInstantOnto(JIT\Variable $arg): void
+    {
+        $last = $this->context->lastDateTimeUnserializeLocalName;
+        if (!\is_string($last) || '' === $last || !isset($this->context->dateTimeLocalInstants[$last])) {
+            return;
+        }
+        $instant = $this->context->dateTimeLocalInstants[$last];
+        if (!\is_array($instant) || !isset($instant['timestamp'])) {
+            return;
+        }
+        $arg->compileTimeDateTimeTimestamp = (int) $instant['timestamp'];
+        $arg->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
+        $arg->compileTimeTimezoneName = $instant['timezone'] ?? null;
+        if (null === $arg->classUserType || '' === $arg->classUserType) {
+            $class = $instant['className'] ?? 'DateTime';
+            $arg->classUserType = \is_string($class) && '' !== $class ? $class : 'DateTime';
         }
     }
 
