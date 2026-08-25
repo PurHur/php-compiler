@@ -53,12 +53,23 @@ final class JitDomCreateTextNode
             return self::boxNullResult($context);
         }
 
-        $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        return self::fromStringArg($context, $args[1]);
+    }
+
+    /**
+     * Text stand-in from a DOMNode|string string arm (ChildNode / ParentNode; #34760).
+     *
+     * Compile-time literals use {@see materialize}; runtime TYPE_STRING / boxed
+     * string values use {@see materializeFromRuntimeData}.
+     */
+    public static function fromStringArg(Context $context, JITVariable $dataArg): Value
+    {
+        $lit = JitStringBuiltinArg::compileTimeLiteral($dataArg) ?? $dataArg->compileTimeString;
         if (null !== $lit) {
             return self::materialize($context, $lit);
         }
 
-        return self::materializeFromRuntimeData($context, $args[1]);
+        return self::materializeFromRuntimeData($context, $dataArg);
     }
 
     public static function materialize(Context $context, string $data = ''): Value
