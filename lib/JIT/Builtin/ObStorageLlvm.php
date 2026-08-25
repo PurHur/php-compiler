@@ -1056,7 +1056,14 @@ final class ObStorageLlvm
             return;
         }
         $i8p = $context->getTypeFromString('int8*');
-        $context->builder->call($fflush, $context->builder->pointerCast($stdout, $i8p));
+        // libc `@stdout` is FILE**; fflush needs the loaded FILE*. Passing the
+        // global address aborts on exit once fopen links StreamGlobalsJit (#34737).
+        // Match StreamGlobalsJit::implementResolveStream / JitTriggerErrorKernel::stderrFilePtr.
+        // php-src: main/output.c php_output_flush → fflush(stdout)
+        $stdoutPtr = $context->builder->load(
+            $context->builder->pointerCast($stdout, $i8p->pointerType(0))
+        );
+        $context->builder->call($fflush, $stdoutPtr);
     }
 
     private static function levelPtr(Context $context): Value
