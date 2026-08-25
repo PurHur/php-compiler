@@ -13,9 +13,11 @@ $ul = unserialize($lit);
 echo $ul->format('%Y-%M-%D %H:%I:%S'), PHP_EOL;
 echo $ul->y, ',', $ul->m, ',', $ul->d, PHP_EOL;
 
-// True runtime string (file_get_contents) — classUserType stamp + int-only format ABI (#34602 residual).
+// True runtime payload (no compileTimeString) — file-backed residual (#34602).
 $tmp = sys_get_temp_dir().'/phpc_34602_di_'.getmypid().'.ser';
 file_put_contents($tmp, $s);
 $uf = unserialize(file_get_contents($tmp));
 @unlink($tmp);
+echo get_class($uf), PHP_EOL;
+echo $uf->y, '-', $uf->m, '-', $uf->d, ' ', $uf->h, ':', $uf->i, ':', $uf->s, PHP_EOL;
 echo $uf->format('%Y-%M-%D %H:%I:%S'), PHP_EOL;

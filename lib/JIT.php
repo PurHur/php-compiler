@@ -13965,7 +13965,12 @@ class JIT {
                     if ($name instanceof Operand\Literal) {
                         // PHPCfg types `new static()` receivers as static — skip declaring-class
                         // guards that target a bogus "static" ClassEntry (#31937).
-                        if ('static' === strtolower(ltrim($declaringClass, '\\'))) {
+                        // Also: unserialize() runtime O: results lack classUserType — use
+                        // __object__.class_id (#34602 file-backed DateInterval residual).
+                        if (
+                            'static' === strtolower(ltrim($declaringClass, '\\'))
+                            || $this->receiverIsFromUnserializeObject($obj)
+                        ) {
                             JIT\LazyObjectHelper::emitEnsureInitialized(
                                 $this->context,
                                 $this->loadPropertyFetchReceiver($obj)
@@ -15446,6 +15451,31 @@ class JIT {
         return ltrim($tagged, '\\');
     }
 
+    /** True when `$obj` is an unserialize() O: result without a concrete classUserType (#34602). */
+    private function receiverIsFromUnserializeObject(Operand $obj): bool
+    {
+        if ($this->context->hasVariableOpInScopes($obj)) {
+            $recv = $this->context->getVariableFromOpInScopes($obj);
+            if ($recv->fromUnserializeObject) {
+                $tag = strtolower(ltrim((string) ($recv->classUserType ?? ''), '\\'));
+                if ('' === $tag || \in_array($tag, ['object', 'stdclass'], true)) {
+                    return true;
+                }
+            }
+        }
+        $resolved = JIT\OperandName::resolve($obj);
+        if (null === $resolved || '' === $resolved) {
+            return false;
+        }
+        $bound = $this->context->namedVariableBindings[$this->context->resolveRefAliasName($resolved)] ?? null;
+        if (!$bound instanceof Variable || !$bound->fromUnserializeObject) {
+            return false;
+        }
+        $tag = strtolower(ltrim((string) ($bound->classUserType ?? ''), '\\'));
+
+        return '' === $tag || \in_array($tag, ['object', 'stdclass'], true);
+    }
+
     private function externalPropertyDeclaringClassFallback(string $scopeClass, string $propName): ?string
     {
         if (!str_starts_with(strtolower($scopeClass), 'phpcompiler\\')) {
@@ -16171,11 +16201,13 @@ class JIT {
     }
 
     /**
-     * Tag literal unserialize(SPL HT-backed) so foreach uses splBackingHashtable (#33649, #33654).
+     * Tag literal / hinted unserialize(SPL HT-backed | Date*) so foreach / props / methods
+     * keep the right class (#33649, #33654, #33876, #34602).
      *
-     * Without classUserType, TYPE_VALUE boxes take __value__readHashtable → SEGV.
-     * Covers SplFixedArray (#33649), ArrayObject / ArrayIterator / RecursiveArrayIterator (#33654),
-     * SplObjectStorage objKeys foreach after unserialize(serialize($sos)) (#33876 residual).
+     * Without classUserType, TYPE_VALUE boxes take __value__readHashtable → SEGV, or
+     * `$u->y` / `$u->format()` resolve as stdClass / object (#34602 file-backed residual).
+     * When the payload class is unknown at compile time, stamp fromUnserializeObject so
+     * property/method lowering uses runtime class_id.
      *
      * @param list<Variable> $callArgs
      */
@@ -16194,11 +16226,14 @@ class JIT {
         if (!($payload instanceof Variable)) {
             return;
         }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
         $class = null;
         $literal = JIT\JitStringArg::compileTimeLiteral($payload);
         if (null !== $literal
             && \preg_match(
-                '/^O:\d+:"(SplFixedArray|ArrayObject|ArrayIterator|RecursiveArrayIterator|SplObjectStorage)":/',
+                '/^O:\d+:"(SplFixedArray|ArrayObject|ArrayIterator|RecursiveArrayIterator|SplObjectStorage|DateInterval|DateTimeImmutable|DateTime|DateTimeZone)":/',
                 $literal,
                 $m
             )
@@ -16215,6 +16250,10 @@ class JIT {
                     'arrayiterator',
                     'recursivearrayiterator',
                     'splobjectstorage',
+                    'dateinterval',
+                    'datetime',
+                    'datetimeimmutable',
+                    'datetimezone',
                 ],
                 true
             )) {
@@ -16224,24 +16263,45 @@ class JIT {
                     'arrayiterator' => 'ArrayIterator',
                     'recursivearrayiterator' => 'RecursiveArrayIterator',
                     'splobjectstorage' => 'SplObjectStorage',
+                    'dateinterval' => 'DateInterval',
+                    'datetime' => 'DateTime',
+                    'datetimeimmutable' => 'DateTimeImmutable',
+                    'datetimezone' => 'DateTimeZone',
                     default => $hint,
                 };
             }
         }
-        if (null === $class) {
-            return;
-        }
-        if (!$this->context->hasVariableOp($result)) {
-            return;
-        }
         $var = $this->context->getVariableFromOp($result);
+        if (null === $class) {
+            // Scalar / array / null wires are not object results — do not force runtime
+            // class_id property/method dispatch (#34602).
+            if (null !== $literal && !\preg_match('/^O:/', $literal)) {
+                return;
+            }
+            // True runtime O: payload (file_get_contents / function return) — no fold stamp.
+            $var->fromUnserializeObject = true;
+            $this->context->lastUnserializeObjectClassUserType = null;
+            $name = JIT\OperandName::resolve($result);
+            if (null !== $name && '' !== $name) {
+                $resolved = $this->context->resolveRefAliasName($name);
+                if (isset($this->context->namedVariableBindings[$resolved])) {
+                    $this->context->namedVariableBindings[$resolved]->fromUnserializeObject = true;
+                }
+                $this->context->bindVariableByName($resolved, $var);
+            }
+
+            return;
+        }
         $var->classUserType = $class;
+        $var->fromUnserializeObject = false;
+        $this->context->lastUnserializeObjectClassUserType = $class;
         $result->type = new Type(Type::TYPE_OBJECT, [], $class);
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
                 $this->context->namedVariableBindings[$resolved]->classUserType = $class;
+                $this->context->namedVariableBindings[$resolved]->fromUnserializeObject = false;
             }
             $this->context->bindVariableByName($resolved, $var);
         }
@@ -23490,6 +23550,27 @@ class JIT {
             (string) ($receiverVar->classUserType ?? $receiverOp->type?->userType ?? ''),
             '\\'
         ));
+        // unserialize() runtime O: result — prefer RuntimeIndirect before object::format throw (#34602).
+        if (
+            $this->receiverIsFromUnserializeObject($receiverOp)
+            && (
+                '' === $recvHintLc
+                || 'object' === $recvHintLc
+                || 'stdclass' === $recvHintLc
+            )
+        ) {
+            $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLcEarlyDispatch);
+            if ([] !== $runtimeCandidates) {
+                $this->context->scope->toCall = new JIT\Call\RuntimeIndirectInstanceMethodCall(
+                    $receiverVar,
+                    $methodLcEarlyDispatch,
+                    $runtimeCandidates
+                );
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
         // Typed DateInterval::format() — ExternalMethod previously wrote empty (#32699).
         if (
             'format' === $methodLcEarlyDispatch
@@ -28071,6 +28152,9 @@ class JIT {
         }
         if (null !== $source->serializePayloadClass) {
             $dest->serializePayloadClass = $source->serializePayloadClass;
+        }
+        if ($source->fromUnserializeObject) {
+            $dest->fromUnserializeObject = true;
         }
         if (null !== $source->compileTimeString) {
             $dest->compileTimeString = $source->compileTimeString;
