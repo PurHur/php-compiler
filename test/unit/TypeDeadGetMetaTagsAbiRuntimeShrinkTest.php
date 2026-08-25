@@ -12,7 +12,8 @@ use PHPUnit\Framework\TestCase;
  * NestedJIT/AOT bridge stays MetaTagsRuntime + MetaTagsJitHelper.
  * Runtime owner declares module-locally (getNamedFunction first) so leftover
  * Type empty decls cannot mint get_meta_tags.1 (#31894 / #32122).
- * Thin standalone AOT also links via Context::ensureStandaloneBodies (#33051 / #33030).
+ * Thin AOT links lazily via JitGetMetaTags::ensureLinked (#34578 / peer #34423) —
+ * Context::ensureMinimalUserStandaloneBodies no longer always-on MetaTags.
  */
 final class TypeDeadGetMetaTagsAbiRuntimeShrinkTest extends TestCase
 {
@@ -58,7 +59,22 @@ final class TypeDeadGetMetaTagsAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type::initialize must not eagerly MetaTagsRuntime::ensureLinked($this->context) (#34423)'
         );
         $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('MetaTagsRuntime::ensureStandaloneBodies($this)', $context);
+        $minimalPos = strpos($context, 'private function ensureMinimalUserStandaloneBodies');
+        $this->assertNotFalse($minimalPos);
+        $minimalEnd = strpos($context, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
+        $this->assertNotFalse($minimalEnd);
+        $minimalBody = substr($context, $minimalPos, $minimalEnd - $minimalPos);
+        $this->assertStringNotContainsString(
+            'MetaTagsRuntime::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimalUserStandaloneBodies must not eagerly MetaTags (#34578)'
+        );
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitGetMetaTags.php');
+        $this->assertStringContainsString(
+            'MetaTagsRuntime::ensureLinked',
+            $jit,
+            'JitGetMetaTags must ensureLinked before lookup (#34578)'
+        );
     }
 
     public function testNoNewRuntimeCForGetMetaTagsAbi(): void
