@@ -360,6 +360,25 @@ final class DomNodeLiveMutationRuntime
                     $context->builder->branchIf($firstNull, $bbAppend, $bbInsert);
 
                     $context->builder->positionAtEnd($bbInsert);
+                    // Already first → no-op (php-src fragment unlink+reinsert; #34813).
+                    // insertBefore LiveSlots throws on new==ref (#34709) — skip that path.
+                    $bbAlreadyFirst = BasicBlockHelper::append(
+                        $context,
+                        'dom_prepend_already_first_'.$prependIdx
+                    );
+                    $bbDoInsert = BasicBlockHelper::append(
+                        $context,
+                        'dom_prepend_do_ib_'.$prependIdx
+                    );
+                    $alreadyFirst = $context->builder->icmp(
+                        Builder::INT_EQ,
+                        $childObj,
+                        $first
+                    );
+                    $context->builder->branchIf($alreadyFirst, $bbAlreadyFirst, $bbDoInsert);
+                    $context->builder->positionAtEnd($bbAlreadyFirst);
+                    $context->builder->branch($bbDone);
+                    $context->builder->positionAtEnd($bbDoInsert);
                     JitDomInsertBeforeLiveSlots::sync($context, $parentObj, $childObj, $first);
                     $context->builder->branch($bbDone);
 

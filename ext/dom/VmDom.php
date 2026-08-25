@@ -7694,6 +7694,14 @@ final class VmDom
         if (DomRegistry::has($parent) && [] !== DomRegistry::state($parent)->childIds) {
             $firstChild = DomRegistry::entry(DomRegistry::state($parent)->childIds[0]);
         }
+        // php-src dom_parent_node_prepend: nodes go through a fragment then
+        // dom_pre_insert(parent->children, …). When the only/first arg is already
+        // the first child, unlink+reinsert lands the same order — a no-op. Our
+        // insertBefore(child, first) path would hit the insertBefore identity
+        // Error (#22686 / #34709); skip instead (#34813 / peer after #34791).
+        if (null !== $firstChild && $child->id === $firstChild->id) {
+            return;
+        }
         self::insertBeforeLiveStandard($ctx, $parent, $child, $firstChild);
     }
 
