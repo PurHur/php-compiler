@@ -124,11 +124,20 @@ final class RuntimeIndirectInstanceMethodCall implements Call
             }
             $proxy = $this->candidatesByClassId[$id];
             assert($proxy instanceof Call);
-            $raw = $proxy->call($context, ...$callArgs);
-            $context->builder->store(
-                JitValueBox::coerceToValuePtrForStore($context, $raw),
-                $resultSlot
-            );
+            // Emitting every class arm at compile time: a fold-only proxy (e.g.
+            // SimpleXMLElement::asXML) must not abort the whole module when another
+            // candidate (DOMDocument::saveXML) is the runtime match (#34567).
+            try {
+                $raw = $proxy->call($context, ...$callArgs);
+                $context->builder->store(
+                    JitValueBox::coerceToValuePtrForStore($context, $raw),
+                    $resultSlot
+                );
+            } catch (\LogicException) {
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'indirect_method_arm_fail_'.$tag.'_'.$i);
+                $context->builder->call($context->lookupFunction('abort'));
+                $context->builder->store($zero, $resultSlot);
+            }
             $context->builder->branch($merge);
         }
 

@@ -37,11 +37,7 @@ final class TypeDeadTypeInitializeLazySessionIniIncludeDefineRuntimeShrinkTest e
                 "Builtin\\Type::initialize must not eagerly {$class}::ensureLinked (#34474)"
             );
         }
-        $this->assertStringContainsString(
-            'SessionStorageGlobals::ensureGlobals($this->context)',
-            $type,
-            'SessionStorageGlobals::ensureGlobals stays (#34474)'
-        );
+        // SessionStorageGlobals::ensureGlobals also lazy as of #34566 (peer).
         // StringTime / EnvLocalRuntime lazy as of #34513 — covered by
         // TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest.
     }
