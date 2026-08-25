@@ -52,15 +52,22 @@ final class ArrayIteratorConstruct implements Call
         $objectType = $context->type->object;
         $slot = $objectType->propertySlotFor($objPtr, $this->className, '__spl_ht');
         // Fresh packed HT (native array → new table; HT arg → copy via spread into alloc).
+        // Store like initEmptyHashtableProperties: alloc already owns rc=1. propertyStore would
+        // addref again, leaving rc≥2 so reserveAppendSlot COW-orphans `$o[]=` writes (#34748 / re-#27286).
         $src = HashTableHelper::coerceToPackedHashtable($context, $args[1]);
+        $ht = HashTableHelper::alloc($context);
         $copy = new Variable(
             $context,
             Variable::TYPE_HASHTABLE,
             Variable::KIND_VALUE,
-            HashTableHelper::alloc($context)
+            $ht
         );
         HashTableHelper::spreadInto($context, $copy, $src);
-        $objectType->propertyStore($slot, $copy, Variable::TYPE_HASHTABLE);
+        $voidPtr = $context->getTypeFromString('void*');
+        $context->builder->store(
+            $context->builder->pointerCast($ht, $voidPtr),
+            $slot
+        );
 
         self::storeFlags($context, $objPtr, $this->className, $args[2] ?? null);
 

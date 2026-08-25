@@ -1096,7 +1096,8 @@ class Object_ extends Type {
     }
 
     /**
-     * SplObjectStorage stores entries in a backing __hashtable__ (issue #601).
+     * SplObjectStorage / ArrayObject family stores entries in backing `__spl_ht` (slot 0; #601).
+     * Attach objectPropertySlot so separateContainerForWrite COW rebinds the object (#34748).
      */
     public function splBackingHashtable(Variable $obj): Variable
     {
@@ -1104,18 +1105,24 @@ class Object_ extends Type {
             throw new \LogicException('splBackingHashtable requires __object__*');
         }
         $objPtr = $this->context->helper->loadValue($obj);
-        $loaded = $this->context->builder->load($this->propertySlotPtr($objPtr, 0));
+        $slot = $this->propertySlotPtr($objPtr, 0);
+        $loaded = $this->context->builder->load($slot);
         $htPtr = $this->context->builder->pointerCast(
             $loaded,
             $this->context->getTypeFromString('__hashtable__*')
         );
 
-        return new Variable(
+        $var = new Variable(
             $this->context,
             Variable::TYPE_HASHTABLE,
             Variable::KIND_VALUE,
             $htPtr
         );
+        $var->objectPropertySlot = $slot;
+        $var->objectPropertyType = Variable::TYPE_HASHTABLE;
+        $var->objectPropertyReceiver = $objPtr;
+
+        return $var;
     }
 
     private function initPropertySlots(PHPLLVM\Value $obj, int $propCount): void
