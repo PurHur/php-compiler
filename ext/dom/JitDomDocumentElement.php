@@ -115,15 +115,24 @@ final class JitDomDocumentElement
         if ('' === $parentPath) {
             $parentPath = '/'.DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         }
-        self::syncChildrenFromXml($context, $element, $xml, $parentPath, $ownerDocument);
+        // Seed descendant attr NS resolution from the root open-tag xmlns (#34618).
+        $rootNs = [];
+        if (preg_match('/<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)\/?>/', $xml, $rootOpen)) {
+            $rootNs = DomParseSimpleXmlJitHelper::xmlnsDeclsFromOpenTagArgv($rootOpen[0]);
+        }
+        self::syncChildrenFromXml($context, $element, $xml, $parentPath, $ownerDocument, $rootNs);
     }
 
+    /**
+     * @param array<string, string> $inScopeNs prefix → URI inherited from ancestors
+     */
     private static function syncChildrenFromXml(
         \PHPCompiler\JIT\Context $context,
         Value $element,
         string $xml,
         string $parentPath,
-        ?Value $ownerDocument = null
+        ?Value $ownerDocument = null,
+        array $inScopeNs = []
     ): void {
         // Include blank text / comments so childNodes->length matches Zend (#27260).
         $children = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
@@ -155,6 +164,10 @@ final class JitDomDocumentElement
                 default => self::materializeElementChild($context, $node),
             };
             $segment = DomParseSimpleXmlJitHelper::nodePathSegmentArgv($children, $idx);
+            $childScope = $inScopeNs;
+            if ('element' === $node['kind'] && isset($node['open']) && \is_string($node['open'])) {
+                $childScope = DomParseSimpleXmlJitHelper::xmlnsDeclsFromOpenTagArgv($node['open']) + $inScopeNs;
+            }
             if ('element' === $node['kind'] && null !== $segment && '' !== $segment) {
                 $childPath = rtrim($parentPath, '/').'/'.$segment;
                 JitDomGetNodePath::storeOn($context, $child, self::CLASS_ELEMENT, $childPath);
@@ -165,14 +178,15 @@ final class JitDomDocumentElement
                         $openAttrs = DomParseSimpleXmlJitHelper::attrSuffixFromOpenTagArgv($node['open']);
                     }
                     $outer = '<'.$node['data'].$openAttrs.'>'.$inner.'</'.$node['data'].'>';
-                    self::syncChildrenFromXml($context, $child, $outer, $childPath, $ownerDocument);
+                    self::syncChildrenFromXml($context, $child, $outer, $childPath, $ownerDocument, $childScope);
                 }
             }
             if ('element' === $node['kind'] && isset($node['open']) && \is_string($node['open'])) {
+                // Inherit ancestor xmlns so prefixed attrs keep URI (xmlHasNsProp; #34618).
                 JitDomCreateElement::storeAttributesPresence(
                     $context,
                     $child,
-                    DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open'])
+                    DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open'], $inScopeNs)
                 );
             }
             self::ensureLinkProps($context);

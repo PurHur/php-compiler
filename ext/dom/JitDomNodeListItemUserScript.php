@@ -280,10 +280,14 @@ final class JitDomNodeListItemUserScript
             return self::boxNull($context);
         }
         $node = $nodes[$index];
+        $rootNs = [];
+        if (preg_match('/<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)\/?>/', $xml, $rootOpen)) {
+            $rootNs = DomParseSimpleXmlJitHelper::xmlnsDeclsFromOpenTagArgv($rootOpen[0]);
+        }
         $object = match ($node['kind']) {
             'comment' => JitDomCreateComment::materialize($context, $node['data']),
             'text' => JitDomCreateTextNode::materialize($context, $node['data']),
-            default => self::materializeDirectElementChild($context, $node),
+            default => self::materializeDirectElementChild($context, $node, $rootNs),
         };
 
         return self::boxObject($context, $object);
@@ -316,9 +320,13 @@ final class JitDomNodeListItemUserScript
 
     /**
      * @param array{kind: string, data: string, inner?: string, open?: string} $node
+     * @param array<string, string> $inheritedNsDecl ancestor xmlns scope (#34618)
      */
-    private static function materializeDirectElementChild(Context $context, array $node): Value
-    {
+    private static function materializeDirectElementChild(
+        Context $context,
+        array $node,
+        array $inheritedNsDecl = []
+    ): Value {
         $tag = $node['data'];
         $inner = $node['inner'] ?? '';
         $text = DomParseSimpleXmlJitHelper::textContentFromInnerXmlArgv($inner);
@@ -330,7 +338,7 @@ final class JitDomNodeListItemUserScript
                 $child,
                 DomParseSimpleXmlJitHelper::attrSuffixFromOpenTagArgv($node['open'])
             );
-            foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open']) as $attrPair) {
+            foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($node['open'], $inheritedNsDecl) as $attrPair) {
                 $qname = $attrPair['qname'];
                 $value = $attrPair['value'];
                 $namespace = $attrPair['namespace'] ?? '';
@@ -388,7 +396,12 @@ final class JitDomNodeListItemUserScript
             $elementName = DomParseSimpleXmlJitHelper::tagNameFromOpenTagArgv($openTag) ?? 'div';
         }
         $element = JitDomCreateElement::materializeElementWithTextContent($context, $elementName, $text);
-        foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($openTag) as $attrPair) {
+        // Ancestor xmlns scope at this open-tag (xmlSearchNs / #34618).
+        $openOffset = DomParseSimpleXmlJitHelper::nthTagOpenTagOffsetArgv($xml, $tag, $position);
+        $inherited = $openOffset >= 0
+            ? DomParseSimpleXmlJitHelper::xmlnsScopeBeforeOffsetArgv($xml, $openOffset)
+            : [];
+        foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($openTag, $inherited) as $attrPair) {
             $qname = $attrPair['qname'];
             $value = $attrPair['value'];
             $namespace = $attrPair['namespace'] ?? '';

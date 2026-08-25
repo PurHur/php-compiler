@@ -15874,6 +15874,19 @@ class JIT {
         }
         $resultVar = $this->context->getVariableFromOp($result);
         $resultVar->compileTimeDomChildIndex = $index;
+        // Thin AOT materializes NodeList::item elements like firstChild (#32315).
+        // Without classUserType, `$list->item(0)->hasAttributeNS(...)` ExternalMethod-nulls
+        // even when loadXML seeded the Attr cache (#34618).
+        $resultVar->classUserType = 'DOMElement';
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->classUserType = 'DOMElement';
+                $this->context->namedVariableBindings[$resolved]->compileTimeDomChildIndex = $index;
+            }
+            $this->context->bindVariableByName($resolved, $resultVar);
+        }
 
         $xml = \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (
