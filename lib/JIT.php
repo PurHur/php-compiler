@@ -8975,6 +8975,19 @@ class JIT {
                             $this->pointObjectPropertySlotAtValueBox($destVar, $shared);
                             break;
                         }
+                        // `$a[] =& $x` / `$a[$k] =& $x`: keep $x on a stable shared box and sync
+                        // each HT entry from it. Rebinding $x onto the append slot (old #34645)
+                        // only works for one append — a second `$a[] =& $x` left the first slot
+                        // as a stale copy (#34685 / Zend zend_assign_to_variable_reference).
+                        if (null !== $srcName) {
+                            $shared = $this->ensureAssignRefSharedValueBox($srcVar, $srcName, $srcOp);
+                            if ($this->syncAssignRefDimEntryFromShared($destVar, $shared)) {
+                                break;
+                            }
+                            // String-key / exotic dim without a live entry pointer: fall through
+                            // to copy+rebind (single-alias behaviour, #34645).
+                            $srcVar = $shared;
+                        }
                         if (
                             Variable::TYPE_VALUE === $srcVar->type
                             && null === $srcVar->valueBoxAliasPtr
@@ -18699,6 +18712,42 @@ class JIT {
     }
 
     /**
+     * `$a[] =& $x`: copy the shared box into the HT entry and register it for write-through (#34685).
+     *
+     * @see php-src Zend/zend_execute.c zend_assign_to_variable_reference
+     */
+    private function syncAssignRefDimEntryFromShared(Variable $destVar, Variable $shared): bool
+    {
+        $entryPtr = $this->assignRefDestEntryPointer($destVar);
+        if (null === $entryPtr) {
+            return false;
+        }
+        $sharedPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $shared);
+        JIT\JitValueBox::copyIntoPointer($this->context, $entryPtr, $sharedPtr);
+        if (null === $shared->assignRefSyncEntryPtrs) {
+            $shared->assignRefSyncEntryPtrs = [];
+        }
+        $shared->assignRefSyncEntryPtrs[] = $entryPtr;
+        $this->markAssignRefLvalueAlias($shared);
+
+        return true;
+    }
+
+    /**
+     * After `$x = …` on a multi-append ASSIGN_REF shared box, refresh every HT alias (#34685).
+     */
+    private function syncAssignRefHtEntriesFromShared(Variable $shared): void
+    {
+        if (null === $shared->assignRefSyncEntryPtrs || [] === $shared->assignRefSyncEntryPtrs) {
+            return;
+        }
+        $sharedPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $shared);
+        foreach ($shared->assignRefSyncEntryPtrs as $entryPtr) {
+            JIT\JitValueBox::copyIntoPointer($this->context, $entryPtr, $sharedPtr);
+        }
+    }
+
+    /**
      * Mark ASSIGN_REF lvalue so #34465 does not strip objectPropertySlot on `$v = …` (#34649).
      */
     private function markAssignRefLvalueAlias(Variable $var): void
@@ -18815,6 +18864,8 @@ class JIT {
                 $destVar->writableIndex
             );
         }
+        // String-key dims: entry may not exist until assignOperand writes (#34645 path).
+        // Keep those on copy+rebind; multi-alias sync is for append / packed index (#34685).
         if (
             Variable::TYPE_VALUE === $destVar->type
             && Variable::KIND_VARIABLE === $destVar->kind
@@ -19352,6 +19403,7 @@ class JIT {
             JIT\JitValueBox::publishAfterWrite($this->context, $result->valueBoxAliasPtr);
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             $this->recordListUnpackAssignSlot($resultOp, $result);
+            $this->syncAssignRefHtEntriesFromShared($result);
 
             return;
         }
@@ -19657,6 +19709,7 @@ class JIT {
                 $value
             );
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
+            $this->syncAssignRefHtEntriesFromShared($result);
 
             return;
         }
@@ -19853,6 +19906,7 @@ class JIT {
             $this->noteDateTimeZoneLocal($resultOp, $value);
             $this->noteDateTimeLocal($resultOp, $value);
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
+            $this->syncAssignRefHtEntriesFromShared($result);
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName($resolved, $result);
