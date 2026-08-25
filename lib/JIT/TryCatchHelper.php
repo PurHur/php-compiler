@@ -9,7 +9,6 @@ use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPCompiler\JIT\Builtin\ExceptionHandlerJitRuntime;
-use PHPCompiler\JIT\Builtin\TryCatchRuntime;
 use PHPCompiler\JIT\Builtin\JitReturnPending;
 use PHPCompiler\JIT\Builtin\ExceptionThrowToStringSeed;
 use PHPCompiler\JIT\Builtin\JitThrow;
@@ -733,6 +732,56 @@ final class TryCatchHelper
         return 'Throwable';
     }
 
+    /**
+     * i1: thrown object matches this catch arm's type list (`A|B`, members may be `A&B`).
+     *
+     * Uses LLVM class_id instanceof (same path as `instanceof` / #34597). Do not call
+     * NestedJIT TryCatchJitHelper here — thin AOT has no active VM context for it.
+     *
+     * @param list<string> $catchTypes lowercase type names from TYPE_CATCH
+     */
+    private static function emitCatchTypesMatchI1(
+        Context $context,
+        Variable $thrownVar,
+        array $catchTypes
+    ): Value {
+        GetClassRuntime::ensureLinked($context);
+        $context->type->object->lookup('Throwable');
+        $context->type->object->lookup('Error');
+        $context->type->object->lookup('Exception');
+        $i1 = $context->getTypeFromString('int1');
+        $acc = $i1->constInt(0, false);
+        foreach ($catchTypes as $typeName) {
+            if ('' === $typeName) {
+                continue;
+            }
+            if (str_contains($typeName, '&')) {
+                $and = $i1->constInt(1, false);
+                foreach (explode('&', $typeName) as $part) {
+                    if ('' === $part) {
+                        continue;
+                    }
+                    $context->type->object->lookup($part);
+                    $check = $context->type->object->emitInstanceOf($thrownVar, $part);
+                    $bool = Variable::TYPE_NATIVE_BOOL === $check->type
+                        ? $check->value
+                        : $context->helper->loadValue($check);
+                    $and = $context->builder->and($and, $bool);
+                }
+                $acc = $context->builder->or($acc, $and);
+                continue;
+            }
+            $context->type->object->lookup($typeName);
+            $check = $context->type->object->emitInstanceOf($thrownVar, $typeName);
+            $bool = Variable::TYPE_NATIVE_BOOL === $check->type
+                ? $check->value
+                : $context->helper->loadValue($check);
+            $acc = $context->builder->or($acc, $bool);
+        }
+
+        return $acc;
+    }
+
     public static function emitRethrow(
         \PHPCompiler\JIT $jit,
         Context $context,
@@ -1011,7 +1060,6 @@ final class TryCatchHelper
 
         $uncaught = self::appendBlock($func, 'try_uncaught_'.$suffix);
         $nextCatch = $dispatch;
-        $singleArm = 1 === count($handler->catchArms);
 
         foreach ($handler->catchArms as $arm) {
             $catchOp = $arm['op'];
@@ -1025,16 +1073,14 @@ final class TryCatchHelper
             $catchSetupBb = self::appendBlock($func, 'try_catch_setup_'.$suffix);
 
             $builder->positionAtEnd($nextCatch);
-            if ([] === $types || $singleArm) {
+            if ([] === $types) {
                 $builder->branch($catchSetupBb);
             } else {
-                $encoded = implode('|', $types);
+                // LLVM class_id instanceof — NestedJIT TryCatchJitHelper needs an active VM
+                // context that thin AOT does not have, so multi-catch never matched and the
+                // old single-arm bypass incorrectly caught non-matching types (#34597).
                 $thrownVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
-                $classNameStr = ReflectionBuiltinHelper::getClassName($context, $thrownVar);
-                $encodedStr = $context->builder->load(
-                    $context->constantStringFromString($encoded)
-                );
-                $matches = TryCatchRuntime::callEncodedTypesMatch($context, $classNameStr, $encodedStr);
+                $matches = self::emitCatchTypesMatchI1($context, $thrownVar, $types);
                 $builder->branchIf($matches, $catchSetupBb, $noMatchBb);
             }
 
