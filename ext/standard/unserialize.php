@@ -159,6 +159,16 @@ final class unserialize extends Internal
         if (null !== $dateObj) {
             return $dateObj;
         }
+        // DateInterval / DateTimeZone — same fold path; NestedJIT firstIntProp→slot0
+        // SIGSEGVs / empties zone name (#34599 / peer #34594 / #34584).
+        $intervalObj = self::tryMaterializeDateIntervalWire($context, $literal);
+        if (null !== $intervalObj) {
+            return $intervalObj;
+        }
+        $zoneObj = self::tryMaterializeDateTimeZoneWire($context, $literal);
+        if (null !== $zoneObj) {
+            return $zoneObj;
+        }
         // Object/enum/class wires need runtime materialize (ArrayObject bag #33636) —
         // decodePayload returns ObjectEntry which cannot fold into LLVM scalars.
         if (\preg_match('/(?:^|[{;])[OCE]:/', $literal)) {
@@ -276,6 +286,231 @@ final class unserialize extends Internal
         );
 
         return $ptr;
+    }
+
+    /**
+     * Fold Zend DateInterval serialize wire into a live object (#34599 / peer #34584).
+     *
+     * php-src: ext/date/php_date.c — php_date_interval_initialize_from_hash /
+     * DateInterval::__unserialize
+     */
+    private static function tryMaterializeDateIntervalWire(Context $context, string $literal): ?Value
+    {
+        if (!\preg_match('/^O:\d+:"DateInterval":(\d+):\{(.*)\}$/s', $literal, $m)) {
+            return null;
+        }
+        $bag = $m[2];
+        // from_string + date_string wire (createFromDateString).
+        if (\preg_match(
+            '/s:11:"from_string";b:1;s:11:"date_string";s:\d+:"([^"]*)";/',
+            $bag,
+            $fs
+        )) {
+            $warning = null;
+            $parsed = VmDateInterval::parseFromDateString($fs[1], $warning);
+            if (null === $parsed) {
+                return null;
+            }
+            $parsed['days'] = false;
+            $parsed['from_string'] = true;
+            $parsed['date_string'] = $fs[1];
+
+            return self::allocateDateIntervalFromState($context, $parsed);
+        }
+        $state = [
+            'y' => self::wireBagInt($bag, 'y') ?? 0,
+            'm' => self::wireBagInt($bag, 'm') ?? 0,
+            'd' => self::wireBagInt($bag, 'd') ?? 0,
+            'h' => self::wireBagInt($bag, 'h') ?? 0,
+            'i' => self::wireBagInt($bag, 'i') ?? 0,
+            's' => self::wireBagInt($bag, 's') ?? 0,
+            'f' => self::wireBagFloat($bag, 'f') ?? 0.0,
+            'invert' => self::wireBagInt($bag, 'invert') ?? 0,
+            'days' => self::wireBagDays($bag),
+            'from_string' => false,
+        ];
+
+        return self::allocateDateIntervalFromState($context, $state);
+    }
+
+    /**
+     * @param array{
+     *     y: int, m: int, d: int, h: int, i: int, s: int, f: float,
+     *     invert: int, days: bool|int, from_string?: bool, date_string?: string
+     * } $state
+     */
+    private static function allocateDateIntervalFromState(Context $context, array $state): ?Value
+    {
+        $className = 'DateInterval';
+        $objectType = $context->type->object;
+        $classId = $objectType->classIdByName($className)
+            ?? $objectType->classIdForLowerName('dateinterval');
+        if (null === $classId) {
+            return null;
+        }
+        $obj = $objectType->allocate($classId);
+        $i64 = $context->getTypeFromString('int64');
+        foreach (['y', 'm', 'd', 'h', 'i', 's', 'invert'] as $name) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($obj, $className, $name),
+                new JITVariable(
+                    $context,
+                    JITVariable::TYPE_NATIVE_LONG,
+                    JITVariable::KIND_VALUE,
+                    $i64->constInt((int) $state[$name], false)
+                ),
+                JITVariable::TYPE_NATIVE_LONG
+            );
+        }
+        $fSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            JitValueBox::pointer($context, $fSlot),
+            $context->constantFromFloat((float) $state['f'])
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, $className, 'f'),
+            new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $fSlot),
+            JITVariable::TYPE_VALUE
+        );
+        $daysSlot = JitValueBox::alloc($context);
+        if (\is_int($state['days'])) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                JitValueBox::pointer($context, $daysSlot),
+                $i64->constInt($state['days'], false)
+            );
+        } else {
+            JitValueBox::writeBool(
+                $context,
+                $daysSlot,
+                $context->getTypeFromString('int32')->constInt(!empty($state['days']) ? 1 : 0, false)
+            );
+        }
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, $className, 'days'),
+            new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $daysSlot),
+            JITVariable::TYPE_VALUE
+        );
+        // JIT Object_ layout has no __di_from_string / __di_date_string slots
+        // (peer JitDateIntervalConstruct) — public y..days are enough for format().
+        ReflectionSetup::markConstructed($context, $obj);
+        // Publish stamp so DateInterval::format() can bake (#34599 / peer #33912 diff).
+        // Runtime NestedJIT formatFromScalars still SIGSEGVs on float args; fold avoids it.
+        $context->lastDateIntervalDiffState = [
+            'y' => (int) $state['y'],
+            'm' => (int) $state['m'],
+            'd' => (int) $state['d'],
+            'h' => (int) $state['h'],
+            'i' => (int) $state['i'],
+            's' => (int) $state['s'],
+            'f' => (float) $state['f'],
+            'invert' => (int) $state['invert'],
+            'days' => $state['days'],
+        ];
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $obj
+        );
+
+        return $ptr;
+    }
+    private static function tryMaterializeDateTimeZoneWire(Context $context, string $literal): ?Value
+    {
+        if (!\preg_match(
+            '/^O:\d+:"DateTimeZone":2:\{(.*)\}$/s',
+            $literal,
+            $m
+        )) {
+            return null;
+        }
+        $bag = $m[1];
+        if (!\preg_match(
+            '/s:13:"timezone_type";i:(\d+);s:8:"timezone";s:\d+:"([^"]*)";/',
+            $bag,
+            $p
+        )) {
+            return null;
+        }
+        $timezoneType = (int) $p[1];
+        $timezone = $p[2];
+        if ($timezoneType < 1 || $timezoneType > 3 || str_contains($timezone, "\0")) {
+            return null;
+        }
+        try {
+            VmDateTimeNative::validateTimezoneId($timezone);
+        } catch (NativeDateInvalidTimeZoneException) {
+            return null;
+        }
+        $className = 'DateTimeZone';
+        $objectType = $context->type->object;
+        $classId = $objectType->classIdByName($className)
+            ?? $objectType->classIdForLowerName('datetimezone');
+        if (null === $classId) {
+            return null;
+        }
+        $obj = $objectType->allocate($classId);
+        $tzVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $context->builder->load($context->constantStringFromString($timezone))
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, $className, DateTimeSupport::TZ_NAME_PROPERTY),
+            $tzVar,
+            JITVariable::TYPE_STRING
+        );
+        ReflectionSetup::markConstructed($context, $obj);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $obj
+        );
+
+        return $ptr;
+    }
+
+    private static function wireBagInt(string $bag, string $name): ?int
+    {
+        $len = \strlen($name);
+        if (!\preg_match('/s:'.$len.':"'.\preg_quote($name, '/').'";i:(-?\d+);/', $bag, $m)) {
+            return null;
+        }
+
+        return (int) $m[1];
+    }
+
+    private static function wireBagFloat(string $bag, string $name): ?float
+    {
+        $len = \strlen($name);
+        if (!\preg_match(
+            '/s:'.$len.':"'.\preg_quote($name, '/').'";d:(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?);/',
+            $bag,
+            $m
+        )) {
+            return null;
+        }
+
+        return (float) $m[1];
+    }
+
+    /** @return bool|int */
+    private static function wireBagDays(string $bag): bool|int
+    {
+        if (\preg_match('/s:4:"days";i:(-?\d+);/', $bag, $m)) {
+            return (int) $m[1];
+        }
+        if (\preg_match('/s:4:"days";b:([01]);/', $bag, $m)) {
+            return 1 === (int) $m[1];
+        }
+
+        return false;
     }
 
     /**
