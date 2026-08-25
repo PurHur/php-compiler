@@ -237,4 +237,24 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame("\xC3\xBF", PregAotFastPath::lastCap(0));
         $this->assertSame(0, PregAotFastPath::matchCount('/\x{41}/', 'B', 0));
     }
+
+    /** Issue #34724 — dot-star and anchored hex32 must match under thin AOT (not Internal error). */
+    public function testDotStarAndAnchoredHex32(): void
+    {
+        $this->assertSame(1, PregAotFastPath::matchCount('/.*/', 'hello', 0));
+        $this->assertSame(0, PregAotFastPath::lastError());
+        $this->assertSame('hello', PregAotFastPath::lastCap(0));
+        $this->assertSame(1, PregAotFastPath::matchCount('/.*/', '', 0));
+        $this->assertSame('', PregAotFastPath::lastCap(0));
+        $this->assertSame(1, PregAotFastPath::matchCount('#.*#', 'x', 0));
+
+        $hex = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+        $this->assertSame(1, PregAotFastPath::matchCount('/^[0-9a-f]{32}$/', $hex, 0));
+        $this->assertSame(0, PregAotFastPath::lastError());
+        $this->assertSame($hex, PregAotFastPath::lastCap(0));
+        $this->assertSame(0, PregAotFastPath::matchCount('/^[0-9a-f]{32}$/', 'gggggggggggggggggggggggggggggggg', 0));
+        $this->assertSame(0, PregAotFastPath::matchCount('/^[0-9a-f]{32}$/', 'aaa', 0));
+        $this->assertSame(0, PregAotFastPath::matchCount('/^[0-9a-f]{32}$/', $hex, 1));
+        $this->assertSame(1, PregAotFastPath::matchCount('#^[0-9a-f]{32}$#', $hex, 0));
+    }
 }

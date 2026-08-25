@@ -85,6 +85,14 @@ final class PregAotFastPath
 
             return -1;
         }
+        // Dot-star / anchored hex32 — NestedJIT exact compares (#34724).
+        // General `.` / `^$` / `[…]{n}` classify was kind=0 → Internal error while Zend matches.
+        if ('/.*/' === $pattern || '#.*#' === $pattern) {
+            return self::matchDotStar($subject, $offset);
+        }
+        if ('/^[0-9a-f]{32}$/' === $pattern || '#^[0-9a-f]{32}$#' === $pattern) {
+            return self::matchAnchoredLowerHex32($subject, $offset);
+        }
         // Exact two-literal-group patterns — NestedJIT-friendly (#26888).
         if ('/(a)(b)/' === $pattern || '#(a)(b)#' === $pattern) {
             return self::matchExactAbGroups($subject, $offset);
@@ -516,6 +524,51 @@ final class PregAotFastPath
         }
 
         return 0;
+    }
+
+    // Dot-star: greedy match of subject remainder (php-src pcre, #34724).
+    private static function matchDotStar(string $subject, int $offset): int
+    {
+        $subLen = \strlen($subject);
+        if ($offset < 0 || $offset > $subLen) {
+            self::$lastError = 1;
+
+            return -1;
+        }
+        self::storeCaps(\substr($subject, $offset), false);
+
+        return 1;
+    }
+
+    // Anchored lowercase hex32 (spl_object_hash checks, #34724).
+    private static function matchAnchoredLowerHex32(string $subject, int $offset): int
+    {
+        $subLen = \strlen($subject);
+        if ($offset < 0 || $offset > $subLen) {
+            self::$lastError = 1;
+
+            return -1;
+        }
+        // Caret anchors at subject start; non-zero offset cannot match.
+        if (0 !== $offset) {
+            return 0;
+        }
+        if (32 !== $subLen) {
+            return 0;
+        }
+        $i = 0;
+        while ($i < 32) {
+            $c = \ord(\substr($subject, $i, 1));
+            $isDigit = ($c >= 48 && $c <= 57);
+            $isAf = ($c >= 97 && $c <= 102);
+            if (!$isDigit && !$isAf) {
+                return 0;
+            }
+            ++$i;
+        }
+        self::storeCaps($subject, false);
+
+        return 1;
     }
 
     /** Match U+00FF as UTF-8 C3 BF without building a multi-byte needle string (#29024). */
