@@ -111,7 +111,7 @@ final class JitMbSubstr
         $i64 = $context->getTypeFromString('int64');
         // 4-arg ABI: length=-1 omitted. Extra hasLength int breaks NestedJIT length ABI (#34256).
         if ($argc >= 3) {
-            if (JITVariable::TYPE_NULL === $args[2]->type) {
+            if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
                 $length = $i64->constInt(-1, true);
             } else {
                 $length = JitStrictIntArg::lower($context, $args[2], 'mb_substr', 3, 'length');
@@ -162,7 +162,7 @@ final class JitMbSubstr
         if ($argc < 3) {
             return ['value' => null];
         }
-        if (JITVariable::TYPE_NULL === $args[2]->type) {
+        if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
             return ['value' => null];
         }
         $len = self::compileTimeInt($context, $args[2]);
