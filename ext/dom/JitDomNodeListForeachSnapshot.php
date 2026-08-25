@@ -349,17 +349,40 @@ final class JitDomNodeListForeachSnapshot
         $list = self::loadNodeListObject($context, $array);
         $ownerSlot = $objectType->propertySlotFor($list, 'DOMNodeList', VmDom::PROP_CHILD_NODES_OWNER);
         $ownerPtr = $context->builder->load($ownerSlot);
-        $noOwner = $context->builder->icmp(Builder::INT_EQ, $ownerPtr, $voidPtr->constNull());
-
+        // Tag lists: empty __value__ box (slot non-null, object null) — same as
+        // JitDomNodeListLength (#28605). Treat as no-owner so #34646 recover runs.
+        $slotNull = $context->builder->icmp(Builder::INT_EQ, $ownerPtr, $voidPtr->constNull());
+        $bbCheckOwner = BasicBlockHelper::append($context, 'dom_nl_foreach_chk_owner');
         $bbFallback = BasicBlockHelper::append($context, 'dom_nl_foreach_fb_xml');
         $bbLive = BasicBlockHelper::append($context, 'dom_nl_foreach_live_walk');
         $bbDone = BasicBlockHelper::append($context, 'dom_nl_foreach_live_done');
-        $context->builder->branchIf($noOwner, $bbFallback, $bbLive);
+        $context->builder->branchIf($slotNull, $bbFallback, $bbCheckOwner);
 
-        // Fallback: original loadXML direct children (#33082) when owner unset;
-        // empty HT when createElement-only with no XML yet (#34500).
+        $context->builder->positionAtEnd($bbCheckOwner);
+        $ownerObjProbe = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $context->builder->pointerCast($ownerPtr, $valuePtrTy)
+        );
+        $hasOwner = $context->builder->icmp(
+            Builder::INT_NE,
+            $ownerObjProbe,
+            $objPtrTy->constNull()
+        );
+        $context->builder->branchIf($hasOwner, $bbLive, $bbFallback);
+
+        // Fallback: held getElementsByTagName list after childNodes fetch has no
+        // owner — recover via liveItemTagQuery (#34646). Else original loadXML
+        // direct children (#33082) when owner unset; empty HT when createElement-only
+        // with no XML yet (#34500).
         $context->builder->positionAtEnd($bbFallback);
-        if (null === $xml || '' === $xml) {
+        $recoverTag = JitDomGetElementsByTagNameUserScript::lastTagQuery()
+            ?? JitDomGetElementsByTagNameUserScript::liveItemTagQuery();
+        if (null !== $recoverTag && null !== $xml && '' !== $xml) {
+            [$tagHt, $tagCount] = self::emitLiveTagListSnapshot($context, $recoverTag, $xml);
+            $context->builder->store($tagHt, $htSlot);
+            $context->builder->store($tagCount, $countSlot);
+            $context->builder->branch($bbDone);
+        } elseif (null === $xml || '' === $xml) {
             $fbHt = HashTableHelper::alloc($context);
             $context->builder->call(
                 $context->lookupFunction('__hashtable__grow'),

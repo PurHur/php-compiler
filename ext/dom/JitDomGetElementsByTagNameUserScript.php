@@ -24,15 +24,32 @@ final class JitDomGetElementsByTagNameUserScript
 
     private static ?string $lastTagQuery = null;
 
+    /**
+     * Tag from the last getElementsByTagName() — survives {@see clearTagQueryState()}
+     * so held NodeList::item() still live-walks after an intervening childNodes /
+     * attributes fetch (#34646 / php-src nodelist.c).
+     */
+    private static ?string $liveItemTagQuery = null;
+
     public static function lastTagQuery(): ?string
     {
         return self::$lastTagQuery;
+    }
+
+    /**
+     * Tag for NodeList::item() when {@see lastTagQuery()} was cleared by
+     * childNodes/attributes fetch (#34646).
+     */
+    public static function liveItemTagQuery(): ?string
+    {
+        return self::$liveItemTagQuery;
     }
 
     /** Clear tag query so childNodes/attributes foreach does not reuse a stale tag (#33082/#33099). */
     public static function clearTagQueryState(): void
     {
         self::$lastTagQuery = null;
+        // Keep $liveItemTagQuery — held getElementsByTagName lists must still item() (#34646).
         self::$lastNsUri = null;
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
@@ -64,6 +81,7 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
         self::$lastTagQuery = null;
+        self::$liveItemTagQuery = null;
         JitDomNodeListForeachSnapshot::clearChildNodesFetch();
         JitDomNodeListForeachSnapshot::clearAttributesFetch();
         if (\count($args) < 2) {
@@ -94,11 +112,13 @@ final class JitDomGetElementsByTagNameUserScript
             // Receiver never loadXML'd (createElement / importNode dest). Seed length
             // from the live pinned tree so pending+source-count cannot double (#34630).
             self::$lastTagQuery = $tagLit;
+            self::$liveItemTagQuery = $tagLit;
             DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
 
             return self::boxNodeList($context, 0);
         }
         self::$lastTagQuery = $tagLit;
+        self::$liveItemTagQuery = $tagLit;
         $count = DomParseSimpleXmlJitHelper::countTagArgv($markup, $tagLit);
         // Preserve live appendChild increments when re-querying the same tag (#28605).
         DomUserScriptLiveTagListLlvm::initCount($context, $tagLit, $count);
