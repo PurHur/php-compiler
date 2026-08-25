@@ -47,6 +47,17 @@ final class JitDomInsertBefore
             return self::appendAsNullRef($context, $args[0], $args[1]);
         }
 
+        // ?DOMNode: reject int/bool/float/string/array before readObject (#34729).
+        if (JitDomRequireDomNodeArg::guardOptionalDomNodeOrAbort(
+            $context,
+            $args[2],
+            'DOMNode::insertBefore',
+            2,
+            'child'
+        )) {
+            return JitDomRequireDomNodeArg::boxNullResult($context);
+        }
+
         // Variable null ($ref = null) is TYPE_VALUE without isNullConstant — branch
         // before readObject (literal null already handled above) (#33031).
         if (JITVariable::TYPE_VALUE === $args[2]->type) {
