@@ -45,31 +45,33 @@ class AssignOp extends Optimizer
         foreach ($block->opCodes as $key => $op) {
             if ($op->type === OpCode::TYPE_ASSIGN && null !== $prior && in_array($prior->type, self::CANDIDATE_OPS, true)) {
                 // replace
-                $binaryOpResult = $block->getOperand($prior->arg1);
+                $binaryDest = (int) $prior->arg1;
+                $binaryOpResult = $block->getOperand($binaryDest);
                 if (
-                    $this->binaryResultUsagesAllowAssignOpFusion($binaryOpResult)
+                    $this->assignOpCanFuseInPlace($block, $prior, $key)
                     && !$this->assignOpMustSkipConcatChainPeephole($prior, $priorPrior, $op)
                 ) {
                     // We can safely replace it with an assign op
-                    $binaryDest = $prior->arg1;
                     // ??/?: deferred RHS: assign copies a pre-bound producer slot into merge dest (#11801, #16206).
-                    if (null !== $op->arg3 && (int) $op->arg3 !== (int) $binaryDest) {
+                    if (null !== $op->arg3 && (int) $op->arg3 !== $binaryDest) {
                         $priorPrior = $prior;
                         $prior = $op;
                         continue;
                     }
-                    $lvalue = $op->arg2;
-                    $prior->arg1 = $lvalue;
+                    $cvSlot = $op->arg2;
+                    // ($g .= 'A') && … — JumpIf / (bool) cast read the concat temp; retarget to
+                    // the CV after in-place fusion (#34558 / leftover #24506).
+                    // Ternary arms also write the ?: result from the same temp (#34561).
+                    $this->retargetShortCircuitReadersFromBinaryResult($block, $binaryDest, $cvSlot);
+                    $this->retargetSiblingAssignExprFromBinaryResult($block, $binaryDest, $cvSlot, $key);
+                    $prior->arg1 = $cvSlot;
                     // Compound assign ($x += 1): arg2 is the in-place lvalue — redirect both (#13083).
                     // Do not clobber additive/concat operands on ??/?: deferred RHS (#11801, #13104, #13105).
-                    if (null === $prior->arg2 || (int) $prior->arg2 === (int) $binaryDest) {
-                        $prior->arg2 = $lvalue;
+                    if (null === $prior->arg2 || (int) $prior->arg2 === $binaryDest) {
+                        $prior->arg2 = $cvSlot;
                     }
-                    // `($g .= 'A') && …`: JumpIf / Cast_Bool may still read the concat temp;
-                    // retarget them to the CV after in-place fusion (#34558).
-                    $this->retargetCondReadersFromTempToLvalue($block, (int) $binaryDest, (int) $lvalue);
                     $assignResult = $block->getOperand($op->arg1);
-                    if ((int) $op->arg3 === (int) $binaryDest || empty($assignResult->usages)) {
+                    if ((int) $op->arg3 === $binaryDest || empty($assignResult->usages)) {
                         // Binary result was only copied into the assign dest; redirect makes assign dead (#11801).
                         $toRemove[] = $key;
                     } else {
@@ -98,6 +100,127 @@ class AssignOp extends Optimizer
     }
 
     /**
+     * Fuse when the binary temp is only used by the following ASSIGN, or by that ASSIGN
+     * plus short-circuit JUMPIF / (bool) cast on the same temp (`($g .= 'A') && …`, #34558),
+     * or plus sibling ASSIGNs that also copy the temp (ternary CV + ?: result, #34561).
+     */
+    private function assignOpCanFuseInPlace(
+        Block $block,
+        OpCode $binary,
+        int|string $assignKey
+    ): bool {
+        $binaryDest = (int) $binary->arg1;
+        $binaryOpResult = $block->getOperand($binaryDest);
+        if (null === $binaryOpResult) {
+            return false;
+        }
+        $usageCount = count($binaryOpResult->usages);
+        if (1 === $usageCount) {
+            return true;
+        }
+        if ($usageCount < 1) {
+            return false;
+        }
+        foreach ($block->opCodes as $laterKey => $later) {
+            if ((int) $laterKey === (int) $assignKey || $later === $binary) {
+                continue;
+            }
+            if (!$this->opReadsValueSlot($block, $later, $binaryDest)) {
+                continue;
+            }
+            if ($this->isShortCircuitBinaryResultReader($later, $binaryDest)) {
+                continue;
+            }
+            if ($this->isSiblingAssignOfBinaryResult($later, $binaryDest)) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * JUMPIF cond or CAST_BOOL expr reading the fused binary temp (#34558).
+     * php-cfg wires `&&` long-arm (bool) cast to the Concat result, not the Assign result.
+     */
+    private function isShortCircuitBinaryResultReader(OpCode $op, int $binaryDest): bool
+    {
+        if (
+            OpCode::TYPE_JUMPIF === $op->type
+            || OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED === $op->type
+        ) {
+            return (int) $op->arg1 === $binaryDest;
+        }
+        if (OpCode::TYPE_CAST_BOOL === $op->type) {
+            return (int) $op->arg2 === $binaryDest;
+        }
+
+        return false;
+    }
+
+    /** Sibling ASSIGN whose expr (arg3) is the concat temp — ternary ?: result (#34561). */
+    private function isSiblingAssignOfBinaryResult(OpCode $op, int $binaryDest): bool
+    {
+        return OpCode::TYPE_ASSIGN === $op->type
+            && null !== $op->arg3
+            && (int) $op->arg3 === $binaryDest;
+    }
+
+    /** Retarget JUMPIF / CAST_BOOL from concat temp to the in-place CV (#34558). */
+    private function retargetShortCircuitReadersFromBinaryResult(Block $block, int $binaryDest, $cvSlot): void
+    {
+        foreach ($block->opCodes as $later) {
+            if (
+                (
+                    OpCode::TYPE_JUMPIF === $later->type
+                    || OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED === $later->type
+                )
+                && (int) $later->arg1 === $binaryDest
+            ) {
+                $later->arg1 = $cvSlot;
+                continue;
+            }
+            if (OpCode::TYPE_CAST_BOOL === $later->type && (int) $later->arg2 === $binaryDest) {
+                $later->arg2 = $cvSlot;
+            }
+        }
+    }
+
+    /**
+     * Retarget sibling ASSIGN expr slots from the dead concat temp to the CV (#34561).
+     * Skips the assign being fused (handled by remove / in-place rewrite).
+     */
+    private function retargetSiblingAssignExprFromBinaryResult(
+        Block $block,
+        int $binaryDest,
+        $cvSlot,
+        int|string $fusedAssignKey
+    ): void {
+        foreach ($block->opCodes as $laterKey => $later) {
+            if ((int) $laterKey === (int) $fusedAssignKey) {
+                continue;
+            }
+            if (!$this->isSiblingAssignOfBinaryResult($later, $binaryDest)) {
+                continue;
+            }
+            $later->arg3 = $cvSlot;
+        }
+    }
+
+    private function opReadsValueSlot(Block $block, OpCode $op, int $slot): bool
+    {
+        foreach ($block->opCodeValueScopeArgs($op) as $arg) {
+            if (null !== $arg && (int) $arg === $slot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Multi-part encapsed ConcatList lowers as CONCAT chain + assign; redirecting the
      * trailing in-place append to the assign dest drops the prior chain result (#13466).
      */
@@ -117,65 +240,5 @@ class AssignOp extends Optimizer
         }
 
         return null !== $priorPrior->arg1 && (int) $priorPrior->arg1 === (int) $prior->arg1;
-    }
-
-    /**
-     * Fuse Concat+Assign when the concat temp is only read by that Assign and optional
-     * JumpIf / Cast_Bool readers (`($g .= 'A') && …`). AOT mis-handles the
-     * temp+assign+JumpIf shape (CV ends up empty / overwritten); in-place
-     * CONCAT($g,$g,lit) + JumpIf($g) matches Zend (#34558, Zend/zend_compile.c
-     * ZEND_ASSIGN_CONCAT). Cast_Bool on the concat temp is the same shape on the
-     * long arm of `&&` (bool result phi).
-     */
-    private function binaryResultUsagesAllowAssignOpFusion(\PHPCfg\Operand $binaryOpResult): bool
-    {
-        // Original gate: concat/result temp has a single reader (the following Assign).
-        if (1 === \count($binaryOpResult->usages)) {
-            return true;
-        }
-        // `($g .= 'A') && …`: JumpIf / Cast_Bool also read the concat temp (#34558).
-        $assignCount = 0;
-        foreach ($binaryOpResult->usages as $usage) {
-            if ($usage instanceof \PHPCfg\Op\Expr\Assign) {
-                ++$assignCount;
-                continue;
-            }
-            if ($usage instanceof \PHPCfg\Op\Stmt\JumpIf) {
-                continue;
-            }
-            if ($usage instanceof \PHPCfg\Op\Expr\Cast\Bool_) {
-                continue;
-            }
-
-            return false;
-        }
-
-        return 1 === $assignCount;
-    }
-
-    /**
-     * After in-place fusion, JumpIf / Cast_Bool must read the CV — not the dead concat temp (#34558).
-     */
-    private function retargetCondReadersFromTempToLvalue(Block $block, int $tempSlot, int $lvalueSlot): void
-    {
-        if ($tempSlot === $lvalueSlot) {
-            return;
-        }
-        foreach ($block->opCodes as $op) {
-            if (
-                OpCode::TYPE_JUMPIF === $op->type
-                && null !== $op->arg1
-                && (int) $op->arg1 === $tempSlot
-            ) {
-                $op->arg1 = $lvalueSlot;
-            }
-            if (
-                OpCode::TYPE_CAST_BOOL === $op->type
-                && null !== $op->arg2
-                && (int) $op->arg2 === $tempSlot
-            ) {
-                $op->arg2 = $lvalueSlot;
-            }
-        }
     }
 }
