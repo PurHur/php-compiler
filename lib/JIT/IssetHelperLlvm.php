@@ -175,6 +175,17 @@ final class IssetHelperLlvm
         if (VmIsset::issetOnPropertyRejectsArrayContainer($container, $containerOp, $issetOnProperty)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
+        // Thin-AOT SXE is often TYPE_VALUE — ArrayAccess isset is skipped (#34555).
+        if (!$issetOnProperty) {
+            $sxeIsset = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldDimIsset(
+                $context,
+                $container,
+                $dim
+            );
+            if (null !== $sxeIsset) {
+                return $sxeIsset;
+            }
+        }
         if ($container->type === Variable::TYPE_STRING) {
             return self::compileStringOffsetIsSet($context, $container, $dim);
         }
