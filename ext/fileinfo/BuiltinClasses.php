@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\fileinfo;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context as JitContext;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -182,5 +183,22 @@ final class FinfoSetFlagsMethod extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
+    }
+
+    public function call(JitContext $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'finfo::set_flags() expects exactly 1 argument, %d given',
+                \max(0, $argc - 1)
+            ));
+        }
+        // php-src zim_finfo_set_flags — RETURN_TRUE; thin AOT peer FinfoConstruct / #34688
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(true));
+
+        return $ptr;
     }
 }
