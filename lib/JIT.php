@@ -8982,6 +8982,7 @@ class JIT {
                         }
                         $this->assignOperand($destOp, $srcVar);
                         $destVar = $this->context->getVariableFromOp($destOp);
+                        $destVar->assignRefLvalueAlias = true;
                         if (null !== $srcName) {
                             $this->context->bindVariableByName($srcName, $destVar);
                             $this->context->setVariableOp($srcOp, $destVar);
@@ -18992,6 +18993,8 @@ class JIT {
                     || $boundLv->functionStaticGlobal
                     || null !== $boundLv->objectPropertySlot
                     || null !== $boundLv->valueBoxAliasPtr
+                    || null !== $boundLv->writableHt
+                    || $boundLv->assignRefLvalueAlias
                 ) {
                     $this->context->setVariableOp($resultOp, $boundLv);
                 }
@@ -19085,8 +19088,10 @@ class JIT {
         $result = $this->resolveAssignLvalue($resultOp);
         // Locals that still carry a non-hashtable property alias from a prior read assign
         // must rebind — writing through would mutate the previous object (#34465).
+        // Intentional `$o->p =& $x` aliases keep the slot (#34649).
         if (
             null !== $result->objectPropertySlot
+            && !$result->assignRefLvalueAlias
             && $this->isScalarObjectPropertyAliasType($result->objectPropertyType)
             && !(
                 $force
@@ -27541,6 +27546,7 @@ class JIT {
                 null !== $existing->valueBoxAliasPtr
                 || $existing->borrowedValueEntry
                 || null !== $existing->foreachByRefPackedArm
+                || $existing->assignRefLvalueAlias
             ) {
                 return false;
             }
@@ -27585,6 +27591,10 @@ class JIT {
             null === $bound->valueBoxAliasPtr
             && !$bound->borrowedValueEntry
             && null === $bound->foreachByRefPackedArm
+            && null === $bound->writableHt
+            && null === $bound->objectPropertySlot
+            && null === $bound->staticPropertyGlobal
+            && !$bound->assignRefLvalueAlias
         ) {
             return false;
         }

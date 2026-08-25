@@ -855,11 +855,14 @@ class Context {
             }
             // Closure use() snapshot reads must not rebind enclosing locals to MCJIT rvalues (#72).
             // `$r = &Class::$prop` must rebind onto the static global lvalue (#32036).
+            // `$o->p =& $x` must rebind `$x` onto the FETCH_PROP_W lvalue (#34649).
             if (
                 Variable::KIND_VARIABLE === $existing->kind
                 && Variable::KIND_VALUE === $var->kind
                 && null === $var->valueBoxAliasPtr
                 && null === $var->staticPropertyGlobal
+                && null === $var->objectPropertySlot
+                && null === $var->writableHt
             ) {
                 // FCC / Closure assigns still need invoke metadata on the stable lvalue (#24106, #24166).
                 if (null !== $var->closureCall) {
