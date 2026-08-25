@@ -10,10 +10,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT ABI for GlobIterator construct snapshot (#27422, #32006).
+ * JIT/AOT ABI for GlobIterator construct snapshot (#27422, #32006, #34628).
  *
  * Always NestedJIT {@see \PHPCompiler\ext\spl\GlobIteratorSnapshotJitHelper} via
  * {@see JitVmHelperLink} (peer glob/scandir #29986 — no thin-AOT libc fork).
+ * Helper must call `\glob()` directly — NestedJIT through VmFsGlob returns null (#34628).
  * php-src: ext/spl/spl_directory.c — GlobIterator
  */
 final class GlobIteratorSnapshotRuntime

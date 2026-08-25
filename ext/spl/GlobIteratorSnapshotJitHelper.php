@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\StdlibConstants;
-use PHPCompiler\ext\standard\VmFsGlob;
 
 /**
- * Thin glob snapshot for AOT GlobIterator (#27422).
+ * Thin glob snapshot for AOT GlobIterator (#27422, #34628).
  *
- * Uses {@see VmFsGlob::glob()} (NestedJIT embed + thin standalone AOT via
- * {@see \PHPCompiler\JIT\Builtin\GlobIteratorSnapshotRuntime} + {@see JitVmHelperLink} #32006).
+ * NestedJIT `\glob()` directly (same whitelist leaf as user-script glob — works under
+ * thin AOT). Do not call {@see \PHPCompiler\ext\standard\VmFsGlob::glob} from this
+ * helper — NestedJIT of that indirection returns null and `array_values(null)` TypeErrors
+ * (#34628 / peer DirectoryIteratorSnapshotJitHelper #33263).
  *
  * Return type is `array` (not HashTable): NestedJIT maps class HashTable to object ABI
  * (peer DirectoryIteratorSnapshotJitHelper #27289).
@@ -27,9 +28,14 @@ final class GlobIteratorSnapshotJitHelper
      */
     public static function entriesArgv(string $pattern, int $flags): array
     {
+        // php-src GlobIterator stores FilesystemIterator flags separately from glob()
+        // flags — only GLOB_* bits are passed to php_glob (#24254).
         $globFlags = $flags & StdlibConstants::GLOB_AVAILABLE_FLAGS;
-        $result = VmFsGlob::glob($pattern, $globFlags);
-        $paths = false === $result ? [] : array_values($result);
+        // Call glob() directly so NestedJIT hits the same whitelist leaf as user-script
+        // glob() (which works under thin AOT). VmFsGlob::glob nested from this helper
+        // returns null (#34628 / peer DI #33263).
+        $result = \glob($pattern, $globFlags);
+        $paths = !\is_array($result) ? [] : array_values($result);
         if (0 !== ($flags & self::FLAG_SKIP_DOTS)) {
             $paths = array_values(array_filter(
                 $paths,
