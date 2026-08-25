@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: runtime unserialize(serialize(DateTime*)) must restore Zend date wire (#34594).
+ * AOT: `$s=serialize($dt); unserialize($s)` must restore Zend date wire (#34594).
  *
  * @see php-src ext/date/php_date.c — php_date_unserialize
  *
@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class Issue34594DateTimeRuntimeUnserializeAotTest extends TestCase
 {
-    public function testAotMatchesZendRuntimeString(): void
+    public function testAotMatchesZendAssignedSerializeStamp(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
@@ -24,16 +24,13 @@ final class Issue34594DateTimeRuntimeUnserializeAotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/issue_34594_datetime_runtime_unserialize_aot.php');
     }
 
-    public function testHelpersWired(): void
+    public function testFoldSeesAssignedSerializeStamp(): void
     {
         $root = dirname(__DIR__, 2);
-        $unser = (string) file_get_contents($root.'/lib/JIT/Builtin/StringUnserialize.php');
-        $this->assertStringContainsString('DateTimeUnserializeJitHelper::compileUnserializeRestore', $unser);
-        $fold = (string) file_get_contents($root.'/ext/standard/unserialize.php');
-        $this->assertStringContainsString('#34594', $fold);
-        $this->assertStringContainsString('compileTimeString', $fold);
-        $this->assertFileExists($root.'/ext/standard/UnserializeDateTimeCivilNestedJitHelper.php');
-        $this->assertFileExists($root.'/lib/VM/DateTimeUnserializeJitHelper.php');
+        $unser = (string) file_get_contents($root.'/ext/standard/unserialize.php');
+        $this->assertStringContainsString('#34594', $unser);
+        $this->assertStringContainsString('compileTimeString', $unser);
+        $this->assertStringContainsString('tryMaterializeDateTimeWire', $unser);
     }
 
     private function assertAotMatchesZend(string $src): void
@@ -66,7 +63,7 @@ final class Issue34594DateTimeRuntimeUnserializeAotTest extends TestCase
             $this->assertSame(0, $compRc, implode("\n", $compOut));
             $this->assertFileExists($bin);
             $out = [];
-            for ($i = 0; $i < 3; ++$i) {
+            for ($i = 0; $i < 5; ++$i) {
                 $runOut = [];
                 $runRc = 0;
                 exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
