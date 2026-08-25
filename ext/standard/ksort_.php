@@ -86,7 +86,12 @@ final class ksort_ extends Internal
             StdlibConstants::SORT_REGULAR === $sortType
             || StdlibConstants::SORT_STRING === $sortType
         ) {
-            KeySortRuntime::ksortByKey($context, $array);
+            // SORT_FLAG_CASE: length-aware strcasecmp on keys (#34707).
+            if (0 !== ($flags & StdlibConstants::SORT_FLAG_CASE)) {
+                KeySortRuntime::ksortByKeyCase($context, $array);
+            } else {
+                KeySortRuntime::ksortByKey($context, $array);
+            }
 
             return;
         }
