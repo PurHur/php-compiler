@@ -30,11 +30,11 @@ final class ContextMinimalStandaloneLazySuperglobalNameRuntimeShrinkTest extends
             'ensureMinimalUserStandaloneBodies must not eagerly SuperglobalNameRuntime (#34812)'
         );
 
-        // CLI argv still NestedJIT before {main} $argc/$argv lowering.
-        $this->assertStringContainsString(
+        // CliArgv always-on removed (#34822): compileToFile + CliArgvGlobalInit ensureLinked.
+        $this->assertStringNotContainsString(
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             $minimalBody,
-            'keep CliArgvRuntime in minimal (#34812)'
+            'ensureMinimalUserStandaloneBodies must not eagerly CliArgvRuntime (#34822)'
         );
     }
 

@@ -32,9 +32,22 @@ final class CliArgvRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CliArgvRuntime.php');
         $this->assertStringContainsString('ensureStandaloneBodies', $source);
         $this->assertStringContainsString('self::implement($context)', $source);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
+        $this->assertStringContainsString('#34822', $source);
         $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringContainsString('CliArgvRuntime::ensureStandaloneBodies', $ctx);
         $this->assertStringNotContainsString('CliArgvRuntime::ensureUserScriptMainStubs', $ctx);
+        // ensureMinimal must not eagerly link (#34822); compileToFile / full still do.
+        $minimalPos = strpos($ctx, 'private function ensureMinimalUserStandaloneBodies');
+        $this->assertNotFalse($minimalPos);
+        $minimalEnd = strpos($ctx, 'private function ensureBootstrapAotStandaloneBodies', $minimalPos);
+        $this->assertNotFalse($minimalEnd);
+        $minimalBody = substr($ctx, $minimalPos, $minimalEnd - $minimalPos);
+        $this->assertStringNotContainsString(
+            'CliArgvRuntime::ensureStandaloneBodies($this)',
+            $minimalBody,
+            'ensureMinimal must not eagerly CliArgvRuntime (#34822)'
+        );
         $init = (string) file_get_contents(__DIR__.'/../../lib/JIT/CliArgvGlobalInit.php');
         $this->assertStringContainsString('CliArgvRuntime::ensureLinked', $init);
     }

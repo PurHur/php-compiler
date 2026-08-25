@@ -2356,9 +2356,13 @@ class Context {
         // not the LLVM ABI. Thin hello-world must not NestedJIT SuperglobalNameJitHelper during
         // init. Leftover Context NestedJIT vs Runtime ABI drift mints is_superglobal_name.1
         // (#31894 / #32122). Full standalone still ensureLinked below.
-        // CLI argv: NestedJIT CliArgvJitHelper during thin init (peer IncludePath #20877 / #20904)
-        // — must precede {main} $argc/$argv lowering (compileToFile stubs are too late).
-        Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
+        // CliArgv always-on removed (#34822): compileToFile thin path + CliArgvGlobalInit /
+        // JitGetopt already ensureLinked / ensureStandaloneBodies before lookup (peer #34812 /
+        // #34463). Thin hello-world must not link CLI argv ABI during ensureMinimal init —
+        // main() still gets __phpc_cli_store_argv from compileToFile. Mid-{main} $argc/$argv
+        // restores insert block after ABI emit (#27317). Leftover Context NestedJIT vs Runtime
+        // ABI drift mints cli_*.1 (#31894 / #32122). Full standalone still ensureStandaloneBodies
+        // below; bootstrap-aot still ensureStandaloneBodies in ensureBootstrapAotStandaloneBodies.
         // DomStandaloneAotInit / DomInstanceMethod always-on removed (#34605):
         // VmActiveContextInitLlvm::emitPendingBeforeSeal ensureLinked DomStandaloneAotInit when
         // thin init is requested; DomInstanceMethodRuntime::invoke ensureBridge per arity
