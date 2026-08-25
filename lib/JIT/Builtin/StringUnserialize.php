@@ -34,6 +34,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * SPL ArrayObject family: bag restore into `__spl_ht` (#33636) — not firstIntProp→slot0.
  * SplFixedArray: integer-keyed elements into `__spl_ht` (#33640) — same slot-0 trap.
  * SplObjectStorage: object-key pairs (#33876); SplDoublyLinkedList/Queue/Stack bag (#33966).
+ * DateTime, DateTimeImmutable, DateTimeZone, DateInterval: Zend date wire via NestedJIT
+ * (#34599 / peer #34594).
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -347,6 +349,20 @@ final class StringUnserialize
             ) {
                 // flags+dllist bag into `__spl_ht` — not firstIntProp→slot0 (#33966).
                 \PHPCompiler\VM\SplDllistJitHelper::compileUnserializeRestore(
+                    $context,
+                    $objVal,
+                    $payloadString
+                );
+            } elseif ('datetime' === $classLc || 'datetimeimmutable' === $classLc) {
+                // Zend date/timezone wire into __dt_* — not firstIntProp→slot0 (#34599 / #34594).
+                \PHPCompiler\VM\DateUnserializeJitHelper::compileDateTimeLikeRestore(
+                    $context,
+                    $objVal,
+                    $payloadString,
+                    $className
+                );
+            } elseif ('datetimezone' === $classLc) {
+                \PHPCompiler\VM\DateUnserializeJitHelper::compileDateTimeZoneRestore(
                     $context,
                     $objVal,
                     $payloadString
