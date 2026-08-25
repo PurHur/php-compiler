@@ -318,10 +318,11 @@ final class JitJsonEncode
     }
 
     /**
-     * Public props via get_object_vars + FORCE_OBJECT so empty objects encode as {} (#28638).
+     * Public props via get_object_vars + CONTAINER_AS_OBJECT so empty objects encode as {} (#28638).
      * ArrayObject/ArrayIterator store in `__spl_ht` — get_object_vars is empty under thin AOT (#33619).
-     * SplFixedArray::jsonSerialize → toArray(); encode `__spl_ht` without FORCE_OBJECT (#33723).
+     * SplFixedArray::jsonSerialize → toArray(); encode `__spl_ht` without container overlay (#33723).
      * DateTime* Zend wire folded in {@see tryFoldDateTimeFamily} (#33752).
+     * Overlay is not user JSON_FORCE_OBJECT — that must still reach nested arrays (#34559 / #34522).
      * php-src: ext/json/json_encoder.c — php_json_encode_object / zend_get_properties_for
      * php-src: ext/spl/spl_array.c — spl_array_get_properties returns the array HT
      * php-src: ext/spl/spl_fixedarray.c — zim_SplFixedArray_jsonSerialize
@@ -336,8 +337,11 @@ final class JitJsonEncode
             return $dateFold;
         }
 
-        $force = $context->getTypeFromString('int64')->constInt(VmJsonFlags::FORCE_OBJECT, false);
-        $flagsObj = $context->builder->or($flags, $force);
+        $overlay = $context->getTypeFromString('int64')->constInt(
+            VmJsonFlags::CONTAINER_AS_OBJECT,
+            false
+        );
+        $flagsObj = $context->builder->or($flags, $overlay);
         $splEncoded = self::tryEncodeSplArrayObjectStorage($context, $arg, $flags, $flagsObj);
         if (null !== $splEncoded) {
             return $splEncoded;
@@ -348,7 +352,7 @@ final class JitJsonEncode
             $context->lookupFunction('__value__readHashtable'),
             $boxed
         );
-        // Skip unconditional overlay — see encode() (#31101). FORCE_OBJECT still applied.
+        // Skip unconditional overlay — see encode() (#31101). CONTAINER_AS_OBJECT still applied.
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
@@ -360,7 +364,7 @@ final class JitJsonEncode
     /**
      * Encode SPL storage via `__spl_ht` (#33619 / #33723).
      *
-     * ArrayObject family: FORCE_OBJECT (php-src spl_array_get_properties → object wire).
+     * ArrayObject family: CONTAINER_AS_OBJECT (php-src spl_array_get_properties → object wire).
      * SplFixedArray: original flags only (JsonSerializable toArray → JSON array, not {}).
      * Null pads leave numElements < nextFreeElement (#27285); sync before encode so
      * isPackedList is true (jsonSerialize includes null holes as list elements).

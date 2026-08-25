@@ -55,12 +55,18 @@ final class JsonEncodeArrayLlvm
             $ht
         );
         $packedNative = (new Call\HashTableIsPackedList())->call($context, $packedVar);
-        // JSON_FORCE_OBJECT=16 — packed lists encode as objects (php-src; ArrayObject #33619).
+        // User JSON_FORCE_OBJECT=16 or internal CONTAINER_AS_OBJECT — packed lists encode as objects
+        // (php-src; ArrayObject #33619 / object props #28638). Overlay must not clear user FORCE_OBJECT
+        // on children (#34559); only CONTAINER_AS_OBJECT is stripped below (#34522).
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
+        $forceMask = $i64->constInt(
+            VmJsonFlags::FORCE_OBJECT | VmJsonFlags::CONTAINER_AS_OBJECT,
+            false
+        );
         $forceObject = $context->builder->icmp(
             Builder::INT_NE,
-            $context->builder->and($flags, $i64->constInt(16, false)),
+            $context->builder->and($flags, $forceMask),
             $i64->constInt(0, false)
         );
         $packed = $context->builder->and(
@@ -160,10 +166,11 @@ final class JsonEncodeArrayLlvm
         $quotedKeyPhi->addIncoming($quotedKey, $keyDoneStr);
         $quotedKeyPhi->addIncoming($quotedKeyLong, $keyDoneLong);
 
-        // FORCE_OBJECT shapes only this HT container; child arrays stay arrays (#34522).
+        // Strip only CONTAINER_AS_OBJECT so object-prop / ArrayObject wire does not leak into
+        // children (#34522). Keep caller JSON_FORCE_OBJECT for nested arrays (#34559).
         $childFlags = $context->builder->and(
             $flags,
-            $i64->constInt(-1 & ~VmJsonFlags::FORCE_OBJECT, false)
+            $i64->constInt(~VmJsonFlags::CONTAINER_AS_OBJECT, false)
         );
         $valJson = JitJsonEncode::encodeBoxedValue($context, $valPtr, $childFlags);
         $childNull = $context->builder->icmp(Builder::INT_EQ, $valJson, $nullStr);
