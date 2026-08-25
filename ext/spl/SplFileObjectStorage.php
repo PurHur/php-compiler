@@ -432,18 +432,19 @@ final class SplFileObjectStorage
             if (false === $line) {
                 $line = '';
             }
+            // php-src is_line_empty + SKIP_EMPTY — decide on the pre-rtrim buffer (#34786).
+            // csv=true path does not DROP_NEW_LINE on the buffer (spl_filesystem_file_read_ex).
+            if (self::shouldSkipEmptyCsvLine($state['flags'], $line)) {
+                continue;
+            }
             // php_fgetcsv_lookup_trailing_spaces — strip line terminators before field parse.
             $line = \rtrim($line, "\r\n");
-            // csv=true path does not DROP_NEW_LINE on the buffer before parse (php-src).
             $row = VmCsv::parseLine(
                 $line,
                 $state['separator'],
                 $state['enclosure'],
                 $state['escape']
             );
-            if (self::shouldSkipEmptyCsvRow($state['flags'], $row)) {
-                continue;
-            }
             $state['currentCsv'] = $row;
             $state['currentLine'] = null;
             $state['lineNum'] += $lineAdd;
@@ -452,14 +453,27 @@ final class SplFileObjectStorage
         } while (true);
     }
 
-    /** @param list<string|null> $row */
-    private static function shouldSkipEmptyCsvRow(int $flags, array $row): bool
+    /**
+     * php-src is_line_empty() for CSV + SKIP_EMPTY (#34786).
+     *
+     * Skip only when current_line_len == 0 (fgets-null → ""), or DROP_NEW_LINE is set and
+     * the buffer is a lone "\n" / "\r\n". Without DROP_NEW_LINE a mid-file "\n" is not empty
+     * and must become [null] after fgetcsv — do not skip solely because the parsed row is [null].
+     */
+    private static function shouldSkipEmptyCsvLine(int $flags, string $rawLine): bool
     {
         if (0 === ($flags & SplFileObjectBuiltin::SKIP_EMPTY)) {
             return false;
         }
-        // php-src: empty CSV line is a single null field — skip when SKIP_EMPTY.
-        return 1 === \count($row) && null === $row[0];
+        $len = \strlen($rawLine);
+        if (0 === $len) {
+            return true;
+        }
+        if (0 === ($flags & SplFileObjectBuiltin::DROP_NEW_LINE)) {
+            return false;
+        }
+
+        return "\n" === $rawLine || "\r\n" === $rawLine;
     }
 
     private static function applyDropNewLine(string $line, int $flags): string
