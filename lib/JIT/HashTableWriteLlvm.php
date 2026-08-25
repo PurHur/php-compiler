@@ -747,6 +747,31 @@ final class HashTableWriteLlvm
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($afterLong);
+        // Bool before float: JIT NATIVE_BOOL (2) == VM TYPE_FLOAT (2) (#34667).
+        $boolUnsetBlock = $fn->appendBasicBlock('ht_unset_vk_bool');
+        $afterBoolUnset = $fn->appendBasicBlock('ht_unset_vk_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+            ),
+            $boolUnsetBlock,
+            $afterBoolUnset
+        );
+        $context->builder->positionAtEnd($boolUnsetBlock);
+        $boolLong = \PHPCompiler\ext\standard\JitZendScalarCast::readBoolByteFromValueBox(
+            $context,
+            $valPtr,
+            $context->getTypeFromString('int64')
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__unsetLongAt'),
+            $ht,
+            $context->builder->truncOrBitCast($boolLong, $context->getTypeFromString('size_t'))
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($afterBoolUnset);
         $floatBlock = $fn->appendBasicBlock('ht_unset_vk_float');
         $afterFloat = $fn->appendBasicBlock('ht_unset_vk_after_float');
         $isNativeDouble = $context->builder->icmp(
@@ -754,16 +779,7 @@ final class HashTableWriteLlvm
             $typeByte,
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
-        $isVmFloat = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
-        );
-        $context->builder->branchIf(
-            $context->builder->or($isNativeDouble, $isVmFloat),
-            $floatBlock,
-            $afterFloat
-        );
+        $context->builder->branchIf($isNativeDouble, $floatBlock, $afterFloat);
         $context->builder->positionAtEnd($floatBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
         $truncatedLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(

@@ -116,9 +116,30 @@ final class JitLongArg {
         $stringEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
-        // Boxed float/double: zend_dval_to_lval + E_DEPRECATED (#23533, #27926).
-        // Do not use silent __value__readLong — that skips INF/NAN and fractional warnings.
+        // Bool before float: JIT TYPE_NATIVE_BOOL (2) collides with VM TYPE_FLOAT (2).
+        // Matching VM float first made boxed true → readDouble → 0 → index 0 (#34667).
         $context->builder->positionAtEnd($afterString);
+        $boolBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_bool');
+        $afterBool = BasicBlockHelper::append($context, 'jit_long_arg_vbox_after_bool');
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolLong = \PHPCompiler\ext\standard\JitZendScalarCast::readBoolByteFromValueBox(
+            $context,
+            $valuePtr,
+            $i64
+        );
+        $boolEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        // Boxed float/double: zend_dval_to_lval + E_DEPRECATED (#23533, #27926).
+        // Only TYPE_NATIVE_DOUBLE (3) — do not OR VM TYPE_FLOAT (2); that steals bools.
+        $context->builder->positionAtEnd($afterBool);
         $doubleBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_double');
         $numericBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_numeric');
         $isNativeDouble = $context->builder->icmp(
@@ -126,14 +147,7 @@ final class JitLongArg {
             $typeByte,
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
-        // Value-box writers may tag floats as VM TYPE_FLOAT (2) rather than NATIVE_DOUBLE (3).
-        $isVmFloat = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
-        );
-        $isFloat = $context->builder->or($isNativeDouble, $isVmFloat);
-        $context->builder->branchIf($isFloat, $doubleBlock, $numericBlock);
+        $context->builder->branchIf($isNativeDouble, $doubleBlock, $numericBlock);
 
         $context->builder->positionAtEnd($doubleBlock);
         $doubleVal = $context->builder->call(
@@ -159,6 +173,7 @@ final class JitLongArg {
         $phi = $context->builder->phi($i64, 'jit_long_arg_vbox_phi');
         $phi->addIncoming($nullLong, $nullEnd);
         $phi->addIncoming($stringLong, $stringEnd);
+        $phi->addIncoming($boolLong, $boolEnd);
         $phi->addIncoming($doubleLong, $doubleEnd);
         $phi->addIncoming($numericLong, $numericEnd);
 

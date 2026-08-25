@@ -269,21 +269,13 @@ final class HashTableReadLlvm
         $context->builder->positionAtEnd($afterBool);
         $floatBlock = $fn->appendBasicBlock('ht_isset_vk_float');
         $afterFloat = $fn->appendBasicBlock('ht_isset_vk_after_float');
+        // Only NATIVE_DOUBLE (3): VM TYPE_FLOAT (2) collides with JIT NATIVE_BOOL (#34667).
         $isNativeDouble = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
-        $isVmFloat = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
-        );
-        $context->builder->branchIf(
-            $context->builder->or($isNativeDouble, $isVmFloat),
-            $floatBlock,
-            $afterFloat
-        );
+        $context->builder->branchIf($isNativeDouble, $floatBlock, $afterFloat);
         $context->builder->positionAtEnd($floatBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
         // floatToLongWithPrecisionWarning branches into intdiv_float_prec_after — PHI
@@ -448,21 +440,13 @@ final class HashTableReadLlvm
         $context->builder->positionAtEnd($afterBoolKey);
         $floatKeyBlock = $fn->appendBasicBlock('ht_read_vk_float');
         $afterFloatKey = $fn->appendBasicBlock('ht_read_vk_after_float');
+        // Only NATIVE_DOUBLE (3): VM TYPE_FLOAT (2) collides with JIT NATIVE_BOOL (#34667).
         $isNativeDouble = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
-        $isVmFloat = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
-        );
-        $context->builder->branchIf(
-            $context->builder->or($isNativeDouble, $isVmFloat),
-            $floatKeyBlock,
-            $afterFloatKey
-        );
+        $context->builder->branchIf($isNativeDouble, $floatKeyBlock, $afterFloatKey);
         $context->builder->positionAtEnd($floatKeyBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
         // Dim read: float→int E_DEPRECATED for finite fractional + INF/NAN (#27926, #27948).
