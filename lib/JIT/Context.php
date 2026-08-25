@@ -3401,6 +3401,13 @@ class Context {
         $this->positionBuilderAtInitEmission();
         try {
             $emit($this);
+            // propertyStore TYPE_VALUE may leave insert in prop_store_box_ready (#34649);
+            // keep initLinearBlock on the open tail so the next emitInInit does not see a
+            // sealed "main" (#34662).
+            $insert = BasicBlockHelper::tryGetInsertBlock($this);
+            if (null !== $insert && null === $insert->getTerminator()) {
+                $this->initLinearBlock = $insert;
+            }
         } finally {
             if ($this->initLinearEmissionDepth > 0) {
                 --$this->initLinearEmissionDepth;

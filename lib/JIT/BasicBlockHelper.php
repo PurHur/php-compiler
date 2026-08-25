@@ -58,6 +58,12 @@ final class BasicBlockHelper
                 $insertParent = $parent;
             }
         }
+        // emitInInit positions the builder in __init__ while loweringLlvmFunction still
+        // names the app main. Prefer the insert parent so prop_store_box_* (and peers)
+        // append to __init__, not cross-function branches (#34662 / #34649).
+        if ($context->emitsInitLinearIR() && $insertParent instanceof Function_) {
+            return $insertParent;
+        }
         // Prefer in-flight lowering owner when insert is parked elsewhere (#31101).
         // Helpers that emit their own LLVM fn must set loweringLlvmFunction to that fn
         // (see HashTableReplaceRecursiveLlvm) so this does not steal their appends.

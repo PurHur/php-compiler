@@ -8747,6 +8747,11 @@ class Object_ extends Type {
         $this->context->builder->branch($doneBlock);
 
         $this->context->builder->positionAtEnd($doneBlock);
+        // #34649 box split seals the prior BB. emitInInit (backed enum case singletons)
+        // still names that BB as initLinearBlock → "already sealed" on the next emit (#34662).
+        if ($this->context->emitsInitLinearIR()) {
+            $this->context->advanceInitLinearTail($doneBlock);
+        }
         $heapPtr = $this->context->builder->phi($valuePtrTy, 'prop_store_box_phi');
         $heapPtr->addIncoming($heapPtrAlloc, $allocBlock);
         $heapPtr->addIncoming($loadedValuePtr, $entryBlock);
