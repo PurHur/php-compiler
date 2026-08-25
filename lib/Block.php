@@ -388,8 +388,8 @@ class Block {
                 return $operand;
             }
             // ?: arm FuncCall name literals can collide with the recorded ternary phi
-            // slot index (#34814). Prefer the Temporary phi over a Literal at the same
-            // slot so ASSIGN writes the call result into the merge ECHO operand.
+            // slot index (#34814 / #34818). Prefer the Temporary phi over a Literal at
+            // the same slot so ASSIGN writes the call result into the merge ECHO operand.
             if ($operand instanceof Temporary) {
                 return $operand;
             }
@@ -883,6 +883,7 @@ class Block {
                 return;
             }
         }
+        $this->displaceLiteralsAtSlotForPhi($slot);
         if (!$this->scope->contains($root)) {
             $this->scope[$root] = $slot;
         }
@@ -898,8 +899,54 @@ class Block {
                 return;
             }
         }
+        // FUNCCALL name Literals often occupy low slots before the ?: arm ASSIGN binds the
+        // merge phi Temporary to the same index (#34818). Move those Literals (and rewrite
+        // already-emitted opcodes) so the phi owns the merge slot alone.
+        if ($operand instanceof Operand\Temporary) {
+            $this->displaceLiteralsAtSlotForPhi($slot);
+        }
         if (!$this->scope->contains($operand)) {
             $this->scope[$operand] = $slot;
+        }
+    }
+
+    /**
+     * Move compile-time Literals off a ?: merge phi slot and retarget opcodes (#34818).
+     */
+    private function displaceLiteralsAtSlotForPhi(int $slot): void
+    {
+        $toMove = [];
+        foreach ($this->scope as $scopedOp) {
+            if ($this->scope[$scopedOp] !== $slot) {
+                continue;
+            }
+            if ($scopedOp instanceof Operand\Literal) {
+                $toMove[] = $scopedOp;
+            }
+        }
+        if ([] === $toMove) {
+            return;
+        }
+        $const = $this->constants[$slot] ?? null;
+        unset($this->constants[$slot]);
+        foreach ($toMove as $lit) {
+            $fresh = $this->forceFreshVarSlot($lit);
+            if (null !== $const) {
+                $this->constants[$fresh] = $const;
+                $const = null;
+            }
+            for ($i = 0; $i < $this->nOpCodes; ++$i) {
+                $op = $this->opCodes[$i];
+                if (null !== $op->arg1 && (int) $op->arg1 === $slot) {
+                    $op->arg1 = $fresh;
+                }
+                if (null !== $op->arg2 && (int) $op->arg2 === $slot) {
+                    $op->arg2 = $fresh;
+                }
+                if (null !== $op->arg3 && (int) $op->arg3 === $slot) {
+                    $op->arg3 = $fresh;
+                }
+            }
         }
     }
 

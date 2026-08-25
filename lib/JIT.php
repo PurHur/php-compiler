@@ -20823,6 +20823,32 @@ class JIT {
             }
 
             return;
+        } elseif (
+            Variable::TYPE_STRING === $result->type
+            && (
+                Variable::TYPE_NATIVE_LONG === $value->type
+                || Variable::TYPE_NATIVE_DOUBLE === $value->type
+            )
+        ) {
+            // ?: echo phi typed as string from the else literal; true arm is strlen/crc32 (#34818).
+            // Box into __value__ so merge/ECHO can hold int|string (peer bool→string #816).
+            $slot = JIT\JitValueBox::alloc($this->context);
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
+                JIT\JitValueBox::pointer($this->context, $slot),
+                $value
+            );
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $result->addref();
+            $this->context->setVariableOp($resultOp, $result);
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $result);
+            }
+
+            return;
         } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_STRING === $value->type) {
             $slot = JIT\JitValueBox::alloc($this->context);
             $str = JIT\JitStringArg::stringPtrFromVariable($this->context, $value);
