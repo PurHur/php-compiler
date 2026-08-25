@@ -62,6 +62,8 @@ final class JitPrintf
         // Format via JitSprintf::format (keeps compile-time format on $args[0] — formatWithFmt
         // dropped it and routed through a broken echo path; #24258). Echo once here, matching
         // implementPrintfBridge (inline buffer GEP + size_t length).
+        // ObOutput is lazy after #34695 — must link before __phpc_ob_echo_substr (#34747).
+        \PHPCompiler\JIT\Builtin\ObOutputRuntime::ensureLinked($context);
         \PHPCompiler\JIT\Builtin\StringFormat::ensureRuntimeHelpersPublic($context);
         $formatted = JitSprintf::format($context, ...$args);
 
