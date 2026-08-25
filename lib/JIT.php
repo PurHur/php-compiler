@@ -12452,7 +12452,12 @@ class JIT {
                 case OpCode::TYPE_FUNCDEF:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
+                    // compileBlock() sets activeFunction for the nested Func; restore the
+                    // enclosing frame so call-site DnfParamCheck in {main} aborts (#29859),
+                    // not pend+return like a callee-body throw (#33971 / #33972 regression).
+                    $savedActiveFunction = $this->context->activeFunction;
                     $this->compileBlock($op->block1, $nameOp->value);
+                    $this->context->activeFunction = $savedActiveFunction;
                     break;
                 case OpCode::TYPE_CLOSURE:
                     if ($this->shouldStubClosureLowering() || null === $op->block1) {
