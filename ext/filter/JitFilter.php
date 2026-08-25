@@ -1827,10 +1827,20 @@ final class JitFilter
         return $phi;
     }
 
-    /** Sanitizing filters via FilterSanitizeJitHelper SSOT (#11419). */
+    /**
+     * Sanitizing filters via FilterSanitizeJitHelper SSOT (#11419).
+     *
+     * Const subject+filter(+flags) fold through {@see VmFilter::sanitizeStringForJit} —
+     * NestedJIT string returns from FilterSanitizeJitHelper SIGSEGV under thin AOT (#34572 /
+     * peer #27068 FILTER_VALIDATE_EMAIL).
+     */
     public static function sanitize(Context $context, JITVariable $value, Value $filterVal, ?Value $flagsVal = null): Value
     {
         self::emitFilterSanitizeStringDeprecationIfNeeded($context, $filterVal);
+        $folded = self::tryFoldConstSanitize($context, $value, $filterVal, $flagsVal);
+        if (null !== $folded) {
+            return $folded;
+        }
         StringFilterSanitize::ensureLinked($context);
         $i64 = $context->getTypeFromString('int64');
         $flags = $flagsVal ?? $i64->constInt(0, false);
@@ -1864,6 +1874,80 @@ final class JitFilter
         );
 
         return $ptr;
+    }
+
+    /**
+     * Compile-time sanitize when filter id, flags, and subject are foldable (#34572).
+     */
+    private static function tryFoldConstSanitize(
+        Context $context,
+        JITVariable $value,
+        Value $filterVal,
+        ?Value $flagsVal
+    ): ?Value {
+        $filterId = self::compileTimeFilterIdInt($context, $filterVal);
+        if (null === $filterId || !VmFilter::isSanitizeFilter($filterId)) {
+            return null;
+        }
+        $flagsInt = self::compileTimeFlagsInt($context, $flagsVal);
+        if (null === $flagsInt) {
+            return null;
+        }
+        $subject = self::compileTimeSanitizeSubject($value);
+        if (null === $subject) {
+            return null;
+        }
+        $out = VmFilter::sanitizeStringForJit($filterId, $subject, $flagsInt);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $context->builder->load($context->constantStringFromString($out))
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+
+        return $ptr;
+    }
+
+    /** @return int|null compile-time FILTER_* id when $filterVal is a const int */
+    private static function compileTimeFilterIdInt(Context $context, Value $filterVal): ?int
+    {
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($filterVal->value)) {
+            return null;
+        }
+
+        return (int) $lib->LLVMConstIntGetZExtValue($filterVal->value);
+    }
+
+    /**
+     * Scalar subject for const sanitize fold (php-src coerce to string; #34572).
+     *
+     * @return string|null null when not foldable at compile time
+     */
+    private static function compileTimeSanitizeSubject(JITVariable $value): ?string
+    {
+        if (JITVariable::TYPE_NULL === $value->type) {
+            return '';
+        }
+        $lit = $value->compileTimeString ?? \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($value);
+        if (null !== $lit) {
+            return $lit;
+        }
+        if (null !== $value->compileTimeLong
+            && (JITVariable::TYPE_NATIVE_LONG === $value->type || JITVariable::TYPE_VALUE === $value->type)) {
+            return (string) $value->compileTimeLong;
+        }
+        if (null !== $value->compileTimeFloat
+            && (JITVariable::TYPE_NATIVE_DOUBLE === $value->type || JITVariable::TYPE_VALUE === $value->type)) {
+            return (string) $value->compileTimeFloat;
+        }
+
+        return null;
     }
 
     private static function jitScalarToString(Context $context, JITVariable $value): ?Value
