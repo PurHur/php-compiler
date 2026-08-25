@@ -20,6 +20,41 @@ final class HashTableReadLlvm
         return ++self::$seq;
     }
 
+    /** Zend convert_to_long(bool): true→1, false→0 (#34667). */
+    private static function nativeBoolDimToSizeT(Context $context, Variable $dim): Value
+    {
+        $boolVal = $context->helper->loadValue($dim);
+        $zext = $context->builder->zExt(
+            $boolVal,
+            $context->getTypeFromString('int64')
+        );
+
+        return $context->builder->truncOrBitCast(
+            $zext,
+            $context->getTypeFromString('size_t')
+        );
+    }
+
+    /** Boxed bool key → size_t index; do not __value__readLong on bool tag (#34667 / #8555). */
+    private static function boxedBoolKeyToSizeT(Context $context, Value $valPtr): Value
+    {
+        $boolByte = JitValueBox::readBoolByte($context, $valPtr);
+        $truthy = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolByte,
+            $context->getTypeFromString('int8')->constInt(0, false)
+        );
+        $zext = $context->builder->zExt(
+            $truthy,
+            $context->getTypeFromString('int64')
+        );
+
+        return $context->builder->truncOrBitCast(
+            $zext,
+            $context->getTypeFromString('size_t')
+        );
+    }
+
     public static function readIndexedToValueBox(Context $context, Value $ht, Value $index): Variable
     {
         $tag = 'rb'.(string) self::nextSeq();
@@ -242,6 +277,26 @@ final class HashTableReadLlvm
         );
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($afterLong);
+        $boolBlock = $fn->appendBasicBlock('ht_isset_vk_bool');
+        $afterBool = $fn->appendBasicBlock('ht_isset_vk_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+            ),
+            $boolBlock,
+            $afterBool
+        );
+        $context->builder->positionAtEnd($boolBlock);
+        $boolIndex = self::boxedBoolKeyToSizeT($context, $valPtr);
+        $boolResult = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $boolIndex
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterBool);
         $floatBlock = $fn->appendBasicBlock('ht_isset_vk_float');
         $afterFloat = $fn->appendBasicBlock('ht_isset_vk_after_float');
         $isNativeDouble = $context->builder->icmp(
@@ -316,6 +371,7 @@ final class HashTableReadLlvm
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($strResult, $stringBlock);
         $phi->addIncoming($longResult, $longBlock);
+        $phi->addIncoming($boolResult, $boolBlock);
         $phi->addIncoming($floatResult, $floatPred);
         $phi->addIncoming($objResResult, $objResPred);
         $phi->addIncoming($objIllegalResult, $objIllegal);
@@ -395,6 +451,27 @@ final class HashTableReadLlvm
         );
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($afterLong);
+        $boolKeyBlock = $fn->appendBasicBlock('ht_read_vk_bool');
+        $afterBoolKey = $fn->appendBasicBlock('ht_read_vk_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+            ),
+            $boolKeyBlock,
+            $afterBoolKey
+        );
+        $context->builder->positionAtEnd($boolKeyBlock);
+        $boolIndex = self::boxedBoolKeyToSizeT($context, $valPtr);
+        $boolBox = self::readIndexedToValueBox($context, $ht, $boolIndex);
+        JitValueBox::copyFromPointer(
+            $context,
+            $destPtr,
+            JitValueBox::pointer($context, $boolBox->value)
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterBoolKey);
         $floatKeyBlock = $fn->appendBasicBlock('ht_read_vk_float');
         $afterFloatKey = $fn->appendBasicBlock('ht_read_vk_after_float');
         $isNativeDouble = $context->builder->icmp(
@@ -556,6 +633,15 @@ final class HashTableReadLlvm
                 $context->helper->loadValue($dim),
                 $context->getTypeFromString('size_t')
             );
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
+            );
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $dim->type) {
+            $index = self::nativeBoolDimToSizeT($context, $dim);
 
             return $context->builder->call(
                 $context->lookupFunction('__hashtable__offsetIsSet'),
@@ -785,6 +871,11 @@ final class HashTableReadLlvm
                 $context->helper->loadValue($dim),
                 $context->getTypeFromString('size_t')
             );
+
+            return self::readIndexedToValueBox($context, $ht, $index);
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $dim->type) {
+            $index = self::nativeBoolDimToSizeT($context, $dim);
 
             return self::readIndexedToValueBox($context, $ht, $index);
         }

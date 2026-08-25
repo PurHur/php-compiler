@@ -913,11 +913,17 @@ final class Variable {
                         }
                         break;
                     case self::TYPE_NATIVE_BOOL:
+                        // Zend convert_to_long(bool): zext i1→long (#34667; was trunc i1*→i1 / i1→i64).
+                        $boolVal = $this->context->helper->loadValue($this);
+
                         return new self(
-                            $this->context, 
+                            $this->context,
                             $type,
                             self::KIND_VALUE,
-                            $this->context->builder->trunc($this->value, $this->context->getTypeFromString('bool'))
+                            $this->context->builder->zExt(
+                                $boolVal,
+                                $this->context->getTypeFromString('long long')
+                            )
                         );
                 }
                 break;
@@ -1436,6 +1442,15 @@ final class Variable {
                 : $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
 
             return $context->builder->truncOrBitCast($truncated, $sizeT);
+        }
+        if (self::TYPE_NATIVE_BOOL === $dim->type) {
+            $boolVal = $context->helper->loadValue($dim);
+            $zext = $context->builder->zExt(
+                $boolVal,
+                $context->getTypeFromString('int64')
+            );
+
+            return $context->builder->truncOrBitCast($zext, $sizeT);
         }
         $indexVal = $context->builder->truncOrBitCast(
             $context->helper->loadValue($dim),
