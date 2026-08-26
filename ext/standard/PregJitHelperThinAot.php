@@ -133,6 +133,28 @@ final class PregJitHelper
         return '' . PregAotFastPath::matchAllPart($index);
     }
 
+    /** Group rows for PREG_PATTERN_ORDER (#34994). */
+    public static function thinMatchAllGroupCount(): int
+    {
+        return PregAotFastPath::matchAllGroupCount();
+    }
+
+    /** One-arg group readers — NestedJIT scrambles (group,match) pairs (#34994). */
+    public static function thinMatchAllG1Part(int $matchIndex): string
+    {
+        return '' . PregAotFastPath::matchAllG1Part($matchIndex);
+    }
+
+    public static function thinMatchAllG2Part(int $matchIndex): string
+    {
+        return '' . PregAotFastPath::matchAllG2Part($matchIndex);
+    }
+
+    public static function thinMatchAllG3Part(int $matchIndex): string
+    {
+        return '' . PregAotFastPath::matchAllG3Part($matchIndex);
+    }
+
     /**
      * Int status for thin AOT find — LLVM builds the string from durable subject/replacement (#27181).
      *

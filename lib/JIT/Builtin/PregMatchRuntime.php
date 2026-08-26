@@ -75,6 +75,14 @@ final class PregMatchRuntime
 
     private const THIN_MATCH_ALL_PART = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchAllPart';
 
+    private const THIN_MATCH_ALL_GROUP_COUNT = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchAllGroupCount';
+
+    private const THIN_MATCH_ALL_G1_PART = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchAllG1Part';
+
+    private const THIN_MATCH_ALL_G2_PART = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchAllG2Part';
+
+    private const THIN_MATCH_ALL_G3_PART = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchAllG3Part';
+
     private const REPLACE_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::replaceArgv';
 
     private const REPLACE_FIND_NEXT = 'PHPCompiler\\ext\\standard\\PregJitHelper::replaceFindNext';
@@ -110,6 +118,10 @@ final class PregMatchRuntime
         self::TAKE_MATCH_ALL_EX_HT,
         self::THIN_MATCH_ALL_PART_COUNT,
         self::THIN_MATCH_ALL_PART,
+        self::THIN_MATCH_ALL_GROUP_COUNT,
+        self::THIN_MATCH_ALL_G1_PART,
+        self::THIN_MATCH_ALL_G2_PART,
+        self::THIN_MATCH_ALL_G3_PART,
         self::REPLACE_HELPER,
         self::REPLACE_FIND_NEXT,
         self::TAKE_LAST_REPLACE_POS,
@@ -460,8 +472,8 @@ final class PregMatchRuntime
     }
 
     /**
-     * Build preg_match_all $matches (PREG_PATTERN_ORDER, no groups) from thinMatchAllPart*.
-     * Shape: `$matches[0] = [m0, m1, …]` when count>0; empty HT when none (#27195).
+     * Build preg_match_all $matches (PREG_PATTERN_ORDER) from thinMatchAll* (#27195 / #34994).
+     * Shape: `$matches[g] = [m0, m1, …]` for each group row (full match is g=0).
      */
     private static function emitThinMatchAllHashtableFromParts(Context $context, LlvmFunction $fn): Value
     {
@@ -476,6 +488,14 @@ final class PregMatchRuntime
             $partCountRaw,
             $partCountRaw->typeOf()
         );
+        $groupCountRaw = $context->builder->call(
+            self::helperFunction($context, self::THIN_MATCH_ALL_GROUP_COUNT)
+        );
+        $groupCount = JitNestedHelperCoerce::scalarToI64(
+            $context,
+            $groupCountRaw,
+            $groupCountRaw->typeOf()
+        );
         $hasParts = $context->builder->icmp(
             Builder::INT_SGT,
             $partCount,
@@ -486,41 +506,64 @@ final class PregMatchRuntime
         $context->builder->branchIf($hasParts, $fillBb, $doneBb);
 
         $context->builder->positionAtEnd($fillBb);
-        $inner = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        // Bound to 4 group rows × 8 matches. Group 0 uses thinMatchAllPart; groups 1–3
+        // use one-arg G*Part helpers — NestedJIT scrambles (group,match) pairs (#34994).
+        $maxGroups = 4;
         $max = 8;
-        for ($i = 0; $i < $max; ++$i) {
-            $idxBb = $fn->appendBasicBlock('preg_match_all_thin_part_'.$i);
-            $skipBb = $fn->appendBasicBlock('preg_match_all_thin_skip_'.$i);
-            $need = $context->builder->icmp(
+        $groupPartHelpers = [
+            0 => self::THIN_MATCH_ALL_PART,
+            1 => self::THIN_MATCH_ALL_G1_PART,
+            2 => self::THIN_MATCH_ALL_G2_PART,
+            3 => self::THIN_MATCH_ALL_G3_PART,
+        ];
+        for ($g = 0; $g < $maxGroups; ++$g) {
+            $grpBb = $fn->appendBasicBlock('preg_match_all_thin_group_'.$g);
+            $grpSkipBb = $fn->appendBasicBlock('preg_match_all_thin_group_skip_'.$g);
+            $needGroup = $context->builder->icmp(
                 Builder::INT_SGT,
-                $partCount,
-                $i64->constInt($i, true)
+                $groupCount,
+                $i64->constInt($g, true)
             );
-            $context->builder->branchIf($need, $idxBb, $skipBb);
+            $context->builder->branchIf($needGroup, $grpBb, $grpSkipBb);
 
-            $context->builder->positionAtEnd($idxBb);
-            $partRaw = $context->builder->call(
-                self::helperFunction($context, self::THIN_MATCH_ALL_PART),
-                $i64->constInt($i, true)
-            );
-            $partStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $partRaw);
-            $slot = new Variable(
+            $context->builder->positionAtEnd($grpBb);
+            $inner = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+            for ($i = 0; $i < $max; ++$i) {
+                $idxBb = $fn->appendBasicBlock('preg_match_all_thin_g'.$g.'_part_'.$i);
+                $skipBb = $fn->appendBasicBlock('preg_match_all_thin_g'.$g.'_skip_'.$i);
+                $need = $context->builder->icmp(
+                    Builder::INT_SGT,
+                    $partCount,
+                    $i64->constInt($i, true)
+                );
+                $context->builder->branchIf($need, $idxBb, $skipBb);
+
+                $context->builder->positionAtEnd($idxBb);
+                $partRaw = $context->builder->call(
+                    self::helperFunction($context, $groupPartHelpers[$g]),
+                    $i64->constInt($i, true)
+                );
+                $partStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $partRaw);
+                $slot = new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $partStr
+                );
+                HashTableHelper::setAtIndex($context, $inner, $sizeT->constInt($i, false), $slot);
+                $context->builder->branch($skipBb);
+                $context->builder->positionAtEnd($skipBb);
+            }
+            $row = new Variable(
                 $context,
-                Variable::TYPE_STRING,
+                Variable::TYPE_HASHTABLE,
                 Variable::KIND_VALUE,
-                $partStr
+                $inner
             );
-            HashTableHelper::setAtIndex($context, $inner, $sizeT->constInt($i, false), $slot);
-            $context->builder->branch($skipBb);
-            $context->builder->positionAtEnd($skipBb);
+            HashTableHelper::setAtIndex($context, $outer, $sizeT->constInt($g, false), $row);
+            $context->builder->branch($grpSkipBb);
+            $context->builder->positionAtEnd($grpSkipBb);
         }
-        $row0 = new Variable(
-            $context,
-            Variable::TYPE_HASHTABLE,
-            Variable::KIND_VALUE,
-            $inner
-        );
-        HashTableHelper::setAtIndex($context, $outer, $sizeT->constInt(0, false), $row0);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);

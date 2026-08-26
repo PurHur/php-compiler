@@ -32,6 +32,7 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('replaceFindNext', $source);
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('thinMatchAllPart', $source);
+        $this->assertStringContainsString('thinMatchAllG1Part', $source);
         $this->assertStringContainsString('emitThinMatchAllHashtableFromParts', $source);
         $this->assertStringContainsString('implementThinSplitBridge', $source);
         $this->assertStringContainsString('emitThinSplitSubjectSlice', $source);

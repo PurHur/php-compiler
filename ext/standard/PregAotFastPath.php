@@ -1725,17 +1725,44 @@ final class PregAotFastPath
 
     private static string $matchAll7 = '';
 
+    private static int $matchAllGroupCount = 1;
+    private static string $matchAllG1_0 = '';
+    private static string $matchAllG1_1 = '';
+    private static string $matchAllG1_2 = '';
+    private static string $matchAllG1_3 = '';
+    private static string $matchAllG1_4 = '';
+    private static string $matchAllG1_5 = '';
+    private static string $matchAllG1_6 = '';
+    private static string $matchAllG1_7 = '';
+    private static string $matchAllG2_0 = '';
+    private static string $matchAllG2_1 = '';
+    private static string $matchAllG2_2 = '';
+    private static string $matchAllG2_3 = '';
+    private static string $matchAllG2_4 = '';
+    private static string $matchAllG2_5 = '';
+    private static string $matchAllG2_6 = '';
+    private static string $matchAllG2_7 = '';
+    private static string $matchAllG3_0 = '';
+    private static string $matchAllG3_1 = '';
+    private static string $matchAllG3_2 = '';
+    private static string $matchAllG3_3 = '';
+    private static string $matchAllG3_4 = '';
+    private static string $matchAllG3_5 = '';
+    private static string $matchAllG3_6 = '';
+    private static string $matchAllG3_7 = '';
+
     /**
-     * NestedJIT-safe preg_match_all — int return + full-match string slots (#27195).
+     * NestedJIT-safe preg_match_all — int return + PREG_PATTERN_ORDER rows (#27195 / #34994).
      *
-     * PREG_PATTERN_ORDER without capture groups only (flags==0). LLVM builds
-     * `$matches[0] = [m0, m1, …]` from {@see self::matchAllPart}.
+     * flags==0 only. Stores group rows in slots; LLVM builds `$matches[g] = [m0, …]`
+     * via {@see self::matchAllGroupMatch} (groups 0..3, matches 0..7).
      *
      * @return int match count, 0 if none, -1 unsupported/error
      */
     public static function matchAllStore(string $pattern, string $subject, int $flags, int $offset): int
     {
         self::$matchAllCount = 0;
+        self::$matchAllGroupCount = 1;
         self::$matchAll0 = '';
         self::$matchAll1 = '';
         self::$matchAll2 = '';
@@ -1744,6 +1771,30 @@ final class PregAotFastPath
         self::$matchAll5 = '';
         self::$matchAll6 = '';
         self::$matchAll7 = '';
+        self::$matchAllG1_0 = '';
+        self::$matchAllG1_1 = '';
+        self::$matchAllG1_2 = '';
+        self::$matchAllG1_3 = '';
+        self::$matchAllG1_4 = '';
+        self::$matchAllG1_5 = '';
+        self::$matchAllG1_6 = '';
+        self::$matchAllG1_7 = '';
+        self::$matchAllG2_0 = '';
+        self::$matchAllG2_1 = '';
+        self::$matchAllG2_2 = '';
+        self::$matchAllG2_3 = '';
+        self::$matchAllG2_4 = '';
+        self::$matchAllG2_5 = '';
+        self::$matchAllG2_6 = '';
+        self::$matchAllG2_7 = '';
+        self::$matchAllG3_0 = '';
+        self::$matchAllG3_1 = '';
+        self::$matchAllG3_2 = '';
+        self::$matchAllG3_3 = '';
+        self::$matchAllG3_4 = '';
+        self::$matchAllG3_5 = '';
+        self::$matchAllG3_6 = '';
+        self::$matchAllG3_7 = '';
         if (0 !== $flags) {
             return -1;
         }
@@ -1752,10 +1803,12 @@ final class PregAotFastPath
             return 0;
         }
         $kind = self::patternKind($pattern);
-        // No-group class-plus (2/4/6), single class (10/12/14), and plain literals (1).
-        // Grouped kinds need nested group rows — defer until thin slots expand.
-        if (1 !== $kind && 2 !== $kind && 4 !== $kind && 6 !== $kind
-            && 10 !== $kind && 12 !== $kind && 14 !== $kind) {
+        // Literals (1), class-plus (2/4/6), single class (10/12/14), grouped (+1) and
+        // exact literal-groups (8). (#34994 expands groups beyond #27195 full-match-only.)
+        if (1 !== $kind && 2 !== $kind && 3 !== $kind && 4 !== $kind && 5 !== $kind
+            && 6 !== $kind && 7 !== $kind && 8 !== $kind
+            && 10 !== $kind && 11 !== $kind && 12 !== $kind && 13 !== $kind
+            && 14 !== $kind && 15 !== $kind) {
             return -1;
         }
         // Reuse NestedJIT-proven matchCount; advance past each hit (#27195).
@@ -1769,6 +1822,7 @@ final class PregAotFastPath
             if (0 === $rc) {
                 break;
             }
+            self::syncCaptureGroupCapsAfterMatch($pattern);
             $full = '' . self::lastCap(0);
             $flen = \strlen($full);
             if ($flen < 1) {
@@ -1789,7 +1843,28 @@ final class PregAotFastPath
             if ($n >= self::MAX_CAPS) {
                 return -1;
             }
-            self::storeMatchAllAt($n, $full);
+            $gc = self::lastCapCount();
+            if ($gc < 1) {
+                $gc = 1;
+            }
+            // Thin slots hold groups 0..3 only.
+            if ($gc > 4) {
+                return -1;
+            }
+            if (0 === $n) {
+                self::$matchAllGroupCount = $gc;
+            }
+            // Unrolled one-arg group stores — NestedJIT scrambles (group,match) pairs (#34994).
+            self::storeMatchAllAt($n, '' . self::lastCap(0));
+            if ($gc > 1) {
+                self::storeMatchAllG1At($n, '' . self::lastCap(1));
+            }
+            if ($gc > 2) {
+                self::storeMatchAllG2At($n, '' . self::lastCap(2));
+            }
+            if ($gc > 3) {
+                self::storeMatchAllG3At($n, '' . self::lastCap(3));
+            }
             ++$n;
             $cursor = $start + $flen;
         }
@@ -1851,6 +1926,163 @@ final class PregAotFastPath
             self::$matchAll6 = $value;
         } elseif (7 === $index) {
             self::$matchAll7 = $value;
+        }
+    }
+
+    public static function matchAllGroupCount(): int
+    {
+        return self::$matchAllGroupCount;
+    }
+
+    /** NestedJIT-safe group columns (#34994) — one-arg readers. */
+    public static function matchAllG1Part(int $match): string
+    {
+        if (0 === $match) {
+            return '' . self::$matchAllG1_0;
+        } elseif (1 === $match) {
+            return '' . self::$matchAllG1_1;
+        } elseif (2 === $match) {
+            return '' . self::$matchAllG1_2;
+        } elseif (3 === $match) {
+            return '' . self::$matchAllG1_3;
+        } elseif (4 === $match) {
+            return '' . self::$matchAllG1_4;
+        } elseif (5 === $match) {
+            return '' . self::$matchAllG1_5;
+        } elseif (6 === $match) {
+            return '' . self::$matchAllG1_6;
+        } elseif (7 === $match) {
+            return '' . self::$matchAllG1_7;
+        }
+
+        return '';
+    }
+
+    public static function matchAllG2Part(int $match): string
+    {
+        if (0 === $match) {
+            return '' . self::$matchAllG2_0;
+        } elseif (1 === $match) {
+            return '' . self::$matchAllG2_1;
+        } elseif (2 === $match) {
+            return '' . self::$matchAllG2_2;
+        } elseif (3 === $match) {
+            return '' . self::$matchAllG2_3;
+        } elseif (4 === $match) {
+            return '' . self::$matchAllG2_4;
+        } elseif (5 === $match) {
+            return '' . self::$matchAllG2_5;
+        } elseif (6 === $match) {
+            return '' . self::$matchAllG2_6;
+        } elseif (7 === $match) {
+            return '' . self::$matchAllG2_7;
+        }
+
+        return '';
+    }
+
+    public static function matchAllG3Part(int $match): string
+    {
+        if (0 === $match) {
+            return '' . self::$matchAllG3_0;
+        } elseif (1 === $match) {
+            return '' . self::$matchAllG3_1;
+        } elseif (2 === $match) {
+            return '' . self::$matchAllG3_2;
+        } elseif (3 === $match) {
+            return '' . self::$matchAllG3_3;
+        } elseif (4 === $match) {
+            return '' . self::$matchAllG3_4;
+        } elseif (5 === $match) {
+            return '' . self::$matchAllG3_5;
+        } elseif (6 === $match) {
+            return '' . self::$matchAllG3_6;
+        } elseif (7 === $match) {
+            return '' . self::$matchAllG3_7;
+        }
+
+        return '';
+    }
+
+    /** PREG_PATTERN_ORDER cell — host/unit tests; AOT uses one-arg G*Part (#34994). */
+    public static function matchAllGroupMatch(int $group, int $match): string
+    {
+        if (0 === $group) {
+            return self::matchAllPart($match);
+        }
+        if (1 === $group) {
+            return self::matchAllG1Part($match);
+        }
+        if (2 === $group) {
+            return self::matchAllG2Part($match);
+        }
+        if (3 === $group) {
+            return self::matchAllG3Part($match);
+        }
+
+        return '';
+    }
+
+    private static function storeMatchAllG1At(int $index, string $value): void
+    {
+        if (0 === $index) {
+            self::$matchAllG1_0 = $value;
+        } elseif (1 === $index) {
+            self::$matchAllG1_1 = $value;
+        } elseif (2 === $index) {
+            self::$matchAllG1_2 = $value;
+        } elseif (3 === $index) {
+            self::$matchAllG1_3 = $value;
+        } elseif (4 === $index) {
+            self::$matchAllG1_4 = $value;
+        } elseif (5 === $index) {
+            self::$matchAllG1_5 = $value;
+        } elseif (6 === $index) {
+            self::$matchAllG1_6 = $value;
+        } elseif (7 === $index) {
+            self::$matchAllG1_7 = $value;
+        }
+    }
+
+    private static function storeMatchAllG2At(int $index, string $value): void
+    {
+        if (0 === $index) {
+            self::$matchAllG2_0 = $value;
+        } elseif (1 === $index) {
+            self::$matchAllG2_1 = $value;
+        } elseif (2 === $index) {
+            self::$matchAllG2_2 = $value;
+        } elseif (3 === $index) {
+            self::$matchAllG2_3 = $value;
+        } elseif (4 === $index) {
+            self::$matchAllG2_4 = $value;
+        } elseif (5 === $index) {
+            self::$matchAllG2_5 = $value;
+        } elseif (6 === $index) {
+            self::$matchAllG2_6 = $value;
+        } elseif (7 === $index) {
+            self::$matchAllG2_7 = $value;
+        }
+    }
+
+    private static function storeMatchAllG3At(int $index, string $value): void
+    {
+        if (0 === $index) {
+            self::$matchAllG3_0 = $value;
+        } elseif (1 === $index) {
+            self::$matchAllG3_1 = $value;
+        } elseif (2 === $index) {
+            self::$matchAllG3_2 = $value;
+        } elseif (3 === $index) {
+            self::$matchAllG3_3 = $value;
+        } elseif (4 === $index) {
+            self::$matchAllG3_4 = $value;
+        } elseif (5 === $index) {
+            self::$matchAllG3_5 = $value;
+        } elseif (6 === $index) {
+            self::$matchAllG3_6 = $value;
+        } elseif (7 === $index) {
+            self::$matchAllG3_7 = $value;
         }
     }
 
