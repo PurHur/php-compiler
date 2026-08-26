@@ -53,16 +53,20 @@ final class SelfHostAotStubAuditTest extends TestCase
         $this->assertSame('m3_real', $statusBySymbol['PHPCompiler\\Runtime::standalone'] ?? null);
     }
 
-    public function testHelloworldCompileSmokeOnM3Deny(): void
+    /** BootstrapAot fixtures are probe drivers, not compile-spine symbols (#35009). */
+    public function testBootstrapFixturesNotOnCompileSpineAudit(): void
     {
         require_once self::$root.'/script/selfhost-aot-stub-audit-lib.php';
 
         $metrics = selfhost_aot_stub_collect_metrics(self::$root);
-        $statusBySymbol = [];
-        foreach ($metrics['spine_symbols'] as $row) {
-            $statusBySymbol[$row['symbol']] = $row['status'];
-        }
-        $this->assertSame('m3_deny', $statusBySymbol['BootstrapAot\\helloworld_compile_smoke'] ?? null);
+        $symbols = array_column($metrics['spine_symbols'], 'symbol');
+        $this->assertNotContains('BootstrapAot\\helloworld_compile_smoke', $symbols);
+        $this->assertNotContains('BootstrapAot\\compile_smoke_m3_emit', $symbols);
+        $this->assertNotContains('BootstrapAot\\runtime_ctor_smoke', $symbols);
+        $this->assertNotContains('BootstrapAot\\runtime_parse_compile_smoke', $symbols);
+        $this->assertSame(0, $metrics['m3_deny']);
+        $this->assertSame(0, $metrics['spine']['m3_deny']);
+        $this->assertSame(0, $metrics['spine']['entry_stub'] + $metrics['spine']['compiler_stub'] + $metrics['spine']['m3_deny']);
     }
 
     public function testCompilerCompileFuncOnM3RealLowering(): void

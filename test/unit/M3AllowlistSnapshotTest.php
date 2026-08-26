@@ -30,7 +30,7 @@ final class M3AllowlistSnapshotTest extends TestCase
         $fromSnapshot = bootstrap_m3_allowlist_read_snapshot(self::$root.'/script/m3-allowlist-snapshot.txt');
 
         $this->assertNotEmpty($fromJit['allow'], 'M3 allowlist must list Runtime spine symbols');
-        $this->assertNotEmpty($fromJit['deny'], 'M3 denylist must list LLVM 9 crash fragments');
+        $this->assertSame([], $fromJit['deny'], 'M3 denylist empty after #35009 (vestigial helloworld deny retired)');
         $this->assertSame($fromJit, $fromSnapshot);
     }
 
@@ -69,12 +69,15 @@ final class M3AllowlistSnapshotTest extends TestCase
         $this->assertNotContains('\\runtime::__destruct', $lists['deny']);
     }
 
-    public function testHelloworldCompileSmokeOnDenylist(): void
+    /** Issue #35009: vestigial helloworld deny fragment retired (not on allowlist; never changed lowering). */
+    public function testHelloworldCompileSmokeNotOnDenylist(): void
     {
         require_once self::$root.'/script/bootstrap-m3-allowlist.php';
 
         $lists = bootstrap_m3_allowlist_from_jit(self::$root.'/lib/JIT.php');
-        $this->assertContains('\\bootstrapaot\\helloworld_compile_smoke', $lists['deny']);
+        $this->assertSame([], $lists['deny']);
+        $this->assertNotContains('\\bootstrapaot\\helloworld_compile_smoke', $lists['deny']);
+        $this->assertNotContains('\\bootstrapaot\\helloworld_compile_smoke', $lists['allow']);
     }
 
     public function testCompileSmokeM3EmitNotOnM3Allowlist(): void
@@ -83,6 +86,6 @@ final class M3AllowlistSnapshotTest extends TestCase
 
         $lists = bootstrap_m3_allowlist_from_jit(self::$root.'/lib/JIT.php');
         $this->assertNotContains('\\bootstrapaot\\compile_smoke_m3_emit', $lists['allow']);
-        $this->assertContains('\\bootstrapaot\\helloworld_compile_smoke', $lists['deny']);
+        $this->assertNotContains('\\bootstrapaot\\helloworld_compile_smoke', $lists['deny']);
     }
 }

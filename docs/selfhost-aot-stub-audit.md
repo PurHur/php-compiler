@@ -8,13 +8,13 @@ Path: `parseAndCompile` → `standalone` → `Compiler::compile` under `PHP_COMP
 |--------|------:|
 | Compiler hot-path skip patterns (`isSkippedCompilerHotPathName`) | 48 |
 | M3 real-lowering allowlist (`isM3CompileDriverRealLoweringName`) | 32 |
-| M3 spine deny fragments (`m3CompileDriverSpineDenyNames`) | 1 |
+| M3 spine deny fragments (`m3CompileDriverSpineDenyNames`) | 0 |
 | Compile-spine symbols — M3 real lowering | 30 |
 | Compile-spine symbols — entry stub | 0 |
 | Compile-spine symbols — compiler hot-path stub | 0 |
-| Compile-spine symbols — M3 deny | 4 |
+| Compile-spine symbols — M3 deny | 0 |
 | Compile-spine symbols — other (VM/native) | 0 |
-| Compile-spine symbols — stubbed total | 4 |
+| Compile-spine symbols — stubbed total | 0 |
 | Compile-spine symbols — honest total | 30 |
 
 ## M3 real lowering (compile spine)
@@ -60,10 +60,7 @@ _None._
 
 ## M3 spine deny (LLVM 9 crashers)
 
-- `BootstrapAot\helloworld_compile_smoke` (bootstrap_fixture)
-- `BootstrapAot\compile_smoke_m3_emit` (bootstrap_fixture)
-- `BootstrapAot\runtime_ctor_smoke` (bootstrap_fixture)
-- `BootstrapAot\runtime_parse_compile_smoke` (bootstrap_fixture)
+_None._
 
 ## Other (not stubbed on spine probe)
 
