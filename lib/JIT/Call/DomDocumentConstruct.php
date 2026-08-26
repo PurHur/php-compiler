@@ -14,13 +14,26 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * DOMDocument::__construct — seed thin-AOT DOMNode::$nodeType (#33607).
+ * DOMDocument::__construct — seed thin-AOT DOMNode::$nodeType (#33607) and
+ * libxml option bool slots (#34908 leftover of #34899).
  *
- * php-src: ext/dom/document.c / node.c — XML_DOCUMENT_NODE.
+ * php-src: ext/dom/document.c / node.c — XML_DOCUMENT_NODE; php_dom.c construct
+ * defaults for formatOutput / preserveWhiteSpace / ….
  * Must be listed in JIT::isVoidJitConstructCall so markObjectConstructed runs.
  */
 final class DomDocumentConstruct implements Call
 {
+    /** Zend construct defaults (php-src ext/dom/document.c; VmDom::initDocumentLibxmlDefaults). */
+    private const OPTION_DEFAULTS = [
+        VmDom::PROP_STRICT_ERROR_CHECKING => true,
+        VmDom::PROP_FORMAT_OUTPUT => false,
+        VmDom::PROP_VALIDATE_ON_PARSE => false,
+        VmDom::PROP_RESOLVE_EXTERNALS => false,
+        VmDom::PROP_PRESERVE_WHITE_SPACE => true,
+        VmDom::PROP_RECOVER => false,
+        VmDom::PROP_SUBSTITUTE_ENTITIES => false,
+    ];
+
     public function call(Context $context, Variable ...$args): Value
     {
         if ([] === $args) {
@@ -55,6 +68,10 @@ final class DomDocumentConstruct implements Call
             Variable::TYPE_OBJECT
         );
 
+        // Seed allocated option slots so PropertyFetch uses ClassProperty values and
+        // PropertyAssign sticks (#34908 — MetaProps must not hardcode these).
+        self::seedOptionDefaults($context, $obj, $classId);
+
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
@@ -62,6 +79,28 @@ final class DomDocumentConstruct implements Call
         );
 
         return $slot;
+    }
+
+    private static function seedOptionDefaults(Context $context, Value $obj, int $classId): void
+    {
+        $objectType = $context->type->object;
+        $i1 = $context->getTypeFromString('int1');
+        foreach (self::OPTION_DEFAULTS as $prop => $default) {
+            if (!$objectType->hasProperty($classId, $prop)) {
+                $objectType->defineProperty($classId, $prop, Variable::TYPE_NATIVE_BOOL);
+            }
+            $flag = new Variable(
+                $context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $i1->constInt($default ? 1 : 0, false)
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($obj, 'DOMDocument', $prop),
+                $flag,
+                Variable::TYPE_NATIVE_BOOL
+            );
+        }
     }
 
     private static function objectPtr(Context $context, Variable $receiver): Value
