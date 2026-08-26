@@ -2931,9 +2931,18 @@ class JIT {
      *
      * Without this, FUNCCALL_INIT runs before runQueue, closureCandidates() is empty,
      * resolveIndirectCall returns null, and the invoke becomes a null call.
+     *
+     * Skip when this block also DECLARE_CLASS/INTERFACE/TRAIT/ENUM: precompile would
+     * lower STATIC_PROPERTY_FETCH / class-const before TYPE_DECLARE_* runs, baking
+     * "undeclared static property" into top-level closures (#34896 leftover of #34868).
+     * Method bodies never DECLARE_CLASS — precompile there still covers #34868.
+     * Top-level closures compile later at TYPE_CLOSURE (after declares in runQueue).
      */
     private function precompileClosuresBeforeQueue(Block $block): void
     {
+        if ($this->blockDeclaresClassLike($block)) {
+            return;
+        }
         foreach ($block->opCodes as $i => $op) {
             if (OpCode::TYPE_CLOSURE !== $op->type || null === $op->block1) {
                 continue;
@@ -2967,6 +2976,23 @@ class JIT {
                 }
             }
         }
+    }
+
+    /** True when the block declares a class-like before runQueue (#34896). */
+    private function blockDeclaresClassLike(Block $block): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (
+                OpCode::TYPE_DECLARE_CLASS === $op->type
+                || OpCode::TYPE_DECLARE_INTERFACE === $op->type
+                || OpCode::TYPE_DECLARE_TRAIT === $op->type
+                || OpCode::TYPE_DECLARE_ENUM === $op->type
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @param JIT\Call $proxy */
