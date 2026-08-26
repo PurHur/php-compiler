@@ -11,6 +11,8 @@ namespace PHPCompiler\ext\mbstring;
  * - No VmMbstring call (encode→decode in one AOT binary SIGSEGVs — #34310 / re-#34299).
  * - No assoc arrays / foreach / preg / native base64_* / sprintf / computed `$data[$i+1]`.
  * - Byte length via strlen (isset-len unreliable under NestedJIT — #34379 / #35225).
+ * - Char checks via \ord+int only — string-char helpers / byteOrd(allBytes) corrupt
+ *   later Base64JitHelper::decodeArgv after Q encode (#35235).
  * - Base64 encode via sequential `$i++` walk; decode via Base64JitHelper.
  *
  * SSOT for VM / compile-time fold: {@see MimeHeaderConvert}
@@ -95,7 +97,7 @@ final class MbMimeheaderJitHelper
                 if (null !== $word) {
                     $out .= $word[0];
                     $i = $word[1];
-                    while ($i < $len && self::isWhitespace($str[$i])) {
+                    while ($i < $len && (0x20 === \ord($str[$i]) || 0x09 === \ord($str[$i]) || 0x0D === \ord($str[$i]) || 0x0A === \ord($str[$i]))) {
                         ++$i;
                     }
                     if ($i < $len && '=' === $str[$i] && ($i + 1) < $len && '?' === $str[$i + 1]) {
@@ -115,7 +117,7 @@ final class MbMimeheaderJitHelper
                 }
                 if ("\n" === $str[$i] || "\r" === $str[$i]) {
                     ++$i;
-                    while ($i < $len && self::isWhitespace($str[$i])) {
+                    while ($i < $len && (0x20 === \ord($str[$i]) || 0x09 === \ord($str[$i]) || 0x0D === \ord($str[$i]) || 0x0A === \ord($str[$i]))) {
                         ++$i;
                     }
                     if ($i < $len) {
@@ -153,35 +155,13 @@ final class MbMimeheaderJitHelper
     private static function firstUnsafeIndex(string $str, int $len): int
     {
         for ($i = 0; $i < $len; ++$i) {
-            if (!self::isSafeAsciiByte($str[$i])) {
+            $ord = \ord($str[$i]);
+            if ($ord < 0x20 || $ord > 0x7E || 0x3D === $ord || 0x3F === $ord || 0x5F === $ord) {
                 return $i;
             }
         }
 
         return $len;
-    }
-
-    /** php-src safe ASCII for mime header pass-through (space allowed). Use ord — NestedJIT. */
-    private static function isSafeAsciiByte(string $byte): bool
-    {
-        $ord = \ord($byte);
-
-        return $ord >= 0x20 && $ord <= 0x7E && 0x3D !== $ord && 0x3F !== $ord && 0x5F !== $ord;
-    }
-
-    /** Pass-through after leading spaces rejects space itself (php-src mbfl). */
-    private static function isGraphSafe(string $byte): bool
-    {
-        $ord = \ord($byte);
-
-        return $ord >= 0x21 && $ord <= 0x7E && 0x3D !== $ord && 0x3F !== $ord && 0x5F !== $ord;
-    }
-
-    private static function isWhitespace(string $byte): bool
-    {
-        $ord = \ord($byte);
-
-        return 0x20 === $ord || 0x09 === $ord || 0x0D === $ord || 0x0A === $ord;
     }
 
     private static function qEncode(string $text): string
@@ -190,16 +170,16 @@ final class MbMimeheaderJitHelper
         $len = \strlen($text);
         $digits = '0123456789ABCDEF';
         for ($i = 0; $i < $len; ++$i) {
-            $byte = $text[$i];
-            if (self::isGraphSafe($byte)) {
-                $out .= $byte;
+            $ord = \ord($text[$i]);
+            // Graph-safe printable ASCII excluding = ? _ (php-src mbfl).
+            if ($ord >= 0x21 && $ord <= 0x7E && 0x3D !== $ord && 0x3F !== $ord && 0x5F !== $ord) {
+                $out .= $text[$i];
                 continue;
             }
-            if (0x20 === \ord($byte)) {
+            if (0x20 === $ord) {
                 $out .= '_';
                 continue;
             }
-            $ord = self::byteOrd($byte);
             $out .= '='.$digits[($ord >> 4) & 15].$digits[$ord & 15];
         }
 
@@ -258,19 +238,19 @@ final class MbMimeheaderJitHelper
         $out = '';
         $i = 0;
         while ($i < $len) {
-            $b0 = self::byteOrd($data[$i]);
+            $b0 = \ord($data[$i]);
             ++$i;
             $have1 = 0;
             $have2 = 0;
             $b1 = 0;
             $b2 = 0;
             if ($i < $len) {
-                $b1 = self::byteOrd($data[$i]);
+                $b1 = \ord($data[$i]);
                 ++$i;
                 $have1 = 1;
             }
             if ($i < $len) {
-                $b2 = self::byteOrd($data[$i]);
+                $b2 = \ord($data[$i]);
                 ++$i;
                 $have2 = 1;
             }
@@ -360,18 +340,6 @@ final class MbMimeheaderJitHelper
         };
     }
 
-    /** NestedJIT-safe byte ordinal (peer Base64JitHelper::byteOrd). */
-    private static function byteOrd(string $byte): int
-    {
-        $all = self::allBytes();
-        for ($code = 0; $code < 256; ++$code) {
-            if ($byte === $all[$code]) {
-                return $code;
-            }
-        }
-
-        return 0;
-    }
 
     private static function byteAt(int $code): string
     {
