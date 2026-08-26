@@ -1318,6 +1318,11 @@ final class DomNodeLiveMutationRuntime
      * {@see ObjectEntry::$class} access segfaults. Compare class_id / ownerDocument /
      * parentNode walks in LLVM and throw catchable {@see \DOMException}.
      *
+     * Attr children are excluded: VmDom installs them via the attribute map before
+     * {@see VmDom::assertCanReceiveTreeMutationChild}, and Attr objects lack Element
+     * ownerDocument/parentNode layout — walking those slots SIGSEGVs (#35185 / re-#33570
+     * after #34089). {@see JitDomAppendChildLiveSlots::sync} still handles Attr.
+     *
      * Peer: {@see VmDom::assertCanReceiveTreeMutationChild} / {@see VmDom::assertSameDocument}
      * / {@see VmDom::assertNotAncestorOfParent}.
      */
@@ -1330,12 +1335,22 @@ final class DomNodeLiveMutationRuntime
         $seq = (string) (self::$treeMutAssertSeq++);
         $objectType = $context->type->object;
         $map = $context->structFieldMap['__object__'];
+        $bbOk = BasicBlockHelper::append($context, 'dom_assert_tree_mut_ok_'.$seq);
+
+        // Attr → attribute map (php-src / VmDom) — do not load Element props on Attr (#35185).
+        $bbAttr = BasicBlockHelper::append($context, 'dom_assert_tree_mut_attr_'.$seq);
+        $bbNotAttr = BasicBlockHelper::append($context, 'dom_assert_tree_mut_not_attr_'.$seq);
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $child);
+        $context->builder->branchIf($isAttr, $bbAttr, $bbNotAttr);
+        $context->builder->positionAtEnd($bbAttr);
+        $context->builder->branch($bbOk);
+
+        $context->builder->positionAtEnd($bbNotAttr);
         $classId = $context->builder->load($context->builder->structGep($child, $map['class_id']));
         $isDoc = self::icmpIsDocumentClass($context, $classId);
 
         $bbDoc = BasicBlockHelper::append($context, 'dom_assert_tree_mut_doc_'.$seq);
         $bbNode = BasicBlockHelper::append($context, 'dom_assert_tree_mut_node_'.$seq);
-        $bbOk = BasicBlockHelper::append($context, 'dom_assert_tree_mut_ok_'.$seq);
         $context->builder->branchIf($isDoc, $bbDoc, $bbNode);
 
         $context->builder->positionAtEnd($bbDoc);

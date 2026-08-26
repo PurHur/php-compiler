@@ -467,10 +467,12 @@ final class JitDomCreateElement
     }
 
     /**
-     * Seed ParentNode / NonDocumentTypeChildNode slots after allocate (#35007).
+     * Seed ParentNode / NonDocumentTypeChildNode / DOMNode child-edge slots after allocate
+     * (#35007 / #35185).
      *
      * allocate() nulls every slot pointer; reading TYPE_NATIVE_LONG childElementCount
-     * then SIGSEGVs. Mirrors JitDomDocumentElement::clearElementNav for createElement.
+     * then SIGSEGVs, and unset TYPE_VALUE firstChild warns. Mirrors
+     * JitDomDocumentElement::clearElementNav for createElement.
      * php-src ext/dom/parentnode.c — empty parent has null first/last and count 0.
      */
     public static function seedEmptyParentNodeNavigation(
@@ -491,7 +493,13 @@ final class JitDomCreateElement
             JITVariable::KIND_VARIABLE,
             $nullSlot
         );
+        // DOMNode child/sibling edges + ParentNode element-nav — allocate() leaves slot
+        // pointers null and `$el->firstChild` warns "Undefined property" (#35185 / #35007).
         foreach ([
+            VmDom::PROP_FIRST_CHILD,
+            VmDom::PROP_LAST_CHILD,
+            VmDom::PROP_NEXT_SIBLING,
+            VmDom::PROP_PREVIOUS_SIBLING,
             VmDom::PROP_FIRST_ELEMENT_CHILD,
             VmDom::PROP_LAST_ELEMENT_CHILD,
             VmDom::PROP_NEXT_ELEMENT_SIBLING,

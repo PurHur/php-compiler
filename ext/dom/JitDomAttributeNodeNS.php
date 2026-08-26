@@ -641,26 +641,15 @@ final class JitDomAttributeNodeNS
         // ownerElement — php-src sets after attribute map install (#33570 / #33598).
         self::storeOwnerElement($context, $element, $attr);
 
-        $id = JitDomCreateElementAttrs::lastId();
-        if (null === $id) {
-            return;
-        }
-        $bagUpdates = self::openTagAttrUpdates('' === $ns ? null : $ns, $qname, $valueLit);
-        $attrs = JitDomCreateElementAttrs::get($id);
-        foreach ($bagUpdates as $name => $val) {
-            unset($attrs[$name]);
-        }
-        $attrs = $bagUpdates + $attrs;
-        foreach ($bagUpdates as $name => $val) {
-            JitDomCreateElementAttrs::set($id, $name, $val);
-        }
+        // Same saveXML bag sync as setAttributeNode — covers createElement attrs id and
+        // loadXML documentElement (null id → refreshCompileTimeXmlRootAttributeSet) (#35185).
         $elementVar = new JITVariable(
             $context,
             JITVariable::TYPE_OBJECT,
             JITVariable::KIND_VALUE,
             $element
         );
-        self::syncSaveXmlAttrSuffix($context, $elementVar, $attrs);
+        self::syncSaveXmlAttrSuffixAfterSetAttributeNode($context, $elementVar);
     }
 
     /**
