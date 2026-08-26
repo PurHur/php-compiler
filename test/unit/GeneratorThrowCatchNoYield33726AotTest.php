@@ -7,9 +7,12 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: Generator::throw into catch that does not yield again (#33726 / re-#27518).
+ * AOT: Generator::throw into catch that does not yield again (#33726 / re-#27518 / #35144).
  *
  * php-src: Zend/zend_generators.c — zend_generator_throw
+ *
+ * The structure assertions alone went green while AotTest failed (#35144): do not treat
+ * source-shape checks as proof the binary matches Zend.
  */
 final class GeneratorThrowCatchNoYield33726AotTest extends TestCase
 {
@@ -32,6 +35,20 @@ final class GeneratorThrowCatchNoYield33726AotTest extends TestCase
         // Empty merge closes via emitGeneratorResumeComplete — not compileIncludedAtEntry
         // (that would ret %__value__ into the i64 resume fn).
         $this->assertStringNotContainsString('compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBodyBb)', $chunk);
+    }
+
+    public function testInjectPendingThrowKeepsPendingThrowRooted(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/VM/GeneratorIteratorJitHelper.php');
+        $fn = strpos($source, 'function emitInjectPendingThrow');
+        $this->assertNotFalse($fn);
+        $chunk = substr($source, $fn, 2800);
+        $this->assertStringContainsString('#35144', $chunk);
+        // writeNull before dispatch freed the Exception while ExceptionJitHelper held only an address.
+        $this->assertStringNotContainsString(
+            "lookupFunction('__value__writeNull')",
+            $chunk
+        );
     }
 
     public function testAotFixtureAndReproExist(): void
