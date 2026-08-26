@@ -9,6 +9,7 @@ require_once __DIR__.'/RuntimeEmitTuAlloc.php';
 require_once __DIR__.'/RuntimeEmitTuInit.php';
 
 use PHPCompiler\ext\standard\JitStringSearch;
+use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -435,6 +436,9 @@ final class BootstrapCompileSmokeM3Emit
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
 
+        // Lazy ensureFull (#35089 / peer #34578): Context no longer NestedJITs
+        // __compiler_file_get_contents during full standalone init (#15604 / #32122).
+        StringFileGetContents::ensureLinked($context);
         $code = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $sourceFile
