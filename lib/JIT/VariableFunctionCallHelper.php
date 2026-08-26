@@ -25,22 +25,79 @@ final class VariableFunctionCallHelper
     public static function hintedCalleeNames(Block $block, ?int $nameSlot): array
     {
         $hints = [];
-        foreach (self::blocksForHintScan($block) as $scanBlock) {
-            if (null !== $nameSlot) {
-                foreach ($scanBlock->opCodes as $op) {
-                    if (OpCode::TYPE_ASSIGN !== $op->type || $op->arg2 !== $nameSlot) {
-                        continue;
-                    }
-                    $literal = self::literalFromAssignSource($scanBlock, $op->arg3);
-                    if (null !== $literal) {
-                        $hints[] = $literal;
-                    }
-                }
-            }
+        $scanBlocks = self::blocksForHintScan($block);
+        // Follow ASSIGN / ITER_VALUE / INIT_ARRAY / ADD_ARRAY_ELEMENT into the callee slot
+        // so foreach (['strlen'] as $fn) { $fn(...) } gets a non-empty candidate table (#35075).
+        if (null !== $nameSlot) {
+            $hints = array_merge($hints, self::hintsFromCalleeSlotAcrossBlocks($scanBlocks, $nameSlot));
+        }
+        foreach ($scanBlocks as $scanBlock) {
             $hints = array_merge($hints, self::assignStringLiteralsInBlock($scanBlock));
         }
 
         return array_values(array_unique($hints));
+    }
+
+    /**
+     * Trace compile-time string literals that can reach a dynamic callee slot (#35075).
+     *
+     * @param list<Block> $blocks
+     * @return list<string>
+     */
+    private static function hintsFromCalleeSlotAcrossBlocks(array $blocks, int $nameSlot): array
+    {
+        $hints = [];
+        $queue = [$nameSlot];
+        $seen = [];
+        while ([] !== $queue) {
+            $slot = (int) array_shift($queue);
+            if (isset($seen[$slot])) {
+                continue;
+            }
+            $seen[$slot] = true;
+
+            foreach ($blocks as $scanBlock) {
+                $direct = self::literalFromAssignSource($scanBlock, $slot);
+                if (null !== $direct) {
+                    $hints[] = $direct;
+                }
+                foreach ($scanBlock->opCodes as $op) {
+                    if (
+                        OpCode::TYPE_ASSIGN === $op->type
+                        && null !== $op->arg2
+                        && (int) $op->arg2 === $slot
+                        && null !== $op->arg3
+                    ) {
+                        $queue[] = (int) $op->arg3;
+                        continue;
+                    }
+                    if (
+                        OpCode::TYPE_ITER_VALUE === $op->type
+                        && null !== $op->arg1
+                        && (int) $op->arg1 === $slot
+                        && null !== $op->arg2
+                    ) {
+                        $queue[] = (int) $op->arg2;
+                        continue;
+                    }
+                    if (
+                        (OpCode::TYPE_INIT_ARRAY === $op->type || OpCode::TYPE_ADD_ARRAY_ELEMENT === $op->type)
+                        && null !== $op->arg1
+                        && (int) $op->arg1 === $slot
+                        && null !== $op->arg2
+                    ) {
+                        $elementLit = self::literalFromAssignSource($scanBlock, (int) $op->arg2);
+                        if (null !== $elementLit) {
+                            $hints[] = $elementLit;
+                        } else {
+                            $queue[] = (int) $op->arg2;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $hints;
     }
 
     /**

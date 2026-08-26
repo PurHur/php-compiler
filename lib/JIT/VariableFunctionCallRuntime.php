@@ -5,27 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Call;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT runtime dispatch for dynamic $fn() via VariableFunctionCallJitHelper PHP (#10135, #24902).
+ * JIT/AOT runtime dispatch for dynamic $fn() (#10135, #24902, #35075).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathModf #22519 / Lcg #22495).
- * Replaces per-candidate JitStringCompare LLVM chains in {@see VariableFunctionCallHelper}.
+ * Matches the runtime name with {@see JitStringCompare::identical} per compile-time
+ * candidate. The prior NestedJIT index-table helper always selected the first ksort'd
+ * callee for every name, so multi-hint $fn() was wrong (#35075).
+ *
+ * php-src: Zend/zend_execute.c — ZEND_INIT_FCALL_BY_NAME / variable calls
  */
 final class VariableFunctionCallRuntime
 {
-    private const HELPER_PATH = '/VM/VariableFunctionCallJitHelper.php';
-
-    private const MATCH_INDEX_HELPER = 'PHPCompiler\\VM\\VariableFunctionCallJitHelper::matchCandidateIndex';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::MATCH_INDEX_HELPER,
-    ];
-
     private static int $blockSeq = 0;
 
     /**
@@ -34,26 +26,6 @@ final class VariableFunctionCallRuntime
     public static function dispatch(
         Context $context,
         Value $nameStr,
-        array $candidates,
-        Variable ...$args
-    ): Value {
-        $candidateNames = \array_keys($candidates);
-        $table = \implode("\0", $candidateNames);
-        $index = $context->builder->call(
-            self::matchHelperFunction($context),
-            $nameStr,
-            $context->builder->load($context->constantStringFromString($table))
-        );
-
-        return self::dispatchByIndex($context, $index, $candidates, ...$args);
-    }
-
-    /**
-     * @param array<string, Call> $candidates
-     */
-    private static function dispatchByIndex(
-        Context $context,
-        Value $index,
         array $candidates,
         Variable ...$args
     ): Value {
@@ -69,48 +41,35 @@ final class VariableFunctionCallRuntime
             $zero = $context->getTypeFromString('__value__*')->constNull();
         }
 
-        $i32 = $context->getTypeFromString('int32');
-        // NestedJIT helpers may surface PHP int as i64; matchCandidateIndex is i32 ABI (#24902 / #34937).
-        $indexTy = $context->getStringFromType($index->typeOf());
-        if ('int64' === $indexTy) {
-            $index = $context->builder->trunc($index, $i32);
-        } elseif ('int8' === $indexTy || 'int16' === $indexTy) {
-            $index = $context->builder->zExt($index, $i32);
-        }
-        $minusOne = $i32->constInt(-1, true);
-        $isMiss = $context->builder->icmp(Builder::INT_EQ, $index, $minusOne);
-        $dispatchEntry = BasicBlockHelper::append($context, 'var_fn_dispatch_'.$tag);
-        $context->builder->branchIf($isMiss, $undef, $dispatchEntry);
-
         $n = \count($candidates);
-        $checkBlocks = [];
-        for ($i = 0; $i < $n; ++$i) {
-            $checkBlocks[$i] = 0 === $i
-                ? $dispatchEntry
-                : BasicBlockHelper::append($context, 'var_fn_idx_check_'.$tag.'_'.$i);
-        }
-
-        $i = 0;
-        foreach ($candidates as $fnName => $proxy) {
-            $context->builder->positionAtEnd($checkBlocks[$i]);
-            $isCase = $context->builder->icmp(
-                Builder::INT_EQ,
-                $index,
-                $i32->constInt($i, false)
-            );
-            $onMatch = BasicBlockHelper::append($context, 'var_fn_idx_match_'.$tag.'_'.$i);
-            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $undef;
-            $context->builder->branchIf($isCase, $onMatch, $onMiss);
-
-            $context->builder->positionAtEnd($onMatch);
-            $raw = $proxy->call($context, ...$args);
-            if ($nativeLong) {
-                $context->builder->store($raw, $resultSlot);
-            } else {
-                $context->builder->store(self::boxCallResult($context, $fnName, $raw), $resultSlot);
+        if (0 === $n) {
+            $context->builder->branch($undef);
+        } else {
+            $checkBlocks = [];
+            for ($i = 0; $i < $n; ++$i) {
+                $checkBlocks[$i] = BasicBlockHelper::append($context, 'var_fn_name_check_'.$tag.'_'.$i);
             }
-            $context->builder->branch($merge);
-            ++$i;
+            $context->builder->branch($checkBlocks[0]);
+
+            $i = 0;
+            foreach ($candidates as $fnName => $proxy) {
+                $context->builder->positionAtEnd($checkBlocks[$i]);
+                $lit = $context->builder->load($context->constantStringFromString($fnName));
+                $isCase = JitStringCompare::identical($context, $nameStr, $lit);
+                $onMatch = BasicBlockHelper::append($context, 'var_fn_name_match_'.$tag.'_'.$i);
+                $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $undef;
+                $context->builder->branchIf($isCase, $onMatch, $onMiss);
+
+                $context->builder->positionAtEnd($onMatch);
+                $raw = $proxy->call($context, ...$args);
+                if ($nativeLong) {
+                    $context->builder->store($raw, $resultSlot);
+                } else {
+                    $context->builder->store(self::boxCallResult($context, $fnName, $raw), $resultSlot);
+                }
+                $context->builder->branch($merge);
+                ++$i;
+            }
         }
 
         $context->builder->positionAtEnd($undef);
@@ -121,23 +80,6 @@ final class VariableFunctionCallRuntime
         $context->builder->positionAtEnd($merge);
 
         return $context->builder->load($resultSlot);
-    }
-
-    private static function matchHelperFunction(Context $context): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, self::MATCH_INDEX_HELPER, '#24902');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#24902'
-        );
     }
 
     /**
@@ -164,6 +106,16 @@ final class VariableFunctionCallRuntime
         $rawTy = $context->getStringFromType($raw->typeOf());
         if ('int64' === $rawTy) {
             JitValueBox::writeLong($context, $slot, $raw);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        // Native double before retTy lookup — mixed abs/round dispatch leaves retTy unset (#35075).
+        if ('double' === $rawTy) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                JitValueBox::pointer($context, $slot),
+                $raw
+            );
 
             return JitValueBox::pointer($context, $slot);
         }
