@@ -642,6 +642,18 @@ final class Variable {
         ) {
             return $context->ensureScriptGlobal($name);
         }
+        // Generator resume: named CVs live in state->frame_slots so they survive
+        // across resume calls (stack allocas die on ret) (#35142).
+        if (
+            $context->compilingGeneratorResume
+            && null !== $context->generatorStateParam
+            && null !== $name
+            && '' !== $name
+            && 'this' !== $name
+            && !Superglobals::isSuperglobalName($name)
+        ) {
+            return self::fromGeneratorFrameLocal($context, $name);
+        }
         $type = self::getTypeFromType($op->type);
         if ($type === self::TYPE_NULL) {
             $slot = JitValueBox::alloc($context);
@@ -676,8 +688,35 @@ final class Variable {
         );
     }
 
+    /**
+     * Heap CV slot in generator state frame — same pointer every resume (#35142).
+     *
+     * Always TYPE_VALUE so int/float/string locals share one spill representation.
+     */
+    public static function fromGeneratorFrameLocal(Context $context, string $name): Variable
+    {
+        if (!isset($context->generatorFrameLocalIndex[$name])) {
+            $context->generatorFrameLocalIndex[$name] = \count($context->generatorFrameLocalIndex);
+        }
+        if (!isset($context->generatorFrameLocalPtrs[$name])) {
+            throw new \LogicException(
+                'generator frame slot for $'.$name.' was not materialized at resume entry (#35142)'
+            );
+        }
+        $var = new Variable(
+            $context,
+            self::TYPE_VALUE,
+            self::KIND_VARIABLE,
+            $context->generatorFrameLocalPtrs[$name]
+        );
+        $context->bindVariableByName($name, $var);
+
+        return $var;
+    }
+
     private static function isVariadicParamOperand(Block $block, Operand $op): bool
     {
+        // NOTE: original isVariadicParamOperand follows — placeholder removed below
         if (null === $block->variadicParamIndex) {
             return false;
         }
@@ -1120,6 +1159,15 @@ final class Variable {
         }
         // Never null out sg_SESSION / other process-owned superglobal slots (#26411).
         if (null !== $this->superglobalName) {
+            return;
+        }
+        // Generator heap frame slots are filled at create / prior resumes — hoisted
+        // makeVariableFromOp must not wipe formals with TYPE_NULL (#35142).
+        if (
+            $this->context->compilingGeneratorResume
+            && self::TYPE_VALUE === $this->type
+            && null !== $this->context->generatorStateParam
+        ) {
             return;
         }
         switch ($this->type) {

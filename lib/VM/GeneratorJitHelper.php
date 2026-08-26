@@ -144,8 +144,27 @@ final class GeneratorJitHelper
             ) {
                 continue;
             }
-            if (OpCode::TYPE_JUMP === $op->type && null !== $op->block2) {
-                self::walkBlockForResumePoints($op->block2, $points, $visited);
+            // JUMP target is block1 (Compiler::compileStmt Jump). Old block2-only walk
+            // never followed real JUMPs and skipped for/while headers (#35142).
+            if (OpCode::TYPE_JUMP === $op->type) {
+                if (null !== $op->block1) {
+                    self::walkBlockForResumePoints($op->block1, $points, $visited);
+                }
+
+                return;
+            }
+            // JUMPIF: block1 = if, block2 = else (default Compiler order). Must walk both
+            // so yields inside loop bodies are resume points (#35142).
+            if (
+                OpCode::TYPE_JUMPIF === $op->type
+                || OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED === $op->type
+            ) {
+                if (null !== $op->block1) {
+                    self::walkBlockForResumePoints($op->block1, $points, $visited);
+                }
+                if (null !== $op->block2) {
+                    self::walkBlockForResumePoints($op->block2, $points, $visited);
+                }
 
                 return;
             }

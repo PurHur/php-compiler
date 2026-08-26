@@ -24,37 +24,41 @@ final class VmGenerator
 
     public static function ensureJitTypes(Context $context): void
     {
-        if (self::$typesRegistered) {
+        // Per-context map — static flag alone skipped setBody/map on a second LLVM context (#35142).
+        if (isset($context->structFieldMap['__generator_state__']['frame_slots'])) {
             return;
         }
-        self::$typesRegistered = true;
         $struct = $context->context->namedStructType('__generator_state__');
         $context->registerType('__generator_state__', $struct);
         $context->registerType('__generator_state__*', $struct->pointerType(0));
-        $struct->setBody(
-            false,
-            $context->getTypeFromString('size_t'),
-            $context->getTypeFromString('size_t'),
-            $context->getTypeFromString('int1'),
-            $context->getTypeFromString('int1'),
-            $context->getTypeFromString('__value__'),
-            $context->getTypeFromString('__value__'),
-            $context->getTypeFromString('int1'),
-            $context->getTypeFromString('__hashtable__*'),
-            $context->getTypeFromString('size_t'),
-            $context->getTypeFromString('int1'),
-            $context->getTypeFromString('int1'),
-            $context->getTypeFromString('__object__*'),
-            $context->getTypeFromString('int1'),
-            $context->getTypeFromString('__value__'),
-            $context->getTypeFromString('int1'),
-            $context->getTypeFromString('int1'),
-            $context->getTypeFromString('__value__'),
-            $context->getTypeFromString('__value__'),
-            $context->getTypeFromString('int1'),
-            $context->getTypeFromString('int1'),
-            $context->getTypeFromString('int1'),
-        );
+        if (!self::$typesRegistered) {
+            self::$typesRegistered = true;
+            $struct->setBody(
+                false,
+                $context->getTypeFromString('size_t'),
+                $context->getTypeFromString('size_t'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('__value__'),
+                $context->getTypeFromString('__value__'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('__hashtable__*'),
+                $context->getTypeFromString('size_t'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('__value__'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('__value__'),
+                $context->getTypeFromString('__value__'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('int1'),
+                $context->getTypeFromString('__value__*'),
+            );
+        }
         $context->structFieldMap['__generator_state__'] = [
             'resume_ip' => 0,
             'auto_key' => 1,
@@ -75,10 +79,9 @@ final class VmGenerator
             'pending_throw' => 16,
             'return_value' => 17,
             'has_returned' => 18,
-            // Zend ZEND_GENERATOR_AT_FIRST_YIELD (#23713).
             'at_first_yield' => 19,
-            // Foreach open-on-valid: skip advance when already positioned (#23713).
             'foreach_needs_advance' => 20,
+            'frame_slots' => 21,
         ];
     }
 
@@ -127,6 +130,8 @@ final class VmGenerator
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['at_first_yield']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['foreach_needs_advance']));
         self::clearYieldFromFields($context, $statePtr);
+        $framePtrTy = $context->getTypeFromString('__value__*');
+        $context->builder->store($framePtrTy->constNull(), $context->builder->structGep($statePtr, $map['frame_slots']));
     }
 
     public static function copyCurrentFromInnerToOuter(
@@ -145,15 +150,17 @@ final class VmGenerator
 
     public static function emitCreateFromCall(
         \PHPCompiler\JIT $jit,
-        string $resumeInternalName
+        string $resumeInternalName,
+        array $callArgs = []
     ): Variable {
-        return self::emitCreateFromCallContext($jit->context, $resumeInternalName);
+        return self::emitCreateFromCallContext($jit->context, $resumeInternalName, $callArgs);
     }
 
     /** Context-only entry for foreach Aggregate→Generator unwrap (#34980). */
     public static function emitCreateFromCallContext(
         Context $context,
-        string $resumeInternalName
+        string $resumeInternalName,
+        array $callArgs = []
     ): Variable {
         self::ensureJitTypes($context);
         $stateTy = $context->getTypeFromString('__generator_state__');
@@ -170,6 +177,9 @@ final class VmGenerator
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['foreach_needs_advance']));
         self::clearYieldFromFields($context, $statePtr);
         self::clearPendingAndReturnFields($context, $statePtr);
+        $framePtrTy = $context->getTypeFromString('__value__*');
+        $context->builder->store($framePtrTy->constNull(), $context->builder->structGep($statePtr, $map['frame_slots']));
+        self::initFrameWithCallArgs($context, $statePtr, $resumeInternalName, $callArgs);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $context->builder->structGep($statePtr, $map['current_key']))
@@ -196,6 +206,104 @@ final class VmGenerator
         $var->isJitGenerator = true;
 
         return $var;
+    }
+
+    /**
+     * Allocate frame_slots and copy call argv into formal slots (#35142).
+     *
+     * @param list<Variable> $callArgs
+     */
+    private static function initFrameWithCallArgs(
+        Context $context,
+        Value $statePtr,
+        string $resumeInternalName,
+        array $callArgs
+    ): void {
+        $resumeLc = strtolower($resumeInternalName);
+        $frameIndex = $context->generatorCreatorFrameIndex[$resumeLc] ?? [];
+        if ([] === $frameIndex) {
+            // Resume symbol may be llvm-sanitized; try raw creator map values.
+            foreach ($context->generatorCreatorFrameIndex as $key => $idxMap) {
+                if (str_ends_with($key, '__resume') || $key === $resumeLc) {
+                    $frameIndex = $idxMap;
+                    break;
+                }
+            }
+        }
+        $count = \count($frameIndex);
+        // Ensure capacity for positional argv even if name indexing missed formals.
+        $count = max($count, \count($callArgs));
+        $map = $context->structFieldMap['__generator_state__'];
+        $frameGep = $context->builder->structGep($statePtr, $map['frame_slots']);
+        $valueTy = $context->getTypeFromString('__value__');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        if ($count <= 0) {
+            $context->builder->store($valuePtrTy->constNull(), $frameGep);
+
+            return;
+        }
+        $oneSize = $context->builder->ptrToInt(
+            $context->builder->gep(
+                $valueTy->pointerType(0)->constNull(),
+                $context->context->int32Type()->constInt(1, false)
+            ),
+            $context->getTypeFromString('size_t')
+        );
+        $bytes = $context->builder->mul(
+            $oneSize,
+            $context->getTypeFromString('size_t')->constInt($count, false)
+        );
+        $raw = $context->builder->call($context->lookupFunction('__mm__malloc'), $bytes);
+        $slots = $context->builder->pointerCast($raw, $valuePtrTy);
+        for ($i = 0; $i < $count; ++$i) {
+            $slot = $context->builder->gep(
+                $slots,
+                $context->context->int32Type()->constInt($i, false)
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $slot)
+            );
+        }
+        $context->builder->store($slots, $frameGep);
+
+        // Map call args by formal order registered at resume compile.
+        $logical = $resumeLc;
+        if (str_ends_with($logical, '__resume')) {
+            $logical = substr($logical, 0, -strlen('__resume'));
+        }
+        $paramNames = $context->generatorCreatorParamNames[$logical] ?? [];
+        if ([] === $paramNames && [] !== $callArgs) {
+            // Positional fallback when ARG_RECV names were not recorded.
+            $byIndex = array_values($frameIndex);
+            sort($byIndex);
+            foreach ($callArgs as $paramIdx => $arg) {
+                if (!$arg instanceof Variable || !isset($byIndex[$paramIdx])) {
+                    continue;
+                }
+                $slot = $context->builder->gep(
+                    $slots,
+                    $context->context->int32Type()->constInt($byIndex[$paramIdx], false)
+                );
+                \PHPCompiler\JIT\GeneratorHelper::assignValueField($context, $slot, $arg, null);
+            }
+
+            return;
+        }
+        foreach ($paramNames as $paramIdx => $paramName) {
+            if (!isset($callArgs[$paramIdx]) || !isset($frameIndex[$paramName])) {
+                continue;
+            }
+            $arg = $callArgs[$paramIdx];
+            if (!$arg instanceof Variable) {
+                continue;
+            }
+            $slot = $context->builder->gep(
+                $slots,
+                $context->context->int32Type()->constInt($frameIndex[$paramName], false)
+            );
+            \PHPCompiler\JIT\GeneratorHelper::assignValueField($context, $slot, $arg, null);
+        }
     }
 
     private static function storeResumeName(Context $context, Value $obj, string $resumeName): void
