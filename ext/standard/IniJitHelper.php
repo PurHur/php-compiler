@@ -684,6 +684,7 @@ final class IniJitHelper
                 break;
             case 'serialize_precision':
                 self::$serializePrecision = self::parseSerializePrecisionIni(self::CFG_SERIALIZE_PRECISION);
+                VmIni::syncSerializePrecision(self::$serializePrecision);
                 break;
             case 'unserialize_max_depth':
                 self::$unserializeMaxDepth = (int) self::CFG_UNSERIALIZE_MAX_DEPTH;
@@ -786,6 +787,8 @@ final class IniJitHelper
     {
         $old = self::serializePrecisionAsIniString();
         self::$serializePrecision = self::parseSerializePrecisionIni($newValue);
+        // Keep VmVarDump / VmFloatDtoa::formatVarDump on the same PG(serialize_precision) (#35020).
+        VmIni::syncSerializePrecision(self::$serializePrecision);
 
         return $old;
     }
