@@ -9,16 +9,15 @@ use PHPUnit\Framework\TestCase;
  */
 final class MbChrOrdRuntimeShrinkTest extends TestCase
 {
-    public function testMbChrCallUsesJitMbChrOrdFold(): void
+    public function testMbChrCallUsesJitMbChrOrdInvoke(): void
     {
         $source = file_get_contents(dirname(__DIR__, 2).'/ext/mbstring/mb_chr.php');
         $this->assertNotFalse($source);
-        $this->assertStringContainsString('JitMbChrOrd::tryChrFold', $source);
-        $foldPos = strpos($source, 'JitMbChrOrd::tryChrFold');
-        $throwPos = strpos($source, "throw new \\LogicException('mb_chr() is not lowered for JIT/AOT");
-        $this->assertNotFalse($foldPos);
-        $this->assertNotFalse($throwPos);
-        $this->assertLessThan($throwPos, $foldPos, 'fold before unsupported throw');
+        $this->assertStringContainsString('JitMbChrOrd::invokeChr', $source);
+        $this->assertStringNotContainsString(
+            "throw new \\LogicException('mb_chr() is not lowered for JIT/AOT",
+            $source
+        );
     }
 
     public function testMbOrdCallUsesJitMbChrOrdInvoke(): void
@@ -39,6 +38,8 @@ final class MbChrOrdRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmMbstring::chr', $source);
         $this->assertStringContainsString('VmMbstring::ord', $source);
         $this->assertStringContainsString('function invokeOrd', $source);
+        $this->assertStringContainsString('function tryChrFold', $source);
+        $this->assertStringContainsString('encodingPtr', $source);
         $this->assertStringContainsString('MbChrOrdRuntime::ensureLinked', $source);
         $this->assertStringContainsString('final class JitMbChrOrd', $source);
     }

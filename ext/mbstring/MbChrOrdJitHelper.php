@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\JIT\Builtin\StringStrpos;
 
 /**
- * mb_chr() / mb_ord() for compiled JIT/AOT modules (#34243 / #34250 leftovers of #30759).
+ * mb_chr() / mb_ord() for compiled JIT/AOT modules (#34243 / #34250 leftovers of #30759; #34870).
  *
  * mb_ord: Returns {@see StringStrpos::NOT_FOUND} (-1) on invalid first character so callers can box int|false.
  * mb_chr: Returns string|false (false → NestedJIT nullish for {@see JitMbChrOrd} boxing).
@@ -15,6 +15,8 @@ use PHPCompiler\JIT\Builtin\StringStrpos;
  * NestedJIT must not call {@see VmMbstring::ord}/{@see VmMbstring::chr} / {@see \PHPCompiler\ext\standard\VmString::isValidUtf8}
  * — those silent-return / misbehave under thin AOT NestedJIT. Encode/decode is inlined with strlen/ord/substr
  * and range compares (peer {@see MbSearchJitHelper}). Avoid PHP {@see chr()} (typed mixed → TypeError under NestedJIT).
+ *
+ * Runtime encoding validation (#34870) — int-returning assert (string-returning NestedJIT throws SIGSEGV).
  *
  * SSOT (VM / compile-time fold): {@see VmMbstring::chr()} / {@see VmMbstring::ord()}
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_chr) / PHP_FUNCTION(mb_ord)
@@ -24,6 +26,24 @@ use PHPCompiler\JIT\Builtin\StringStrpos;
  */
 final class MbChrOrdJitHelper
 {
+    /**
+     * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
+     * SIGSEGVs under thin AOT; int helpers match {@see MbCaseJitHelper::assertEncodingArgv} (#34870 / #34858).
+     *
+     * Encoding is Argument #2 for mb_chr / mb_ord.
+     */
+    public static function assertEncodingArgv(string $encoding, string $function): int
+    {
+        if ('' === self::canon($encoding)) {
+            // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+            throw new \ValueError(
+                $function.'(): Argument #2 ($encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
+
+        return 1;
+    }
+
     /**
      * All 256 bytes as a literal — NestedJIT-safe substitute for chr($b).
      */
@@ -53,13 +73,34 @@ final class MbChrOrdJitHelper
         return \substr(self::allBytes(), $b, 1);
     }
 
+    private static function canon(string $encoding): string
+    {
+        if ('UTF-8' === $encoding || 'utf-8' === $encoding || 'UTF8' === $encoding || 'utf8' === $encoding) {
+            return 'UTF-8';
+        }
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            return 'ASCII';
+        }
+        if ('8BIT' === $encoding || '8bit' === $encoding || 'BINARY' === $encoding || 'binary' === $encoding) {
+            return '8BIT';
+        }
+
+        return '';
+    }
+
     /**
      * mb_chr() — encode codepoint, or false when out of range / surrogate.
+     *
+     * Encoding must already be validated via {@see assertEncodingArgv} (#34870).
      *
      * @return string|false
      */
     public static function chrArgv(int $codepoint, string $encoding)
     {
+        $encoding = self::canon($encoding);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             if ($codepoint < 0 || $codepoint > 255) {
                 return false;
@@ -119,12 +160,15 @@ final class MbChrOrdJitHelper
 
     /**
      * mb_ord() — first character codepoint, or NOT_FOUND when the lead sequence is invalid.
+     *
+     * Encoding must already be validated via {@see assertEncodingArgv} (#34870).
      */
     public static function ordArgv(string $string, string $encoding): int
     {
         if ('' === $string) {
             throw new \ValueError('mb_ord(): Argument #1 ($string) must not be empty');
         }
+        $encoding = self::canon($encoding);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             return \ord(\substr($string, 0, 1));
         }

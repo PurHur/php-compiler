@@ -10,16 +10,17 @@ use PHPCompiler\JIT\Builtin\StringStrpos;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT for mb_chr() / mb_ord() (php-src ext/mbstring/mbstring.c; #30759 / #34243 / #34250).
+ * LLVM JIT/AOT for mb_chr() / mb_ord() (php-src ext/mbstring/mbstring.c; #30759 / #34243 / #34250 / #34870).
  *
  * Compile-time fold via {@see VmMbstring}; runtime via NestedJIT {@see MbChrOrdJitHelper}.
- * Peer {@see JitMbSearch}.
+ * Runtime encoding via NestedJIT (#34870 leftover of #34250; peer {@see JitMbCase} / {@see JitMbSearch}).
  */
 final class JitMbChrOrd
 {
@@ -46,29 +47,8 @@ final class JitMbChrOrd
             1,
             'codepoint'
         );
-        if ($argc >= 2) {
-            if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
-                $encoding = 'UTF-8';
-            } elseif (JITVariable::TYPE_STRING !== $args[1]->type) {
-                throw new \LogicException('mb_chr() encoding must be a string literal in this compiler build');
-            } else {
-                $encoding = $args[1]->compileTimeString ?? null;
-                if (null === $encoding) {
-                    throw new \LogicException('mb_chr() encoding must be a string literal in this compiler build');
-                }
-            }
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_chr');
 
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbChrOrdRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             MbChrOrdRuntime::chrHelper($context),
@@ -133,29 +113,8 @@ final class JitMbChrOrd
         }
 
         $string = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_ord', 0, 'string');
-        if ($argc >= 2) {
-            if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
-                $encoding = 'UTF-8';
-            } elseif (JITVariable::TYPE_STRING !== $args[1]->type) {
-                throw new \LogicException('mb_ord() encoding must be a string literal in this compiler build');
-            } else {
-                $encoding = $args[1]->compileTimeString ?? null;
-                if (null === $encoding) {
-                    throw new \LogicException('mb_ord() encoding must be a string literal in this compiler build');
-                }
-            }
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_ord');
 
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbChrOrdRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
         $found = JitNestedHelperCoerce::callHelper(
             $context,
             MbChrOrdRuntime::ordHelper($context),
@@ -163,6 +122,76 @@ final class JitMbChrOrd
         );
 
         return StringStrpos::boxFoundOffset($context, $found);
+    }
+
+    /**
+     * Link MbChrOrdRuntime + resolve encoding ptr; NestedJIT assert when encoding is non-literal
+     * or an unsupported/invalid name (#34870).
+     *
+     * @param list<JITVariable> $args
+     */
+    private static function linkAndEncodingPtr(Context $context, array $args, int $argc, string $function): Value
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbChrOrdRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_runtime');
+
+        [$encPtr, $needsAssert] = self::encodingPtr($context, $args, $argc, $function);
+        if ($needsAssert) {
+            $fnName = $context->builder->load($context->constantStringFromString($function));
+            $context->builder->call(
+                MbChrOrdRuntime::assertEncodingHelper($context),
+                $encPtr,
+                $fnName
+            );
+        }
+
+        return $encPtr;
+    }
+
+    /**
+     * Literal UTF-8/ASCII/8BIT → constant string (no assert); otherwise NestedJIT encoding + assert (#34870).
+     *
+     * @param list<JITVariable> $args
+     * @return array{0: Value, 1: bool} encoding ptr, needsAssert
+     */
+    private static function encodingPtr(Context $context, array $args, int $argc, string $function): array
+    {
+        if ($argc < 2 || JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            $encoding = 'UTF-8';
+            self::assertSupportedEncoding($encoding);
+
+            return [$context->builder->load($context->constantStringFromString($encoding)), false];
+        }
+
+        $encodingLit = JitStringArg::compileTimeLiteral($args[1]);
+        if (null !== $encodingLit) {
+            $canonical = MbstringEncodingRegistry::resolve($encodingLit);
+            if (null !== $canonical && self::isSupportedEncoding($canonical)) {
+                return [$context->builder->load($context->constantStringFromString($canonical)), false];
+            }
+            // Invalid / unsupported literal — NestedJIT assert throws catchable ValueError (#34870).
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
+        }
+
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[1],
+                $function,
+                1,
+                'encoding'
+            ),
+            true,
+        ];
+    }
+
+    private static function isSupportedEncoding(string $encoding): bool
+    {
+        return 'UTF-8' === $encoding || 'ASCII' === $encoding || '8BIT' === $encoding;
     }
 
     /**
@@ -277,7 +306,7 @@ final class JitMbChrOrd
 
     private static function assertSupportedEncoding(string $encoding): void
     {
-        if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
+        if (!self::isSupportedEncoding($encoding)) {
             throw new \LogicException(
                 'mb_chr()/mb_ord() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
             );
