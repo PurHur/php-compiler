@@ -10901,6 +10901,34 @@ class JIT {
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
                     $classOp = $block->getOperand($op->arg2);
                     $nameOp = $block->getOperand($op->arg3);
+                    $useRuntimeStatic = $classOp instanceof Operand\Literal
+                        && 'static' === strtolower(ltrim((string) $classOp->value, '\\'))
+                        && JIT\LateStaticBindingHelper::useRuntimeLateStatic($this->context);
+                    if ($useRuntimeStatic && $nameOp instanceof Operand\Literal) {
+                        // AOT: `static::$prop` must use get_called_scope(), not declaring class
+                        // (#34912; peer static::CONST / static::method #19614 / #24169).
+                        $destSlot = (int) $op->arg1;
+                        $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsIncDec($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsCompoundAssign($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsDimWriteContainer($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsDimRwContainer($block, $i, $destSlot)
+                            || $this->varFetchDestUsedAsByRefReturn($block, $i, $destSlot);
+                        $runtimeClassId = JIT\ClassConstFetchHelper::emitStaticKeywordClassIdForPseudoConst(
+                            $this->context->type->object,
+                            $block
+                        );
+                        $fetched = $this->context->type->object->staticPropertyFetchByRuntimeClassId(
+                            $runtimeClassId,
+                            $nameOp->value,
+                            $forWrite
+                        );
+                        if ($forWrite) {
+                            $fetched->objectPropertyName = $nameOp->value;
+                        }
+                        $this->context->setVariableOp($block->getOperand($op->arg1), $fetched);
+                        break;
+                    }
                     $classId = $this->context->type->object->resolveClassId($classOp);
                     $className = $this->context->type->object->classNameForId($classId);
                     if ($nameOp instanceof Operand\Literal) {

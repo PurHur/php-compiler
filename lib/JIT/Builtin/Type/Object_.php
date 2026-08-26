@@ -7667,6 +7667,17 @@ class Object_ extends Type {
     }
 
     /**
+     * `static::$prop` with runtime called-class id (AOT LSB, #34912).
+     */
+    public function staticPropertyFetchByRuntimeClassId(
+        \PHPLLVM\Value $classIdVal,
+        string $name,
+        bool $forWrite = false
+    ): Variable {
+        return ObjectStaticPropertyLlvm::fetchByRuntimeClassId($this, $classIdVal, $name, $forWrite);
+    }
+
+    /**
      * isset(Class::$prop) without reading uninitialized typed slots (#15112, zend_object_handlers.c).
      */
     public function compileStaticPropertyIsSet(int $classId, string $name): PHPLLVM\Value

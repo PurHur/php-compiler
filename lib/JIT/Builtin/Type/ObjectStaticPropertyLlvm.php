@@ -236,6 +236,116 @@ final class ObjectStaticPropertyLlvm
     }
 
     /**
+     * `static::$prop` under AOT/standalone — class id from get_called_scope() (#34912).
+     *
+     * Compile-time {@see Object_::resolveClassId} folds `static` to the declaring class
+     * (self::-equivalent). php-src ZEND_FETCH_STATIC_PROP_* looks up from the called class
+     * so a child that shadows the property is visible.
+     *
+     * @param Value $classIdVal int64 late-static / called-class id
+     */
+    public static function fetchByRuntimeClassId(
+        Object_ $object,
+        Value $classIdVal,
+        string $name,
+        bool $forWrite = false
+    ): Variable {
+        $context = $object->jitContext();
+        $candidates = [];
+        foreach ($object->allClassNamesById() as $id => $_className) {
+            $entry = $object->staticPropertyGlobalEntry((int) $id, $name);
+            if (null !== $entry) {
+                $candidates[(int) $id] = $entry;
+            }
+        }
+        if ([] === $candidates) {
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise(
+                $context,
+                'Access to undeclared static property static::$'.$name
+            );
+
+            return new Variable(
+                $context,
+                Variable::TYPE_NULL,
+                Variable::KIND_VALUE,
+                $context->getTypeFromString('int8')->constInt(0, false)
+            );
+        }
+        if (1 === \count($candidates)) {
+            // Only one class in the module owns this name — shared inherited storage
+            // (#32301) or a leaf declaration. Fetch it; LSB already constrained the
+            // called class to this hierarchy when the method was entered.
+            return self::fetch($object, (int) array_key_first($candidates), $name, $forWrite);
+        }
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entryBlock = $context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('lsb_static_prop_done');
+        $exit = $fn->appendBasicBlock('lsb_static_prop_exit');
+        $fallback = $fn->appendBasicBlock('lsb_static_prop_undef');
+        $destSlot = JitValueBox::alloc($context);
+        $firstGlobal = reset($candidates)['global'];
+        // Global_ has typeOf(), not getType() (PHPLLVM LLVMAbstract).
+        $globalSlot = BasicBlockHelper::entryAlloca($context, $firstGlobal->typeOf());
+        $ids = array_keys($candidates);
+        $n = \count($ids);
+        $checkBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $checkBlocks[$i] = 0 === $i
+                ? $entryBlock
+                : $fn->appendBasicBlock('lsb_static_prop_try_'.$i);
+        }
+        foreach ($ids as $i => $id) {
+            $context->builder->positionAtEnd($checkBlocks[$i]);
+            $expected = $context->constantFromInteger((int) $id, 'int64');
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expected);
+            $caseBlock = $fn->appendBasicBlock('lsb_static_prop_case_'.$i);
+            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $fallback;
+            $context->builder->branchIf($isMatch, $caseBlock, $onMiss);
+            $context->builder->positionAtEnd($caseBlock);
+            $entry = $candidates[$id];
+            // Always FETCH_R into the value box; writes store via staticPropertyGlobal (#34912).
+            $fetched = self::fetch($object, (int) $id, $name, false);
+            self::boxFetchedIntoValue($object, $destSlot, $fetched, $entry['type']);
+            $context->builder->store($entry['global'], $globalSlot);
+            $after = $context->builder->getInsertBlock();
+            if (null !== $after && null === $after->getTerminator()) {
+                $context->builder->branch($done);
+            }
+        }
+        $context->builder->positionAtEnd($fallback);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise(
+            $context,
+            'Access to undeclared static property static::$'.$name
+        );
+        self::returnAfterPendingError($context, $fn);
+        $context->builder->positionAtEnd($done);
+        $context->builder->branch($exit);
+        $context->builder->positionAtEnd($exit);
+        $result = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $destSlot
+        );
+        $result->staticPropertyGlobal = $context->builder->load($globalSlot);
+        $types = array_values(array_unique(array_map(
+            static fn (array $entry): int => $entry['type'],
+            $candidates
+        )));
+        if (1 !== \count($types)) {
+            throw new \LogicException(
+                'LSB static property fetch JIT requires uniform static property types for '.$name
+            );
+        }
+        $result->staticPropertyType = $types[0];
+
+        return $result;
+    }
+
+    /**
      * ZEND_FETCH_STATIC_PROP_R: boxed statics must not return the module {@see __value__}
      * pointer. Arrays are zend_array_dup'd so `$b = A::$a; $b[0] = 99` does not mutate
      * `A::$a` (#32307; php-src Zend/zend_hash.c, Zend/zend_execute.c zend_assign_to_variable).
