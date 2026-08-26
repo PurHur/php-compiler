@@ -4,21 +4,26 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\ext\standard\JitExplode;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\MbEncodingAliasesRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
-use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT compile-time folding for mb_list_encodings() / mb_encoding_aliases().
+ * LLVM JIT/AOT for mb_list_encodings() / mb_encoding_aliases().
  *
+ * Compile-time fold + NestedJIT runtime encoding for aliases (#35216 leftover of #30795).
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_list_encodings) / mb_encoding_aliases
  * Packed HT via {@see HashTableHelper} (peer {@see JitMbStrSplit} — AOT json_encode-safe);
  * invalid encoding → catchable ValueError (peer php_uname #28136 / #30795).
@@ -54,24 +59,90 @@ final class JitMbEncodingRegistry
             );
         }
         $encodingLit = JitStringArg::compileTimeLiteral($args[0]);
-        if (null === $encodingLit) {
-            throw new \LogicException(
-                'mb_encoding_aliases() encoding must be a compile-time string in this compiler build'
-            );
-        }
-        $canonical = MbstringEncodingRegistry::resolve($encodingLit);
-        if (null === $canonical) {
-            return self::emitEncodingValueError(
-                $context,
-                sprintf(
-                    'mb_encoding_aliases(): Argument #1 ($encoding) must be a valid encoding, "%s" given',
-                    $encodingLit
-                )
-            );
-        }
-        // Transfer-encoding E_DEPRECATED is VM/runtime (#28983); AOT fold still returns aliases.
+        if (null !== $encodingLit) {
+            $canonical = MbstringEncodingRegistry::resolve($encodingLit);
+            if (null === $canonical) {
+                return self::emitEncodingValueError(
+                    $context,
+                    sprintf(
+                        'mb_encoding_aliases(): Argument #1 ($encoding) must be a valid encoding, "%s" given',
+                        $encodingLit
+                    )
+                );
+            }
+            // Transfer-encoding E_DEPRECATED is VM/runtime (#28983); AOT fold still returns aliases.
 
-        return self::buildHtFromStringParts($context, MbstringEncodingRegistry::aliases($canonical));
+            return self::buildHtFromStringParts($context, MbstringEncodingRegistry::aliases($canonical));
+        }
+
+        // Runtime encoding (TYPE_VALUE / non-literal TYPE_STRING) — NestedJIT (#35216).
+        return self::lowerRuntimeAliases($context, $args[0]);
+    }
+
+    /** NestedJIT joined aliases → packed HT (peer {@see JitMbStrSplit::hashtableFromJoined}). */
+    private static function lowerRuntimeAliases(Context $context, JITVariable $encodingArg): Value
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbEncodingAliasesRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_encoding_aliases_runtime');
+
+        $enc = JitStringBuiltinArg::lower(
+            $context,
+            $encodingArg,
+            'mb_encoding_aliases',
+            0,
+            'encoding'
+        );
+        $context->builder->call(MbEncodingAliasesRuntime::assertEncodingHelper($context), $enc);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            MbEncodingAliasesRuntime::aliasesHelper($context),
+            [$enc]
+        );
+        $joined = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+
+        return self::hashtableFromJoined($context, $joined);
+    }
+
+    /** Empty joined → []; otherwise explode on {@see MbEncodingAliasesJitHelper::JOIN_DELIM}. */
+    private static function hashtableFromJoined(Context $context, Value $joined): Value
+    {
+        $tag = 'mba';
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $slen = $context->builder->call($context->lookupFunction('__string__strlen'), $joined);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $slen, $zero);
+
+        $emptyBlock = BasicBlockHelper::append($context, 'mb_encoding_aliases_empty_'.$tag);
+        $explodeBlock = BasicBlockHelper::append($context, 'mb_encoding_aliases_explode_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'mb_encoding_aliases_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $explodeBlock);
+
+        $htTy = $context->getTypeFromString('__hashtable__*');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $htTy);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->store(HashTableHelper::alloc($context), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($explodeBlock);
+        $delim = $context->builder->load(
+            $context->constantStringFromString(MbEncodingAliasesJitHelper::JOIN_DELIM)
+        );
+        $ownedJoined = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $joined
+        );
+        $ht = JitExplode::explode($context, $delim, $ownedJoined);
+        $context->builder->store($ht, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
     }
 
     /** Public wrapper for mb_preferred_mime_name() compile-time ValueError (#34298). */
