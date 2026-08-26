@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\ClassConstFetchHelper;
 use PHPCompiler\JIT\Context;
@@ -47,10 +48,19 @@ final class LateStaticBindingRuntime
             return;
         }
 
+        // Mid-function ensureLinked (forward_static_call / static::) must not leave the
+        // caller's insert BB cleared — parentless effectiveCalledClassId calls fail verify (#35110).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
         LateStaticBindingGlobals::ensureGlobal($context);
         self::ensureJitHelperCompiled($context);
         self::implementEffectiveIdBridge($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     public static function emitStoreClassId(Context $context, Value $classId): void
