@@ -397,7 +397,7 @@ final class JitDomNodeListItemUserScript
      * Compile-time Nth direct child of document element for childNodes foreach (#33082).
      *
      * Peer {@see materializeItemAtCompileTime} / loadXML {@see JitDomDocumentElement}
-     * child seeding — comment / text / element with INNER_XML + attrs.
+     * child seeding — comment / pi / text / element with INNER_XML + attrs.
      */
     public static function materializeDirectChildAtCompileTime(
         Context $context,
@@ -416,6 +416,11 @@ final class JitDomNodeListItemUserScript
         }
         $object = match ($node['kind']) {
             'comment' => JitDomCreateComment::materialize($context, $node['data']),
+            'pi' => JitDomCreateProcessingInstruction::materialize(
+                $context,
+                $node['data'],
+                $node['content'] ?? ''
+            ),
             'text' => JitDomCreateTextNode::materialize($context, $node['data']),
             'cdata' => JitDomCreateCDATASection::materialize($context, $node['data']),
             default => self::materializeDirectElementChild($context, $node, $rootNs),
