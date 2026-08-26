@@ -27776,8 +27776,12 @@ class JIT {
 
             [$paramNames, $variadicIndex] = $this->jitCalleeParamMetadata($toCall);
             $functionName = $this->jitInternalBuiltinFunctionName($toCall);
+            // Prefer the block being lowered — INIT_ARRAY for ...[1,2] often lives in a
+            // successor after a prior ?: / JUMPIF, not the function entry (jitEnclosingBlock).
+            // Entry-only lookup drops the unpack → call_user_func forwards 0 args (#35105).
+            $unpackBlock = $this->context->jitCurrentBlock ?? $this->context->jitEnclosingBlock;
             $namedUnpack = JIT\CallUnpackHelper::tryResolveCompileTimeNamedUnpack(
-                $this->context->jitEnclosingBlock,
+                $unpackBlock,
                 $userEntries,
                 $userOperands,
                 $paramNames,
