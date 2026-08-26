@@ -489,7 +489,25 @@ final class JitDomLiveElementsByTagWalk
             $context->builder->positionAtEnd($bbCmp);
             $want = $context->builder->load($context->constantStringFromString($tagLc));
             $cmp = JitStringCompare::strcmp($context, $tagStrVal, $want);
-            $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+            $eqTag = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+            // php-src nodelist.c / xmlNode->name: match local name so `<x:a>`
+            // satisfies getElementsByTagName('a') (#34936).
+            if (!$objectType->hasProperty($elementClassId, VmDom::PROP_LOCAL_NAME)) {
+                $objectType->defineProperty($elementClassId, VmDom::PROP_LOCAL_NAME, JITVariable::TYPE_STRING);
+            }
+            $localVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $node,
+                'DOMElement',
+                VmDom::PROP_LOCAL_NAME,
+                $elementClassId
+            );
+            $localStr = $context->helper->loadValue($localVar);
+            $localNull = $context->builder->icmp(Builder::INT_EQ, $localStr, $strPtr->constNull());
+            $cmpLocal = JitStringCompare::strcmp($context, $localStr, $want);
+            $eqLocal = $context->builder->icmp(Builder::INT_EQ, $cmpLocal, $i64->constInt(0, false));
+            $eqLocal = $context->builder->select($localNull, $i1->constInt(0, false), $eqLocal);
+            $eq = $context->builder->or($eqTag, $eqLocal);
             $context->builder->store($eq, $outSlot);
             $context->builder->branch($bbDone);
         }
