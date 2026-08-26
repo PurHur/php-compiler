@@ -32,6 +32,9 @@ final class JitXmlReaderUserScript
     /** @var list<array{nodeType: int, name: string, value: string}>|null */
     private static ?array $lastEvents = null;
 
+    /** Set when the last XML()/fromString lowering was the instance form (#35106). */
+    public static bool $lastCallWasInstance = false;
+
     public static function isUserScriptAot(): bool
     {
         return UserScriptAotEnv::isActive();
@@ -50,11 +53,27 @@ final class JitXmlReaderUserScript
         if (!self::isUserScriptAot() || \count($args) < 1) {
             return null;
         }
-        // Static factory: source is $args[0]. Instance XML()/open() may keep EX(This) as
-        // $args[0] with source in $args[1] (#22630 / #28670).
-        $lit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
-        if ((null === $lit || '' === $lit) && isset($args[1])) {
+        self::$lastCallWasInstance = false;
+        // Static factory: source is $args[0]. Instance XML() keeps EX(This) as $args[0]
+        // with source in $args[1] (#22630 / #28670 / #35106).
+        // Do NOT read compileTimeString from the object receiver — ARG_SEND may stamp the
+        // source literal onto $this (#35106), which falsely selects the static-factory path.
+        $instanceReceiver = null;
+        $lit = null;
+        if (isset($args[1])
+            && (JITVariable::TYPE_OBJECT === $args[0]->type
+                || JITVariable::TYPE_VALUE === $args[0]->type)
+        ) {
             $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null !== $lit && '' !== $lit) {
+                $instanceReceiver = $args[0];
+                self::$lastCallWasInstance = true;
+            }
+        }
+        if (null === $lit || '' === $lit) {
+            $lit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+            $instanceReceiver = null;
+            self::$lastCallWasInstance = false;
         }
         if (null === $lit || '' === $lit) {
             return null;
@@ -79,7 +98,63 @@ final class JitXmlReaderUserScript
         }
         self::$lastEvents = $events;
 
+        if (null !== $instanceReceiver) {
+            return self::resetReceiverForParse($context, $instanceReceiver);
+        }
+
         return self::materializeReader($context);
+    }
+
+    /**
+     * Instance XML(): reset pull-parser slots on $this and return true (#35106).
+     *
+     * Allocating a fresh reader (static-factory path) left the caller's `$r` from
+     * `new XMLReader()` uninitialized — `read()`/`->name` then SIGSEGVd.
+     */
+    private static function resetReceiverForParse(Context $context, JITVariable $receiver): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_xml_instance_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_NAME);
+        self::ensureLayout($objectType, $classId);
+
+        $reader = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $posVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $i64->constInt(-1, true)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($reader, self::CLASS_NAME, self::PROP_POS),
+            $posVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $zero = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $i64->constInt(0, true)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($reader, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
+            $zero,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($reader, self::CLASS_NAME, VmXmlReader::PROP_NAME),
+            self::stringLlvm($context, ''),
+            JITVariable::TYPE_STRING
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($reader, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
+            self::stringLlvm($context, ''),
+            JITVariable::TYPE_STRING
+        );
+
+        // Return raw i1 so assignCallResultOperand keeps NATIVE_BOOL (not object box) (#35106).
+        return $context->getTypeFromString('int1')->constInt(1, false);
     }
 
     private static function materializeReader(Context $context): Value
