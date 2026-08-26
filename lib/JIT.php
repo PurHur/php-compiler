@@ -16900,6 +16900,12 @@ class JIT {
         ) {
             return;
         }
+        // Instance XML() returns bool after resetting $this (#35106) — do not retag as object.
+        if ($toCall instanceof JIT\Call\XmlReaderXML
+            && \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastCallWasInstance
+        ) {
+            return;
+        }
         $result->type = new Type(Type::TYPE_OBJECT, [], 'XMLReader');
         if ($this->context->hasVariableOp($result)) {
             $var = $this->context->getVariableFromOp($result);
@@ -17417,11 +17423,18 @@ class JIT {
                 return;
             }
             // XMLReader::XML()/fromString() — CFG types XML() as bool (InternalArgInfo) but the
-            // factory returns a __value__ object box. Force VALUE storage + classUserType so
-            // ASSIGN/$reader->nodeType do not take the non-object property path (#28670).
+            // static factory returns a __value__ object box. Force VALUE storage + classUserType
+            // so ASSIGN/$reader->nodeType do not take the non-object property path (#28670).
+            // Instance XML() returns i1 bool after resetting $this — skip (#35106).
             if (
-                $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
-                || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromString
+                (
+                    $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
+                    || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromString
+                )
+                && !(
+                    $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
+                    && \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::$lastCallWasInstance
+                )
             ) {
                 $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
                 if ($this->context->hasVariableOp($result)) {
