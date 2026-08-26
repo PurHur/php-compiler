@@ -4142,6 +4142,8 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_PRESERVE_WHITE_SPACE, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_RECOVER, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_SUBSTITUTE_ENTITIES, Variable::TYPE_NATIVE_LONG);
+            // DOMNode::$baseURI — late defineProperty after loadXML SIGSEGVs (#34904 leftover of #34894).
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI, Variable::TYPE_VALUE);
             $this->markHasConstructor($id);
         }
         if ('domattr' === $lcname) {

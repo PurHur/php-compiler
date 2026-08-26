@@ -10,14 +10,15 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument computed meta / option properties
- * (#34894 leftover of #34887; #34899 option props).
+ * LLVM lowering for DOMDocument computed meta / option / baseURI properties
+ * (#34894 leftover of #34887; #34899 option props; #34904 baseURI).
  *
  * Thin AOT has no DomRegistry — undeclared PropertyFetch after loadXML late-defines an
  * uninitialized slot (SIGSEGV). Props are pinned in {@see Object_::allocate} layout;
  * fetches return computed values (peer {@see JitDomDocumentDoctype} / #28940).
  *
- * php-src: ext/dom/php_dom.c — dom_document_*_read; ext/dom/document.c
+ * php-src: ext/dom/php_dom.c — dom_document_*_read; ext/dom/node.c — dom_node_base_uri_read;
+ * ext/dom/document.c
  */
 final class JitDomDocumentMetaProps
 {
@@ -49,7 +50,9 @@ final class JitDomDocumentMetaProps
             || 'resolveexternals' === $propLc
             || 'preservewhitespace' === $propLc
             || 'recover' === $propLc
-            || 'substituteentities' === $propLc;
+            || 'substituteentities' === $propLc
+            // DOMNode::$baseURI — same documentURI cwd stamp after loadXML (#34904).
+            || 'baseuri' === $propLc;
     }
 
     public static function fetch(Object_ $objectType, Value $obj, string $className, string $propName): JITVariable
@@ -89,8 +92,9 @@ final class JitDomDocumentMetaProps
 
             return self::boxString($context, $enc);
         }
-        if ('documenturi' === $propLc) {
-            // loadXML(string) sets documentURI to the CWD in php-src; empty doc stays null.
+        if ('documenturi' === $propLc || 'baseuri' === $propLc) {
+            // loadXML(string) sets documentURI/baseURI to the CWD in php-src; empty doc stays null.
+            // php-src: dom_node_base_uri_read → xmlNodeGetBase on the document (#34904).
             if (JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
                 $cwd = \getcwd();
                 if (false !== $cwd && '' !== $cwd) {
