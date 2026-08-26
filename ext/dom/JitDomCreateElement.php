@@ -232,6 +232,8 @@ final class JitDomCreateElement
         // Always seed textContent/nodeValue — defineProperty alone leaves a null
         // __string__* and pure-user-script fetches segfault (#25475 / re-#23251).
         self::storeTextContentSlots($context, $obj, '', $className);
+        // ParentNode nav — null first/last + count 0 (uninitialised NATIVE_LONG SIGSEGVs; #35007).
+        self::seedEmptyParentNodeNavigation($context, $obj, $className);
 
         return $obj;
     }
@@ -459,8 +461,59 @@ final class JitDomCreateElement
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, VmDom::PROP_LOCAL_NAME, $nameStr);
         self::storeNodeType($context, $obj, self::CLASS_ELEMENT, DomConstants::XML_ELEMENT_NODE);
         self::storeAttributesPresence($context, $obj, [], self::CLASS_ELEMENT);
+        self::seedEmptyParentNodeNavigation($context, $obj, self::CLASS_ELEMENT);
 
         return $obj;
+    }
+
+    /**
+     * Seed ParentNode / NonDocumentTypeChildNode slots after allocate (#35007).
+     *
+     * allocate() nulls every slot pointer; reading TYPE_NATIVE_LONG childElementCount
+     * then SIGSEGVs. Mirrors JitDomDocumentElement::clearElementNav for createElement.
+     * php-src ext/dom/parentnode.c — empty parent has null first/last and count 0.
+     */
+    public static function seedEmptyParentNodeNavigation(
+        Context $context,
+        Value $obj,
+        string $className = self::CLASS_ELEMENT
+    ): void {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup($className);
+        self::ensureDomElementStandInLayout($objectType, $classId);
+
+        $nullSlot = JitValueBox::alloc($context);
+        $nullPtr = JitValueBox::pointer($context, $nullSlot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+        $nullJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $nullSlot
+        );
+        foreach ([
+            VmDom::PROP_FIRST_ELEMENT_CHILD,
+            VmDom::PROP_LAST_ELEMENT_CHILD,
+            VmDom::PROP_NEXT_ELEMENT_SIBLING,
+            VmDom::PROP_PREVIOUS_ELEMENT_SIBLING,
+        ] as $prop) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($obj, $className, $prop),
+                $nullJit,
+                JITVariable::TYPE_NULL
+            );
+        }
+        $zeroJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, $className, VmDom::PROP_CHILD_ELEMENT_COUNT),
+            $zeroJit,
+            JITVariable::TYPE_NATIVE_LONG
+        );
     }
 
     private static function ensureElementPropertyLayout(
