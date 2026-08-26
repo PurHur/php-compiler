@@ -29,7 +29,10 @@ final class MbSubstrRuntimeIntOffsetAotTest extends TestCase
     {
         $helper = (string) file_get_contents(dirname(__DIR__, 2).'/ext/mbstring/MbStrcutJitHelper.php');
         $this->assertStringContainsString('Never reassign', $helper);
-        $this->assertStringContainsString('$startAt = $start', $helper);
+        // Plain `$startAt = $start` is NestedJIT-zeroed (#34883 false green); require `+ 0`.
+        $this->assertStringContainsString('$startAt = $start + 0', $helper);
+        $this->assertStringContainsString('$fromAt = $from + 0', $helper);
+        $this->assertStringContainsString('$lenAt = $length + 0', $helper);
         $this->assertStringNotContainsString('$start = $charLen + $start', $helper);
         $this->assertStringNotContainsString('$from = \\strlen', $helper);
         $this->assertStringNotContainsString('private static function', $helper);

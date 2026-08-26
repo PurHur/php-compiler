@@ -17,7 +17,7 @@ namespace PHPCompiler\ext\mbstring;
  * - Prefer `$found == 0` and nested range ifs (no elseif / ternaries).
  * - Do not branch on `$encoding` before the UTF-8 walk (NestedJIT mis-slice).
  * - Never reassign `$start` / `$length` / `$from` params — NestedJIT then treats them as 0
- *   (#34256 / #34881).
+ *   (#34256 / #34881). Plain `$startAt = $start` is also zeroed; copy via `$startAt = $start + 0`.
  *
  * Runtime encoding validation (#34875) — int-returning assert (string-returning NestedJIT throws SIGSEGV).
  */
@@ -59,9 +59,10 @@ final class MbStrcutJitHelper
     {
         // Encoding must already be validated via {@see assertEncodingArgv} (#34875).
         // Never reassign $from — NestedJIT zeros reassigned params (#34881 / #34256).
+        // Plain `$fromAt = $from` is also zeroed under NestedJIT — use `+ 0`.
         // UTF-8 char-boundary snap inlined (php-src mb_strcut; no helper calls in this unit).
         $byteLen = \strlen($string);
-        $fromAt = $from;
+        $fromAt = $from + 0;
         if ($from < 0) {
             $fromAt = $byteLen + $from;
             if ($fromAt < 0) {
@@ -100,7 +101,7 @@ final class MbStrcutJitHelper
             return '';
         }
         $end = $fromAt + $length;
-        $lenAt = $length;
+        $lenAt = $length + 0;
         if ($end >= $byteLen) {
             $lenAt = $byteLen - $fromAt;
         }
@@ -174,7 +175,8 @@ final class MbSubstrJitHelper
             $bytePos = $bytePos + $w;
             $charLen = $charLen + 1;
         }
-        $startAt = $start;
+        // NestedJIT zeros plain `$startAt = $start` — use `+ 0` (#34881 leftover of #34883).
+        $startAt = $start + 0;
         if ($start < 0) {
             $startAt = $charLen + $start;
         }
@@ -185,7 +187,7 @@ final class MbSubstrJitHelper
             return '';
         }
         // -1 = omitted length sentinel from JitMbSubstr (#34256). Never reassign $length.
-        $lenAt = $length;
+        $lenAt = $length + 0;
         if (-1 == $length) {
             $lenAt = $charLen - $startAt;
         }
