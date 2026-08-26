@@ -282,6 +282,8 @@ final class JitDomReplaceChildLiveSlots
         $context->builder->branch($bbAfterLen);
 
         $context->builder->positionAtEnd($bbAfterLen);
+        // ParentNode first/lastElementChild after element↔element replace (#35010).
+        JitDomParentNodeElementNavLiveSlots::afterReplace($context, $parent, $newChild, $oldChild);
         // saveXML reads PROP_USER_SCRIPT_INNER_XML — rebuild after text/element splice
         // so replaceChild(createTextNode) matches Zend (#33335). Walk ancestors so
         // saveXML($root) after nested createElement replace matches Zend (#33450).

@@ -127,6 +127,8 @@ final class JitDomRemoveChildLiveSlots
         $newSecond->addIncoming($objPtrTy->constNull(), $nullPred);
         $newSecond->addIncoming($loadedSecond, $readPred);
         self::decrementChildNodesLengthInPlace($context, $parent, $newFirst, $newSecond);
+        // ParentNode first/lastElementChild + childElementCount (#35010 / parentnode.c).
+        JitDomParentNodeElementNavLiveSlots::afterRemove($context, $parent, $child);
         // saveXML reads PROP_USER_SCRIPT_INNER_XML — createElement trees have no
         // loadXML seed, so syncUserScriptInnerXmlAfterRemove no-ops. Rebuild from
         // live firstChild/nextSibling like replaceChild (#34945 / peer #33335).
