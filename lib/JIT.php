@@ -13055,6 +13055,14 @@ class JIT {
                         if (null !== $nameSlot) {
                             $this->foldCompileTimeStringFromSlot($block, $nameSlot, $nameVar);
                         }
+                        // foreach (['a','b'] as $fn) / multi-assign $fn=…: refuse a single
+                        // folded callee when hints name more than one (#35075).
+                        if (null !== $nameVar->compileTimeString && null !== $nameSlot) {
+                            $foreachHints = JIT\VariableFunctionCallHelper::hintedCalleeNames($block, $nameSlot);
+                            if (\count($foreachHints) > 1) {
+                                $nameVar->compileTimeString = null;
+                            }
+                        }
                         if (null === $nameVar->compileTimeString) {
                             if ($this->shouldUseSelfHostJitStubs()) {
                                 $this->context->scope->toCall = null;

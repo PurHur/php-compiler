@@ -60750,6 +60750,10 @@ class Compiler {
         if (null === $nameSlot) {
             return null;
         }
+        // Multi-assign / foreach-fed callees must stay dynamic (#35075).
+        if ($this->variableFunctionNameHasDivergentStringSources($nameSlot, $block)) {
+            return null;
+        }
         $name = $this->resolveCompileTimeStringSlot($nameSlot, $block);
         if (null === $name) {
             return null;
@@ -60758,6 +60762,31 @@ class Compiler {
         $lit->type = Type::string();
 
         return $this->compileOperand($lit, $block, true);
+    }
+
+    /**
+     * True when more than one distinct compile-time string can flow into {@see $nameSlot}
+     * via TYPE_ASSIGN in this block (reassignment) (#35075).
+     */
+    private function variableFunctionNameHasDivergentStringSources(int $nameSlot, Block $block): bool
+    {
+        $found = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type || $op->arg2 !== $nameSlot) {
+                continue;
+            }
+            $visited = [];
+            $resolved = $this->resolveCompileTimeStringSlot((int) $op->arg3, $block, $visited);
+            if (null === $resolved) {
+                continue;
+            }
+            $found[strtolower($resolved)] = true;
+            if (\count($found) > 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -60777,14 +60806,20 @@ class Compiler {
 
             return $const->toString();
         }
+        // Prefer the last ASSIGN in this block (reassignment: $fn='a'; …; $fn='b'; …) (#35075).
+        $lastResolved = null;
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN !== $op->type || $op->arg2 !== $slot) {
                 continue;
             }
-            $resolved = $this->resolveCompileTimeStringSlot((int) $op->arg3, $block, $visited);
+            $branchVisited = $visited;
+            $resolved = $this->resolveCompileTimeStringSlot((int) $op->arg3, $block, $branchVisited);
             if (null !== $resolved) {
-                return $resolved;
+                $lastResolved = $resolved;
             }
+        }
+        if (null !== $lastResolved) {
+            return $lastResolved;
         }
 
         foreach ($block->parents as $parent) {

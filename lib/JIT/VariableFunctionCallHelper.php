@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * Compile-time hint scanning + candidate resolution for dynamic $fn() (issue #1997).
  *
- * LLVM dispatch: {@see VariableFunctionCallRuntime} via {@see VariableFunctionCallJitHelper} PHP (#10135).
+ * LLVM dispatch: {@see VariableFunctionCallRuntime} via {@see JitStringCompare} (#10135 / #35075).
  */
 final class VariableFunctionCallHelper
 {
@@ -25,15 +25,28 @@ final class VariableFunctionCallHelper
     public static function hintedCalleeNames(Block $block, ?int $nameSlot): array
     {
         $hints = [];
-        foreach (self::blocksForHintScan($block) as $scanBlock) {
+        $scanBlocks = self::blocksForHintScan($block);
+        foreach ($scanBlocks as $scanBlock) {
             if (null !== $nameSlot) {
                 foreach ($scanBlock->opCodes as $op) {
-                    if (OpCode::TYPE_ASSIGN !== $op->type || $op->arg2 !== $nameSlot) {
-                        continue;
+                    if (OpCode::TYPE_ASSIGN === $op->type && $op->arg2 === $nameSlot) {
+                        $literal = self::literalFromAssignSource($scanBlock, $op->arg3);
+                        if (null !== $literal) {
+                            $hints[] = $literal;
+                        } elseif (null !== $op->arg3) {
+                            // foreach (['strlen'] as $fn) { $fn(...) } — ASSIGN ← ITER_VALUE (#35075)
+                            $hints = array_merge(
+                                $hints,
+                                self::foreachArrayLiteralHints($scanBlocks, $op->arg3)
+                            );
+                        }
                     }
-                    $literal = self::literalFromAssignSource($scanBlock, $op->arg3);
-                    if (null !== $literal) {
-                        $hints[] = $literal;
+                    // Direct callee slot from ITER_VALUE (no intermediate ASSIGN).
+                    if (OpCode::TYPE_ITER_VALUE === $op->type && $op->arg1 === $nameSlot && null !== $op->arg2) {
+                        $hints = array_merge(
+                            $hints,
+                            self::arrayLiteralElementHints($scanBlocks, $op->arg2)
+                        );
                     }
                 }
             }
@@ -41,6 +54,57 @@ final class VariableFunctionCallHelper
         }
 
         return array_values(array_unique($hints));
+    }
+
+    /**
+     * String literals in INIT_ARRAY / ADD_ARRAY_ELEMENT feeding an ITER_VALUE result slot.
+     *
+     * @param list<Block> $scanBlocks
+     * @return list<string>
+     */
+    private static function foreachArrayLiteralHints(array $scanBlocks, int $iterValueResultSlot): array
+    {
+        foreach ($scanBlocks as $scanBlock) {
+            foreach ($scanBlock->opCodes as $op) {
+                if (OpCode::TYPE_ITER_VALUE !== $op->type || $op->arg1 !== $iterValueResultSlot) {
+                    continue;
+                }
+                if (null === $op->arg2) {
+                    continue;
+                }
+
+                return self::arrayLiteralElementHints($scanBlocks, $op->arg2);
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Collect string element literals from INIT_ARRAY / ADD_ARRAY_ELEMENT for one array slot.
+     *
+     * @param list<Block> $scanBlocks
+     * @return list<string>
+     */
+    private static function arrayLiteralElementHints(array $scanBlocks, int $arraySlot): array
+    {
+        $hints = [];
+        foreach ($scanBlocks as $scanBlock) {
+            foreach ($scanBlock->opCodes as $op) {
+                if (
+                    (OpCode::TYPE_INIT_ARRAY === $op->type || OpCode::TYPE_ADD_ARRAY_ELEMENT === $op->type)
+                    && $op->arg1 === $arraySlot
+                    && null !== $op->arg2
+                ) {
+                    $literal = self::literalFromAssignSource($scanBlock, $op->arg2);
+                    if (null !== $literal) {
+                        $hints[] = $literal;
+                    }
+                }
+            }
+        }
+
+        return $hints;
     }
 
     /**

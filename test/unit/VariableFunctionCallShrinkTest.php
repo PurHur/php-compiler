@@ -22,22 +22,23 @@ final class VariableFunctionCallShrinkTest extends TestCase
         $this->assertStringNotContainsString('dispatchSingleCandidate', $source);
         $this->assertStringNotContainsString('boxCallResult', $source);
         // Helper was ~387 lines with inline JitStringCompare; keep a budget against re-bloat (#10135).
+        // Foreach INIT_ARRAY hint scan (#35075) adds ~60 lines.
         $lineCount = \substr_count($source, "\n") + 1;
-        $this->assertLessThan(280, $lineCount);
-        $this->assertGreaterThan(100, 387 - $lineCount);
+        $this->assertLessThan(360, $lineCount);
+        $this->assertGreaterThan(200, $lineCount);
     }
 
     public function testVariableFunctionCallRuntimeUsesJitHelper(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/VariableFunctionCallRuntime.php');
-        $this->assertStringContainsString('VariableFunctionCallJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('JitStringCompare::strcmp', $source);
+        $this->assertStringContainsString('matchIndexByStrcmp', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new \\PHPCompiler\\JIT(', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('JitStringCompare::identical', $source);
+        $this->assertStringNotContainsString('implode("\\0"', $source);
+        $this->assertStringNotContainsString("implode(\"\\0\"", $source);
     }
 
     public function testVariableFunctionCallJitHelperDelegatesToSharedSemantics(): void
@@ -51,7 +52,7 @@ final class VariableFunctionCallShrinkTest extends TestCase
         $this->assertSame(0, VariableFunctionCall::matchCandidateIndex('strlen', ['strlen', 'myfn']));
         $this->assertSame(1, VariableFunctionCall::matchCandidateIndex('MyFn', ['strlen', 'myfn']));
         $this->assertSame(-1, VariableFunctionCall::matchCandidateIndex('missing', ['strlen']));
-        $table = "strlen\0myfn";
+        $table = "strlen\x1emyfn";
         $this->assertSame(1, VariableFunctionCallJitHelper::matchCandidateIndex('myfn', $table));
     }
 }

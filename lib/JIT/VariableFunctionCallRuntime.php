@@ -7,25 +7,16 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\JIT\Call;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT runtime dispatch for dynamic $fn() via VariableFunctionCallJitHelper PHP (#10135, #24902).
+ * JIT/AOT runtime dispatch for dynamic $fn() (#10135, #24902, #35075).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathModf #22519 / Lcg #22495).
- * Replaces per-candidate JitStringCompare LLVM chains in {@see VariableFunctionCallHelper}.
+ * Matches the runtime name with {@see JitStringCompare} (not a NUL/RS-delimited
+ * helper table — AOT string constants truncate at embedded NUL, which collapsed
+ * multi-candidate foreach dispatch to index 0).
  */
 final class VariableFunctionCallRuntime
 {
-    private const HELPER_PATH = '/VM/VariableFunctionCallJitHelper.php';
-
-    private const MATCH_INDEX_HELPER = 'PHPCompiler\\VM\\VariableFunctionCallJitHelper::matchCandidateIndex';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::MATCH_INDEX_HELPER,
-    ];
-
     private static int $blockSeq = 0;
 
     /**
@@ -37,15 +28,34 @@ final class VariableFunctionCallRuntime
         array $candidates,
         Variable ...$args
     ): Value {
-        $candidateNames = \array_keys($candidates);
-        $table = \implode("\0", $candidateNames);
-        $index = $context->builder->call(
-            self::matchHelperFunction($context),
-            $nameStr,
-            $context->builder->load($context->constantStringFromString($table))
-        );
+        $index = self::matchIndexByStrcmp($context, $nameStr, \array_keys($candidates));
 
         return self::dispatchByIndex($context, $index, $candidates, ...$args);
+    }
+
+    /**
+     * @param list<string> $candidateNames lowercase names in dispatch order
+     */
+    private static function matchIndexByStrcmp(Context $context, Value $nameStr, array $candidateNames): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $indexSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $context->builder->store($i32->constInt(-1, true), $indexSlot);
+
+        $i = 0;
+        foreach ($candidateNames as $candidate) {
+            $lit = $context->builder->load($context->constantStringFromString($candidate));
+            $cmp = JitStringCompare::strcmp($context, $nameStr, $lit);
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+            $cur = $context->builder->load($indexSlot);
+            $picked = $context->builder->select($isMatch, $i32->constInt($i, false), $cur);
+            $context->builder->store($picked, $indexSlot);
+            ++$i;
+        }
+
+        return $context->builder->load($indexSlot);
     }
 
     /**
@@ -70,7 +80,6 @@ final class VariableFunctionCallRuntime
         }
 
         $i32 = $context->getTypeFromString('int32');
-        // NestedJIT helpers may surface PHP int as i64; matchCandidateIndex is i32 ABI (#24902 / #34937).
         $indexTy = $context->getStringFromType($index->typeOf());
         if ('int64' === $indexTy) {
             $index = $context->builder->trunc($index, $i32);
@@ -123,23 +132,6 @@ final class VariableFunctionCallRuntime
         return $context->builder->load($resultSlot);
     }
 
-    private static function matchHelperFunction(Context $context): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, self::MATCH_INDEX_HELPER, '#24902');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#24902'
-        );
-    }
-
     /**
      * @param array<string, Call> $candidates
      */
@@ -162,8 +154,24 @@ final class VariableFunctionCallRuntime
     {
         $slot = JitValueBox::alloc($context);
         $rawTy = $context->getStringFromType($raw->typeOf());
+        // Prefer the LLVM return shape: Internal builtins (ceil/floor/round) return
+        // native double without setting functionReturnType (#35075).
         if ('int64' === $rawTy) {
             JitValueBox::writeLong($context, $slot, $raw);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        if ('double' === $rawTy) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                JitValueBox::pointer($context, $slot),
+                $raw
+            );
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        if ('int1' === $rawTy) {
+            JitValueBox::writeBool($context, $slot, $raw);
 
             return JitValueBox::pointer($context, $slot);
         }
@@ -187,7 +195,6 @@ final class VariableFunctionCallRuntime
 
             return JitValueBox::pointer($context, $slot);
         }
-        $rawTy = $context->getStringFromType($raw->typeOf());
         if ('__value__*' === $rawTy || '__value__' === $rawTy) {
             JitValueBox::copyFromPointer(
                 $context,
@@ -203,11 +210,6 @@ final class VariableFunctionCallRuntime
                 JitValueBox::pointer($context, $slot),
                 $raw
             );
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('int1' === $rawTy) {
-            JitValueBox::writeBool($context, $slot, $raw);
 
             return JitValueBox::pointer($context, $slot);
         }
