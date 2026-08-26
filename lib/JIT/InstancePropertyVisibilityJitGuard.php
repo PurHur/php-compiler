@@ -70,7 +70,8 @@ final class InstancePropertyVisibilityJitGuard
         Object_ $objectType,
         int $classId,
         string $propName,
-        ?Block $enclosingBlock
+        ?Block $enclosingBlock,
+        ?string $receiverClassName = null
     ): bool {
         $meta = $objectType->instancePropertyVisibilityMeta($classId, $propName);
         if (null === $meta) {
@@ -79,7 +80,9 @@ final class InstancePropertyVisibilityJitGuard
         $getVisibility = $meta['getVisibility'] ?? 0;
         $declaringLc = strtolower(ltrim($meta['declaringClassName'], '\\'));
         $callerLc = self::callerClassLc($objectType->jitContext(), $enclosingBlock);
-        $receiverLc = self::classIdToLc($objectType, $classId);
+        $receiverLc = null !== $receiverClassName && '' !== $receiverClassName
+            ? strtolower(ltrim($receiverClassName, '\\'))
+            : self::classIdToLc($objectType, $classId);
 
         return PropertyVisibility::isParentPrivatePropertyInvisibleFromChildScope(
             $meta['visibility'],
@@ -171,6 +174,9 @@ final class InstancePropertyVisibilityJitGuard
         }
         if ('' !== $context->scope->className) {
             return strtolower(ltrim($context->scope->className, '\\'));
+        }
+        if (null !== $context->jitEnclosingBlock?->func?->class) {
+            return strtolower(ltrim((string) $context->jitEnclosingBlock->func->class->value, '\\'));
         }
 
         return null;
