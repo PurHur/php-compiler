@@ -23,6 +23,7 @@ use PHPLLVM\Value;
  * a user-script DOMElement instead — tag/inner XML from compile-time loadXML
  * (#32350) or loadHTML getElementById (#19212). `$deep` must gate InnerXml (#33097).
  * Attributes are always copied (xmlDocCopyNode); #33097 only gated children (#33362).
+ * DOMText sources materialize via {@see JitDomCreateTextNode} (#35043).
  */
 final class JitDomImportNode
 {
@@ -164,6 +165,13 @@ final class JitDomImportNode
         JITVariable $sourceNode,
         bool $deep
     ): Value {
+        // Text / CharacterData first — element-only fallback treats destination loadXML root
+        // as the import and yields a wrong DOMElement (#35043 / php-src xmlDocCopyNode).
+        $textData = self::resolveCompileTimeTextData($sourceNode);
+        if (null !== $textData) {
+            return self::materializeImportedText($context, $textData);
+        }
+
         $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
         $tag = 'div';
@@ -203,6 +211,14 @@ final class JitDomImportNode
         }
         if (null !== $srcTag && '' !== $srcTag && null === $sourceNode->compileTimeDomTagName) {
             $sourceNode->compileTimeDomTagName = $srcTag;
+        }
+        // Path recovery may yield libxml `text()` — not an element tag (#35043).
+        if ('text()' === $srcTag || '#text' === $srcTag) {
+            $data = self::resolveCompileTimeTextData($sourceNode)
+                ?? JitDomCreateTextNode::$lastMaterializedData
+                ?? '';
+
+            return self::materializeImportedText($context, $data);
         }
         if (null !== $srcTag && '' !== $srcTag) {
             $tag = $srcTag;
@@ -302,6 +318,59 @@ final class JitDomImportNode
         }
 
         return self::boxObjectResult($context, $element);
+    }
+
+    /**
+     * Compile-time text payload for importNode(DOMText) (#35043).
+     *
+     * ARG_SEND often drops Variable stamps; recover via createTextNode /
+     * firstChild|nextSibling lastMaterializedData (peer cloneNode / #35021).
+     */
+    private static function resolveCompileTimeTextData(JITVariable $sourceNode): ?string
+    {
+        if (null !== $sourceNode->compileTimeDomTextData) {
+            return $sourceNode->compileTimeDomTextData;
+        }
+        $tag = $sourceNode->compileTimeDomTagName;
+        if ('#text' === $tag) {
+            return JitDomCreateTextNode::$lastMaterializedData ?? '';
+        }
+        $path = $sourceNode->compileTimeDomNodePath ?? JitDomGetNodePath::$lastPath;
+        if (\is_string($path) && 1 === preg_match('#(?:^|/)text\(\)$#', $path)) {
+            return JitDomCreateTextNode::$lastMaterializedData ?? '';
+        }
+        // Child-edge text: stampChildIndex clears lastFetchedTagName (#34314).
+        $index = $sourceNode->compileTimeDomChildIndex
+            ?? JitDomNodeChildProperty::$lastFetchedChildIndex;
+        if (null !== $index
+            && (null === $tag || '' === $tag)
+            && null === JitDomNodeChildProperty::$lastFetchedTagName
+            && null !== JitDomCreateTextNode::$lastMaterializedData
+        ) {
+            return JitDomCreateTextNode::$lastMaterializedData;
+        }
+        // createTextNode($lit) result — no element identity stamps (#35043).
+        if ((null === $tag || '' === $tag)
+            && null === $sourceNode->compileTimeDomChildIndex
+            && null === $sourceNode->compileTimeDomNodePath
+            && null === $sourceNode->compileTimeDomInnerXml
+            && null === $sourceNode->compileTimeDomLoadXml
+            && null !== JitDomCreateTextNode::$lastMaterializedData
+            && null === JitDomNodeChildProperty::$lastFetchedTagName
+        ) {
+            return JitDomCreateTextNode::$lastMaterializedData;
+        }
+
+        return null;
+    }
+
+    private static function materializeImportedText(Context $context, string $data): Value
+    {
+        self::$lastMaterializedTagName = '#text';
+        self::$lastMaterializedInnerXml = null;
+        $obj = JitDomCreateTextNode::materialize($context, $data);
+
+        return self::boxObjectResult($context, $obj);
     }
 
     /**

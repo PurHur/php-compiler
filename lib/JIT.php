@@ -16431,11 +16431,34 @@ class JIT {
         if (!$src instanceof Variable) {
             return;
         }
-        $tag = $src->compileTimeDomTagName ?? null;
-        if (null === $tag || '' === $tag) {
+        if (!$this->context->hasVariableOp($result)) {
             return;
         }
-        if (!$this->context->hasVariableOp($result)) {
+        // importNode(DOMText) — stamp text data so appendChild / CharacterData see #text (#35043).
+        $textData = $src->compileTimeDomTextData
+            ?? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData;
+        $srcTag = $src->compileTimeDomTagName ?? null;
+        $importedAsText = null !== $textData
+            && (
+                null !== $src->compileTimeDomTextData
+                || '#text' === $srcTag
+                || 'text()' === $srcTag
+                || '#text' === \PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName
+            );
+        if ($importedAsText) {
+            $this->bindCompileTimeDomTextData($result, (string) $textData);
+            $resultVar = $this->context->getVariableFromOp($result);
+            $resultVar->compileTimeDomTagName = null;
+            $resultVar->compileTimeDomInnerXml = null;
+            $resultVar->compileTimeDomLoadXml = null;
+
+            return;
+        }
+        $tag = $srcTag;
+        if (null === $tag || '' === $tag) {
+            $tag = \PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName;
+        }
+        if (null === $tag || '' === $tag || '#text' === $tag || 'text()' === $tag) {
             return;
         }
         $deep = false;
