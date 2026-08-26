@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: mb_scrub() via MbScrubJitHelper (#34338 leftover of #6050).
+ * AOT: mb_scrub() via MbScrubJitHelper (#34338 leftover of #6050 / #35161).
  *
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_scrub)
  *
@@ -24,14 +24,31 @@ final class MbScrubRuntimeAotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/aot_mb_scrub_runtime.php');
     }
 
+    public function testAotRuntimeEncodingMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(__DIR__.'/../repro/mb_scrub_runtime_encoding_aot.php');
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
         $helper = (string) file_get_contents($root.'/ext/mbstring/MbScrubJitHelper.php');
         $this->assertStringContainsString('function scrubArgv', $helper);
+        $this->assertStringContainsString('function assertEncodingArgv', $helper);
+        $this->assertStringContainsString('Argument #2', $helper);
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbScrubRuntime.php');
         $this->assertStringContainsString('scrubHelper', $runtime);
+        $this->assertStringContainsString('assertEncodingHelper', $runtime);
         $this->assertStringContainsString('MbScrubJitHelper::scrubArgv', $runtime);
+        $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbScrub.php');
+        $this->assertStringContainsString('encodingPtr', $jit);
+        $this->assertStringNotContainsString(
+            'encoding must be a string literal in this compiler build',
+            $jit
+        );
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_scrub.php');
         $this->assertStringContainsString('JitMbScrub::invoke', $src);
         $this->assertStringNotContainsString(

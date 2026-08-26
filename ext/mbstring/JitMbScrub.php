@@ -15,10 +15,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT for mb_scrub() (php-src ext/mbstring/mbstring.c; #6050, #34338).
+ * LLVM JIT/AOT for mb_scrub() (php-src ext/mbstring/mbstring.c; #6050, #34338, #35161).
  *
- * Compile-time fold for string literals; runtime string + encoding literal via NestedJIT
- * {@see MbScrubJitHelper} (peer {@see JitMbCase} / {@see JitMbConvertEncoding}).
+ * Compile-time fold for string literals; runtime string via NestedJIT
+ * {@see MbScrubJitHelper}. Runtime encoding via NestedJIT assertEncodingArgv
+ * (#35161 leftover of #34338 / peer #35155 / #35151).
  */
 final class JitMbScrub
 {
@@ -37,15 +38,13 @@ final class JitMbScrub
             return $folded;
         }
 
-        $encoding = self::runtimeEncodingLiteral($args, $argc);
-        if (null === $encoding) {
-            throw new \LogicException(
-                'mb_scrub() encoding must be a string literal in this compiler build'
-            );
+        // Link NestedJIT helpers before lowering args — NestedJIT can invalidate prior IR (#34270 / #35161).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbScrubRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         }
-        if (null === self::canonicalEncoding($encoding)) {
-            return self::emitEncodingValueError($context, $encoding);
-        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_scrub_runtime');
 
         // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21516).
         $str = JitStringBuiltinArg::lowerTrimFamilyString(
@@ -55,16 +54,16 @@ final class JitMbScrub
             0,
             'string'
         );
-
-        // NestedJIT helper compile can clear insert; restore before call (#34270 peer).
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbScrubRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        [$encPtr, $needsAssert] = self::encodingPtr($context, $args, $argc);
+        if ($needsAssert) {
+            $fnName = $context->builder->load($context->constantStringFromString('mb_scrub'));
+            $context->builder->call(
+                MbScrubRuntime::assertEncodingHelper($context),
+                $encPtr,
+                $fnName
+            );
         }
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_scrub_runtime');
 
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
         $resultStr = $context->builder->call(
             MbScrubRuntime::scrubHelper($context),
             $str,
@@ -106,6 +105,41 @@ final class JitMbScrub
     }
 
     /**
+     * Literal UTF-8/ASCII/8BIT → constant string (no assert); otherwise NestedJIT encoding + assert (#35161).
+     *
+     * @param list<JITVariable> $args
+     * @return array{0: Value, 1: bool} encoding ptr, needsAssert
+     */
+    private static function encodingPtr(Context $context, array $args, int $argc): array
+    {
+        if ($argc < 2 || JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            return [$context->builder->load($context->constantStringFromString('UTF-8')), false];
+        }
+
+        $encodingLit = JitStringArg::compileTimeLiteral($args[1]);
+        if (null !== $encodingLit) {
+            $canonical = self::canonicalEncoding($encodingLit);
+            if (null !== $canonical) {
+                return [$context->builder->load($context->constantStringFromString($canonical)), false];
+            }
+
+            // Invalid / unsupported literal — NestedJIT assert throws catchable ValueError (#35161).
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
+        }
+
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[1],
+                'mb_scrub',
+                1,
+                'encoding'
+            ),
+            true,
+        ];
+    }
+
+    /**
      * @param JITVariable[] $args
      */
     private static function compileTimeEncoding(array $args, int $index): ?string
@@ -121,21 +155,6 @@ final class JitMbScrub
         }
 
         return $args[$index]->compileTimeString ?? null;
-    }
-
-    /**
-     * @param list<JITVariable> $args
-     */
-    private static function runtimeEncodingLiteral(array $args, int $argc): ?string
-    {
-        if ($argc < 2) {
-            return 'UTF-8';
-        }
-        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
-            return 'UTF-8';
-        }
-
-        return JitStringArg::compileTimeLiteral($args[1]);
     }
 
     private static function canonicalEncoding(string $encoding): ?string

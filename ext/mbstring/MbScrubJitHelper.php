@@ -5,18 +5,50 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * mb_scrub() NestedJIT runtime (#34338 leftover of #6050).
+ * mb_scrub() NestedJIT runtime (#34338 leftover of #6050 / #35161).
  *
  * Leaf UTF-8 / ASCII / 8BIT scrub with '?' substitution (Zend default
- * mb_substitute_character). Encoding is always a compile-time-validated
- * literal from {@see JitMbScrub} — no ValueError here (NestedJIT throw
- * paths pollute the user module).
+ * mb_substitute_character). Runtime encoding via {@see assertEncodingArgv}
+ * (#35161 leftover of #34338 / peer #35155).
+ *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_scrub)
  */
 final class MbScrubJitHelper
 {
+    /**
+     * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
+     * SIGSEGVs under thin AOT; int helpers match {@see MbSubstrCountJitHelper::assertEncodingArgv} (#35161).
+     *
+     * Argument #2 ($encoding) for mb_scrub.
+     */
+    public static function assertEncodingArgv(string $encoding, string $function): int
+    {
+        $ok = 0;
+        if ('UTF-8' === $encoding || 'utf-8' === $encoding || 'UTF8' === $encoding || 'utf8' === $encoding) {
+            $ok = 1;
+        }
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            $ok = 1;
+        }
+        if ('8BIT' === $encoding || '8bit' === $encoding || 'BINARY' === $encoding || 'binary' === $encoding) {
+            $ok = 1;
+        }
+        if (0 === $ok) {
+            // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+            throw new \ValueError(
+                $function.'(): Argument #2 ($encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
+
+        return 1;
+    }
+
     public static function scrubArgv(string $value, string $encoding): string
     {
+        // Encoding must already be validated via {@see assertEncodingArgv} for runtime paths (#35161).
         $canonical = self::canonical($encoding);
         if ('8BIT' === $canonical) {
             return $value;
