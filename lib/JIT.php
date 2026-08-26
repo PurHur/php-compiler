@@ -2917,11 +2917,76 @@ class JIT {
             }
         }
 
+        $this->precompileClosuresBeforeQueue($block);
         $this->queue[] = [$func, $block, $argVars];
         if ($callbackType === 'void(*)()' && !Block::containsNonLiteralEvalOpcodes($block)) {
             $this->context->addExport($internalName, $callbackType, $block);
         }
         return $func;
+    }
+
+    /**
+     * Compile nested TYPE_CLOSURE bodies before the enclosing function is queued so
+     * `{closure}_N` proxies exist when main lowers `$f = m(); $f()` (#34868).
+     *
+     * Without this, FUNCCALL_INIT runs before runQueue, closureCandidates() is empty,
+     * resolveIndirectCall returns null, and the invoke becomes a null call.
+     */
+    private function precompileClosuresBeforeQueue(Block $block): void
+    {
+        foreach ($block->opCodes as $i => $op) {
+            if (OpCode::TYPE_CLOSURE !== $op->type || null === $op->block1) {
+                continue;
+            }
+            if (null !== $op->closurePrecompiledInternalName) {
+                continue;
+            }
+            if ($this->shouldStubClosureLowering()) {
+                continue;
+            }
+            $internalName = JIT\ClosureHelper::nextInternalName();
+            $op->closurePrecompiledInternalName = $internalName;
+            $this->compileClosureBodyBlock($block, $op->block1, $internalName);
+            $lcname = strtolower($internalName);
+            if (!isset($this->context->functionProxies[$lcname])) {
+                continue;
+            }
+            $proxy = $this->context->functionProxies[$lcname];
+            // Captures wrap must wait until TYPE_CLOSURE (enclosing locals exist then).
+            $n = \count($block->opCodes);
+            for ($j = $i + 1; $j < $n; ++$j) {
+                $next = $block->opCodes[$j];
+                if (OpCode::TYPE_RETURN === $next->type && null !== $next->arg1
+                    && (int) $next->arg1 === (int) $op->arg1
+                ) {
+                    $this->recordReturnedClosureProxyForBlock($block, $proxy);
+                    break;
+                }
+                if (OpCode::TYPE_CLOSURE === $next->type || OpCode::TYPE_RETURN === $next->type) {
+                    break;
+                }
+            }
+        }
+    }
+
+    /** @param JIT\Call $proxy */
+    private function recordReturnedClosureProxyForBlock(Block $block, $proxy): void
+    {
+        if (null === $block->func) {
+            return;
+        }
+        $funcName = $block->func->name ?? null;
+        if (!is_string($funcName) || '' === $funcName || '{main}' === $funcName) {
+            return;
+        }
+        $lc = strtolower($funcName);
+        if (null !== $block->func->class && is_string($block->func->class->value ?? null)) {
+            $classLc = strtolower(ltrim((string) $block->func->class->value, '\\'));
+            if ('' !== $classLc) {
+                $lc = $classLc.'::'.$lc;
+            }
+        }
+        $this->context->functionReturnedClosureCall[$lc] = $proxy;
     }
 
   /** LLVM/C symbols reserved for the AOT entry wrapper and runtime init (#2779). */
@@ -12337,7 +12402,9 @@ class JIT {
                         ? $returnBlock
                         : $origBasicBlock;
                 case OpCode::TYPE_RETURN:
-                    $return = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    $returnOperand = $block->getOperand($op->arg1);
+                    $return = $this->context->getVariableFromOp($returnOperand);
+                    $this->recordFunctionReturnedClosureCall($block, $return);
                     $this->markJitThisConstructedIfLeavingConstruct($block);
                     if (
                         0 === $this->context->inlineIncludeDepth
@@ -12492,8 +12559,11 @@ class JIT {
                         $this->assignOperand($block->getOperand($op->arg1), $closureObj, true);
                         break;
                     }
-                    $internalName = JIT\ClosureHelper::nextInternalName();
-                    $this->compileClosureBodyBlock($block, $op->block1, $internalName);
+                    $internalName = $op->closurePrecompiledInternalName
+                        ?? JIT\ClosureHelper::nextInternalName();
+                    if (null === $op->closurePrecompiledInternalName) {
+                        $this->compileClosureBodyBlock($block, $op->block1, $internalName);
+                    }
                     $lcname = strtolower($internalName);
                     if (!isset($this->context->functionProxies[$lcname])) {
                         throw new \LogicException("Closure body failed to register JIT proxy: {$internalName}");
@@ -12579,6 +12649,10 @@ class JIT {
                             $boundScope
                         );
                         $closureObj->closureCall = new JIT\Call\ClosureWithBinding($callProxy, $boundThis, $boundScope);
+                    }
+                    // Refresh returned-closure map with the final proxy (captures / binding) (#34868).
+                    if (null !== $closureObj->closureCall) {
+                        $this->recordReturnedClosureProxyForBlock($block, $closureObj->closureCall);
                     }
                     $this->assignOperand($block->getOperand($op->arg1), $closureObj, true);
                     break;
@@ -13257,6 +13331,7 @@ class JIT {
                         $result,
                         $this->calleeReturnsByRef($this->context->scope->toCall)
                     );
+                    $this->attachReturnedClosureInvokeMetadata($block, $op);
                     $this->syncDateTimeDiffMetaToResult(
                         $this->context->scope->toCall,
                         $block->getOperand($op->arg1)
@@ -19260,6 +19335,64 @@ class JIT {
             if (null !== $slot) {
                 $this->context->fccClosureCallByResultSlot[$slot] = $value->closureCall;
             }
+        }
+    }
+
+    /**
+     * Stash Closure invoke proxy when a user function/method returns a known closure (#34868).
+     *
+     * Cross-function `$f = m(); $f()` cannot see the callee Variable::closureCall; without this
+     * map EXEC_RETURN leaves a bare object and FUNCCALL_INIT falls through to a null callee.
+     */
+    private function recordFunctionReturnedClosureCall(Block $block, Variable $return): void
+    {
+        if (null === $return->closureCall || null === $block->func) {
+            return;
+        }
+        $funcName = $block->func->name ?? null;
+        if (!is_string($funcName) || '' === $funcName || '{main}' === $funcName) {
+            return;
+        }
+        $lc = strtolower($funcName);
+        if (null !== $block->func->class && is_string($block->func->class->value ?? null)) {
+            $classLc = strtolower(ltrim((string) $block->func->class->value, '\\'));
+            if ('' !== $classLc) {
+                $lc = $classLc.'::'.$lc;
+            }
+        }
+        $this->context->functionReturnedClosureCall[$lc] = $return->closureCall;
+    }
+
+    /**
+     * Reattach callee-returned Closure invoke metadata onto EXEC_RETURN's result (#34868).
+     */
+    private function attachReturnedClosureInvokeMetadata(Block $block, OpCode $op): void
+    {
+        $toCall = $this->context->scope->toCall;
+        $lc = null;
+        if ($toCall instanceof JIT\Call\Native) {
+            $lc = strtolower($toCall->name);
+        } elseif ($toCall instanceof CoreFunc\Internal) {
+            $lc = strtolower($toCall->getName());
+        }
+        if (null === $lc || !isset($this->context->functionReturnedClosureCall[$lc])) {
+            return;
+        }
+        $proxy = $this->context->functionReturnedClosureCall[$lc];
+        $resultOp = $block->getOperand($op->arg1);
+        if (null === $resultOp || !$this->context->hasVariableOp($resultOp)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($resultOp);
+        $var->closureCall = $proxy;
+        $resolved = JIT\OperandName::resolve($resultOp);
+        if (null !== $resolved && '' !== $resolved) {
+            $this->context->bindVariableByName($resolved, $var);
+        }
+        $this->context->fccClosureCallByResultSlot[(int) $op->arg1] = $proxy;
+        $slot = $block->slotForOperand($resultOp);
+        if (null !== $slot) {
+            $this->context->fccClosureCallByResultSlot[$slot] = $proxy;
         }
     }
 

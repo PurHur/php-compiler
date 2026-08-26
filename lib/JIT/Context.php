@@ -285,6 +285,16 @@ class Context {
     public array $fccClosureCallByResultSlot = [];
 
     /**
+     * User function / method lcname => Closure invoke proxy for a compile-time
+     * `return fn()…` / `return function()…` so the caller's EXEC_RETURN can reattach
+     * Variable::closureCall (otherwise `$f = m(); $f()` loses the proxy and AOT
+     * returns null / SIGSEGV — #34868).
+     *
+     * @var array<string, Call>
+     */
+    public array $functionReturnedClosureCall = [];
+
+    /**
      * Array result operand slot => normalized element key => Closure invoke proxy.
      *
      * Populated at array literal build; consumed when foreach iter value assigns into a
@@ -4118,7 +4128,14 @@ class Context {
         $returnOperands = new \SplObjectStorage();
         $returnSlots = [];
         foreach ($block->opCodes as $blockOp) {
-            if (OpCode::TYPE_RETURN !== $blockOp->type || null === $blockOp->arg1) {
+            // TYPE_THROW must keep its operand alive the same way RETURN does: uncaught
+            // emitThrow calls freeDeadVariables before instanceof Throwable, and freeing the
+            // Exception object made `return throw new …` / `fn()=>throw new …` look like a
+            // non-Throwable (or SIGSEGV) under AOT (#34868, peer #34859).
+            if (
+                (OpCode::TYPE_RETURN !== $blockOp->type && OpCode::TYPE_THROW !== $blockOp->type)
+                || null === $blockOp->arg1
+            ) {
                 continue;
             }
             $returnOp = $block->getOperand($blockOp->arg1);
