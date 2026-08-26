@@ -6,7 +6,9 @@ namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\UndefinedPropertyFetchRuntime;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable;
@@ -157,6 +159,16 @@ final class ObjectInstancePropertyLlvm
         }
         $propset = $object->resolvePropertySetForNameId($classId, $nameId);
         if (null !== $propset) {
+                if (self::shouldTreatAsInvisibleParentPrivateRead($object, $name, $forWrite)) {
+                    $scopeClassId = self::scopeClassIdForVisibility($object);
+                    if (null !== $scopeClassId) {
+                        return self::invisibleParentPrivateUndefinedRead(
+                            $object,
+                            $name,
+                            $object->classNameForId($scopeClassId)
+                        );
+                    }
+                }
                 $slot = $object->propertySlotPtr($obj, $propset[3]);
                 if (Variable::TYPE_VALUE === $propset[2]) {
                     $valueType = $context->getTypeFromString('__value__');
@@ -378,6 +390,16 @@ final class ObjectInstancePropertyLlvm
         if (1 === \count($candidates)) {
             $classId = array_key_first($candidates);
             $className = $candidates[$classId];
+            if (self::shouldTreatAsInvisibleParentPrivateRead($object, $name, $forWrite)) {
+                $scopeClassId = self::scopeClassIdForVisibility($object);
+                if (null !== $scopeClassId) {
+                    return self::invisibleParentPrivateUndefinedRead(
+                        $object,
+                        $name,
+                        $object->classNameForId($scopeClassId)
+                    );
+                }
+            }
 
             return self::propertyFetchOrdinary($object, $obj, $className, $name, $classId, $forWrite);
         }
@@ -670,6 +692,76 @@ final class ObjectInstancePropertyLlvm
         throw new \LogicException(
             'Property fetch receiver must be object or object-valued property, got '
             .Variable::getStringType($var->type)
+        );
+    }
+
+    /**
+     * Child-scope read of parent private: property exists but not from this scope (#19005).
+     */
+    private static function shouldTreatAsInvisibleParentPrivateRead(
+        Object_ $object,
+        string $name,
+        bool $forWrite
+    ): bool {
+        if ($forWrite || !UserScriptAotEnv::isActive()) {
+            return false;
+        }
+        $scopeClassId = self::scopeClassIdForVisibility($object);
+        if (null === $scopeClassId || !self::scopeClassIsUserScript($object, $scopeClassId)) {
+            return false;
+        }
+
+        return !$object->propertyExistsFromScope($scopeClassId, $name)
+            && null !== $object->resolvePropertySlot($object->classNameForId($scopeClassId), $name);
+    }
+
+    private static function scopeClassIdForVisibility(Object_ $object): ?int
+    {
+        $ctx = $object->jitContext();
+        $scopeName = $ctx->scope->className;
+        if ('' === $scopeName && null !== $ctx->jitEnclosingBlock?->func?->class) {
+            $scopeName = ltrim((string) $ctx->jitEnclosingBlock->func->class->value, '\\');
+        }
+        if ('' === $scopeName || !$object->hasDeclaredClass($scopeName)) {
+            return null;
+        }
+
+        return $object->lookup($scopeName);
+    }
+
+    private static function scopeClassIsUserScript(Object_ $object, int $scopeClassId): bool
+    {
+        try {
+            $name = strtolower(ltrim($object->classNameForId($scopeClassId), '\\'));
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        return '' !== $name
+            && !str_starts_with($name, 'phpcompiler\\')
+            && !str_starts_with($name, 'phpcfg\\');
+    }
+
+    private static function invisibleParentPrivateUndefinedRead(
+        Object_ $object,
+        string $name,
+        string $receiverClassName
+    ): Variable {
+        $context = $object->jitContext();
+        UndefinedPropertyFetchRuntime::emitWarning($context, $receiverClassName, $name);
+        $valueType = $context->getTypeFromString('__value__');
+        $storage = BasicBlockHelper::entryAlloca($context, $valueType);
+        $valueMap = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($storage, $valueMap['type'])
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_NULL,
+            Variable::KIND_VARIABLE,
+            $storage,
         );
     }
 }

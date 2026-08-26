@@ -15147,14 +15147,15 @@ class JIT {
                                 $this->context->type->object,
                                 $classId,
                                 $name->value,
-                                $block
+                                $block,
+                                $this->resolvePropertyFetchReceiverClassName($obj, $block, $declaringClass)
                             )
                         ) {
                             // Non-null receiver: nullsafe still warns like plain -> (#23705).
                             JIT\UndefinedPropertyFetchHelper::lowerUndefinedDynamicPropertyRead(
                                 $this->context,
                                 $result,
-                                $declaringClass,
+                                $this->resolvePropertyFetchReceiverClassName($obj, $block, $declaringClass),
                                 $name->value
                             );
                             break;
@@ -16175,6 +16176,19 @@ class JIT {
 
     private function resolvePropertyDeclaringClass(Operand $obj, Block $block, ?string $propName): string
     {
+        // `$this->prop` resolves property names in the *method* scope (Child), not the CFG
+        // userType on `$this` (often the parent). Using the parent as declaringClass made
+        // isInvisibleParentPrivateFetch treat the receiver as ParentOnly and read the parent's
+        // private slot under AOT (#19005 / #19011 VM+JIT parity).
+        $recvName = strtolower(JIT\OperandName::resolve($obj) ?? '');
+        if (
+            'this' === $recvName
+            && null !== $block->func
+            && null !== $block->func->class
+        ) {
+            return ltrim((string) $block->func->class->value, '\\');
+        }
+
         $declaringClass = $obj->type->userType ?? null;
         if (null !== $declaringClass && '' !== $declaringClass) {
             $pseudoLc = strtolower(ltrim($declaringClass, '\\'));
@@ -16258,6 +16272,60 @@ class JIT {
         $declaringClass = $this->recoverPropertyDeclaringClassFromReceiverVar($obj, $declaringClass);
 
         return $declaringClass;
+    }
+
+    /**
+     * Runtime receiver class for visibility / undefined-property warnings on `$this->prop`.
+     *
+     * CFG userType on `$this` is often the parent; zend_fetch_property uses the object's
+     * class for the invisible-parent-private check (#19005).
+     */
+    private function resolvePropertyFetchReceiverClassName(Operand $obj, Block $block, string $fallback): string
+    {
+        if ($this->propertyFetchOperandIsThis($obj, $block)) {
+            if (null !== $block->func?->class) {
+                return ltrim((string) $block->func->class->value, '\\');
+            }
+            if ('' !== $this->context->scope->className) {
+                return ltrim($this->context->scope->className, '\\');
+            }
+        }
+        if ($this->context->hasVariableOpInScopes($obj)) {
+            $recv = $this->context->getVariableFromOpInScopes($obj);
+            $tagged = $recv->classUserType ?? null;
+            if (is_string($tagged) && '' !== $tagged && 'object' !== strtolower(ltrim($tagged, '\\'))) {
+                return ltrim($tagged, '\\');
+            }
+        }
+
+        return $fallback;
+    }
+
+    private function propertyFetchOperandIsThis(Operand $obj, Block $block): bool
+    {
+        if ('this' === strtolower(JIT\OperandName::resolve($obj) ?? '')) {
+            return true;
+        }
+        if (!$this->instanceMethodUsesThis($block)) {
+            return false;
+        }
+        foreach ($block->orig->hoistedOperands ?? [] as $hoisted) {
+            if ('this' !== strtolower(JIT\OperandName::resolve($hoisted) ?? '')) {
+                continue;
+            }
+            if ($hoisted === $obj) {
+                return true;
+            }
+            $cur = $obj;
+            while ($cur instanceof Operand\Temporary && null !== $cur->original) {
+                if ($cur->original === $hoisted) {
+                    return true;
+                }
+                $cur = $cur->original;
+            }
+        }
+
+        return false;
     }
 
     /**
