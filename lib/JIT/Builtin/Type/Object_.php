@@ -18,6 +18,7 @@ use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\ext\dom\VmDomLiving;
 use PHPCompiler\ext\sqlite3\Sqlite3Constants;
 use PHPCompiler\ext\standard\ThrowableManifest;
+use PHPCompiler\ext\zip\VmZipArchive;
 use PHPCompiler\ext\zip\ZipArchiveConstants;
 use PHPCompiler\ext\zip\ZipExtensionPolicy;
 use PHPCompiler\VM\ExceptionSupport;
@@ -3929,6 +3930,17 @@ class Object_ extends Type {
             $this->defineProperty($id, '__hcBuf', Variable::TYPE_STRING);
             $this->defineProperty($id, '__hcKey', Variable::TYPE_STRING);
             $this->defineProperty($id, '__hcHmac', Variable::TYPE_NATIVE_LONG);
+        }
+        // ZipArchive stub props — late defineProperty after new SIGSEGVs (#35002 leftover of #20584).
+        // TYPE_VALUE for filename/comment: emitSetStringPropertyFromCstr stores heap __value__* boxes.
+        if ('ziparchive' === $lcname) {
+            $this->defineProperty($id, VmZipArchive::PROP_STATUS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, VmZipArchive::PROP_STATUS_SYS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, VmZipArchive::PROP_LAST_ID, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, VmZipArchive::PROP_NUM_FILES, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, VmZipArchive::PROP_FILENAME, Variable::TYPE_VALUE);
+            $this->defineProperty($id, VmZipArchive::PROP_COMMENT, Variable::TYPE_VALUE);
+            $this->markHasConstructor($id);
         }
         // OpenSSLAsymmetricKey PEM for thin AOT openssl_pkey_new (#34015).
         if ('opensslasymmetrickey' === $lcname) {

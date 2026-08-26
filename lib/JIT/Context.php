@@ -2122,6 +2122,8 @@ class Context {
         $this->functionProxies['datetimeimmutable::__construct'] = new Call\DateTimeImmutableConstruct();
         // DOMDocument::__construct — seed nodeType for thin AOT (#33607).
         $this->functionProxies['domdocument::__construct'] = new Call\DomDocumentConstruct();
+        // ZipArchive::__construct — seed stub props for thin AOT (#35002 leftover of #20584).
+        $this->functionProxies['ziparchive::__construct'] = new Call\ZipArchiveConstruct();
         $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
         $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();
         $this->functionProxies['dateinterval::format'] = new Call\DateIntervalFormat();
