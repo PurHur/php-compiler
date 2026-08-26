@@ -188,18 +188,18 @@ final class JitDomNodeListItemUserScript
                 $pinned,
                 $objPtrTy->constNull()
             );
-            // Prefixed loadXML children match by local name in markup (#34936). When the
-            // compile-time scan finds the Nth open-tag, prefer rematerialize — the live
-            // walk historically compared tagName QName and can return a bad/null node.
-            // Live walk remains for appendChild nodes absent from the original literal.
-            $markupHasNth = null !== DomParseSimpleXmlJitHelper::nthTagOpenTagArgv(
-                $itemMarkup,
-                $tagQuery,
-                $index + 1
+            // Prefer the live tree node when the pinned root walk finds it (#34983).
+            // #34936 rematerialize-when-markup-has-Nth returned a detached clone
+            // (null parentNode) so removeChild($list->item(N)) raised Not Found.
+            // Live walk already matches local names for prefixed tags (#34936);
+            // fall back to rematerialize only when pin or live result is null.
+            $liveObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $live
             );
-            $tagResult = $markupHasNth
-                ? $compileTime
-                : $context->builder->select($pinNull, $compileTime, $live);
+            $liveNull = $context->builder->icmp(Builder::INT_EQ, $liveObj, $objPtrTy->constNull());
+            $preferRemat = $context->builder->or($pinNull, $liveNull);
+            $tagResult = $context->builder->select($preferRemat, $compileTime, $live);
 
             return null !== $recoveredTagQuery
                 ? self::selectTagWalkUnlessChildNodesOwner(
