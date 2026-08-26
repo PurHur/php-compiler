@@ -128,6 +128,12 @@ final class PregAotFastPath
         if ('/a(b)(c)/' === $pattern || '#a(b)(c)#' === $pattern) {
             return self::matchExactAGroupBC($subject, $offset);
         }
+        if ('/b(c)/' === $pattern || '#b(c)#' === $pattern) {
+            return self::matchExactBGroupC($subject, $offset);
+        }
+        if ('/b(oundary)=(\\w+)/' === $pattern || '#b(oundary)=(\\w+)#' === $pattern) {
+            return self::matchExactBoundaryEqualsWord($subject, $offset);
+        }
         // Exact \\x{…} / \\xHH literals — NestedJIT body expand path is unreliable (#29024).
         $hexLit = self::exactHexEscapeLiteral($pattern);
         if (null !== $hexLit) {
@@ -301,7 +307,9 @@ final class PregAotFastPath
         }
         // Literal prefix + groups — exact kind for #33611 (matchCount uses dedicated exact matchers).
         if ('/a(b)/' === $pattern || '#a(b)#' === $pattern
-            || '/a(b)(c)/' === $pattern || '#a(b)(c)#' === $pattern) {
+            || '/a(b)(c)/' === $pattern || '#a(b)(c)#' === $pattern
+            || '/b(c)/' === $pattern || '#b(c)#' === $pattern
+            || '/b(oundary)=(\\w+)/' === $pattern || '#b(oundary)=(\\w+)#' === $pattern) {
             return 8;
         }
         if ('/(?<digit>\\d+)/' === $pattern || '#(?<digit>\\d+)#' === $pattern) {
@@ -967,7 +975,11 @@ final class PregAotFastPath
         }
     }
 
-    /** Consecutive `(literal)` groups — NestedJIT-safe bool (no array return) (#26888). */
+    /**
+     * Literal prefix + `(literal|\d|\s|\w)` groups — NestedJIT-safe bool (#26888, #33611).
+     *
+     * Covers `/(a)(b)/`, `/b(c)/`, `/b(oundary)=(\w+)/`, and literal separators between groups.
+     */
     private static function isLiteralGroupsPattern(string $pattern): bool
     {
         $plen = \strlen($pattern);
@@ -983,39 +995,88 @@ final class PregAotFastPath
         }
         $body = \substr($pattern, 1, $plen - 2);
         $blen = \strlen($body);
-        if (0 === $blen || '(' !== \substr($body, 0, 1)) {
+        if (0 === $blen) {
             return false;
         }
         $i = 0;
-        $groups = 0;
-        while ($i < $blen) {
-            if ('(' !== \substr($body, $i, 1)) {
+        while ($i < $blen && '(' !== \substr($body, $i, 1)) {
+            if (!self::isLiteralBodyChar(\substr($body, $i, 1))) {
                 return false;
             }
             ++$i;
-            while ($i < $blen) {
-                $c = \substr($body, $i, 1);
-                if (')' === $c) {
-                    break;
-                }
-                if ('\\' === $c || '[' === $c || '(' === $c || '|' === $c
-                    || '*' === $c || '+' === $c || '?' === $c || '{' === $c || '}' === $c
-                    || '^' === $c || '$' === $c || '.' === $c) {
+        }
+        if ($i >= $blen) {
+            return false;
+        }
+        $groups = 0;
+        while ($i < $blen) {
+            if (!self::scanLiteralPrefixGroup($body, $i)) {
+                return false;
+            }
+            ++$groups;
+            if ($groups >= self::MAX_CAPS) {
+                return false;
+            }
+            while ($i < $blen && '(' !== \substr($body, $i, 1)) {
+                if (!self::isLiteralBodyChar(\substr($body, $i, 1))) {
                     return false;
                 }
+                ++$i;
+            }
+        }
+
+        return $groups >= 1;
+    }
+
+    private static function isLiteralBodyChar(string $c): bool
+    {
+        return !('\\' === $c || '[' === $c || '(' === $c || ')' === $c || '|' === $c
+            || '*' === $c || '+' === $c || '?' === $c || '{' === $c || '}' === $c
+            || '^' === $c || '$' === $c || '.' === $c);
+    }
+
+    /** Advance $i past one `(...)` group; false when invalid. */
+    private static function scanLiteralPrefixGroup(string $body, int &$i): bool
+    {
+        $blen = \strlen($body);
+        if ($i >= $blen || '(' !== \substr($body, $i, 1)) {
+            return false;
+        }
+        ++$i;
+        if ($i + 1 < $blen && '\\' === \substr($body, $i, 1)) {
+            $cls = \substr($body, $i + 1, 1);
+            if ('d' !== $cls && 's' !== $cls && 'w' !== $cls) {
+                return false;
+            }
+            $i += 2;
+            if ($i < $blen && '+' === \substr($body, $i, 1)) {
                 ++$i;
             }
             if ($i >= $blen || ')' !== \substr($body, $i, 1)) {
                 return false;
             }
             ++$i;
-            ++$groups;
-            if ($groups >= self::MAX_CAPS) {
+
+            return true;
+        }
+        $start = $i;
+        while ($i < $blen) {
+            $c = \substr($body, $i, 1);
+            if (')' === $c) {
+                if ($i === $start) {
+                    return false;
+                }
+                ++$i;
+
+                return true;
+            }
+            if (!self::isLiteralBodyChar($c)) {
                 return false;
             }
+            ++$i;
         }
 
-        return $groups >= 1;
+        return false;
     }
 
     /**
@@ -1154,6 +1215,64 @@ final class PregAotFastPath
         return 0;
     }
 
+    /** `/b(c)/` — full match bc, group 1 is c (#15642 tier-2 preg_capture). */
+    private static function matchExactBGroupC(string $subject, int $offset): int
+    {
+        $subLen = \strlen($subject);
+        $j = $offset;
+        while ($j + 2 <= $subLen) {
+            if ('b' === \substr($subject, $j, 1) && 'c' === \substr($subject, $j + 1, 1)) {
+                self::$cap0 = 'bc';
+                self::$cap1 = 'c';
+                self::$capCount = 2;
+
+                return 1;
+            }
+            ++$j;
+        }
+
+        return 0;
+    }
+
+    /** `/b(oundary)=(\w+)/` — multipart boundary capture (#15642 tier-2 preg_capture). */
+    private static function matchExactBoundaryEqualsWord(string $subject, int $offset): int
+    {
+        $subLen = \strlen($subject);
+        $j = $offset;
+        while ($j < $subLen) {
+            if ('b' !== \substr($subject, $j, 1)) {
+                ++$j;
+                continue;
+            }
+            $cursor = $j + 1;
+            $boundary = 'oundary=';
+            $bLen = 8;
+            if ($cursor + $bLen > $subLen
+                || !self::literalEqualsAt($subject, $cursor, $boundary, $bLen)) {
+                ++$j;
+                continue;
+            }
+            $cursor += $bLen;
+            if ($cursor >= $subLen || !self::charInClass(\substr($subject, $cursor, 1), 4)) {
+                ++$j;
+                continue;
+            }
+            $wordStart = $cursor;
+            ++$cursor;
+            while ($cursor < $subLen && self::charInClass(\substr($subject, $cursor, 1), 4)) {
+                ++$cursor;
+            }
+            self::$cap0 = \substr($subject, $j, $cursor - $j);
+            self::$cap1 = 'oundary';
+            self::$cap2 = \substr($subject, $wordStart, $cursor - $wordStart);
+            self::$capCount = 3;
+
+            return 1;
+        }
+
+        return 0;
+    }
+
     /** `/a(b)(c)/` — full match abc, groups b and c (#33611). */
     private static function matchExactAGroupBC(string $subject, int $offset): int
     {
@@ -1177,15 +1296,11 @@ final class PregAotFastPath
     }
 
     /**
-     * One or two literal groups `/(x)/` / `/(a)(b)/` (#26888, #33887).
-     *
-     * Min length was 7 (two-group only), so single `/(x)/` (len 5) returned -2 while
-     * {@see isLiteralGroupsPattern} still classified kind 8.
+     * Literal prefix + capturing groups `/(x)/`, `/(a)(b)/`, `/b(c)/`, `/b(oundary)=(\w+)/` (#26888, #33611).
      */
     private static function matchLiteralGroups(string $pattern, string $subject, int $offset): int
     {
         $plen = \strlen($pattern);
-        // `/(x)/` is 5 chars — was incorrectly rejected by plen < 7 (#33887).
         if ($plen < 5) {
             return -2;
         }
@@ -1198,78 +1313,130 @@ final class PregAotFastPath
         }
         $body = \substr($pattern, 1, $plen - 2);
         $blen = \strlen($body);
-        if ($blen < 3 || '(' !== \substr($body, 0, 1)) {
+        if ($blen < 3) {
             return -2;
         }
-        $i = 1;
-        $g1Start = 1;
-        while ($i < $blen && ')' !== \substr($body, $i, 1)) {
-            $c = \substr($body, $i, 1);
-            if ('\\' === $c || '[' === $c || '(' === $c || '|' === $c
-                || '*' === $c || '+' === $c || '?' === $c || '{' === $c || '}' === $c
-                || '^' === $c || '$' === $c || '.' === $c) {
+        $pos = 0;
+        $prefix = '';
+        while ($pos < $blen && '(' !== \substr($body, $pos, 1)) {
+            if (!self::isLiteralBodyChar(\substr($body, $pos, 1))) {
                 return -2;
             }
-            ++$i;
+            $prefix .= \substr($body, $pos, 1);
+            ++$pos;
         }
-        if ($i >= $blen || ')' !== \substr($body, $i, 1)) {
+        if ($pos >= $blen) {
             return -2;
         }
-        $g1 = \substr($body, $g1Start, $i - $g1Start);
-        ++$i;
-        if ($i >= $blen || '(' !== \substr($body, $i, 1)) {
-            if ($i !== $blen) {
-                return -2;
-            }
-            $full = $g1;
-            $fullLen = \strlen($full);
-            $subLen = \strlen($subject);
-            $j = $offset;
-            while ($j + $fullLen <= $subLen) {
-                if (0 === $fullLen || 0 === \strncmp(\substr($subject, $j), $full, $fullLen)) {
-                    self::storeCapAt(0, $full);
-                    self::storeCapAt(1, $g1);
-                    self::$capCount = 2;
-
-                    return 1;
-                }
-                if (0 === $fullLen) {
-                    break;
-                }
-                ++$j;
-            }
-
-            return 0;
-        }
-        ++$i;
-        $g2Start = $i;
-        while ($i < $blen && ')' !== \substr($body, $i, 1)) {
-            $c = \substr($body, $i, 1);
-            if ('\\' === $c || '[' === $c || '(' === $c || '|' === $c
-                || '*' === $c || '+' === $c || '?' === $c || '{' === $c || '}' === $c
-                || '^' === $c || '$' === $c || '.' === $c) {
-                return -2;
-            }
-            ++$i;
-        }
-        if ($i >= $blen || ')' !== \substr($body, $i, 1)) {
-            return -2;
-        }
-        $g2 = \substr($body, $g2Start, $i - $g2Start);
-        ++$i;
-        if ($i !== $blen) {
-            return -2;
-        }
-        $full = $g1 . $g2;
-        $fullLen = \strlen($full);
+        $prefixLen = \strlen($prefix);
         $subLen = \strlen($subject);
         $j = $offset;
-        while ($j + $fullLen <= $subLen) {
-            if (0 === \strncmp(\substr($subject, $j), $full, $fullLen)) {
-                self::storeCapAt(0, $full);
-                self::storeCapAt(1, $g1);
-                self::storeCapAt(2, $g2);
-                self::$capCount = 3;
+        while ($j < $subLen) {
+            $cursor = $j;
+            $parsePos = $pos;
+            $matched = true;
+            $capIndex = 1;
+            if ($prefixLen > 0) {
+                if ($cursor + $prefixLen > $subLen
+                    || !self::literalEqualsAt($subject, $cursor, $prefix, $prefixLen)) {
+                    ++$j;
+                    continue;
+                }
+                $cursor += $prefixLen;
+            }
+            $matchStart = $j;
+            while ($parsePos < $blen && $matched) {
+                if ('(' !== \substr($body, $parsePos, 1)) {
+                    $matched = false;
+                    break;
+                }
+                ++$parsePos;
+                if ($parsePos + 1 < $blen && '\\' === \substr($body, $parsePos, 1)) {
+                    $cls = \substr($body, $parsePos + 1, 1);
+                    $charClass = 0;
+                    if ('d' === $cls) {
+                        $charClass = 2;
+                    } elseif ('s' === $cls) {
+                        $charClass = 3;
+                    } elseif ('w' === $cls) {
+                        $charClass = 4;
+                    } else {
+                        $matched = false;
+                        break;
+                    }
+                    $parsePos += 2;
+                    $plus = false;
+                    if ($parsePos < $blen && '+' === \substr($body, $parsePos, 1)) {
+                        $plus = true;
+                        ++$parsePos;
+                    }
+                    if ($parsePos >= $blen || ')' !== \substr($body, $parsePos, 1)) {
+                        $matched = false;
+                        break;
+                    }
+                    ++$parsePos;
+                    if ($cursor >= $subLen
+                        || !self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
+                        $matched = false;
+                        break;
+                    }
+                    $capStart = $cursor;
+                    ++$cursor;
+                    if ($plus) {
+                        while ($cursor < $subLen
+                            && self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
+                            ++$cursor;
+                        }
+                    }
+                    self::storeCapAt($capIndex, \substr($subject, $capStart, $cursor - $capStart));
+                    ++$capIndex;
+                } else {
+                    $gStart = $parsePos;
+                    while ($parsePos < $blen && ')' !== \substr($body, $parsePos, 1)) {
+                        if (!self::isLiteralBodyChar(\substr($body, $parsePos, 1))) {
+                            $matched = false;
+                            break 2;
+                        }
+                        ++$parsePos;
+                    }
+                    if ($parsePos >= $blen || ')' !== \substr($body, $parsePos, 1)) {
+                        $matched = false;
+                        break;
+                    }
+                    $gContent = \substr($body, $gStart, $parsePos - $gStart);
+                    ++$parsePos;
+                    $gLen = \strlen($gContent);
+                    if ($cursor + $gLen > $subLen
+                        || !self::literalEqualsAt($subject, $cursor, $gContent, $gLen)) {
+                        $matched = false;
+                        break;
+                    }
+                    self::storeCapAt($capIndex, \substr($subject, $cursor, $gLen));
+                    ++$capIndex;
+                    $cursor += $gLen;
+                }
+                $sepStart = $parsePos;
+                while ($parsePos < $blen && '(' !== \substr($body, $parsePos, 1)) {
+                    if (!self::isLiteralBodyChar(\substr($body, $parsePos, 1))) {
+                        $matched = false;
+                        break 2;
+                    }
+                    ++$parsePos;
+                }
+                $sep = \substr($body, $sepStart, $parsePos - $sepStart);
+                if ('' !== $sep) {
+                    $sepLen = \strlen($sep);
+                    if ($cursor + $sepLen > $subLen
+                        || !self::literalEqualsAt($subject, $cursor, $sep, $sepLen)) {
+                        $matched = false;
+                        break;
+                    }
+                    $cursor += $sepLen;
+                }
+            }
+            if ($matched && $parsePos === $blen) {
+                self::storeCapAt(0, \substr($subject, $matchStart, $cursor - $matchStart));
+                self::$capCount = $capIndex;
 
                 return 1;
             }

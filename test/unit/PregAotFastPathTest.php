@@ -102,6 +102,17 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame('ab', PregAotFastPath::lastCap(0));
         $this->assertSame('a', PregAotFastPath::lastCap(1));
         $this->assertSame('b', PregAotFastPath::lastCap(2));
+
+        // General literal prefix + groups — tier-2 preg_capture / multipart boundary (#15642).
+        $this->assertSame(8, PregAotFastPath::patternKind('/b(c)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/b(c)/', 'bc', 0));
+        $this->assertSame('bc', PregAotFastPath::lastCap(0));
+        $this->assertSame('c', PregAotFastPath::lastCap(1));
+        $this->assertSame(8, PregAotFastPath::patternKind('/b(oundary)=(\\w+)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/b(oundary)=(\\w+)/', 'boundary=x', 0));
+        $this->assertSame('boundary=x', PregAotFastPath::lastCap(0));
+        $this->assertSame('oundary', PregAotFastPath::lastCap(1));
+        $this->assertSame('x', PregAotFastPath::lastCap(2));
     }
 
     /** Issue #33887 — single literal group was rejected by plen<7; named lit groups too. */
