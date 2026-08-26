@@ -26,6 +26,9 @@ use PHPLLVM\Value;
  */
 final class JitMbDetectEncoding
 {
+    /** @var int Per-function CFG disambiguator — duplicate block names break multi-call scripts (#34358). */
+    private static int $boxBlockSuffix = 0;
+
     private const SUPPORTED = [
         'ASCII' => true,
         'UTF-8' => true,
@@ -277,9 +280,10 @@ final class JitMbDetectEncoding
         $zero = $context->getTypeFromString('int64')->constInt(0, false);
         $isFalse = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
         $fn = BasicBlockHelper::parentFunction($context);
-        $falseBlock = $fn->appendBasicBlock('mb_detect_false');
-        $strBlock = $fn->appendBasicBlock('mb_detect_str');
-        $doneBlock = $fn->appendBasicBlock('mb_detect_done');
+        $suffix = ++self::$boxBlockSuffix;
+        $falseBlock = $fn->appendBasicBlock('mb_detect_false_'.$suffix);
+        $strBlock = $fn->appendBasicBlock('mb_detect_str_'.$suffix);
+        $doneBlock = $fn->appendBasicBlock('mb_detect_done_'.$suffix);
         $context->builder->branchIf($isFalse, $falseBlock, $strBlock);
 
         $slot = JitValueBox::alloc($context);

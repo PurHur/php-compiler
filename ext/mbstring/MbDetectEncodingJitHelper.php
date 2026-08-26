@@ -117,16 +117,13 @@ final class MbDetectEncodingJitHelper
 
             return true;
         }
-        $byte = \ord($ch);
-        if (($byte & 0xE0) === 0xC0) {
+        // Lead-byte class via char range — NestedJIT ord()+mask misfires (#34358).
+        if ($ch >= "\xC0" && $ch <= "\xDF") {
             $need = 1;
-            $min = 0x80;
-        } elseif (($byte & 0xF0) === 0xE0) {
+        } elseif ($ch >= "\xE0" && $ch <= "\xEF") {
             $need = 2;
-            $min = 0x800;
-        } elseif (($byte & 0xF8) === 0xF0) {
+        } elseif ($ch >= "\xF0" && $ch <= "\xF7") {
             $need = 3;
-            $min = 0x10000;
         } else {
             $need = 0;
 
@@ -135,19 +132,13 @@ final class MbDetectEncodingJitHelper
         if ($i + $need >= $len) {
             return false;
         }
-        $cp = $byte & (0xFF >> (2 + $need));
         $j = 1;
         while ($j <= $need) {
             $nextCh = $string[$i + $j];
             if ($nextCh < "\x80" || $nextCh > "\xBF") {
                 return false;
             }
-            $next = \ord($nextCh);
-            $cp = ($cp << 6) | ($next & 0x3F);
             ++$j;
-        }
-        if ($cp < $min || ($cp >= 0xD800 && $cp <= 0xDFFF)) {
-            return false;
         }
 
         return true;
