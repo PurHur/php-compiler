@@ -127,9 +127,11 @@ final class SplObjectStorageJitHelper
     }
 
     /**
-     * php-src SplObjectStorage serialize — flat object/info pairs from objKeys (#33876).
+     * php-src SplObjectStorage serialize — O: bag from objKeys (#33876 / #35122).
      *
      * Prefer helper-runtime (avoid PHP_COMPILER_HELPER_RUNTIME_O=0) — peer #32925 / #33625.
+     * Flat object HT + NestedJIT encode SIGABRTs on non-empty storage (#35122); LLVM-concat
+     * empty-stdClass keys + `__compiler_serialize_value` for info (peer #35119 legacy path).
      *
      * @return Value {@see __string__*} full `O:len:"SplObjectStorage":2:{…}` wire
      */
@@ -140,88 +142,84 @@ final class SplObjectStorageJitHelper
         $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj);
         $classNameStr = ReflectionBuiltinHelper::getClassName($context, $objVar);
         $srcHt = self::htPtr($context, $obj);
-        $flat = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $idxSlot = BasicBlockHelper::entryAlloca($context, $i64);
-        $context->builder->store($i64->constInt(0, false), $idxSlot);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $pairSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt(0, false), $pairSlot);
+        $bodySlot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->store($empty, $bodySlot);
 
         self::foreachObjKeyNode($context, $srcHt, 'sos_ser', static function (
             Context $context,
             Value $node
-        ) use ($flat, $idxSlot, $i64, $sizeT): void {
+        ) use ($pairSlot, $bodySlot, $i64): void {
             $nodeMap = $context->structFieldMap['__objkey_node__'];
-            $keyObj = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
-            $idx = $context->builder->load($idxSlot);
-            $idxSize = $context->builder->truncOrBitCast($idx, $sizeT);
-            $context->builder->call(
-                $context->lookupFunction('__hashtable__setObjectAt'),
-                $flat,
-                $idxSize,
-                $keyObj
-            );
-            $context->builder->store(
-                $context->builder->add($idx, $i64->constInt(1, false)),
-                $idxSlot
-            );
-            $idx2 = $context->builder->load($idxSlot);
             $valField = $context->builder->structGep($node, $nodeMap['value']);
-            $idxBox = JitValueBox::alloc($context);
-            JitValueBox::writeLong($context, $idxBox, $idx2);
-            $idxVar = new JITVariable(
-                $context,
-                JITVariable::TYPE_VALUE,
-                JITVariable::KIND_VARIABLE,
-                $idxBox
-            );
             $infoVar = new JITVariable(
                 $context,
                 JITVariable::TYPE_VALUE,
                 JITVariable::KIND_VARIABLE,
                 $valField
             );
-            HashTableHelper::setValueBoxKey($context, $flat, $idxVar, $infoVar);
+            $infoWire = $context->builder->call(
+                $context->lookupFunction('__compiler_serialize_value'),
+                JitValueBox::valuePtrFromVariable($context, $infoVar),
+                $i64->constInt(0, false)
+            );
+            $pair = $context->builder->load($pairSlot);
+            $even = $context->builder->mul($pair, $i64->constInt(2, false));
+            $odd = $context->builder->add($even, $i64->constInt(1, false));
+            $evenDigits = VmResourceIdString::formatNativeLong($context, $even);
+            $oddDigits = VmResourceIdString::formatNativeLong($context, $odd);
+            $iPrefix = $context->builder->load($context->constantStringFromString('i:'));
+            $semi = $context->builder->load($context->constantStringFromString(';'));
+            // php_var_serialize(stdClass) is `O:8:"stdClass":0:{}` — no trailing semicolon.
+            $objWire = $context->builder->load($context->constantStringFromString('O:8:"stdClass":0:{}'));
+            $piece = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $iPrefix, $evenDigits);
+            $piece = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $piece, $semi);
+            $piece = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $piece, $objWire);
+            $piece = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $piece, $iPrefix);
+            $piece = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $piece, $oddDigits);
+            $piece = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $piece, $semi);
+            $piece = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $piece, $infoWire);
+            $body = $context->builder->load($bodySlot);
             $context->builder->store(
-                $context->builder->add($idx2, $i64->constInt(1, false)),
-                $idxSlot
+                \PHPCompiler\ext\standard\JitStringConcat::concat($context, $body, $piece),
+                $bodySlot
+            );
+            $context->builder->store(
+                $context->builder->add($pair, $i64->constInt(1, false)),
+                $pairSlot
             );
         });
 
-        $logical = 'PHPCompiler\\ext\\standard\\SerializeSplObjectStorageNestedJitHelper::encodeWire';
-        $saved = BasicBlockHelper::tryGetInsertBlock($context);
-        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
-            $context,
-            '/ext/standard/SerializeSplObjectStorageNestedJitHelper.php',
-            [$logical],
-            '#33876'
-        );
-        BasicBlockHelper::restoreInsertBlock($context, $saved);
-        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#33876');
+        $pairs = $context->builder->load($pairSlot);
+        $elemCount = $context->builder->mul($pairs, $i64->constInt(2, false));
+        $elemDigits = VmResourceIdString::formatNativeLong($context, $elemCount);
         $strMap = $context->structFieldMap['__string__'];
         $classLen = $context->builder->load(
             $context->builder->structGep($classNameStr, $strMap['length'])
         );
-        $args = [
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $classNameStr,
-                $fn->getParam(0)->typeOf()
-            ),
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $classLen,
-                $fn->getParam(1)->typeOf()
-            ),
-            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
-                $context,
-                $flat,
-                $fn->getParam(2)->typeOf()
-            ),
-        ];
-        $raw = $context->builder->call($fn, ...$args);
-        $strPtr = $context->getTypeFromString('__string__*');
+        $classLenDigits = VmResourceIdString::formatNativeLong($context, $classLen);
+        $oPrefix = $context->builder->load($context->constantStringFromString('O:'));
+        $colonQuote = $context->builder->load($context->constantStringFromString(':"'));
+        $quoteColon2 = $context->builder->load($context->constantStringFromString('":2:{i:0;a:'));
+        $openBrace = $context->builder->load($context->constantStringFromString(':{'));
+        $membersTail = $context->builder->load($context->constantStringFromString('}i:1;a:0:{}}'));
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $oPrefix, $classLenDigits);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $colonQuote);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $classNameStr);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $quoteColon2);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $elemDigits);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $openBrace);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat(
+            $context,
+            $acc,
+            $context->builder->load($bodySlot)
+        );
 
-        return \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr);
+        return \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $membersTail);
     }
 
     /**
