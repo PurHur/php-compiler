@@ -96,6 +96,53 @@ final class JitDomNodeChildProperty
     }
 
     /**
+     * Seed firstElementChild / lastElementChild compile-time tag/index (#35017).
+     *
+     * Peer of {@see annotateCompileTimeChild} for firstChild. Without this,
+     * importNode(documentElement->firstElementChild) falls back to the
+     * documentElement GetNodePath stamp and copies the root (re-#33918).
+     */
+    public static function annotateCompileTimeElementChild(
+        JITVariable $result,
+        string $propName,
+        ?JITVariable $receiverVar = null
+    ): void {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
+        }
+        $propLc = strtolower($propName);
+        if ('firstelementchild' !== $propLc && 'lastelementchild' !== $propLc) {
+            return;
+        }
+        $nodes = self::compileTimeChildNodesForReceiver($receiverVar);
+        if ([] === $nodes) {
+            return;
+        }
+        $index = null;
+        if ('firstelementchild' === $propLc) {
+            foreach ($nodes as $i => $node) {
+                if ('element' === ($node['kind'] ?? '')) {
+                    $index = $i;
+                    break;
+                }
+            }
+        } else {
+            for ($i = \count($nodes) - 1; $i >= 0; --$i) {
+                if ('element' === ($nodes[$i]['kind'] ?? '')) {
+                    $index = $i;
+                    break;
+                }
+            }
+        }
+        if (null === $index) {
+            return;
+        }
+        self::stampChildIndex($result, $nodes, $index);
+        // Multi-segment path so importNode recovery does not treat this as documentElement.
+        JitDomGetNodePath::annotateElementChildPath($result, $propLc, $receiverVar, $index);
+    }
+
+    /**
      * Seed child index/tag from loadXML literal so replaceChild can rebuild
      * PROP_USER_SCRIPT_INNER_XML without collapsing siblings (#28671 / #33273).
      *

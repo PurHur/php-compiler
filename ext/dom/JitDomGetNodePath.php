@@ -149,6 +149,55 @@ final class JitDomGetNodePath
         self::rememberWalk($path, $inner);
     }
 
+    /**
+     * Path stamp for firstElementChild / lastElementChild after index is known (#35017).
+     *
+     * Unlike {@see annotateChildFetch}, the sibling index may skip leading text nodes.
+     */
+    public static function annotateElementChildPath(
+        JITVariable $result,
+        string $propLc,
+        ?JITVariable $receiverVar,
+        int $index
+    ): void {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
+        }
+        $parentPath = self::$lastParentPath;
+        $parentInner = self::$lastParentInner;
+        if (null === $parentInner && null !== $receiverVar) {
+            $parentInner = $receiverVar->compileTimeDomInnerXml;
+            $parentPath = $receiverVar->compileTimeDomNodePath
+                ?? (null !== $receiverVar->compileTimeDomTagName
+                    ? '/'.$receiverVar->compileTimeDomTagName
+                    : null);
+        }
+        if (null === $parentInner) {
+            $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+            if (null === $xml) {
+                return;
+            }
+            $parentPath = '/'.DomParseSimpleXmlJitHelper::rootTagArgv($xml);
+            $parentInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+        }
+        $siblings = DomParseSimpleXmlJitHelper::parseSiblingNodesArgv((string) $parentInner);
+        if ($index < 0 || $index >= \count($siblings)) {
+            return;
+        }
+        $segment = DomParseSimpleXmlJitHelper::nodePathSegmentArgv($siblings, $index);
+        if (null === $segment || '' === $segment) {
+            return;
+        }
+        $path = rtrim((string) $parentPath, '/').'/'.$segment;
+        $inner = $siblings[$index]['inner'] ?? '';
+        $result->compileTimeDomNodePath = $path;
+        if (null === $result->compileTimeDomInnerXml) {
+            $result->compileTimeDomInnerXml = $inner;
+        }
+        self::$lastChildFetchWasFirstChild = false;
+        self::rememberWalk($path, $inner);
+    }
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getnodepath_cont');
