@@ -55,6 +55,16 @@ final class DomDocumentConstruct implements Call
             Variable::TYPE_OBJECT
         );
 
+        // Seed libxml option bools so reads work and writes stick (#34908).
+        // php-src DOMDocument::__construct defaults — ext/dom/php_dom.c / document.c.
+        self::seedOptionBool($context, $obj, VmDom::PROP_FORMAT_OUTPUT, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_VALIDATE_ON_PARSE, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_RESOLVE_EXTERNALS, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_SUBSTITUTE_ENTITIES, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_PRESERVE_WHITE_SPACE, true);
+        self::seedOptionBool($context, $obj, VmDom::PROP_RECOVER, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_STRICT_ERROR_CHECKING, true);
+
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
@@ -62,6 +72,34 @@ final class DomDocumentConstruct implements Call
         );
 
         return $slot;
+    }
+
+    private static function seedOptionBool(Context $context, Value $obj, string $prop, bool $value): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, $prop)) {
+            $objectType->defineProperty($classId, $prop, Variable::TYPE_VALUE);
+        }
+        $box = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        $i32 = $context->getTypeFromString('int32');
+        JitValueBox::writeBool(
+            $context,
+            $box,
+            $context->builder->zext($i1->constInt($value ? 1 : 0, false), $i32)
+        );
+        $propVar = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $box
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', $prop),
+            $propVar,
+            Variable::TYPE_VALUE
+        );
     }
 
     private static function objectPtr(Context $context, Variable $receiver): Value
