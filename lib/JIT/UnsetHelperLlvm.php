@@ -502,6 +502,17 @@ final class UnsetHelperLlvm
             )) {
                 return;
             }
+            // Undeclared + __unset before propertyFetch(forWrite) — defineProperty grows past
+            // the object allocation and SIGSEGVs (zend_std_unset_property; #35078 / #35076).
+            if (MagicMethodDispatch::tryEmitMagicUnset(
+                $context,
+                $receiver,
+                $declaringClass,
+                (string) $dimOp->value,
+                $context->jitEnclosingBlock
+            )) {
+                return;
+            }
             // forWrite: skip typed-null → value-box rewrite so objectPropertyType stays native (#33007).
             $prop = $context->type->object->propertyFetch($receiver, $declaringClass, $dimOp->value, true);
             if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {

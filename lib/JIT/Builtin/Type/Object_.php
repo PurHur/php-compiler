@@ -8358,18 +8358,30 @@ class Object_ extends Type {
                 $name
             );
         }
-        if (!$this->hasProperty($classId, $name)) {
-            // (object)$resource keeps CFG userType "resource" while runtime value is stdClass
-            // (#30793, TypeReconstructor preserves TYPE_OBJECT). Probe stdClass before giving up.
-            $classLc = strtolower(ltrim($class, '\\'));
-            if ('resource' === $classLc) {
-                $class = 'stdClass';
-                $classId = $this->lookup('stdClass');
-            }
             if (!$this->hasProperty($classId, $name)) {
-                return $i1->constInt(0, false);
+                // (object)$resource keeps CFG userType "resource" while runtime value is stdClass
+                // (#30793, TypeReconstructor preserves TYPE_OBJECT). Probe stdClass before giving up.
+                $classLc = strtolower(ltrim($class, '\\'));
+                if ('resource' === $classLc) {
+                    $class = 'stdClass';
+                    $classId = $this->lookup('stdClass');
+                }
+                if (!$this->hasProperty($classId, $name)) {
+                    // Undeclared → __isset (zend_std_has_property; #35078 leftover of #35076).
+                    $magicIsset = MagicMethodDispatch::tryEmitMagicIsset(
+                        $this->context,
+                        $obj,
+                        '' !== $class ? $class : 'stdClass',
+                        $name,
+                        $this->context->jitEnclosingBlock
+                    );
+                    if (null !== $magicIsset) {
+                        return $magicIsset;
+                    }
+
+                    return $i1->constInt(0, false);
+                }
             }
-        }
         // Check the declared slot directly — do not propertyFetch (typed-native null raises; #33007).
         $nameId = $this->propNameIdFor($name);
         if (null !== $nameId) {

@@ -85,6 +85,38 @@ final class MagicMethodDispatch
         return MagicMethodLlvm::tryEmitMagicSet($context, $receiver, $propertyName, $value, $enclosingBlock);
     }
 
+    public static function tryEmitMagicUnset(
+        Context $context,
+        Value $receiver,
+        string $declaringClass,
+        string $propertyName,
+        ?Block $enclosingBlock
+    ): bool {
+        return MagicMethodLlvm::tryEmitMagicUnset(
+            $context,
+            $receiver,
+            $declaringClass,
+            $propertyName,
+            $enclosingBlock
+        );
+    }
+
+    public static function tryEmitMagicIsset(
+        Context $context,
+        Value $receiver,
+        string $declaringClass,
+        string $propertyName,
+        ?Block $enclosingBlock
+    ): ?Value {
+        return MagicMethodLlvm::tryEmitMagicIsset(
+            $context,
+            $receiver,
+            $declaringClass,
+            $propertyName,
+            $enclosingBlock
+        );
+    }
+
     public static function tryInitMagicCall(
         Context $context,
         string $declaringClassLc,
