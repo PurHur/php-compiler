@@ -32,11 +32,16 @@ use PHPLLVM\Value;
  * middle children (`item(1)` / `nextSibling` in 3+ lists) so `$n->parentNode` is
  * null and `$n->parentNode->replaceChild(...)` aborts (#34590).
  *
+ * DOMAttr / Dom\Attr: parentNode is the owner element (php-src attr parent_get).
+ * Never GEP DOMElement::$parentNode on an Attr object — that SIGSEGVs (#35227 / re-#20501).
+ *
  * Reference: php-src ext/dom/php_dom.c / ext/dom/node.c dom_node_replace_child.
  */
 final class JitDomParentNodeProperty
 {
     private const CLASS_ELEMENT = 'DOMElement';
+
+    private const CLASS_ATTR = 'DOMAttr';
 
     private const CLASS_NODE = 'DOMNode';
 
@@ -66,9 +71,136 @@ final class JitDomParentNodeProperty
             return self::fetchDeclaredParent($objectType, $obj);
         }
 
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_parent_fetch');
+        $resultTy = $context->getTypeFromString('__value__*');
+
+        // Attr → ownerElement (do not walk Element slots) (#35227 / re-#20501 / #35185).
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $obj);
+        $bbAttr = BasicBlockHelper::append($context, 'dom_parent_attr');
+        $bbElem = BasicBlockHelper::append($context, 'dom_parent_elem');
+        $bbOut = BasicBlockHelper::append($context, 'dom_parent_out');
+        $context->builder->branchIf($isAttr, $bbAttr, $bbElem);
+
+        $context->builder->positionAtEnd($bbAttr);
+        $attrParent = self::fetchAttrOwnerAsParent($objectType, $obj);
+        $attrPtr = JitValueBox::valuePtrFromVariable($context, $attrParent);
+        $attrPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbOut);
+
+        $context->builder->positionAtEnd($bbElem);
+        $elemParent = self::fetchElementParentVerified($objectType, $obj);
+        $elemPtr = JitValueBox::valuePtrFromVariable($context, $elemParent);
+        $elemPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbOut);
+
+        $context->builder->positionAtEnd($bbOut);
+        $phi = $context->builder->phi($resultTy);
+        $phi->addIncoming($attrPtr, $attrPred);
+        $phi->addIncoming($elemPtr, $elemPred);
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $phi)
+        );
+    }
+
+    /**
+     * php-src: Attr parentNode === ownerElement (libxml xmlAttr->parent).
+     */
+    private static function fetchAttrOwnerAsParent(Object_ $objectType, Value $obj): JITVariable
+    {
+        $attrClassId = $objectType->lookup(self::CLASS_ATTR);
+        if (!$objectType->hasProperty($attrClassId, VmDom::PROP_OWNER_ELEMENT)) {
+            $objectType->defineProperty($attrClassId, VmDom::PROP_OWNER_ELEMENT, JITVariable::TYPE_VALUE);
+        }
+        if ($objectType->hasDeclaredClass('Dom\\Attr')) {
+            $livingId = $objectType->lookup('Dom\\Attr');
+            if (!$objectType->hasProperty($livingId, VmDom::PROP_OWNER_ELEMENT)) {
+                $objectType->defineProperty($livingId, VmDom::PROP_OWNER_ELEMENT, JITVariable::TYPE_VALUE);
+            }
+        }
+
+        // Runtime class_id selects DOMAttr vs Dom\Attr layout (peer #35185).
+        return self::fetchAttrOwnerElementByClassId($objectType, $obj);
+    }
+
+    /**
+     * Load Attr::$ownerElement using the object's runtime class_id (DOMAttr vs Dom\Attr).
+     */
+    private static function fetchAttrOwnerElementByClassId(Object_ $objectType, Value $obj): JITVariable
+    {
+        $context = $objectType->jitContext();
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_attr_owner_fetch');
+        $resultTy = $context->getTypeFromString('__value__*');
+        $map = $context->structFieldMap['__object__'];
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($obj, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $classicId = $objectType->lookup(self::CLASS_ATTR);
+        $isClassic = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($classicId, false)
+        );
+        $bbClassic = BasicBlockHelper::append($context, 'dom_attr_owner_classic');
+        $bbLiving = BasicBlockHelper::append($context, 'dom_attr_owner_living');
+        $bbMerge = BasicBlockHelper::append($context, 'dom_attr_owner_merge');
+        $context->builder->branchIf($isClassic, $bbClassic, $bbLiving);
+
+        $context->builder->positionAtEnd($bbClassic);
+        $classic = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $obj,
+            self::CLASS_ATTR,
+            VmDom::PROP_OWNER_ELEMENT,
+            $classicId
+        );
+        $classicPtr = JitValueBox::valuePtrFromVariable($context, $classic);
+        $classicPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbLiving);
+        $livingClass = 'Dom\\Attr';
+        $livingId = $objectType->lookup($livingClass);
+        if (!$objectType->hasProperty($livingId, VmDom::PROP_OWNER_ELEMENT)) {
+            $objectType->defineProperty($livingId, VmDom::PROP_OWNER_ELEMENT, JITVariable::TYPE_VALUE);
+        }
+        $living = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $obj,
+            $livingClass,
+            VmDom::PROP_OWNER_ELEMENT,
+            $livingId
+        );
+        $livingPtr = JitValueBox::valuePtrFromVariable($context, $living);
+        $livingPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbMerge);
+        $phi = $context->builder->phi($resultTy);
+        $phi->addIncoming($classicPtr, $classicPred);
+        $phi->addIncoming($livingPtr, $livingPred);
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $phi)
+        );
+    }
+
+    /**
+     * Element/Document parentNode with stale-slot / freed-sentinel checks (#27411 / #34590).
+     */
+    private static function fetchElementParentVerified(Object_ $objectType, Value $obj): JITVariable
+    {
+        $context = $objectType->jitContext();
         self::ensureParentProp($objectType);
         self::ensureChildLinkProps($objectType);
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_parent_fetch');
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_parent_elem_fetch');
 
         $resultTy = $context->getTypeFromString('__value__*');
         $voidPtr = $context->getTypeFromString('void*');
