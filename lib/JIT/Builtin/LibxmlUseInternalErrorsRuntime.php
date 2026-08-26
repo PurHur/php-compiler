@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for libxml error-buffer builtins (#28659, #29161).
+ * JIT/AOT link for libxml error-buffer builtins (#28659, #29161, #35082).
  *
  * Thin standalone AOT keeps the error ring in module globals (NestedJIT statics are not
  * shared across seed vs get_errors call sites). JIT/embed still uses NestedJIT → VmLibxml.
@@ -87,8 +87,15 @@ final class LibxmlUseInternalErrorsRuntime
     {
         $probe = $context->module->getNamedFunction('__compiler_libxml_use_internal_errors');
         $clearProbe = $context->module->getNamedFunction('__compiler_libxml_clear_errors');
+        $getErrorsProbe = $context->module->getNamedFunction('__compiler_libxml_get_errors');
+        $getLastProbe = $context->module->getNamedFunction('__compiler_libxml_get_last_error');
+        // Require get_errors / get_last_error bodies too — use+clear alone used to early-return
+        // and leave empty decls that mid-main ensureLinked then filled under the wrong
+        // loweringLlvmFunction (#35082 / re-#29161 / peer #27211).
         if (null !== $probe && $probe->countBasicBlocks() > 0
             && null !== $clearProbe && $clearProbe->countBasicBlocks() > 0
+            && null !== $getErrorsProbe && $getErrorsProbe->countBasicBlocks() > 0
+            && null !== $getLastProbe && $getLastProbe->countBasicBlocks() > 0
         ) {
             self::registerLinkedRuntime($context);
 
@@ -482,23 +489,27 @@ final class LibxmlUseInternalErrorsRuntime
                 $abiName,
                 $context->context->functionType($htPtr, false)
             );
-
-        $entry = $fn->appendBasicBlock('libxml_get_errors_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        if (self::isStandalone($context)) {
-            // Dedicated ABI fn (hrtime_pair peer): fresh LibXMLError[] from ring globals.
-            $context->builder->returnValue(self::emitBuildErrorsHtFromRing($context));
-        } else {
-            $raw = JitNestedHelperCoerce::callHelper(
-                $context,
-                self::helperFunction($context, self::GET_ERRORS_HELPER),
-                []
-            );
-            $context->builder->returnValue(
-                JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $htPtr)
-            );
-        }
+        // Mid-main ensureLinked: loweringLlvmFunction is still the app fn — ring materialize
+        // uses BasicBlockHelper::append; without this scope, take/skip BBs land in main/void
+        // and verify fails (cross-fn br + ret hashtable* in void) (#35082 / peer #27211).
         $context->registerFunction($abiName, $fn);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn, $htPtr): void {
+            $entry = $fn->appendBasicBlock('libxml_get_errors_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            if (self::isStandalone($context)) {
+                // Dedicated ABI fn (hrtime_pair peer): fresh LibXMLError[] from ring globals.
+                $context->builder->returnValue(self::emitBuildErrorsHtFromRing($context));
+            } else {
+                $raw = JitNestedHelperCoerce::callHelper(
+                    $context,
+                    self::helperFunction($context, self::GET_ERRORS_HELPER),
+                    []
+                );
+                $context->builder->returnValue(
+                    JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $htPtr)
+                );
+            }
+        });
         $context->builder->clearInsertionPosition();
     }
 
@@ -519,22 +530,23 @@ final class LibxmlUseInternalErrorsRuntime
                 $abiName,
                 $context->context->functionType($objPtr, false)
             );
-
-        $entry = $fn->appendBasicBlock('libxml_get_last_error_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        if (self::isStandalone($context)) {
-            $context->builder->returnValue(self::emitBuildLastErrorFromRing($context));
-        } else {
-            $raw = JitNestedHelperCoerce::callHelper(
-                $context,
-                self::helperFunction($context, self::GET_LAST_HELPER),
-                []
-            );
-            $context->builder->returnValue(
-                JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $objPtr)
-            );
-        }
         $context->registerFunction($abiName, $fn);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn, $objPtr): void {
+            $entry = $fn->appendBasicBlock('libxml_get_last_error_bridge_entry');
+            $context->builder->positionAtEnd($entry);
+            if (self::isStandalone($context)) {
+                $context->builder->returnValue(self::emitBuildLastErrorFromRing($context));
+            } else {
+                $raw = JitNestedHelperCoerce::callHelper(
+                    $context,
+                    self::helperFunction($context, self::GET_LAST_HELPER),
+                    []
+                );
+                $context->builder->returnValue(
+                    JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $objPtr)
+                );
+            }
+        });
         $context->builder->clearInsertionPosition();
     }
 
