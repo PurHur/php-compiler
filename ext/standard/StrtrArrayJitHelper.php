@@ -9,24 +9,27 @@ use PHPCompiler\VM\HashTable;
 /**
  * Lowered into JIT/AOT modules for strtr() array form (#9392, #27056, php-in-PHP).
  *
- * NestedJIT AOT constraints (#27056 / #23912 / #22990):
+ * NestedJIT AOT constraints (#27056 / #23912 / #22990 / #35038):
  * - `$pair[0]`/`$pair[1]` + `(string)` cast — not Variable method stringification (abort)
- * - Drive the subject walk with `isset($subject[$i])` — not a precomputed length
- *   (isset-length was short-by-one under NestedJIT here, dropping the last byte)
+ * - Drive subject/`$from` length with `\strlen` — NestedJIT `isset($s[$i])` is always
+ *   false for this helper shape (#35038 / peer #35032 / #33334), so the walk was a no-op
  * - `++` only; no `$a[]`; no list-assign; no countdown `--`
+ *
+ * php-src: ext/standard/string.c — PHP_FUNCTION(strtr) array form
  */
 final class StrtrArrayJitHelper
 {
     public static function strtrArray(string $subject, HashTable $replacePairs): string
     {
-        if (!isset($subject[0])) {
+        $subjectLen = \strlen($subject);
+        if (0 === $subjectLen) {
             return '';
         }
 
         $out = '';
         $i = 0;
         $wrote = false;
-        while (isset($subject[$i])) {
+        while ($i < $subjectLen) {
             $bestLen = 0;
             $bestTo = '';
             foreach ($replacePairs->exportKeyValuePairs(true) as $pair) {
@@ -37,10 +40,7 @@ final class StrtrArrayJitHelper
                     }
                     continue;
                 }
-                $flen = 0;
-                while (isset($from[$flen])) {
-                    ++$flen;
-                }
+                $flen = \strlen($from);
                 if ($flen <= $bestLen) {
                     continue;
                 }
@@ -48,7 +48,7 @@ final class StrtrArrayJitHelper
                 $j = 0;
                 $hi = $i;
                 while ($j < $flen) {
-                    if (!isset($subject[$hi]) || $subject[$hi] !== $from[$j]) {
+                    if ($hi >= $subjectLen || $subject[$hi] !== $from[$j]) {
                         $matched = false;
                         break;
                     }
