@@ -72,6 +72,12 @@ final class DomDocumentConstruct implements Call
         self::seedEncodingNull($context, $obj);
         // documentURI null — writable; baseURI read-only alias via MetaProps (#34925).
         self::seedDocumentUriNull($context, $obj);
+        // DOMNode identity on Document (php-src ext/dom/node.c; #34992 leftover of #34899).
+        self::seedNodeName($context, $obj, '#document');
+        self::seedPrefixEmpty($context, $obj);
+        self::seedNullValueProp($context, $obj, VmDom::PROP_NAMESPACE_URI);
+        self::seedNullValueProp($context, $obj, VmDom::PROP_LOCAL_NAME);
+        self::seedNullValueProp($context, $obj, VmDom::PROP_ATTRIBUTES);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
@@ -175,6 +181,87 @@ final class DomDocumentConstruct implements Call
             $context,
             $box,
             $context->builder->zext($i1->constInt($value ? 1 : 0, false), $i32)
+        );
+        $propVar = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $box
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', $prop),
+            $propVar,
+            Variable::TYPE_VALUE
+        );
+    }
+
+    /** php-src DOMNode::$nodeName for XML_DOCUMENT_NODE — "#document" (#34992). */
+    private static function seedNodeName(Context $context, Value $obj, string $name): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_NODE_NAME)) {
+            $objectType->defineProperty($classId, VmDom::PROP_NODE_NAME, Variable::TYPE_STRING);
+        }
+        $str = $context->builder->load($context->constantStringFromString($name));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $propVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $owned
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_NODE_NAME),
+            $propVar,
+            Variable::TYPE_STRING
+        );
+    }
+
+    /** php-src DOMNode::$prefix for documents — empty string (#34992). */
+    private static function seedPrefixEmpty(Context $context, Value $obj): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_PREFIX)) {
+            $objectType->defineProperty($classId, VmDom::PROP_PREFIX, Variable::TYPE_STRING);
+        }
+        $str = $context->builder->load($context->constantStringFromString(''));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $propVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $owned
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_PREFIX),
+            $propVar,
+            Variable::TYPE_STRING
+        );
+    }
+
+    /**
+     * Seed a nullable DOMNode VALUE prop to null (namespaceURI / localName / attributes
+     * on Document — #34992).
+     */
+    private static function seedNullValueProp(Context $context, Value $obj, string $prop): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, $prop)) {
+            $objectType->defineProperty($classId, $prop, Variable::TYPE_VALUE);
+        }
+        $box = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $box)
         );
         $propVar = new Variable(
             $context,
