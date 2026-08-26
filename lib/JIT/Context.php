@@ -2349,7 +2349,7 @@ class Context {
         // #20966 / #20982 / #20998). ensureMinimal is reached for user-script AOT and via
         // bootstrap-aot ensureBootstrapAotStandaloneBodies; the old `!$isUserScriptAot`
         // guard only NestedJIT Stream* on the bootstrap path and still risked feof.1 /
-        // stream_bucket_*.1 (#31894 / #32122). Full standalone still ensureLinked below.
+        // stream_bucket_*.1 (#31894 / #32122). Full standalone drop is #35086 (peer #35073).
         // StringTriggerError always-on removed (#34641): trigger_error_.php / JitBuiltinWarning /
         // JitIncDec / HashTableResourceKeyLlvm / JitTriggerErrorKernel already ensureLinked before
         // lookup (peer #34631 / #33234). JitTriggerErrorKernel restores builder insert mid-{main}.
@@ -2417,9 +2417,12 @@ class Context {
         try {
             ExceptionBridge::ensureStandaloneBodies($this);
             ErrorBridge::ensureStandaloneBodies($this);
-            // NestedJIT StreamLifecycle/StreamRead helpers during full standalone init (#20966 / #20982).
-            Builtin\StreamLifecycleRuntime::ensureLinked($this);
-            Builtin\StreamReadRuntime::ensureLinked($this);
+            // StreamLifecycle / StreamRead always-on removed (#35086): JitFclose / JitFeof /
+            // JitFflush / JitFgetc / JitFgets / StringVarDump / StringPrintR / SilenceRuntime /
+            // StreamReadJit / StringFgetcsvJit already ensureLinked(ForUserScriptLowering)
+            // before lookup (peer ensureMinimal #34836 / #20966 / #20982). Full standalone
+            // must not NestedJIT feof/fclose/fflush/fgets during init — leftover Context
+            // NestedJIT vs Runtime ABI drift mints feof.1 / fflush.1 (#31894 / #32122).
             // StringTriggerError / AssertFail / AssertOptions / JitReturnPending always-on
             // removed (#35073): JitAssert / JitAssertOptions / TryCatchHelper /
             // AssertFail::ensureLinked (→ StringTriggerError) already ensure before lookup
@@ -2479,14 +2482,22 @@ class Context {
             // (peer #35035). Do not NestedJIT offset / scalar-dim helpers during full init.
             // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
             // (call sites / AssertFail ensure StringTriggerError; avoid duplicate bodies — #10524 / #35073).
-            // NestedJIT StreamFilterJitHelper during full standalone init (#21041 / peer #20998).
-            Builtin\StreamFilter::ensureLinked($this);
-            // GcToggle / FunctionStatic / GcCollect / ProgressNote / LastError always-on
-            // removed (#35073): JitGcToggle / JitGcCollectCycles / ProgressNoteRuntime /
-            // JitErrorGetLast / JitTriggerErrorKernel / Object_ delref already ensureLinked
-            // before lookup (peer ensureMinimal #34605 / #34631). Full standalone must not
-            // NestedJIT gc_* / progress_note / last_error during init (#31894 / #32122).
-            Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
+            // StreamFilter / StreamBucket always-on removed (#35086): StreamIoJit /
+            // StreamReadJit / StreamReadRuntime / JitStreamBucket / JitIsResource already
+            // StreamFilter::ensureLinked / StreamBucket::ensureLinked before lookup
+            // (peer ensureMinimal #34836 / #21041 / #20998). Full standalone must not
+            // NestedJIT stream_filter_* / stream_bucket_* during init — leftover Context
+            // NestedJIT vs Runtime ABI drift mints stream_bucket_*.1 (#31894 / #32122).
+            // GcToggle / GcCollect / ProgressNote / LastError always-on removed (#35073):
+            // JitGcToggle / JitGcCollectCycles / ProgressNoteRuntime / JitErrorGetLast /
+            // JitTriggerErrorKernel / Object_ delref already ensureLinked before lookup
+            // (peer ensureMinimal #34605 / #34631). Full standalone must not NestedJIT
+            // gc_* / progress_note / last_error during init (#31894 / #32122).
+            // FunctionStatic always-on removed (#35086): FunctionStaticHelper::ensureRuntime
+            // already FunctionStaticRuntime::ensureLinked before phpc_fn_static_* lookup
+            // (#10173). Full standalone must not emit fn-static table ABI during init —
+            // leftover Context NestedJIT vs Runtime ABI drift mints phpc_fn_static_*.1
+            // (#31894 / #32122).
             Builtin\StringUtf8Latin1::ensureStandaloneBodies($this);
             Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
             Builtin\DefineRuntime::ensureStandaloneBodies($this);
@@ -2504,7 +2515,9 @@ class Context {
             // ensureStandaloneBodies is a no-op — helper LLVM compiles on first lowering
             // (TokenGetAll::helperFunction / JitHighlight / JitHebrev). Do not re-add eager
             // NestedJIT here (#31894 / #32122 .1 mint class).
-            \PHPCompiler\ext\standard\JitStreamBucketKernel::ensureStandaloneBodies($this);
+            // JitStreamBucketKernel always-on removed (#35086): StreamBucket::ensureLinked →
+            // JitStreamBucketKernel::ensureLinked (JitStreamBucket / JitIsResource) already
+            // implement before lookup (peer #34836). Do not NestedJIT stream_bucket_* here.
         } finally {
             Builtin\StreamIoRuntime::endStandaloneInitPhase();
         }

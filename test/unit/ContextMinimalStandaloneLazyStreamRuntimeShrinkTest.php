@@ -47,20 +47,8 @@ final class ContextMinimalStandaloneLazyStreamRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testCallSitesAndFullStandaloneStillEnsure(): void
+    public function testCallSitesStillEnsureLazily(): void
     {
-        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString(
-            'StreamLifecycleRuntime::ensureLinked($this)',
-            $context,
-            'ensureFullStandaloneBodies still ensureLinked StreamLifecycle (#34836)'
-        );
-        $this->assertStringContainsString(
-            'StreamReadRuntime::ensureLinked($this)',
-            $context,
-            'ensureFullStandaloneBodies still ensureLinked StreamRead (#34836)'
-        );
-
         $checks = [
             'ext/standard/JitFclose.php' => 'StreamLifecycleRuntime::ensureLinkedForUserScriptLowering',
             'ext/standard/JitFeof.php' => 'StreamLifecycleRuntime::ensureLinkedForUserScriptLowering',
@@ -78,6 +66,11 @@ final class ContextMinimalStandaloneLazyStreamRuntimeShrinkTest extends TestCase
             $source = (string) file_get_contents($path);
             $this->assertStringContainsString($needle, $source, $rel.' must ensure lazily (#34836)');
         }
+
+        // Full standalone also dropped Stream* (#35086) — guard lives in
+        // ContextFullStandaloneLazyStreamRuntimeShrinkTest.
+        $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('#35086', $context);
     }
 
     public function testNoNewRuntimeCForMinimalStreamLazy(): void
