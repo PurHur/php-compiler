@@ -3093,6 +3093,12 @@ class JIT {
             if ($this->shouldStubClosureLowering()) {
                 continue;
             }
+            // Fiber::suspend callbacks must use compileResumeFunction at TYPE_CLOSURE —
+            // precompileClosureBodyBlock hits FiberSuspendStatic outside resume context
+            // (#34868 interaction with #4019; AOT fiber_suspend.phpt).
+            if (JIT\FiberHelper::blockContainsFiberSuspend($op->block1)) {
+                continue;
+            }
             $internalName = JIT\ClosureHelper::nextInternalName();
             $op->closurePrecompiledInternalName = $internalName;
             $this->compileClosureBodyBlock($block, $op->block1, $internalName);
