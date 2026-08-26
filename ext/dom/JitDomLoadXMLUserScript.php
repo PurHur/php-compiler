@@ -747,12 +747,22 @@ final class JitDomLoadXMLUserScript
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($xml);
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
-        $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
-        JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
         // Root open-tag attrs for node-scoped saveXML (peer child sync #33014).
         $rootMarkup = DomParseSimpleXmlJitHelper::parseElementMarkupArgv(
             preg_replace('/^\\s*<\\?xml[^?]*\\?>\\s*/i', '', trim($xml)) ?? trim($xml)
         );
+        $rootOpen = '';
+        if (null !== $rootMarkup) {
+            // Rebuild open-tag shape for xmlns scope + attr suffix (#34924).
+            $rootOpen = '<'.$tag.$rootMarkup['attrs'].'>';
+        }
+        $element = JitDomDocumentElement::materializeElementFromXmlTag(
+            $context,
+            $tag,
+            $text,
+            $rootOpen
+        );
+        JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
         if (null !== $rootMarkup && '' !== $rootMarkup['attrs']) {
             JitDomCreateElement::storeUserScriptXmlnsAttr($context, $element, $rootMarkup['attrs']);
         }
