@@ -4159,6 +4159,16 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_FIRST_ELEMENT_CHILD, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_LAST_ELEMENT_CHILD, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_CHILD_ELEMENT_COUNT, Variable::TYPE_NATIVE_LONG);
+            // DOMNode identity on Document — late defineProperty after loadXML undersizes /
+            // reads uninitialised slots (#34992 leftover of #34899 / #34910). php-src node.c:
+            // node_name_read → "#document"; namespace_uri/local_name/attributes → null;
+            // prefix → "". previousSibling/nextSibling stay on the child-edge fetch path
+            // (JitDomNodeChildProperty) — pinning them here hangs thin AOT compile.
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_NODE_NAME, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_PREFIX, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_NAMESPACE_URI, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_LOCAL_NAME, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ATTRIBUTES, Variable::TYPE_VALUE);
             $this->markHasConstructor($id);
         }
         if ('domattr' === $lcname) {
