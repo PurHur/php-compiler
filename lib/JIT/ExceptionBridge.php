@@ -14,6 +14,8 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
  *
  * Replaces lib/AOT/runtime/phpc_type_error_raise.c — LLVM bodies live in {@see TypeErrorRaise}
  * and {@see JitThrow}; this bridge is the single entry point for MCJIT/AOT wiring.
+ * Standalone bodies are lazy via ensureLinked at call sites (#34732 / #35099); Context
+ * ensureMinimal and ensureFull no longer eagerly NestedJIT this ABI.
  */
 final class ExceptionBridge
 {

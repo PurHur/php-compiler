@@ -12,8 +12,8 @@ use PHPCompiler\JIT\Builtin\ErrorRaise;
  *
  * Replaces lib/AOT/runtime/phpc_error_raise.c — LLVM bodies live in {@see ErrorRaise};
  * readonly property guards use {@see ReadonlyBridge} (#5374).
- * Standalone bodies are lazy via ensureLinked at call sites (#34769); Context
- * ensureMinimal no longer eagerly NestedJITs this ABI.
+ * Standalone bodies are lazy via ensureLinked at call sites (#34769 / #35099); Context
+ * ensureMinimal and ensureFull no longer eagerly NestedJIT this ABI.
  */
 final class ErrorBridge
 {
