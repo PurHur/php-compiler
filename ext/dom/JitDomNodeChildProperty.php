@@ -175,9 +175,12 @@ final class JitDomNodeChildProperty
         $result->compileTimeDomChildIndex = $index;
         self::$lastFetchedChildIndex = $index;
         $kind = $nodes[$index]['kind'] ?? '';
-        // Text/comment payloads for CharacterData methods on firstChild temps (#34314 / #34475).
-        if ('text' === $kind || 'comment' === $kind) {
-            $data = $nodes[$index]['data'];
+        // Text/comment/PI/CDATA payloads for CharacterData methods on firstChild temps
+        // (#34314 / #34475 / #34952 / #34949).
+        if ('text' === $kind || 'comment' === $kind || 'pi' === $kind || 'cdata' === $kind) {
+            $data = 'pi' === $kind
+                ? ($nodes[$index]['content'] ?? '')
+                : $nodes[$index]['data'];
             $result->compileTimeDomTextData = $data;
             JitDomSubstringData::remember($data);
             if ('text' === $kind) {

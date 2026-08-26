@@ -1021,6 +1021,20 @@ final class DomParseSimpleXmlJitHelper
 
                 continue;
             }
+            if (1 === preg_match('/\G<!\[CDATA\[.*?\]\]>/s', $inner, $cdata, 0, $i)) {
+                $chunks[] = $cdata[0];
+                $i += \strlen($cdata[0]);
+
+                continue;
+            }
+            // Processing instructions (#34952) — peer of comment markup chunks.
+            // Split before '>' so source does not contain the PHP closer sequence.
+            if (1 === preg_match('/\G<\?[a-zA-Z_][\w.-]*(?:\s+.*?)?\?'.'>/s', $inner, $pi, 0, $i)) {
+                $chunks[] = $pi[0];
+                $i += \strlen($pi[0]);
+
+                continue;
+            }
             if (1 === preg_match('/\G<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)(\/?)>/', $inner, $el, 0, $i)) {
                 $start = $i;
                 $tag = $el[1];
@@ -1072,7 +1086,7 @@ final class DomParseSimpleXmlJitHelper
      * Compile-time only (host preg). Keeps inter-element whitespace so AOT
      * {@code childNodes->length} matches Zend when preserveWhiteSpace is default.
      *
-     * @return list<array{kind: 'comment'|'text'|'cdata'|'element', data: string, inner?: string, open?: string}>
+     * @return list<array{kind: 'comment'|'pi'|'text'|'cdata'|'element', data: string, content?: string, inner?: string, open?: string}>
      */
     public static function directChildNodesArgv(string $xml): array
     {
@@ -1084,7 +1098,7 @@ final class DomParseSimpleXmlJitHelper
      *
      * Used by {@see JitDomGetNodePath} nested firstChild walks (#32474).
      *
-     * @return list<array{kind: 'comment'|'text'|'cdata'|'element', data: string, inner?: string, open?: string}>
+     * @return list<array{kind: 'comment'|'pi'|'text'|'cdata'|'element', data: string, content?: string, inner?: string, open?: string}>
      */
     public static function parseSiblingNodesArgv(string $inner): array
     {
@@ -1105,6 +1119,18 @@ final class DomParseSimpleXmlJitHelper
             if (1 === preg_match('/\G<!\[CDATA\[(.*?)\]\]>/s', $inner, $cdata, 0, $i)) {
                 $nodes[] = ['kind' => 'cdata', 'data' => $cdata[1]];
                 $i += \strlen($cdata[0]);
+
+                continue;
+            }
+            // PI target/data — libxml XML_PI_NODE; nodeName is target (#34952).
+            // Split before '>' so source does not contain the PHP closer sequence.
+            if (1 === preg_match('/\G<\?([a-zA-Z_][\w.-]*)(?:\s+(.*?))?\?'.'>/s', $inner, $pi, 0, $i)) {
+                $nodes[] = [
+                    'kind' => 'pi',
+                    'data' => $pi[1],
+                    'content' => $pi[2] ?? '',
+                ];
+                $i += \strlen($pi[0]);
 
                 continue;
             }
@@ -1163,6 +1189,11 @@ final class DomParseSimpleXmlJitHelper
         if ('comment' === $node['kind']) {
             return 'comment()';
         }
+        if ('pi' === $node['kind']) {
+            $target = $node['data'] ?? '';
+
+            return "processing-instruction('".$target."')";
+        }
         if ('element' !== $node['kind']) {
             return $node['data'] ?? null;
         }
@@ -1188,7 +1219,7 @@ final class DomParseSimpleXmlJitHelper
     /**
      * First child under the document element for user-script AOT navigation (#19455).
      *
-     * @return null|array{kind: 'comment'|'text'|'element', data: string}
+     * @return null|array{kind: 'comment'|'pi'|'text'|'cdata'|'element', data: string, content?: string}
      */
     public static function firstChildNodeArgv(string $xml): ?array
     {
@@ -1202,6 +1233,13 @@ final class DomParseSimpleXmlJitHelper
         }
         if (preg_match('/^\s*<!\[CDATA\[(.*?)\]\]>/s', $rest, $cdata)) {
             return ['kind' => 'cdata', 'data' => $cdata[1]];
+        }
+        if (preg_match('/^\s*<\?([a-zA-Z_][\w.-]*)(?:\s+(.*?))?\?'.'>/s', $rest, $pi)) {
+            return [
+                'kind' => 'pi',
+                'data' => $pi[1],
+                'content' => $pi[2] ?? '',
+            ];
         }
         if (preg_match('/^\s*<([a-zA-Z_][\w:.-]*)(?:\s|\/|>)/', $rest, $child)) {
             return ['kind' => 'element', 'data' => $child[1]];

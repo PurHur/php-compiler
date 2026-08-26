@@ -159,6 +159,11 @@ final class JitDomDocumentElement
         foreach ($children as $idx => $node) {
             $child = match ($node['kind']) {
                 'comment' => JitDomCreateComment::materialize($context, $node['data']),
+                'pi' => JitDomCreateProcessingInstruction::materialize(
+                    $context,
+                    $node['data'],
+                    $node['content'] ?? ''
+                ),
                 'text' => JitDomCreateTextNode::materialize($context, $node['data']),
                 'cdata' => JitDomCreateCDATASection::materialize($context, $node['data']),
                 // Seed textContent/INNER_XML/attrs + NS props like createElementNS (#33014 / #34924).
