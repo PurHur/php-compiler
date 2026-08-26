@@ -526,6 +526,16 @@ final class GeneratorIteratorJitHelper
         ) {
             return false;
         }
+        // Compile-time class tag: only real Generator objects may hydrate. A module with a
+        // single generator creator (e.g. IteratorAggregate::getIterator that yields) used to
+        // mark *every* object as that Generator via inferResumeNameFromContext — foreach then
+        // took compileIterReset and SIGSEGVd (#34980).
+        $tagged = $genVar->classUserType ?? null;
+        if (null !== $tagged && '' !== $tagged) {
+            if (0 !== strcasecmp(ltrim($tagged, '\\'), 'Generator')) {
+                return false;
+            }
+        }
         try {
             self::normalizeGeneratorObjectVariable($context, $genVar);
             self::loadStateFromGeneratorObject($context, $genVar);

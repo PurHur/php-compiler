@@ -147,7 +147,14 @@ final class VmGenerator
         \PHPCompiler\JIT $jit,
         string $resumeInternalName
     ): Variable {
-        $context = $jit->context;
+        return self::emitCreateFromCallContext($jit->context, $resumeInternalName);
+    }
+
+    /** Context-only entry for foreach Aggregate→Generator unwrap (#34980). */
+    public static function emitCreateFromCallContext(
+        Context $context,
+        string $resumeInternalName
+    ): Variable {
         self::ensureJitTypes($context);
         $stateTy = $context->getTypeFromString('__generator_state__');
         $statePtr = $context->memory->malloc($stateTy);
