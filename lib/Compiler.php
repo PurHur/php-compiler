@@ -22980,6 +22980,54 @@ class Compiler {
         return $this->slotForRecentInitArrayCallArg($block);
     }
 
+    /**
+     * json_encode(nested(), …) — keep outer FUNCCALL_INIT after nested inline producers (#34559).
+     *
+     * Hoisted JSON_* ConstFetch for flags triggers prependFuncCallInitBeforeTrailingArgConstFetches
+     * (#17697) and left outer INIT before inner f()/make_list() under AOT. Dead arg temps may not
+     * share cfg roots with the nested FuncCall result, so detect sibling FuncCall producers.
+     */
+    private function jsonEncodeDeferredInitForNestedCallArg(Op $cfgCallOp, Block $block): bool
+    {
+        if ('json_encode' !== strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
+            return false;
+        }
+        if ($this->callArgIsNestedFuncCallResult($cfgCallOp, 0, $block)) {
+            return true;
+        }
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return false;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex)) {
+            return false;
+        }
+        $sibling = $this->firstSiblingInlineFuncCallProducerIndex($callIndex, $block->orig->children);
+        if (null === $sibling) {
+            return false;
+        }
+        $flagsArg = $cfgCallOp->args[1] ?? null;
+        if (!$flagsArg instanceof Operand) {
+            return true;
+        }
+        $flagsProducer = $this->findCfgProducerExprForOperand($flagsArg);
+        if ($flagsProducer instanceof Op\Expr\ConstFetch) {
+            $name = $this->staticNameFromOperand($flagsProducer->name);
+            if (null !== $name && str_starts_with(strtoupper($name), 'JSON_')) {
+                return true;
+            }
+        }
+        $prev = $block->orig->children[$callIndex - 1] ?? null;
+        if ($prev instanceof Op\Expr\ConstFetch) {
+            $name = $this->staticNameFromOperand($prev->name);
+            if (null !== $name && str_starts_with(strtoupper($name), 'JSON_')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** True when a hoisted nested FuncCall feeds this dead inline call arg (#14042). */
     private function callArgIsNestedFuncCallResult(Op $cfgCallOp, int $argIndex, Block $block): bool
     {
@@ -60347,11 +60395,16 @@ class Compiler {
                 ['date_sunrise', 'date_sunset', 'date_sun_info'],
                 true
             );
+        // json_encode(f(), JSON_FORCE_OBJECT) — hoisted JSON_* ConstFetch must not prepend outer
+        // INIT before nested FuncCall producers; AOT walked clobbered arg temps (#34559).
+        $skipPrependForJsonEncodeNestedCallArg = null !== $cfgCallOp
+            && $this->jsonEncodeDeferredInitForNestedCallArg($cfgCallOp, $block);
         if (
             !$skipPrependForSiblingFuncProducer
             && !$skipPrependForHaystackFamilyDimFetch
             && !$skipPrependForExplodeLeadingConstFunc
             && !$skipPrependForDateSunFunc
+            && !$skipPrependForJsonEncodeNestedCallArg
         ) {
             $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
                 $block,
@@ -60368,6 +60421,7 @@ class Compiler {
             && !$skipPrependForHaystackFamilyDimFetch
             && !$skipPrependForExplodeLeadingConstFunc
             && !$skipPrependForDateSunFunc
+            && !$skipPrependForJsonEncodeNestedCallArg
         ) {
             $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
                 $block,
