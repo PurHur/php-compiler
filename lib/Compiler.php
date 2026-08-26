@@ -23028,6 +23028,39 @@ class Compiler {
         return false;
     }
 
+    /**
+     * str_pad()/mb_str_pad(…, nested(), STR_PAD_*) — keep outer FUNCCALL_INIT after nested producers (#34890).
+     *
+     * Hoisted STR_PAD_* (or user) ConstFetch for pad_type triggers prependFuncCallInitBeforeTrailingArgConstFetches
+     * (#17697) and left outer INIT before nested pad_string/encoding FuncCalls under VM — return became the
+     * nested call value. Peer {@see jsonEncodeDeferredInitForNestedCallArg} / #34559.
+     *
+     * CFG may order ConstFetch before the nested FuncCall (`STR_PAD_*` then `enc()` then `mb_str_pad`), so
+     * pad_type Operand may be a dead temp — sibling FuncCall detection is the reliable signal.
+     */
+    private function strPadDeferredInitForNestedCallArg(Op $cfgCallOp, Block $block): bool
+    {
+        $name = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if ('str_pad' !== $name && 'mb_str_pad' !== $name) {
+            return false;
+        }
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return false;
+        }
+        $argc = \count($cfgCallOp->args);
+        for ($i = 0; $i < $argc; ++$i) {
+            if ($this->callArgIsNestedFuncCallResult($cfgCallOp, $i, $block)) {
+                return true;
+            }
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex)) {
+            return false;
+        }
+
+        return null !== $this->firstSiblingInlineFuncCallProducerIndex($callIndex, $block->orig->children);
+    }
+
     /** True when a hoisted nested FuncCall feeds this dead inline call arg (#14042). */
     private function callArgIsNestedFuncCallResult(Op $cfgCallOp, int $argIndex, Block $block): bool
     {
@@ -60399,12 +60432,16 @@ class Compiler {
         // INIT before nested FuncCall producers; AOT walked clobbered arg temps (#34559).
         $skipPrependForJsonEncodeNestedCallArg = null !== $cfgCallOp
             && $this->jsonEncodeDeferredInitForNestedCallArg($cfgCallOp, $block);
+        // str_pad/mb_str_pad(…, s(), STR_PAD_*) — same INIT/ConstFetch hoist; VM returned nested value (#34890).
+        $skipPrependForStrPadNestedCallArg = null !== $cfgCallOp
+            && $this->strPadDeferredInitForNestedCallArg($cfgCallOp, $block);
         if (
             !$skipPrependForSiblingFuncProducer
             && !$skipPrependForHaystackFamilyDimFetch
             && !$skipPrependForExplodeLeadingConstFunc
             && !$skipPrependForDateSunFunc
             && !$skipPrependForJsonEncodeNestedCallArg
+            && !$skipPrependForStrPadNestedCallArg
         ) {
             $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
                 $block,
@@ -60422,6 +60459,7 @@ class Compiler {
             && !$skipPrependForExplodeLeadingConstFunc
             && !$skipPrependForDateSunFunc
             && !$skipPrependForJsonEncodeNestedCallArg
+            && !$skipPrependForStrPadNestedCallArg
         ) {
             $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
                 $block,
