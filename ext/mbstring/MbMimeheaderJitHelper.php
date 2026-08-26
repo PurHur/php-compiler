@@ -10,7 +10,8 @@ namespace PHPCompiler\ext\mbstring;
  * NestedJIT-safe peel (peer {@see MbStrcutJitHelper}):
  * - No VmMbstring call (encode→decode in one AOT binary SIGSEGVs — #34310 / re-#34299).
  * - No assoc arrays / foreach / preg / native base64_* / sprintf / computed `$data[$i+1]`.
- * - Byte length via isset; base64 encode via sequential `$i++` walk; decode via Base64JitHelper.
+ * - Byte length via strlen (isset-len unreliable under NestedJIT — #34379 / #35225).
+ * - Base64 encode via sequential `$i++` walk; decode via Base64JitHelper.
  *
  * SSOT for VM / compile-time fold: {@see MimeHeaderConvert}
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_encode_mimeheader) / mb_decode_mimeheader
@@ -28,10 +29,8 @@ final class MbMimeheaderJitHelper
         string $charset,
         string $transferEncoding
     ): string {
-        $len = 0;
-        while (isset($str[$len])) {
-            ++$len;
-        }
+        // Prefer strlen over isset-length — NestedJIT isset-len on helper params is unreliable (#34379).
+        $len = \strlen($str);
         if (0 === $len) {
             return '';
         }
@@ -47,20 +46,27 @@ final class MbMimeheaderJitHelper
             return $str;
         }
 
+        // Match MimeHeaderConvert::splitSegments — all-safe (incl. spaces) must not encode (#35225).
         $encodeStart = self::firstUnsafeIndex($str, $len);
+        if ($encodeStart >= $len) {
+            return $str;
+        }
         $ascii = '';
         $encoded = $str;
+        // NestedJIT: avoid spacePos=-1 sentinel and `$j >= 0` (miscompiles café → leading "c" #35225).
         if ($encodeStart > 0) {
-            $spacePos = -1;
-            $j = $encodeStart - 1;
-            while ($j >= 0) {
-                if (' ' === $str[$j]) {
+            $foundSpace = 0;
+            $spacePos = 0;
+            $j = $encodeStart;
+            while ($j > 0) {
+                --$j;
+                if (0x20 === \ord($str[$j])) {
+                    $foundSpace = 1;
                     $spacePos = $j;
                     break;
                 }
-                --$j;
             }
-            if ($spacePos >= 0) {
+            if (1 === $foundSpace) {
                 $ascii = \substr($str, 0, $spacePos + 1);
                 $encoded = \substr($str, $spacePos + 1);
             }
@@ -76,10 +82,7 @@ final class MbMimeheaderJitHelper
 
     public static function decodeArgv(string $str): string
     {
-        $len = 0;
-        while (isset($str[$len])) {
-            ++$len;
-        }
+        $len = \strlen($str);
         if (0 === $len) {
             return '';
         }
@@ -134,12 +137,12 @@ final class MbMimeheaderJitHelper
     {
         $checkingLeading = 1;
         for ($i = 0; $i < $len; ++$i) {
-            $byte = $str[$i];
-            if (1 === $checkingLeading && ' ' === $byte) {
+            $ord = \ord($str[$i]);
+            if (1 === $checkingLeading && 0x20 === $ord) {
                 continue;
             }
             $checkingLeading = 0;
-            if (!self::isGraphSafe($byte)) {
+            if ($ord < 0x21 || $ord > 0x7E || 0x3D === $ord || 0x3F === $ord || 0x5F === $ord) {
                 return false;
             }
         }
@@ -158,30 +161,33 @@ final class MbMimeheaderJitHelper
         return $len;
     }
 
-    /** php-src safe ASCII for mime header pass-through (space allowed). */
+    /** php-src safe ASCII for mime header pass-through (space allowed). Use ord — NestedJIT. */
     private static function isSafeAsciiByte(string $byte): bool
     {
-        return $byte >= ' ' && $byte <= '~' && '=' !== $byte && '?' !== $byte && '_' !== $byte;
+        $ord = \ord($byte);
+
+        return $ord >= 0x20 && $ord <= 0x7E && 0x3D !== $ord && 0x3F !== $ord && 0x5F !== $ord;
     }
 
     /** Pass-through after leading spaces rejects space itself (php-src mbfl). */
     private static function isGraphSafe(string $byte): bool
     {
-        return $byte >= '!' && $byte <= '~' && '=' !== $byte && '?' !== $byte && '_' !== $byte;
+        $ord = \ord($byte);
+
+        return $ord >= 0x21 && $ord <= 0x7E && 0x3D !== $ord && 0x3F !== $ord && 0x5F !== $ord;
     }
 
     private static function isWhitespace(string $byte): bool
     {
-        return ' ' === $byte || "\t" === $byte || "\r" === $byte || "\n" === $byte;
+        $ord = \ord($byte);
+
+        return 0x20 === $ord || 0x09 === $ord || 0x0D === $ord || 0x0A === $ord;
     }
 
     private static function qEncode(string $text): string
     {
         $out = '';
-        $len = 0;
-        while (isset($text[$len])) {
-            ++$len;
-        }
+        $len = \strlen($text);
         $digits = '0123456789ABCDEF';
         for ($i = 0; $i < $len; ++$i) {
             $byte = $text[$i];
@@ -189,7 +195,7 @@ final class MbMimeheaderJitHelper
                 $out .= $byte;
                 continue;
             }
-            if (' ' === $byte) {
+            if (0x20 === \ord($byte)) {
                 $out .= '_';
                 continue;
             }
@@ -245,10 +251,7 @@ final class MbMimeheaderJitHelper
     private static function b64Encode(string $data): string
     {
         $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-        $len = 0;
-        while (isset($data[$len])) {
-            ++$len;
-        }
+        $len = \strlen($data);
         if (0 === $len) {
             return '';
         }
@@ -293,10 +296,7 @@ final class MbMimeheaderJitHelper
     private static function b64Decode(string $payload): string
     {
         $clean = '';
-        $len = 0;
-        while (isset($payload[$len])) {
-            ++$len;
-        }
+        $len = \strlen($payload);
         for ($i = 0; $i < $len; ++$i) {
             $ch = $payload[$i];
             if ("\r" === $ch || "\n" === $ch || "\t" === $ch || ' ' === $ch || '=' === $ch) {
@@ -315,10 +315,7 @@ final class MbMimeheaderJitHelper
     private static function qDecode(string $payload): string
     {
         $out = '';
-        $len = 0;
-        while (isset($payload[$len])) {
-            ++$len;
-        }
+        $len = \strlen($payload);
         for ($i = 0; $i < $len; ++$i) {
             $byte = $payload[$i];
             if ('_' === $byte) {
