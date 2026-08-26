@@ -88,7 +88,11 @@ final class JitSprintf
         $toFree = [];
         for ($i = 0; $i < $numArgs; ++$i) {
             $conv = $conversions[$i] ?? '';
-            if ('s' === $conv || 'S' === $conv) {
+            // '*' = sequential star width/precision — always i64 for libc snprintf (#34969).
+            // Without this slot, %*s maps the width int onto %s → SIGSEGV (#33010 class).
+            if ('*' === $conv) {
+                $snprintfArgs[] = self::extractStarLongArg($context, $args[$i + 1]);
+            } elseif ('s' === $conv || 'S' === $conv) {
                 $snprintfArgs[] = self::extractAsCString($context, $args[$i + 1], $toFree);
             } else {
                 $snprintfArgs[] = self::extractSnprintfArg($context, $args[$i + 1], $toFree);
@@ -145,7 +149,12 @@ final class JitSprintf
     }
 
     /**
-     * First N conversion specifiers (skipping %%); lower-case letter only.
+     * Per-arg snprintf roles for a compile-time format (skipping %%).
+     *
+     * Each sequential `*` width/precision pushes `'*'` so argv stays aligned with
+     * libc snprintf (php-src formatted_print.c). Conversion letter is lower-cased.
+     *
+     * Example: `%*s` → `['*', 's']`; `%.*s` → `['*', 's']`; `%*.*s` → `['*', '*', 's']`.
      *
      * @return list<string>
      */
@@ -166,6 +175,7 @@ final class JitSprintf
                 ++$i;
             }
             if ($i < $len && '*' === $fmt[$i]) {
+                $out[] = '*';
                 ++$i;
             } else {
                 while ($i < $len && $fmt[$i] >= '0' && $fmt[$i] <= '9') {
@@ -175,6 +185,7 @@ final class JitSprintf
             if ($i < $len && '.' === $fmt[$i]) {
                 ++$i;
                 if ($i < $len && '*' === $fmt[$i]) {
+                    $out[] = '*';
                     ++$i;
                 } else {
                     while ($i < $len && $fmt[$i] >= '0' && $fmt[$i] <= '9') {
@@ -186,11 +197,68 @@ final class JitSprintf
                 ++$i;
             }
             if ($i < $len) {
-                $out[] = $fmt[$i];
+                $out[] = \strtolower($fmt[$i]);
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Star width/precision arg as int64 for libc snprintf (#34969).
+     *
+     * php-src: formatted_print.c — `*` consumes next arg via zval_get_long.
+     */
+    private static function extractStarLongArg(Context $context, JITVariable $arg): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            return $i64->constInt(0, false);
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type
+            || JITVariable::TYPE_NATIVE_BOOL === $arg->type
+        ) {
+            if (null === $arg->valueBoxAliasPtr
+                && \in_array(
+                    $context->getStringFromType($arg->value->typeOf()),
+                    ['__value__*', '__value__value*'],
+                    true
+                )
+            ) {
+                $valuePtr = JitValueBox::normalizeValuePtr($context, $arg->value);
+
+                return $context->builder->call(
+                    $context->lookupFunction('__value__readLong'),
+                    $valuePtr
+                );
+            }
+
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            $dbl = $context->helper->loadValue($arg);
+
+            return $context->builder->fpToSi($dbl, $i64);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type
+            || null !== $arg->valueBoxAliasPtr
+            || \in_array(
+                $context->getStringFromType($arg->value->typeOf()),
+                ['__value__*', '__value__value*'],
+                true
+            )
+        ) {
+            $valuePtr = null !== $arg->valueBoxAliasPtr
+                ? JitValueBox::normalizeValuePtr($context, $arg->valueBoxAliasPtr)
+                : JitValueBox::valuePtrFromVariable($context, $arg);
+
+            return $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                $valuePtr
+            );
+        }
+
+        return $i64->constInt(0, false);
     }
 
     /**
