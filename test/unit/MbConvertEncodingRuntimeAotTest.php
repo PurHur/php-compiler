@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * AOT: mb_convert_encoding() runtime via MbConvertEncodingJitHelper (#34309 leftover of #6251).
+ * Runtime encodings via NestedJIT assertTo/FromEncodingArgv (#35165 leftover of #34309).
  *
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_convert_encoding)
  *
@@ -27,14 +28,35 @@ final class MbConvertEncodingRuntimeAotTest extends TestCase
         );
     }
 
+    public function testAotRuntimeEncodingMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(
+            __DIR__.'/../repro/mb_convert_encoding_runtime_encoding_aot.php',
+            []
+        );
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
         $helper = (string) file_get_contents($root.'/ext/mbstring/MbConvertEncodingJitHelper.php');
         $this->assertStringContainsString('function convertArgv', $helper);
+        $this->assertStringContainsString('function assertToEncodingArgv', $helper);
+        $this->assertStringContainsString('function assertFromEncodingArgv', $helper);
         $this->assertStringContainsString('utf8ToLatin1', $helper);
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbConvertEncodingRuntime.php');
         $this->assertStringContainsString('convertHelper', $runtime);
+        $this->assertStringContainsString('assertToEncodingHelper', $runtime);
+        $this->assertStringContainsString('assertFromEncodingHelper', $runtime);
+        $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbConvertEncoding.php');
+        $this->assertStringContainsString('toEncodingPtr', $jit);
+        $this->assertStringNotContainsString(
+            'to_encoding must be a string literal in this compiler build',
+            $jit
+        );
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_convert_encoding.php');
         $this->assertStringContainsString('JitMbConvertEncoding::invoke', $src);
         $this->assertStringNotContainsString(
