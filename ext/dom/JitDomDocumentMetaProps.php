@@ -13,9 +13,10 @@ use PHPLLVM\Value;
  * LLVM lowering for DOMDocument computed meta / baseURI properties
  * (#34894 leftover of #34887; #34904 baseURI).
  *
- * Option bools (formatOutput, …) and xmlVersion / xmlStandalone (plus legacy
- * aliases) use allocate()+DomDocumentConstruct seeds so writes stick
- * (#34908 / #34916) — not hardcoded fetch.
+ * Option bools (formatOutput, …), xmlVersion / xmlStandalone, and encoding use
+ * allocate()+DomDocumentConstruct seeds so writes stick (#34908 / #34916 / #34919)
+ * — not hardcoded fetch. xmlEncoding / actualEncoding read the encoding slot
+ * (php-src aliases; write-rejected in Object_.php).
  *
  * php-src: ext/dom/php_dom.c — dom_document_*_read; ext/dom/node.c — dom_node_base_uri_read;
  * ext/dom/document.c
@@ -37,7 +38,6 @@ final class JitDomDocumentMetaProps
             || 'documenturi' === $propLc
             || 'xmlencoding' === $propLc
             || 'actualencoding' === $propLc
-            || 'encoding' === $propLc
             || 'config' === $propLc
             // DOMNode::$baseURI — same documentURI cwd stamp after loadXML (#34904).
             || 'baseuri' === $propLc;
@@ -54,13 +54,18 @@ final class JitDomDocumentMetaProps
         if ('implementation' === $propLc) {
             return self::boxImplementation($context);
         }
-        if ('xmlencoding' === $propLc || 'actualencoding' === $propLc || 'encoding' === $propLc) {
-            $enc = self::encodingFromLoadXmlStamp();
-            if (null === $enc) {
-                return self::boxNull($context);
-            }
+        // Read-only aliases of $encoding (php-src document.c; #34919).
+        if ('xmlencoding' === $propLc || 'actualencoding' === $propLc) {
+            $classId = $objectType->lookup('DOMDocument');
 
-            return self::boxString($context, $enc);
+            return \PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $obj,
+                'DOMDocument',
+                VmDom::PROP_ENCODING,
+                $classId,
+                false
+            );
         }
         if ('documenturi' === $propLc || 'baseuri' === $propLc) {
             // loadXML(string) sets documentURI/baseURI to the CWD in php-src; empty doc stays null.
@@ -81,20 +86,6 @@ final class JitDomDocumentMetaProps
         }
 
         return self::boxNull($context);
-    }
-
-    private static function encodingFromLoadXmlStamp(): ?string
-    {
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXmlSource()
-            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xml || '' === $xml) {
-            return null;
-        }
-        if (1 !== preg_match('/<\?xml[^>]*encoding\s*=\s*["\']([^"\']+)["\']/i', $xml, $m)) {
-            return null;
-        }
-
-        return (string) $m[1];
     }
 
     private static function boxImplementation(\PHPCompiler\JIT\Context $context): JITVariable

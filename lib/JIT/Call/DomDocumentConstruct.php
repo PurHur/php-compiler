@@ -68,6 +68,8 @@ final class DomDocumentConstruct implements Call
         self::seedOptionBool($context, $obj, VmDom::PROP_XML_STANDALONE, false);
         self::seedOptionBool($context, $obj, VmDom::PROP_STANDALONE, false);
         self::seedXmlVersion($context, $obj, '1.0');
+        // encoding null — writable slot; xmlEncoding/actualEncoding alias via MetaProps (#34919).
+        self::seedEncodingNull($context, $obj);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
@@ -103,6 +105,32 @@ final class DomDocumentConstruct implements Call
                 Variable::TYPE_STRING
             );
         }
+    }
+
+    /** php-src DOMDocument::$encoding default null (ext/dom/php_dom.c; #34919). */
+    private static function seedEncodingNull(Context $context, Value $obj): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_ENCODING)) {
+            $objectType->defineProperty($classId, VmDom::PROP_ENCODING, Variable::TYPE_VALUE);
+        }
+        $box = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $box)
+        );
+        $propVar = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $box
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_ENCODING),
+            $propVar,
+            Variable::TYPE_VALUE
+        );
     }
 
     private static function seedOptionBool(Context $context, Value $obj, string $prop, bool $value): void
