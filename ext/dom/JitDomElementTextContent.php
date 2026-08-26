@@ -312,9 +312,16 @@ final class JitDomElementTextContent
         }
         // getAttributeNode remembers the key via lastFetchedKey; createAttribute via
         // lastCreateLocalName. Prefer fetch key so loadXML Attr writes refresh saveXML (#34305).
-        $fetched = JitDomAttrRename::lastFetchedKey();
-        $ns = $fetched[0] ?? DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
-        $local = $fetched[1] ?? DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        // createAttribute orphan must prefer lastCreate — a prior getAttributeNode leaves
+        // lastFetchedKey pointing at a different Attr (#35118).
+        if (JitDomAttrRename::lastAttrIsOrphan()) {
+            $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+            $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        } else {
+            $fetched = JitDomAttrRename::lastFetchedKey();
+            $ns = $fetched[0] ?? DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+            $local = $fetched[1] ?? DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        }
         if (null === $local || 'xmlns' === $local) {
             return;
         }
