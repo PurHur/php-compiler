@@ -27,6 +27,17 @@ final class StringHashCryptoPhp
 
     private const NONCRYPTO_HELPER_PATH = '/ext/standard/HashNonCryptoJitHelper.php';
 
+    /**
+     * Solo `--unit=` emit must compile NonCrypto before HashCrypto (#34828 / #32122).
+     * Without this, COMPILED_HELPERS lists supports/digest but only HELPER_PATH is lowered.
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::NONCRYPTO_HELPER_PATH,
+        self::HELPER_PATH,
+    ];
+
     private const HASH_HELPER = 'PHPCompiler\\ext\\standard\\HashCryptoJitHelper::hash';
 
     private const HMAC_HELPER = 'PHPCompiler\\ext\\standard\\HashCryptoJitHelper::hashHmac';
