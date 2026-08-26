@@ -27,12 +27,15 @@ final class MbCaseRuntime
 
     private const LCFIRST_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbCaseJitHelper::lcfirstArgv';
 
+    private const ASSERT_ENCODING_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbCaseJitHelper::assertEncodingArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::STRTOUPPER_LOGICAL,
         self::STRTOLOWER_LOGICAL,
         self::UCFIRST_LOGICAL,
         self::LCFIRST_LOGICAL,
+        self::ASSERT_ENCODING_LOGICAL,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -66,6 +69,13 @@ final class MbCaseRuntime
         self::ensureJitHelperCompiled($context);
 
         return JitVmHelperLink::lookupCompiled($context, self::LCFIRST_LOGICAL, 'mb_lcfirst');
+    }
+
+    public static function assertEncodingHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::ASSERT_ENCODING_LOGICAL, 'mb_case_encoding');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
