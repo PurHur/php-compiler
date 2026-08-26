@@ -764,12 +764,55 @@ class JIT {
         return false;
     }
 
+    /**
+     * True when merge CONCAT reads the ?: result (directly or via ASSIGN into $b) (#35095).
+     *
+     * Literal-arm echo redirect (#18784) only rewrites ECHO — merge CONCAT still runs and
+     * reads an uninitialized SSA phi when stack-phi was skipped for literal arms, dropping
+     * the LHS or SIGSEGVing (re-#14142 / #33094).
+     */
+    private function mergeConcatReadsTernaryResult(Block $mergeBlock, int $resultSlot): bool
+    {
+        $aliases = [$resultSlot => true];
+        foreach ($mergeBlock->opCodes as $mergeOp) {
+            if (
+                OpCode::TYPE_ASSIGN === $mergeOp->type
+                && null !== $mergeOp->arg2
+                && null !== $mergeOp->arg3
+            ) {
+                $src = (int) $mergeOp->arg3;
+                $dest = (int) $mergeOp->arg2;
+                if (isset($aliases[$src])) {
+                    $aliases[$dest] = true;
+                }
+            }
+            if (
+                OpCode::TYPE_CONCAT === $mergeOp->type
+                && null !== $mergeOp->arg2
+                && null !== $mergeOp->arg3
+                && (
+                    isset($aliases[(int) $mergeOp->arg2])
+                    || isset($aliases[(int) $mergeOp->arg3])
+                )
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Literal ?: echo arms keep operand redirect; non-literal arms need stack-slot phi (#18052). */
     private function ternaryEchoMergeNeedsStackPhi(Block $mergeBlock, ?Block $ifBlock, ?Block $elseBlock): bool
     {
         $resultSlot = $this->mergeTernaryResultSlot($mergeBlock, $ifBlock, $elseBlock);
         if (null === $resultSlot) {
             return false;
+        }
+        // Merge CONCAT(lit, ?:phi) / `$b = ?:; echo lit.$b` needs stack phi even when both
+        // arms assign string literals (#35095).
+        if ($this->mergeConcatReadsTernaryResult($mergeBlock, $resultSlot)) {
+            return true;
         }
         foreach ([$ifBlock, $elseBlock] as $branch) {
             if (null === $branch) {
@@ -12329,6 +12372,9 @@ class JIT {
                         && !$isTernaryReturnMerge
                         && !$isTernaryEchoMerge
                         && $this->jumpIfTargetsMatchEchoMerge($op->block1, $op->block2);
+                    // When merge CONCAT needs stack-phi, suppress #18784 literal-echo redirect
+                    // so ECHO prints the concat result (not the bare ?: arm) (#35095).
+                    $needsLiteralRedirect = false;
                     if ($isTernaryReturnMerge) {
                         $mergeBlock = $this->branchJumpMergeBlock($op->block1);
                         assert(null !== $mergeBlock);
@@ -12359,12 +12405,22 @@ class JIT {
                                 $op->block1,
                                 $op->block2
                             );
-                            if (!$needsLiteralRedirect) {
-                                $this->ensureCoalesceMergeStackSlot($ternaryMergeEcho);
-                            }
                             // Map the slot the merge *consumes* (ECHO arg or CONCAT operand), not
                             // only a trailing ECHO of a concat result (#32908).
                             $resultSlot = $this->mergeTernaryResultSlot($mergeBlock, $op->block1, $op->block2);
+                            // Merge CONCAT must run against a real stack phi — literal-echo
+                            // redirect only rewrites ECHO and leaves CONCAT on an uninit SSA
+                            // temp (LHS drop / SIGSEGV; #35095 / re-#33094).
+                            if (
+                                $needsStackPhi
+                                && null !== $resultSlot
+                                && $this->mergeConcatReadsTernaryResult($mergeBlock, $resultSlot)
+                            ) {
+                                $needsLiteralRedirect = false;
+                            }
+                            if ($needsStackPhi || !$needsLiteralRedirect) {
+                                $this->ensureCoalesceMergeStackSlot($ternaryMergeEcho);
+                            }
                             if (null !== $resultSlot && $needsStackPhi) {
                                 $this->context->coalesceMergeSlotOperands[$resultSlot] = $ternaryMergeEcho;
                                 $ternaryMergeEchoSlot = $resultSlot;
@@ -12405,29 +12461,27 @@ class JIT {
                     // historically lacked IS_STRING and treated them as falsy (#32919).
                     // Prefer compile-time / native-string truthiness when available.
                     $condition = $this->jitJumpIfConditionToBool($condVar);
-                    if ($isTernaryEchoMerge) {
+                    if ($isTernaryEchoMerge && $needsLiteralRedirect) {
                         $mergeBlock = $this->branchJumpMergeBlock($op->block1);
                         assert(null !== $mergeBlock);
-                        if ($this->ternaryEchoMergeNeedsLiteralArmRedirect($block, $i, $mergeBlock, $op->block1, $op->block2)) {
-                            $ifLiteral = $this->ternaryEchoBranchLiteralString($op->block1, $mergeBlock);
-                            $elseLiteral = $this->ternaryEchoBranchLiteralString($op->block2, $mergeBlock);
-                            if (null !== $ifLiteral && null !== $elseLiteral) {
-                                // CONCAT(ternary, "\n") / ("x" . ternary): keep the literal
-                                // side when #18784 replaces ECHO of the concat result (#33094).
-                                [$prefix, $suffix] = $this->ternaryEchoConcatLiteralAffixes(
-                                    $mergeBlock,
-                                    $op->block1,
-                                    $op->block2
-                                );
-                                $condSlot = JIT\BasicBlockHelper::entryAlloca(
-                                    $this->context,
-                                    $this->context->getTypeFromString('int1')
-                                );
-                                $this->context->builder->store($condition, $condSlot);
-                                $this->context->ternaryEchoLiteralConditionSlot = $condSlot;
-                                $this->context->ternaryEchoLiteralIf = $prefix.$ifLiteral.$suffix;
-                                $this->context->ternaryEchoLiteralElse = $prefix.$elseLiteral.$suffix;
-                            }
+                        $ifLiteral = $this->ternaryEchoBranchLiteralString($op->block1, $mergeBlock);
+                        $elseLiteral = $this->ternaryEchoBranchLiteralString($op->block2, $mergeBlock);
+                        if (null !== $ifLiteral && null !== $elseLiteral) {
+                            // CONCAT(ternary, "\n") / ("x" . ternary): keep the literal
+                            // side when #18784 replaces ECHO of the concat result (#33094).
+                            [$prefix, $suffix] = $this->ternaryEchoConcatLiteralAffixes(
+                                $mergeBlock,
+                                $op->block1,
+                                $op->block2
+                            );
+                            $condSlot = JIT\BasicBlockHelper::entryAlloca(
+                                $this->context,
+                                $this->context->getTypeFromString('int1')
+                            );
+                            $this->context->builder->store($condition, $condSlot);
+                            $this->context->ternaryEchoLiteralConditionSlot = $condSlot;
+                            $this->context->ternaryEchoLiteralIf = $prefix.$ifLiteral.$suffix;
+                            $this->context->ternaryEchoLiteralElse = $prefix.$elseLiteral.$suffix;
                         }
                     }
                     // If-branch JUMP may compile a shared merge RETURN_VOID before the else/elseif arm
