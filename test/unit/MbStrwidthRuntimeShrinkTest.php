@@ -19,7 +19,16 @@ final class MbStrwidthRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MbStrwidthJitHelper::strwidth', $source);
         $this->assertStringContainsString('MbStrwidthJitHelper::strimwidth', $source);
         $this->assertStringContainsString('MbStrwidthJitHelper::strPad', $source);
+        $this->assertStringContainsString('MbStrwidthJitHelper::assertEncodingArgv', $source);
         $this->assertStringContainsString('/ext/mbstring/MbStrwidthJitHelper.php', $source);
+        $helper = (string) \file_get_contents(__DIR__.'/../../ext/mbstring/MbStrwidthJitHelper.php');
+        $this->assertStringContainsString('function assertEncodingArgv', $helper);
+        $jit = (string) \file_get_contents(__DIR__.'/../../ext/mbstring/JitMbStrwidth.php');
+        $this->assertStringContainsString('assertEncodingHelper', $jit);
+        $this->assertStringNotContainsString(
+            'encoding must be a string literal in this compiler build',
+            $jit
+        );
     }
 
     public function testMbStrwidthUsesJitVmHelperLink(): void

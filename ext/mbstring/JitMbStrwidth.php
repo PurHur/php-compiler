@@ -9,12 +9,15 @@ use PHPCompiler\JIT\Builtin\MbStrwidth;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for mb_strwidth() / mb_strimwidth() — MbStrwidthJitHelper in-module (#3495, #34264).
+ * LLVM lowering for mb_strwidth() / mb_strimwidth() — MbStrwidthJitHelper in-module (#3495, #34264 / #34884).
+ *
+ * Runtime encoding via NestedJIT assertEncodingArgv (#34884 leftover of #34264 / peer #34875).
  */
 final class JitMbStrwidth
 {
@@ -26,8 +29,10 @@ final class JitMbStrwidth
         }
 
         $strLit = $args[0]->compileTimeString ?? null;
-        $encLit = 2 === $argc ? ($args[1]->compileTimeString ?? null) : 'UTF-8';
-        if (null !== $strLit && null !== $encLit) {
+        $encLit = self::compileTimeEncoding($args, $argc, 1);
+        // Only fold when encoding is a supported canon — invalid names must reach NestedJIT
+        // for catchable ValueError (peer JitMbStrcut #34875; #34884).
+        if (null !== $strLit && null !== $encLit && self::isSupportedEncoding($encLit)) {
             return $context->constantFromInteger(
                 VmMbstring::strwidth($strLit, $encLit),
                 'int64'
@@ -36,18 +41,7 @@ final class JitMbStrwidth
 
         // Z_PARAM_STR $string — non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c; #24257).
         $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_strwidth', 0, 'string');
-        if (2 === $argc) {
-            if (JITVariable::TYPE_STRING !== $args[1]->type) {
-                throw new \LogicException('mb_strwidth() encoding must be a string literal in this compiler build');
-            }
-            $encoding = $args[1]->compileTimeString ?? 'UTF-8';
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
-
-        MbStrwidth::ensureLinked($context);
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_strwidth', 1);
 
         return $context->builder->call(
             MbStrwidth::strwidthFunction($context),
@@ -67,8 +61,14 @@ final class JitMbStrwidth
         $fromLit = self::compileTimeInt($context, $args[1]);
         $widthLit = self::compileTimeInt($context, $args[2]);
         $markerLit = $argc >= 4 ? ($args[3]->compileTimeString ?? '') : '';
-        $encLit = 5 === $argc ? ($args[4]->compileTimeString ?? null) : 'UTF-8';
-        if (null !== $strLit && null !== $fromLit && null !== $widthLit && null !== $encLit) {
+        $encLit = self::compileTimeEncoding($args, $argc, 4);
+        if (
+            null !== $strLit
+            && null !== $fromLit
+            && null !== $widthLit
+            && null !== $encLit
+            && self::isSupportedEncoding($encLit)
+        ) {
             return self::materializeString(
                 $context,
                 VmMbstring::strimwidth($strLit, $fromLit, $widthLit, $markerLit, $encLit)
@@ -84,24 +84,9 @@ final class JitMbStrwidth
         } else {
             $marker = $context->builder->load($context->constantStringFromString(''));
         }
-        if (5 === $argc) {
-            if (JITVariable::TYPE_STRING !== $args[4]->type) {
-                throw new \LogicException('mb_strimwidth() encoding must be a string literal in this compiler build');
-            }
-            $encoding = $args[4]->compileTimeString ?? 'UTF-8';
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
 
         // NestedJIT helper compile can clear insert; restore before arg coerce/call (#34264 peer #34256).
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbStrwidth::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_strimwidth', 4);
         // Runtime int ABI + boxed string return — direct call SIGSEGVs (#34264 / #3495 leftover).
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
@@ -113,13 +98,107 @@ final class JitMbStrwidth
         return self::materializeOwnedString($context, $resultStr);
     }
 
-    private static function assertSupportedEncoding(string $encoding): void
-    {
-        if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
-            throw new \LogicException(
-                'mb_strwidth() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
+    /**
+     * Link NestedJIT helpers, lower encoding (literal or runtime), assert when needed (#34884).
+     *
+     * @param list<JITVariable> $args
+     * @param int               $encIndex 0-based encoding arg index (1=strwidth, 4=strimwidth)
+     */
+    private static function linkAndEncodingPtr(
+        Context $context,
+        array $args,
+        int $argc,
+        string $function,
+        int $encIndex
+    ): Value {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbStrwidth::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_runtime');
+
+        [$encPtr, $needsAssert] = self::encodingPtr($context, $args, $argc, $function, $encIndex);
+        if ($needsAssert) {
+            $fnName = $context->builder->load($context->constantStringFromString($function));
+            $context->builder->call(
+                MbStrwidth::assertEncodingHelper($context),
+                $encPtr,
+                $fnName
             );
         }
+
+        return $encPtr;
+    }
+
+    /**
+     * Literal UTF-8/ASCII/8BIT → constant string (no assert); otherwise NestedJIT encoding + assert (#34884).
+     *
+     * @param list<JITVariable> $args
+     * @return array{0: Value, 1: bool} encoding ptr, needsAssert
+     */
+    private static function encodingPtr(
+        Context $context,
+        array $args,
+        int $argc,
+        string $function,
+        int $encIndex
+    ): array {
+        if ($argc <= $encIndex || JITVariable::TYPE_NULL === $args[$encIndex]->type || ($args[$encIndex]->isNullConstant ?? false)) {
+            $encoding = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
+            if (!self::isSupportedEncoding($encoding)) {
+                $encoding = 'UTF-8';
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encoding)), false];
+        }
+
+        $encodingLit = JitStringArg::compileTimeLiteral($args[$encIndex]);
+        if (null !== $encodingLit) {
+            $canonical = MbstringEncodingRegistry::resolve($encodingLit);
+            if (null !== $canonical && self::isSupportedEncoding($canonical)) {
+                return [$context->builder->load($context->constantStringFromString($canonical)), false];
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
+        }
+
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[$encIndex],
+                $function,
+                $encIndex,
+                'encoding'
+            ),
+            true,
+        ];
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     * @param int               $encIndex 0-based encoding arg index
+     */
+    private static function compileTimeEncoding(array $args, int $argc, int $encIndex): ?string
+    {
+        if ($argc <= $encIndex) {
+            return MbstringState::internalEncoding();
+        }
+        if (JITVariable::TYPE_NULL === $args[$encIndex]->type || ($args[$encIndex]->isNullConstant ?? false)) {
+            return MbstringState::internalEncoding();
+        }
+        $lit = JitStringArg::compileTimeLiteral($args[$encIndex]);
+        if (null === $lit) {
+            return null;
+        }
+        $canonical = MbstringEncodingRegistry::resolve($lit);
+
+        return null !== $canonical ? $canonical : $lit;
+    }
+
+    private static function isSupportedEncoding(string $encoding): bool
+    {
+        return 'UTF-8' === $encoding || 'ASCII' === $encoding || '8BIT' === $encoding;
     }
 
     private static function materializeString(Context $context, string $str): Value
