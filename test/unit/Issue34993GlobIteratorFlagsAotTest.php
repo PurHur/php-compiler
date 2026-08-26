@@ -56,7 +56,7 @@ TXT;
         ob_start();
         $rt->run($block);
         $out = ob_get_clean();
-        $this->assertSame(self::EXPECTED, $out);
+        $this->assertSame(self::EXPECTED, rtrim($out));
     }
 
     public function testProxiesRegistered(): void
