@@ -1617,117 +1617,20 @@ final class VmFilter
     /**
      * php-src ext/filter/logical_filters.c — php_filter_validate_mac.
      */
+    /** Host SSOT — delegates to NestedJIT-safe {@see FilterMacValidate} (#35029). */
     public static function isValidMacAddress(string $input, ?string $expectedSeparator = null): bool
     {
-        $inputLen = \strlen($input);
-        if (14 === $inputLen) {
-            $tokens = 3;
-            $length = 4;
-            $separator = '.';
-        } elseif (17 === $inputLen && '-' === $input[2]) {
-            $tokens = 6;
-            $length = 2;
-            $separator = '-';
-        } elseif (17 === $inputLen && ':' === $input[2]) {
-            $tokens = 6;
-            $length = 2;
-            $separator = ':';
-        } else {
-            return false;
-        }
-        if (null !== $expectedSeparator && $separator !== $expectedSeparator) {
-            return false;
-        }
-        for ($i = 0; $i < $tokens; ++$i) {
-            $offset = $i * ($length + 1);
-            if ($i < $tokens - 1 && $input[$offset + $length] !== $separator) {
-                return false;
-            }
-            if (!self::isValidHexToken(substr($input, $offset, $length))) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static function isValidHexToken(string $token): bool
-    {
-        $len = \strlen($token);
-        if (0 === $len) {
-            return false;
-        }
-        for ($i = 0; $i < $len; ++$i) {
-            $ch = $token[$i];
-            if (!(($ch >= '0' && $ch <= '9') || ($ch >= 'a' && $ch <= 'f') || ($ch >= 'A' && $ch <= 'F'))) {
-                return false;
-            }
-        }
-
-        return true;
+        return FilterMacValidate::isValid($input, $expectedSeparator);
     }
 
     /**
-     * SSOT used by JIT/AOT helper bridge.
+     * Host SSOT — delegates to NestedJIT-safe {@see FilterDomainValidate} (#35029).
      *
      * php-src ext/filter/logical_filters.c — php_filter_validate_domain_ex.
-     * Plain mode is permissive (allows `_`, leading/trailing `-` in labels, etc.);
-     * FILTER_FLAG_HOSTNAME applies hostname label rules.
      */
     public static function isValidDomain(string $host, int $flags = 0): bool
     {
-        $hostname = 0 !== ($flags & self::FILTER_FLAG_HOSTNAME);
-        $len = \strlen($host);
-        $end = $len;
-
-        // Ignore trailing dot for length / scan bound (char still peekable past $end).
-        if ($len > 0 && '.' === $host[$len - 1]) {
-            $end = $len - 1;
-            $len = $end;
-        }
-
-        if ($len > 253) {
-            return false;
-        }
-
-        // "" → success in loose mode; "." (stripped to empty) → fail via first-char '.'.
-        if (0 === $len) {
-            return 0 === \strlen($host) && !$hostname;
-        }
-
-        $first = $host[0];
-        if ('.' === $first || ($hostname && !self::isAlnumByte($first))) {
-            return false;
-        }
-
-        $labelLen = 1;
-        for ($s = 0; $s < $end; ++$s) {
-            $ch = $host[$s];
-            $next = ($s + 1 < \strlen($host)) ? $host[$s + 1] : "\0";
-            if ('.' === $ch) {
-                // Reject ".." and (HOSTNAME) labels that do not start/end alnum.
-                if ('.' === $next
-                    || ($hostname && (
-                        !self::isAlnumByte($host[$s - 1])
-                        || !self::isAlnumByte($next)
-                    ))) {
-                    return false;
-                }
-                $labelLen = 1;
-                continue;
-            }
-
-            // Label length > 63, or (HOSTNAME) char not alnum/`-` (hyphen not at NUL).
-            if ($labelLen > 63
-                || ($hostname
-                    && ('-' !== $ch || "\0" === $next)
-                    && !self::isAlnumByte($ch))) {
-                return false;
-            }
-            ++$labelLen;
-        }
-
-        return true;
+        return FilterDomainValidate::isValid($host, $flags);
     }
 
     /**
@@ -2010,14 +1913,6 @@ final class VmFilter
         $inner = substr($host, 1, -1);
 
         return (bool) preg_match('/^[0-9a-fA-F:.]+$/', $inner);
-    }
-
-    /** php-src isalnum((unsigned char)ch) for domain label checks. */
-    private static function isAlnumByte(string $ch): bool
-    {
-        return ($ch >= 'a' && $ch <= 'z')
-            || ($ch >= 'A' && $ch <= 'Z')
-            || ($ch >= '0' && $ch <= '9');
     }
 
     public static function isIntegerString(string $s): bool

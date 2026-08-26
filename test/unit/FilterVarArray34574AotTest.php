@@ -41,6 +41,29 @@ final class FilterVarArray34574AotTest extends TestCase
         );
     }
 
+    /** #35029 — MAC/DOMAIN NestedJIT ?string+VmFilter stubs always false under thin AOT. */
+    public function testDefinitionMacAndDomainMatchZend(): void
+    {
+        $this->assertAotExport(
+            "<?php \$r=filter_var_array("
+            ."['m'=>'00:11:22:33:44:55','d'=>'example.com','bad'=>'nope'],"
+            ."['m'=>FILTER_VALIDATE_MAC,'d'=>FILTER_VALIDATE_DOMAIN,'bad'=>FILTER_VALIDATE_MAC]);"
+            ."echo \$r['m'],'|',\$r['d'],'|',var_export(\$r['bad'],true);",
+            "00:11:22:33:44:55|example.com|false"
+        );
+    }
+
+    /** #35029 — standalone filter_var MAC/DOMAIN must match Zend (not just array form). */
+    public function testStandaloneMacAndDomainMatchZend(): void
+    {
+        $this->assertAotExport(
+            "<?php echo filter_var('00:11:22:33:44:55', FILTER_VALIDATE_MAC),'|',"
+            ."filter_var('example.com', FILTER_VALIDATE_DOMAIN),'|',"
+            ."var_export(filter_var('nope', FILTER_VALIDATE_MAC), true);",
+            "00:11:22:33:44:55|example.com|false"
+        );
+    }
+
     public function testRuntimeArrayFilterIdMatchesZend(): void
     {
         $this->assertAotExport(

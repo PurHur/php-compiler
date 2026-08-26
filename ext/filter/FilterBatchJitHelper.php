@@ -17,7 +17,7 @@ use PHPCompiler\Web\Superglobals;
  * {@see VmFilter} — NestedJIT of that call graph SIGSEGVs under standalone AOT
  * (peer #34572). VM {@see filter_var_array::execute()} still uses VmFilter.
  * Thin AOT user scripts use {@see \PHPCompiler\JIT\Builtin\FilterVarArrayLlvm}.
- * String validators EMAIL/URL/IP/MAC/DOMAIN wired in applyFilter (#35016).
+ * String validators EMAIL/URL/IP/MAC/DOMAIN wired in applyFilter (#35016 / #35029).
  *
  * filter_input_array* returns {@see HashTable}|null (ArrayChunk `__hashtable__*` ABI).
  * Variable returns abort under thin AOT (#34580; peer #34574).
@@ -191,21 +191,21 @@ final class FilterBatchJitHelper
             return $out;
         }
         if (self::FILTER_VALIDATE_MAC === $filterId) {
-            $ok = FilterMacJitHelper::validate($value->toString());
-            if (null === $ok) {
-                $out->bool(false);
+            $s = $value->toString();
+            if (1 === FilterMacValidate::isValidInt($s)) {
+                $out->string($s);
             } else {
-                $out->string($ok);
+                $out->bool(false);
             }
 
             return $out;
         }
         if (self::FILTER_VALIDATE_DOMAIN === $filterId) {
-            $ok = FilterDomainJitHelper::validate($value->toString());
-            if (null === $ok) {
-                $out->bool(false);
+            $s = $value->toString();
+            if (1 === FilterDomainValidate::isValidInt($s)) {
+                $out->string($s);
             } else {
-                $out->string($ok);
+                $out->bool(false);
             }
 
             return $out;

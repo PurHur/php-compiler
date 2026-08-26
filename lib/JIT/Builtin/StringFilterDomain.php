@@ -8,24 +8,28 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPLLVM\Value\Function_ as LlvmFunction;
+use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_filter_validate_domain via FilterDomainJitHelper PHP (#17407, #19370, #24667).
+ * JIT/AOT link for __compiler_filter_validate_domain via FilterDomainValidate PHP (#17407, #35029).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringFilterIp #24650).
+ * NestedJIT {@see FilterDomainValidate::isValidInt} (int 0/1) and return the ABI input
+ * `__string__*` on success — NestedJIT `?string` / VmFilter paths are corrupt under thin AOT
+ * (#26853 / #27068 / peer StringFilterUrl #27206).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled}.
  * php-src: ext/filter/logical_filters.c — php_filter_validate_domain[_ex]
  * ABI: (string*, int64 flags) — flags include FILTER_FLAG_HOSTNAME.
  */
 final class StringFilterDomain
 {
-    private const HELPER_PATH = '/ext/filter/FilterDomainJitHelper.php';
+    private const VALIDATE_PATH = '/ext/filter/FilterDomainValidate.php';
 
-    private const VALIDATE_HELPER = 'PHPCompiler\\ext\\filter\\FilterDomainJitHelper::validate';
+    private const VALIDATE_IS_VALID_INT = 'PHPCompiler\\ext\\filter\\FilterDomainValidate::isValidInt';
 
     /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::VALIDATE_HELPER,
+    private const COMPILED_VALIDATE = [
+        self::VALIDATE_IS_VALID_INT,
     ];
 
     /** @var list<string> */
@@ -47,9 +51,7 @@ final class StringFilterDomain
             return;
         }
 
-        // Restore caller insert block after bridge emit (#20988 / peer StringFilterIp #24650) —
-        // clearInsertionPosition left the user-script builder detached
-        // ("Current basic block has no parent function").
+        // Restore caller insert block after bridge emit (#20988 / peer StringFilterUrl #27206).
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementValidateBridge($context);
@@ -79,35 +81,36 @@ final class StringFilterDomain
             : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('filter_domain_bridge_entry');
+        $okBlock = $fn->appendBasicBlock('filter_domain_bridge_ok');
+        $failBlock = $fn->appendBasicBlock('filter_domain_bridge_fail');
         $context->builder->positionAtEnd($entry);
-        // NestedJIT ?string may be __value__*; ABI is __string__* (#26853).
-        $helper = self::helperFunction($context, self::VALIDATE_HELPER);
-        $raw = JitNestedHelperCoerce::callHelper(
+
+        $isValidInt = JitVmHelperLink::lookupCompiled($context, self::VALIDATE_IS_VALID_INT, '#35029');
+        $rawOk = JitNestedHelperCoerce::callHelper(
             $context,
-            $helper,
+            $isValidInt,
             [$fn->getParam(0), $fn->getParam(1)]
         );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
+        $okI64 = JitNestedHelperCoerce::coerceBridgeResult($context, $rawOk, $i64);
+        $ok = $context->builder->icmp(
+            Builder::INT_NE,
+            $okI64,
+            $i64->constInt(0, false)
         );
+        $context->builder->branchIf($ok, $okBlock, $failBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->returnValue($fn->getParam(0));
+
+        $context->builder->positionAtEnd($failBlock);
+        $context->builder->returnValue($strPtr->constNull());
+
         $context->registerFunction($abiName, $fn);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#24667');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#24667'
-        );
+        JitVmHelperLink::ensureCompiled($context, self::VALIDATE_PATH, self::COMPILED_VALIDATE, '#35029');
     }
 
     private static function registerLinkedRuntime(Context $context): void
