@@ -10,16 +10,85 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Pure LLVM array_filter(Closure) for thin standalone AOT (#32672 peer ArrayMapLlvm / UsortPackedLlvm).
+ * Pure LLVM array_filter for thin standalone AOT (#32672 / #34897).
  *
- * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayFilterJitHelper} declines callback forms under
- * thin AOT; iterate packed slots and invoke the Closure via {@see NestedClosureInvoke}.
- * Packed walks skip TYPE_UNDEFINED only — TYPE_NULL is kept when the callback returns truthy (#33705).
+ * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayFilterJitHelper} SIGSEGVs on the no-callback
+ * path under thin AOT (#34897); closure forms already skip NestedJIT via packed walk +
+ * {@see NestedClosureInvoke}. Default falsy filter walks exportPairs (assoc + packed) like
+ * {@see HashTableKeyFilterLlvm}. Packed callback walks skip TYPE_UNDEFINED only — TYPE_NULL is
+ * kept when the callback returns truthy (#33705).
  *
  * php-src: ext/standard/array.c — php_array_filter()
  */
 final class ArrayFilterLlvm
 {
+    private static int $seq = 0;
+
+    /**
+     * No-callback / null-callback: keep elements where the value is truthy (php-src default).
+     *
+     * Uses {@see Call\HashTableExportKeyValuePairs::exportPairsForSlice} so thin-AOT const-local
+     * `__value__` array boxes are readable (peer #27521 / #34897).
+     */
+    public static function filterDefault(Context $context, Value $src): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'array_filter_default_cont');
+        $pairs = Call\HashTableExportKeyValuePairs::exportPairsForSlice($context, $src);
+        $dest = HashTableHelper::alloc($context);
+
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $pairs
+        );
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $idxSlot);
+        $tag = (string) ++self::$seq;
+        $prefix = 'array_filter_default';
+
+        $head = BasicBlockHelper::append($context, $prefix.'_head_'.$tag);
+        $body = BasicBlockHelper::append($context, $prefix.'_body_'.$tag);
+        $keep = BasicBlockHelper::append($context, $prefix.'_keep_'.$tag);
+        $skip = BasicBlockHelper::append($context, $prefix.'_skip_'.$tag);
+        $advance = BasicBlockHelper::append($context, $prefix.'_advance_'.$tag);
+        $done = BasicBlockHelper::append($context, $prefix.'_done_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $past = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $context->builder->branchIf($past, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $pair = HashTableReadLlvm::readIndexedToValueBox($context, $pairs, $idx);
+        $pairHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::valuePtrFromVariable($context, $pair)
+        );
+        $keyVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $zero);
+        $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $one);
+        $valPtr = JitValueBox::valuePtrFromVariable($context, $valVar);
+        $truthy = boolval::boxedTruthyScalar($context, $valPtr);
+        $context->builder->branchIf($truthy, $keep, $skip);
+
+        $context->builder->positionAtEnd($keep);
+        HashTableWriteLlvm::setValueBoxKey($context, $dest, $keyVar, $valVar);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+
+        return $dest;
+    }
+
     /**
      * Default {@see ARRAY_FILTER_USE_VALUE}: keep elements where callback($value) is truthy.
      */
