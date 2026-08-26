@@ -4822,6 +4822,8 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\SplDllistJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
             // Iterator mode for setIteratorMode/getIteratorMode / serialize bag (#33987).
             $this->defineProperty($id, \PHPCompiler\VM\SplDllistJitHelper::PROP_FLAGS, Variable::TYPE_NATIVE_LONG);
+            // Iterator cursor for rewind/valid/current/key/next (#34976).
+            $this->defineProperty($id, \PHPCompiler\VM\SplDllistJitHelper::PROP_ITER_POS, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             $methods = [

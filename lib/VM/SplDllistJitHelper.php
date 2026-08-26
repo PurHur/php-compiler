@@ -28,6 +28,14 @@ final class SplDllistJitHelper
     /** Iterator mode flags (IT_MODE_*); peer SplPriorityQueue `__spl_flags` (#33987). */
     public const PROP_FLAGS = '__spl_flags';
 
+    /**
+     * Iterator cursor for rewind/valid/current/key/next (#34976).
+     * -1 = not started / exhausted (LIFO); matches unset traverse_pointer until rewind.
+     */
+    public const PROP_ITER_POS = '__spl_iter_pos';
+
+    public const IT_MODE_DELETE = 1;
+
     public const IT_MODE_LIFO = 2;
 
     public const IT_MODE_FIX = 4;
@@ -51,6 +59,8 @@ final class SplDllistJitHelper
             $flags = self::IT_MODE_FIX;
         }
         self::storeLongProperty($context, $obj, $className, self::PROP_FLAGS, $flags);
+        // php-src: traverse_pointer NULL until rewind → valid() false (#34976).
+        self::storeLongProperty($context, $obj, $className, self::PROP_ITER_POS, -1);
         $objectType->markObjectConstructed($obj);
 
         return self::voidResult($context);
@@ -530,6 +540,209 @@ final class SplDllistJitHelper
     public static function loadFlags(Context $context, Value $obj, string $className): Value
     {
         return self::loadLongProperty($context, $obj, $className, self::PROP_FLAGS);
+    }
+
+    /**
+     * php-src zim_SplDoublyLinkedList_rewind / spl_dllist_it_helper_rewind (#34976).
+     * LIFO → last index; FIFO → 0; empty → -1.
+     */
+    public static function compileRewind(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $n64 = $context->builder->truncOrBitCast($n, $i64);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $flags = self::loadLongProperty($context, $obj, $className, self::PROP_FLAGS);
+        $lifo = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flags, $i64->constInt(self::IT_MODE_LIFO, false)),
+            $i64->constInt(0, false)
+        );
+        $negOne = $i64->constInt(-1, true);
+        $fifoPos = $context->builder->select($empty, $negOne, $i64->constInt(0, false));
+        $lifoPos = $context->builder->select(
+            $empty,
+            $negOne,
+            $context->builder->sub($n64, $i64->constInt(1, false))
+        );
+        $pos = $context->builder->select($lifo, $lifoPos, $fifoPos);
+        self::storeLongPropertyValue($context, $obj, $className, self::PROP_ITER_POS, $pos);
+
+        return self::voidResult($context);
+    }
+
+    /**
+     * php-src zim_SplDoublyLinkedList_valid (#34976).
+     */
+    public static function compileValid(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $pos = self::loadLongProperty($context, $obj, $className, self::PROP_ITER_POS);
+        $i64 = $context->getTypeFromString('int64');
+        $n64 = $context->builder->truncOrBitCast($n, $i64);
+        $nonNeg = $context->builder->icmp(Builder::INT_SGE, $pos, $i64->constInt(0, false));
+        $inRange = $context->builder->icmp(Builder::INT_SLT, $pos, $n64);
+        $ok = $context->builder->and($nonNeg, $inRange);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $ok);
+
+        return $slot;
+    }
+
+    /**
+     * php-src zim_SplDoublyLinkedList_current — NULL when not valid (#24326 / #34976).
+     */
+    public static function compileCurrent(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $pos = self::loadLongProperty($context, $obj, $className, self::PROP_ITER_POS);
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $n64 = $context->builder->truncOrBitCast($n, $i64);
+        $nonNeg = $context->builder->icmp(Builder::INT_SGE, $pos, $i64->constInt(0, false));
+        $inRange = $context->builder->icmp(Builder::INT_SLT, $pos, $n64);
+        $ok = $context->builder->and($nonNeg, $inRange);
+        $out = JitValueBox::alloc($context);
+        $badBb = BasicBlockHelper::append($context, 'spldllist_current_bad');
+        $okBb = BasicBlockHelper::append($context, 'spldllist_current_ok');
+        $doneBb = BasicBlockHelper::append($context, 'spldllist_current_done');
+        $context->builder->branchIf($ok, $okBb, $badBb);
+
+        $context->builder->positionAtEnd($badBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $out)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $idx = $context->builder->truncOrBitCast($pos, $sizeT);
+        $fetched = HashTableHelper::readIndexedToValueBox($context, $ht, $idx);
+        JitValueBox::copyFromPointer(
+            $context,
+            $out,
+            JitValueBox::valuePtrFromVariable($context, $fetched)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $out;
+    }
+
+    /**
+     * php-src zim_SplDoublyLinkedList_key (#34976).
+     */
+    public static function compileKey(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pos = self::loadLongProperty($context, $obj, $className, self::PROP_ITER_POS);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $pos);
+
+        return $slot;
+    }
+
+    /**
+     * php-src zim_SplDoublyLinkedList_next / spl_dllist_it_helper_move_forward (#34976).
+     * KEEP: ±1 by LIFO; DELETE: pop/shift then re-anchor cursor.
+     */
+    public static function compileNext(Context $context, JITVariable $receiver, string $className): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $pos = self::loadLongProperty($context, $obj, $className, self::PROP_ITER_POS);
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $n64 = $context->builder->truncOrBitCast($n, $i64);
+        $nonNeg = $context->builder->icmp(Builder::INT_SGE, $pos, $i64->constInt(0, false));
+        $inRange = $context->builder->icmp(Builder::INT_SLT, $pos, $n64);
+        $ok = $context->builder->and($nonNeg, $inRange);
+
+        $skipBb = BasicBlockHelper::append($context, 'spldllist_next_skip');
+        $bodyBb = BasicBlockHelper::append($context, 'spldllist_next_body');
+        $doneBb = BasicBlockHelper::append($context, 'spldllist_next_done');
+        $context->builder->branchIf($ok, $bodyBb, $skipBb);
+
+        $context->builder->positionAtEnd($skipBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        $flags = self::loadLongProperty($context, $obj, $className, self::PROP_FLAGS);
+        $isDelete = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flags, $i64->constInt(self::IT_MODE_DELETE, false)),
+            $i64->constInt(0, false)
+        );
+        $isLifo = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flags, $i64->constInt(self::IT_MODE_LIFO, false)),
+            $i64->constInt(0, false)
+        );
+
+        $delBb = BasicBlockHelper::append($context, 'spldllist_next_del');
+        $keepBb = BasicBlockHelper::append($context, 'spldllist_next_keep');
+        $context->builder->branchIf($isDelete, $delBb, $keepBb);
+
+        $context->builder->positionAtEnd($keepBb);
+        $inc = $context->builder->add($pos, $i64->constInt(1, false));
+        $dec = $context->builder->sub($pos, $i64->constInt(1, false));
+        $kept = $context->builder->select($isLifo, $dec, $inc);
+        self::storeLongPropertyValue($context, $obj, $className, self::PROP_ITER_POS, $kept);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($delBb);
+        $delLifoBb = BasicBlockHelper::append($context, 'spldllist_next_del_lifo');
+        $delFifoBb = BasicBlockHelper::append($context, 'spldllist_next_del_fifo');
+        $delMergeBb = BasicBlockHelper::append($context, 'spldllist_next_del_merge');
+        $context->builder->branchIf($isLifo, $delLifoBb, $delFifoBb);
+
+        $context->builder->positionAtEnd($delLifoBb);
+        // Discard popped value — Iterator::next is void (php-src zim_SplDoublyLinkedList_next).
+        self::compilePop($context, $receiver);
+        $htAfter = self::htPtr($context, $obj);
+        $nAfter = $context->builder->load($context->builder->structGep($htAfter, $map['numElements']));
+        $nAfter64 = $context->builder->truncOrBitCast($nAfter, $i64);
+        $emptyAfter = $context->builder->icmp(Builder::INT_EQ, $nAfter, $sizeT->constInt(0, false));
+        $lifoPos = $context->builder->select(
+            $emptyAfter,
+            $i64->constInt(-1, true),
+            $context->builder->sub($nAfter64, $i64->constInt(1, false))
+        );
+        self::storeLongPropertyValue($context, $obj, $className, self::PROP_ITER_POS, $lifoPos);
+        $context->builder->branch($delMergeBb);
+
+        $context->builder->positionAtEnd($delFifoBb);
+        self::compileShift($context, $receiver);
+        $htAfterF = self::htPtr($context, $obj);
+        $nAfterF = $context->builder->load($context->builder->structGep($htAfterF, $map['numElements']));
+        $emptyAfterF = $context->builder->icmp(Builder::INT_EQ, $nAfterF, $sizeT->constInt(0, false));
+        $fifoPos = $context->builder->select(
+            $emptyAfterF,
+            $i64->constInt(-1, true),
+            $i64->constInt(0, false)
+        );
+        self::storeLongPropertyValue($context, $obj, $className, self::PROP_ITER_POS, $fifoPos);
+        $context->builder->branch($delMergeBb);
+
+        $context->builder->positionAtEnd($delMergeBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return self::voidResult($context);
     }
 
     /**

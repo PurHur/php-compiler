@@ -1769,6 +1769,8 @@ class Context {
                 '__construct', 'push', 'pop', 'shift', 'unshift', 'top', 'bottom', 'count', 'isempty',
                 'offsetGet', 'offsetExists', 'offsetSet', 'offsetUnset',
                 'setIteratorMode', 'getIteratorMode',
+                // Iterator protocol — without proxy thin AOT silent-nulls (#579 / #34976)
+                'rewind', 'valid', 'current', 'key', 'next',
             ];
             if ('splqueue' === $dllLc) {
                 $dllMethods = array_merge($dllMethods, ['enqueue', 'dequeue']);

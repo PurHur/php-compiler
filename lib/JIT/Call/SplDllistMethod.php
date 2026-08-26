@@ -176,6 +176,62 @@ final class SplDllistMethod implements Call
                     $this->className
                 )
             ),
+            // php-src Iterator protocol — without proxy thin AOT silent-nulls (#579 / #34976)
+            'rewind' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::rewind',
+                0,
+                fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileRewind(
+                    $ctx,
+                    $self,
+                    $this->className
+                )
+            ),
+            'valid' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::valid',
+                0,
+                fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileValid(
+                    $ctx,
+                    $self,
+                    $this->className
+                )
+            ),
+            'current' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::current',
+                0,
+                fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileCurrent(
+                    $ctx,
+                    $self,
+                    $this->className
+                )
+            ),
+            'key' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::key',
+                0,
+                fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileKey(
+                    $ctx,
+                    $self,
+                    $this->className
+                )
+            ),
+            'next' => $this->callExactArg(
+                $context,
+                $args,
+                'SplDoublyLinkedList::next',
+                0,
+                fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileNext(
+                    $ctx,
+                    $self,
+                    $this->className
+                )
+            ),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),
