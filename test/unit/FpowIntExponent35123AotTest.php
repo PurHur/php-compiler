@@ -32,12 +32,14 @@ final class FpowIntExponent35123AotTest extends TestCase
         $fpow = (string) file_get_contents(__DIR__.'/../../ext/standard/FpowJitHelper.php');
         $this->assertStringContainsString('#35123', $fpow);
         $this->assertStringContainsString('powByIntPositive', $fpow);
-        $this->assertStringNotContainsString('$e = $neg ? -$exp : $exp', $fpow);
+        $this->assertDoesNotMatchRegularExpression(
+            '/^\s*\$e\s*=\s*\$neg\s*\?\s*-\$exp\s*:\s*\$exp\s*;/m',
+            $fpow
+        );
 
         $powInt = (string) file_get_contents(__DIR__.'/../../ext/standard/PowIntJitHelper.php');
         $this->assertStringContainsString('#35123', $powInt);
         $this->assertStringContainsString('floatPowPositive', $powInt);
-        // Executable peel must not remain — comments mentioning the anti-pattern are OK.
         $this->assertDoesNotMatchRegularExpression(
             '/^\s*\$e\s*=\s*\$neg\s*\?\s*-\$exp\s*:\s*\$exp\s*;/m',
             $powInt
