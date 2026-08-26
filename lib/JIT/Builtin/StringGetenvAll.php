@@ -11,7 +11,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_getenv_all (#5075, #20156, #20758, #21579, #24855).
+ * JIT/AOT link for __compiler_getenv_all (#5075, #20156, #20758, #21579, #24855, #35127).
  *
  * Embed + thin standalone AOT: process environ via {@see EnvironMirrorRuntime}
  * (`__superglobals__mirror_process_environ` — shared with $_SERVER refresh #18984).
@@ -19,6 +19,9 @@ use PHPLLVM\Builder;
  * environ walk already includes overlay entries. A NestedJIT overlay-merge helper
  * segfaults under thin AOT when getenv() is the only env builtin (#24855 / re-#20758).
  * No inline environ-kernel walk in this bridge (Rename #19215 shape).
+ * Owns `__compiler_getenv_all` module-locally: {@see ensureLinked} before lookup.
+ * {@see Context::ensureFullStandaloneBodies} must not NestedJIT this during init (#35127)
+ * — peer #35113 / #32122 `.1` mint class; `JitEnv::getenvAll` ensures before lookup (#32665).
  * php-src: ext/standard/basic_functions.c — zif_getenv argc==0
  */
 final class StringGetenvAll
