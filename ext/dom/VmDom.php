@@ -4943,6 +4943,11 @@ final class VmDom
         if (self::isDocument($node)) {
             return true;
         }
+        $state = DomRegistry::state($node);
+        if (null === $state->parentId) {
+            // Thin-AOT loadXML wires PROP_PARENT_NODE in LLVM before DomRegistry parentId (#35241).
+            return self::isConnectedViaPropertyParentChain($node);
+        }
         $current = $node;
         while (true) {
             $parentId = DomRegistry::state($current)->parentId;
@@ -4955,6 +4960,68 @@ final class VmDom
             }
             if (self::isDocument($parent)) {
                 return true;
+            }
+            $current = $parent;
+        }
+    }
+
+    /**
+     * Seed DomRegistry parentId from materialized PROP_PARENT_NODE (thin-AOT loadXML).
+     *
+     * isConnected() walks parentId; LLVM sibling slots alone left nested getElementById null (#35241).
+     */
+    public static function syncDomRegistryParentChainFromProperties(ObjectEntry $node): void
+    {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        $current = $node;
+        while (!self::isDocument($current)) {
+            if (!$current->hasProperty(self::PROP_PARENT_NODE)) {
+                break;
+            }
+            $parentVar = $current->getProperty(self::PROP_PARENT_NODE)->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $parentVar->type) {
+                break;
+            }
+            $parent = $parentVar->toObject();
+            if (!DomRegistry::has($parent)) {
+                break;
+            }
+            DomRegistry::state($current)->parentId = $parent->id;
+            if (null === DomRegistry::state($current)->documentId) {
+                $doc = self::ownerDocumentEntry($current);
+                if (null !== $doc) {
+                    DomRegistry::state($current)->documentId = $doc->id;
+                }
+            }
+            $current = $parent;
+        }
+    }
+
+    /** Fallback when DomRegistry parentId was never seeded (user-script AOT loadXML tree). */
+    private static function isConnectedViaPropertyParentChain(ObjectEntry $node): bool
+    {
+        $current = $node;
+        $seen = [];
+        while (true) {
+            if (isset($seen[$current->id])) {
+                return false;
+            }
+            $seen[$current->id] = true;
+            if (self::isDocument($current)) {
+                return true;
+            }
+            if (!$current->hasProperty(self::PROP_PARENT_NODE)) {
+                return false;
+            }
+            $parentVar = $current->getProperty(self::PROP_PARENT_NODE)->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $parentVar->type) {
+                return false;
+            }
+            $parent = $parentVar->toObject();
+            if (!DomRegistry::has($parent)) {
+                return false;
             }
             $current = $parent;
         }

@@ -114,14 +114,33 @@ final class JitDomGetElementById
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $hitBoxed), $resultSlot);
             $context->builder->branch($doneBlock);
 
-            // Cache active but id miss — PROP_ELEMENT_ID_MAP holds other loadXML
-            // DTD IDs (single-slot cache is first-wins only; #34696). NestedJIT covers
-            // setIdAttribute DomRegistry updates when the map has no entry (#33957).
+            // Cache active but id miss — consult DomRegistry before PROP_ELEMENT_ID_MAP.
+            // LLVM single-slot cache holds the last setIdAttribute id; other registered ids
+            // live in DomRegistry (synced map can lag behind NestedJIT; #34696 / re-#19870).
             $context->builder->positionAtEnd($cacheMiss);
-            $mapHit = self::lookupElementIdMapBoxed($context, $document, $idStr);
-            $mapValPtr = JitValueBox::normalizeValuePtr($context, $mapHit);
+            $nestedHit = self::callNestedGetElementById($context, $document, $idStr);
+            $nestedValPtr = JitValueBox::normalizeValuePtr($context, $nestedHit);
             $valueMap = $context->structFieldMap['__value__'];
             $i8 = $context->getTypeFromString('int8');
+            $nestedType = $context->builder->load(
+                $context->builder->structGep($nestedValPtr, $valueMap['type'])
+            );
+            $nestedIsObject = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $nestedType,
+                $i8->constInt(JITVariable::TYPE_OBJECT, false)
+            );
+            $nestedOk = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_miss_nested_ok');
+            $mapFallback = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_miss_map');
+            $context->builder->branchIf($nestedIsObject, $nestedOk, $mapFallback);
+
+            $context->builder->positionAtEnd($nestedOk);
+            $context->builder->store($nestedValPtr, $resultSlot);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($mapFallback);
+            $mapHit = self::lookupElementIdMapBoxed($context, $document, $idStr);
+            $mapValPtr = JitValueBox::normalizeValuePtr($context, $mapHit);
             $mapType = $context->builder->load(
                 $context->builder->structGep($mapValPtr, $valueMap['type'])
             );
@@ -130,20 +149,17 @@ final class JitDomGetElementById
                 $mapType,
                 $i8->constInt(JITVariable::TYPE_OBJECT, false)
             );
-            $mapOk = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_miss_map');
-            $mapNested = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_miss_nested');
-            $context->builder->branchIf($mapIsObject, $mapOk, $mapNested);
+            $mapOk = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_miss_map_ok');
+            $mapNull = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_miss_null');
+            $context->builder->branchIf($mapIsObject, $mapOk, $mapNull);
 
             $context->builder->positionAtEnd($mapOk);
             $context->builder->store($mapValPtr, $resultSlot);
             $context->builder->branch($doneBlock);
 
-            $context->builder->positionAtEnd($mapNested);
+            $context->builder->positionAtEnd($mapNull);
             $context->builder->store(
-                JitValueBox::normalizeValuePtr(
-                    $context,
-                    self::callNestedGetElementById($context, $document, $idStr)
-                ),
+                JitValueBox::normalizeValuePtr($context, self::boxNullResult($context)),
                 $resultSlot
             );
             $context->builder->branch($doneBlock);

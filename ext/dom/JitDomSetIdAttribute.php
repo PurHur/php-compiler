@@ -88,11 +88,17 @@ final class JitDomSetIdAttribute
             if (!$skipCache) {
                 if (null !== $elemAttrVal && '' !== $elemAttrVal) {
                     $idStr = $context->builder->load($context->constantStringFromString($elemAttrVal));
-                    self::storeCacheFromRuntimeIdString($context, $element, $idStr);
+                    self::storeCacheFromRuntimeIdString($context, $element, $idStr, $elemAttrVal);
                     self::$registeredIdLiterals[$elemAttrVal] = true;
                 } else {
                     // Live Attr cache value — NestedJIT getAttribute is empty after loadXML (#33957).
-                    self::storeCacheFromRuntimeGetAttribute($context, $element, $nameLlvm, $nameLit);
+                    self::storeCacheFromRuntimeGetAttribute(
+                        $context,
+                        $element,
+                        $nameLlvm,
+                        $nameLit,
+                        $idLitForSkip
+                    );
                     if (null !== $idLitForSkip && '' !== $idLitForSkip) {
                         self::$registeredIdLiterals[$idLitForSkip] = true;
                     }
@@ -142,7 +148,7 @@ final class JitDomSetIdAttribute
             $elemAttrVal = self::compileTimeReceiverAttrValue($args[0], $localLit);
             if (null !== $elemAttrVal && '' !== $elemAttrVal) {
                 $idStr = $context->builder->load($context->constantStringFromString($elemAttrVal));
-                self::storeCacheFromRuntimeIdString($context, $element, $idStr);
+                self::storeCacheFromRuntimeIdString($context, $element, $idStr, $elemAttrVal);
             } else {
                 // getAttribute(localName) live cache — DomRegistry empty after loadXML (#33957).
                 self::storeCacheFromRuntimeGetAttribute($context, $element, $localLlvm, $localLit);
@@ -219,7 +225,8 @@ final class JitDomSetIdAttribute
         Context $context,
         Value $element,
         Value $nameLlvm,
-        ?string $nameLit = null
+        ?string $nameLit = null,
+        ?string $idLitForMap = null
     ): void {
         if (null !== $nameLit && '' !== $nameLit) {
             $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit);
@@ -231,27 +238,33 @@ final class JitDomSetIdAttribute
             $context->builder->branchIf($isNull, $miss, $hit);
 
             $context->builder->positionAtEnd($miss);
-            self::storeCacheFromNestedGetAttribute($context, $element, $nameLlvm);
+            self::storeCacheFromNestedGetAttribute($context, $element, $nameLlvm, $idLitForMap);
             $context->builder->branch($done);
 
             $context->builder->positionAtEnd($hit);
             $attrClass = JitDomAttributeNodeNS::attrClassForUserScriptCache();
             JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
             $valueVar = $context->type->object->propertyFetch($attr, $attrClass, 'value');
-            self::storeCacheFromRuntimeIdString($context, $element, $context->helper->loadValue($valueVar));
+            self::storeCacheFromRuntimeIdString(
+                $context,
+                $element,
+                $context->helper->loadValue($valueVar),
+                $idLitForMap ?? DomUserScriptAttributeCacheLlvm::literalValue('', (string) $nameLit)
+            );
             $context->builder->branch($done);
 
             $context->builder->positionAtEnd($done);
 
             return;
         }
-        self::storeCacheFromNestedGetAttribute($context, $element, $nameLlvm);
+        self::storeCacheFromNestedGetAttribute($context, $element, $nameLlvm, $idLitForMap);
     }
 
     private static function storeCacheFromNestedGetAttribute(
         Context $context,
         Value $element,
-        Value $nameLlvm
+        Value $nameLlvm,
+        ?string $idLitForMap = null
     ): void {
         JitDomDocumentMethodKernel::ensureGetAttributeBridge($context);
         $idStr = $context->builder->call(
@@ -259,7 +272,7 @@ final class JitDomSetIdAttribute
             $element,
             $nameLlvm
         );
-        self::storeCacheFromRuntimeIdString($context, $element, $idStr);
+        self::storeCacheFromRuntimeIdString($context, $element, $idStr, $idLitForMap);
     }
 
     /** setIdAttributeNode — Attr::$value is the id string (#33957). */
@@ -282,13 +295,19 @@ final class JitDomSetIdAttribute
             'value',
             $attrClassId
         );
-        self::storeCacheFromRuntimeIdString($context, $element, $context->helper->loadValue($valueVar));
+        self::storeCacheFromRuntimeIdString(
+            $context,
+            $element,
+            $context->helper->loadValue($valueVar),
+            DomUserScriptAttributeCacheLlvm::literalValue('', 'id')
+        );
     }
 
     private static function storeCacheFromRuntimeIdString(
         Context $context,
         Value $element,
-        Value $idStr
+        Value $idStr,
+        ?string $idLitForMap = null
     ): void {
         $map = $context->structFieldMap['__string__'];
         $len = $context->builder->load($context->builder->structGep($idStr, $map['length']));
@@ -300,12 +319,12 @@ final class JitDomSetIdAttribute
 
         $context->builder->positionAtEnd($storeBlock);
         $document = self::loadOwnerDocumentObject($context, $element);
-        // xmlAddID first-wins for loadXML child-edge setIdAttribute (#34050).
-        // createElement/setAttribute path must overwrite the single-slot cache (issue_29257).
-        if (null !== JitDomNodeChildProperty::$lastFetchedAttributes) {
-            DomUserScriptElementCacheLlvm::storeFirstWins($context, $document, $idStr, $element);
-        } else {
-            DomUserScriptElementCacheLlvm::store($context, $document, $idStr, $element);
+        // Single-slot cache is first-wins (xmlAddID); every id also lands in PROP_ELEMENT_ID_MAP.
+        DomUserScriptElementCacheLlvm::storeFirstWins($context, $document, $idStr, $element);
+        // Multi-id documents: single-slot cache is first-wins; every setIdAttribute id
+        // must also land in PROP_ELEMENT_ID_MAP (#34696 / maintainer_gap replaceChild idmap).
+        if (null !== $idLitForMap && '' !== $idLitForMap) {
+            JitDomLoadXMLUserScript::storeElementInIdMap($context, $document, $idLitForMap, $element);
         }
         $context->builder->branch($cont);
         $context->builder->positionAtEnd($cont);
@@ -334,8 +353,8 @@ final class JitDomSetIdAttribute
      * Attribute value from the receiver's loadXML open-tag stamp (#34050).
      *
      * ARG_SEND / method temps often drop {@see JITVariable::$compileTimeDomAttributes};
-     * fall back to {@see JitDomNodeChildProperty::$lastFetchedAttributes} (cleared on
-     * createElement / documentElement so it cannot leak across documents).
+     * do not fall back to {@see JitDomNodeChildProperty::$lastFetchedAttributes} — it
+     * reflects the last firstChild walk, not this receiver (#35241 / #34050).
      */
     private static function compileTimeReceiverAttrValue(JITVariable $receiver, ?string $nameLit): ?string
     {
@@ -343,9 +362,6 @@ final class JitDomSetIdAttribute
             return null;
         }
         $attrs = $receiver->compileTimeDomAttributes;
-        if (null === $attrs || [] === $attrs) {
-            $attrs = JitDomNodeChildProperty::$lastFetchedAttributes;
-        }
         if (null === $attrs || [] === $attrs) {
             return null;
         }

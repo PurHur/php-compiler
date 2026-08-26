@@ -1184,12 +1184,16 @@ final class JitDomLoadXMLUserScript
         }
     }
 
-    private static function storeElementInIdMap(
+    /** Register or overwrite one id → element in PROP_ELEMENT_ID_MAP (#34696 / #19870 rebind). */
+    public static function storeElementInIdMap(
         Context $context,
         Value $document,
         string $idLit,
         Value $element
     ): void {
+        if ('' === $idLit) {
+            return;
+        }
         self::ensureDocumentPropertyLayout($context);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_DOCUMENT);
@@ -1208,6 +1212,44 @@ final class JitDomLoadXMLUserScript
             $idStr,
             $element
         );
+        self::writeElementIdMapHashtable($context, $document, $ht);
+    }
+
+    /** Drop one id key from PROP_ELEMENT_ID_MAP after setAttribute/removeAttribute rebind (#19870). */
+    public static function removeElementFromIdMap(
+        Context $context,
+        Value $document,
+        string $idLit
+    ): void {
+        if ('' === $idLit) {
+            return;
+        }
+        self::ensureDocumentPropertyLayout($context);
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_DOCUMENT);
+        $mapVar = ObjectInstancePropertyLlvm::propertyFetchOrdinary(
+            $objectType,
+            $document,
+            self::CLASS_DOCUMENT,
+            VmDom::PROP_ELEMENT_ID_MAP,
+            $classId
+        );
+        $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
+        $idStr = $context->builder->load($context->constantStringFromString($idLit));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__unsetStringKey'),
+            $ht,
+            $idStr
+        );
+        self::writeElementIdMapHashtable($context, $document, $ht);
+    }
+
+    private static function writeElementIdMapHashtable(
+        Context $context,
+        Value $document,
+        Value $ht
+    ): void {
+        $objectType = $context->type->object;
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(

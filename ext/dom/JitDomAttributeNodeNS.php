@@ -1171,10 +1171,18 @@ final class JitDomAttributeNodeNS
             if ('xmlns' === $nameLit) {
                 return self::boxBoolResult($context, true);
             }
+            $oldIdLit = 'id' === $nameLit ? self::compileTimePriorIdLiteral($args[0], $nameLit) : null;
             $attr = self::setAttributeLiteralReuseOrCreate($context, $nameLit, $valueLit);
             // Live NamedNodeMap pins/length (#33128).
             JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
             if ('id' === $nameLit) {
+                $document = self::loadOwnerDocumentObject($context, $element);
+                if (null !== $oldIdLit && '' !== $oldIdLit && $oldIdLit !== $valueLit) {
+                    JitDomLoadXMLUserScript::removeElementFromIdMap($context, $document, $oldIdLit);
+                }
+                if ('' !== $valueLit) {
+                    JitDomLoadXMLUserScript::storeElementInIdMap($context, $document, $valueLit, $element);
+                }
                 DomUserScriptElementCacheLlvm::rebindId($context, $valueLit);
                 JitDomSetIdAttribute::rememberSetAttributeIdValue($valueLit);
                 // Keep setIdAttribute cache in sync when setAttribute runs after a prior
@@ -1466,6 +1474,11 @@ final class JitDomAttributeNodeNS
         $nameLit = self::compileTimeStringArg($args[1]);
         if (null !== $nameLit) {
             if ('id' === $nameLit) {
+                $oldIdLit = self::compileTimePriorIdLiteral($args[0], $nameLit);
+                if (null !== $oldIdLit && '' !== $oldIdLit) {
+                    $document = self::loadOwnerDocumentObject($context, $element);
+                    JitDomLoadXMLUserScript::removeElementFromIdMap($context, $document, $oldIdLit);
+                }
                 DomUserScriptElementCacheLlvm::clearId($context);
                 $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
                 if (null !== $parsed) {
@@ -1483,6 +1496,46 @@ final class JitDomAttributeNodeNS
         JitValueBox::writeBool($context, $slot, $i1->constInt(1, false));
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    /**
+     * Prior id= literal before setAttribute/removeAttribute mutates the live Attr cache (#19870).
+     */
+    private static function compileTimePriorIdLiteral(JITVariable $receiver, string $nameLit): ?string
+    {
+        if ('id' !== $nameLit) {
+            return null;
+        }
+        $cached = DomUserScriptAttributeCacheLlvm::literalValue('', 'id');
+        if (null !== $cached && '' !== $cached) {
+            return $cached;
+        }
+        $attrs = $receiver->compileTimeDomAttributes;
+        if (null !== $attrs && isset($attrs['id']) && '' !== $attrs['id']) {
+            return $attrs['id'];
+        }
+        $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+
+        return null !== $parsed && '' !== ($parsed['id'] ?? '') ? $parsed['id'] : null;
+    }
+
+    private static function loadOwnerDocumentObject(Context $context, Value $element): Value
+    {
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT)) {
+            return $element;
+        }
+        $ownerVar = $objectType->propertyFetch(
+            $element,
+            'DOMElement',
+            VmDom::PROP_OWNER_DOCUMENT
+        );
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $ownerVar)
+        );
     }
 
     /**
