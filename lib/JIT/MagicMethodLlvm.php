@@ -15,10 +15,11 @@ use PHPCfg\Operand;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for user magic methods __get / __set / __call / __toString (#146, #4022, #10201).
+ * LLVM lowering for user magic methods __get / __set / __isset / __unset / __call / __toString
+ * (#146, #4022, #10201, #35078).
  *
  * php-src: Zend/zend_object_handlers.c — zend_std_read_property, zend_std_write_property,
- * zend_std_get_method, zend_std_cast_object_tostring.
+ * zend_std_has_property, zend_std_unset_property, zend_std_get_method, zend_std_cast_object_tostring.
  */
 final class MagicMethodLlvm
 {
@@ -262,6 +263,94 @@ final class MagicMethodLlvm
         $context->callerStrictTypes = $prevStrict;
 
         return true;
+    }
+
+    /**
+     * Undeclared unset($obj->prop) → __unset (zend_std_unset_property; #35078 leftover of #35076).
+     * Must run before propertyFetch(forWrite), which defineProperty's a slot past the allocation.
+     */
+    public static function tryEmitMagicUnset(
+        Context $context,
+        Value $receiver,
+        string $declaringClass,
+        string $propertyName,
+        ?Block $enclosingBlock
+    ): bool {
+        $classId = $context->type->object->lookup('' !== $declaringClass ? $declaringClass : 'stdclass');
+        if ($context->type->object->hasProperty($classId, $propertyName)) {
+            return false;
+        }
+        if (!self::hasInstanceMethod($context->type->object, $classId, '__unset')) {
+            return false;
+        }
+        $proxy = self::resolveInstanceMethodProxy($context, $declaringClass, '__unset');
+        if (null === $proxy) {
+            return false;
+        }
+        $receiverVar = new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $receiver
+        );
+        $receiverVar->objectPropertyClassName = $declaringClass;
+        $nameVar = self::stringVariable($context, $propertyName);
+        $toCall = $context->resolveFunctionProxy($proxy);
+        $prevStrict = $context->callerStrictTypes;
+        $context->callerStrictTypes = $enclosingBlock?->strictTypes ?? false;
+        $toCall->call($context, $receiverVar, $nameVar);
+        $context->callerStrictTypes = $prevStrict;
+
+        return true;
+    }
+
+    /**
+     * Undeclared isset($obj->prop) → __isset → bool (zend_std_has_property; #35078).
+     *
+     * @return Value|null i1 when __isset was lowered; null when caller should keep the declared-slot path
+     */
+    public static function tryEmitMagicIsset(
+        Context $context,
+        Value $receiver,
+        string $declaringClass,
+        string $propertyName,
+        ?Block $enclosingBlock
+    ): ?Value {
+        $classId = $context->type->object->lookup('' !== $declaringClass ? $declaringClass : 'stdclass');
+        if ($context->type->object->hasProperty($classId, $propertyName)) {
+            return null;
+        }
+        if (!self::hasInstanceMethod($context->type->object, $classId, '__isset')) {
+            return null;
+        }
+        $proxy = self::resolveInstanceMethodProxy($context, $declaringClass, '__isset');
+        if (null === $proxy) {
+            return null;
+        }
+        $receiverVar = new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $receiver
+        );
+        $receiverVar->objectPropertyClassName = $declaringClass;
+        $nameVar = self::stringVariable($context, $propertyName);
+        $toCall = $context->resolveFunctionProxy($proxy);
+        $prevStrict = $context->callerStrictTypes;
+        $context->callerStrictTypes = $enclosingBlock?->strictTypes ?? false;
+        $resultVal = $toCall->call($context, $receiverVar, $nameVar);
+        $context->callerStrictTypes = $prevStrict;
+        if (null === $resultVal) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+        $resultVar = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VALUE,
+            $resultVal
+        );
+
+        return \PHPCompiler\ext\standard\JitZendScalarCast::emitBoolCast($context, $resultVar);
     }
 
     public static function tryInitMagicCall(
