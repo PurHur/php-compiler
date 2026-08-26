@@ -4144,6 +4144,11 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_SUBSTITUTE_ENTITIES, Variable::TYPE_VALUE);
             // DOMNode::$baseURI — late defineProperty after loadXML SIGSEGVs (#34904 leftover of #34894).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI, Variable::TYPE_VALUE);
+            // ParentNode element-nav — JitDomElementNavigationProperty used DOMElement slots on
+            // Document and SIGSEGVd (#34910 leftover of #34899 / #34352).
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_FIRST_ELEMENT_CHILD, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_LAST_ELEMENT_CHILD, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_CHILD_ELEMENT_COUNT, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
         }
         if ('domattr' === $lcname) {
