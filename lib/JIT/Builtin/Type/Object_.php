@@ -4132,8 +4132,11 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_IMPLEMENTATION, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_DOCUMENT_URI, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_ENCODING, Variable::TYPE_VALUE);
+            // xmlVersion / xmlStandalone (+ legacy aliases) — slots so writes stick (#34916).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_VERSION, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_STANDALONE, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_VERSION, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_STANDALONE, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_STANDALONE, Variable::TYPE_VALUE);
             // libxml option props — VALUE bool boxes so var_export/writes match Zend (#34899 / #34908).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_STRICT_ERROR_CHECKING, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_FORMAT_OUTPUT, Variable::TYPE_VALUE);

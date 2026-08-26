@@ -64,6 +64,10 @@ final class DomDocumentConstruct implements Call
         self::seedOptionBool($context, $obj, VmDom::PROP_PRESERVE_WHITE_SPACE, true);
         self::seedOptionBool($context, $obj, VmDom::PROP_RECOVER, false);
         self::seedOptionBool($context, $obj, VmDom::PROP_STRICT_ERROR_CHECKING, true);
+        // xmlVersion / xmlStandalone (+ Level-3 aliases) — same MetaProps leftover (#34916).
+        self::seedOptionBool($context, $obj, VmDom::PROP_XML_STANDALONE, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_STANDALONE, false);
+        self::seedXmlVersion($context, $obj, '1.0');
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
@@ -72,6 +76,33 @@ final class DomDocumentConstruct implements Call
         );
 
         return $slot;
+    }
+
+    private static function seedXmlVersion(Context $context, Value $obj, string $version): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        $str = $context->builder->load($context->constantStringFromString($version));
+        foreach ([VmDom::PROP_XML_VERSION, VmDom::PROP_VERSION] as $prop) {
+            if (!$objectType->hasProperty($classId, $prop)) {
+                $objectType->defineProperty($classId, $prop, Variable::TYPE_STRING);
+            }
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $str
+            );
+            $propVar = new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $owned
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($obj, 'DOMDocument', $prop),
+                $propVar,
+                Variable::TYPE_STRING
+            );
+        }
     }
 
     private static function seedOptionBool(Context $context, Value $obj, string $prop, bool $value): void
