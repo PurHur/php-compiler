@@ -22,6 +22,8 @@ use PHPLLVM\Value;
  *
  * php-src: ext/dom/php_dom.c PHP_METHOD(DOMImplementation, createDocument)
  *          xmlNewDoc + xmlNewDocNode + xmlDocSetRootElement (#32531)
+ *
+ * Must seed {@code nodeType=XML_DOCUMENT_NODE} (#35173 peer #35168 / #33607).
  */
 final class JitDomCreateDocument
 {
@@ -76,6 +78,13 @@ final class JitDomCreateDocument
 
         $document = $objectType->allocate($docClassId);
         $objectType->markObjectConstructed($document);
+        // Unset NATIVE_LONG nodeType SIGSEGVs on $doc->nodeType (#35173 peer #35168).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $document,
+            self::CLASS_DOCUMENT,
+            DomConstants::XML_DOCUMENT_NODE
+        );
 
         if ('' === $qualifiedName) {
             self::storeNullDocumentElement($context, $document);

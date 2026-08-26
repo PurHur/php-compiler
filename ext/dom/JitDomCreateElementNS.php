@@ -13,10 +13,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument::createElementNS() (#14314, #18938, #24923, #32302).
+ * LLVM lowering for DOMDocument::createElementNS() (#14314, #18938, #24923, #32302, #35173).
  *
  * php-src: ext/dom/php_dom.stub.php — createElementNS(?string $namespace, …)
  * null namespace ≠ "" (no xmlns vs xmlns="") — preserve on AOT materialization.
+ * Must seed {@code nodeType=XML_ELEMENT_NODE} (#35173 peer #35168 / #33607).
  */
 final class JitDomCreateElementNS
 {
@@ -225,6 +226,14 @@ final class JitDomCreateElementNS
 
         $obj = $objectType->allocate($classId);
         $objectType->markObjectConstructed($obj);
+
+        // Seed nodeType — unset NATIVE_LONG SIGSEGVs on $el->nodeType (#35173 peer #35168 / #33607).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            $className,
+            DomConstants::XML_ELEMENT_NODE
+        );
 
         $nameStr = $context->builder->load($context->constantStringFromString($qualifiedName));
         self::storeStringProperty($context, $obj, $className, VmDom::PROP_NODE_NAME, $nameStr);
