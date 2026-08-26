@@ -13,8 +13,9 @@ use PHPLLVM\Value;
  * LLVM lowering for DOMDocument computed meta / baseURI properties
  * (#34894 leftover of #34887; #34904 baseURI).
  *
- * Option bools (formatOutput, …) use allocate()+DomDocumentConstruct seeds so
- * writes stick (#34908) — not hardcoded fetch.
+ * Option bools (formatOutput, …) and xmlVersion / xmlStandalone (plus legacy
+ * aliases) use allocate()+DomDocumentConstruct seeds so writes stick
+ * (#34908 / #34916) — not hardcoded fetch.
  *
  * php-src: ext/dom/php_dom.c — dom_document_*_read; ext/dom/node.c — dom_node_base_uri_read;
  * ext/dom/document.c
@@ -37,10 +38,6 @@ final class JitDomDocumentMetaProps
             || 'xmlencoding' === $propLc
             || 'actualencoding' === $propLc
             || 'encoding' === $propLc
-            || 'xmlversion' === $propLc
-            || 'version' === $propLc
-            || 'xmlstandalone' === $propLc
-            || 'standalone' === $propLc
             || 'config' === $propLc
             // DOMNode::$baseURI — same documentURI cwd stamp after loadXML (#34904).
             || 'baseuri' === $propLc;
@@ -56,12 +53,6 @@ final class JitDomDocumentMetaProps
         }
         if ('implementation' === $propLc) {
             return self::boxImplementation($context);
-        }
-        if ('xmlversion' === $propLc || 'version' === $propLc) {
-            return self::boxString($context, '1.0');
-        }
-        if ('xmlstandalone' === $propLc || 'standalone' === $propLc) {
-            return self::boxBool($context, false);
         }
         if ('xmlencoding' === $propLc || 'actualencoding' === $propLc || 'encoding' === $propLc) {
             $enc = self::encodingFromLoadXmlStamp();
