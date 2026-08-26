@@ -1738,11 +1738,12 @@ class Context {
                 'SplFileObject'
             );
         }
-        // GlobIterator — glob snapshot + Iterator (#27422).
+        // GlobIterator — glob snapshot + Iterator (#27422); getFlags/setFlags (#34993).
         $this->type->object->lookup('GlobIterator');
         foreach ([
             '__construct', 'rewind', 'valid', 'current', 'key', 'next',
             'getFilename', 'count',
+            'getFlags', 'setFlags',
         ] as $giMethod) {
             $this->functionProxies['globiterator::'.strtolower($giMethod)] = new Call\GlobIteratorMethod(
                 $giMethod

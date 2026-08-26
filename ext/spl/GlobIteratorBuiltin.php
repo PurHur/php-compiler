@@ -391,7 +391,7 @@ final class GlobIteratorCount extends VmClassMethod
     }
 }
 
-/** php-src GlobIterator::getFlags via FilesystemIterator (#22306). */
+/** php-src GlobIterator::getFlags via FilesystemIterator (#22306 / #34993). */
 final class GlobIteratorGetFlags extends VmClassMethod
 {
     public function __construct()
@@ -406,6 +406,8 @@ final class GlobIteratorGetFlags extends VmClassMethod
             GlobIteratorBuiltin::CLASS_LC,
             'GlobIterator::getFlags()'
         );
+        // php-src inherits zim_FilesystemIterator_getFlags — ACE cites FilesystemIterator (#34993).
+        $this->requireExactUserArgCount($frame, 'FilesystemIterator::getFlags', 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -413,7 +415,7 @@ final class GlobIteratorGetFlags extends VmClassMethod
     }
 }
 
-/** php-src GlobIterator::setFlags via FilesystemIterator (#22306). */
+/** php-src GlobIterator::setFlags via FilesystemIterator (#22306 / #34993). */
 final class GlobIteratorSetFlags extends VmClassMethod
 {
     public function __construct()
@@ -428,15 +430,11 @@ final class GlobIteratorSetFlags extends VmClassMethod
             GlobIteratorBuiltin::CLASS_LC,
             'GlobIterator::setFlags()'
         );
-        if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError(
-                'GlobIterator::setFlags() expects exactly 1 argument, '
-                .(\count($frame->calledArgs) - 1).' given'
-            );
-        }
+        // php-src inherits zim_FilesystemIterator_setFlags — ACE cites FilesystemIterator (#34993).
+        $this->requireExactUserArgCount($frame, 'FilesystemIterator::setFlags', 1);
         $flags = SplFilesystemArg::requireIntArg(
             $frame->calledArgs[1],
-            'GlobIterator::setFlags',
+            'FilesystemIterator::setFlags',
             1,
             'flags'
         );
