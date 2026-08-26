@@ -15,6 +15,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitValueNumeric;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -51,6 +53,15 @@ final class pow extends Internal
     {
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
             return $context->helper->loadValue($arg);
+        }
+        // Boxed locals: read float/int/bool/string correctly — never JitLongArg truncate (#35058).
+        if (JitValueBox::isValueOperand($arg)) {
+            return JitValueNumeric::valueBoxToDouble($context, $arg);
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            $v = $context->helper->loadValue($arg);
+
+            return $context->builder->siToFp($v, $double);
         }
         $v = JitLongArg::lower($context, $arg, 'pow() argument');
 

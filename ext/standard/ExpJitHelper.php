@@ -7,13 +7,14 @@ namespace PHPCompiler\ext\standard;
 /**
  * exp() for compiled JIT/AOT modules (#15116, #27047, #28241, php-in-PHP).
  *
- * NestedJIT-safe ln2 range reduction + 20-term Taylor Horner + float 2^|n| peel (#28241).
+ * NestedJIT-safe ln2 range reduction + 20-term Taylor Horner + float 2^|n| peel (#28241, #35058).
  * Avoid `\exp` / {@see VmMath::exp} — NestedJIT re-enters MathExp bridge under thin AOT.
  * Avoid pack/unpack (#27496). Avoid ternary self-assign scale (`$s = $n >= 1 ? $s * 2 : $s`) —
  * NestedJIT zeros the result. Avoid large-magnitude threshold compares — NestedJIT mis-folds
  * them for ordinary negatives (Floor #27650). ±Inf/−0 edges: +Inf via constructed Inf identity;
  * −Inf/NaN host paths match Zend; NestedJIT NaN/−Inf compares are unreliable (same class) —
  * normal-range matches Zend. Avoid unbounded while-loops (#27838).
+ * Avoid compound `&&` in for-conds for the 2^|n| peel (#28716 / #35058) — that left scale=1.
  * php-src: ext/standard/math.c — PHP_FUNCTION(exp)
  */
 final class ExpJitHelper
@@ -63,18 +64,27 @@ final class ExpJitHelper
         $y = 1.0 + $r * $y / 2.0;
         $y = 1.0 + $r * $y / 1.0;
 
-        $absN = $n;
-        if ($n < 0) {
-            $absN = -$n;
-        }
-        // Float doubling (not int shift) covers |n| up to 1024 without int overflow.
+        // NestedJIT: avoid compound `&&` in for-conds (#28716 / #35058) — that left scale=1
+        // so exp(1)≈1.359 and pow(9,0.5)≈0.75. Pos/neg peels like LdexpJitHelper (#29578).
         // `$scale = $scale + $scale` — NestedJIT-safe (peer Sqrt peel); avoid `*= 0.5` half-chains
         // gated on `$n <= -k` (mis-taken under NestedJIT).
         $scale = 1.0;
-        for ($i = 0; $i < $absN && $i < 1024; ++$i) {
-            $scale = $scale + $scale;
-        }
-        if ($n < 0) {
+        if ($n > 0) {
+            $limit = $n;
+            if ($limit > 1024) {
+                $limit = 1024;
+            }
+            for ($i = 0; $i < $limit; ++$i) {
+                $scale = $scale + $scale;
+            }
+        } elseif ($n < 0) {
+            $limit = -$n;
+            if ($limit > 1024) {
+                $limit = 1024;
+            }
+            for ($i = 0; $i < $limit; ++$i) {
+                $scale = $scale + $scale;
+            }
             $scale = 1.0 / $scale;
         }
 
