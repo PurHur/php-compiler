@@ -324,6 +324,15 @@ final class JitDomInsertBeforeLiveSlots
         $context->builder->branch($afterFec);
 
         $context->builder->positionAtEnd($afterFec);
+        // ParentNode childElementCount + element-sibling links (#35010 / parentnode.c).
+        // Same-parent moves must not bump childElementCount.
+        $bbFreshNav = BasicBlockHelper::append($context, 'dom_ib_fresh_nav');
+        $bbAfterNav = BasicBlockHelper::append($context, 'dom_ib_after_nav');
+        $context->builder->branchIf($isMember, $bbAfterNav, $bbFreshNav);
+        $context->builder->positionAtEnd($bbFreshNav);
+        JitDomParentNodeElementNavLiveSlots::afterInsertElement($context, $parent, $newChild, $refChild);
+        $context->builder->branch($bbAfterNav);
+        $context->builder->positionAtEnd($bbAfterNav);
         self::finishChildNodesAfterInsert($context, $parent, $isMember);
         // saveXML reads PROP_USER_SCRIPT_INNER_XML — rebuild destination + ancestors
         // so createElement trees match Zend after cross-parent insert (#33450).
