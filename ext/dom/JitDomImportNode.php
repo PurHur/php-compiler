@@ -15,7 +15,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument::importNode() (#19212, #32350, #33097, #33362).
+ * LLVM lowering for DOMDocument::importNode() (#19212, #32350, #33097, #33362, #35118).
  *
  * php-src ext/dom/document.c PHP_METHOD(DOMDocument, importNode) → xmlDocCopyNode.
  * Thin-standalone AOT cannot return NestedJIT object pointers (property fetch
@@ -23,6 +23,8 @@ use PHPLLVM\Value;
  * a user-script DOMElement instead — tag/inner XML from compile-time loadXML
  * (#32350) or loadHTML getElementById (#19212). `$deep` must gate InnerXml (#33097).
  * Attributes are always copied (xmlDocCopyNode); #33097 only gated children (#33362).
+ * Attr / leaf sources materialize as stand-ins (#35043 / #35098 / #35118) — never the
+ * destination loadXML root via lastPath poisoning.
  */
 final class JitDomImportNode
 {
@@ -165,6 +167,11 @@ final class JitDomImportNode
      * CharacterData kinds; treating that as text alone materializes `#text` (#35043 /
      * #35098 / peer cloneNode). Element-only fallback would return the destination
      * root tag (e.g. `r`) as a DOMElement.
+     *
+     * DOMAttr / Dom\Attr sources must materialize via
+     * {@see JitDomAttributeNodeNS::materializeAttrFromLiterals} (#35118). getAttributeNode
+     * leaves {@see JitDomAttrRename::lastFetchedKey} while `$src->documentElement` poisons
+     * {@see JitDomGetNodePath::$lastPath} — element recovery would copy the dest root.
      */
     private static function invokeUserScriptMaterialize(
         Context $context,
@@ -194,6 +201,11 @@ final class JitDomImportNode
             }
 
             return self::boxObjectResult($context, $object);
+        }
+
+        $attrSpec = self::resolveSourceAttrSpec($sourceNode);
+        if (null !== $attrSpec) {
+            return self::materializeImportedAttr($context, $attrSpec);
         }
 
         $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
@@ -334,6 +346,118 @@ final class JitDomImportNode
         }
 
         return self::boxObjectResult($context, $element);
+    }
+
+    /**
+     * Attr import source: getAttributeNode / createAttribute orphan (#35118).
+     *
+     * Element identity stamps on the Variable (documentElement / firstChild) win —
+     * ARG_SEND may drop them, but then lastPath recovery in the element path applies.
+     * Prefer Attr only when the Variable itself carries no element/leaf stamps.
+     *
+     * @return null|array{namespace: string, qname: string, local: string, value: string}
+     */
+    private static function resolveSourceAttrSpec(JITVariable $sourceNode): ?array
+    {
+        if (null !== $sourceNode->compileTimeDomTagName
+            || null !== $sourceNode->compileTimeDomChildIndex
+            || null !== $sourceNode->compileTimeDomNodePath
+            || null !== $sourceNode->compileTimeDomTextData
+            || null !== $sourceNode->compileTimeDomInnerXml
+        ) {
+            return null;
+        }
+
+        // createAttribute orphan — rememberOrphan; getAttributeNode clears orphan flag.
+        if (JitDomAttrRename::lastAttrIsOrphan()) {
+            $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace();
+            $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+            $qname = DomUserScriptAttributeCacheLlvm::lastCreateQualifiedName();
+            if (null !== $ns && null !== $local && null !== $qname) {
+                $value = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
+
+                return [
+                    'namespace' => $ns,
+                    'qname' => $qname,
+                    'local' => $local,
+                    'value' => $value,
+                ];
+            }
+        }
+
+        $key = JitDomAttrRename::lastFetchedKey();
+        if (null === $key) {
+            return null;
+        }
+        [$ns, $local] = $key;
+        $value = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local);
+        if (null === $value) {
+            // loadXML attrs may be present in the cache object without valueByKey yet —
+            // recover from the source document's open-tag pairs.
+            $xml = $sourceNode->compileTimeDomLoadXml
+                ?? JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
+                ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+            if (null !== $xml) {
+                foreach (DomParseSimpleXmlJitHelper::rootAttributesArgv($xml) as $pair) {
+                    $qname = $pair['qname'];
+                    $pos = strpos($qname, ':');
+                    $pairLocal = false === $pos ? $qname : substr($qname, $pos + 1);
+                    $pairNs = $pair['namespace'] ?? '';
+                    if ($pairLocal === $local && $pairNs === $ns) {
+                        $value = $pair['value'];
+                        break;
+                    }
+                    if ('' === $ns && ($local === $qname || $local === $pairLocal)) {
+                        $value = $pair['value'];
+                        break;
+                    }
+                }
+            }
+        }
+        $value ??= '';
+        // getAttributeNode keys empty-NS + name; qName is the local/name lit.
+        $qname = '' === $ns ? $local : $local;
+
+        return [
+            'namespace' => $ns,
+            'qname' => $qname,
+            'local' => $local,
+            'value' => $value,
+        ];
+    }
+
+    /**
+     * xmlDocCopyNode of XML_ATTRIBUTE_NODE — orphan Attr on the destination document (#35118).
+     *
+     * @param array{namespace: string, qname: string, local: string, value: string} $spec
+     */
+    private static function materializeImportedAttr(Context $context, array $spec): Value
+    {
+        self::$lastMaterializedTagName = $spec['qname'];
+        self::$lastMaterializedInnerXml = '';
+        $living = null !== JitDomLoadXMLUserScript::lastDocumentClass()
+            && str_starts_with((string) JitDomLoadXMLUserScript::lastDocumentClass(), 'Dom\\');
+        $className = $living
+            ? JitDomAttributeNodeNS::CLASS_LIVING_ATTR
+            : 'DOMAttr';
+        $object = JitDomAttributeNodeNS::materializeAttrFromLiterals(
+            $context,
+            $spec['namespace'],
+            $spec['qname'],
+            $spec['value'],
+            $className,
+            $living
+        );
+        // setAttributeNode user-script path keys off lastCreate* (#33570 / #35118).
+        DomUserScriptAttributeCacheLlvm::rememberCreate($spec['namespace'], $spec['qname']);
+        DomUserScriptAttributeCacheLlvm::setLiteralValue(
+            $spec['namespace'],
+            $spec['local'],
+            $spec['value']
+        );
+        JitDomAttrRename::rememberOrphan();
+
+        return self::boxObjectResult($context, $object);
     }
 
     /**

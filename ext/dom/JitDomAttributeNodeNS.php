@@ -618,22 +618,37 @@ final class JitDomAttributeNodeNS
         }
         $qname = DomUserScriptAttributeCacheLlvm::lastCreateQualifiedName() ?? $local;
         $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
-        $id = $elementArg->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
-        if (null === $id) {
-            return;
-        }
         $bagUpdates = self::openTagAttrUpdates('' === $ns ? null : $ns, $qname, $valueLit);
-        $attrs = $elementArg->compileTimeDomAttributes ?? JitDomCreateElementAttrs::get($id);
+        $id = $elementArg->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+        $attrs = $elementArg->compileTimeDomAttributes
+            ?? (null !== $id ? JitDomCreateElementAttrs::get($id) : []);
         foreach ($bagUpdates as $name => $val) {
             unset($attrs[$name]);
         }
         $attrs = $bagUpdates + $attrs;
-        foreach ($bagUpdates as $name => $val) {
-            JitDomCreateElementAttrs::set($id, $name, $val);
+        if (null !== $id) {
+            foreach ($bagUpdates as $name => $val) {
+                JitDomCreateElementAttrs::set($id, $name, $val);
+            }
+            if (null === $elementArg->compileTimeDomElementId) {
+                $elementArg->compileTimeDomElementId = $id;
+            }
         }
         $elementArg->compileTimeDomAttributes = $attrs;
-        if (null === $elementArg->compileTimeDomElementId) {
-            $elementArg->compileTimeDomElementId = $id;
+        // loadXML documentElement: createElementAttrs id is often null — refresh the
+        // compile-time open-tag so saveXML emits the Attr (peer setAttribute #32981 / #35118).
+        $path = $elementArg->compileTimeDomNodePath ?? null;
+        $nested = null !== $path && '' !== $path
+            && substr_count(trim($path, '/'), '/') >= 1;
+        if (!$nested) {
+            foreach ($bagUpdates as $name => $val) {
+                if ('xmlns' === $name || str_starts_with($name, 'xmlns:')) {
+                    continue;
+                }
+                JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeSet($name, $val);
+            }
+        } else {
+            JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
         }
         self::syncSaveXmlAttrSuffix($context, $elementArg, $attrs);
     }
