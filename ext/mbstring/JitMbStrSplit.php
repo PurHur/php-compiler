@@ -12,17 +12,19 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for mb_str_split() (#26870 / #34278).
+ * LLVM lowering for mb_str_split() (#26870 / #34278 / #34880).
  *
  * Compile-time fold: {@see VmMbstring::strSplit} → packed HT.
  * Runtime: NestedJIT string peel (no HashTable under thin AOT — peer explode #27660)
  * then {@see JitExplode} in the user module.
+ * Runtime encoding via NestedJIT assertEncodingArgv (#34880 leftover of #34278).
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_str_split)
  */
 final class JitMbStrSplit
@@ -33,26 +35,6 @@ final class JitMbStrSplit
     {
         // Arity checked by mb_str_split::call via requireArgCountRangeJit (#30786).
         $argc = \count($args);
-
-        $encoding = 'UTF-8';
-        if ($argc >= 3) {
-            if (JITVariable::TYPE_STRING !== $args[2]->type) {
-                throw new \LogicException(
-                    'mb_str_split() encoding must be a string literal in this compiler build'
-                );
-            }
-            $encoding = $args[2]->compileTimeString ?? null;
-            if (null === $encoding) {
-                throw new \LogicException(
-                    'mb_str_split() encoding must be a string literal in this compiler build'
-                );
-            }
-        }
-        if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
-            throw new \LogicException(
-                'mb_str_split() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
-            );
-        }
 
         $stringLit = $args[0]->compileTimeString ?? null;
         $lengthLit = 1;
@@ -65,8 +47,17 @@ final class JitMbStrSplit
                 $lengthLit = $resolved;
             }
         }
-        if (null !== $stringLit && $lengthIsLiteral && $lengthLit > 0) {
-            return self::foldLiteral($context, $stringLit, $lengthLit, $encoding);
+        $encLit = self::compileTimeEncoding($args, $argc);
+        // Only fold when encoding is a supported canon — invalid names must reach NestedJIT
+        // for catchable ValueError (peer JitMbStrcut #34875; #34880).
+        if (
+            null !== $stringLit
+            && $lengthIsLiteral
+            && $lengthLit > 0
+            && null !== $encLit
+            && self::isSupportedEncoding($encLit)
+        ) {
+            return self::foldLiteral($context, $stringLit, $lengthLit, $encLit);
         }
 
         // Soft-null DEP+coerce on 8.4 (peer mb_strcut / #24207).
@@ -84,14 +75,7 @@ final class JitMbStrSplit
         }
         self::emitLengthGuard($context, $length);
 
-        // NestedJIT helper compile can clear insert; restore before arg coerce/call (#34270).
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbStrSplitRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_str_split');
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             MbStrSplitRuntime::helperFunction($context),
@@ -100,6 +84,97 @@ final class JitMbStrSplit
         $joined = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::hashtableFromJoined($context, $joined);
+    }
+
+    /**
+     * Link NestedJIT str_split helpers, lower encoding (literal or runtime), assert when needed (#34880).
+     *
+     * @param list<JITVariable> $args
+     */
+    private static function linkAndEncodingPtr(Context $context, array $args, int $argc, string $function): Value
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbStrSplitRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_runtime');
+
+        [$encPtr, $needsAssert] = self::encodingPtr($context, $args, $argc, $function);
+        if ($needsAssert) {
+            $fnName = $context->builder->load($context->constantStringFromString($function));
+            $context->builder->call(
+                MbStrSplitRuntime::assertEncodingHelper($context),
+                $encPtr,
+                $fnName
+            );
+        }
+
+        return $encPtr;
+    }
+
+    /**
+     * Literal UTF-8/ASCII/8BIT → constant string (no assert); otherwise NestedJIT encoding + assert (#34880).
+     *
+     * @param list<JITVariable> $args
+     * @return array{0: Value, 1: bool} encoding ptr, needsAssert
+     */
+    private static function encodingPtr(Context $context, array $args, int $argc, string $function): array
+    {
+        if ($argc < 3 || JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
+            $encoding = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
+            if (!self::isSupportedEncoding($encoding)) {
+                $encoding = 'UTF-8';
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encoding)), false];
+        }
+
+        $encodingLit = JitStringArg::compileTimeLiteral($args[2]);
+        if (null !== $encodingLit) {
+            $canonical = MbstringEncodingRegistry::resolve($encodingLit);
+            if (null !== $canonical && self::isSupportedEncoding($canonical)) {
+                return [$context->builder->load($context->constantStringFromString($canonical)), false];
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
+        }
+
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[2],
+                $function,
+                2,
+                'encoding'
+            ),
+            true,
+        ];
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function compileTimeEncoding(array $args, int $argc): ?string
+    {
+        if ($argc < 3) {
+            return MbstringState::internalEncoding();
+        }
+        if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
+            return MbstringState::internalEncoding();
+        }
+        $lit = JitStringArg::compileTimeLiteral($args[2]);
+        if (null === $lit) {
+            return null;
+        }
+        $canonical = MbstringEncodingRegistry::resolve($lit);
+
+        return null !== $canonical ? $canonical : $lit;
+    }
+
+    private static function isSupportedEncoding(string $encoding): bool
+    {
+        return 'UTF-8' === $encoding || 'ASCII' === $encoding || '8BIT' === $encoding;
     }
 
     /** php-src ext/mbstring/mbstring.c — length must be > 0 before split. */

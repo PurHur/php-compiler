@@ -20,7 +20,8 @@ use PHPLLVM\Value;
  * Zend Z_PARAM_STR soft-null + DEP on $string under PROFILE=8.4 (not TypeError) — #24207,
  * peer #24176 / #24209 (mb_trim / mb_convert_kana family).
  *
- * JIT/AOT: {@see JitMbStrSplit} → NestedJIT {@see MbStrSplitJitHelper} (#26870).
+ * JIT/AOT: {@see JitMbStrSplit} → NestedJIT {@see MbStrSplitJitHelper} (#26870 / #34880).
+ * Runtime encoding via NestedJIT assertEncodingArgv (#34880 leftover of #34278 / peer #34875).
  * Excess argc → Zend `expects at most` ArgumentCountError (#30786).
  */
 final class mb_str_split extends Internal

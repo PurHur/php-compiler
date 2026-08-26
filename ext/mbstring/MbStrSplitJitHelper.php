@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * mb_str_split() NestedJIT peel for thin AOT (#26870 / #34278, php-in-PHP).
+ * mb_str_split() NestedJIT peel for thin AOT (#26870 / #34278 / #34880, php-in-PHP).
  *
  * Thin AOT cannot NestedJIT-construct {@see \PHPCompiler\VM\HashTable} (peer
  * {@see \PHPCompiler\ext\standard\JitExplode} / #27660). Returns a
@@ -14,6 +14,8 @@ namespace PHPCompiler\ext\mbstring;
  * NestedJIT-safe UTF-8 peel mirrors {@see MbStrwidthJitHelper} (#34270):
  * isset-index length, no VmMbstring, char-index walk via utf8Substr.
  *
+ * Runtime encoding via assertEncodingArgv (#34880 leftover of #34278 / peer #34875).
+ *
  * SSOT (VM / compile-time fold): {@see VmMbstring::strSplit}
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_str_split)
  */
@@ -21,13 +23,97 @@ final class MbStrSplitJitHelper
 {
     public const JOIN_DELIM = "\x1E";
 
+    /**
+     * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
+     * SIGSEGVs under thin AOT; int helpers match {@see MbStrcutJitHelper::assertEncodingArgv} (#34880).
+     *
+     * Encoding is Argument #3 for mb_str_split.
+     */
+    public static function assertEncodingArgv(string $encoding, string $function): int
+    {
+        if ('' === self::canon($encoding)) {
+            // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+            throw new \ValueError(
+                $function.'(): Argument #3 ($encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
+
+        return 1;
+    }
+
+    private static function canon(string $encoding): string
+    {
+        if ('UTF-8' === $encoding || 'utf-8' === $encoding || 'UTF8' === $encoding || 'utf8' === $encoding) {
+            return 'UTF-8';
+        }
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            return 'ASCII';
+        }
+        if ('8BIT' === $encoding || '8bit' === $encoding || 'BINARY' === $encoding || 'binary' === $encoding) {
+            return '8BIT';
+        }
+
+        return '';
+    }
+
     public static function strSplitArgv(string $string, int $length, string $encoding): string
     {
-        unset($encoding);
+        // Encoding must already be validated via {@see assertEncodingArgv} (#34880).
         if ($length <= 0) {
             return '';
         }
 
+        $enc = self::canon($encoding);
+        $single = 0;
+        if ('ASCII' === $enc) {
+            $single = 1;
+        }
+        if ('8BIT' === $enc) {
+            $single = 1;
+        }
+        if (1 === $single) {
+            return self::joinByteChunks($string, $length);
+        }
+
+        return self::joinUtf8Chunks($string, $length);
+    }
+
+    private static function joinByteChunks(string $string, int $length): string
+    {
+        $byteLen = self::byteLength($string);
+        if (0 === $byteLen) {
+            return '';
+        }
+
+        $joined = '';
+        $pos = 0;
+        $first = 1;
+        $delim = "\x1E";
+        $guard = $byteLen + 1;
+        while ($pos < $byteLen && $guard > 0) {
+            $guard = $guard - 1;
+            $take = $length;
+            if ($pos + $take > $byteLen) {
+                $take = $byteLen - $pos;
+            }
+            $part = \substr($string, $pos, $take);
+            if (1 === $first) {
+                $joined = $part;
+                $first = 0;
+            } else {
+                $joined = $joined.$delim.$part;
+            }
+            $pos = $pos + $length;
+        }
+
+        return $joined;
+    }
+
+    private static function joinUtf8Chunks(string $string, int $length): string
+    {
         $charLen = self::utf8CharLength($string);
         if (0 === $charLen) {
             return '';
