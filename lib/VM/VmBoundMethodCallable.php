@@ -42,31 +42,29 @@ final class VmBoundMethodCallable
         if (null === $arraySlot) {
             return null;
         }
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_ADD_ARRAY_ELEMENT !== $op->type || $op->arg1 !== $arraySlot) {
+        // Packed [$obj,'method'] emits NULL keys; explicit [0=>$obj,1=>'method'] uses int keys.
+        // Reuse arrayElementValueSlot packed-index walk (peer static #32299 / #35094).
+        $methodValueSlot = self::arrayElementValueSlot($block, $arraySlot, 1);
+        if (null === $methodValueSlot) {
+            return null;
+        }
+        $methodConstSlot = self::constantStringSlot($block, $methodValueSlot);
+        if (null !== $methodConstSlot) {
+            return strtolower($block->constants[$methodConstSlot]->toString());
+        }
+        if (isset($block->constants[$methodValueSlot])) {
+            return strtolower($block->constants[$methodValueSlot]->toString());
+        }
+        foreach ($block->opCodes as $prior) {
+            if (
+                OpCode::TYPE_ASSIGN !== $prior->type
+                || $prior->arg2 !== $methodValueSlot
+                || !isset($block->constants[$prior->arg3])
+            ) {
                 continue;
             }
-            if (null === $op->arg3 || !isset($block->constants[$op->arg3])) {
-                continue;
-            }
-            if (1 !== $block->constants[$op->arg3]->toInt()) {
-                continue;
-            }
-            $methodSlot = $op->arg2;
-            if (isset($block->constants[$methodSlot])) {
-                return strtolower($block->constants[$methodSlot]->toString());
-            }
-            foreach ($block->opCodes as $prior) {
-                if (
-                    OpCode::TYPE_ASSIGN !== $prior->type
-                    || $prior->arg2 !== $methodSlot
-                    || !isset($block->constants[$prior->arg3])
-                ) {
-                    continue;
-                }
 
-                return strtolower($block->constants[$prior->arg3]->toString());
-            }
+            return strtolower($block->constants[$prior->arg3]->toString());
         }
 
         return null;
