@@ -2485,15 +2485,19 @@ class Context {
             Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
             Builtin\DefineRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
-            Builtin\SuperglobalNameRuntime::ensureLinked($this);
+            // SuperglobalName always-on removed (#35035): JitSuperglobalName / JIT.php
+            // StringSuperglobalName::ensureLinked before lookup (peer ensureMinimal #34812 /
+            // #33235). Full standalone must not NestedJIT is_superglobal_name during init —
+            // leftover Context NestedJIT vs Runtime ABI drift mints is_superglobal_name.1
+            // (#31894 / #32122).
             Builtin\StringStrspn::ensureStandaloneBodies($this);
             // BootstrapCompileSmokeM3Emit / inventory argv {main} calls __compiler_file_get_contents (#15604).
             Builtin\StringFileGetContents::ensureStandaloneBodies($this);
             Builtin\StringReadfile::ensureStandaloneBodies($this);
-            Builtin\TokenGetAll::ensureStandaloneBodies($this);
-            Builtin\Highlight::ensureStandaloneBodies($this);
-            Builtin\Hebrev::ensureStandaloneBodies($this);
-            Builtin\Hebrevc::ensureStandaloneBodies($this);
+            // TokenGetAll / Highlight / Hebrev / Hebrevc always-on removed (#35035): each
+            // ensureStandaloneBodies is a no-op — helper LLVM compiles on first lowering
+            // (TokenGetAll::helperFunction / JitHighlight / JitHebrev). Do not re-add eager
+            // NestedJIT here (#31894 / #32122 .1 mint class).
             \PHPCompiler\ext\standard\JitStreamBucketKernel::ensureStandaloneBodies($this);
         } finally {
             Builtin\StreamIoRuntime::endStandaloneInitPhase();

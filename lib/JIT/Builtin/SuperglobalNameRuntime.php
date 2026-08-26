@@ -17,7 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Owns `__compiler_is_superglobal_name` ABI module-locally: {@see getNamedFunction} first, then
  * {@see implementBridge}. Do not re-add empty always-on shells in {@see Type} — leftover decls
  * mint is_superglobal_name.1 (#31894 / #32122 / #33235). Context ensureMinimalUserStandaloneBodies
- * must not NestedJIT this during thin hello-world init (#34812) — call sites
+ * and ensureFullStandaloneBodies must not NestedJIT this during init (#34812 / #35035) — call sites
  * {@see StringSuperglobalName::ensureLinked} / {@see \PHPCompiler\ext\standard\JitSuperglobalName}
  * already ensureLinked before lookup. Call-site ensureLinked restores the caller insert block
  * after bridge emit (thin AOT: parentless call / module verify — peer MetaTagsRuntime #27317).
