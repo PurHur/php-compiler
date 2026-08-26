@@ -186,6 +186,95 @@ final class JitDomNamedNodeMap
     }
 
     /**
+     * DOMElement::getAttribute() via the receiver's attributes pins (#34863).
+     *
+     * php-src element.c xmlGetProp reads that element's property list — never a
+     * process-global name→value table. lastFetchedAttributes / Attr-cache
+     * literalValue collapse sibling id= values after lastChild / getElementById.
+     *
+     * @return Value {@see __value__*} string box ("" when missing; classic DOM)
+     */
+    public static function invokeElementGetAttribute(
+        Context $context,
+        JITVariable $elementArg,
+        JITVariable $nameArg,
+        string $elementClass = 'DOMElement'
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_el_getattr_nnm_cont');
+        $objectType = $context->type->object;
+        $elemClassId = $objectType->lookup($elementClass);
+        if (!$objectType->hasProperty($elemClassId, VmDom::PROP_ATTRIBUTES)) {
+            $objectType->defineProperty($elemClassId, VmDom::PROP_ATTRIBUTES, JITVariable::TYPE_VALUE);
+        }
+        self::ensureLayout($objectType, $objectType->lookup(self::CLASS_MAP));
+        self::ensureAttrNameLayout($objectType);
+        // Attr::$value layout for pin reads (DOMAttr and Dom\Attr).
+        JitDomAttributeNodeNS::ensureAttrValueLayoutForGetAttribute($context);
+
+        $element = self::loadObject($context, $elementArg);
+        $nameStr = self::loadStringArg($context, $nameArg);
+        $map = self::loadAttributesMapOrAllocate($context, $element, $elementClass);
+        $attrBox = self::emitRuntimeGetNamedItem($context, $map, $nameStr);
+
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $done = $fn->appendBasicBlock('dom_el_getattr_nnm_done');
+        $miss = $fn->appendBasicBlock('dom_el_getattr_nnm_miss');
+        $hit = $fn->appendBasicBlock('dom_el_getattr_nnm_hit');
+        $resultSlot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__value__*')
+        );
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $emptyBox = self::boxStringPtr($context, $empty);
+
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $attrValPtr = JitValueBox::normalizeValuePtr($context, $attrBox);
+        $attrType = $context->builder->load(
+            $context->builder->structGep($attrValPtr, $valueMap['type'])
+        );
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $attrType,
+            $i8->constInt(JITVariable::TYPE_OBJECT, false)
+        );
+        $context->builder->branchIf($isObject, $hit, $miss);
+
+        $context->builder->positionAtEnd($miss);
+        $context->builder->store($emptyBox, $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($hit);
+        $attrObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $attrValPtr
+        );
+        $attrClass = JitDomAttributeNodeNS::attrClassForUserScriptCache();
+        $valueVar = $objectType->propertyFetch($attrObj, $attrClass, 'value');
+        $str = $context->helper->loadValue($valueVar);
+        $context->builder->store(self::boxStringPtr($context, $str), $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /** @return Value {@see __value__*} */
+    private static function boxStringPtr(Context $context, Value $str): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $str
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    /**
      * Live-append Attr onto element.attributes after setAttribute* (#33128).
      *
      * Zend NamedNodeMap is the same object before/after mutation; rewrite of an

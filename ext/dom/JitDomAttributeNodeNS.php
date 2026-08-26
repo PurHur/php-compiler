@@ -833,6 +833,18 @@ final class JitDomAttributeNodeNS
         return [substr($qualifiedName, 0, $pos), substr($qualifiedName, $pos + 1)];
     }
 
+    /**
+     * Ensure DOMAttr / Dom\Attr::$value (and name props) exist for pin-based getAttribute (#34863).
+     */
+    public static function ensureAttrValueLayoutForGetAttribute(Context $context): void
+    {
+        $objectType = $context->type->object;
+        self::ensureAttrPropertyLayout($objectType, $objectType->lookup(self::CLASS_ATTR));
+        if ($objectType->hasDeclaredClass(self::CLASS_LIVING_ATTR)) {
+            self::ensureAttrPropertyLayout($objectType, $objectType->lookup(self::CLASS_LIVING_ATTR));
+        }
+    }
+
     private static function ensureAttrPropertyLayout(
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
