@@ -176,6 +176,27 @@ final class PregJitHelper
         return '';
     }
 
+    /** Thin AOT only (#34994). */
+    public static function thinMatchAllGroupCount(): int
+    {
+        return 1;
+    }
+
+    public static function thinMatchAllG1Part(int $matchIndex): string
+    {
+        return '';
+    }
+
+    public static function thinMatchAllG2Part(int $matchIndex): string
+    {
+        return '';
+    }
+
+    public static function thinMatchAllG3Part(int $matchIndex): string
+    {
+        return '';
+    }
+
     /** @return int match count, or -1 on PCRE error */
     public static function matchAllExArgv(string $pattern, string $subject, int $flags, int $offset): int
     {

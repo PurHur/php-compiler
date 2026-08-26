@@ -199,12 +199,37 @@ final class PregAotFastPathTest extends TestCase
         // Issue #27195 — thin AOT preg_match_all /\w+/ "a b c" → a,b,c
         $this->assertSame(3, PregAotFastPath::matchAllStore('/\w+/', 'a b c', 0, 0));
         $this->assertSame(3, PregAotFastPath::matchAllPartCount());
+        $this->assertSame(1, PregAotFastPath::matchAllGroupCount());
         $this->assertSame('a', PregAotFastPath::matchAllPart(0));
         $this->assertSame('b', PregAotFastPath::matchAllPart(1));
         $this->assertSame('c', PregAotFastPath::matchAllPart(2));
         $this->assertSame(0, PregAotFastPath::matchAllStore('/\w+/', '   ', 0, 0));
-        $this->assertSame(-1, PregAotFastPath::matchAllStore('/(\w+)/', 'a b', 0, 0));
         $this->assertSame(-1, PregAotFastPath::matchAllStore('/\w+/', 'a b', PREG_SET_ORDER, 0));
+    }
+
+    /** Issue #34994 — capturing groups fill PREG_PATTERN_ORDER rows under thin AOT. */
+    public function testMatchAllCaptureGroupsStoreRows(): void
+    {
+        $this->assertSame(2, PregAotFastPath::matchAllStore('/a(b)/', 'ab ab', 0, 0));
+        $this->assertSame(2, PregAotFastPath::matchAllPartCount());
+        $this->assertSame(2, PregAotFastPath::matchAllGroupCount());
+        $this->assertSame('ab', PregAotFastPath::matchAllGroupMatch(0, 0));
+        $this->assertSame('ab', PregAotFastPath::matchAllGroupMatch(0, 1));
+        $this->assertSame('b', PregAotFastPath::matchAllGroupMatch(1, 0));
+        $this->assertSame('b', PregAotFastPath::matchAllGroupMatch(1, 1));
+
+        $this->assertSame(2, PregAotFastPath::matchAllStore('/(\w+)/', 'a b', 0, 0));
+        $this->assertSame(2, PregAotFastPath::matchAllGroupCount());
+        $this->assertSame('a', PregAotFastPath::matchAllGroupMatch(0, 0));
+        $this->assertSame('b', PregAotFastPath::matchAllGroupMatch(0, 1));
+        $this->assertSame('a', PregAotFastPath::matchAllGroupMatch(1, 0));
+        $this->assertSame('b', PregAotFastPath::matchAllGroupMatch(1, 1));
+
+        $this->assertSame(1, PregAotFastPath::matchAllStore('/(a)(b)/', 'ab', 0, 0));
+        $this->assertSame(3, PregAotFastPath::matchAllGroupCount());
+        $this->assertSame('ab', PregAotFastPath::matchAllGroupMatch(0, 0));
+        $this->assertSame('a', PregAotFastPath::matchAllGroupMatch(1, 0));
+        $this->assertSame('b', PregAotFastPath::matchAllGroupMatch(2, 0));
     }
 
     public function testMatchAllLiteralStoresAll(): void
