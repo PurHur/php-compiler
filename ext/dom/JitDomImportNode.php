@@ -391,32 +391,36 @@ final class JitDomImportNode
         }
         [$ns, $local] = $key;
         $value = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local);
-        if (null === $value) {
-            // loadXML attrs may be present in the cache object without valueByKey yet —
-            // recover from the source document's open-tag pairs.
-            $xml = $sourceNode->compileTimeDomLoadXml
-                ?? JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
-                ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
-            if (null !== $xml) {
-                foreach (DomParseSimpleXmlJitHelper::rootAttributesArgv($xml) as $pair) {
-                    $qname = $pair['qname'];
-                    $pos = strpos($qname, ':');
-                    $pairLocal = false === $pos ? $qname : substr($qname, $pos + 1);
-                    $pairNs = $pair['namespace'] ?? '';
-                    if ($pairLocal === $local && $pairNs === $ns) {
+        $qname = $local;
+        // Prefer documentElement-bound XML — lastCompileTimeXml may be another document
+        // after a second loadXML (#35131 / peer getAttributeNodeNS).
+        $xml = $sourceNode->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
+            ?? JitDomGetNodePath::$lastDocumentElementXml
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null !== $xml) {
+            foreach (DomParseSimpleXmlJitHelper::rootAttributesArgv($xml) as $pair) {
+                $pairQ = $pair['qname'];
+                $pos = strpos($pairQ, ':');
+                $pairLocal = false === $pos ? $pairQ : substr($pairQ, $pos + 1);
+                $pairNs = $pair['namespace'] ?? '';
+                if ($pairLocal === $local && $pairNs === $ns) {
+                    $qname = $pairQ;
+                    if (null === $value) {
                         $value = $pair['value'];
-                        break;
                     }
-                    if ('' === $ns && ($local === $qname || $local === $pairLocal)) {
+                    break;
+                }
+                if ('' === $ns && ($local === $pairQ || $local === $pairLocal)) {
+                    $qname = $pairQ;
+                    if (null === $value) {
                         $value = $pair['value'];
-                        break;
                     }
+                    break;
                 }
             }
         }
         $value ??= '';
-        // getAttributeNode keys empty-NS + name; qName is the local/name lit.
-        $qname = '' === $ns ? $local : $local;
 
         return [
             'namespace' => $ns,

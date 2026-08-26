@@ -38,6 +38,12 @@ final class JitDomGetNodePath
 
     public static bool $lastChildFetchWasFirstChild = false;
 
+    /**
+     * loadXML literal of the last annotated documentElement — ARG_SEND drops
+     * compileTimeDomLoadXml before getAttributeNodeNS (#35131 / peer #32987).
+     */
+    public static ?string $lastDocumentElementXml = null;
+
     public static function rememberWalk(?string $path, ?string $inner): void
     {
         self::$lastPath = $path;
@@ -64,6 +70,7 @@ final class JitDomGetNodePath
         $result->compileTimeDomInnerXml = $inner;
         $result->compileTimeDomTagName = $tag;
         $result->compileTimeDomLoadXml = $xml;
+        self::$lastDocumentElementXml = $xml;
         $result->compileTimeDomLineNo = JitDomGetLineNo::rootLineNo(
             JitDomLoadXMLUserScript::lastCompileTimeXmlSource() ?? $xml
         );
