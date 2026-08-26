@@ -19,7 +19,7 @@ Expand `JIT::isM3CompileDriverRealLoweringName()` **one function at a time** whi
 Supporting fixes from #1402:
 
 - `jitFunctionSkipName()` — FUNCDEF short names → scoped names for stub/M3 gates
-- `m3CompileDriverSpineDenyNames()` — documented LLVM 9 crashers during spine expansion
+- `m3CompileDriverSpineDenyNames()` — hook for proven LLVM 9 crashers (empty as of #35009)
 - `compileBlockPhpLowering()` + `compileRuntime*M3Native()` — PHP CFG lowering for split `Runtime` ctor spine (#1494)
 
 ## Step 1 (done — #1402)
@@ -49,7 +49,7 @@ Supporting fixes from #1402:
 | `Block::slotIndexForVariableName` / `Block::slotForOperand` | PHP CFG via `isM3CompileDriverBlockPhpLoweringName` (#2910) |
 | `Compiler::compileFunc` | On M3 allowlist; CFG entry real-lowers on compile-driver link (#9228, #1402) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
-| `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); compile_driver bundle keeps stub; runtime emit via `compiler_helloworld_smoke/compile_driver.php` / `compiler_compile_smoke/compile_driver.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
+| `helloworld_compile_smoke` | Not on M3 allowlist (probe driver, not compile spine); stubbed via SELFHOST_AOT entry paths. Deny fragment retired (#35009). Emit via `compiler_helloworld_smoke/compile_driver.php` / `compiler_compile_smoke/compile_driver.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
 | Native emit runtime | `BOOTSTRAP_M3_RUNTIME_COMPILE=1` + `PHP_COMPILER_M3_EMIT_MINIMAL=1` skips eager `loadJitCompileModuleFuncs` during smoke emit |
 | `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php`; int exit (#1514) |
 | `runtime_parse_compile_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_parse_compile_smoke.php` |
@@ -103,9 +103,7 @@ PHP_COMPILER_M3_SOURCE=bin/compile.php PHP_COMPILER_M3_OUT=/tmp/bin-compile-aot 
 
 ### Known LLVM 9 link crashers (deny list)
 
-| Symbol | Notes |
-|--------|-------|
-| `helloworld_compile_smoke` | Deny-listed FUNCDEF (#1514); emit via M3 sidecar |
+_None._ (`m3CompileDriverSpineDenyNames()` empty as of #35009 — BootstrapAot probe drivers are not compile-spine allowlist entries.)
 
 **Next:** complete native `VM\Context` (hashtable props + sub-objects) without LLVM 9 link regression, or small `lib/AOT/runtime/` C floor (#1494).
 

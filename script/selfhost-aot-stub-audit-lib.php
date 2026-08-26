@@ -117,12 +117,9 @@ function selfhost_aot_stub_compile_spine_symbols(): array
         'PHPCompiler\\Compiler::operandsChainEqual',
         'PHPCompiler\\Compiler::unwrapOperandChain',
     ];
-    $bootstrap = [
-        'BootstrapAot\\helloworld_compile_smoke',
-        'BootstrapAot\\compile_smoke_m3_emit',
-        'BootstrapAot\\runtime_ctor_smoke',
-        'BootstrapAot\\runtime_parse_compile_smoke',
-    ];
+
+    // BootstrapAot\* probe drivers are not on parseAndCompile → standalone → Compiler::compile.
+    // Counting them as spine stubs (#35009) hid that the real spine is fully M3-real-lowered.
 
     $rows = [];
     foreach ($runtime as $symbol) {
@@ -130,9 +127,6 @@ function selfhost_aot_stub_compile_spine_symbols(): array
     }
     foreach ($compiler as $symbol) {
         $rows[] = ['symbol' => $symbol, 'cluster' => 'compiler_spine'];
-    }
-    foreach ($bootstrap as $symbol) {
-        $rows[] = ['symbol' => $symbol, 'cluster' => 'bootstrap_fixture'];
     }
 
     return $rows;
@@ -200,10 +194,6 @@ function selfhost_aot_stub_classify_symbol_static(string $symbol, array $ctx): s
         }
 
         return 'compiler_stub';
-    }
-
-    if (str_starts_with($lower, 'bootstrapaot\\')) {
-        return 'm3_deny';
     }
 
     return 'other';

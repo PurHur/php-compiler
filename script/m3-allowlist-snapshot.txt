@@ -31,4 +31,3 @@ allow:\runtime::rewritesourcebeforeparser
 allow:\runtime::standalone
 allow:slotforoperand
 allow:slotindexforvariablename
-deny:\bootstrapaot\helloworld_compile_smoke

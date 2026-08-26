@@ -54,6 +54,7 @@ function bootstrap_m5_doc_parse_allow_deny(string $docPath): array
 function bootstrap_m5_doc_fixture_only_keys(): array
 {
     return [
+        '\\bootstrapaot\\helloworld_compile_smoke',
         '\\bootstrapaot\\runtime_ctor_smoke',
         '\\bootstrapaot\\runtime_parse_compile_smoke',
     ];
