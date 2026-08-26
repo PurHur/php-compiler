@@ -521,9 +521,21 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
             $compile
         );
         $ctx = (string) file_get_contents(self::$root.'/lib/JIT/Context.php');
-        $this->assertStringContainsString('StringStrReplace::ensureStandaloneBodies', $ctx);
+        // #35160: StringStrReplace is lazy at invoke — ensureFull must not early-bind.
+        $fullPos = strpos($ctx, 'private function ensureFullStandaloneBodies');
+        $this->assertNotFalse($fullPos);
+        $fullEnd = strpos($ctx, 'public function compileToFile', $fullPos);
+        $this->assertNotFalse($fullEnd);
+        $fullBody = substr($ctx, $fullPos, $fullEnd - $fullPos);
+        $this->assertStringNotContainsString(
+            'StringStrReplace::ensureStandaloneBodies',
+            $fullBody,
+            'ensureFull must not early-bind StringStrReplace (#35160 / #23970)'
+        );
+        $this->assertStringContainsString('#35160', $ctx);
         $strReplace = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/StringStrReplace.php');
         $this->assertStringContainsString('HelperRuntimeCache::enabled()', $strReplace);
+        $this->assertStringContainsString('#35160', $strReplace);
         $makefile = (string) file_get_contents(self::$root.'/Makefile');
         $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O', $makefile);
         $this->assertStringContainsString('gen-0 argv driver as emit helper', $makefile);
