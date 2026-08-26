@@ -18,6 +18,7 @@ use PHPCompiler\VM\Variable;
  * No str_replace — NestedJIT helper emit lacks phpc_str_replace (#27078).
  * JSON_FORCE_OBJECT: packed HT → object form including empty {} (#28638 / #33619).
  * U+2028/U+2029: `\u` unless JSON_UNESCAPED_LINE_TERMINATORS (#33745).
+ * Float encode: {@see IniGetLeafJitHelper::formatJsonDouble} / PG(serialize_precision) (#35027).
  * php-src: ext/json/php_json.c — php_json_encode
  */
 final class JsonEncodeNestedJitHelper
@@ -35,7 +36,8 @@ final class JsonEncodeNestedJitHelper
             return $value->toBool() ? 'true' : 'false';
         }
         if (2 === $t) {
-            return (string) $value->toFloat();
+            // PG(serialize_precision) via leaf — not (string) cast / PG(precision) (#35027)
+            return IniGetLeafJitHelper::formatJsonDouble($value->toFloat());
         }
         if (4 === $t) {
             return self::quote($value->toString(), $flags);
@@ -87,7 +89,7 @@ final class JsonEncodeNestedJitHelper
             } elseif (3 === $t) {
                 $out .= $val->toBool() ? 'true' : 'false';
             } elseif (2 === $t) {
-                $out .= (string) $val->toFloat();
+                $out .= IniGetLeafJitHelper::formatJsonDouble($val->toFloat());
             } elseif (4 === $t) {
                 $out .= self::quote($val->toString(), $flags);
             } else {

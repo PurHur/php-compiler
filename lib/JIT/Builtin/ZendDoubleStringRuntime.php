@@ -17,7 +17,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT float→string honoring PG(precision) (#21963).
  *
  * LLVM snprintf over {@see IniRuntime::loadPrecision()} (echo / `(string)`).
- * var_dump uses {@see formatVarDumpH()} / {@see IniRuntime::loadSerializePrecision()} (#32328).
+ * var_dump / json_encode / serialize use {@see formatH()} /
+ * {@see IniRuntime::loadSerializePrecision()} (#32328 / #35027).
  * Echo / `(string)` rewrite libc `%g` to zend_gcvt E-form (#32316).
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmZendDoubleString}.
  * php-src: Zend/zend_operators.c — _convert_to_string float branch
@@ -93,7 +94,8 @@ final class ZendDoubleStringRuntime
         $context->builder->branchIf($isNf, $nfBb, $okBb);
 
         $context->builder->positionAtEnd($okBb);
-        $formatted = self::format($context, $dbl);
+        // php_json_encode_double → zend_gcvt with PG(serialize_precision), not PG(precision) (#35027).
+        $formatted = self::formatH($context, $dbl);
         $okEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
@@ -252,7 +254,17 @@ final class ZendDoubleStringRuntime
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($okBb);
-        $okRaw = self::snprintfCall($context, $dbl, 'd:%.16g;', null);
+        // php_var_serialize double → smart_str_append_double(..., PG(serialize_precision)) (#35027).
+        // Was hardcoded d:%.16g; which ignored ini_set(serialize_precision).
+        IniRuntime::ensureLinked($context);
+        $body = self::formatH($context, $dbl);
+        $prefix = $context->builder->load($context->constantStringFromString('d:'));
+        $suffix = $context->builder->load($context->constantStringFromString(';'));
+        $okRaw = self::concatStrings(
+            $context,
+            self::concatStrings($context, $prefix, $body),
+            $suffix
+        );
         $okEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
@@ -826,6 +838,25 @@ final class ZendDoubleStringRuntime
         return $str;
     }
 
+    /** Concatenate two `__string__*` values (serialize `d:` + body + `;`, #35027). */
+    private static function concatStrings(Context $context, Value $left, Value $right): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $leftSize = $context->builder->load($context->builder->structGep($left, $map['length']));
+        $rightSize = $context->builder->load($context->builder->structGep($right, $map['length']));
+        $size = $context->builder->add($leftSize, $rightSize);
+        $result = $context->builder->call($context->lookupFunction('__string__alloc'), $size);
+        $context->intrinsic->builder = $context->builder;
+        $dest = $context->builder->structGep($result, $map['value']);
+        $leftChar = $context->builder->structGep($left, $map['value']);
+        $context->intrinsic->memcpy($dest, $leftChar, $leftSize, false);
+        $dest2 = $context->builder->gep($dest, $leftSize);
+        $rightChar = $context->builder->structGep($right, $map['value']);
+        $context->intrinsic->memcpy($dest2, $rightChar, $rightSize, false);
+
+        return $result;
+    }
+
     private static function ensureDecls(Context $context): void
     {
         $charPtr = $context->getTypeFromString('char*');
@@ -841,6 +872,7 @@ final class ZendDoubleStringRuntime
                 '__mm__malloc' => [$i8p, false, [$sizeT]],
                 '__mm__free' => [$voidTy, false, [$i8p]],
                 '__string__init' => [$strPtr, false, [$i64, $charPtr]],
+                '__string__alloc' => [$strPtr, false, [$i64]],
                 // Unused memcmp decl dropped with LibcExtern always-on (#31954).
             ] as $name => [$ret, $vararg, $params]
         ) {
