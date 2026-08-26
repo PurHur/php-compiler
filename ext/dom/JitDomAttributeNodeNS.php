@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -277,25 +278,77 @@ final class JitDomAttributeNodeNS
 
     private static function invokeCreateUserScript(Context $context, JITVariable ...$args): Value
     {
+        // php-src ext/dom/document.c dom_document_create_attribute_ns() — requires
+        // document_element; empty doc → E_WARNING + false (#35180 / VM #19200).
+        $tag = (string) (self::$boxSeq++);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $bbMissing = BasicBlockHelper::append($context, 'dom_createattrns_no_root_'.$tag);
+        $bbOk = BasicBlockHelper::append($context, 'dom_createattrns_has_root_'.$tag);
+        $bbDone = BasicBlockHelper::append($context, 'dom_createattrns_root_done_'.$tag);
+        $context->builder->branchIf(
+            self::documentElementIsNull($context, $args[0]),
+            $bbMissing,
+            $bbOk
+        );
+
+        $context->builder->positionAtEnd($bbMissing);
+        JitBuiltinWarning::emit(
+            $context,
+            'DOMDocument::createAttributeNS(): Document Missing Root Element'
+        );
+        $context->builder->store(self::boxBoolResult($context, false), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbOk);
         // Prefer isNullConstant over stale compileTimeString (#33534 / peer #33532).
         $nsLit = self::compileTimeNullableStringArg($args[1]);
         $qLit = self::compileTimeStringArg($args[2]);
         if (null !== $nsLit && null !== $qLit) {
             DomUserScriptAttributeCacheLlvm::rememberCreate($nsLit, $qLit);
-
-            return self::boxObjectResult(
-                $context,
-                self::materializeAttrFromLiterals($context, $nsLit, $qLit, '')
+            $context->builder->store(
+                self::boxObjectResult(
+                    $context,
+                    self::materializeAttrFromLiterals($context, $nsLit, $qLit, '')
+                ),
+                $resultSlot
+            );
+        } else {
+            $namespace = self::loadStringArg($context, $args[1]);
+            $qualifiedName = self::loadStringArg($context, $args[2]);
+            $context->builder->store(
+                self::boxObjectResult(
+                    $context,
+                    self::materializeAttrFromRuntime($context, $namespace, $qualifiedName, null)
+                ),
+                $resultSlot
             );
         }
+        $context->builder->branch($bbDone);
 
-        $namespace = self::loadStringArg($context, $args[1]);
-        $qualifiedName = self::loadStringArg($context, $args[2]);
+        $context->builder->positionAtEnd($bbDone);
 
-        return self::boxObjectResult(
-            $context,
-            self::materializeAttrFromRuntime($context, $namespace, $qualifiedName, null)
-        );
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * True when DOMDocument::$documentElement is unset (null object pointer).
+     *
+     * Thin AOT seeds the slot as `__object__* null` in {@see DomDocumentConstruct} (#32736).
+     */
+    private static function documentElementIsNull(Context $context, JITVariable $documentArg): Value
+    {
+        $document = self::loadObjectArg($context, $documentArg, 'DOMDocument::createAttributeNS() receiver');
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCUMENT_ELEMENT)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
+        }
+        $slot = $objectType->propertySlotFor($document, 'DOMDocument', VmDom::PROP_DOCUMENT_ELEMENT);
+        $ptr = $context->builder->load($slot);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $root = $context->builder->pointerCast($ptr, $objPtr);
+
+        return $context->builder->icmp(Builder::INT_EQ, $root, $objPtr->constNull());
     }
 
     private static function invokeGetUserScript(Context $context, JITVariable ...$args): Value
