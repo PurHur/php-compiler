@@ -205,9 +205,14 @@ final class GeneratorHelper
         );
         $stateParam = $func->getParam(0);
         $savedBuilder = $context->builder;
+        $savedIntrinsic = $context->intrinsic;
         $savedLoweringLlvm = $context->loweringLlvmFunction;
         $savedActiveFunction = $context->activeFunction;
         $context->builder = $context->context->builderCreate();
+        // Intrinsic caches the builder used at construction. Leaving it on the outer
+        // builder makes ReadonlyRaise / AssertionErrorRaise memcpy parentless while
+        // phis land in the resume builder → Module.php:180 on send+echo (#35178).
+        $context->intrinsic = $context->module->intrinsic($context->builder);
         $context->compilingGeneratorResume = true;
         $context->generatorStateParam = $stateParam;
         // Pin so JitValueBox::copyFromPointer / BasicBlockHelper::append stay in this
@@ -478,6 +483,7 @@ final class GeneratorHelper
         }
         $context->builder->clearInsertionPosition();
         $context->builder = $savedBuilder;
+        $context->intrinsic = $savedIntrinsic;
         $context->compilingGeneratorResume = false;
         $context->generatorStateParam = null;
         $context->generatorFrameLocalIndex = [];
