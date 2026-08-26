@@ -402,11 +402,13 @@ final class JitDomNodeListItemUserScript
             return self::boxNull($context);
         }
         $ns = '' === $match['ns'] ? '' : $match['ns'];
-        // Prefer local-name text helper so prefixed matches get inner text (#34936).
-        $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $localName, $index + 1) ?? '';
+        // Prefer the matched element's local name — wild localName "*" would
+        // resolve nthTagTextArgv to the document-element inner XML (#35138).
+        $textTag = '*' === $localName ? $match['local'] : $localName;
+        $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $textTag, $index + 1) ?? '';
         $element = JitDomCreateElementNS::materializeElementNSFromLiterals(
             $context,
-            $ns,
+            $ns !== '' ? $ns : null,
             $match['qname'],
             $text
         );

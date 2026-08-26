@@ -366,7 +366,16 @@ final class JitDomDocumentElement
             );
         }
 
-        return JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        // Unprefixed / no default xmlns: still allocate null namespaceURI + empty
+        // prefix VALUE slots. Non-NS createElement left those hollow so
+        // $documentElement->namespaceURI and getElementsByTagNameNS($uri, '*')
+        // (live walk visits the root first) SIGSEGV (#35138 / leftover #34924).
+        return JitDomCreateElementNS::materializeElementNSFromLiterals(
+            $context,
+            null,
+            $tag,
+            $text
+        );
     }
 
     /**
