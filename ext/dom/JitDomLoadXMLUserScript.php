@@ -658,6 +658,7 @@ final class JitDomLoadXMLUserScript
         self::$loadXmlIdAttrsByElement = DomParseSimpleXmlIdsJitHelper::parseDoctypeIdAttributes($lit);
         self::$loadXmlRegisteredIds = [];
         // Stable documentElement + inner markup so saveXML($node)/appendChild see children (#26757).
+        // Also pins $doc->doctype DocumentType stand-in (#34887 / peer #28940).
         self::materializeAndStoreDocumentElement($context, $args[0], $lit);
         self::$loadXmlIdAttrsByElement = [];
         self::$loadXmlRegisteredIds = [];
@@ -738,6 +739,10 @@ final class JitDomLoadXMLUserScript
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_loadxml_us_document_element');
         $document = self::loadObjectArg($context, $receiver);
+        // Grow DOMElement stand-in layout (name/publicId/systemId) BEFORE allocating
+        // documentElement — otherwise DocumentType::materialize leaves earlier nodes
+        // undersized and SIGSEGVs (#34887 / peer #33565).
+        self::storeDoctypeProperty($context, $document, $xml);
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($xml);
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
@@ -834,6 +839,55 @@ final class JitDomLoadXMLUserScript
         // So getElementsByTagName()->item(0) returns the linked firstChild (#26752).
         DomUserScriptPinnedRootLlvm::pin($context, $element);
         self::pinUserScriptLoadSideEffects($context);
+    }
+
+    /**
+     * Initialize DOMDocument::$doctype for user-script loadXML (#34887).
+     *
+     * No {@code <!DOCTYPE>} → leave unset; {@see JitDomDocumentDoctype} returns null.
+     * Explicit doctype → DocumentType stand-in with name/publicId/systemId (peer
+     * {@see JitDomHtmlDocumentCreateFromString::storeDoctypeProperty} / #28940).
+     *
+     * Must run before documentElement allocate: {@see JitDomCreateDocumentType::materialize}
+     * grows the DOMElement stand-in class; allocating the tree first leaves it undersized
+     * (#33565).
+     *
+     * {@see JitDomCreateDocumentType::materialize} calls {@see DomUserScriptDoctypeLlvm::rememberCreate}
+     * (clears attached); re-{@see DomUserScriptDoctypeLlvm::markAttached} so saveXML prefix (#34877) stays.
+     */
+    private static function storeDoctypeProperty(
+        Context $context,
+        Value $document,
+        string $xml
+    ): void {
+        $parsed = DomUserScriptDoctypeLlvm::parseFromXml($xml);
+        if (null === $parsed) {
+            return;
+        }
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        // PROP_DOCTYPE is in DOMDocument allocate() layout (#34887 / Object_.php).
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCTYPE)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCTYPE, JITVariable::TYPE_VALUE);
+        }
+        $doctype = JitDomCreateDocumentType::materialize(
+            $context,
+            $parsed['name'],
+            $parsed['publicId'],
+            $parsed['systemId']
+        );
+        $doctypeJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $doctype
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCTYPE),
+            $doctypeJit,
+            JITVariable::TYPE_VALUE
+        );
+        DomUserScriptDoctypeLlvm::markAttached();
     }
 
     /**

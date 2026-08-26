@@ -29,6 +29,33 @@ final class DomUserScriptDoctypeLlvm
     }
 
     /**
+     * Parse {@code <!DOCTYPE …>} from a loadXML/loadHTML literal.
+     *
+     * @return array{name: string, publicId: string, systemId: string}|null
+     */
+    public static function parseFromXml(string $xml): ?array
+    {
+        $trimmed = trim($xml);
+        // Match name + optional PUBLIC "pub" "sys" | PUBLIC "pub" | SYSTEM "sys" (+ optional internal subset).
+        // Name token only — do not use \\S+ (greedy through the document's final '>').
+        if (1 !== preg_match(
+            '/<!DOCTYPE\s+([a-zA-Z_][\w:.-]*)(?:\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"|\s+PUBLIC\s+"([^"]*)"|\s+SYSTEM\s+"([^"]*)")?\s*(?:\[[^\]]*\])?\s*>/i',
+            $trimmed,
+            $m
+        )) {
+            return null;
+        }
+        $publicId = '' !== ($m[2] ?? '') ? (string) $m[2] : (string) ($m[4] ?? '');
+        $systemId = '' !== ($m[3] ?? '') ? (string) $m[3] : (string) ($m[5] ?? '');
+
+        return [
+            'name' => (string) $m[1],
+            'publicId' => $publicId,
+            'systemId' => $systemId,
+        ];
+    }
+
+    /**
      * Stamp from a compile-time loadXML literal so document-wide saveXML prepends
      * {@code <!DOCTYPE …>} when the slot walk has no DocumentType child (#34877).
      *
@@ -39,20 +66,11 @@ final class DomUserScriptDoctypeLlvm
     public static function rememberAttachedFromLoadXml(string $xml): void
     {
         self::reset();
-        $trimmed = trim($xml);
-        // Match name + optional PUBLIC "pub" "sys" | PUBLIC "pub" | SYSTEM "sys" (+ optional internal subset).
-        // Name token only — do not use \\S+ (greedy through the document's final '>').
-        if (1 !== preg_match(
-            '/<!DOCTYPE\s+([a-zA-Z_][\w:.-]*)(?:\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"|\s+PUBLIC\s+"([^"]*)"|\s+SYSTEM\s+"([^"]*)")?\s*(?:\[[^\]]*\])?\s*>/i',
-            $trimmed,
-            $m
-        )) {
+        $parsed = self::parseFromXml($xml);
+        if (null === $parsed) {
             return;
         }
-        $name = $m[1];
-        $publicId = '' !== ($m[2] ?? '') ? (string) $m[2] : (string) ($m[4] ?? '');
-        $systemId = '' !== ($m[3] ?? '') ? (string) $m[3] : (string) ($m[5] ?? '');
-        self::rememberCreate($name, $publicId, $systemId);
+        self::rememberCreate($parsed['name'], $parsed['publicId'], $parsed['systemId']);
         self::markAttached();
     }
 
@@ -61,6 +79,12 @@ final class DomUserScriptDoctypeLlvm
         if (null !== self::$qualifiedName) {
             self::$attached = true;
         }
+    }
+
+    /** True when a DocumentType is attached for saveXML / $doc->doctype (#34887). */
+    public static function isAttached(): bool
+    {
+        return self::$attached && null !== self::$qualifiedName && '' !== self::$qualifiedName;
     }
 
     public static function reset(): void
