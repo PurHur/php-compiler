@@ -18,11 +18,13 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Embed + thin standalone AOT: ABI stubs then real `__phpc_cli_refresh_argv_global`
  * (no void-refresh fork). Empty argv tables use `__hashtable__alloc` (DefineRuntime /
  * SuperglobalInit shape) — NestedJIT `new HashTable()` segfaults in user-script AOT.
- * Context ensureMinimalUserStandaloneBodies must not eagerly link this during thin
- * hello-world init (#34822) — {@see Context::compileToFile} thin path +
- * {@see \PHPCompiler\JIT\CliArgvGlobalInit} / JitGetopt already ensureLinked before lookup.
- * Call-site ensureLinked restores the caller insert block after ABI emit (thin AOT:
- * parentless call / module verify — peer MetaTagsRuntime #27317 / #34812).
+ * Context ensureMinimalUserStandaloneBodies / ensureFullStandaloneBodies must not
+ * eagerly link this during init (#34822 / #35133) — {@see Context::compileToFile}
+ * (every LOAD_TYPE_STANDALONE) + {@see \PHPCompiler\JIT\CliArgvGlobalInit} / JitGetopt
+ * already ensureLinked before lookup. Call-site ensureLinked restores the caller insert
+ * block after ABI emit (thin AOT: parentless call / module verify — peer MetaTagsRuntime
+ * #27317 / #34812). Leftover Context NestedJIT vs Runtime ABI drift mints cli_*.1
+ * (#31894 / #32122).
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmCliArgv} / {@see \PHPCompiler\ext\standard\CliArgvJitHelper}
  * php-src: ext/standard/basic_functions.c — $argc / $argv in CLI SAPI
  */

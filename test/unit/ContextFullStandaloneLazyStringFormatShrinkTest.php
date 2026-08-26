@@ -39,10 +39,14 @@ final class ContextFullStandaloneLazyStringFormatShrinkTest extends TestCase
             );
         }
 
-        // Still links echo / argv / refresh used by standalone main.
+        // Still links echo / refresh; CliArgv deferred to compileToFile in #35133.
         $this->assertStringContainsString('ValueEchoRuntime::ensureLinked($this)', $fullBody);
-        $this->assertStringContainsString('CliArgvRuntime::ensureStandaloneBodies($this)', $fullBody);
         $this->assertStringContainsString('SuperglobalRefreshRuntime::ensureStandaloneBodies($this)', $fullBody);
+        $this->assertStringNotContainsString(
+            'CliArgvRuntime::ensureStandaloneBodies($this)',
+            $fullBody,
+            'CliArgv deferred to compileToFile (#35133)'
+        );
     }
 
     public function testCallSitesStillEnsureBeforeLookup(): void

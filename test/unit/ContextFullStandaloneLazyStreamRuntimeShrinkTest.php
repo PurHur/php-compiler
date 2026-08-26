@@ -39,9 +39,8 @@ final class ContextFullStandaloneLazyStreamRuntimeShrinkTest extends TestCase
             );
         }
 
-        // Still links echo / argv / refresh used by standalone main.
+        // Still links echo / refresh used by standalone main (#35133: CliArgv at compileToFile).
         $this->assertStringContainsString('ValueEchoRuntime::ensureLinked($this)', $fullBody);
-        $this->assertStringContainsString('CliArgvRuntime::ensureStandaloneBodies($this)', $fullBody);
         $this->assertStringContainsString('SuperglobalRefreshRuntime::ensureStandaloneBodies($this)', $fullBody);
     }
 

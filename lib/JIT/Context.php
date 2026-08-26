@@ -2402,13 +2402,14 @@ class Context {
         // not the LLVM ABI. Thin hello-world must not NestedJIT SuperglobalNameJitHelper during
         // init. Leftover Context NestedJIT vs Runtime ABI drift mints is_superglobal_name.1
         // (#31894 / #32122). Full standalone still ensureLinked below.
-        // CliArgv always-on removed (#34822): compileToFile thin path + CliArgvGlobalInit /
-        // JitGetopt already ensureLinked / ensureStandaloneBodies before lookup (peer #34812 /
-        // #34463). Thin hello-world must not link CLI argv ABI during ensureMinimal init —
-        // main() still gets __phpc_cli_store_argv from compileToFile. Mid-{main} $argc/$argv
-        // restores insert block after ABI emit (#27317). Leftover Context NestedJIT vs Runtime
-        // ABI drift mints cli_*.1 (#31894 / #32122). Full standalone still ensureStandaloneBodies
-        // below; bootstrap-aot still ensureStandaloneBodies in ensureBootstrapAotStandaloneBodies.
+        // CliArgv always-on removed (#34822 / #35133): compileToFile (all standalone) +
+        // CliArgvGlobalInit / JitGetopt already ensureLinked / ensureStandaloneBodies before
+        // lookup (peer #34812 / #34463). Thin hello-world must not link CLI argv ABI during
+        // ensureMinimal init — main() still gets __phpc_cli_store_argv from compileToFile.
+        // Mid-{main} $argc/$argv restores insert block after ABI emit (#27317). Leftover Context
+        // NestedJIT vs Runtime ABI drift mints cli_*.1 (#31894 / #32122). Full standalone also
+        // deferred to compileToFile (#35133); bootstrap-aot still ensureStandaloneBodies in
+        // ensureBootstrapAotStandaloneBodies.
         // DomStandaloneAotInit / DomInstanceMethod always-on removed (#34605):
         // VmActiveContextInitLlvm::emitPendingBeforeSeal ensureLinked DomStandaloneAotInit when
         // thin init is requested; DomInstanceMethodRuntime::invoke ensureBridge per arity
@@ -2452,7 +2453,11 @@ class Context {
             // ObOutput always-on removed (#34695): ValueEchoRuntime::ensureLinked → ObOutput
             // (and ValueEchoHelper call sites). Do not re-add before ValueEcho here.
             Builtin\ValueEchoRuntime::ensureLinked($this);
-            Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
+            // CliArgv always-on removed (#35133 / peer ensureMinimal #34822): compileToFile
+            // ensures CliArgvRuntime for every LOAD_TYPE_STANDALONE before main emits
+            // __phpc_cli_store_argv; CliArgvGlobalInit / JitGetopt ensureLinked before lookup.
+            // Full standalone must not NestedJIT cli_* during init — leftover Context NestedJIT
+            // vs Runtime ABI drift mints cli_*.1 (#31894 / #32122).
             // Soundex/Quotemeta/PregQuote/Nl2br/Ucwords/Metaphone/Wordwrap/MbNumericEntity/
             // Bin2hex/Base64*/Strrev/StrRepeat/StrPad/StrRot13/Uniqid/ChunkSplit/
             // GraphemeStrSplit/Hex2bin/Levenshtein/SubstrCount/CountChars/NCompare/
@@ -2565,14 +2570,18 @@ class Context {
         // Silent-null method lowerings are invisible without this (#579); opt-in via env.
         $this->reportExternalMethodStubs();
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isThinStandaloneAotMain()) {
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+            // Every standalone main emits __phpc_cli_store_argv — link before that call.
+            // Was ensureFull-only for non-thin (#35133); thin already linked here (#34822).
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
-            // IniRuntime always-on removed (#34848): JitIni / IniGet / IniSet / ErrorReporting /
-            // ZendDoubleStringRuntime / ExceptionThrowToStringSeed already ensureLinked before
-            // lookup (peer #34578 / #34822). Thin hello-world must not NestedJIT ini ABI during
-            // compileToFile pre-main — leftover Context NestedJIT vs Runtime ABI drift mints
-            // ini_get.1 / phpc_ini_*.1 (#31894 / #32122).
-            Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshEmit($this);
+            if ($this->isThinStandaloneAotMain()) {
+                // IniRuntime always-on removed (#34848): JitIni / IniGet / IniSet / ErrorReporting /
+                // ZendDoubleStringRuntime / ExceptionThrowToStringSeed already ensureLinked before
+                // lookup (peer #34578 / #34822). Thin hello-world must not NestedJIT ini ABI during
+                // compileToFile pre-main — leftover Context NestedJIT vs Runtime ABI drift mints
+                // ini_get.1 / phpc_ini_*.1 (#31894 / #32122).
+                Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshEmit($this);
+            }
         }
 
         // add main function
