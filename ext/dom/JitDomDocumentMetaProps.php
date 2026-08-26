@@ -10,12 +10,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument computed meta / option / baseURI properties
- * (#34894 leftover of #34887; #34899 option props; #34904 baseURI).
+ * LLVM lowering for DOMDocument computed meta / baseURI properties
+ * (#34894 leftover of #34887; #34904 baseURI).
  *
- * Thin AOT has no DomRegistry — undeclared PropertyFetch after loadXML late-defines an
- * uninitialized slot (SIGSEGV). Props are pinned in {@see Object_::allocate} layout;
- * fetches return computed values (peer {@see JitDomDocumentDoctype} / #28940).
+ * Option bools (formatOutput, …) use allocate()+DomDocumentConstruct seeds so
+ * writes stick (#34908) — not hardcoded fetch.
  *
  * php-src: ext/dom/php_dom.c — dom_document_*_read; ext/dom/node.c — dom_node_base_uri_read;
  * ext/dom/document.c
@@ -43,14 +42,6 @@ final class JitDomDocumentMetaProps
             || 'xmlstandalone' === $propLc
             || 'standalone' === $propLc
             || 'config' === $propLc
-            // libxml option props — defaults from php-src document construct (#34899).
-            || 'stricterrorchecking' === $propLc
-            || 'formatoutput' === $propLc
-            || 'validateonparse' === $propLc
-            || 'resolveexternals' === $propLc
-            || 'preservewhitespace' === $propLc
-            || 'recover' === $propLc
-            || 'substituteentities' === $propLc
             // DOMNode::$baseURI — same documentURI cwd stamp after loadXML (#34904).
             || 'baseuri' === $propLc;
     }
@@ -70,18 +61,6 @@ final class JitDomDocumentMetaProps
             return self::boxString($context, '1.0');
         }
         if ('xmlstandalone' === $propLc || 'standalone' === $propLc) {
-            return self::boxBool($context, false);
-        }
-        // php-src DOMDocument::__construct defaults (ext/dom/php_dom.c / document.c).
-        if ('stricterrorchecking' === $propLc || 'preservewhitespace' === $propLc) {
-            return self::boxBool($context, true);
-        }
-        if ('formatoutput' === $propLc
-            || 'validateonparse' === $propLc
-            || 'resolveexternals' === $propLc
-            || 'recover' === $propLc
-            || 'substituteentities' === $propLc
-        ) {
             return self::boxBool($context, false);
         }
         if ('xmlencoding' === $propLc || 'actualencoding' === $propLc || 'encoding' === $propLc) {
