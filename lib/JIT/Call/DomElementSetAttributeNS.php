@@ -44,7 +44,8 @@ final class DomElementSetAttributeNS implements Call
                 $attrs = $bagUpdates + $attrs;
                 if (null !== $id) {
                     foreach ($bagUpdates as $name => $val) {
-                        JitDomCreateElementAttrs::set($id, $name, $val);
+                        // Numeric-looking qnames become int keys in PHP arrays; cast (#35234).
+                        JitDomCreateElementAttrs::set($id, (string) $name, (string) $val);
                     }
                     if (null === $args[0]->compileTimeDomElementId) {
                         $args[0]->compileTimeDomElementId = $id;
