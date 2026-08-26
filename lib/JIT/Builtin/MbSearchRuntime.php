@@ -35,6 +35,8 @@ final class MbSearchRuntime
 
     private const STRRICHR_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSearchJitHelper::strrichrArgv';
 
+    private const ASSERT_ENCODING_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSearchJitHelper::assertEncodingArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::STRPOS_LOGICAL,
@@ -45,6 +47,7 @@ final class MbSearchRuntime
         self::STRISTR_LOGICAL,
         self::STRRCHR_LOGICAL,
         self::STRRICHR_LOGICAL,
+        self::ASSERT_ENCODING_LOGICAL,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -106,6 +109,13 @@ final class MbSearchRuntime
         self::ensureJitHelperCompiled($context);
 
         return JitVmHelperLink::lookupCompiled($context, self::STRRICHR_LOGICAL, 'mb_strrichr');
+    }
+
+    public static function assertEncodingHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::ASSERT_ENCODING_LOGICAL, 'mb_search_encoding');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void

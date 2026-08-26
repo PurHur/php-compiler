@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -20,7 +21,7 @@ use PHPLLVM\Value;
  * LLVM JIT/AOT for mbstring search builtins (#7015).
  *
  * Compile-time fold via {@see VmMbstring}; mb_strpos()/mb_strstr()/mb_strrchr() runtime via NestedJIT
- * (#34146 leftover of #27187; #34211).
+ * (#34146 leftover of #27187; #34211). Runtime encoding via NestedJIT (#34866 peer #34858).
  */
 final class JitMbSearch
 {
@@ -47,29 +48,7 @@ final class JitMbSearch
         $offset = $argc >= 3
             ? JitStrictIntArg::lower($context, $args[2], 'mb_strpos', 3, 'offset')
             : $i64->constInt(0, false);
-        if ($argc >= 4) {
-            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
-                $encoding = 'UTF-8';
-            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
-                throw new \LogicException('mb_strpos() encoding must be a string literal in this compiler build');
-            } else {
-                $encoding = $args[3]->compileTimeString ?? null;
-                if (null === $encoding) {
-                    throw new \LogicException('mb_strpos() encoding must be a string literal in this compiler build');
-                }
-            }
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbSearchRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_strpos');
         $found = JitNestedHelperCoerce::callHelper(
             $context,
             MbSearchRuntime::strposHelper($context),
@@ -101,29 +80,7 @@ final class JitMbSearch
         $offset = $argc >= 3
             ? JitStrictIntArg::lower($context, $args[2], 'mb_stripos', 3, 'offset')
             : $i64->constInt(0, false);
-        if ($argc >= 4) {
-            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
-                $encoding = 'UTF-8';
-            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
-                throw new \LogicException('mb_stripos() encoding must be a string literal in this compiler build');
-            } else {
-                $encoding = $args[3]->compileTimeString ?? null;
-                if (null === $encoding) {
-                    throw new \LogicException('mb_stripos() encoding must be a string literal in this compiler build');
-                }
-            }
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbSearchRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_stripos');
         $found = JitNestedHelperCoerce::callHelper(
             $context,
             MbSearchRuntime::striposHelper($context),
@@ -155,29 +112,7 @@ final class JitMbSearch
         $offset = $argc >= 3
             ? JitStrictIntArg::lower($context, $args[2], 'mb_strrpos', 3, 'offset')
             : $i64->constInt(0, false);
-        if ($argc >= 4) {
-            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
-                $encoding = 'UTF-8';
-            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
-                throw new \LogicException('mb_strrpos() encoding must be a string literal in this compiler build');
-            } else {
-                $encoding = $args[3]->compileTimeString ?? null;
-                if (null === $encoding) {
-                    throw new \LogicException('mb_strrpos() encoding must be a string literal in this compiler build');
-                }
-            }
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbSearchRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_strrpos');
         $found = JitNestedHelperCoerce::callHelper(
             $context,
             MbSearchRuntime::strrposHelper($context),
@@ -209,29 +144,7 @@ final class JitMbSearch
         $offset = $argc >= 3
             ? JitStrictIntArg::lower($context, $args[2], 'mb_strripos', 3, 'offset')
             : $i64->constInt(0, false);
-        if ($argc >= 4) {
-            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
-                $encoding = 'UTF-8';
-            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
-                throw new \LogicException('mb_strripos() encoding must be a string literal in this compiler build');
-            } else {
-                $encoding = $args[3]->compileTimeString ?? null;
-                if (null === $encoding) {
-                    throw new \LogicException('mb_strripos() encoding must be a string literal in this compiler build');
-                }
-            }
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbSearchRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_strripos');
         $found = JitNestedHelperCoerce::callHelper(
             $context,
             MbSearchRuntime::strriposHelper($context),
@@ -262,29 +175,7 @@ final class JitMbSearch
         $beforeNeedle = $argc >= 3
             ? JitBoolArg::lowerZParamBool($context, $args[2], 'mb_strstr', 'before_needle', 3)
             : $context->constantFromBool(false);
-        if ($argc >= 4) {
-            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
-                $encoding = 'UTF-8';
-            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
-                throw new \LogicException('mb_strstr() encoding must be a string literal in this compiler build');
-            } else {
-                $encoding = $args[3]->compileTimeString ?? null;
-                if (null === $encoding) {
-                    throw new \LogicException('mb_strstr() encoding must be a string literal in this compiler build');
-                }
-            }
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbSearchRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_strstr');
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             MbSearchRuntime::strstrHelper($context),
@@ -315,29 +206,7 @@ final class JitMbSearch
         $beforeNeedle = $argc >= 3
             ? JitBoolArg::lowerZParamBool($context, $args[2], 'mb_stristr', 'before_needle', 3)
             : $context->constantFromBool(false);
-        if ($argc >= 4) {
-            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
-                $encoding = 'UTF-8';
-            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
-                throw new \LogicException('mb_stristr() encoding must be a string literal in this compiler build');
-            } else {
-                $encoding = $args[3]->compileTimeString ?? null;
-                if (null === $encoding) {
-                    throw new \LogicException('mb_stristr() encoding must be a string literal in this compiler build');
-                }
-            }
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbSearchRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_stristr');
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             MbSearchRuntime::stristrHelper($context),
@@ -368,29 +237,7 @@ final class JitMbSearch
         $beforeNeedle = $argc >= 3
             ? JitBoolArg::lowerZParamBool($context, $args[2], 'mb_strrchr', 'before_needle', 3)
             : $context->constantFromBool(false);
-        if ($argc >= 4) {
-            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
-                $encoding = 'UTF-8';
-            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
-                throw new \LogicException('mb_strrchr() encoding must be a string literal in this compiler build');
-            } else {
-                $encoding = $args[3]->compileTimeString ?? null;
-                if (null === $encoding) {
-                    throw new \LogicException('mb_strrchr() encoding must be a string literal in this compiler build');
-                }
-            }
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbSearchRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_strrchr');
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             MbSearchRuntime::strrchrHelper($context),
@@ -421,29 +268,7 @@ final class JitMbSearch
         $beforeNeedle = $argc >= 3
             ? JitBoolArg::lowerZParamBool($context, $args[2], 'mb_strrichr', 'before_needle', 3)
             : $context->constantFromBool(false);
-        if ($argc >= 4) {
-            if (JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
-                $encoding = 'UTF-8';
-            } elseif (JITVariable::TYPE_STRING !== $args[3]->type) {
-                throw new \LogicException('mb_strrichr() encoding must be a string literal in this compiler build');
-            } else {
-                $encoding = $args[3]->compileTimeString ?? null;
-                if (null === $encoding) {
-                    throw new \LogicException('mb_strrichr() encoding must be a string literal in this compiler build');
-                }
-            }
-        } else {
-            $encoding = 'UTF-8';
-        }
-        self::assertSupportedEncoding($encoding);
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbSearchRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        $encPtr = self::linkAndEncodingPtr($context, $args, $argc, 'mb_strrichr');
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             MbSearchRuntime::strrichrHelper($context),
@@ -748,12 +573,74 @@ final class JitMbSearch
         return $context->constantFromInteger($result, 'int64');
     }
 
-    private static function assertSupportedEncoding(string $encoding): void
+    /**
+     * Link NestedJIT search helpers, lower encoding (literal or runtime), assert when needed (#34866).
+     *
+     * @param list<JITVariable> $args
+     */
+    private static function linkAndEncodingPtr(Context $context, array $args, int $argc, string $function): Value
     {
-        if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
-            throw new \LogicException(
-                'mb_strpos() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbSearchRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_runtime');
+
+        [$encPtr, $needsAssert] = self::encodingPtr($context, $args, $argc, $function);
+        if ($needsAssert) {
+            $fnName = $context->builder->load($context->constantStringFromString($function));
+            $context->builder->call(
+                MbSearchRuntime::assertEncodingHelper($context),
+                $encPtr,
+                $fnName
             );
         }
+
+        return $encPtr;
+    }
+
+    /**
+     * Literal UTF-8/ASCII/8BIT → constant string (no assert); otherwise NestedJIT encoding + assert (#34866).
+     *
+     * @param list<JITVariable> $args
+     * @return array{0: Value, 1: bool} encoding ptr, needsAssert
+     */
+    private static function encodingPtr(Context $context, array $args, int $argc, string $function): array
+    {
+        if ($argc < 4 || JITVariable::TYPE_NULL === $args[3]->type || ($args[3]->isNullConstant ?? false)) {
+            $encoding = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
+            if (!self::isSupportedEncoding($encoding)) {
+                $encoding = 'UTF-8';
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encoding)), false];
+        }
+
+        $encodingLit = JitStringArg::compileTimeLiteral($args[3]);
+        if (null !== $encodingLit) {
+            $canonical = MbstringEncodingRegistry::resolve($encodingLit);
+            if (null !== $canonical && self::isSupportedEncoding($canonical)) {
+                return [$context->builder->load($context->constantStringFromString($canonical)), false];
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
+        }
+
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[3],
+                $function,
+                3,
+                'encoding'
+            ),
+            true,
+        ];
+    }
+
+    private static function isSupportedEncoding(string $encoding): bool
+    {
+        return 'UTF-8' === $encoding || 'ASCII' === $encoding || '8BIT' === $encoding;
     }
 }
