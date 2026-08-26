@@ -36,7 +36,8 @@ final class DomParseSimpleXmlJitHelper
             while ($nameEnd < $len) {
                 $ch = $xml[$nameEnd];
                 if ('>' === $ch || '/' === $ch || ' ' === $ch || "	" === $ch || "
-" === $ch || "" === $ch) {
+" === $ch || "
+" === $ch) {
                     break;
                 }
                 ++$nameEnd;
@@ -294,26 +295,39 @@ final class DomParseSimpleXmlJitHelper
         if ('*' === $tag) {
             return self::nthElementOpenTagArgv($xml, $position);
         }
-        $needle = '<'.$tag;
+        // Local-name match — prefixed open-tags count (#34936 / peer countTagArgv).
         $seen = 0;
         $offset = 0;
-        while (false !== ($pos = stripos($xml, $needle, $offset))) {
-            $after = $pos + \strlen($needle);
-            if ($after >= \strlen($xml)) {
-                break;
-            }
-            $next = $xml[$after];
-            if ('>' !== $next && '/' !== $next && ' ' !== $next) {
+        $len = \strlen($xml);
+        while ($offset < $len && false !== ($pos = strpos($xml, '<', $offset))) {
+            $next = $xml[$pos + 1] ?? '';
+            if ('/' === $next || '!' === $next || '?' === $next || '' === $next) {
                 $offset = $pos + 1;
                 continue;
             }
-            $gt = strpos($xml, '>', $pos);
-            if (false === $gt) {
-                break;
+            $nameStart = $pos + 1;
+            $nameEnd = $nameStart;
+            while ($nameEnd < $len) {
+                $ch = $xml[$nameEnd];
+                if ('>' === $ch || '/' === $ch || ' ' === $ch || "\t" === $ch || "\n" === $ch || "\r" === $ch) {
+                    break;
+                }
+                ++$nameEnd;
             }
-            ++$seen;
-            if ($seen === $position) {
-                return substr($xml, $pos, $gt - $pos + 1);
+            if ($nameEnd > $nameStart) {
+                $qname = strtolower(substr($xml, $nameStart, $nameEnd - $nameStart));
+                $colon = strrpos($qname, ':');
+                $local = false === $colon ? $qname : substr($qname, $colon + 1);
+                if ($local === $tag) {
+                    $gt = strpos($xml, '>', $pos);
+                    if (false === $gt) {
+                        break;
+                    }
+                    ++$seen;
+                    if ($seen === $position) {
+                        return substr($xml, $pos, $gt - $pos + 1);
+                    }
+                }
             }
             $offset = $pos + 1;
         }
@@ -481,26 +495,39 @@ final class DomParseSimpleXmlJitHelper
 
             return -1;
         }
-        $needle = '<'.$tag;
+        // Local-name match (#34936).
         $seen = 0;
         $offset = 0;
-        while (false !== ($pos = stripos($xml, $needle, $offset))) {
-            $after = $pos + \strlen($needle);
-            if ($after >= \strlen($xml)) {
-                break;
-            }
-            $next = $xml[$after];
-            if ('>' !== $next && '/' !== $next && ' ' !== $next) {
+        $len = \strlen($xml);
+        while ($offset < $len && false !== ($pos = strpos($xml, '<', $offset))) {
+            $next = $xml[$pos + 1] ?? '';
+            if ('/' === $next || '!' === $next || '?' === $next || '' === $next) {
                 $offset = $pos + 1;
                 continue;
             }
-            $gt = strpos($xml, '>', $pos);
-            if (false === $gt) {
-                break;
+            $nameStart = $pos + 1;
+            $nameEnd = $nameStart;
+            while ($nameEnd < $len) {
+                $ch = $xml[$nameEnd];
+                if ('>' === $ch || '/' === $ch || ' ' === $ch || "\t" === $ch || "\n" === $ch || "\r" === $ch) {
+                    break;
+                }
+                ++$nameEnd;
             }
-            ++$seen;
-            if ($seen === $position) {
-                return $pos;
+            if ($nameEnd > $nameStart) {
+                $qname = strtolower(substr($xml, $nameStart, $nameEnd - $nameStart));
+                $colon = strrpos($qname, ':');
+                $local = false === $colon ? $qname : substr($qname, $colon + 1);
+                if ($local === $tag) {
+                    $gt = strpos($xml, '>', $pos);
+                    if (false === $gt) {
+                        break;
+                    }
+                    ++$seen;
+                    if ($seen === $position) {
+                        return $pos;
+                    }
+                }
             }
             $offset = $pos + 1;
         }
@@ -666,40 +693,35 @@ final class DomParseSimpleXmlJitHelper
             // Re-resolve by concrete name at the same document-order index among all tags.
             return self::nthWildcardElementTextArgv($xml, $position, $name, $openTag);
         }
-        $needle = '<'.$tag;
-        $seen = 0;
-        $offset = 0;
-        while (false !== ($pos = stripos($xml, $needle, $offset))) {
-            $after = $pos + \strlen($needle);
-            if ($after >= \strlen($xml)) {
-                break;
-            }
-            $next = $xml[$after];
-            if ('>' !== $next && '/' !== $next && ' ' !== $next) {
-                $offset = $pos + 1;
-                continue;
-            }
-            $gt = strpos($xml, '>', $pos);
-            if (false === $gt) {
-                break;
-            }
-            ++$seen;
-            if ($seen !== $position) {
-                $offset = $pos + 1;
-                continue;
-            }
-            if ($gt > $pos && '/' === $xml[$gt - 1]) {
-                return '';
-            }
-            $close = stripos($xml, '</'.$tag.'>', $gt + 1);
-            if (false === $close) {
-                return '';
-            }
-
-            return substr($xml, $gt + 1, $close - $gt - 1);
+        // Local-name open-tag (#34936) — close with the matched QName.
+        $openTag = self::nthTagOpenTagArgv($xml, $tag, $position);
+        if (null === $openTag) {
+            return null;
+        }
+        if (str_ends_with(rtrim($openTag), '/>') || str_ends_with($openTag, '/>')) {
+            return '';
+        }
+        $qname = self::tagNameFromOpenTagArgv($openTag);
+        if (null === $qname) {
+            return '';
+        }
+        $pos = self::nthTagOpenTagOffsetArgv($xml, $tag, $position);
+        if ($pos < 0) {
+            return '';
+        }
+        $gt = strpos($xml, '>', $pos);
+        if (false === $gt) {
+            return '';
+        }
+        if ($gt > $pos && '/' === $xml[$gt - 1]) {
+            return '';
+        }
+        $close = stripos($xml, '</'.$qname.'>', $gt + 1);
+        if (false === $close) {
+            return '';
         }
 
-        return null;
+        return substr($xml, $gt + 1, $close - $gt - 1);
     }
 
     /** Inner markup of the Nth element open-tag for "*" lists (#33063). */

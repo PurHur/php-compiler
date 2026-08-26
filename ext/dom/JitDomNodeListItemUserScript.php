@@ -41,6 +41,19 @@ final class JitDomNodeListItemUserScript
                 $index = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($arg->value->value);
             }
         }
+        // Literal 0 often arrives as TYPE_NATIVE_LONG KIND_VALUE with compileTimeLong
+        // set — without this, getElementsByTagNameNS()->item(0) never reaches the
+        // NS materialize path and returns NULL (#34936).
+        if (null === $index && null !== $arg->compileTimeLong) {
+            $index = (int) $arg->compileTimeLong;
+        }
+        if (
+            null === $index
+            && null !== $arg->compileTimeString
+            && is_numeric($arg->compileTimeString)
+        ) {
+            $index = (int) $arg->compileTimeString;
+        }
 
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         $queryTag = JitDomXPathQueryUserScript::lastQueryTag();
@@ -175,7 +188,18 @@ final class JitDomNodeListItemUserScript
                 $pinned,
                 $objPtrTy->constNull()
             );
-            $tagResult = $context->builder->select($pinNull, $compileTime, $live);
+            // Prefixed loadXML children match by local name in markup (#34936). When the
+            // compile-time scan finds the Nth open-tag, prefer rematerialize — the live
+            // walk historically compared tagName QName and can return a bad/null node.
+            // Live walk remains for appendChild nodes absent from the original literal.
+            $markupHasNth = null !== DomParseSimpleXmlJitHelper::nthTagOpenTagArgv(
+                $itemMarkup,
+                $tagQuery,
+                $index + 1
+            );
+            $tagResult = $markupHasNth
+                ? $compileTime
+                : $context->builder->select($pinNull, $compileTime, $live);
 
             return null !== $recoveredTagQuery
                 ? self::selectTagWalkUnlessChildNodesOwner(
@@ -345,11 +369,13 @@ final class JitDomNodeListItemUserScript
             return self::boxNull($context);
         }
         $ns = '' === $match['ns'] ? '' : $match['ns'];
+        // Prefer local-name text helper so prefixed matches get inner text (#34936).
+        $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $localName, $index + 1) ?? '';
         $element = JitDomCreateElementNS::materializeElementNSFromLiterals(
             $context,
             $ns,
             $match['qname'],
-            ''
+            $text
         );
 
         return self::boxObject($context, $element);
@@ -494,17 +520,20 @@ final class JitDomNodeListItemUserScript
                 }
             }
         }
-        // getElementsByTagName("*"): open-tag carries the real element name (#33063).
-        $elementName = $tag;
-        if ('*' === $tag) {
-            $elementName = DomParseSimpleXmlJitHelper::tagNameFromOpenTagArgv($openTag) ?? 'div';
-        }
-        $element = JitDomCreateElement::materializeElementWithTextContent($context, $elementName, $text);
-        // Ancestor xmlns scope at this open-tag (xmlSearchNs / #34618).
+        // Always take the real open-tag QName — getElementsByTagName('a') may
+        // have matched `<x:a>` by local name (#34936 / #33063 for "*").
+        $elementName = DomParseSimpleXmlJitHelper::tagNameFromOpenTagArgv($openTag) ?? $tag;
         $openOffset = DomParseSimpleXmlJitHelper::nthTagOpenTagOffsetArgv($xml, $tag, $position);
         $inherited = $openOffset >= 0
             ? DomParseSimpleXmlJitHelper::xmlnsScopeBeforeOffsetArgv($xml, $openOffset)
             : [];
+        $element = JitDomDocumentElement::materializeElementFromXmlTag(
+            $context,
+            $elementName,
+            $text,
+            $openTag,
+            $inherited
+        );
         foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($openTag, $inherited) as $attrPair) {
             $qname = $attrPair['qname'];
             $value = $attrPair['value'];
