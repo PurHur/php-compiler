@@ -994,9 +994,9 @@ final class SprintfJitHelper
     }
 
     /**
-     * NestedJIT-safe %.*s / %.Ns / %*.*s (php-src formatted_print.c; issue #21956).
+     * NestedJIT-safe %.*s / %.Ns / %*.*s / %*s (php-src formatted_print.c; #21956 / #34969).
      *
-     * @return ?string null when format is not a handled string-precision conversion
+     * @return ?string null when format is not a handled string width/precision conversion
      */
     private static function tryFormatStarPrecisionString(
         string $format,
@@ -1013,23 +1013,26 @@ final class SprintfJitHelper
             $widthFromArg = true;
             ++$pos;
         }
-        if ($pos >= $fmtLen || '.' !== $format[$pos]) {
-            return null;
-        }
-        ++$pos;
         $precisionFromArg = false;
-        $precision = 0;
-        if ($pos < $fmtLen && '*' === $format[$pos]) {
-            $precisionFromArg = true;
+        $precision = null;
+        $hasPrecision = false;
+        if ($pos < $fmtLen && '.' === $format[$pos]) {
+            $hasPrecision = true;
             ++$pos;
-        } elseif ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
-            while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
-                $precision = ($precision * 10) + self::digitValue($format[$pos]);
-                ++$pos;
-            }
-        } else {
-            // "%.s" → precision 0
             $precision = 0;
+            if ($pos < $fmtLen && '*' === $format[$pos]) {
+                $precisionFromArg = true;
+                ++$pos;
+            } elseif ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    $precision = ($precision * 10) + self::digitValue($format[$pos]);
+                    ++$pos;
+                }
+            }
+            // else "%.s" → precision 0
+        } elseif (!$widthFromArg) {
+            // Need at least one of star width or precision (%.Ns handled above).
+            return null;
         }
         if ($pos >= $fmtLen || 's' !== $format[$pos] || ($pos + 1) !== $fmtLen) {
             return null;
@@ -1061,7 +1064,7 @@ final class SprintfJitHelper
         if (null === $string) {
             return $format;
         }
-        $out = self::truncateBytes($string, $precision);
+        $out = $hasPrecision ? self::truncateBytes($string, (int) $precision) : $string;
         if (null !== $width) {
             $out = self::padLeftSpaces($out, $width);
         }
