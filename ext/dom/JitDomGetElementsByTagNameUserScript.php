@@ -19,8 +19,20 @@ final class JitDomGetElementsByTagNameUserScript
 
     private static ?string $lastNsLocal = null;
 
+    /**
+     * NS uri/local from the last getElementsByTagNameNS — survives
+     * {@see clearTagQueryState()} so held NS lists still item()/decrement
+     * after an intervening childNodes fetch (#34995 / peer #34646).
+     */
+    private static ?string $liveItemNsUri = null;
+
+    private static ?string $liveItemNsLocal = null;
+
     /** Last NS query was DOMElement::getElementsByTagNameNS (skip document element; #32511). */
     private static bool $lastNsFromElement = false;
+
+    /** Survives clearTagQueryState with {@see $liveItemNsUri} (#34995). */
+    private static bool $liveItemNsFromElement = false;
 
     private static ?string $lastTagQuery = null;
 
@@ -63,6 +75,7 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastTagQuery = null;
         // Keep $liveItemTagQuery / $lastTagQueryFromElement — held Element/Document
         // getElementsByTagName lists must still item() (#34646 / #34780).
+        // Keep $liveItemNs* — held getElementsByTagNameNS lists (#34995).
         self::$lastNsUri = null;
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
@@ -76,16 +89,24 @@ final class JitDomGetElementsByTagNameUserScript
     /** @return null|array{0: string, 1: string} namespace URI + localName from last NS query (#32415). */
     public static function lastNsQuery(): ?array
     {
-        if (null === self::$lastNsUri || null === self::$lastNsLocal) {
-            return null;
+        if (null !== self::$lastNsUri && null !== self::$lastNsLocal) {
+            return [self::$lastNsUri, self::$lastNsLocal];
+        }
+        // Held NS list after childNodes/attributes fetch (#34995).
+        if (null !== self::$liveItemNsUri && null !== self::$liveItemNsLocal) {
+            return [self::$liveItemNsUri, self::$liveItemNsLocal];
         }
 
-        return [self::$lastNsUri, self::$lastNsLocal];
+        return null;
     }
 
     public static function lastNsQueryFromElement(): bool
     {
-        return self::$lastNsFromElement;
+        if (null !== self::$lastNsUri && null !== self::$lastNsLocal) {
+            return self::$lastNsFromElement;
+        }
+
+        return self::$liveItemNsFromElement;
     }
 
     public static function tryInvoke(Context $context, JITVariable ...$args): ?Value
@@ -93,6 +114,9 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastNsUri = null;
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
+        self::$liveItemNsUri = null;
+        self::$liveItemNsLocal = null;
+        self::$liveItemNsFromElement = false;
         self::$lastTagQuery = null;
         self::$liveItemTagQuery = null;
         self::$lastTagQueryFromElement = false;
@@ -175,11 +199,21 @@ final class JitDomGetElementsByTagNameUserScript
         if (null === $xml) {
             return null;
         }
-        $count = DomParseSimpleXmlJitHelper::countElementsByTagNameNSArgv($xml, $nsLit, $localLit);
         self::$lastNsUri = $nsLit;
         self::$lastNsLocal = $localLit;
         self::$lastNsFromElement = false;
-        DomUserScriptLiveTagListLlvm::initCount($context, 'ns|'.$nsLit.'|'.$localLit, $count);
+        self::$liveItemNsUri = $nsLit;
+        self::$liveItemNsLocal = $localLit;
+        self::$liveItemNsFromElement = false;
+        $tagKey = 'ns|'.$nsLit.'|'.$localLit;
+        // LiveSlots mutations leave compile-time NS counts stale (#34995 / peer #33918).
+        if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()) {
+            DomUserScriptLiveTagListLlvm::resyncCountFromLiveTreeNs($context, $nsLit, $localLit, false);
+
+            return self::boxNodeList($context, 0);
+        }
+        $count = DomParseSimpleXmlJitHelper::countElementsByTagNameNSArgv($xml, $nsLit, $localLit);
+        DomUserScriptLiveTagListLlvm::initCount($context, $tagKey, $count);
 
         return self::boxNodeList($context, $count);
     }
@@ -194,6 +228,9 @@ final class JitDomGetElementsByTagNameUserScript
         self::$lastNsUri = null;
         self::$lastNsLocal = null;
         self::$lastNsFromElement = false;
+        self::$liveItemNsUri = null;
+        self::$liveItemNsLocal = null;
+        self::$liveItemNsFromElement = false;
         // Peer Document tryInvoke: seed tag so NodeList::item() does not fall through
         // to pinned-root firstChild (#34780).
         self::$lastTagQuery = null;
@@ -254,15 +291,24 @@ final class JitDomGetElementsByTagNameUserScript
         if (null === $xml) {
             return null;
         }
+        self::$lastNsUri = $nsLit;
+        self::$lastNsLocal = $localLit;
+        self::$lastNsFromElement = true;
+        self::$liveItemNsUri = $nsLit;
+        self::$liveItemNsLocal = $localLit;
+        self::$liveItemNsFromElement = true;
+        $tagKey = 'elns|'.$nsLit.'|'.$localLit;
+        if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()) {
+            DomUserScriptLiveTagListLlvm::resyncCountFromLiveTreeNs($context, $nsLit, $localLit, true);
+
+            return self::boxNodeList($context, 0);
+        }
         $count = DomParseSimpleXmlJitHelper::countElementsByTagNameNSFromDescendantsArgv(
             $xml,
             $nsLit,
             $localLit
         );
-        self::$lastNsUri = $nsLit;
-        self::$lastNsLocal = $localLit;
-        self::$lastNsFromElement = true;
-        DomUserScriptLiveTagListLlvm::initCount($context, 'elns|'.$nsLit.'|'.$localLit, $count);
+        DomUserScriptLiveTagListLlvm::initCount($context, $tagKey, $count);
 
         return self::boxNodeList($context, $count);
     }

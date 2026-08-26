@@ -97,7 +97,61 @@ final class JitDomLiveElementsByTagWalk
         Value $indexI64,
         bool $descendantsOnly = false
     ): Value {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_live_tag_item');
+        return self::itemAtMatching(
+            $context,
+            $root,
+            $indexI64,
+            $descendantsOnly,
+            'dom_live_tag_item',
+            static function (Context $context, Value $node) use ($tag): Value {
+                return self::emitNodeMatchesTag($context, $node, $tag);
+            }
+        );
+    }
+
+    /**
+     * Return the Nth getElementsByTagNameNS match under {@code $root}, or null box (#34995).
+     *
+     * php-src nodelist.c: match localName + namespaceURI (either may be {@code *}).
+     * Prefer this over compile-time rematerialize so item() keeps live parentNode.
+     *
+     * @param bool $descendantsOnly when true (Element::getElementsByTagNameNS), skip
+     *        {@code $root} itself (#32511 / php-src element.c).
+     */
+    public static function itemAtNs(
+        Context $context,
+        Value $root,
+        string $namespaceUri,
+        string $localName,
+        Value $indexI64,
+        bool $descendantsOnly = false
+    ): Value {
+        return self::itemAtMatching(
+            $context,
+            $root,
+            $indexI64,
+            $descendantsOnly,
+            'dom_live_ns_item',
+            static function (Context $context, Value $node) use ($namespaceUri, $localName): Value {
+                return self::emitNodeMatchesNs($context, $node, $namespaceUri, $localName);
+            }
+        );
+    }
+
+    /**
+     * Shared Nth-match walk: tag or NS predicate via {@code $matchesNode}.
+     *
+     * @param callable(Context, Value): Value $matchesNode returns i1
+     */
+    private static function itemAtMatching(
+        Context $context,
+        Value $root,
+        Value $indexI64,
+        bool $descendantsOnly,
+        string $labelPrefix,
+        callable $matchesNode
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, $labelPrefix);
         self::ensureLayout($context);
         $objPtrTy = $context->getTypeFromString('__object__*');
         $i64 = $context->getTypeFromString('int64');
@@ -108,8 +162,8 @@ final class JitDomLiveElementsByTagWalk
         $rootNull = $context->builder->icmp(Builder::INT_EQ, $root, $objPtrTy->constNull());
         $neg = $context->builder->icmp(Builder::INT_SLT, $indexI64, $i64->constInt(0, false));
         $bad = $context->builder->or($rootNull, $neg);
-        $bbDone = BasicBlockHelper::append($context, 'dom_live_tag_item_done');
-        $bbWalk = BasicBlockHelper::append($context, 'dom_live_tag_item_walk');
+        $bbDone = BasicBlockHelper::append($context, $labelPrefix.'_done');
+        $bbWalk = BasicBlockHelper::append($context, $labelPrefix.'_walk');
         $context->builder->branchIf($bad, $bbDone, $bbWalk);
 
         $context->builder->positionAtEnd($bbWalk);
@@ -117,13 +171,20 @@ final class JitDomLiveElementsByTagWalk
         if ($descendantsOnly) {
             $start = self::loadFirstChildObject($context, $root);
             $startNull = $context->builder->icmp(Builder::INT_EQ, $start, $objPtrTy->constNull());
-            $bbFind = BasicBlockHelper::append($context, 'dom_live_tag_item_find');
+            $bbFind = BasicBlockHelper::append($context, $labelPrefix.'_find');
             $context->builder->branchIf($startNull, $bbDone, $bbFind);
             $context->builder->positionAtEnd($bbFind);
         }
-        $found = self::emitPreorderFind($context, $start, $root, $tag, $indexI64);
+        $found = self::emitPreorderFindMatching(
+            $context,
+            $start,
+            $root,
+            $indexI64,
+            $labelPrefix,
+            $matchesNode
+        );
         $foundNull = $context->builder->icmp(Builder::INT_EQ, $found, $objPtrTy->constNull());
-        $bbWrite = BasicBlockHelper::append($context, 'dom_live_tag_item_write');
+        $bbWrite = BasicBlockHelper::append($context, $labelPrefix.'_write');
         $context->builder->branchIf($foundNull, $bbDone, $bbWrite);
         $context->builder->positionAtEnd($bbWrite);
         $context->builder->call(
@@ -136,6 +197,84 @@ final class JitDomLiveElementsByTagWalk
         $context->builder->positionAtEnd($bbDone);
 
         return JitValueBox::normalizeValuePtr($context, $resultPtr);
+    }
+
+    /**
+     * Public i1 wrapper for {@see emitNodeMatchesNs} — used by live NS count
+     * decrement on removeChild (#34995).
+     */
+    public static function nodeMatchesNsPublic(
+        Context $context,
+        Value $node,
+        string $namespaceUri,
+        string $localName
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_live_ns_match_pub');
+        self::ensureLayout($context);
+
+        return self::emitNodeMatchesNs($context, $node, $namespaceUri, $localName);
+    }
+
+    /**
+     * Count getElementsByTagNameNS matches under {@code $root} (#34995).
+     */
+    public static function countMatchingNs(
+        Context $context,
+        Value $root,
+        string $namespaceUri,
+        string $localName,
+        bool $descendantsOnly = false
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_live_ns_count');
+        self::ensureLayout($context);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $i64 = $context->getTypeFromString('int64');
+        $countSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt(0, false), $countSlot);
+
+        $rootNull = $context->builder->icmp(Builder::INT_EQ, $root, $objPtrTy->constNull());
+        $bbDone = BasicBlockHelper::append($context, 'dom_live_ns_count_done');
+        $bbWalk = BasicBlockHelper::append($context, 'dom_live_ns_count_walk');
+        $context->builder->branchIf($rootNull, $bbDone, $bbWalk);
+
+        $context->builder->positionAtEnd($bbWalk);
+        $start = $root;
+        if ($descendantsOnly) {
+            $start = self::loadFirstChildObject($context, $root);
+            $startNull = $context->builder->icmp(Builder::INT_EQ, $start, $objPtrTy->constNull());
+            $bbFind = BasicBlockHelper::append($context, 'dom_live_ns_count_find');
+            $context->builder->branchIf($startNull, $bbDone, $bbFind);
+            $context->builder->positionAtEnd($bbFind);
+        }
+        $curSlot = BasicBlockHelper::entryAlloca($context, $objPtrTy);
+        $context->builder->store($start, $curSlot);
+        $bbHdr = BasicBlockHelper::append($context, 'dom_live_ns_count_hdr');
+        $bbBody = BasicBlockHelper::append($context, 'dom_live_ns_count_body');
+        $bbNext = BasicBlockHelper::append($context, 'dom_live_ns_count_next');
+        $context->builder->branch($bbHdr);
+
+        $context->builder->positionAtEnd($bbHdr);
+        $cur = $context->builder->load($curSlot);
+        $curNull = $context->builder->icmp(Builder::INT_EQ, $cur, $objPtrTy->constNull());
+        $context->builder->branchIf($curNull, $bbDone, $bbBody);
+
+        $context->builder->positionAtEnd($bbBody);
+        $matches = self::emitNodeMatchesNs($context, $cur, $namespaceUri, $localName);
+        $bbInc = BasicBlockHelper::append($context, 'dom_live_ns_count_inc');
+        $context->builder->branchIf($matches, $bbInc, $bbNext);
+        $context->builder->positionAtEnd($bbInc);
+        $n = $context->builder->load($countSlot);
+        $context->builder->store($context->builder->add($n, $i64->constInt(1, false)), $countSlot);
+        $context->builder->branch($bbNext);
+
+        $context->builder->positionAtEnd($bbNext);
+        $next = self::emitNextPreorder($context, $cur, $root);
+        $context->builder->store($next, $curSlot);
+        $context->builder->branch($bbHdr);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return $context->builder->load($countSlot);
     }
 
     /** Load PROP_FIRST_CHILD as __object__* or null. */
@@ -179,10 +318,18 @@ final class JitDomLiveElementsByTagWalk
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
-        foreach ([VmDom::PROP_TAG_NAME, VmDom::PROP_NODE_NAME] as $prop) {
+        foreach ([
+            VmDom::PROP_TAG_NAME,
+            VmDom::PROP_NODE_NAME,
+            VmDom::PROP_LOCAL_NAME,
+        ] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_STRING);
             }
+        }
+        // namespaceURI is a nullable VALUE box on ElementNS (#24923) — never TYPE_STRING.
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NAMESPACE_URI)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_NAMESPACE_URI, JITVariable::TYPE_VALUE);
         }
     }
 
@@ -255,15 +402,17 @@ final class JitDomLiveElementsByTagWalk
     /**
      * Preorder find: return object at matching index, or null.
      *
-     * @param Value $start first node to visit
-     * @param Value $boundary climb stop (context element / documentElement)
+     * @param Value                            $start       first node to visit
+     * @param Value                            $boundary    climb stop (context element / documentElement)
+     * @param callable(Context, Value): Value  $matchesNode returns i1
      */
-    private static function emitPreorderFind(
+    private static function emitPreorderFindMatching(
         Context $context,
         Value $start,
         Value $boundary,
-        string $tag,
-        Value $indexI64
+        Value $indexI64,
+        string $labelPrefix,
+        callable $matchesNode
     ): Value {
         $objPtrTy = $context->getTypeFromString('__object__*');
         $i64 = $context->getTypeFromString('int64');
@@ -275,10 +424,10 @@ final class JitDomLiveElementsByTagWalk
         $context->builder->store($i64->constInt(0, false), $idxSlot);
         $context->builder->store($objPtrTy->constNull(), $foundSlot);
 
-        $bbHdr = BasicBlockHelper::append($context, 'dom_live_tag_find_hdr');
-        $bbBody = BasicBlockHelper::append($context, 'dom_live_tag_find_body');
-        $bbNext = BasicBlockHelper::append($context, 'dom_live_tag_find_next');
-        $bbEnd = BasicBlockHelper::append($context, 'dom_live_tag_find_end');
+        $bbHdr = BasicBlockHelper::append($context, $labelPrefix.'_find_hdr');
+        $bbBody = BasicBlockHelper::append($context, $labelPrefix.'_find_body');
+        $bbNext = BasicBlockHelper::append($context, $labelPrefix.'_find_next');
+        $bbEnd = BasicBlockHelper::append($context, $labelPrefix.'_find_end');
         $context->builder->branch($bbHdr);
 
         $context->builder->positionAtEnd($bbHdr);
@@ -287,15 +436,15 @@ final class JitDomLiveElementsByTagWalk
         $context->builder->branchIf($curNull, $bbEnd, $bbBody);
 
         $context->builder->positionAtEnd($bbBody);
-        $matches = self::emitNodeMatchesTag($context, $cur, $tag);
-        $bbMaybe = BasicBlockHelper::append($context, 'dom_live_tag_find_maybe');
+        $matches = $matchesNode($context, $cur);
+        $bbMaybe = BasicBlockHelper::append($context, $labelPrefix.'_find_maybe');
         $context->builder->branchIf($matches, $bbMaybe, $bbNext);
 
         $context->builder->positionAtEnd($bbMaybe);
         $idx = $context->builder->load($idxSlot);
         $at = $context->builder->icmp(Builder::INT_EQ, $idx, $indexI64);
-        $bbHit = BasicBlockHelper::append($context, 'dom_live_tag_find_hit');
-        $bbInc = BasicBlockHelper::append($context, 'dom_live_tag_find_inc');
+        $bbHit = BasicBlockHelper::append($context, $labelPrefix.'_find_hit');
+        $bbInc = BasicBlockHelper::append($context, $labelPrefix.'_find_inc');
         $context->builder->branchIf($at, $bbHit, $bbInc);
 
         $context->builder->positionAtEnd($bbHit);
@@ -509,6 +658,140 @@ final class JitDomLiveElementsByTagWalk
             $eqLocal = $context->builder->select($localNull, $i1->constInt(0, false), $eqLocal);
             $eq = $context->builder->or($eqTag, $eqLocal);
             $context->builder->store($eq, $outSlot);
+            $context->builder->branch($bbDone);
+        }
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return $context->builder->load($outSlot);
+    }
+
+    /**
+     * i1: node is a DOMElement matching getElementsByTagNameNS (php-src nodelist.c; #34995).
+     *
+     * {@code *} for localName or namespaceURI is a wildcard. Empty namespaceURI matches
+     * elements with no / empty namespace.
+     */
+    private static function emitNodeMatchesNs(
+        Context $context,
+        Value $node,
+        string $namespaceUri,
+        string $localName
+    ): Value {
+        $objectType = $context->type->object;
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        $elementId = $objectType->lookup('DOMElement');
+        $livingId = $objectType->lookup('Dom\\Element');
+        $map = $context->structFieldMap['__object__'];
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($node, $map['class_id'])
+        );
+        $isClassic = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($elementId, false)
+        );
+        $isLiving = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $i64->constInt($livingId, false)
+        );
+        $isElement = $context->builder->or($isClassic, $isLiving);
+
+        $outSlot = BasicBlockHelper::entryAlloca($context, $i1);
+        $context->builder->store($i1->constInt(0, false), $outSlot);
+        $bbNotElem = BasicBlockHelper::append($context, 'dom_live_ns_match_no');
+        $bbElem = BasicBlockHelper::append($context, 'dom_live_ns_match_elem');
+        $bbDone = BasicBlockHelper::append($context, 'dom_live_ns_match_done');
+        $context->builder->branchIf($isElement, $bbElem, $bbNotElem);
+
+        $context->builder->positionAtEnd($bbNotElem);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbElem);
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NODE_NAME)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_NODE_NAME, JITVariable::TYPE_STRING);
+        }
+        $nameVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            VmDom::PROP_NODE_NAME,
+            $elementClassId
+        );
+        $nameStr = $context->helper->loadValue($nameVar);
+        $isRealElement = self::emitNodeNameIsElement($context, $nameStr);
+        $bbReal = BasicBlockHelper::append($context, 'dom_live_ns_match_real');
+        $context->builder->branchIf($isRealElement, $bbReal, $bbDone);
+        $context->builder->positionAtEnd($bbReal);
+
+        // Local name: * matches any; else strcmp against PROP_LOCAL_NAME (fallback nodeName).
+        $localOk = $i1->constInt(1, false);
+        if ('*' !== $localName) {
+            if (!$objectType->hasProperty($elementClassId, VmDom::PROP_LOCAL_NAME)) {
+                $objectType->defineProperty($elementClassId, VmDom::PROP_LOCAL_NAME, JITVariable::TYPE_STRING);
+            }
+            $localVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $node,
+                'DOMElement',
+                VmDom::PROP_LOCAL_NAME,
+                $elementClassId
+            );
+            $localStr = $context->helper->loadValue($localVar);
+            $localNull = $context->builder->icmp(Builder::INT_EQ, $localStr, $strPtr->constNull());
+            $wantLocal = $context->builder->load($context->constantStringFromString($localName));
+            $cmpLocal = JitStringCompare::strcmp($context, $localStr, $wantLocal);
+            $eqLocal = $context->builder->icmp(Builder::INT_EQ, $cmpLocal, $i64->constInt(0, false));
+            $eqLocal = $context->builder->select($localNull, $i1->constInt(0, false), $eqLocal);
+            // Fallback: unprefixed tagName when localName slot empty (#34924 hollow).
+            $cmpTag = JitStringCompare::strcmp($context, $nameStr, $wantLocal);
+            $eqTag = $context->builder->icmp(Builder::INT_EQ, $cmpTag, $i64->constInt(0, false));
+            $localOk = $context->builder->or($eqLocal, $eqTag);
+        }
+
+        $bbNs = BasicBlockHelper::append($context, 'dom_live_ns_match_ns');
+        $context->builder->branchIf($localOk, $bbNs, $bbDone);
+        $context->builder->positionAtEnd($bbNs);
+
+        if ('*' === $namespaceUri) {
+            $context->builder->store($i1->constInt(1, false), $outSlot);
+            $context->builder->branch($bbDone);
+        } else {
+            if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NAMESPACE_URI)) {
+                $objectType->defineProperty($elementClassId, VmDom::PROP_NAMESPACE_URI, JITVariable::TYPE_VALUE);
+            }
+            $nsVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $node,
+                'DOMElement',
+                VmDom::PROP_NAMESPACE_URI,
+                $elementClassId
+            );
+            // VALUE box (#24923) — readString, not strcmp against a raw __value__*.
+            $nsValPtr = JitValueBox::valuePtrFromVariable($context, $nsVar);
+            $nsStr = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $nsValPtr
+            );
+            $nsNull = $context->builder->icmp(Builder::INT_EQ, $nsStr, $strPtr->constNull());
+            if ('' === $namespaceUri) {
+                // Empty URI: match null or empty string (php-src).
+                $wantEmpty = $context->builder->load($context->constantStringFromString(''));
+                $cmpEmpty = JitStringCompare::strcmp($context, $nsStr, $wantEmpty);
+                $eqEmpty = $context->builder->icmp(Builder::INT_EQ, $cmpEmpty, $i64->constInt(0, false));
+                $nsOk = $context->builder->or($nsNull, $eqEmpty);
+            } else {
+                $wantNs = $context->builder->load($context->constantStringFromString($namespaceUri));
+                $cmpNs = JitStringCompare::strcmp($context, $nsStr, $wantNs);
+                $eqNs = $context->builder->icmp(Builder::INT_EQ, $cmpNs, $i64->constInt(0, false));
+                $nsOk = $context->builder->select($nsNull, $i1->constInt(0, false), $eqNs);
+            }
+            $context->builder->store($nsOk, $outSlot);
             $context->builder->branch($bbDone);
         }
 

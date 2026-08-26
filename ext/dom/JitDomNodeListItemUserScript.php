@@ -153,10 +153,43 @@ final class JitDomNodeListItemUserScript
             return self::materializeNthQueryMatch($context, $xml, $queryTag, $index);
         }
 
-        // getElementsByTagNameNS live list: materialize Nth NS match (#32415).
+        // getElementsByTagNameNS live list — prefer pinned-root walk (#34995 / re-#34983).
+        // Always rematerializing (#32415) returned a detached clone (null parentNode)
+        // so removeChild($list->item(N)) raised Not Found.
         $nsQuery = JitDomGetElementsByTagNameUserScript::lastNsQuery();
         if (null !== $xml && null !== $nsQuery) {
-            return self::materializeNthNsMatch($context, $xml, $nsQuery[0], $nsQuery[1], $index);
+            $pinned = DomUserScriptPinnedRootLlvm::load($context);
+            $i64 = $context->getTypeFromString('int64');
+            $fromNsElement = JitDomGetElementsByTagNameUserScript::lastNsQueryFromElement();
+            $live = JitDomLiveElementsByTagWalk::itemAtNs(
+                $context,
+                $pinned,
+                $nsQuery[0],
+                $nsQuery[1],
+                $i64->constInt($index, false),
+                $fromNsElement
+            );
+            $compileTime = self::materializeNthNsMatch(
+                $context,
+                $xml,
+                $nsQuery[0],
+                $nsQuery[1],
+                $index
+            );
+            $objPtrTy = $context->getTypeFromString('__object__*');
+            $pinNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $pinned,
+                $objPtrTy->constNull()
+            );
+            $liveObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $live
+            );
+            $liveNull = $context->builder->icmp(Builder::INT_EQ, $liveObj, $objPtrTy->constNull());
+            $preferRemat = $context->builder->or($pinNull, $liveNull);
+
+            return $context->builder->select($preferRemat, $compileTime, $live);
         }
 
         // Legacy XPath evaluate/query cache hit (item(0) only).
