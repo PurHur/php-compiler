@@ -16,7 +16,12 @@ use PHPCompiler\JIT\Context;
  *
  * Former NestedJIT {@see \PHPCompiler\Web\SuperglobalRefreshJitHelper} bridge removed (#21888):
  * `: HashTable` returns TypeError under self-host stubs (`HashTable, int returned` — peer #20652 /
- * #13571). Zend/VM SSOT remains {@see \PHPCompiler\Web\Superglobals} + the JitHelper unit tests.
+ * #13571). Context ensureFullStandaloneBodies must not eagerly link this during init (#35137) —
+ * {@see Context::compileToFile} (every LOAD_TYPE_STANDALONE: thin ensureUserScriptRefreshEmit,
+ * full ensureStandaloneBodies) + bootstrap-aot ensureBootstrapAotStandaloneBodies already ensure
+ * before main looks up __superglobals__refresh. Leftover Context NestedJIT vs Runtime ABI drift
+ * mints __superglobals__refresh.1 (#31894 / #32122).
+ * Zend/VM SSOT remains {@see \PHPCompiler\Web\Superglobals} + the JitHelper unit tests.
  * php-src: main/php_variables.c
  */
 final class SuperglobalRefreshRuntime
