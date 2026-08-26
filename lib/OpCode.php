@@ -332,6 +332,12 @@ class OpCode {
     /** PHP 8.4+ Zend {@code {closure:…:line}} for TYPE_CLOSURE (#30076). */
     public ?string $closureRichDisplayName = null;
 
+    /**
+     * Internal `{closure}_N` when the body was precompiled before the enclosing function
+     * ran from the JIT queue — so returned-closure call sites see candidates (#34868).
+     */
+    public ?string $closurePrecompiledInternalName = null;
+
     /** Declaring class for method-scoped TYPE_CLOSURE (#30076 / #29953). */
     public ?string $closureDeclaringClass = null;
 

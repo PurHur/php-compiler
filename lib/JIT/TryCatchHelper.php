@@ -853,8 +853,11 @@ final class TryCatchHelper
             } else {
                 $builder->positionAtEnd($throwBlock);
             }
-            $context->freeDeadVariables($func, $throwBlock, $block);
-            $thrown = $context->getVariableFromOp($block->getOperand($op->arg1));
+            // Resolve the throw operand before freeDeadVariables — and pass it as skip —
+            // so the Exception object is not freed before instanceof Throwable (#34868).
+            $throwOperand = $block->getOperand($op->arg1);
+            $context->freeDeadVariables($func, $throwBlock, $block, $throwOperand);
+            $thrown = $context->getVariableFromOp($throwOperand);
             if (VMVariable::TYPE_ENUM_CASE === $thrown->type) {
                 // AOT standalone: ErrorRaise has no body — allocate Error + UncaughtThrowPrinter (#33975).
                 self::emitUncaughtErrorObject(
