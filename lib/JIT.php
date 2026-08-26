@@ -3077,6 +3077,10 @@ class JIT {
      * "undeclared static property" into top-level closures (#34896 leftover of #34868).
      * Method bodies never DECLARE_CLASS — precompile there still covers #34868.
      * Top-level closures compile later at TYPE_CLOSURE (after declares in runQueue).
+     *
+     * Skip Fiber callbacks with Fiber::suspend(): they must use compileResumeFunction
+     * at TYPE_CLOSURE (compilingFiberResume=true). Precompile hits FiberSuspendStatic
+     * with compilingFiberResume=false → LogicException (#35188 / re-#4019).
      */
     private function precompileClosuresBeforeQueue(Block $block): void
     {
@@ -3091,6 +3095,9 @@ class JIT {
                 continue;
             }
             if ($this->shouldStubClosureLowering()) {
+                continue;
+            }
+            if (JIT\FiberHelper::blockContainsFiberSuspend($op->block1)) {
                 continue;
             }
             $internalName = JIT\ClosureHelper::nextInternalName();
