@@ -25,14 +25,16 @@ final class UrldecodeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('formDecoding', $source);
     }
 
-    public function testUrldecodeJitHelperDelegatesToVmString(): void
+    public function testUrldecodeJitHelperSelfContainedMatchesVmString(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UrldecodeJitHelper.php');
-        $this->assertStringContainsString('VmString::urldecode', $source);
-        $this->assertStringContainsString('VmString::rawurldecode', $source);
+        $this->assertStringNotContainsString('VmString::', $source);
+        $this->assertStringContainsString('\\strlen($data)', $source);
+        $this->assertStringContainsString('byteAt', $source);
 
         $this->assertSame('foo bar', UrldecodeJitHelper::urldecodeArgv('foo+bar'));
         $this->assertSame('foo+bar', UrldecodeJitHelper::rawurldecodeArgv('foo%2Bbar'));
+        $this->assertSame('a b&c', UrldecodeJitHelper::urldecodeArgv('a+b%26c'));
         $this->assertSame('foo bar', VmString::urldecode('foo+bar'));
         $this->assertSame('foo+bar', VmString::rawurldecode('foo%2Bbar'));
     }
