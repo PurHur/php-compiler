@@ -767,7 +767,135 @@ final class ArrayObjectJitHelper
         return \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $tail);
     }
 
-    /** Expose object load for {@see \PHPCompiler\ext\standard\JitSerialize} (#33625). */
+    /**
+     * php-src zim_ArrayObject_serialize — legacy `x:i:flags;a:N:{…};m:a:0:{}` (#35111).
+     *
+     * Thin AOT without proxy silent-nulled (#579). Reuses `__compiler_serialize_hashtable`.
+     *
+     * @return Value {@see __value__*} string box
+     */
+    public static function compileLegacySerialize(
+        Context $context,
+        JITVariable $receiver,
+        string $className = self::CLASS_NAME
+    ): Value {
+        \PHPCompiler\JIT\Builtin\StringSerialize::ensureLinked($context);
+        $obj = self::loadObject($context, $receiver);
+        $flagsSlot = $context->type->object->propertyFetch($obj, $className, self::PROP_FLAGS);
+        $flags = JITVariable::TYPE_NATIVE_LONG === $flagsSlot->type
+            ? $context->helper->loadValue($flagsSlot)
+            : $context->builder->call(
+                $context->lookupFunction('__value__toLong'),
+                JitValueBox::valuePtrFromVariable($context, $flagsSlot)
+            );
+        // SPL_ARRAY_CLONE_MASK — php-src spl_array.h / SplArraySerializeSupport::LEGACY_CLONE_MASK
+        $i64 = $context->getTypeFromString('int64');
+        $flags = $context->builder->and($flags, $i64->constInt(0x0100FFFF, false));
+
+        $ht = self::htPtr($context, $obj);
+        $serFlags = $i64->constInt(0, false);
+        $storageWire = $context->builder->call(
+            $context->lookupFunction('__compiler_serialize_hashtable'),
+            $ht,
+            $serFlags
+        );
+        $flagDigits = VmResourceIdString::formatNativeLong($context, $flags);
+        $xPrefix = $context->builder->load($context->constantStringFromString('x:i:'));
+        $semi = $context->builder->load($context->constantStringFromString(';'));
+        $mTail = $context->builder->load($context->constantStringFromString(';m:a:0:{}'));
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $xPrefix, $flagDigits);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $semi);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $storageWire);
+        $wire = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $mTail);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $wire
+        );
+
+        return $slot;
+    }
+
+    /**
+     * php-src zim_ArrayObject_unserialize — restore from legacy x:/m: wire (#35111).
+     *
+     * @return Value null box (void)
+     */
+    public static function compileLegacyUnserialize(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $data,
+        string $className = self::CLASS_NAME
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        foreach ([
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
+        ] as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof \PHPCompiler\JIT\Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
+            }
+        }
+        $logical = 'PHPCompiler\\ext\\standard\\UnserializeSplArrayLegacyNestedJitHelper::restore';
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplArrayLegacyNestedJitHelper.php',
+            [$logical],
+            '#35111'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#35111');
+
+        $ht = HashTableHelper::alloc($context);
+        $slot = $context->type->object->propertySlotFor($obj, $className, self::PROP_HT);
+        $voidPtr = $context->getTypeFromString('void*');
+        $context->builder->store(
+            $context->builder->pointerCast($ht, $voidPtr),
+            $slot
+        );
+
+        $payload = $context->helper->loadValue($data);
+        if (JITVariable::TYPE_STRING !== $data->type) {
+            $payload = $context->builder->call(
+                $context->lookupFunction('__value__toString'),
+                JitValueBox::valuePtrFromVariable($context, $data)
+            );
+        }
+        $payloadOwned = self::nestedJitOwnedString($context, $payload);
+        $destI64 = \PHPCompiler\JIT\JitNestedHelperCoerce::ptrToI64($context, $ht);
+        $i64 = $context->getTypeFromString('int64');
+        $flagsRaw = $context->builder->call(
+            $fn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper($context, $destI64, $fn->getParam(0)->typeOf()),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper($context, $payloadOwned, $fn->getParam(1)->typeOf())
+        );
+        $flags = \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $flagsRaw, $i64);
+        $ok = $context->builder->icmp(Builder::INT_SGE, $flags, $i64->constInt(0, false));
+        $parent = BasicBlockHelper::parentFunction($context);
+        $bbStore = $parent->appendBasicBlock('ao_leg_unser_store');
+        $bbDone = $parent->appendBasicBlock('ao_leg_unser_done');
+        $context->builder->branchIf($ok, $bbStore, $bbDone);
+        $context->builder->positionAtEnd($bbStore);
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, $className, self::PROP_FLAGS),
+            new JITVariable($context, JITVariable::TYPE_NATIVE_LONG, JITVariable::KIND_VALUE, $flags),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        if ('ArrayObject' === $className) {
+            self::storeDefaultIteratorClassSlots($context, $obj);
+        }
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbDone);
+
+        return self::voidResult($context);
+    }
+
+
     public static function loadObjectPtr(Context $context, JITVariable $receiver): Value
     {
         return self::loadObject($context, $receiver);

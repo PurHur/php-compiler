@@ -204,6 +204,30 @@ final class ArrayIteratorMethod implements Call
                     $qualified
                 )
             ),
+            // php-src zim_ArrayIterator_serialize/unserialize — thin AOT silent-null (#579 / #35111)
+            'serialize' => $this->compileExact(
+                $context,
+                $args,
+                $qualified,
+                0,
+                fn () => ArrayObjectJitHelper::compileLegacySerialize(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this'),
+                    $this->className
+                )
+            ),
+            'unserialize' => $this->compileExact(
+                $context,
+                $args,
+                $qualified,
+                1,
+                fn () => ArrayObjectJitHelper::compileLegacyUnserialize(
+                    $context,
+                    $args[0] ?? throw new \LogicException($qualified.'() called without $this'),
+                    $args[1],
+                    $this->className
+                )
+            ),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),

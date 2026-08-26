@@ -1517,6 +1517,9 @@ class Context {
             // php-src zim_ArrayIterator_getFlags/setFlags — thin AOT was a silent no-op (#33616).
             'getFlags',
             'setFlags',
+            // php-src zim_ArrayIterator_serialize/unserialize — silent-null (#579 / #35111)
+            'serialize',
+            'unserialize',
         ] as $aiMethod) {
             $this->functionProxies['arrayiterator::'.strtolower($aiMethod)] = new Call\ArrayIteratorMethod(
                 $aiMethod,
@@ -1552,6 +1555,9 @@ class Context {
             // php-src zim_ArrayObject_getFlags/setFlags — thin AOT was a silent no-op (#33616).
             'getFlags',
             'setFlags',
+            // php-src zim_ArrayObject_serialize/unserialize — silent-null (#579 / #35111)
+            'serialize',
+            'unserialize',
         ] as $aoMethod) {
             $this->functionProxies['arrayobject::'.strtolower($aoMethod)] = new Call\ArrayObjectMethod($aoMethod);
         }
@@ -1790,6 +1796,8 @@ class Context {
                 'setIteratorMode', 'getIteratorMode',
                 // Iterator protocol — without proxy thin AOT silent-nulls (#579 / #34976)
                 'rewind', 'valid', 'current', 'key', 'next',
+                // Serializable::serialize/unserialize — silent-null (#579 / #35111)
+                'serialize', 'unserialize',
             ];
             if ('splqueue' === $dllLc) {
                 $dllMethods = array_merge($dllMethods, ['enqueue', 'dequeue']);

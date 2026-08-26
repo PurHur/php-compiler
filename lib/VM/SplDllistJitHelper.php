@@ -802,6 +802,162 @@ final class SplDllistJitHelper
     }
 
     /**
+     * php-src zim_SplDoublyLinkedList_serialize — legacy `i:flags;:elem;…` (#35111).
+     *
+     * Thin AOT without proxy silent-nulled (#579). LLVM concat + `__compiler_serialize_value`
+     * (NestedJIT encode after ArrayObject hashtable serialize aborted — peer ordering).
+     *
+     * @return Value {@see __value__*} string box
+     */
+    public static function compileLegacySerialize(Context $context, JITVariable $receiver): Value
+    {
+        \PHPCompiler\JIT\Builtin\StringSerialize::ensureLinked($context);
+        $obj = self::loadObject($context, $receiver);
+        $flags = self::loadFlagsForAnyDllistClass($context, $obj);
+        $ht = self::htPtr($context, $obj);
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $n64 = $context->builder->zExt($n, $i64);
+
+        $flagDigits = VmResourceIdString::formatNativeLong($context, $flags);
+        $iPrefix = $context->builder->load($context->constantStringFromString('i:'));
+        $semi = $context->builder->load($context->constantStringFromString(';'));
+        $colon = $context->builder->load($context->constantStringFromString(':'));
+        $acc0 = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $iPrefix, $flagDigits);
+        $acc0 = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc0, $semi);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $accSlot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $context->builder->store($acc0, $accSlot);
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt(0, false), $idxSlot);
+
+        $parent = BasicBlockHelper::parentFunction($context);
+        $bbHead = $parent->appendBasicBlock('dll_leg_ser_head');
+        $bbBody = $parent->appendBasicBlock('dll_leg_ser_body');
+        $bbDone = $parent->appendBasicBlock('dll_leg_ser_done');
+        $context->builder->branch($bbHead);
+
+        $context->builder->positionAtEnd($bbHead);
+        $idx = $context->builder->load($idxSlot);
+        $cont = $context->builder->icmp(Builder::INT_SLT, $idx, $n64);
+        $context->builder->branchIf($cont, $bbBody, $bbDone);
+
+        $context->builder->positionAtEnd($bbBody);
+        $idxSize = $context->builder->truncOrBitCast($idx, $sizeT);
+        $elemBox = HashTableHelper::readIndexedToValueBox($context, $ht, $idxSize);
+        $serFlags = $i64->constInt(0, false);
+        $elemWire = $context->builder->call(
+            $context->lookupFunction('__compiler_serialize_value'),
+            JitValueBox::valuePtrFromVariable($context, $elemBox),
+            $serFlags
+        );
+        $acc = $context->builder->load($accSlot);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $colon);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $elemWire);
+        $context->builder->store($acc, $accSlot);
+        $context->builder->store(
+            $context->builder->add($idx, $i64->constInt(1, false)),
+            $idxSlot
+        );
+        $context->builder->branch($bbHead);
+
+        $context->builder->positionAtEnd($bbDone);
+        $wire = $context->builder->load($accSlot);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $wire
+        );
+
+        return $slot;
+    }
+
+    /**
+     * php-src zim_SplDoublyLinkedList_unserialize — restore legacy wire (#35111).
+     *
+     * @return Value null box (void)
+     */
+    public static function compileLegacyUnserialize(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $data,
+        string $className = 'SplDoublyLinkedList'
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $internals = [
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_double_at(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_bool_at(),
+        ];
+        foreach ($internals as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof \PHPCompiler\JIT\Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
+            }
+        }
+        $logical = 'PHPCompiler\\ext\\standard\\UnserializeSplDllistLegacyNestedJitHelper::restore';
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplDllistLegacyNestedJitHelper.php',
+            [$logical],
+            '#35111'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#35111');
+        $ht = self::htPtr($context, $obj);
+        $payload = $context->helper->loadValue($data);
+        if (JITVariable::TYPE_STRING !== $data->type) {
+            $payload = $context->builder->call(
+                $context->lookupFunction('__value__toString'),
+                JitValueBox::valuePtrFromVariable($context, $data)
+            );
+        }
+        $payloadOwned = self::nestedJitOwnedString($context, $payload);
+        $destI64 = \PHPCompiler\JIT\JitNestedHelperCoerce::ptrToI64($context, $ht);
+        $flagsRaw = $context->builder->call(
+            $fn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $destI64,
+                $fn->getParam(0)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $payloadOwned,
+                $fn->getParam(1)->typeOf()
+            )
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $flags = \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $flagsRaw, $i64);
+        $ok = $context->builder->icmp(Builder::INT_SGE, $flags, $i64->constInt(0, false));
+        $parent = BasicBlockHelper::parentFunction($context);
+        $bbStore = $parent->appendBasicBlock('dll_leg_unser_flags');
+        $bbDone = $parent->appendBasicBlock('dll_leg_unser_done');
+        $context->builder->branchIf($ok, $bbStore, $bbDone);
+        $context->builder->positionAtEnd($bbStore);
+        $storeClass = \in_array($className, ['SplDoublyLinkedList', 'SplQueue', 'SplStack'], true)
+            ? $className
+            : 'SplDoublyLinkedList';
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, $storeClass, self::PROP_FLAGS),
+            new JITVariable($context, JITVariable::TYPE_NATIVE_LONG, JITVariable::KIND_VALUE, $flags),
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbDone);
+
+        return self::voidResult($context);
+    }
+
+    /**
      * Load `__spl_flags` for SplDoublyLinkedList / SplQueue / SplStack (#34592).
      *
      * Construct stores the property under the concrete class name; branch on class_id.
