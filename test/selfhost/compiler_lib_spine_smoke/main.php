@@ -8011,9 +8011,11 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionMethodVisibilityQuery.php
 require_once __DIR__.'/../../../ext/mbstring/JitMbCase.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbSubstrCount.php';
 require_once __DIR__.'/../../../ext/mbstring/MbCaseJitHelper.php';
+require_once __DIR__.'/../../../ext/mbstring/MbCheckEncodingJitHelper.php';
 require_once __DIR__.'/../../../ext/mbstring/MbChrOrdJitHelper.php';
 require_once __DIR__.'/../../../ext/mbstring/MbSubstrCountJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MbCaseRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MbCheckEncodingRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MbChrOrdRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MbConvertCaseRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MbConvertEncodingRuntime.php';
