@@ -27311,6 +27311,35 @@ class JIT {
             '__construct' === $methodLc
         );
         $proxyName = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
+        // Static generator methods register a resume creator under class::method, not an
+        // ordinary callable proxy — mirror METHODCALL_INIT (#35147) for Class::g() (#35153 /
+        // Zend zend_generators.c; re-#4938 false fatal removed so this path is reachable).
+        $genResume = null;
+        $genWalk = $declaringClassLc;
+        $genSeen = [];
+        while ('' !== $genWalk && 'object' !== $genWalk && !isset($genSeen[$genWalk])) {
+            $genSeen[$genWalk] = true;
+            $genResume = JIT\GeneratorHelper::creatorResumeName(
+                $this->context,
+                $genWalk.'::'.$methodLc
+            );
+            if (null !== $genResume) {
+                break;
+            }
+            $parentLc = $this->context->type->object->parentClassLc($genWalk);
+            if (null === $parentLc || '' === $parentLc) {
+                break;
+            }
+            $genWalk = $parentLc;
+        }
+        if (null !== $genResume) {
+            $this->context->scope->generatorResumeCallee = $genResume;
+            // Non-null toCall required: EXEC_RETURN null-short-circuits before generatorResumeCallee.
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+            $this->context->scope->args = [];
+
+            return;
+        }
         // Per-user-module VmClosureInvoke::invokeVariable needs NestedClosureInvoke (#24156).
         if (
             'invokevariable' === $methodLc
