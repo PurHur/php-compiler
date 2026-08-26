@@ -282,6 +282,13 @@ final class JitDomCreateElementNS
             self::xmlnsAttrForSaveXml($namespace, $qualifiedName),
             $className
         );
+        // Unset NATIVE_LONG nodeType SIGSEGVs on $el->nodeType (#35173 leftover of #35168).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            $className,
+            DomConstants::XML_ELEMENT_NODE
+        );
 
         return $obj;
     }
