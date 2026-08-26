@@ -22108,6 +22108,7 @@ class JIT {
             || $toCall instanceof JIT\Call\DateIntervalConstruct
             || $toCall instanceof JIT\Call\DatePeriodConstruct
             || $toCall instanceof JIT\Call\DomDocumentConstruct
+            || $toCall instanceof JIT\Call\ZipArchiveConstruct
             || $toCall instanceof JIT\Call\PdoConstruct
             || $toCall instanceof JIT\Call\ArrayIteratorConstruct
             || $toCall instanceof JIT\Call\RecursiveIteratorIteratorConstruct
