@@ -12,8 +12,10 @@ use PHPCompiler\OpCode;
 use PHPCompiler\VM\GeneratorIteratorJitHelper;
 use PHPCompiler\VM\GeneratorJitHelper;
 use PHPCompiler\VM\GeneratorYieldFromJitHelper;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPCompiler\VM\VmGenerator;
 use PHPCfg\Operand;
+use PHPCfg\Operand\Literal;
 use PHPLLVM\Value;
 
 /**
@@ -630,7 +632,166 @@ final class GeneratorHelper
     }
 
     /**
+     * Locate SMALLER/… + JUMPIF in a for/while header (optional leading CONST_FETCH).
+     *
+     * @return array{0: OpCode, 1: OpCode}|null
+     */
+    private static function findLoopHeaderCompare(Block $header): ?array
+    {
+        $n = $header->nOpCodes;
+        for ($i = 0; $i < $n - 1; ++$i) {
+            $cmpOp = $header->opCodes[$i];
+            $jumpIf = $header->opCodes[$i + 1];
+            if (OpCode::TYPE_JUMPIF !== $jumpIf->type) {
+                continue;
+            }
+            if (
+                OpCode::TYPE_SMALLER !== $cmpOp->type
+                && OpCode::TYPE_SMALLER_OR_EQUAL !== $cmpOp->type
+                && OpCode::TYPE_GREATER !== $cmpOp->type
+                && OpCode::TYPE_GREATER_OR_EQUAL !== $cmpOp->type
+            ) {
+                continue;
+            }
+
+            return [$cmpOp, $jumpIf];
+        }
+
+        return null;
+    }
+
+    /**
+     * Loop bound as i64: frame local, block constant, literal, or folded CONST_FETCH (#35166).
+     */
+    private static function resolveHandLowerLoopBoundI64(
+        Context $context,
+        Block $cmpBlock,
+        OpCode $cmpOp,
+        string $iName
+    ): ?Value {
+        $leftSlot = $cmpOp->arg2;
+        $rightSlot = $cmpOp->arg3;
+        if (null === $rightSlot && null === $leftSlot) {
+            return null;
+        }
+        $leftName = null;
+        if (null !== $leftSlot) {
+            $leftOp = $cmpBlock->getOperand((int) $leftSlot);
+            $leftName = null !== $leftOp ? OperandName::resolve($leftOp) : null;
+        }
+        $rightName = null;
+        if (null !== $rightSlot) {
+            $rightOp = $cmpBlock->getOperand((int) $rightSlot);
+            $rightName = null !== $rightOp ? OperandName::resolve($rightOp) : null;
+        }
+        // Common: $i < bound — bound on RHS.
+        if ($leftName === $iName || (null === $leftName && $rightName !== $iName)) {
+            if (null === $rightSlot) {
+                return null;
+            }
+
+            return self::operandSlotToI64Bound($context, $cmpBlock, (int) $rightSlot, $iName);
+        }
+        // bound ? $i — bound on LHS.
+        if ($rightName === $iName && null !== $leftSlot) {
+            return self::operandSlotToI64Bound($context, $cmpBlock, (int) $leftSlot, $iName);
+        }
+
+        return null;
+    }
+
+    private static function operandSlotToI64Bound(
+        Context $context,
+        Block $block,
+        int $slot,
+        string $iName
+    ): ?Value {
+        $i64 = $context->getTypeFromString('int64');
+        if (isset($block->constants[$slot])) {
+            $c = $block->constants[$slot];
+            if (VmVariable::TYPE_INTEGER === $c->type) {
+                return $i64->constInt($c->toInt(), true);
+            }
+        }
+        $op = $block->getOperand($slot);
+        if ($op instanceof Literal && \is_int($op->value)) {
+            return $i64->constInt($op->value, true);
+        }
+        $name = null !== $op ? OperandName::resolve($op) : null;
+        if (null !== $name && $name !== $iName && isset($context->generatorFrameLocalPtrs[$name])) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                JitValueBox::pointer($context, $context->generatorFrameLocalPtrs[$name])
+            );
+        }
+        // Header often does CONST_FETCH N → temp then SMALLER($i, temp) (#35166).
+        for ($i = 0; $i < $block->nOpCodes; ++$i) {
+            $fetch = $block->opCodes[$i];
+            if (OpCode::TYPE_CONST_FETCH !== $fetch->type || (int) $fetch->arg1 !== $slot) {
+                continue;
+            }
+            if (null === $fetch->arg2 || !isset($block->constants[(int) $fetch->arg2])) {
+                continue;
+            }
+            $constName = $block->constants[(int) $fetch->arg2]->toString();
+            $folded = self::foldDeclaredGlobalConstInt($context, $constName);
+            if (null !== $folded) {
+                return $i64->constInt($folded, true);
+            }
+        }
+
+        return null;
+    }
+
+    /** File `const N = 3` may not be in context yet (FUNCDEF runs before DECLARE) (#35166). */
+    private static function foldDeclaredGlobalConstInt(Context $context, string $constName): ?int
+    {
+        if (isset($context->constants[$constName][2]) && \is_int($context->constants[$constName][2])) {
+            return $context->constants[$constName][2];
+        }
+        $nameOp = new Literal($constName);
+        $fetched = $context->constantFetch($nameOp);
+        if (isset($context->constants[$constName][2]) && \is_int($context->constants[$constName][2])) {
+            return $context->constants[$constName][2];
+        }
+        unset($fetched);
+        // FUNCDEF compiles before DECLARE_GLOBAL_CONST on the same script block — scan
+        // already-entered blocks (enclosing {main} is in blockStorage) for the declare.
+        if (!$context->scope->blockStorage instanceof \SplObjectStorage) {
+            return null;
+        }
+        foreach ($context->scope->blockStorage as $scanBlock) {
+            if (!$scanBlock instanceof Block) {
+                continue;
+            }
+            foreach ($scanBlock->opCodes as $decl) {
+                if (OpCode::TYPE_DECLARE_GLOBAL_CONST !== $decl->type) {
+                    continue;
+                }
+                if (null === $decl->arg1 || null === $decl->arg2) {
+                    continue;
+                }
+                if (!isset($scanBlock->constants[(int) $decl->arg1])
+                    || !isset($scanBlock->constants[(int) $decl->arg2])
+                ) {
+                    continue;
+                }
+                if ($scanBlock->constants[(int) $decl->arg1]->toString() !== $constName) {
+                    continue;
+                }
+                $val = $scanBlock->constants[(int) $decl->arg2];
+                if (VmVariable::TYPE_INTEGER === $val->type) {
+                    return $val->toInt();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * while ($i < $n) { yield; $i++; } — INC lives in the yield block (#35142).
+     * Bound may be a param frame local or a literal/const (#35166).
      *
      * @param array{kind: string, op: OpCode, block: Block} $last
      * @param array<string, int>                           $map
@@ -675,38 +836,18 @@ final class GeneratorHelper
         if (!$header instanceof Block || null === $incWriteName || '' === $incWriteName) {
             return false;
         }
-        if ($header->nOpCodes < 2) {
+        $cmpPair = self::findLoopHeaderCompare($header);
+        if (null === $cmpPair) {
             return false;
         }
-        $cmpOp = $header->opCodes[0];
-        $jumpIf = $header->opCodes[1];
-        if (OpCode::TYPE_JUMPIF !== $jumpIf->type) {
-            return false;
-        }
-        if (
-            OpCode::TYPE_SMALLER !== $cmpOp->type
-            && OpCode::TYPE_SMALLER_OR_EQUAL !== $cmpOp->type
-            && OpCode::TYPE_GREATER !== $cmpOp->type
-            && OpCode::TYPE_GREATER_OR_EQUAL !== $cmpOp->type
-        ) {
-            return false;
-        }
+        [$cmpOp] = $cmpPair;
 
         $iName = $incWriteName;
-        $nName = null;
-        foreach (array_keys($context->generatorFrameLocalIndex) as $pn) {
-            if ($pn !== $iName) {
-                $nName = $pn;
-                break;
-            }
-        }
-        if (null === $nName || '' === $nName) {
+        if (!isset($context->generatorFrameLocalPtrs[$iName])) {
             return false;
         }
-        if (
-            !isset($context->generatorFrameLocalPtrs[$iName])
-            || !isset($context->generatorFrameLocalPtrs[$nName])
-        ) {
+        $nVal = self::resolveHandLowerLoopBoundI64($context, $header, $cmpOp, $iName);
+        if (null === $nVal) {
             return false;
         }
 
@@ -719,10 +860,6 @@ final class GeneratorHelper
         $iVal = $context->builder->call($context->lookupFunction('__value__readLong'), $iPtr);
         $iNext = $context->builder->add($iVal, $i64->constInt(1, false));
         $context->builder->call($context->lookupFunction('__value__writeLong'), $iPtr, $iNext);
-        $nVal = $context->builder->call(
-            $context->lookupFunction('__value__readLong'),
-            JitValueBox::pointer($context, $context->generatorFrameLocalPtrs[$nName])
-        );
         $pred = match ($cmpOp->type) {
             OpCode::TYPE_SMALLER => \PHPLLVM\Builder::INT_SLT,
             OpCode::TYPE_SMALLER_OR_EQUAL => \PHPLLVM\Builder::INT_SLE,
@@ -852,7 +989,7 @@ final class GeneratorHelper
                         break;
                     }
                 }
-                // for-loop: after yield, $i++ in frame then re-yield while $i < $n (#35142).
+                // for-loop: after yield, $i++ in frame then re-yield while $i < bound (#35142/#35166).
                 if (
                     null === $returnIdx
                     && null === $throwIdx
@@ -887,12 +1024,22 @@ final class GeneratorHelper
                             ? OperandName::resolve($yieldValOp)
                             : null;
                     }
-                    // Bound param is usually the first named frame local (ARG_RECV) (#35142).
-                    $nName = null;
-                    foreach (array_keys($context->generatorFrameLocalIndex) as $pn) {
-                        if ($pn !== $iName) {
-                            $nName = $pn;
-                            break;
+                    $header = $tailBlock->opCodes[$jEnd - 1]->block1
+                        ?? $tailBlock->opCodes[$jEnd - 1]->block2;
+                    $cmpOp = null;
+                    $nVal = null;
+                    $pred = \PHPLLVM\Builder::INT_SLT;
+                    if ($header instanceof Block && null !== $iName && '' !== $iName) {
+                        $cmpPair = self::findLoopHeaderCompare($header);
+                        if (null !== $cmpPair) {
+                            $cmpOp = $cmpPair[0];
+                            $nVal = self::resolveHandLowerLoopBoundI64($context, $header, $cmpOp, $iName);
+                            $pred = match ($cmpOp->type) {
+                                OpCode::TYPE_SMALLER => \PHPLLVM\Builder::INT_SLT,
+                                OpCode::TYPE_SMALLER_OR_EQUAL => \PHPLLVM\Builder::INT_SLE,
+                                OpCode::TYPE_GREATER => \PHPLLVM\Builder::INT_SGT,
+                                default => \PHPLLVM\Builder::INT_SGE,
+                            };
                         }
                     }
                     $i1 = $context->getTypeFromString('int1');
@@ -901,19 +1048,14 @@ final class GeneratorHelper
                     $exitBb = $func->appendBasicBlock('gen_loop_exit');
                     if (
                         null !== $iName
-                        && null !== $nName
+                        && null !== $nVal
                         && isset($context->generatorFrameLocalPtrs[$iName])
-                        && isset($context->generatorFrameLocalPtrs[$nName])
                     ) {
                         $iPtr = JitValueBox::pointer($context, $context->generatorFrameLocalPtrs[$iName]);
                         $iVal = $context->builder->call($context->lookupFunction('__value__readLong'), $iPtr);
                         $iNext = $context->builder->add($iVal, $i64->constInt(1, false));
                         $context->builder->call($context->lookupFunction('__value__writeLong'), $iPtr, $iNext);
-                        $nVal = $context->builder->call(
-                            $context->lookupFunction('__value__readLong'),
-                            JitValueBox::pointer($context, $context->generatorFrameLocalPtrs[$nName])
-                        );
-                        $lt = $context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $iNext, $nVal);
+                        $lt = $context->builder->icmp($pred, $iNext, $nVal);
                         $context->builder->branchIf($lt, $yieldBb, $exitBb);
                     } else {
                         $context->builder->branch($exitBb);
