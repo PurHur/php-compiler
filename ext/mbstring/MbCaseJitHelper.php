@@ -15,6 +15,7 @@ namespace PHPCompiler\ext\mbstring;
  * — no PHP chr()).
  *
  * Illegal UTF-8 bytes emit default `?` (mb_substitute_character default / MODE_CHAR).
+ * Runtime encoding validation (#34858) — concat ValueError (not sprintf) for NestedJIT verify.
  *
  * TITLE: {@see MbConvertCaseJitHelper} (#34284) — separate unit.
  *
@@ -24,6 +25,7 @@ final class MbCaseJitHelper
 {
     public static function strtoupperArgv(string $string, string $encoding): string
     {
+        // Encoding must already be validated via {@see assertEncodingArgv} (#34858).
         if (self::isAsciiFamily($encoding)) {
             return self::asciiUpper($string);
         }
@@ -90,9 +92,47 @@ final class MbCaseJitHelper
         return $head.$rest;
     }
 
+    /**
+     * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
+     * SIGSEGVs under thin AOT; int helpers match {@see MbStrlenJitHelper} (#34858 / #34625).
+     *
+     * $function is the user-facing builtin name for the ValueError message.
+     */
+    public static function assertEncodingArgv(string $encoding, string $function): int
+    {
+        if ('' === self::canon($encoding)) {
+            // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+            throw new \ValueError(
+                $function.'(): Argument #2 ($encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
+
+        return 1;
+    }
+
+    private static function canon(string $encoding): string
+    {
+        if ('UTF-8' === $encoding || 'utf-8' === $encoding || 'UTF8' === $encoding || 'utf8' === $encoding) {
+            return 'UTF-8';
+        }
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            return 'ASCII';
+        }
+        if ('8BIT' === $encoding || '8bit' === $encoding || 'BINARY' === $encoding || 'binary' === $encoding) {
+            return '8BIT';
+        }
+
+        return '';
+    }
+
     private static function isAsciiFamily(string $encoding): bool
     {
-        return 'ASCII' === $encoding || '8BIT' === $encoding;
+        $c = self::canon($encoding);
+
+        return 'ASCII' === $c || '8BIT' === $c;
     }
 
     private static function asciiUpper(string $source): string

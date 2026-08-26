@@ -24,12 +24,27 @@ final class MbCaseRuntimeAotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/mb_case_runtime_aot.php');
     }
 
+    public function testAotRuntimeEncodingMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(__DIR__.'/../repro/mb_case_runtime_encoding_aot.php');
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
         $helper = (string) file_get_contents($root.'/ext/mbstring/MbCaseJitHelper.php');
         $this->assertStringContainsString('function strtoupperArgv', $helper);
         $this->assertStringContainsString('function strtolowerArgv', $helper);
+        $this->assertStringContainsString('assertEncodingArgv', $helper);
+        $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbCase.php');
+        $this->assertStringContainsString('encodingPtr', $jit);
+        $this->assertStringNotContainsString(
+            'mb case JIT encoding must be a string literal',
+            $jit
+        );
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbCaseRuntime.php');
         $this->assertStringContainsString('strtoupperHelper', $runtime);
         $this->assertStringContainsString('strtolowerHelper', $runtime);
