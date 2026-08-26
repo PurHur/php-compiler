@@ -18,6 +18,7 @@ final class MbConvertKanaRuntimeShrinkTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MbConvertKanaRuntime.php');
         $this->assertStringContainsString('MbConvertKanaJitHelper::convertArgv', $source);
         $this->assertStringContainsString('MbConvertKanaJitHelper::convertDefaultArgv', $source);
+        $this->assertStringContainsString('MbConvertKanaJitHelper::assertEncodingArgv', $source);
         $this->assertStringContainsString('/ext/mbstring/MbConvertKanaJitHelper.php', $source);
     }
 

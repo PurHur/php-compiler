@@ -89,8 +89,9 @@ final class KanaConvert
     {
         $canonical = MbstringEncodingRegistry::resolve($encoding) ?? $encoding;
         if ('UTF-8' !== $canonical && 'ASCII' !== $canonical && '8BIT' !== $canonical) {
-            throw new \LogicException(
-                'mb_convert_kana() requires mbstring for encoding '.$encoding.' in this compiler build'
+            // Zend ValueError (php-src mbstring.c); peer NestedJIT assertEncodingArgv (#35193).
+            throw new \ValueError(
+                'mb_convert_kana(): Argument #3 ($encoding) must be a valid encoding, "'.$encoding.'" given'
             );
         }
     }
