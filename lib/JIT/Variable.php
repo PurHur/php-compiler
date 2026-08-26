@@ -656,14 +656,18 @@ final class Variable {
         }
         $type = self::getTypeFromType($op->type);
         if ($type === self::TYPE_NULL) {
+            // Match fromLiteral TYPE_NULL — keep isNullConstant so builtins can treat
+            // SSA null temps like literal null (mb_trim $characters, #35199).
             $slot = JitValueBox::alloc($context);
-
-            return new Variable(
+            $nullVar = new Variable(
                 $context,
                 self::TYPE_VALUE,
                 self::KIND_VARIABLE,
                 $slot
             );
+            $nullVar->isNullConstant = true;
+
+            return $nullVar;
         }
         $stringType = self::getStringType($type);
         if ($type === self::TYPE_HASHTABLE) {
