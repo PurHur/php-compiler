@@ -59,9 +59,16 @@ final class JitDomDocumentDoctype
             ) {
                 return self::boxNull($context);
             }
+            // loadXML without <!DOCTYPE>: do not detachedFetch an unset slot (#34887).
+            // Writing a runtime null __value__ into the instance also segfaults on thin-AOT
+            // (#27300 / re-#28940) — return a fresh null box instead.
+            if (null === $cfsSource && !DomUserScriptDoctypeLlvm::isAttached()) {
+                return self::boxNull($context);
+            }
         }
         if ($objectType->hasProperty($docClassId, self::PROP_DOCTYPE)
-            || JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+            || (JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+                && DomUserScriptDoctypeLlvm::isAttached())
         ) {
             if (!$objectType->hasProperty($docClassId, self::PROP_DOCTYPE)) {
                 $objectType->defineProperty($docClassId, self::PROP_DOCTYPE, JITVariable::TYPE_VALUE);

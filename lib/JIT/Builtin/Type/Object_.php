@@ -4106,6 +4106,11 @@ class Object_ extends Type {
             $this->defineProperty($id, 'attributes', Variable::TYPE_VALUE);
             // Thin AOT nodeType seed (#33607) — must be in allocate() layout.
             $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
+            // DocumentType stand-in slots (createDocumentType / loadXML doctype) —
+            // late define after loadXML tree allocate undersizes (#34887 / #33565).
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'publicId', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'systemId', Variable::TYPE_STRING);
         }
         if ('domdocument' === $lcname) {
             // Must be in the allocate() prop layout — late defineProperty from
@@ -4121,6 +4126,8 @@ class Object_ extends Type {
             // loadHTML/loadXML id-map — late defineProperty after new DOMDocument()
             // OOB in __object__load_value_slot (#33689 / peer #32736).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);
+            // loadXML $doc->doctype — late defineProperty after new undersizes (#34887 / #32736).
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_DOCTYPE, Variable::TYPE_VALUE);
             $this->markHasConstructor($id);
         }
         if ('domattr' === $lcname) {
