@@ -19,7 +19,11 @@ use PHPLLVM\Value;
  *
  * Thin standalone AOT documentElement/firstChild temps lose DOMElement userType
  * and NestedJIT DomRegistry is empty — instance-invoke aborts. Probe the live
- * DOMElement attributes slot (peer {@see JitDomHasChildNodes}).
+ * DOMElement attributes NamedNodeMap length (peer {@see JitDomHasChildNodes}).
+ *
+ * Empty length-0 maps are always allocated after #33128 so
+ * {@code $el->attributes->length} matches Zend — slot non-null alone is not
+ * {@code properties != NULL} (#34854 / re-#32458).
  *
  * php-src: ext/dom/node.c PHP_METHOD(DOMNode, hasAttributes) (#32458)
  */
@@ -42,11 +46,15 @@ final class JitDomHasAttributes
             throw new \LogicException('DOMNode::hasAttributes() expects a receiver');
         }
 
-        return self::boxBoolResult($context, self::attributesSlotIsSet($context, $receiver));
+        return self::boxBoolResult($context, self::attributesMapLengthNonZero($context, $receiver));
     }
 
-    /** php-src: RETURN_BOOL(nodep->properties != NULL). */
-    private static function attributesSlotIsSet(Context $context, JITVariable $receiver): Value
+    /**
+     * php-src: RETURN_BOOL(nodep->properties != NULL).
+     *
+     * Live map length > 0 — empty NamedNodeMap after #33128 must return false (#34854).
+     */
+    private static function attributesMapLengthNonZero(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);
         $objectType = $context->type->object;
@@ -70,6 +78,7 @@ final class JitDomHasAttributes
         $no = $fn->appendBasicBlock('dom_hasattr_no');
         $done = $fn->appendBasicBlock('dom_hasattr_done');
         $afterSlot = $fn->appendBasicBlock('dom_hasattr_obj');
+        $afterMap = $fn->appendBasicBlock('dom_hasattr_len');
         $context->builder->branchIf($slotNull, $no, $afterSlot);
 
         $context->builder->positionAtEnd($afterSlot);
@@ -79,7 +88,18 @@ final class JitDomHasAttributes
         );
         $objPtr = $context->getTypeFromString('__object__*');
         $objNull = $context->builder->icmp(Builder::INT_EQ, $attrsObj, $objPtr->constNull());
-        $context->builder->branchIf($objNull, $no, $yes);
+        $context->builder->branchIf($objNull, $no, $afterMap);
+
+        $context->builder->positionAtEnd($afterMap);
+        $lengthVar = JitDomNamedNodeMap::fetchLength($objectType, $attrsObj);
+        $length = $context->helper->loadValue($lengthVar);
+        $i64 = $context->getTypeFromString('int64');
+        $nonzero = $context->builder->icmp(
+            Builder::INT_NE,
+            $length,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($nonzero, $yes, $no);
 
         $context->builder->positionAtEnd($yes);
         $context->builder->branch($done);

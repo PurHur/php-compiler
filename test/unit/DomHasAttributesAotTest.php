@@ -7,7 +7,9 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: hasAttributes xmlNode->properties probe (#32458).
+ * AOT: hasAttributes xmlNode->properties probe (#32458 / #34854).
+ *
+ * Empty length-0 NamedNodeMap (#33128) must not report true for leaf children.
  *
  * @see php-src ext/dom/node.c PHP_METHOD(DOMNode, hasAttributes)
  *
