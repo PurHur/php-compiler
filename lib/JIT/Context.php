@@ -132,6 +132,9 @@ class Context {
     /** Operand for call_user_func_array() $args during FUNCCALL lowering (#10359). */
     public ?Operand $jitCallUserFuncArrayParamsOperand = null;
 
+    /** Operand for call_user_func() $callback — fold compile-time ['Class','method'] (#35090). */
+    public ?Operand $jitCallUserFuncCallbackOperand = null;
+
     /**
      * New DateTime / DateTimeImmutable result — construct stamps unix instant (#29732 peer).
      */

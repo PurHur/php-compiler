@@ -14,9 +14,11 @@ use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\LateStaticBindingHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\VariableFunctionCallHelper;
 use PHPCompiler\VM\Variable as VmVariable;
+use PHPCompiler\VM\VmBoundMethodCallable;
 use PHPCfg\Operand;
 use PHPTypes\Type;
 use PHPLLVM\Value;
@@ -37,6 +39,13 @@ final class JitCallUserFunc
         $literal = JitStringArg::compileTimeLiteral($callback);
         if (null !== $literal && '' !== $literal && !str_contains($literal, '::')) {
             return self::invokeCompileTimeFunction($context, $literal, $extraArgs);
+        }
+
+        // Fold compile-time ['Class','method'] before TYPE_VALUE → RuntimeVariableFunction
+        // (that path aborts when the boxed value is an array, #35090 / peer #32299).
+        $staticArray = self::tryInvokeStaticArrayCallable($context, $extraArgs);
+        if (null !== $staticArray) {
+            return $staticArray;
         }
 
         if (
@@ -174,6 +183,134 @@ final class JitCallUserFunc
         }
 
         return self::boxCallResult($context, $proxy, $proxy, ...$extraArgs);
+    }
+
+    /**
+     * Fold compile-time `call_user_func(['Class','method'], …)` to a static method proxy (#35090).
+     *
+     * Peer: {@see \PHPCompiler\JIT::tryInitStaticArrayCallableDirect} / #32299 for `$c()` form.
+     * php-src: ext/standard/basic_functions.c PHP_FUNCTION(call_user_func).
+     *
+     * @param list<JITVariable> $extraArgs
+     */
+    private static function tryInvokeStaticArrayCallable(Context $context, array $extraArgs): ?Value
+    {
+        $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
+        $callbackOp = $context->jitCallUserFuncCallbackOperand
+            ?? ($context->scope->argOperands[0] ?? null);
+        if (!$block instanceof Block || !($callbackOp instanceof Operand)) {
+            return null;
+        }
+        $slot = $block->slotForOperand($callbackOp);
+        if (null === $slot) {
+            return null;
+        }
+        $slots = VmBoundMethodCallable::resolveStaticArrayCallableSlots($block, $slot);
+        if (null === $slots) {
+            return null;
+        }
+        if (!isset($block->constants[$slots[0]], $block->constants[$slots[1]])) {
+            return null;
+        }
+        $className = $block->constants[$slots[0]]->toString();
+        $methodName = $block->constants[$slots[1]]->toString();
+        if ('' === $className || '' === $methodName) {
+            return null;
+        }
+        $classLc = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($methodName);
+        $proxyName = self::resolveStaticProxyForClass($context, $classLc, $methodLc);
+        if (null === $proxyName || !$context->functionIsRegistered($proxyName)) {
+            throw new \LogicException(
+                "call_user_func() callback [{$className}, {$methodName}] is not a defined static method "
+                .'in this compile unit (#35090)'
+            );
+        }
+        $proxy = $context->resolveFunctionProxy($proxyName);
+        if ($proxy instanceof ExternalMethod) {
+            throw new \LogicException(
+                "call_user_func() callback [{$className}, {$methodName}] is not a defined static method "
+                .'in this compile unit (#35090)'
+            );
+        }
+        // Match direct ['Class','method']() (#32299): store LSB then invoke the static proxy.
+        if (LateStaticBindingHelper::useRuntimeLateStatic($context)) {
+            LateStaticBindingHelper::emitStoreClassId(
+                $context,
+                $context->constantFromInteger($context->type->object->lookup($className), 'int64')
+            );
+        }
+
+        return self::boxRawCallResult($context, $proxy->call($context, ...$extraArgs));
+    }
+
+    /** Box a single Call::call() result the same way as {@see boxCallResult} without re-invoking. */
+    private static function boxRawCallResult(Context $context, Value $raw): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $rawTy = $context->getStringFromType($raw->typeOf());
+        if ('int64' === $rawTy) {
+            JitValueBox::writeLong($context, $slot, $raw);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        if ('double' === $rawTy) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                JitValueBox::pointer($context, $slot),
+                $raw
+            );
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        if ('int1' === $rawTy || 'bool' === $rawTy) {
+            JitValueBox::writeBool($context, $slot, $raw);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        if ('__value__*' === $rawTy || '__value__' === $rawTy) {
+            return JitValueBox::normalizeValuePtr($context, $raw);
+        }
+        if ('__string__*' === $rawTy) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                JitValueBox::pointer($context, $slot),
+                $raw
+            );
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        // Object / other pointer results: treat as already-materialized value pointer when possible.
+        if (str_ends_with($rawTy, '*')) {
+            return JitValueBox::normalizeValuePtr($context, $raw);
+        }
+        JitValueBox::copyFromPointer(
+            $context,
+            $slot,
+            JitValueBox::normalizeValuePtr($context, $raw)
+        );
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function resolveStaticProxyForClass(Context $context, string $classLc, string $methodLc): ?string
+    {
+        $visited = [];
+        $current = $classLc;
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            $proxy = $current.'::'.$methodLc;
+            if ($context->functionIsRegistered($proxy)) {
+                return $proxy;
+            }
+            $parent = $context->type->object->parentClassLc($current);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return null;
     }
 
     /**
