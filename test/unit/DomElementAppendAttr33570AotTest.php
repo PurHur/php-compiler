@@ -5,7 +5,7 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: Element appendChild(Attr) / setAttributeNode keep attrs in saveXML (#33570).
+ * AOT: Element appendChild(Attr) / setAttributeNode keep attrs in saveXML (#33570 / #35185).
  *
  * @group llvm
  */
@@ -14,6 +14,11 @@ final class DomElementAppendAttr33570AotTest extends TestCase
     public function testAppendChildAttr(): void
     {
         $this->assertAotMatchesZend(__DIR__.'/../repro/issue_33570_dom_append_attr_aot.php');
+    }
+
+    public function testAppendChildAttrOnLoadXmlDocumentElement(): void
+    {
+        $this->assertAotMatchesZend(__DIR__.'/../repro/issue_35185_dom_append_attr_loadxml_aot.php');
     }
 
     public function testSetAttributeNodeAttr(): void
