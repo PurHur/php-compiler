@@ -526,6 +526,15 @@ final class GeneratorIteratorJitHelper
         ) {
             return false;
         }
+        // Compile-time class other than Generator: do not attach the unit's sole
+        // creator resume via inferResumeNameFromContext (IteratorAggregate + yield
+        // in getIterator() was mis-tagged and SIGSEGVd under AOT foreach, #34980).
+        $tagged = $genVar->classUserType ?? null;
+        if (null !== $tagged && '' !== $tagged) {
+            if ('generator' !== strtolower(ltrim($tagged, '\\'))) {
+                return false;
+            }
+        }
         try {
             self::normalizeGeneratorObjectVariable($context, $genVar);
             self::loadStateFromGeneratorObject($context, $genVar);

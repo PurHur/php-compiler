@@ -560,6 +560,14 @@ class Context {
     public array $foreachAggregateInnerHtSlots = [];
 
     /**
+     * IteratorAggregate foreach whose getIterator() is a Generator creator — store
+     * resume name; walk via GeneratorHelper (Zend zend_user_it_get_new_iterator, #34980).
+     *
+     * @var array<string, string>
+     */
+    public array $foreachAggregateGeneratorSlots = [];
+
+    /**
      * SplStack (and LIFO dllist) foreach — packed `__spl_ht` walked descending (#28705).
      *
      * @var array<string, true>

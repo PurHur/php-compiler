@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Builtin\WeakRefRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\DatePeriodForeachSnapshot;
+use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ObjectPropertyForeachHelper;
@@ -19,6 +20,7 @@ use PHPCompiler\JIT\SimpleXmlForeachSnapshot;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\GeneratorIteratorJitHelper;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -71,6 +73,41 @@ final class VmIteratorForeach
         JitVariable $array,
         ?string $containerUserType
     ): bool {
+        if (!self::isAggregateOnlyForeachCandidate($context, $array, $containerUserType)) {
+            return false;
+        }
+        // Generator getIterator() has no `__spl_ht` — use Generator foreach (#34980).
+        if (null !== self::aggregateGetIteratorResumeName($context, $containerUserType)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * IteratorAggregate whose getIterator() is a Generator method (yield) — Zend
+     * zend_user_it_get_new_iterator then generator handlers (#34980).
+     */
+    private static function canLowerAggregateInnerGenerator(
+        Context $context,
+        JitVariable $array,
+        ?string $containerUserType
+    ): bool {
+        if (!self::isAggregateOnlyForeachCandidate($context, $array, $containerUserType)) {
+            return false;
+        }
+
+        return null !== self::aggregateGetIteratorResumeName($context, $containerUserType);
+    }
+
+    /**
+     * Shared shape: concrete class with getIterator and no rewind (not HT-backed SPL).
+     */
+    private static function isAggregateOnlyForeachCandidate(
+        Context $context,
+        JitVariable $array,
+        ?string $containerUserType
+    ): bool {
         if (null === $containerUserType || '' === $containerUserType) {
             return false;
         }
@@ -84,7 +121,12 @@ final class VmIteratorForeach
         if (JitVariable::TYPE_OBJECT !== $array->type && JitVariable::TYPE_VALUE !== $array->type) {
             return false;
         }
-        if (!$context->functionIsRegistered($classLc.'::getiterator')) {
+        // Generator methods register creators, not always a call proxy (#34980).
+        $getIter = $classLc.'::getiterator';
+        if (
+            !$context->functionIsRegistered($getIter)
+            && !isset($context->generatorCreators[$getIter])
+        ) {
             return false;
         }
         // Full Iterator (rewind on the same class) keeps the method-protocol path.
@@ -98,6 +140,36 @@ final class VmIteratorForeach
         }
 
         return true;
+    }
+
+    /** Resume name for Aggregate::getIterator when that method is a Generator creator. */
+    private static function aggregateGetIteratorResumeName(
+        Context $context,
+        ?string $containerUserType
+    ): ?string {
+        if (null === $containerUserType || '' === $containerUserType) {
+            return null;
+        }
+        $classLc = strtolower(ltrim($containerUserType, '\\'));
+        $proxy = $classLc.'::getiterator';
+
+        return $context->generatorCreators[$proxy] ?? null;
+    }
+
+    /** Load stored Generator receiver and reattach resume / state metadata (#34980). */
+    private static function loadAggregateGeneratorReceiver(
+        Context $context,
+        JitVariable $slotKey
+    ): JitVariable {
+        $mapKey = $context->foreachSlotMapKey($slotKey);
+        $resume = $context->foreachAggregateGeneratorSlots[$mapKey]
+            ?? throw new \LogicException('foreach aggregate Generator slot missing resume name');
+        $receiver = IteratorProtocolHelper::loadReceiver($context, $slotKey);
+        $receiver->generatorResumeName = $resume;
+        $receiver->isJitGenerator = true;
+        GeneratorIteratorJitHelper::loadStateFromGeneratorObject($context, $receiver);
+
+        return $receiver;
     }
 
     /** DOM IteratorAggregate classes whose getIterator() returns InternalIterator, not ArrayIterator. */
@@ -490,6 +562,20 @@ final class VmIteratorForeach
 
             return;
         }
+        // IteratorAggregate → getIterator() Generator — emitCreate + Generator foreach (#34980).
+        // php-src: Zend/zend_interfaces.c zend_user_it_get_new_iterator → Generator handlers.
+        if (self::canLowerAggregateInnerGenerator($context, $array, $containerUserType)) {
+            $resume = self::aggregateGetIteratorResumeName($context, $containerUserType);
+            if (null === $resume) {
+                throw new \LogicException('aggregate Generator foreach missing resume name');
+            }
+            $gen = GeneratorHelper::emitCreate($context, $resume);
+            IteratorProtocolHelper::storeReceiver($context, $slotKey, $gen);
+            $context->foreachAggregateGeneratorSlots[$context->foreachSlotMapKey($slotKey)] = $resume;
+            GeneratorHelper::compileIterReset($context, $gen);
+
+            return;
+        }
         // IteratorAggregate → getIterator() → ArrayIterator `__spl_ht` (#26785).
         if (self::canLowerAggregateInnerHt($context, $array, $containerUserType)) {
             $receiver = IteratorProtocolHelper::resolveForeachReceiver($context, $array, $containerUserType);
@@ -557,6 +643,12 @@ final class VmIteratorForeach
         }
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileValid($context, $slotKey, $containerUserType);
+        }
+        if (isset($context->foreachAggregateGeneratorSlots[$context->foreachSlotMapKey($slotKey)])) {
+            return GeneratorHelper::compileIterValid(
+                $context,
+                self::loadAggregateGeneratorReceiver($context, $slotKey)
+            );
         }
         if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             return self::compileValidHashtable(
@@ -849,6 +941,12 @@ final class VmIteratorForeach
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileKey($context, $slotKey, $containerUserType);
         }
+        if (isset($context->foreachAggregateGeneratorSlots[$context->foreachSlotMapKey($slotKey)])) {
+            return GeneratorHelper::compileIterKey(
+                $context,
+                self::loadAggregateGeneratorReceiver($context, $slotKey)
+            );
+        }
         if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             return self::compileKeyHashtable(
                 $context,
@@ -1053,6 +1151,12 @@ final class VmIteratorForeach
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileValue($context, $slotKey, $containerUserType);
         }
+        if (isset($context->foreachAggregateGeneratorSlots[$context->foreachSlotMapKey($slotKey)])) {
+            return GeneratorHelper::compileIterValue(
+                $context,
+                self::loadAggregateGeneratorReceiver($context, $slotKey)
+            );
+        }
         if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             return self::compileValueHashtable(
                 $context,
@@ -1080,6 +1184,13 @@ final class VmIteratorForeach
         $slotKey = $array;
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileValueByRef($context, $slotKey, $containerUserType);
+        }
+        if (isset($context->foreachAggregateGeneratorSlots[$context->foreachSlotMapKey($slotKey)])) {
+            return GeneratorHelper::compileIterValueByRef(
+                $context,
+                self::loadAggregateGeneratorReceiver($context, $slotKey),
+                $jit
+            );
         }
         if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             // Inner ArrayIterator `__spl_ht` — same FE_RESET_RW allow-list as ArrayIterator (#19444, #26785).

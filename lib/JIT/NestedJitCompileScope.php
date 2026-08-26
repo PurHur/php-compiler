@@ -94,6 +94,7 @@ final class NestedJitCompileScope
         $savedForeachDatePeriodSnapshotHts = $context->foreachDatePeriodSnapshotHts;
         $savedForeachSimpleXmlSnapshotKeys = $context->foreachSimpleXmlSnapshotKeys;
         $savedForeachAggregateInnerHtSlots = $context->foreachAggregateInnerHtSlots;
+        $savedForeachAggregateGeneratorSlots = $context->foreachAggregateGeneratorSlots;
         // Outer ?: stack-phi maps must survive NestedJIT (var_export etc.) when the true arm
         // JUMP compiles the merge before the else arm runs (#34960 / leftover #34956).
         $savedCoalesceAssignTargets = $context->coalesceAssignTargets;
@@ -116,6 +117,7 @@ final class NestedJitCompileScope
         $context->foreachDatePeriodSnapshotHts = [];
         $context->foreachSimpleXmlSnapshotKeys = [];
         $context->foreachAggregateInnerHtSlots = [];
+        $context->foreachAggregateGeneratorSlots = [];
         $context->coalesceAssignTargets = new \SplObjectStorage();
         $context->coalesceMergeSlotOperands = [];
         $context->ternaryEchoPhiByAliasSlot = [];
@@ -153,6 +155,7 @@ final class NestedJitCompileScope
             $context->foreachDatePeriodSnapshotHts = $savedForeachDatePeriodSnapshotHts;
             $context->foreachSimpleXmlSnapshotKeys = $savedForeachSimpleXmlSnapshotKeys;
             $context->foreachAggregateInnerHtSlots = $savedForeachAggregateInnerHtSlots;
+            $context->foreachAggregateGeneratorSlots = $savedForeachAggregateGeneratorSlots;
             $context->coalesceAssignTargets = $savedCoalesceAssignTargets;
             $context->coalesceMergeSlotOperands = $savedCoalesceMergeSlotOperands;
             $context->ternaryEchoPhiByAliasSlot = $savedTernaryEchoPhiByAliasSlot;

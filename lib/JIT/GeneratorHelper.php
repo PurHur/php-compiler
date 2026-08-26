@@ -538,6 +538,12 @@ final class GeneratorHelper
         return VmGenerator::emitCreateFromCall($jit, $resumeInternalName);
     }
 
+    /** Context-only Generator allocate — foreach aggregate unwrap (#34980). */
+    public static function emitCreate(Context $context, string $resumeInternalName): Variable
+    {
+        return VmGenerator::emitCreate($context, $resumeInternalName);
+    }
+
     public static function compileIterValid(Context $context, Variable $gen): Value
     {
         return GeneratorIteratorJitHelper::compileIterValid($context, $gen);

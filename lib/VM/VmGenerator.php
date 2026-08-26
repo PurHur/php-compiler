@@ -147,7 +147,15 @@ final class VmGenerator
         \PHPCompiler\JIT $jit,
         string $resumeInternalName
     ): Variable {
-        $context = $jit->context;
+        return self::emitCreate($jit->context, $resumeInternalName);
+    }
+
+    /**
+     * Allocate a fresh Generator object bound to {@see $resumeInternalName}
+     * (Zend zend_generator_create / zend_generator_create_zval).
+     */
+    public static function emitCreate(Context $context, string $resumeInternalName): Variable
+    {
         self::ensureJitTypes($context);
         $stateTy = $context->getTypeFromString('__generator_state__');
         $statePtr = $context->memory->malloc($stateTy);
