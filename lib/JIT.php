@@ -1092,6 +1092,18 @@ class JIT {
         if (null === $resultSlot) {
             return null;
         }
+        $mergeIsArgSendPhi = false;
+        foreach ($mergeBlock->opCodes as $mergeOp) {
+            if (
+                OpCode::TYPE_ARG_SEND === $mergeOp->type
+                && null !== $mergeOp->arg1
+                && (int) $mergeOp->arg1 === $resultSlot
+            ) {
+                $mergeIsArgSendPhi = true;
+                break;
+            }
+        }
+        $mergePhi = $mergeIsArgSendPhi ? $mergeBlock->getOperand($resultSlot) : null;
         foreach ([$ifBlock, $elseBlock] as $branch) {
             if (null === $branch) {
                 continue;
@@ -1102,6 +1114,14 @@ class JIT {
                 }
                 if ((int) $branchOp->arg2 !== $resultSlot) {
                     continue;
+                }
+
+                $armOp = $branch->getOperand($branchOp->arg2);
+                // FUNCCALL ARG_SEND merges: arm INIT_ARRAY may mint a distinct Temporary at the
+                // phi slot — coalesce must target the merge ARG_SEND operand (#34956).
+                // ECHO merges keep the arm operand (#34814 / #32912).
+                if (null !== $mergePhi && null !== $armOp && $armOp !== $mergePhi) {
+                    return $mergePhi;
                 }
 
                 // Prefer the shared phi lvalue (arg2) over the per-arm Assign result temp
@@ -9854,6 +9874,22 @@ class JIT {
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
                     $resultOp = $block->getOperand($op->arg1);
+                    // ?: arm `[…]` at the FUNCCALL ARG_SEND phi slot may use a Temporary
+                    // distinct from coalesceMergeSlotOperands — build into the stack-phi
+                    // Variable ARG_SEND reads (#34956 / #34944).
+                    if (
+                        null !== $op->arg1
+                        && isset($this->context->coalesceMergeSlotOperands[(int) $op->arg1])
+                    ) {
+                        $phiOp = $this->context->coalesceMergeSlotOperands[(int) $op->arg1];
+                        if (!$this->context->hasVariableOp($phiOp)) {
+                            $this->ensureCoalesceMergeStackSlot($phiOp);
+                        }
+                        $this->context->setVariableOp(
+                            $resultOp,
+                            $this->context->getVariableFromOp($phiOp)
+                        );
+                    }
                     $result = $this->context->getVariableFromOp($resultOp);
                     JIT\HashTableHelper::initArray($this->context, $result);
                     $result->compileTimeEmptyArrayLiteral = null === $op->arg2;
