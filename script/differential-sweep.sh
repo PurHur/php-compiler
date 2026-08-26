@@ -57,6 +57,11 @@ if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
         wrap_args+=("$a")
         prev="$a"
     done
+    # bash `printf '%q '` with zero operands prints `''`, which becomes `$1=""` after
+    # re-exec and trips `unknown option:` (#34860). Only quote when args exist.
+    if [ "${#wrap_args[@]}" -eq 0 ]; then
+        exec ./script/docker-exec.sh -- bash -lc "source script/php-env.sh && ./script/differential-sweep.sh"
+    fi
     args=$(printf '%q ' "${wrap_args[@]}")
     # shellcheck disable=SC2086
     exec ./script/docker-exec.sh -- bash -lc "source script/php-env.sh && ./script/differential-sweep.sh ${args}"

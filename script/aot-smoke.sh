@@ -26,6 +26,10 @@ cd "$REPO_ROOT" || exit 1
 
 if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
     && [[ "${PHP_COMPILER_IN_DOCKER:-0}" != "1" ]]; then
+    # bash `printf '%q '` with zero operands prints `''` (#34860 / peer #34536).
+    if [ "$#" -eq 0 ]; then
+        exec ./script/docker-exec.sh -- bash -lc "source script/php-env.sh && ./script/aot-smoke.sh"
+    fi
     args=$(printf '%q ' "$@")
     # shellcheck disable=SC2086
     exec ./script/docker-exec.sh -- bash -lc "source script/php-env.sh && ./script/aot-smoke.sh ${args}"

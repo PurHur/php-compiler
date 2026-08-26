@@ -49,7 +49,11 @@ if ! { [[ -f /.dockerenv ]] && [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; } \
       _fwd+=("${_v}=$(printf '%q' "${!_v}")")
     fi
   done
-  args=$(printf '%q ' "$@")
+  args=""
+  if [ "$#" -gt 0 ]; then
+    # bash `printf '%q '` with zero operands prints `''` (#34860).
+    args=$(printf '%q ' "$@")
+  fi
   _fwd_str=""
   if ((${#_fwd[@]} > 0)); then
     _fwd_str="${_fwd[*]} "
