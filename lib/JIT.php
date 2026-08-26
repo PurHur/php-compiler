@@ -25208,6 +25208,48 @@ class JIT {
         }
         $methodLc = strtolower($methodName);
 
+        // Generator methods register a resume creator under class::method, not an ordinary
+        // callable proxy — mirror FUNCCALL_INIT generatorResumeCallee → emitCreateFromCall
+        // (#35147 / Zend zend_generators.c; Aggregate getIterator already used creatorResumeName).
+        $genResume = null;
+        $genWalk = $declaringClassLc;
+        $genSeen = [];
+        while ('' !== $genWalk && 'object' !== $genWalk && !isset($genSeen[$genWalk])) {
+            $genSeen[$genWalk] = true;
+            $genResume = JIT\GeneratorHelper::creatorResumeName(
+                $this->context,
+                $genWalk.'::'.$methodLc
+            );
+            if (null !== $genResume) {
+                break;
+            }
+            $parentLc = $this->context->type->object->parentClassLc($genWalk);
+            if (null === $parentLc || '' === $parentLc) {
+                break;
+            }
+            $genWalk = $parentLc;
+        }
+        if (null === $genResume) {
+            $recvHint = (string) ($receiverVar->classUserType ?? '');
+            $recvHintLc = strtolower(ltrim($recvHint, '\\'));
+            if ('' !== $recvHintLc && 'object' !== $recvHintLc && !isset($genSeen[$recvHintLc])) {
+                $genResume = JIT\GeneratorHelper::creatorResumeName(
+                    $this->context,
+                    $recvHintLc.'::'.$methodLc
+                );
+            }
+        }
+        if (null !== $genResume) {
+            $this->context->scope->generatorResumeCallee = $genResume;
+            // Non-null toCall required: EXEC_RETURN null-short-circuits before generatorResumeCallee.
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                $declaringClassLc.'::'.$methodLc
+            );
+            $this->context->scope->args = [$receiverVar];
+
+            return;
+        }
+
         // Prefer typed WeakReference::get when create() tagged the receiver (#27118).
         if (
             'get' === $methodLc
