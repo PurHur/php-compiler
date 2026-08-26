@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * stripslashes() for compiled JIT/AOT modules (#14742, #28104, php-in-PHP).
+ * stripslashes() for compiled JIT/AOT modules (#14742, #28104, #35045, php-in-PHP).
  *
  * Self-contained for NestedJIT (#16075 / #25345) — must not NestedJIT {@see VmString}
  * (thin AOT segfault after c:main_before_php when deps pull VmString — #26907).
@@ -13,6 +13,10 @@ namespace PHPCompiler\ext\standard;
  *
  * NestedJIT cannot lower a loop-carried string accumulator when indexing by offset;
  * recurse with `$prefix.$rest` instead (peer {@see AddslashesJitHelper}).
+ *
+ * Bound walks with `\strlen` — NestedJIT `isset($s[$i+1])` is always false for this
+ * helper shape (#35045 / peer #35038 / #35032 / #33334), so the backslash branch never
+ * entered and escapes were emitted verbatim.
  *
  * Skip-2 advance via mutual `$i+1` recursion only — literal `$i+2` / flag-param strip
  * helpers truncate or segfault under thin AOT (#28104).
@@ -27,11 +31,12 @@ final class StripslashesJitHelper
     /** Public so NestedJIT helper TUs bind the recursive callee (#25345). */
     public static function stripFrom(string $string, int $i): string
     {
-        if (!isset($string[$i])) {
+        $len = \strlen($string);
+        if ($i >= $len) {
             return '';
         }
         $ch = $string[$i];
-        if ('\\' === $ch && isset($string[$i + 1])) {
+        if ('\\' === $ch && ($i + 1) < $len) {
             // Consume the backslash; emitEscaped advances one more past the escaped byte.
             return self::emitEscaped($string, $i + 1);
         }
@@ -45,7 +50,8 @@ final class StripslashesJitHelper
      */
     public static function emitEscaped(string $string, int $i): string
     {
-        if (!isset($string[$i])) {
+        $len = \strlen($string);
+        if ($i >= $len) {
             return '';
         }
         $next = $string[$i];
