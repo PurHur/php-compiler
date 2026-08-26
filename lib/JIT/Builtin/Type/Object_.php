@@ -4123,6 +4123,13 @@ class Object_ extends Type {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
             $this->defineProperty($id, 'publicId', Variable::TYPE_STRING);
             $this->defineProperty($id, 'systemId', Variable::TYPE_STRING);
+            // ParentNode / NonDocumentTypeChildNode — peer Document #34910. createElement
+            // stand-in must pin before allocate or childElementCount NATIVE_LONG SIGSEGVs (#35007).
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_FIRST_ELEMENT_CHILD, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_LAST_ELEMENT_CHILD, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_CHILD_ELEMENT_COUNT, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_NEXT_ELEMENT_SIBLING, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_PREVIOUS_ELEMENT_SIBLING, Variable::TYPE_VALUE);
         }
         if ('domdocument' === $lcname) {
             // Must be in the allocate() prop layout — late defineProperty from

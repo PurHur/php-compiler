@@ -57,6 +57,8 @@ final class JitDomCreateDocumentFragment
             $ownerVar,
             JITVariable::TYPE_VALUE
         );
+        // ParentNode nav on fragment stand-in (#35007 leftover of #34910).
+        JitDomCreateElement::seedEmptyParentNodeNavigation($context, $obj, self::CLASS_STANDIN);
 
         return $obj;
     }

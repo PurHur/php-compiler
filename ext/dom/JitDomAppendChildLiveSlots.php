@@ -269,6 +269,8 @@ final class JitDomAppendChildLiveSlots
             $objPtrTy->constNull()
         );
         self::storeParentNode($context, $child, $parent);
+        // ParentNode element-nav for first element child (#35007).
+        self::syncParentNodeNavOnAppend($context, $parent, $child);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbAppendTail);
@@ -298,6 +300,8 @@ final class JitDomAppendChildLiveSlots
         $pin1 = self::loadSibling($context, $curFirst, VmDom::PROP_NEXT_SIBLING, 'dom_acls_pin1');
         self::incrementChildNodesLengthInPlace($context, $parent, $curFirst, $pin1);
         self::storeParentNode($context, $child, $parent);
+        // ParentNode element-nav when appending another element (#35007).
+        self::syncParentNodeNavOnAppend($context, $parent, $child);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
@@ -942,6 +946,8 @@ final class JitDomAppendChildLiveSlots
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
         $listClassId = $objectType->lookup('DOMNodeList');
+        // Full createElement stand-in incl. ParentNode nav (#35007 / #24973).
+        JitDomCreateElement::ensureDomElementStandInLayout($objectType, $elementClassId);
         foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
@@ -969,6 +975,138 @@ final class JitDomAppendChildLiveSlots
                 $objectType->defineProperty($listClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
+    }
+
+    /**
+     * Mirror ParentNode / NonDocumentTypeChildNode slots after appendChild (#35007).
+     *
+     * Only element children (nodeType XML_ELEMENT_NODE) update first/lastElementChild,
+     * childElementCount, and next/previousElementSibling. php-src parentnode.c.
+     */
+    private static function syncParentNodeNavOnAppend(
+        Context $context,
+        Value $parent,
+        Value $child
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, self::tag('dom_acls_el_nav'));
+        self::ensureLayout($context);
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $i64 = $context->getTypeFromString('int64');
+
+        $nodeTypeVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $child,
+            'DOMElement',
+            VmDom::PROP_NODE_TYPE,
+            $elementClassId
+        );
+        $nodeType = $context->helper->loadValue($nodeTypeVar);
+        $isElement = $context->builder->icmp(
+            Builder::INT_EQ,
+            $nodeType,
+            $i64->constInt(DomConstants::XML_ELEMENT_NODE, false)
+        );
+        $bbEl = BasicBlockHelper::append($context, self::tag('dom_acls_el_nav_el'));
+        $bbDone = BasicBlockHelper::append($context, self::tag('dom_acls_el_nav_done'));
+        $context->builder->branchIf($isElement, $bbEl, $bbDone);
+
+        $context->builder->positionAtEnd($bbEl);
+        // Document ParentNode is computed from documentElement (#34910) — do not write
+        // DOMElement nav indices into a Document allocation.
+        $docClassId = $objectType->lookup('DOMDocument');
+        $map = $context->structFieldMap['__object__'];
+        $parentClassId = $context->builder->load(
+            $context->builder->structGep($parent, $map['class_id'])
+        );
+        $isDoc = $context->builder->icmp(
+            Builder::INT_EQ,
+            $parentClassId,
+            $i64->constInt($docClassId, false)
+        );
+        $bbNotDoc = BasicBlockHelper::append($context, self::tag('dom_acls_el_nav_not_doc'));
+        $context->builder->branchIf($isDoc, $bbDone, $bbNotDoc);
+
+        $context->builder->positionAtEnd($bbNotDoc);
+        $childJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $child);
+        $nullBox = self::nullValueVar($context);
+
+        $prevLast = self::loadLink(
+            $context,
+            $parent,
+            'DOMElement',
+            VmDom::PROP_LAST_ELEMENT_CHILD,
+            self::tag('dom_acls_el_nav_last')
+        );
+        $prevLastNull = $context->builder->icmp(Builder::INT_EQ, $prevLast, $objPtrTy->constNull());
+        $bbFirstEl = BasicBlockHelper::append($context, self::tag('dom_acls_el_nav_first'));
+        $bbMoreEl = BasicBlockHelper::append($context, self::tag('dom_acls_el_nav_more'));
+        $context->builder->branchIf($prevLastNull, $bbFirstEl, $bbMoreEl);
+
+        $context->builder->positionAtEnd($bbFirstEl);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_FIRST_ELEMENT_CHILD),
+            $childJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_LAST_ELEMENT_CHILD),
+            $childJit,
+            JITVariable::TYPE_VALUE
+        );
+        $one = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $i64->constInt(1, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_CHILD_ELEMENT_COUNT),
+            $one,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        self::storeSibling($context, $child, VmDom::PROP_PREVIOUS_ELEMENT_SIBLING, $nullBox);
+        self::storeSibling($context, $child, VmDom::PROP_NEXT_ELEMENT_SIBLING, $nullBox);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbMoreEl);
+        self::storeSibling($context, $prevLast, VmDom::PROP_NEXT_ELEMENT_SIBLING, $childJit);
+        self::storeSibling(
+            $context,
+            $child,
+            VmDom::PROP_PREVIOUS_ELEMENT_SIBLING,
+            new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $prevLast)
+        );
+        self::storeSibling($context, $child, VmDom::PROP_NEXT_ELEMENT_SIBLING, $nullBox);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_LAST_ELEMENT_CHILD),
+            $childJit,
+            JITVariable::TYPE_VALUE
+        );
+        $countVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $parent,
+            'DOMElement',
+            VmDom::PROP_CHILD_ELEMENT_COUNT,
+            $elementClassId
+        );
+        $oldCount = $context->helper->loadValue($countVar);
+        $newCount = $context->builder->add($oldCount, $i64->constInt(1, false));
+        $countJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $newCount
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($parent, 'DOMElement', VmDom::PROP_CHILD_ELEMENT_COUNT),
+            $countJit,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     private static function storeChildEdge(
