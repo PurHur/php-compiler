@@ -20,9 +20,19 @@ final class MbSubstrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('function strcutArgv', $helper);
         $this->assertStringNotContainsString('VmMbstring::', $helper);
         $this->assertStringNotContainsString('PHP_INT_MIN', $helper);
-        $this->assertStringNotContainsString('private static function', $helper);
+        // assertEncodingArgv may use private canon (#34875); peel helpers must stay non-private (#34256).
+        $this->assertStringContainsString('private static function canon', $helper);
+        $peelOnly = \str_replace('private static function canon', 'CANON', $helper);
+        $this->assertStringNotContainsString('private static function', $peelOnly);
         $this->assertStringContainsString('$n = $sliceEnd - $sliceStart', $helper);
-        $this->assertStringContainsString('$endAt = $start + $length', $helper);
+        $this->assertStringContainsString('$endAt = $startAt + $lenAt', $helper);
+        // NestedJIT zeros rewritten params and plain copies (#34881) — arithmetic locals only.
+        $this->assertStringContainsString('$startAt = $start + 0', $helper);
+        $this->assertStringContainsString('$fromAt = $from + 0', $helper);
+        $this->assertStringContainsString('$lenAt = $length + 0', $helper);
+        $this->assertStringNotContainsString('$start = $charLen', $helper);
+        $this->assertStringNotContainsString('$from = \\strlen', $helper);
+        $this->assertStringNotContainsString('$length = $charLen', $helper);
     }
 
     public function testMbSubstrUsesJitVmHelperLink(): void

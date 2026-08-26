@@ -9,10 +9,13 @@ namespace PHPCompiler\ext\mbstring;
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strcut) / PHP_FUNCTION(mb_substr).
  *
- * NestedJIT constraints proven on #34256:
+ * NestedJIT constraints proven on #34256 / #34881:
  * - No VmMbstring / VmString; omit length uses call-site sentinel -1 (not int-min).
  * - No private helpers in this unit.
- * - Precompute `$endAt = $start + $length` before the char walk.
+ * - Never reassign `$start` / `$from` / `$length` params — NestedJIT treats a rewritten
+ *   param as 0 on all paths (#34881 leftover of #34846). Copy via `$startAt = $start + 0`
+ *   (a plain `$startAt = $start` is also zeroed under NestedJIT).
+ * - Precompute `$endAt = $startAt + $lenAt` before the char walk.
  * - Use `$n = $sliceEnd - $sliceStart` then `\substr($string, $sliceStart, $n)`.
  * - Prefer `$found == 0` and nested range ifs (no elseif / ternaries).
  * - Do not branch on `$encoding` before the UTF-8 walk (NestedJIT mis-slice).
@@ -60,17 +63,110 @@ final class MbStrcutJitHelper
     public static function strcutArgv(string $string, int $from, int $length, string $encoding): string
     {
         // Encoding must already be validated via {@see assertEncodingArgv} (#34875).
+        // Never reassign $from / $length — NestedJIT zeros rewritten params (#34881).
+        // Plain `$fromAt = $from` is also zeroed; use `+ 0` so NestedJIT keeps the runtime int.
+        $fromAt = $from + 0;
+        $byteLen = \strlen($string);
         if ($from < 0) {
-            $from = \strlen($string) + $from;
-            if ($from < 0) {
-                $from = 0;
+            $fromAt = $byteLen + $from;
+            if ($fromAt < 0) {
+                $fromAt = 0;
             }
         }
+        $lenAt = $length + 0;
         if ($length < 0) {
-            return \substr($string, $from);
+            $lenAt = ($byteLen - $fromAt) + $length;
+            if ($lenAt < 0) {
+                $lenAt = 0;
+            }
         }
+        if ($fromAt > $byteLen) {
+            return '';
+        }
+        if ($lenAt == 0) {
+            return '';
+        }
+        // UTF-8 byte cut with character-boundary alignment (php-src mb_strcut / utf8AlignByteStart).
+        // Mid-character $from backs up to the lead byte — without this, from=1 on "über" mis-slices.
+        $p = 0;
+        $lastWidth = 1;
+        $g = $byteLen + 1;
+        while ($p < $fromAt && $p < $byteLen && $g > 0) {
+            $g = $g - 1;
+            $b = \ord(\substr($string, $p, 1));
+            $w = 1;
+            if ($b >= 192) {
+                if ($b < 224) {
+                    if ($p + 1 < $byteLen) {
+                        $w = 2;
+                    }
+                }
+            }
+            if ($b >= 224) {
+                if ($b < 240) {
+                    if ($p + 2 < $byteLen) {
+                        $w = 3;
+                    }
+                }
+            }
+            if ($b >= 240) {
+                if ($b < 248) {
+                    if ($p + 3 < $byteLen) {
+                        $w = 4;
+                    }
+                }
+            }
+            $lastWidth = $w;
+            $p = $p + $w;
+        }
+        if ($p > $fromAt) {
+            $p = $p - $lastWidth;
+        }
+        $sliceStart = $p;
+        if ($sliceStart >= $byteLen) {
+            return '';
+        }
+        if ($lenAt >= $byteLen - $sliceStart) {
+            return \substr($string, $sliceStart);
+        }
+        $target = $sliceStart + $lenAt;
+        $p = $sliceStart;
+        $lastWidth = 1;
+        $g = $byteLen + 1;
+        while ($p < $target && $p < $byteLen && $g > 0) {
+            $g = $g - 1;
+            $b = \ord(\substr($string, $p, 1));
+            $w = 1;
+            if ($b >= 192) {
+                if ($b < 224) {
+                    if ($p + 1 < $byteLen) {
+                        $w = 2;
+                    }
+                }
+            }
+            if ($b >= 224) {
+                if ($b < 240) {
+                    if ($p + 2 < $byteLen) {
+                        $w = 3;
+                    }
+                }
+            }
+            if ($b >= 240) {
+                if ($b < 248) {
+                    if ($p + 3 < $byteLen) {
+                        $w = 4;
+                    }
+                }
+            }
+            $lastWidth = $w;
+            $p = $p + $w;
+        }
+        if ($p > $target) {
+            $p = $p - $lastWidth;
+        }
+        $n = $p - $sliceStart;
 
-        return \substr($string, $from, $length);
+        return \substr($string, $sliceStart, $n);
     }
 }
 
@@ -117,28 +213,32 @@ final class MbSubstrJitHelper
             $bytePos = $bytePos + $w;
             $charLen = $charLen + 1;
         }
+        // Never reassign $start / $length — NestedJIT zeros rewritten params on all paths (#34881).
+        // Plain `$startAt = $start` is also zeroed; use `+ 0` so NestedJIT keeps the runtime int.
+        $startAt = $start + 0;
         if ($start < 0) {
-            $start = $charLen + $start;
+            $startAt = $charLen + $start;
         }
-        if ($start < 0) {
-            $start = 0;
+        if ($startAt < 0) {
+            $startAt = 0;
         }
-        if ($start >= $charLen) {
+        if ($startAt >= $charLen) {
             return '';
         }
         // -1 = omitted length sentinel from JitMbSubstr (#34256).
+        $lenAt = $length + 0;
         if (-1 === $length) {
-            $length = $charLen - $start;
+            $lenAt = $charLen - $startAt;
         } elseif ($length < 0) {
-            $length = $charLen - $start + $length;
-            if ($length < 0) {
+            $lenAt = $charLen - $startAt + $length;
+            if ($lenAt < 0) {
                 return '';
             }
         }
-        if ($length <= 0) {
+        if ($lenAt <= 0) {
             return '';
         }
-        $endAt = $start + $length;
+        $endAt = $startAt + $lenAt;
         $charIndex = 0;
         $bytePos = 0;
         $sliceStart = $byteLen;
@@ -149,7 +249,7 @@ final class MbSubstrJitHelper
         while ($bytePos < $byteLen && $g > 0) {
             $g = $g - 1;
             if ($foundStart == 0) {
-                if ($charIndex == $start) {
+                if ($charIndex == $startAt) {
                     $sliceStart = $bytePos;
                     $foundStart = 1;
                 }
