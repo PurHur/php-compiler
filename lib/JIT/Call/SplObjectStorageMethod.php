@@ -129,6 +129,40 @@ final class SplObjectStorageMethod implements Call
                     $hashArg,
                     'SplObjectStorage::getHash'
                 );
+            case 'serialize':
+                // php-src zim_SplObjectStorage_serialize — legacy x:/m: (#35117); without proxy → NULL (#579).
+                if (!VmClassMethod::requireExactJitUserArgCount(
+                    $context,
+                    $args,
+                    'SplObjectStorage::serialize',
+                    0
+                )) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileLegacySerialize($context, $args[0]);
+            case 'unserialize':
+                if (!VmClassMethod::requireExactJitUserArgCount(
+                    $context,
+                    $args,
+                    'SplObjectStorage::unserialize',
+                    1
+                )) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+                $payload = \PHPCompiler\JIT\JitStringBuiltinArg::lowerStrictOrCoercible(
+                    $context,
+                    $args[1],
+                    'SplObjectStorage::unserialize',
+                    0,
+                    'data'
+                );
+
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileLegacyUnserialize(
+                    $context,
+                    $args[0],
+                    $payload
+                );
             case 'addall':
                 // php-src: ZEND_PARSE_PARAMETERS_START(1, 1) — #33847 / #30999
                 if (!VmClassMethod::requireExactJitUserArgCount(

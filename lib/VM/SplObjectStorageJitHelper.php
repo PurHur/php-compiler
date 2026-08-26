@@ -224,6 +224,135 @@ final class SplObjectStorageJitHelper
         return \PHPCompiler\JIT\JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr);
     }
 
+    /**
+     * php-src zim_SplObjectStorage_serialize — legacy `x:/m:` wire (#35117 / #31627).
+     *
+     * NestedJIT HT encode SIGABRTs on the method path (peer #34491); build wire in LLVM
+     * with empty-stdClass keys + `__compiler_serialize_value` for info (matches #33876 limits).
+     *
+     * @return Value boxed `__value__*` string
+     */
+    public static function compileLegacySerialize(Context $context, JITVariable $receiver): Value
+    {
+        \PHPCompiler\JIT\Builtin\StringSerialize::ensureLinked($context);
+        $obj = self::loadObject($context, $receiver);
+        $srcHt = self::htPtr($context, $obj);
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $countSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt(0, false), $countSlot);
+        $bodySlot = BasicBlockHelper::entryAlloca($context, $strPtr);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->store($empty, $bodySlot);
+
+        self::foreachObjKeyNode($context, $srcHt, 'sos_leg_ser', static function (
+            Context $context,
+            Value $node
+        ) use ($countSlot, $bodySlot, $i64): void {
+            $nodeMap = $context->structFieldMap['__objkey_node__'];
+            $valField = $context->builder->structGep($node, $nodeMap['value']);
+            $infoVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_VALUE,
+                JITVariable::KIND_VARIABLE,
+                $valField
+            );
+            $infoPtr = JitValueBox::valuePtrFromVariable($context, $infoVar);
+            $infoWire = $context->builder->call(
+                $context->lookupFunction('__compiler_serialize_value'),
+                $infoPtr,
+                $i64->constInt(0, false)
+            );
+            $objPart = $context->builder->load($context->constantStringFromString('O:8:"stdClass":0:{},'));
+            $semi = $context->builder->load($context->constantStringFromString(';'));
+            $piece = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $objPart, $infoWire);
+            $piece = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $piece, $semi);
+            $body = $context->builder->load($bodySlot);
+            $context->builder->store(
+                \PHPCompiler\ext\standard\JitStringConcat::concat($context, $body, $piece),
+                $bodySlot
+            );
+            $context->builder->store(
+                $context->builder->add($context->builder->load($countSlot), $i64->constInt(1, false)),
+                $countSlot
+            );
+        });
+
+        $count = $context->builder->load($countSlot);
+        $countDigits = VmResourceIdString::formatNativeLong($context, $count);
+        $xPrefix = $context->builder->load($context->constantStringFromString('x:i:'));
+        $semi = $context->builder->load($context->constantStringFromString(';'));
+        $mTail = $context->builder->load($context->constantStringFromString('m:a:0:{}'));
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $xPrefix, $countDigits);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $semi);
+        $acc = \PHPCompiler\ext\standard\JitStringConcat::concat(
+            $context,
+            $acc,
+            $context->builder->load($bodySlot)
+        );
+        $wire = \PHPCompiler\ext\standard\JitStringConcat::concat($context, $acc, $mTail);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $wire
+        );
+
+        return $slot;
+    }
+
+    /**
+     * php-src zim_SplObjectStorage_unserialize — restore legacy `x:/m:` (#35117).
+     */
+    public static function compileLegacyUnserialize(
+        Context $context,
+        JITVariable $receiver,
+        Value $payloadString
+    ): Value {
+        \PHPCompiler\JIT\Builtin\StringUnserialize::ensureLinked($context);
+        $internals = [
+            new \PHPCompiler\ext\standard\phpc_native_sos_attach_empty_stdclass_null(),
+            new \PHPCompiler\ext\standard\phpc_native_sos_attach_empty_stdclass_long(),
+            new \PHPCompiler\ext\standard\phpc_native_sos_attach_empty_stdclass_string(),
+        ];
+        foreach ($internals as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof \PHPCompiler\JIT\Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
+            }
+        }
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $logical = 'PHPCompiler\\ext\\standard\\UnserializeSplObjectStorageLegacyNestedJitHelper::restoreInto';
+        $saved = BasicBlockHelper::tryGetInsertBlock($context);
+        \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled(
+            $context,
+            '/ext/standard/UnserializeSplObjectStorageLegacyNestedJitHelper.php',
+            [$logical],
+            '#35117'
+        );
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+        $fn = \PHPCompiler\JIT\JitVmHelperLink::lookupCompiled($context, $logical, '#35117');
+        $payloadOwned = self::nestedJitOwnedString($context, $payloadString);
+        $destI64 = \PHPCompiler\JIT\JitNestedHelperCoerce::ptrToI64($context, $ht);
+        $context->builder->call(
+            $fn,
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $destI64,
+                $fn->getParam(0)->typeOf()
+            ),
+            \PHPCompiler\JIT\JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $payloadOwned,
+                $fn->getParam(1)->typeOf()
+            )
+        );
+
+        return self::voidResult($context);
+    }
+
     /** Expose object load for {@see \PHPCompiler\ext\standard\JitSerialize} (#33876). */
     public static function loadObjectPtr(Context $context, JITVariable $receiver): Value
     {
