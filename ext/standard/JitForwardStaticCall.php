@@ -15,6 +15,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\LateStaticBindingHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\VmBoundMethodCallable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -33,6 +34,9 @@ final class JitForwardStaticCall
     public static function invoke(Context $context, JITVariable $callable, array $extraArgs, string $builtinName): Value
     {
         $block = self::requireClassScope($context, $builtinName);
+        if (null === $block) {
+            return $context->getTypeFromString('__value__*')->constNull();
+        }
         $methodLc = self::parseMethodLc($context, $callable, $builtinName);
         $ownerClass = self::resolveMethodOwnerClassName($context, $block, $callable);
         if (null !== $ownerClass) {
@@ -384,10 +388,18 @@ final class JitForwardStaticCall
             return '' !== $class ? $class : null;
         }
 
-        $block = $context->jitEnclosingBlock;
+        $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
         if ($block instanceof Block && isset($context->scope->argOperands[0])) {
             $slot = $block->slotForOperand($context->scope->argOperands[0]);
             if (null !== $slot) {
+                // ['Class','method'] — peer #35090 / VmBoundMethodCallable (#35110).
+                $staticSlots = VmBoundMethodCallable::resolveStaticArrayCallableSlots($block, $slot);
+                if (null !== $staticSlots && isset($block->constants[$staticSlots[0]])) {
+                    $className = $block->constants[$staticSlots[0]]->toString();
+
+                    return '' !== $className ? $className : null;
+                }
+
                 return BoundMethodCallableHelper::resolveBoundMethodReceiverClassName($block, $slot);
             }
         }
@@ -422,7 +434,7 @@ final class JitForwardStaticCall
         );
     }
 
-    private static function requireClassScope(Context $context, string $builtinName): Block
+    private static function requireClassScope(Context $context, string $builtinName): ?Block
     {
         $block = $context->jitEnclosingBlock;
         if (!$block instanceof Block || null === $block->func || null === $block->func->class) {
@@ -430,6 +442,8 @@ final class JitForwardStaticCall
             ErrorRaise::ensureLinked($context);
             ErrorRaise::emitRaise($context, "Cannot call {$builtinName}() when no class scope is active");
             $context->builder->call($context->lookupFunction('abort'));
+            // Do not keep lowering after abort in this BB (#35110 Module verify).
+            return null;
         }
 
         return $block;
