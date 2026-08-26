@@ -35,7 +35,8 @@ final class JsonEncodeJitHelper
         }
         try {
             // null Frame avoids NestedJIT of stack-frame walk (#13245 / #20816).
-            $exported = VmJson::export($value->resolveIndirect(), $ctx, $vm, null);
+            // Pass flags so PARTIAL continues past depth (#34947).
+            $exported = VmJson::export($value->resolveIndirect(), $ctx, $vm, null, 512, 0, $flags);
         } catch (VmJsonExportException $e) {
             VmJson::setLastError($e->errorCode);
 

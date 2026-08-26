@@ -44,7 +44,9 @@ final class json_encode extends Internal
                 $ctx,
                 $vm,
                 $frame,
-                $maxDepth
+                $maxDepth,
+                0,
+                $flags
             );
         } catch (VmJsonExportException $e) {
             // php-src: THROW without PARTIAL leaves JSON_G(error_code) unchanged (#25456).

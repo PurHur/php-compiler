@@ -242,9 +242,10 @@ final class VmJson
         ?VM $vm = null,
         ?Frame $frame = null,
         int $maxDepth = 512,
-        int $depth = 0
+        int $depth = 0,
+        int $flags = 0
     ): mixed {
-        return self::exportValue($v, $ctx, $vm, $frame, new \SplObjectStorage(), $maxDepth, $depth);
+        return self::exportValue($v, $ctx, $vm, $frame, new \SplObjectStorage(), $maxDepth, $depth, $flags);
     }
 
     private static function exportValue(
@@ -254,7 +255,8 @@ final class VmJson
         ?Frame $frame,
         \SplObjectStorage $visited,
         int $maxDepth,
-        int $depth
+        int $depth,
+        int $flags = 0
     ): mixed {
         $v = $v->resolveIndirect();
         if (is_resource_::isResource($v)) {
@@ -273,8 +275,12 @@ final class VmJson
                 return $v->toString();
             case Variable::TYPE_ARRAY:
                 $arrayDepth = $depth + 1;
+                // php-src: with PARTIAL, depth overflow still exports (#34947).
                 if ($arrayDepth > $maxDepth) {
-                    throw new VmJsonExportException(self::ERROR_DEPTH);
+                    if (!VmJsonFlags::partialOutputOnError($flags)) {
+                        throw new VmJsonExportException(self::ERROR_DEPTH);
+                    }
+                    self::setLastError(self::ERROR_DEPTH);
                 }
                 $ht = $v->toArray();
                 if ($visited->contains($ht)) {
@@ -293,7 +299,8 @@ final class VmJson
                                 $frame,
                                 $visited,
                                 $maxDepth,
-                                $arrayDepth
+                                $arrayDepth,
+                                $flags
                             );
                         } elseif (Variable::TYPE_INTEGER === $k->type) {
                             $out[$k->toInt()] = self::exportValue(
@@ -303,7 +310,8 @@ final class VmJson
                                 $frame,
                                 $visited,
                                 $maxDepth,
-                                $arrayDepth
+                                $arrayDepth,
+                                $flags
                             );
                         } else {
                             throw new \LogicException(
@@ -317,11 +325,14 @@ final class VmJson
                     $visited->detach($ht);
                 }
             case Variable::TYPE_ENUM_CASE:
-                return self::exportEnumCase($v->toEnumCase(), $ctx, $vm, $frame, $visited, $maxDepth, $depth);
+                return self::exportEnumCase($v->toEnumCase(), $ctx, $vm, $frame, $visited, $maxDepth, $depth, $flags);
             case Variable::TYPE_OBJECT:
                 $objectDepth = $depth + 1;
                 if ($objectDepth > $maxDepth) {
-                    throw new VmJsonExportException(self::ERROR_DEPTH);
+                    if (!VmJsonFlags::partialOutputOnError($flags)) {
+                        throw new VmJsonExportException(self::ERROR_DEPTH);
+                    }
+                    self::setLastError(self::ERROR_DEPTH);
                 }
                 if (null === $ctx || null === $vm) {
                     throw new \LogicException(
@@ -372,7 +383,8 @@ final class VmJson
                             $frame,
                             $visited,
                             $maxDepth,
-                            $objectDepth
+                            $objectDepth,
+                            $flags
                         );
                     }
                     if (!InterfaceCheck::entryImplements($object->class, 'jsonserializable', $ctx)) {
@@ -383,7 +395,8 @@ final class VmJson
                             $frame,
                             $visited,
                             $maxDepth,
-                            $objectDepth
+                            $objectDepth,
+                            $flags
                         );
                     }
                     if (!$vm->hasInstanceMethod($object->class, 'jsonserialize')) {
@@ -405,7 +418,8 @@ final class VmJson
                         $frame,
                         $visited,
                         $maxDepth,
-                        $objectDepth
+                        $objectDepth,
+                        $flags
                     );
                 } finally {
                     $visited->detach($object);
@@ -427,7 +441,8 @@ final class VmJson
         ?Frame $frame,
         \SplObjectStorage $visited,
         int $maxDepth,
-        int $depth
+        int $depth,
+        int $flags = 0
     ): \stdClass {
         $out = new \stdClass();
         if (null !== $frame) {
@@ -439,7 +454,8 @@ final class VmJson
                     $frame,
                     $visited,
                     $maxDepth,
-                    $depth
+                    $depth,
+                    $flags
                 );
             }
 
@@ -477,7 +493,8 @@ final class VmJson
                     $frame,
                     $visited,
                     $maxDepth,
-                    $depth
+                    $depth,
+                    $flags
                 );
             }
         }
@@ -498,7 +515,8 @@ final class VmJson
                 $frame,
                 $visited,
                 $maxDepth,
-                $depth
+                $depth,
+                $flags
             );
         }
 
@@ -515,7 +533,8 @@ final class VmJson
         ?Frame $frame,
         \SplObjectStorage $visited,
         int $maxDepth,
-        int $depth
+        int $depth,
+        int $flags = 0
     ): mixed {
         if (null !== $ctx && null !== $vm
             && InterfaceCheck::entryImplements($case->enumClass, 'jsonserializable', $ctx)) {
@@ -540,7 +559,8 @@ final class VmJson
                 $frame,
                 $visited,
                 $maxDepth,
-                $depth
+                $depth,
+                $flags
             );
         }
 

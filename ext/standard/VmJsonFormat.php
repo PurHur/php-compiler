@@ -144,8 +144,13 @@ final class VmJsonFormat
         }
         if ($value instanceof \stdClass) {
             $nestedDepth = $depth + 1;
+            // php-src json_encoder.c: depth checked after children; with PARTIAL keep
+            // encoding and sticky PHP_JSON_ERROR_DEPTH (#34947).
             if ($nestedDepth > $maxDepth) {
-                throw new VmJsonExportException(VmJson::ERROR_DEPTH);
+                if (!VmJsonFlags::partialOutputOnError($flags)) {
+                    throw new VmJsonExportException(VmJson::ERROR_DEPTH);
+                }
+                VmJson::setLastError(VmJson::ERROR_DEPTH);
             }
             $props = get_object_vars($value);
             if ([] === $props) {
@@ -166,7 +171,10 @@ final class VmJsonFormat
         if (\is_array($value)) {
             $nestedDepth = $depth + 1;
             if ($nestedDepth > $maxDepth) {
-                throw new VmJsonExportException(VmJson::ERROR_DEPTH);
+                if (!VmJsonFlags::partialOutputOnError($flags)) {
+                    throw new VmJsonExportException(VmJson::ERROR_DEPTH);
+                }
+                VmJson::setLastError(VmJson::ERROR_DEPTH);
             }
             $encodeAsObject = !array_is_list($value) || self::forceObject($flags);
             if ([] === $value) {

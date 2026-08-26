@@ -37,7 +37,7 @@ final class JsonEncodeArrayLlvm
         $tag = (string) ++self::$seq;
         $merge = BasicBlockHelper::append($context, 'json_ht_enc_merge_'.$tag);
 
-        $enterOk = JsonEncodeDepthLlvm::tryEnter($context);
+        $enterOk = JsonEncodeDepthLlvm::tryEnter($context, $flags);
         $depthFail = BasicBlockHelper::append($context, 'json_ht_enc_depth_fail_'.$tag);
         $depthOk = BasicBlockHelper::append($context, 'json_ht_enc_depth_ok_'.$tag);
         $context->builder->branchIf($enterOk, $depthOk, $depthFail);
