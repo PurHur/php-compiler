@@ -143,6 +143,59 @@ final class JitDomNodeChildProperty
     }
 
     /**
+     * Seed nextElementSibling / previousElementSibling compile-time tag/index (#35021).
+     *
+     * Sibling edges walk the *parent* child list (GetNodePath lastParentInner), not
+     * the receiver element's empty inner — otherwise importNode falls back to the
+     * prior FEC/LEC stamp and copies the wrong element.
+     */
+    public static function annotateCompileTimeElementSibling(
+        JITVariable $result,
+        string $propName,
+        ?JITVariable $receiverVar = null
+    ): void {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
+        }
+        $propLc = strtolower($propName);
+        if ('nextelementsibling' !== $propLc && 'previouselementsibling' !== $propLc) {
+            return;
+        }
+        $nodes = self::compileTimeParentSiblingNodes($receiverVar);
+        if ([] === $nodes) {
+            return;
+        }
+        $base = $receiverVar?->compileTimeDomChildIndex
+            ?? self::$lastFetchedChildIndex
+            ?? null;
+        if (null === $base) {
+            return;
+        }
+        $index = null;
+        if ('nextelementsibling' === $propLc) {
+            for ($i = $base + 1, $n = \count($nodes); $i < $n; ++$i) {
+                if ('element' === ($nodes[$i]['kind'] ?? '')) {
+                    $index = $i;
+                    break;
+                }
+            }
+        } else {
+            for ($i = $base - 1; $i >= 0; --$i) {
+                if ('element' === ($nodes[$i]['kind'] ?? '')) {
+                    $index = $i;
+                    break;
+                }
+            }
+        }
+        if (null === $index) {
+            return;
+        }
+        self::stampChildIndex($result, $nodes, $index);
+        // null receiver: do not treat the sibling child as the parent for path recovery.
+        JitDomGetNodePath::annotateElementChildPath($result, $propLc, null, $index);
+    }
+
+    /**
      * Seed child index/tag from loadXML literal so replaceChild can rebuild
      * PROP_USER_SCRIPT_INNER_XML without collapsing siblings (#28671 / #33273).
      *
@@ -157,22 +210,13 @@ final class JitDomNodeChildProperty
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }
-        $nodes = self::compileTimeChildNodesForReceiver($receiverVar);
-        if ([] === $nodes) {
-            return;
-        }
         $propLc = strtolower($propName);
-        if ('firstchild' === $propLc) {
-            self::stampChildIndex($result, $nodes, 0);
-
-            return;
-        }
-        if ('lastchild' === $propLc) {
-            self::stampChildIndex($result, $nodes, \count($nodes) - 1);
-
-            return;
-        }
         if ('nextsibling' === $propLc || 'previoussibling' === $propLc) {
+            // Parent sibling list — receiver is the child edge, not the parent (#35021).
+            $nodes = self::compileTimeParentSiblingNodes($receiverVar);
+            if ([] === $nodes) {
+                return;
+            }
             $base = $receiverVar?->compileTimeDomChildIndex
                 ?? self::$lastFetchedChildIndex
                 ?? null;
@@ -184,7 +228,50 @@ final class JitDomNodeChildProperty
                 return;
             }
             self::stampChildIndex($result, $nodes, $index);
+            JitDomGetNodePath::annotateElementChildPath($result, $propLc, null, $index);
+
+            return;
         }
+        $nodes = self::compileTimeChildNodesForReceiver($receiverVar);
+        if ([] === $nodes) {
+            return;
+        }
+        if ('firstchild' === $propLc) {
+            self::stampChildIndex($result, $nodes, 0);
+
+            return;
+        }
+        if ('lastchild' === $propLc) {
+            self::stampChildIndex($result, $nodes, \count($nodes) - 1);
+
+            return;
+        }
+    }
+
+    /**
+     * Siblings under the parent of a child-edge receiver (next/previousSibling).
+     *
+     * Must not use the child's empty InnerXml or the process-global last loadXML
+     * (destination wins during importNode) — prefer GetNodePath's lastParentInner
+     * stamped by documentElement / parent walks (#35021).
+     *
+     * @return list<array{kind: string, data: string, inner?: string, open?: string}>
+     */
+    private static function compileTimeParentSiblingNodes(?JITVariable $childVar): array
+    {
+        $parentInner = JitDomGetNodePath::$lastParentInner;
+        if (null !== $parentInner && '' !== $parentInner) {
+            return DomParseSimpleXmlJitHelper::parseSiblingNodesArgv($parentInner);
+        }
+        if (null !== $childVar) {
+            $bound = $childVar->compileTimeDomLoadXml
+                ?? JitDomLoadXMLUserScript::compileTimeXmlFor($childVar);
+            if (null !== $bound) {
+                return DomParseSimpleXmlJitHelper::directChildNodesArgv($bound);
+            }
+        }
+
+        return [];
     }
 
     /**

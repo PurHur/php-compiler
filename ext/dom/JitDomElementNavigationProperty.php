@@ -24,8 +24,8 @@ use PHPLLVM\Value;
  * For Document, first/lastElementChild ≡ documentElement; childElementCount is 0 or 1
  * (php-src parentnode.c / document can have at most one element child).
  *
- * Element-receiver FEC/LEC also stamp compile-time tag/index so importNode recovers
- * the element child after ARG_SEND drops Variable metadata (#35017 / peer firstChild #33918).
+ * Element-receiver FEC/LEC/NES/PES stamp compile-time tag/index so importNode recovers
+ * the right element after ARG_SEND drops Variable metadata (#35017 / #35021 / peer #33918).
  */
 final class JitDomElementNavigationProperty
 {
@@ -102,11 +102,19 @@ final class JitDomElementNavigationProperty
                 $propName,
                 $classId
             );
-            // Stamp element-child compile-time metadata so importNode / cloneNode
-            // recover the element — not documentElement — after ARG_SEND (#35017).
+            // Stamp element-child / element-sibling compile-time metadata so
+            // importNode / cloneNode recover the right node after ARG_SEND
+            // (#35017 FEC/LEC; #35021 NES/PES).
             if ('firstelementchild' === $propLc || 'lastelementchild' === $propLc) {
                 $result->classUserType = self::CLASS_ELEMENT;
                 JitDomNodeChildProperty::annotateCompileTimeElementChild(
+                    $result,
+                    $propName,
+                    $receiverVar
+                );
+            } elseif ('nextelementsibling' === $propLc || 'previouselementsibling' === $propLc) {
+                $result->classUserType = self::CLASS_ELEMENT;
+                JitDomNodeChildProperty::annotateCompileTimeElementSibling(
                     $result,
                     $propName,
                     $receiverVar
