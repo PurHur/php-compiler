@@ -25,6 +25,7 @@ use PHPLLVM\Value;
  * Thin standalone AOT: compile-time string literals materialize a main-module
  * Dom\XMLDocument (peer {@see JitDomLoadXMLUserScript}) so get_class /
  * documentElement / Attr::rename do not touch NestedJIT ObjectEntry layout.
+ * Must seed {@code nodeType=XML_DOCUMENT_NODE} (#35177 peer #35173).
  */
 final class JitDomXmlDocumentCreateFromString
 {
@@ -156,6 +157,13 @@ final class JitDomXmlDocumentCreateFromString
 
         $document = $objectType->allocate($docClassId);
         $objectType->markObjectConstructed($document);
+        // Unset NATIVE_LONG nodeType → empty/SIGSEGV on $doc->nodeType (#35177 peer #35173).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $document,
+            self::CLASS_DOCUMENT,
+            DomConstants::XML_DOCUMENT_NODE
+        );
 
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($forParse);
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($forParse);
