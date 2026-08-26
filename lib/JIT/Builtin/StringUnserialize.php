@@ -29,8 +29,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Embed + thin standalone AOT: {@see UnserializeJitHelper} NestedJIT
  * (Serialize #20773 shape — no thin null/empty stubs).
  * Helper NestedJIT-decodes `i:N;` as int; bridge boxes to `__value__*` (#20785).
- * Simple `O:` public-prop objects: {@see UnserializeObjectNestedJitHelper} + call-site
- * LLVM materialize (class table must include user classes — emit from JitUnserialize).
+ * Simple `O:` public-prop objects: {@see UnserializeObjectNestedJitHelper}::propsInto HT
+ * + copy into declared slots (#35107; NestedJIT `$x++` miscompile fixed in helper).
  * SPL ArrayObject family: bag restore into `__spl_ht` (#33636) — not firstIntProp→slot0.
  * SplFixedArray: integer-keyed elements into `__spl_ht` (#33640) — same slot-0 trap.
  * SplObjectStorage: object-key pairs (#33876); SplDoublyLinkedList/Queue/Stack bag (#33966).
@@ -167,6 +167,9 @@ final class StringUnserialize
             new \PHPCompiler\ext\standard\phpc_native_ht_alloc(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_long(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_double(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_bool(),
+            new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key_null(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_long_at(),
             new \PHPCompiler\ext\standard\phpc_native_ht_set_null_at(),
@@ -217,17 +220,27 @@ final class StringUnserialize
         self::ensureObjectHelpersCompiled($context);
         self::ensureRuntimeHelpers($context);
         StringStrContains::ensureLinked($context);
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $i1Ty = $context->getTypeFromString('int1');
         try {
             $context->lookupFunction('__hashtable__readStringKeyValue');
         } catch (\Throwable) {
-            $htPtr = $context->getTypeFromString('__hashtable__*');
-            $strPtr = $context->getTypeFromString('__string__*');
-            $valuePtr = $context->getTypeFromString('__value__*');
             $fn = $context->module->addFunction(
                 '__hashtable__readStringKeyValue',
-                $context->context->functionType($valuePtr, false, $htPtr, $strPtr)
+                $context->context->functionType($valuePtrTy, false, $htPtrTy, $strPtrTy)
             );
             $context->registerFunction('__hashtable__readStringKeyValue', $fn);
+        }
+        try {
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey');
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction(
+                '__hashtable__offsetIsSetStringKey',
+                $context->context->functionType($i1Ty, false, $htPtrTy, $strPtrTy)
+            );
+            $context->registerFunction('__hashtable__offsetIsSetStringKey', $fn);
         }
 
         $fn = BasicBlockHelper::parentFunction($context);
@@ -317,6 +330,18 @@ final class StringUnserialize
             );
             $context->builder->branchIf($isMatch, $case, $next);
             $context->builder->positionAtEnd($case);
+            $classLcEarly = strtolower(ltrim($className, '\\'));
+            if ('stdclass' === $classLcEarly) {
+                foreach (\range('a', 'z') as $ch) {
+                    $object->defineProperty($id, (string) $ch, \PHPCompiler\JIT\Variable::TYPE_VALUE);
+                }
+                foreach (\range('A', 'Z') as $ch) {
+                    $object->defineProperty($id, (string) $ch, \PHPCompiler\JIT\Variable::TYPE_VALUE);
+                }
+                for ($d = 0; $d <= 9; ++$d) {
+                    $object->defineProperty($id, (string) $d, \PHPCompiler\JIT\Variable::TYPE_VALUE);
+                }
+            }
             $objVal = $object->allocate($id);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'unser_obj_after_alloc_'.$id);
             $object->markObjectConstructed($objVal);
@@ -388,23 +413,69 @@ final class StringUnserialize
                 // Fold path covers assigned serialize→unserialize (#34608). NestedJIT bag TBD —
                 // skip firstIntProp (empty alloc still SIGSEGVs on foreach without timestamps).
             } else {
+                // User / stdClass public props: propsInto → declared slots (#35107).
+                self::ensureObjectHelpersCompiled($context);
+                $htI64 = ParseStrNativeOpsJit::alloc($context);
+                $propsInto = self::objectHelperFunction($context, self::PROPS_INTO_HELPER);
+                $context->builder->call(
+                    $propsInto,
+                    JitNestedHelperCoerce::coerceArgForHelper(
+                        $context,
+                        $htI64,
+                        $propsInto->getParam(0)->typeOf()
+                    ),
+                    JitNestedHelperCoerce::coerceArgForHelper(
+                        $context,
+                        $payloadString,
+                        $propsInto->getParam(1)->typeOf()
+                    )
+                );
+                $htVar = new \PHPCompiler\JIT\Variable(
+                    $context,
+                    \PHPCompiler\JIT\Variable::TYPE_NATIVE_LONG,
+                    \PHPCompiler\JIT\Variable::KIND_VALUE,
+                    $htI64
+                );
+                $propsHt = ParseStrNativeOpsJit::htPointerFromI64Arg($context, $htVar);
                 $voidPtr = $context->getTypeFromString('void*');
+                $i1 = $context->getTypeFromString('int1');
+                $serial = 0;
                 foreach ($object->instancePropertySets($id) as $propset) {
                     $propName = $propset[1];
-                    $box = \PHPCompiler\JIT\JitValueBox::alloc($context);
-                    $boxPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $box);
-                    $context->builder->call(
-                        $context->lookupFunction('__value__writeLong'),
-                        $boxPtr,
-                        $firstInt
+                    if ('' === $propName || "\0" === $propName[0] || str_starts_with($propName, '__')) {
+                        continue;
+                    }
+                    ++$serial;
+                    $keyStr = $context->builder->load($context->constantStringFromString($propName));
+                    $isset = $context->builder->call(
+                        $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                        $propsHt,
+                        $keyStr
+                    );
+                    $yes = BasicBlockHelper::append($context, 'unser_prop_yes_'.$id.'_'.$serial);
+                    $no = BasicBlockHelper::append($context, 'unser_prop_no_'.$id.'_'.$serial);
+                    $context->builder->branchIf(
+                        $context->builder->icmp(
+                            \PHPLLVM\Builder::INT_NE,
+                            $isset,
+                            $i1->constInt(0, false)
+                        ),
+                        $yes,
+                        $no
+                    );
+                    $context->builder->positionAtEnd($yes);
+                    $valEntry = $context->builder->call(
+                        $context->lookupFunction('__hashtable__readStringKeyValue'),
+                        $propsHt,
+                        $keyStr
                     );
                     $slot = $object->propertySlotFor($objVal, $className, $propName);
                     $context->builder->store(
-                        $context->builder->pointerCast($boxPtr, $voidPtr),
+                        $context->builder->pointerCast($valEntry, $voidPtr),
                         $slot
                     );
-                    // firstIntProp covers the first int wire value; enough for #27030 single-prop.
-                    break;
+                    $context->builder->branch($no);
+                    $context->builder->positionAtEnd($no);
                 }
             }
             BasicBlockHelper::ensureOpenInsertBlock($context, 'unser_obj_after_props_'.$id);

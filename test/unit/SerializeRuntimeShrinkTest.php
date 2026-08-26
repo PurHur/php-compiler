@@ -67,7 +67,7 @@ final class SerializeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UnserializeObjectNestedJitHelper.php');
         $this->assertStringContainsString('firstIntProp', $source);
-        $this->assertStringContainsString('phpc_native_ht_set_long_at', $source);
+        $this->assertStringContainsString('phpc_native_ht_set_string_key_long', $source);
         $this->assertStringContainsString('propsInto', $source);
         $this->assertStringNotContainsString('VmUnserialize', $source);
         $this->assertStringNotContainsString('Superglobals', $source);
