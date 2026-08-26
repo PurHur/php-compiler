@@ -2626,9 +2626,13 @@ final class HashTableWriteLlvm
         self::ensureHashtableInitLvalueSlot($context, $result);
         $ht = self::alloc($context);
         if (Variable::TYPE_VALUE === $result->type) {
+            // Script globals are `__value__**` module slots — load before writeHashtable
+            // (expects `__value__*`). Passing the global raw fails module verify on
+            // top-level string-keyed INIT_ARRAY (#34967; peer #27520 / ScopeBuiltinIndexLlvm).
+            $destPtr = JitValueBox::valuePtrFromVariable($context, $result);
             $context->builder->call(
                 $context->lookupFunction('__value__writeHashtable'),
-                $result->value,
+                $destPtr,
                 $ht
             );
             $result->valueBoxHashtable = true;
