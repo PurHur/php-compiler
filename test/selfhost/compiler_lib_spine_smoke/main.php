@@ -552,6 +552,7 @@ require_once __DIR__.'/../../../ext/dom/JitDomNormalize.php';
 require_once __DIR__.'/../../../ext/dom/JitDomNormalizeLiveSlots.php';
 require_once __DIR__.'/../../../ext/dom/JitDomParentChildLinkLayout.php';
 require_once __DIR__.'/../../../ext/dom/JitDomParentNodeProperty.php';
+require_once __DIR__.'/../../../ext/dom/JitDomParentNodeElementNavLiveSlots.php';
 require_once __DIR__.'/../../../ext/dom/JitDomRemoveChildLiveSlots.php';
 require_once __DIR__.'/../../../ext/dom/JitDomRemoveChild.php';
 require_once __DIR__.'/../../../ext/dom/JitDomReplaceChild.php';

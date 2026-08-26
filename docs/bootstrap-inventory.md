@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7909 |
-| Phase A inventory files (M2 ratio SSOT) | 7909 |
+| PHP files on vm.php path | 7910 |
+| Phase A inventory files (M2 ratio SSOT) | 7910 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25211 |
+| Source constructs flagged (warnings) | 25225 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -434,7 +434,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ImplementationHasFeature.php` | 0 | 1 |
 | `ext/dom/JitDomAdoptNode.php` | 0 | 1 |
 | `ext/dom/JitDomAppendChild.php` | 0 | 2 |
-| `ext/dom/JitDomAppendChildLiveSlots.php` | 0 | 17 |
+| `ext/dom/JitDomAppendChildLiveSlots.php` | 0 | 21 |
 | `ext/dom/JitDomAppendChildUserScript.php` | 0 | 14 |
 | `ext/dom/JitDomAppendData.php` | 0 | 1 |
 | `ext/dom/JitDomAttrRename.php` | 0 | 3 |
@@ -449,7 +449,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomCreateDocument.php` | 0 | 4 |
 | `ext/dom/JitDomCreateDocumentFragment.php` | 0 | 3 |
 | `ext/dom/JitDomCreateDocumentType.php` | 0 | 4 |
-| `ext/dom/JitDomCreateElement.php` | 0 | 12 |
+| `ext/dom/JitDomCreateElement.php` | 0 | 14 |
 | `ext/dom/JitDomCreateElementAttrs.php` | 0 | 1 |
 | `ext/dom/JitDomCreateElementNS.php` | 0 | 8 |
 | `ext/dom/JitDomCreateEntityReference.php` | 0 | 2 |
@@ -500,6 +500,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomNormalize.php` | 0 | 1 |
 | `ext/dom/JitDomNormalizeLiveSlots.php` | 0 | 2 |
 | `ext/dom/JitDomParentChildLinkLayout.php` | 0 | 1 |
+| `ext/dom/JitDomParentNodeElementNavLiveSlots.php` | 0 | 8 |
 | `ext/dom/JitDomParentNodeProperty.php` | 0 | 3 |
 | `ext/dom/JitDomRemoveChild.php` | 0 | 2 |
 | `ext/dom/JitDomRemoveChildLiveSlots.php` | 0 | 12 |
@@ -10584,21 +10585,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 128)
 - new JITVariable (line 238)
-- new JITVariable (line 291)
-- new JITVariable (line 898)
-- new JITVariable (line 924)
-- new JITVariable (line 1013)
-- new JITVariable (line 1089)
-- new JITVariable (line 1095)
-- new JITVariable (line 1159)
-- new JITVariable (line 1197)
-- new JITVariable (line 1208)
-- new JITVariable (line 1215)
-- new JITVariable (line 1223)
-- new JITVariable (line 1230)
-- new JITVariable (line 1290)
-- new JITVariable (line 1319)
-- 25 class method(s)
+- new JITVariable (line 293)
+- new JITVariable (line 902)
+- new JITVariable (line 928)
+- new JITVariable (line 1033)
+- new JITVariable (line 1059)
+- new JITVariable (line 1080)
+- new JITVariable (line 1097)
+- new JITVariable (line 1152)
+- new JITVariable (line 1228)
+- new JITVariable (line 1234)
+- new JITVariable (line 1298)
+- new JITVariable (line 1336)
+- new JITVariable (line 1347)
+- new JITVariable (line 1354)
+- new JITVariable (line 1362)
+- new JITVariable (line 1369)
+- new JITVariable (line 1429)
+- new JITVariable (line 1458)
+- 26 class method(s)
 
 ### `ext/dom/JitDomAppendChildUserScript.php`
 
@@ -10656,11 +10661,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomChildNodeSiblingInsert.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 82)
-- new JITVariable (line 133)
+- new JITVariable (line 83)
 - new JITVariable (line 134)
 - new JITVariable (line 135)
-- new JITVariable (line 167)
+- new JITVariable (line 136)
+- new JITVariable (line 171)
 - 4 class method(s)
 
 ### `ext/dom/JitDomChildNodesProperty.php`
@@ -10698,7 +10703,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 54)
-- new JITVariable (line 80)
+- new JITVariable (line 82)
 - 4 class method(s)
 
 ### `ext/dom/JitDomCreateDocumentType.php`
@@ -10712,18 +10717,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomCreateElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 275)
-- new JITVariable (line 311)
-- new JITVariable (line 323)
-- new JITVariable (line 381)
-- new JITVariable (line 415)
-- new JITVariable (line 440)
-- new JITVariable (line 548)
-- new JITVariable (line 568)
-- new JITVariable (line 593)
-- new JITVariable (line 624)
-- new JITVariable (line 626)
-- 24 class method(s)
+- new JITVariable (line 277)
+- new JITVariable (line 313)
+- new JITVariable (line 325)
+- new JITVariable (line 383)
+- new JITVariable (line 417)
+- new JITVariable (line 442)
+- new JITVariable (line 488)
+- new JITVariable (line 506)
+- new JITVariable (line 601)
+- new JITVariable (line 621)
+- new JITVariable (line 646)
+- new JITVariable (line 677)
+- new JITVariable (line 679)
+- 25 class method(s)
 
 ### `ext/dom/JitDomCreateElementAttrs.php`
 
@@ -10811,9 +10818,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomElementNavigationProperty.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 112)
-- new JITVariable (line 120)
-- new JITVariable (line 165)
+- new JITVariable (line 136)
+- new JITVariable (line 144)
+- new JITVariable (line 189)
 - 3 class method(s)
 
 ### `ext/dom/JitDomElementTextContent.php`
@@ -10854,8 +10861,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomGetNodePath.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 192)
-- 9 class method(s)
+- new JITVariable (line 241)
+- 10 class method(s)
 
 ### `ext/dom/JitDomHasAttributes.php`
 
@@ -10914,19 +10921,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 119)
 - new JITVariable (line 120)
 - new JITVariable (line 121)
-- new JITVariable (line 427)
-- new JITVariable (line 445)
-- new JITVariable (line 517)
-- new JITVariable (line 523)
-- new JITVariable (line 550)
-- new JITVariable (line 568)
-- new JITVariable (line 700)
-- new JITVariable (line 711)
-- new JITVariable (line 730)
-- new JITVariable (line 752)
+- new JITVariable (line 436)
+- new JITVariable (line 454)
+- new JITVariable (line 526)
+- new JITVariable (line 532)
+- new JITVariable (line 559)
+- new JITVariable (line 577)
+- new JITVariable (line 709)
+- new JITVariable (line 720)
+- new JITVariable (line 739)
 - new JITVariable (line 761)
-- new JITVariable (line 808)
-- new JITVariable (line 837)
+- new JITVariable (line 770)
+- new JITVariable (line 817)
+- new JITVariable (line 846)
 - 12 class method(s)
 
 ### `ext/dom/JitDomInsertData.php`
@@ -11031,7 +11038,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomNodeChildProperty.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 9 class method(s)
 
 ### `ext/dom/JitDomNodeIsConnected.php`
 
@@ -11082,6 +11089,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 22 class method(s)
 
+### `ext/dom/JitDomParentNodeElementNavLiveSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 147)
+- new JITVariable (line 179)
+- new JITVariable (line 216)
+- new JITVariable (line 479)
+- new JITVariable (line 519)
+- new JITVariable (line 536)
+- new JITVariable (line 565)
+- 15 class method(s)
+
 ### `ext/dom/JitDomParentNodeProperty.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11098,17 +11117,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomRemoveChildLiveSlots.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 240)
-- new JITVariable (line 246)
-- new JITVariable (line 274)
-- new JITVariable (line 292)
-- new JITVariable (line 378)
-- new JITVariable (line 389)
-- new JITVariable (line 396)
-- new JITVariable (line 404)
-- new JITVariable (line 411)
-- new JITVariable (line 490)
-- new JITVariable (line 519)
+- new JITVariable (line 242)
+- new JITVariable (line 248)
+- new JITVariable (line 276)
+- new JITVariable (line 294)
+- new JITVariable (line 380)
+- new JITVariable (line 391)
+- new JITVariable (line 398)
+- new JITVariable (line 406)
+- new JITVariable (line 413)
+- new JITVariable (line 492)
+- new JITVariable (line 521)
 - 10 class method(s)
 
 ### `ext/dom/JitDomReplaceChild.php`
@@ -11127,19 +11146,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 117)
-- new JITVariable (line 322)
-- new JITVariable (line 399)
-- new JITVariable (line 411)
-- new JITVariable (line 438)
-- new JITVariable (line 456)
-- new JITVariable (line 544)
-- new JITVariable (line 568)
-- new JITVariable (line 579)
-- new JITVariable (line 586)
-- new JITVariable (line 594)
-- new JITVariable (line 601)
-- new JITVariable (line 661)
-- new JITVariable (line 690)
+- new JITVariable (line 324)
+- new JITVariable (line 401)
+- new JITVariable (line 413)
+- new JITVariable (line 440)
+- new JITVariable (line 458)
+- new JITVariable (line 546)
+- new JITVariable (line 570)
+- new JITVariable (line 581)
+- new JITVariable (line 588)
+- new JITVariable (line 596)
+- new JITVariable (line 603)
+- new JITVariable (line 663)
+- new JITVariable (line 692)
 - 17 class method(s)
 
 ### `ext/dom/JitDomReplaceData.php`
@@ -13110,13 +13129,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/filter/FilterBatchJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 39)
-- new HashTable (line 47)
-- new Variable (line 66)
-- new HashTable (line 81)
-- new Frame (line 102)
-- new Frame (line 116)
-- new Variable (line 124)
+- new Variable (line 51)
+- new HashTable (line 59)
+- new Variable (line 78)
+- new HashTable (line 93)
+- new Frame (line 114)
+- new Frame (line 128)
+- new Variable (line 136)
 - 12 class method(s)
 
 ### `ext/filter/FilterBooleanJitHelper.php`
@@ -30655,7 +30674,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/IniGetLeafJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 12 class method(s)
 
 ### `ext/standard/IniIntrospectionJitHelper.php`
 
@@ -36945,14 +36964,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 1087)
-- new HashTable (line 1118)
-- new HashTable (line 1125)
-- new Variable (line 1136)
-- new Variable (line 1245)
-- new Variable (line 1253)
-- new Variable (line 1261)
-- 72 class method(s)
+- new HashTable (line 1093)
+- new HashTable (line 1124)
+- new HashTable (line 1131)
+- new Variable (line 1142)
+- new Variable (line 1251)
+- new Variable (line 1259)
+- new Variable (line 1267)
+- 73 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
@@ -50291,7 +50310,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 275)
 - new JITVariable (line 297)
 - new JITVariable (line 387)
-- new JITVariable (line 456)
+- new JITVariable (line 487)
 - 11 class method(s)
 
 ### `lib/JIT/Builtin/FilterVarArrayRuntime.php`
@@ -53816,26 +53835,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2862)
 - new Variable (line 2875)
 - new Variable (line 3085)
-- new VMVariable (line 5117)
-- new VMVariable (line 5137)
-- new VMVariable (line 5147)
-- new VMVariable (line 5167)
-- new VMVariable (line 6599)
-- new ReflectionClassConstant (line 7332)
-- new Variable (line 7766)
-- new Variable (line 7792)
-- new Variable (line 7800)
-- new Variable (line 7823)
-- new Variable (line 7849)
-- new Variable (line 7857)
-- new Variable (line 7931)
-- new Literal (line 7948)
-- new Literal (line 7953)
-- new Literal (line 7958)
-- new Variable (line 7969)
-- new Variable (line 8002)
-- new Variable (line 8025)
-- new Variable (line 8551)
+- new VMVariable (line 5124)
+- new VMVariable (line 5144)
+- new VMVariable (line 5154)
+- new VMVariable (line 5174)
+- new VMVariable (line 6606)
+- new ReflectionClassConstant (line 7339)
+- new Variable (line 7773)
+- new Variable (line 7799)
+- new Variable (line 7807)
+- new Variable (line 7830)
+- new Variable (line 7856)
+- new Variable (line 7864)
+- new Variable (line 7938)
+- new Literal (line 7955)
+- new Literal (line 7960)
+- new Literal (line 7965)
+- new Variable (line 7976)
+- new Variable (line 8009)
+- new Variable (line 8032)
+- new Variable (line 8558)
 - 327 class method(s)
 - 8 closure(s)
 
@@ -56939,7 +56958,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\GeneratorRewind (line 41)
 - new Call\GeneratorValid (line 42)
 - new Call\GeneratorKey (line 43)
-- new Native (line 376)
+- new Native (line 407)
 - 31 class method(s)
 
 ### `lib/JIT/GlobalsTableInit.php`
@@ -58008,19 +58027,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new TryCatchHandler (line 162)
-- new TryCatchHandler (line 332)
-- new Variable (line 541)
-- new Variable (line 573)
-- new Variable (line 648)
-- new Variable (line 659)
-- new Variable (line 682)
-- new Variable (line 684)
-- new Variable (line 1085)
-- new Type (line 1108)
-- new Variable (line 1113)
-- new Variable (line 1271)
-- new Variable (line 1287)
-- new Variable (line 1294)
+- new TryCatchHandler (line 338)
+- new Variable (line 547)
+- new Variable (line 579)
+- new Variable (line 654)
+- new Variable (line 665)
+- new Variable (line 688)
+- new Variable (line 690)
+- new Variable (line 1095)
+- new Type (line 1118)
+- new Variable (line 1123)
+- new Variable (line 1281)
+- new Variable (line 1297)
+- new Variable (line 1304)
 - 40 class method(s)
 
 ### `lib/JIT/TryCatchState.php`
