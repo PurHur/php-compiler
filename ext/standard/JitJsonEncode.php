@@ -10,16 +10,17 @@ use PHPCompiler\JIT\Builtin\JsonEncodeQuoteStringRuntime;
 use PHPCompiler\JIT\Builtin\StringJsonEncode;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
+use PHPCompiler\JIT\Builtin\Type\ObjectEnumCasePropertyLlvm;
 use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Variable as VmVariable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -342,6 +343,25 @@ final class JitJsonEncode
             false
         );
         $flagsObj = $context->builder->or($flags, $overlay);
+
+        $objectType = $context->type->object;
+        if ($objectType instanceof ObjectBuiltin) {
+            $enumIds = $objectType->registeredEnumClassIds();
+            if ([] !== $enumIds) {
+                $objVar = self::resolveObjectReceiver($context, $arg);
+                if (null !== $objVar) {
+                    return self::encodeEnumObjectOrPublicProps(
+                        $context,
+                        $arg,
+                        $objVar,
+                        $flags,
+                        $flagsObj,
+                        $enumIds
+                    );
+                }
+            }
+        }
+
         $splEncoded = self::tryEncodeSplArrayObjectStorage($context, $arg, $flags, $flagsObj);
         if (null !== $splEncoded) {
             return $splEncoded;
@@ -481,6 +501,129 @@ final class JitJsonEncode
         return $phi;
     }
 
+    /**
+     * Runtime enum cases in arrays/maps — route through VmJson, not get_object_vars (#19786).
+     *
+     * Thin AOT get_object_vars on enum receivers yields {"name","value"} instead of the
+     * backing scalar or JsonSerializable wire. SPL dispatch returns non-null for every
+     * resolved object and previously routed enums through plain get_object_vars first.
+     * Encode via enum ->value then {@see encodeBoxedValue} (NestedJIT value bridge lacks
+     * enum export — #34957).
+     *
+     * php-src: ext/json/php_json.c — php_json_encode_enum before default object encoding
+     *
+     * @param list<int> $enumIds
+     */
+    private static function encodeEnumObjectOrPublicProps(
+        Context $context,
+        JITVariable $arg,
+        JITVariable $objVar,
+        Value $flags,
+        Value $flagsObj,
+        array $enumIds
+    ): Value {
+        $id = (string) (++self::$blockSerial);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = self::valuePtrForJsonEncode($context, $arg);
+        $objPtr = $context->helper->loadValue($objVar);
+        $map = $context->structFieldMap['__object__'];
+        $runtimeClassId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('json_encode_enum_obj_done_'.$id);
+        $plainBlock = $fn->appendBasicBlock('json_encode_enum_obj_plain_'.$id);
+        $i64 = $context->getTypeFromString('int64');
+        $checkBlock = $entry;
+        $lastIdx = \count($enumIds) - 1;
+        /** @var list<array{0: Value, 1: \PHPLLVM\BasicBlock}> $enumEnds */
+        $enumEnds = [];
+
+        foreach ($enumIds as $idx => $enumId) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $runtimeClassId,
+                $i64->constInt($enumId, false)
+            );
+            $enumBlock = $fn->appendBasicBlock('json_encode_enum_obj_'.$enumId.'_'.$id);
+            $nextBlock = $idx === $lastIdx
+                ? $plainBlock
+                : $fn->appendBasicBlock('json_encode_enum_obj_try_'.($idx + 1).'_'.$id);
+            $context->builder->branchIf($match, $enumBlock, $nextBlock);
+
+            $context->builder->positionAtEnd($enumBlock);
+            $objectType = $context->type->object;
+            if (!$objectType instanceof ObjectBuiltin) {
+                $enumResult = $context->builder->call(
+                    $context->lookupFunction('__compiler_json_encode_value'),
+                    $valuePtr,
+                    $flags
+                );
+            } else {
+                $backingVar = ObjectEnumCasePropertyLlvm::enumCasePropertyFetch(
+                    $objectType,
+                    $objPtr,
+                    $enumId,
+                    'value'
+                );
+                $backingPtr = JitValueBox::valuePtrFromVariable($context, $backingVar);
+                $enumResult = $context->builder->call(
+                    $context->lookupFunction('__compiler_json_encode_value'),
+                    $backingPtr,
+                    $flags
+                );
+            }
+            $enumEnds[] = [$enumResult, $context->builder->getInsertBlock()];
+            $context->builder->branch($done);
+            $checkBlock = $nextBlock;
+        }
+
+        $context->builder->positionAtEnd($plainBlock);
+        $plainResult = self::encodeViaGetObjectVars($context, $arg, $flagsObj);
+        $plainEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($strPtr, 'json_encode_enum_obj_phi_'.$id);
+        foreach ($enumEnds as [$enumResult, $enumEnd]) {
+            $phi->addIncoming($enumResult, $enumEnd);
+        }
+        $phi->addIncoming($plainResult, $plainEnd);
+
+        return $phi;
+    }
+
+    private static function encodeViaGetObjectVars(Context $context, JITVariable $arg, Value $flagsObj): Value
+    {
+        $boxed = JitGetObjectVars::invoke($context, $arg, false);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $boxed
+        );
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_json_encode_array'),
+            $ht,
+            $flagsObj
+        );
+    }
+
+    /** Box JIT operands for {@see JsonEncodeJitHelper::encodeValue}. */
+    private static function valuePtrForJsonEncode(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return JitValueBox::valuePtrFromVariable($context, $arg);
+        }
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::assignToPointer($context, $ptr, $arg);
+
+        return $ptr;
+    }
+
     /** @return JITVariable|null TYPE_OBJECT receiver for class_id / `__spl_ht` */
     private static function resolveObjectReceiver(Context $context, JITVariable $arg): ?JITVariable
     {
@@ -553,9 +696,15 @@ final class JitJsonEncode
             $kind,
             $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
         );
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_ENUM_CASE, false)
+        );
 
         $id = (string) (++self::$blockSerial);
         $htBlock = BasicBlockHelper::append($context, 'json_encode_boxed_ht_'.$id);
+        $enumCaseCheck = BasicBlockHelper::append($context, 'json_encode_boxed_enum_'.$id);
         $objCheck = BasicBlockHelper::append($context, 'json_encode_boxed_objchk_'.$id);
         $objBlock = BasicBlockHelper::append($context, 'json_encode_boxed_obj_'.$id);
         $scalarCheck = BasicBlockHelper::append($context, 'json_encode_boxed_scalar_'.$id);
@@ -567,7 +716,7 @@ final class JitJsonEncode
         $boolFalseBlock = BasicBlockHelper::append($context, 'json_encode_boxed_bool_false_'.$id);
         $valueBlock = BasicBlockHelper::append($context, 'json_encode_boxed_value_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'json_encode_boxed_done_'.$id);
-        $context->builder->branchIf($isHt, $htBlock, $objCheck);
+        $context->builder->branchIf($isHt, $htBlock, $enumCaseCheck);
 
         $context->builder->positionAtEnd($htBlock);
         $boxedArray = new JITVariable(
@@ -585,6 +734,9 @@ final class JitJsonEncode
         );
         $htEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($enumCaseCheck);
+        $context->builder->branchIf($isEnumCase, $valueBlock, $objCheck);
 
         $context->builder->positionAtEnd($objCheck);
         $context->builder->branchIf($isObj, $objBlock, $scalarCheck);
