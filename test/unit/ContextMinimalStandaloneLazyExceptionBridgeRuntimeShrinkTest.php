@@ -42,18 +42,7 @@ final class ContextMinimalStandaloneLazyExceptionBridgeRuntimeShrinkTest extends
             'ensureMinimal must not eagerly ErrorBridge (#34769)'
         );
 
-        // ensureFull still eagerly ExceptionBridge (full AOT fixture surface).
-        $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
-        $this->assertNotFalse($fullPos);
-        $fullEnd = strpos($context, 'private function ', $fullPos + 1);
-        $fullHead = false === $fullEnd
-            ? substr($context, $fullPos, 2500)
-            : substr($context, $fullPos, min(2500, $fullEnd - $fullPos));
-        $this->assertStringContainsString(
-            'ExceptionBridge::ensureStandaloneBodies($this)',
-            $fullHead,
-            'ensureFullStandaloneBodies still ensures ExceptionBridge (#34732)'
-        );
+        // ensureFull drop is #35099 — no longer asserts ExceptionBridge stays eager.
     }
 
     public function testTypeErrorRaiseEnsureLinkedImplementsStandaloneBodies(): void

@@ -2340,7 +2340,7 @@ class Context {
         // standalone bodies before lookup (peer #34732). Thin hello-world must not NestedJIT
         // pending-Error ABI during init — thin {main} skips ErrorBridge clear/abort when unused.
         // Leftover Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
-        // Full standalone still ensureStandaloneBodies below.
+        // Full standalone drop is #35099 (peer #35089 / #35086).
         // ErrorHandler / ExceptionHandler always-on removed (#34612): JitErrorHandler /
         // JitTriggerErrorKernel / JitExceptionHandler / TryCatchHelper already ensureLinked
         // before lookup (peer #34605). implement() paths restore builder insert mid-{main}.
@@ -2418,8 +2418,13 @@ class Context {
     {
         Builtin\StreamIoRuntime::beginStandaloneInitPhase();
         try {
-            ExceptionBridge::ensureStandaloneBodies($this);
-            ErrorBridge::ensureStandaloneBodies($this);
+            // ExceptionBridge / ErrorBridge always-on removed (#35099): TypeErrorRaise /
+            // JitThrow / ErrorRaise / AssertionErrorRaise / ReadonlyRaise ensureLinked +
+            // emitClear/emitAbort/emitRaise already implement standalone bodies before lookup
+            // (peer ensureMinimal #34732 / #34769). Full {main} still ErrorBridge::ensureLinked
+            // / ExceptionBridge::emitClear|emitAbort → ensureLinked before lookup. Full
+            // standalone must not NestedJIT type_error_* / error_* during init — leftover
+            // Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
             // StreamLifecycle / StreamRead always-on removed (#35086): JitFclose / JitFeof /
             // JitFflush / JitFgetc / JitFgets / StringVarDump / StringPrintR / SilenceRuntime /
             // StreamReadJit / StringFgetcsvJit already ensureLinked(ForUserScriptLowering)
@@ -2437,37 +2442,14 @@ class Context {
             // (and ValueEchoHelper call sites). Do not re-add before ValueEcho here.
             Builtin\ValueEchoRuntime::ensureLinked($this);
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
-            // Nested-JIT string helpers: lazy via ensureLinked during spine/thin init (#14472, #20571).
-            // Gate on thin-standalone + init-phase only — not the broad StreamIo M3 defer bag (#20553).
-            if (!$this->isThinStandaloneAotMain() && !Builtin\StreamIoRuntime::isStandaloneInitPhase()) {
-                Builtin\StringSoundex::ensureStandaloneBodies($this);
-                Builtin\StringQuotemeta::ensureStandaloneBodies($this);
-                Builtin\StringPregQuote::ensureStandaloneBodies($this);
-                Builtin\StringNl2br::ensureStandaloneBodies($this);
-                Builtin\StringUcwords::ensureStandaloneBodies($this);
-                Builtin\StringMetaphone::ensureStandaloneBodies($this);
-                Builtin\StringWordwrap::ensureStandaloneBodies($this);
-                Builtin\MbNumericEntity::ensureStandaloneBodies($this);
-                Builtin\StringBin2hex::ensureStandaloneBodies($this);
-                Builtin\StringBase64Encode::ensureStandaloneBodies($this);
-                Builtin\StringBase64Decode::ensureStandaloneBodies($this);
-                Builtin\StringStrrev::ensureStandaloneBodies($this);
-                Builtin\StringStrRepeat::ensureStandaloneBodies($this);
-                Builtin\StringStrPad::ensureStandaloneBodies($this);
-                Builtin\StringStrRot13::ensureStandaloneBodies($this);
-                Builtin\StringUniqid::ensureStandaloneBodies($this);
-                Builtin\StringChunkSplit::ensureStandaloneBodies($this);
-                Builtin\StringGraphemeStrSplit::ensureStandaloneBodies($this);
-                Builtin\StringHex2bin::ensureStandaloneBodies($this);
-                Builtin\StringLevenshtein::ensureStandaloneBodies($this);
-                Builtin\StringSubstrCount::ensureStandaloneBodies($this);
-                Builtin\StringCountChars::ensureStandaloneBodies($this);
-                Builtin\StringNCompare::ensureStandaloneBodies($this);
-                Builtin\StringStrWordCount::ensureStandaloneBodies($this);
-                Builtin\StringStripTags::ensureStandaloneBodies($this);
-                Builtin\StringStrtr::ensureStandaloneBodies($this);
-                Builtin\StringParseStr::ensureStandaloneBodies($this);
-            }
+            // Soundex/Quotemeta/PregQuote/Nl2br/Ucwords/Metaphone/Wordwrap/MbNumericEntity/
+            // Bin2hex/Base64*/Strrev/StrRepeat/StrPad/StrRot13/Uniqid/ChunkSplit/
+            // GraphemeStrSplit/Hex2bin/Levenshtein/SubstrCount/CountChars/NCompare/
+            // StrWordCount/StripTags/Strtr/ParseStr always-on removed (#35099): the old
+            // `!isStandaloneInitPhase()` gate never ran — ensureFull always
+            // beginStandaloneInitPhase() first (#14472 / #20571). Call sites already
+            // ensureLinked before lookup (peer ensureMinimal #34578). Do not NestedJIT
+            // those ABIs during full init (#31894 / #32122).
             Builtin\StringFormat::ensureStandaloneBodies($this);
             // Skip-bundle inventory compile_driver (#23970): bind phpc_str_replace before
             // NestedJIT includes; HelperRuntimeCache supplies the TU when enabled.
