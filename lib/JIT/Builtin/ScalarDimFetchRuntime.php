@@ -11,6 +11,8 @@ use PHPCompiler\JIT\JitVmHelperLink;
  * JIT/AOT link for scalar dim fetch warnings via ScalarDimFetchJitHelper PHP (#10271, #10343).
  *
  * SSOT: {@see \PHPCompiler\VM\ScalarDimFetchJitHelper}, {@see \PHPCompiler\VM\ErrorReporter}
+ * emitWarning / emitWarningForNativeBool ensureLinked before ABI use; ensureFullStandaloneBodies
+ * must not NestedJIT this during init (#35065) — peer #35035 / #32122 `.1` mint class.
  */
 final class ScalarDimFetchRuntime
 {

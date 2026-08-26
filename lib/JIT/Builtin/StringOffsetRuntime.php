@@ -23,6 +23,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * (ChunkSplit #21399 / ObOutput #21476 shape — no user-script standalone inline LLVM fork).
  * Nested helper compile leaf: inline LLVM matching {@see StringOffsetJitHelper::normalizeByteIndex}
  * without re-entering NestedJIT (#17279 / MathFpow Kernel shape).
+ * dimFetch / readDimAsString / … ensureLinked before ABI use; ensureFullStandaloneBodies must
+ * not NestedJIT this during init (#35065) — peer #35035 / #32122 `.1` mint class.
  * SSOT: {@see \PHPCompiler\VM\StringOffsetJitHelper}, {@see \PHPCompiler\VM\Variable}
  * php-src: Zend/zend_operators.c — string offset fetch/write
  */

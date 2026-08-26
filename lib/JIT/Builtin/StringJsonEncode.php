@@ -30,6 +30,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Embed + thin standalone AOT: {@see JsonEncodeNestedJitHelper} via {@see JitVmHelperLink}
  * (Context-free NestedJIT path — avoids `$ctx->runtime->vm` SIGSEGV on thin AOT).
+ * Call sites ensureLinked / ensureJitHelperCompiled before lookup; ensureFullStandaloneBodies
+ * must not NestedJIT this during init (#35065) — peer #35035 / #32122 `.1` mint class.
  * php-src: ext/json/php_json.c — php_json_encode
  */
 final class StringJsonEncode
