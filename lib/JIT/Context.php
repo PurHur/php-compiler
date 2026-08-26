@@ -2519,13 +2519,16 @@ class Context {
             // JitStreamBucketKernel always-on removed (#35086): StreamBucket::ensureLinked →
             // JitStreamBucketKernel::ensureLinked (JitStreamBucket / JitIsResource) already
             // implement before lookup (peer #34836). Do not NestedJIT stream_bucket_* here.
+            // StringGetenv / StringGetenvAll always-on removed (#35127): JitEnv::getenv /
+            // getenvAll already StringGetenv::ensureLinked / StringGetenvAll::ensureLinked
+            // before lookup (peer ensureMinimal Type #32665 / #34807). Full standalone must
+            // not NestedJIT __compiler_getenv / __compiler_getenv_all during init — leftover
+            // Context NestedJIT vs Runtime ABI drift mints getenv.1 / getenv_all.1
+            // (#31894 / #32122). Post-init always-helper (#20156) was the prior reason these
+            // sat after endStandaloneInitPhase; call-site ensureLinked is enough now.
         } finally {
             Builtin\StreamIoRuntime::endStandaloneInitPhase();
         }
-        // After init-phase: NestedJIT GetenvJitHelper (always-helper, #20156) — skipped during
-        // standaloneInitPhase so peer stream kernels keep thin inventory stubs (#20576 / #20553).
-        Builtin\StringGetenv::ensureStandaloneBodies($this);
-        Builtin\StringGetenvAll::ensureStandaloneBodies($this);
     }
 
     public function compileToFile(string $file) {

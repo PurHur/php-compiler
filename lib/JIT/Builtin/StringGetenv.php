@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_getenv (#9092, #8992, #20156, #20644, #29313).
+ * JIT/AOT link for __compiler_getenv (#9092, #8992, #20156, #20644, #29313, #35127).
  *
  * Embed + thin standalone AOT: {@see GetenvLookupJitHelper} via {@see JitVmHelperLink}
  * (Rename #20603 shape — no thin libc ABI fork). NestedJIT leaf: libc getenv(3)
@@ -25,6 +25,10 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * strchr(3) is module-local after LibcExtern always-on drop (#31519);
  * setenv(3)/unsetenv(3) are module-local after LibcExtern always-on drop (#31558);
  * getenv(3) is module-local after LibcExtern always-on drop (#31637).
+ * Owns `__compiler_getenv` module-locally: {@see getNamedFunction} first via
+ * {@see ensureLinked}. {@see Context::ensureFullStandaloneBodies} must not NestedJIT
+ * this during init (#35127) — peer #35113 / #32122 `.1` mint class; `JitEnv` ensures
+ * before lookup (#32665).
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */
 final class StringGetenv
