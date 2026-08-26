@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -277,25 +278,54 @@ final class JitDomAttributeNodeNS
 
     private static function invokeCreateUserScript(Context $context, JITVariable ...$args): Value
     {
+        // php-src dom_document_create_attribute_ns — no document_element → warning + false
+        // (#35180 leftover of VM #19200; thin AOT materialize skipped the guard).
+        $document = self::loadObjectArg($context, $args[0], 'DOMDocument::createAttributeNS() receiver');
+        $tag = (string) (self::$boxSeq++);
+        $rootJit = JitDomDocumentElement::fetch($context->type->object, $document, $args[0]);
+        $rootPtr = JITVariable::KIND_VALUE === $rootJit->kind
+            ? $rootJit->value
+            : $context->builder->load($rootJit->value);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $rootPtr, $objPtrTy->constNull());
+        $missingBlock = BasicBlockHelper::append($context, 'dom_createattrns_no_root_'.$tag);
+        $okBlock = BasicBlockHelper::append($context, 'dom_createattrns_ok_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'dom_createattrns_done_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isNull, $missingBlock, $okBlock);
+
+        $context->builder->positionAtEnd($missingBlock);
+        JitBuiltinWarning::emit(
+            $context,
+            'DOMDocument::createAttributeNS(): Document Missing Root Element'
+        );
+        $context->builder->store(self::boxBoolResult($context, false), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
         // Prefer isNullConstant over stale compileTimeString (#33534 / peer #33532).
         $nsLit = self::compileTimeNullableStringArg($args[1]);
         $qLit = self::compileTimeStringArg($args[2]);
         if (null !== $nsLit && null !== $qLit) {
             DomUserScriptAttributeCacheLlvm::rememberCreate($nsLit, $qLit);
-
-            return self::boxObjectResult(
+            $okResult = self::boxObjectResult(
                 $context,
                 self::materializeAttrFromLiterals($context, $nsLit, $qLit, '')
             );
+        } else {
+            $namespace = self::loadStringArg($context, $args[1]);
+            $qualifiedName = self::loadStringArg($context, $args[2]);
+            $okResult = self::boxObjectResult(
+                $context,
+                self::materializeAttrFromRuntime($context, $namespace, $qualifiedName, null)
+            );
         }
+        $context->builder->store($okResult, $resultSlot);
+        $context->builder->branch($doneBlock);
 
-        $namespace = self::loadStringArg($context, $args[1]);
-        $qualifiedName = self::loadStringArg($context, $args[2]);
+        $context->builder->positionAtEnd($doneBlock);
 
-        return self::boxObjectResult(
-            $context,
-            self::materializeAttrFromRuntime($context, $namespace, $qualifiedName, null)
-        );
+        return $context->builder->load($resultSlot);
     }
 
     private static function invokeGetUserScript(Context $context, JITVariable ...$args): Value
