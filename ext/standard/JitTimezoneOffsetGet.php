@@ -14,17 +14,17 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\DateTimeSupport;
-use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for timezone_offset_get() / DateTimeZone::getOffset() (#6041, #27308).
+ * LLVM lowering for timezone_offset_get() / DateTimeZone::getOffset() (#6041, #27308, #34853).
  *
  * php-src: ext/date/php_date.c — PHP_FUNCTION(timezone_offset_get) / zim_DateTimeZone_getOffset
  *
  * Prefer compile-time materialize when zone name + DateTime timestamp are folded
- * (construct leaves both on the receivers; peer getName/getTransitions).
+ * (construct leaves compileTimeTimezoneName + compileTimeDateTimeTimestamp; peer getName /
+ * JitDateOffsetGet). Runtime path soft-reads TYPE_VALUE receivers (#29733 / #34853).
  */
 final class JitTimezoneOffsetGet
 {
@@ -111,19 +111,25 @@ final class JitTimezoneOffsetGet
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
 
-        // Thin AOT: NestedJIT helper link shifts class_ids so assertClassOneOf aborts
-        // ("object given"). Read zone-name prop without class_id check (#29732).
-        $zoneObj = self::requireObjectValue($context, $zoneArg, $zoneTypeError, 'array');
-        $zoneNamePtr = JitTimezoneProceduralArg::readStringPropPtr(
-            $context,
-            $object,
-            $zoneObj,
-            'DateTimeZone',
-            DateTimeSupport::TZ_NAME_PROPERTY
-        );
+        // Prefer compile-time zone id (METHODCALL_INIT / dateTimeZoneLocalNames) so we never
+        // touch a TYPE_VALUE receiver that still fails a hard type-byte check (#34853 / re-#29732).
+        if (null !== $zoneName) {
+            $zoneNamePtr = $context->builder->load($context->constantStringFromString($zoneName));
+        } else {
+            // Thin AOT: NestedJIT helper link shifts class_ids so assertClassOneOf aborts
+            // ("object given"). Soft-read like JitTimezoneNameGet (#29733) — no TypeError+abort.
+            $zoneObj = self::requireObjectValue($context, $zoneArg, $zoneTypeError, 'array');
+            $zoneNamePtr = JitTimezoneProceduralArg::readStringPropPtr(
+                $context,
+                $object,
+                $zoneObj,
+                'DateTimeZone',
+                DateTimeSupport::TZ_NAME_PROPERTY
+            );
+        }
 
         if (null !== $timestamp) {
-            // Common case: DateTime(Immutable) construct stamped compileTimeLong (#29732).
+            // Common case: DateTime(Immutable) construct stamped compileTimeDateTimeTimestamp (#32691).
             $context->builder->call(
                 $context->lookupFunction('__phpc_timezone_offset_seconds'),
                 $zoneNamePtr,
@@ -135,12 +141,12 @@ final class JitTimezoneOffsetGet
         }
 
         $dtObj = self::requireObjectValue($context, $datetimeArg, $datetimeTypeError, 'array');
-        // Prefer DateTimeImmutable prop layout then DateTime — avoid class_id branch (#29732).
+        // DateTime layout first (shared __dt_ts with Immutable); avoid class_id branch (#29732).
         $ts = self::readLongProp(
             $context,
             $object,
             $dtObj,
-            'DateTimeImmutable',
+            'DateTime',
             DateTimeSupport::TS_PROPERTY
         );
         $context->builder->call(
@@ -188,6 +194,12 @@ final class JitTimezoneOffsetGet
 
     private static function tryCompileTimeTimestamp(JITVariable $arg): ?int
     {
+        // After #32691 construct stamps live on compileTimeDateTimeTimestamp, not
+        // compileTimeLong (peer JitDateOffsetGet / #33939). Missing this made every
+        // local DateTime arg look "runtime" and forced requireObjectValue (#34853).
+        if (null !== $arg->compileTimeDateTimeTimestamp) {
+            return (int) $arg->compileTimeDateTimeTimestamp;
+        }
         if (null !== $arg->compileTimeLong) {
             return (int) $arg->compileTimeLong;
         }
@@ -239,24 +251,11 @@ final class JitTimezoneOffsetGet
         }
 
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
-        $typeField = $context->structFieldMap['__value__']['type'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $typeField)
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $isObject = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(VmVariable::TYPE_OBJECT, false)
-        );
-        $okBlock = BasicBlockHelper::append($context, 'tzoff_obj_ok');
-        $errBlock = BasicBlockHelper::append($context, 'tzoff_obj_err');
-        $context->builder->branchIf($isObject, $okBlock, $errBlock);
-
-        $context->builder->positionAtEnd($errBlock);
-        self::emitTypeErrorAndAbort($context, \sprintf($typeErrorTemplate, $nonObjectGiven));
-
-        $context->builder->positionAtEnd($okBlock);
+        // Soft path (peer JitTimezoneNameGet #29733): thin-AOT DateTimeZone / DateTime
+        // locals are often TYPE_VALUE boxes whose type byte is not yet TYPE_OBJECT after
+        // NestedJIT helper link. Hard TypeError+abort was the #29732/#34853 regression.
+        // Keep $typeErrorTemplate / $nonObjectGiven for non-VALUE scalar rejects above.
+        unset($nonObjectGiven);
 
         return $context->builder->call(
             $context->lookupFunction('__value__readObject'),
