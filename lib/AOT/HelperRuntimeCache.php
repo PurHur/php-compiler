@@ -85,6 +85,13 @@ final class HelperRuntimeCache
         // NestedJIT recursive escapeFrom works (MiniWebApp $appName).
         'phpcompiler\\ext\\standard\\htmlspecialcharsjithelper::htmlspecialchars' => true,
         'phpcompiler\\ext\\standard\\htmlspecialcharsjithelper::escapefrom' => true,
+        // #35067 — prelinked HtmlEntitiesJitHelper unit.o leaves UTF-8 letters unescaped under
+        // thin AOT when flags are non-constant (isset/ord NestedJIT; fingerprint-fresh IR-stale).
+        // NestedJIT encode/escapeFrom/lookupEntity into user AOT matches Zend/VM (O=0 OK).
+        'phpcompiler\\ext\\standard\\htmlentitiesjithelper::encode' => true,
+        'phpcompiler\\ext\\standard\\htmlentitiesjithelper::escapefrom' => true,
+        'phpcompiler\\ext\\standard\\htmlentitiesjithelper::lookupentity' => true,
+        'phpcompiler\\ext\\standard\\htmlentitiesjithelper::entityforcodepoint' => true,
         // #27050 — helper-runtime HtmlspecialcharsDecodeJitHelper unit.o returns "" under thin
         // AOT (strlen/while accumulator NestedJIT miscompile). Force NestedJIT of recursive
         // decodeFrom (peer #25345 htmlspecialchars encode).

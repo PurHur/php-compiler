@@ -7,11 +7,15 @@ namespace PHPCompiler\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * #35050 — AOT htmlentities() UTF-8 entity map under NestedJIT strlen bounds.
+ * #35067 / #35050 — AOT htmlentities() UTF-8 entity map under NestedJIT.
+ *
+ * Probe uses string locals + encoding arg so VmString compile-time fold cannot
+ * hide a broken helper-runtime unit (leftover #35050 cheap green).
  *
  * @see php-src ext/standard/html.c php_html_entities
  *
  * @group llvm
+ * @group aot
  */
 final class HtmlEntitiesUtf8NestedJitIsset35050Test extends TestCase
 {
@@ -26,13 +30,13 @@ final class HtmlEntitiesUtf8NestedJitIsset35050Test extends TestCase
         $this->assertStringContainsString('caf&eacute;', $zend);
         $this->assertStringContainsString('&eacute;', $zend);
 
-        $bin = sys_get_temp_dir().'/phpc_35050_'.getmypid().'.bin';
+        $bin = sys_get_temp_dir().'/phpc_35067_'.getmypid().'.bin';
         $compile = $this->runCompile($src, $bin);
         $this->assertSame(0, $compile['code'], "AOT compile failed:\n".$compile['out']);
         $aot = $this->runBin($bin);
         @unlink($bin);
 
-        $this->assertSame($zend, $aot['out'], 'AOT must match Zend htmlentities UTF-8');
+        $this->assertSame($zend, $aot['out'], 'AOT must match Zend htmlentities UTF-8 locals');
         $this->assertSame(0, $aot['code']);
     }
 
@@ -43,6 +47,10 @@ final class HtmlEntitiesUtf8NestedJitIsset35050Test extends TestCase
         $this->assertStringContainsString('\\strlen($string)', $src);
         $this->assertStringNotContainsString('isset($string[$i + 1])', $src);
         $this->assertStringNotContainsString('isset($string[$i + 2])', $src);
+        $this->assertStringContainsString('entityForCodePoint', $src);
+        $this->assertStringContainsString('byteOrd', $src);
+        $this->assertStringNotContainsString('\\ord($', $src);
+        $this->assertStringNotContainsString('isset($map[$', $src);
     }
 
     public function testHelperEncodeMatchesZendCafe(): void
@@ -74,6 +82,7 @@ final class HtmlEntitiesUtf8NestedJitIsset35050Test extends TestCase
     private function runCompile(string $src, string $bin): array
     {
         $root = dirname(__DIR__, 2);
+        // Default helper-runtime (prelinked) — must not rely on O=0 to hide a stale unit (#35067).
         $cmd = 'php '.escapeshellarg($root.'/bin/compile.php').' -o '.escapeshellarg($bin)
             .' '.escapeshellarg($src).' 2>&1';
         exec($cmd, $lines, $code);

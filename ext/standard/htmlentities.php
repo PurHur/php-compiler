@@ -162,7 +162,8 @@ final class htmlentities extends Internal
         $encoding = 'UTF-8';
         if ($argc >= 3 && !self::encodingArgIsNull($args[2])) {
             $encodingLit = JitStringArg::compileTimeLiteral($args[2]);
-            if (null === $encodingLit || JITVariable::KIND_VALUE !== $args[2]->kind) {
+            // KIND_VARIABLE string slots keep compileTimeString (peer htmlspecialchars #25345).
+            if (null === $encodingLit || !self::isCompileTimeFoldableString($args[2])) {
                 return null;
             }
             $encoding = $encodingLit;
@@ -299,11 +300,20 @@ final class htmlentities extends Internal
 
     private static function compileTimeLong(Context $context, JITVariable $var): ?int
     {
+        if (null !== $var->compileTimeLong) {
+            return (int) $var->compileTimeLong;
+        }
         if (JITVariable::TYPE_NATIVE_LONG === $var->type
             && JITVariable::KIND_VALUE === $var->kind) {
             $lib = $context->llvm->lib;
             if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
                 return (int) $lib->LLVMConstIntGetSExtValue($var->value->value);
+            }
+        }
+        if (null !== $var->compileTimeConstantName && null !== $context->runtime->vmContext) {
+            $phpVar = $context->runtime->vmContext->constantFetch($var->compileTimeConstantName);
+            if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->resolveIndirect()->type) {
+                return $phpVar->resolveIndirect()->toInt();
             }
         }
 
