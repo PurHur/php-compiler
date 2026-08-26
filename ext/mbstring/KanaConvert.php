@@ -80,9 +80,43 @@ final class KanaConvert
     public static function convert(string $input, ?string $option = null, string $encoding = 'UTF-8'): string
     {
         self::assertEncoding($encoding);
+        $canonical = MbstringEncodingRegistry::resolve($encoding) ?? $encoding;
         $mode = self::parseOptions($option);
 
-        return self::convertUtf8($input, $mode);
+        return match ($canonical) {
+            'ASCII' => self::convertAscii($input, $mode),
+            '8BIT' => $input,
+            default => self::convertUtf8($input, $mode),
+        };
+    }
+
+    /** php-src: ASCII mode maps non-ASCII bytes to '?' before width conversion. */
+    private static function convertAscii(string $input, int $mode): string
+    {
+        if (0 === $mode) {
+            return $input;
+        }
+        $out = '';
+        $len = \strlen($input);
+        for ($i = 0; $i < $len; ++$i) {
+            $byte = $input[$i];
+            if ($byte > "\x7F") {
+                $out .= '?';
+                continue;
+            }
+            $consumed = false;
+            $second = 0;
+            $converted = self::convertCodepoint(\ord($byte), 0, $consumed, $second, $mode);
+            $out .= \chr($converted);
+            if ($second) {
+                $out .= \chr($second);
+            }
+            if ($consumed) {
+                ++$i;
+            }
+        }
+
+        return $out;
     }
 
     private static function assertEncoding(string $encoding): void

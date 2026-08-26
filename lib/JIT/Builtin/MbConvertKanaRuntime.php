@@ -23,14 +23,24 @@ final class MbConvertKanaRuntime
 
     private const ASSERT_ENCODING_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbConvertKanaJitHelper::assertEncodingArgv';
 
+    private const SELECT_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbConvertKanaJitHelper::selectEncodingArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::ASSERT_ENCODING_LOGICAL,
+        self::SELECT_LOGICAL,
     ];
 
     public static function ensureLinked(Context $context): void
     {
         self::ensureJitHelperCompiled($context);
+    }
+
+    public static function selectHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::SELECT_LOGICAL, 'mb_convert_kana_select');
     }
 
     public static function assertEncodingHelper(Context $context): LlvmFunction

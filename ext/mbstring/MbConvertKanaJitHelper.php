@@ -16,6 +16,27 @@ namespace PHPCompiler\ext\mbstring;
 final class MbConvertKanaJitHelper
 {
     /**
+     * Pick precomputed UTF-8/ASCII/8BIT fold for runtime encoding (#35193).
+     */
+    public static function selectEncodingArgv(string $encoding, string $utf8, string $ascii, string $eightBit): string
+    {
+        if (
+            '8BIT' === $encoding || '8bit' === $encoding
+            || 'BINARY' === $encoding || 'binary' === $encoding
+        ) {
+            return $eightBit;
+        }
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            return $ascii;
+        }
+
+        return $utf8;
+    }
+
+    /**
      * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
      * SIGSEGVs under thin AOT; int helpers match {@see MbConvertCaseJitHelper::assertEncodingArgv}.
      *
