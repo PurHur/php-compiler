@@ -22,6 +22,8 @@ use PHPLLVM\Value;
  * fresh length-0 object left held lists stale and refetch at 0 while siblings remain.
  * Attr child: Not Found before sibling unlink (#33596 / peer #33587).
  * Non-child (parentNode !== parent): Not Found before unlink (#33599).
+ * createElement trees: rebuild PROP_USER_SCRIPT_INNER_XML after unlink so
+ * saveXML drops the removed child (#34945 / peer replaceChild #33335).
  *
  * Reference: php-src ext/dom/node.c dom_node_remove_child.
  */
@@ -125,6 +127,11 @@ final class JitDomRemoveChildLiveSlots
         $newSecond->addIncoming($objPtrTy->constNull(), $nullPred);
         $newSecond->addIncoming($loadedSecond, $readPred);
         self::decrementChildNodesLengthInPlace($context, $parent, $newFirst, $newSecond);
+        // saveXML reads PROP_USER_SCRIPT_INNER_XML — createElement trees have no
+        // loadXML seed, so syncUserScriptInnerXmlAfterRemove no-ops. Rebuild from
+        // live firstChild/nextSibling like replaceChild (#34945 / peer #33335).
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parent);
+        JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parent);
     }
 
     /**
