@@ -416,14 +416,25 @@ final class FilterVarArrayLlvm
         $intBb = BasicBlockHelper::append($context, 'fva_filt_int_'.$tag);
         $boolBb = BasicBlockHelper::append($context, 'fva_filt_bool_'.$tag);
         $floatBb = BasicBlockHelper::append($context, 'fva_filt_float_'.$tag);
+        $emailBb = BasicBlockHelper::append($context, 'fva_filt_email_'.$tag);
+        $urlBb = BasicBlockHelper::append($context, 'fva_filt_url_'.$tag);
+        $ipBb = BasicBlockHelper::append($context, 'fva_filt_ip_'.$tag);
+        $macBb = BasicBlockHelper::append($context, 'fva_filt_mac_'.$tag);
+        $domainBb = BasicBlockHelper::append($context, 'fva_filt_domain_'.$tag);
         $defaultBb = BasicBlockHelper::append($context, 'fva_filt_default_'.$tag);
         $failBb = BasicBlockHelper::append($context, 'fva_filt_fail_'.$tag);
         $mergeBb = BasicBlockHelper::append($context, 'fva_filt_merge_'.$tag);
 
-        $switch = $context->builder->branchSwitch($filterId, $failBb, 4);
+        // INT/BOOL/FLOAT/DEFAULT + EMAIL/URL/IP/MAC/DOMAIN (#35016 leftover of #34574).
+        $switch = $context->builder->branchSwitch($filterId, $failBb, 9);
         $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_INT, false), $intBb);
         $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_BOOLEAN, false), $boolBb);
         $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_FLOAT, false), $floatBb);
+        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_EMAIL, false), $emailBb);
+        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_URL, false), $urlBb);
+        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_IP, false), $ipBb);
+        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_MAC, false), $macBb);
+        $switch->addCase($i64->constInt(VmFilter::FILTER_VALIDATE_DOMAIN, false), $domainBb);
         $switch->addCase($i64->constInt(VmFilter::FILTER_DEFAULT, false), $defaultBb);
 
         $context->builder->positionAtEnd($intBb);
@@ -436,6 +447,26 @@ final class FilterVarArrayLlvm
 
         $context->builder->positionAtEnd($floatBb);
         JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateFloat($context, $value));
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($emailBb);
+        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateEmail($context, $value));
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($urlBb);
+        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateUrl($context, $value));
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($ipBb);
+        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateIp($context, $value));
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($macBb);
+        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateMac($context, $value));
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($domainBb);
+        JitValueBox::copyFromPointer($context, $resultSlot, JitFilter::validateDomain($context, $value));
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($defaultBb);
