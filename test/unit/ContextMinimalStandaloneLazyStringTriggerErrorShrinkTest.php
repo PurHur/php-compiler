@@ -57,11 +57,19 @@ final class ContextMinimalStandaloneLazyStringTriggerErrorShrinkTest extends Tes
             'ensureMinimal must not eagerly StringHtmlspecialchars (#34642)'
         );
 
-        // Full standalone still links StringTriggerError before AssertFail / LastError.
+        // Full standalone also drops StringTriggerError (#35073); AssertFail::ensureLinked covers #33234.
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullBody = substr($context, $fullPos);
-        $this->assertStringContainsString('StringTriggerError::ensureStandaloneBodies($this)', $fullBody);
+        $fullEnd = strpos($context, 'public function compileToFile', $fullPos);
+        $this->assertNotFalse($fullEnd);
+        $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureStandaloneBodies($this)',
+            $fullBody,
+            'ensureFullStandaloneBodies must not eagerly StringTriggerError (#35073)'
+        );
+        $assert = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/AssertFail.php');
+        $this->assertStringContainsString('StringTriggerError::ensureLinked($context)', $assert);
     }
 
     public function testCallSitesEnsureBeforeLookup(): void

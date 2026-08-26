@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
  * JIT/AOT link for __phpc_progress_note via ProgressJitHelper PHP (#9521, #19874).
  *
  * Thin orchestrator — NestedJIT bridges + SIGSEGV breadcrumb LLVM live in {@see JitProgressNoteKernel}.
+ * Context ensureFull no longer eagerly NestedJITs this (#35073 / peer ensureMinimal #34605).
  * Refs #9521, #9795, #6748
  */
 final class ProgressNoteRuntime

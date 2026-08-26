@@ -18,14 +18,16 @@ final class JitReturnPending
 {
     public static function ensureLinked(Context $context): void
     {
+        // Register decls before implement — compileToFile clear + TryCatchHelper
+        // after ensureFull always-on drop (#35073 / peer #34621).
+        self::registerDeclarations($context);
         ReturnPendingRuntime::implement($context);
     }
 
     /** LLVM bodies for standalone AOT — routes through ReturnPendingJitHelper PHP (#9663). */
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::registerDeclarations($context);
-        ReturnPendingRuntime::implement($context);
+        self::ensureLinked($context);
     }
 
     public static function registerDeclarations(Context $context): void

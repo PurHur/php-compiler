@@ -19,7 +19,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Helper compile: per-file {@see JitVmHelperLink::ensureCompiled} (peer ObGzhandler #26331 /
  * ProcessOpen #26269). Replaces lib/AOT/runtime/phpc_gc.c; semantics mirror Zend
- * gc_collect_cycles subset. php-src: Zend/zend_gc.c
+ * gc_collect_cycles subset. Context ensureFull no longer eagerly NestedJITs this
+ * (#35073 / peer ensureMinimal #34605). php-src: Zend/zend_gc.c
  */
 final class GcCollectCyclesRuntime
 {

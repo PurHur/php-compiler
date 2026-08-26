@@ -12,6 +12,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for phpc_gc_enable/disable/is_enabled via GcToggleJitHelper PHP (#9577, #9687, #22644).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer CtypeRuntime #22626).
+ * Context ensureFull no longer eagerly NestedJITs this (#35073 / peer ensureMinimal #34605).
  * php-src: Zend/zend_gc.c
  */
 final class GcToggleRuntime
