@@ -34,10 +34,20 @@ final class VmFloatDtoa
         return VmSerializeFormat::formatDoubleWithPrecision($value, -1);
     }
 
-    /** var_dump()/debug_zval_dump() float branch (ext/standard/var.c php_var_dump). */
+    /**
+     * var_dump()/debug_zval_dump() float branch (ext/standard/var.c php_var_dump).
+     *
+     * Honors PG(serialize_precision) at call time — same SSOT as serialize() (#35020).
+     * Default -1 keeps {@see formatH()} dtoa; positive N uses %.*H / zend_gcvt digits.
+     */
     public static function formatVarDump(float $value): string
     {
-        return self::formatH($value);
+        $precision = VmIni::parseSerializePrecision(VmIni::getSerializePrecision());
+        if ($precision < 0) {
+            return self::formatH($value);
+        }
+
+        return VmSerializeFormat::formatDoubleWithPrecision($value, $precision);
     }
 
     /**

@@ -69,12 +69,14 @@ final class IniGetLeafJitHelper
         if ('precision' === $option || 'PRECISION' === $option) {
             $old = self::formatInt(self::$precision);
             self::$precision = self::parseIntIni($newValue, 14);
+            VmIni::syncPrecision(self::$precision);
 
             return $old;
         }
         if ('serialize_precision' === $option) {
             $old = self::formatInt(self::$serializePrecision);
             self::$serializePrecision = self::parseIntIni($newValue, -1);
+            VmIni::syncSerializePrecision(self::$serializePrecision);
 
             return $old;
         }
@@ -95,11 +97,13 @@ final class IniGetLeafJitHelper
         self::seed();
         if ('precision' === $option || 'PRECISION' === $option) {
             self::$precision = 14;
+            VmIni::syncPrecision(14);
 
             return;
         }
         if ('serialize_precision' === $option) {
             self::$serializePrecision = -1;
+            VmIni::syncSerializePrecision(-1);
 
             return;
         }
@@ -119,6 +123,10 @@ final class IniGetLeafJitHelper
         self::$exceptionIgnoreArgs = false;
     }
 
+    /**
+     * NestedJIT-safe int→decimal (no sprintf / (string) cast — #33059 / #35020).
+     * Hot literals first; digit walk for the rest (was wrongly falling back to "14").
+     */
     private static function formatInt(int $n): string
     {
         if (14 === $n) {
@@ -136,6 +144,9 @@ final class IniGetLeafJitHelper
         if (10 === $n) {
             return '10';
         }
+        if (17 === $n) {
+            return '17';
+        }
         if (2 === $n) {
             return '2';
         }
@@ -151,11 +162,8 @@ final class IniGetLeafJitHelper
         if (16 === $n) {
             return '16';
         }
-        if (17 === $n) {
-            return '17';
-        }
 
-        return '14';
+        return self::intToDecimalDigits($n);
     }
 
     /** php-src PG(precision) for float→string LLVM global sync (#21963 / #33059). */
@@ -174,6 +182,13 @@ final class IniGetLeafJitHelper
         return self::$serializePrecision;
     }
 
+    /**
+     * NestedJIT-safe parse of ini int strings (#33059 / #35020).
+     *
+     * Hot equality paths first (NestedJIT historically miscompiled general intval).
+     * Digits beyond the whitelist walk char-by-char — previously "17" fell through to
+     * $default so ini_set('serialize_precision','17') was a silent no-op under thin AOT.
+     */
     private static function parseIntIni(string $raw, int $default): int
     {
         if ('14' === $raw) {
@@ -191,7 +206,154 @@ final class IniGetLeafJitHelper
         if ('10' === $raw) {
             return 10;
         }
+        if ('17' === $raw) {
+            return 17;
+        }
+        if ('16' === $raw) {
+            return 16;
+        }
+        if ('1' === $raw) {
+            return 1;
+        }
+        if ('2' === $raw) {
+            return 2;
+        }
+        if ('4' === $raw) {
+            return 4;
+        }
+        if ('6' === $raw) {
+            return 6;
+        }
+        if ('12' === $raw) {
+            return 12;
+        }
+        if ('20' === $raw) {
+            return 20;
+        }
 
-        return $default;
+        return self::parseIntDigits($raw, $default);
+    }
+
+    /** Char-walk signed decimal; NestedJIT-safe (no intval / (int) cast). */
+    private static function parseIntDigits(string $raw, int $default): int
+    {
+        $len = \strlen($raw);
+        if (0 === $len) {
+            return $default;
+        }
+        $i = 0;
+        $neg = false;
+        if ('-' === $raw[0]) {
+            $neg = true;
+            $i = 1;
+            if ($i === $len) {
+                return $default;
+            }
+        }
+        $n = 0;
+        $any = false;
+        while ($i < $len) {
+            $ch = $raw[$i];
+            $digit = self::decimalDigit($ch);
+            if ($digit < 0) {
+                return $default;
+            }
+            $n = $n * 10 + $digit;
+            $any = true;
+            $i = $i + 1;
+        }
+        if (!$any) {
+            return $default;
+        }
+
+        return $neg ? -$n : $n;
+    }
+
+    private static function decimalDigit(string $ch): int
+    {
+        if ('0' === $ch) {
+            return 0;
+        }
+        if ('1' === $ch) {
+            return 1;
+        }
+        if ('2' === $ch) {
+            return 2;
+        }
+        if ('3' === $ch) {
+            return 3;
+        }
+        if ('4' === $ch) {
+            return 4;
+        }
+        if ('5' === $ch) {
+            return 5;
+        }
+        if ('6' === $ch) {
+            return 6;
+        }
+        if ('7' === $ch) {
+            return 7;
+        }
+        if ('8' === $ch) {
+            return 8;
+        }
+        if ('9' === $ch) {
+            return 9;
+        }
+
+        return -1;
+    }
+
+    private static function intToDecimalDigits(int $n): string
+    {
+        if (0 === $n) {
+            return '0';
+        }
+        $neg = $n < 0;
+        if ($neg) {
+            $n = -$n;
+        }
+        $out = '';
+        while ($n > 0) {
+            $digit = $n % 10;
+            $out = self::digitChar($digit).$out;
+            $n = intdiv($n, 10);
+        }
+
+        return $neg ? '-'.$out : $out;
+    }
+
+    private static function digitChar(int $digit): string
+    {
+        if (0 === $digit) {
+            return '0';
+        }
+        if (1 === $digit) {
+            return '1';
+        }
+        if (2 === $digit) {
+            return '2';
+        }
+        if (3 === $digit) {
+            return '3';
+        }
+        if (4 === $digit) {
+            return '4';
+        }
+        if (5 === $digit) {
+            return '5';
+        }
+        if (6 === $digit) {
+            return '6';
+        }
+        if (7 === $digit) {
+            return '7';
+        }
+        if (8 === $digit) {
+            return '8';
+        }
+
+        return '9';
     }
 }
