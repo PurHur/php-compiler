@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Call\RuntimeIndirectClosureCall;
 use PHPCompiler\JIT\Call\RuntimeVariableFunction;
 use PHPCompiler\JIT\CallUnpackHelper;
 use PHPCompiler\JIT\ClosureHelper;
+use PHPCompiler\JIT\BoundMethodCallableHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -46,6 +47,12 @@ final class JitCallUserFunc
         $staticArray = self::tryInvokeStaticArrayCallable($context, $extraArgs);
         if (null !== $staticArray) {
             return $staticArray;
+        }
+
+        // Fold [$obj,'method'] before TYPE_VALUE → RuntimeVariableFunction (#35094 / peer #4040).
+        $boundMethod = self::tryInvokeBoundMethodArrayCallable($context, $extraArgs);
+        if (null !== $boundMethod) {
+            return $boundMethod;
         }
 
         if (
@@ -242,6 +249,70 @@ final class JitCallUserFunc
         }
 
         return self::boxRawCallResult($context, $proxy->call($context, ...$extraArgs));
+    }
+
+    /**
+     * Fold `call_user_func([$obj,'method'], …)` to an instance method proxy (#35094).
+     *
+     * Peer: {@see \PHPCompiler\JIT::tryInitBoundMethodFccDirect} / #4040 for `$c()` form.
+     * php-src: ext/standard/basic_functions.c PHP_FUNCTION(call_user_func).
+     *
+     * @param list<JITVariable> $extraArgs
+     */
+    private static function tryInvokeBoundMethodArrayCallable(Context $context, array $extraArgs): ?Value
+    {
+        $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
+        $callbackOp = $context->jitCallUserFuncCallbackOperand
+            ?? ($context->scope->argOperands[0] ?? null);
+        if (!$block instanceof Block || !($callbackOp instanceof Operand)) {
+            return null;
+        }
+        $callbackVar = $context->getVariableFromOp($callbackOp);
+        if (!BoundMethodCallableHelper::isBoundMethodArrayCallee($callbackOp, $callbackVar)) {
+            return null;
+        }
+        $slot = $block->slotForOperand($callbackOp);
+        if (null === $slot) {
+            return null;
+        }
+        $methodLc = BoundMethodCallableHelper::resolveMethodLcFromCalleeSlot($block, $slot);
+        if (null === $methodLc || '' === $methodLc) {
+            return null;
+        }
+        $receiverOp = BoundMethodCallableHelper::resolveBoundMethodReceiverOperand($block, $slot);
+        if (null === $receiverOp) {
+            return null;
+        }
+        if (null === $receiverOp->type || Type::TYPE_OBJECT !== $receiverOp->type->type) {
+            return null;
+        }
+        $receiverVar = $context->getVariableFromOp($receiverOp);
+        $classHint = BoundMethodCallableHelper::resolveBoundMethodReceiverClassName($block, $slot);
+        if (null === $classHint || '' === $classHint) {
+            $classHint = (string) ($receiverVar->classUserType ?? $receiverOp->type->userType ?? '');
+        }
+        $classLc = strtolower(ltrim($classHint, '\\'));
+        if ('' === $classLc || 'object' === $classLc) {
+            return null;
+        }
+        $proxyName = self::resolveStaticProxyForClass($context, $classLc, $methodLc);
+        if (null === $proxyName || !$context->functionIsRegistered($proxyName)) {
+            throw new \LogicException(
+                "call_user_func() callback [object, {$methodLc}] is not a defined instance method "
+                ."on {$classHint} in this compile unit (#35094)"
+            );
+        }
+        $proxy = $context->resolveFunctionProxy($proxyName);
+        if ($proxy instanceof ExternalMethod) {
+            throw new \LogicException(
+                "call_user_func() callback [object, {$methodLc}] is not a defined instance method "
+                ."on {$classHint} in this compile unit (#35094)"
+            );
+        }
+        // Instance proxies take $this as arg0 (peer initJitMethodCall scope->args).
+        $callArgs = array_merge([$receiverVar], $extraArgs);
+
+        return self::boxRawCallResult($context, $proxy->call($context, ...$callArgs));
     }
 
     /** Box a single Call::call() result the same way as {@see boxCallResult} without re-invoking. */
