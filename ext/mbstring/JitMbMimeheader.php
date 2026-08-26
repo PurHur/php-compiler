@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbMimeheaderRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -13,10 +15,12 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT for mb_encode_mimeheader()/mb_decode_mimeheader() (#6038, #34299).
+ * LLVM JIT/AOT for mb_encode_mimeheader()/mb_decode_mimeheader() (#6038, #34299, #35225).
  *
  * Compile-time fold for string literals; runtime via NestedJIT {@see MbMimeheaderJitHelper}.
- * Peer {@see JitMbConvertKana} / #34294.
+ * Call through {@see JitNestedHelperCoerce::callHelper} — NestedJIT may type string params as
+ * by-value `__value__` while the caller holds `__string__*` (#35225 / peer #34270).
+ * Peer {@see JitMbStrPad} / {@see JitMbTrim}.
  */
 final class JitMbMimeheader
 {
@@ -37,19 +41,23 @@ final class JitMbMimeheader
 
         // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21430).
         $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_encode_mimeheader', 0, 'str');
-        $charset = self::runtimeCharsetLiteral($args, $argc);
-        self::assertSupportedCharset($charset);
-        $transfer = self::runtimeTransferLiteral($args, $argc);
 
+        // NestedJIT helper compile can clear insert; restore before coerce/call (#34270 / #35225).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbMimeheaderRuntime::ensureLinked($context);
-        $charsetPtr = $context->builder->load($context->constantStringFromString($charset));
-        $transferPtr = $context->builder->load($context->constantStringFromString($transfer));
-        $resultStr = $context->builder->call(
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_encode_mimeheader_runtime');
+
+        $charsetPtr = self::charsetPtr($context, $args, $argc);
+        $transferPtr = self::transferPtr($context, $args, $argc);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbMimeheaderRuntime::encodeHelper($context),
-            $str,
-            $charsetPtr,
-            $transferPtr
+            [$str, $charsetPtr, $transferPtr]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::materializeOwnedString($context, $resultStr);
     }
@@ -72,11 +80,19 @@ final class JitMbMimeheader
         // Soft-null DEP+coerce (non-strict) / TypeError path handled by caller (#30311).
         $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_decode_mimeheader', 0, 'string');
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbMimeheaderRuntime::ensureLinked($context);
-        $resultStr = $context->builder->call(
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_decode_mimeheader_runtime');
+
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbMimeheaderRuntime::decodeHelper($context),
-            $str
+            [$str]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::materializeOwnedString($context, $resultStr);
     }
@@ -101,6 +117,11 @@ final class JitMbMimeheader
         if (null === $charset) {
             return null;
         }
+        $canonical = MbstringEncodingRegistry::resolve($charset) ?? $charset;
+        if ('UTF-8' !== $canonical && 'ASCII' !== $canonical && '8BIT' !== $canonical) {
+            // Unknown charset → NestedJIT path (helper returns "" today; assert later).
+            return null;
+        }
         $base64 = true;
         if (isset($args[2]) && JITVariable::TYPE_NULL !== $args[2]->type) {
             if (JITVariable::TYPE_STRING !== $args[2]->type) {
@@ -120,7 +141,7 @@ final class JitMbMimeheader
         // mb_convert_kana (#34294); keep the literal path as a plain constant string.
         return $context->builder->load(
             $context->constantStringFromString(
-                VmMbstring::encodeMimeheader($string, $charset, $base64)
+                VmMbstring::encodeMimeheader($string, $canonical, $base64)
             )
         );
     }
@@ -164,63 +185,62 @@ final class JitMbMimeheader
     }
 
     /**
-     * Match {@see mb_encode_mimeheader::execute}: omitted charset is UTF-8.
+     * Literal / omitted → constant; runtime string via {@see JitStringBuiltinArg::lower} (#35225).
      *
      * @param list<JITVariable> $args
      */
-    private static function runtimeCharsetLiteral(array $args, int $argc): string
+    private static function charsetPtr(Context $context, array $args, int $argc): Value
     {
         if ($argc < 2 || !isset($args[1]) || JITVariable::TYPE_NULL === $args[1]->type
             || ($args[1]->isNullConstant ?? false)) {
-            return 'UTF-8';
-        }
-        if (JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException(
-                'mb_encode_mimeheader() charset must be a string literal in this compiler build'
-            );
-        }
-        $charset = $args[1]->compileTimeString ?? null;
-        if (null === $charset) {
-            throw new \LogicException(
-                'mb_encode_mimeheader() charset must be a string literal in this compiler build'
-            );
+            return $context->builder->load($context->constantStringFromString('UTF-8'));
         }
 
-        return $charset;
+        $lit = JitStringArg::compileTimeLiteral($args[1]);
+        if (null !== $lit) {
+            $canonical = MbstringEncodingRegistry::resolve($lit) ?? $lit;
+            if ('UTF-8' !== $canonical && 'ASCII' !== $canonical && '8BIT' !== $canonical) {
+                throw new \LogicException(
+                    'mb_encode_mimeheader() JIT only supports UTF-8, ASCII, or 8BIT charset literals in this compiler build'
+                );
+            }
+
+            return $context->builder->load($context->constantStringFromString($canonical));
+        }
+
+        return JitStringBuiltinArg::lower(
+            $context,
+            $args[1],
+            'mb_encode_mimeheader',
+            1,
+            'charset'
+        );
     }
 
     /**
+     * Literal / omitted → constant "B"; runtime via lower (#35225).
+     *
      * @param list<JITVariable> $args
      */
-    private static function runtimeTransferLiteral(array $args, int $argc): string
+    private static function transferPtr(Context $context, array $args, int $argc): Value
     {
         if ($argc < 3 || !isset($args[2]) || JITVariable::TYPE_NULL === $args[2]->type
             || ($args[2]->isNullConstant ?? false)) {
-            return 'B';
-        }
-        if (JITVariable::TYPE_STRING !== $args[2]->type) {
-            throw new \LogicException(
-                'mb_encode_mimeheader() transfer_encoding must be a string literal in this compiler build'
-            );
-        }
-        $transfer = $args[2]->compileTimeString ?? null;
-        if (null === $transfer) {
-            throw new \LogicException(
-                'mb_encode_mimeheader() transfer_encoding must be a string literal in this compiler build'
-            );
+            return $context->builder->load($context->constantStringFromString('B'));
         }
 
-        return $transfer;
-    }
-
-    private static function assertSupportedCharset(string $charset): void
-    {
-        $canonical = MbstringEncodingRegistry::resolve($charset) ?? $charset;
-        if ('UTF-8' !== $canonical && 'ASCII' !== $canonical && '8BIT' !== $canonical) {
-            throw new \LogicException(
-                'mb_encode_mimeheader() JIT only supports UTF-8, ASCII, or 8BIT charset literals in this compiler build'
-            );
+        $lit = JitStringArg::compileTimeLiteral($args[2]);
+        if (null !== $lit) {
+            return $context->builder->load($context->constantStringFromString($lit));
         }
+
+        return JitStringBuiltinArg::lower(
+            $context,
+            $args[2],
+            'mb_encode_mimeheader',
+            2,
+            'transfer_encoding'
+        );
     }
 
     private static function materializeOwnedString(Context $context, Value $resultStr): Value
