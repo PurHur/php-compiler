@@ -96,14 +96,13 @@ final class ArrayMapRuntime
      */
     public static function mapNullZipMultiple(Context $context, array $arrays): Value
     {
-        self::ensureLinked($context);
+        // Pure LLVM — NestedJIT of ArrayMapJitHelper::mapNullZipMultiple aborts under thin AOT (#34978).
         $sources = [];
         foreach ($arrays as $array) {
             $sources[] = self::argToHashtable($context, $array);
         }
-        $packed = self::packHashtablePtrArray($context, $sources);
 
-        return self::callMapNullMultiple($context, $packed);
+        return ArrayMapLlvm::mapNullZipMultiple($context, $sources);
     }
 
     /**
