@@ -24,6 +24,7 @@ final class MbSubstrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('$n = $sliceEnd - $sliceStart', $helper);
         $this->assertStringContainsString('$endAt = $startAt + $lenAt', $helper);
         $this->assertStringContainsString('Never reassign', $helper);
+        $this->assertStringContainsString('$startAt = $start + 0', $helper);
         $this->assertStringContainsString('function assertEncodingArgv', $helper);
     }
 
