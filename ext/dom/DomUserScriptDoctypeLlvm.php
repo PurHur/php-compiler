@@ -28,6 +28,34 @@ final class DomUserScriptDoctypeLlvm
         self::$attached = false;
     }
 
+    /**
+     * Stamp from a compile-time loadXML literal so document-wide saveXML prepends
+     * {@code <!DOCTYPE …>} when the slot walk has no DocumentType child (#34877).
+     *
+     * createDocumentType+appendChild uses {@see rememberCreate}+{@see markAttached};
+     * loadXML materializes only documentElement as firstChild, so without this stamp
+     * AOT omits the doctype while Zend/VM keep {@code doc->intSubset}.
+     */
+    public static function rememberAttachedFromLoadXml(string $xml): void
+    {
+        self::reset();
+        $trimmed = trim($xml);
+        // Match name + optional PUBLIC "pub" "sys" | PUBLIC "pub" | SYSTEM "sys" (+ optional internal subset).
+        // Name token only — do not use \\S+ (greedy through the document's final '>').
+        if (1 !== preg_match(
+            '/<!DOCTYPE\s+([a-zA-Z_][\w:.-]*)(?:\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"|\s+PUBLIC\s+"([^"]*)"|\s+SYSTEM\s+"([^"]*)")?\s*(?:\[[^\]]*\])?\s*>/i',
+            $trimmed,
+            $m
+        )) {
+            return;
+        }
+        $name = $m[1];
+        $publicId = '' !== ($m[2] ?? '') ? (string) $m[2] : (string) ($m[4] ?? '');
+        $systemId = '' !== ($m[3] ?? '') ? (string) $m[3] : (string) ($m[5] ?? '');
+        self::rememberCreate($name, $publicId, $systemId);
+        self::markAttached();
+    }
+
     public static function markAttached(): void
     {
         if (null !== self::$qualifiedName) {

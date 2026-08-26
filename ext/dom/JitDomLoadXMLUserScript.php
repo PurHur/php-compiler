@@ -642,6 +642,9 @@ final class JitDomLoadXMLUserScript
         self::rememberCompileTimeXmlFor($context, $args[0], $lit, $sourceXml);
         self::$lastDocumentClass = self::CLASS_DOCUMENT;
         self::markLastLoadPureUserScript();
+        // loadXML with <!DOCTYPE> must stamp saveXML prefix — firstChild is only
+        // documentElement, so the #34160 child walk would otherwise omit it (#34877).
+        DomUserScriptDoctypeLlvm::rememberAttachedFromLoadXml($lit);
         // Declare textContent/nodeValue on DOMElement so forWrite hasProperty skips
         // dynamic-property deprecation (hasProperty does not walk DOMNode; #23251).
         $objectType = $context->type->object;
