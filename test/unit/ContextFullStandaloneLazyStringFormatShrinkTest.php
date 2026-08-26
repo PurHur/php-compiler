@@ -39,9 +39,13 @@ final class ContextFullStandaloneLazyStringFormatShrinkTest extends TestCase
             );
         }
 
-        // Still links echo / refresh; CliArgv deferred to compileToFile in #35133.
+        // Still links echo; CliArgv/#35133 + SuperglobalRefresh/#35137 at compileToFile.
         $this->assertStringContainsString('ValueEchoRuntime::ensureLinked($this)', $fullBody);
-        $this->assertStringContainsString('SuperglobalRefreshRuntime::ensureStandaloneBodies($this)', $fullBody);
+        $this->assertStringNotContainsString(
+            'SuperglobalRefreshRuntime::ensureStandaloneBodies($this)',
+            $fullBody,
+            'SuperglobalRefresh deferred to compileToFile (#35137)'
+        );
         $this->assertStringNotContainsString(
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             $fullBody,
