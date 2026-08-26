@@ -16419,6 +16419,7 @@ class JIT {
      * `$deep` must gate InnerXml: shallow importNode must not re-stamp source children
      * onto the result (php-src xmlDocCopyNode deep=0; #33097).
      * Attributes are always copied (#33362).
+     * Text imports stamp compileTimeDomTextData (#35043).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -16431,11 +16432,35 @@ class JIT {
         if (!$src instanceof Variable) {
             return;
         }
-        $tag = $src->compileTimeDomTagName ?? null;
-        if (null === $tag || '' === $tag) {
+        if (!$this->context->hasVariableOp($result)) {
             return;
         }
-        if (!$this->context->hasVariableOp($result)) {
+        $resultVar = $this->context->getVariableFromOp($result);
+        $textData = $src->compileTimeDomTextData
+            ?? (
+                '#text' === ($src->compileTimeDomTagName ?? null)
+                    ? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData
+                    : null
+            )
+            ?? (
+                '#text' === (\PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName ?? null)
+                    ? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData
+                    : null
+            );
+        if (null !== $textData) {
+            $this->bindCompileTimeDomTextData($result, $textData);
+            $resultVar->compileTimeDomTagName = null;
+            $resultVar->compileTimeDomInnerXml = null;
+            $resultVar->compileTimeDomLoadXml = null;
+            $resultVar->compileTimeDomAttributes = null;
+
+            return;
+        }
+        $tag = $src->compileTimeDomTagName ?? null;
+        if (null === $tag || '' === $tag) {
+            $tag = \PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName;
+        }
+        if (null === $tag || '' === $tag || '#text' === $tag) {
             return;
         }
         $deep = false;
@@ -16448,7 +16473,6 @@ class JIT {
                     || 'true' === strtolower($deepArg->compileTimeString);
             }
         }
-        $resultVar = $this->context->getVariableFromOp($result);
         $resultVar->compileTimeDomTagName = $tag;
         $resultVar->compileTimeDomInnerXml = $deep ? ($src->compileTimeDomInnerXml ?? '') : '';
         // Imported node is owned by the destination document — do not keep the source

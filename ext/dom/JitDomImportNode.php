@@ -157,6 +157,10 @@ final class JitDomImportNode
      *
      * `$deep` mirrors php-src xmlDocCopyNode: shallow omits child markup (#33097).
      * Attribute suffix is always applied (deep does not gate attrs; #33362).
+     *
+     * Text sources (`createTextNode` / loadXML `#text` siblings) must materialize via
+     * {@see JitDomCreateTextNode} — the element-only fallback otherwise returns the
+     * destination root tag (e.g. `r`) as a DOMElement (#35043 / peer cloneNode).
      */
     private static function invokeUserScriptMaterialize(
         Context $context,
@@ -164,6 +168,17 @@ final class JitDomImportNode
         JITVariable $sourceNode,
         bool $deep
     ): Value {
+        $textData = self::resolveSourceTextData($sourceNode, $documentVar);
+        if (null !== $textData) {
+            self::$lastMaterializedTagName = '#text';
+            self::$lastMaterializedInnerXml = '';
+
+            return self::boxObjectResult(
+                $context,
+                JitDomCreateTextNode::materialize($context, $textData)
+            );
+        }
+
         $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
             ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
         $tag = 'div';
@@ -302,6 +317,96 @@ final class JitDomImportNode
         }
 
         return self::boxObjectResult($context, $element);
+    }
+
+    /**
+     * Character data for a text-node import source (#35043).
+     *
+     * Returns null when the source is not known to be text (element / unknown).
+     * Empty string is a valid text node body (createTextNode('')).
+     */
+    private static function resolveSourceTextData(
+        JITVariable $sourceNode,
+        JITVariable $documentVar
+    ): ?string {
+        if (null !== $sourceNode->compileTimeDomTextData) {
+            return $sourceNode->compileTimeDomTextData;
+        }
+        $tag = $sourceNode->compileTimeDomTagName;
+        if ('#text' === $tag) {
+            return JitDomCreateTextNode::$lastMaterializedData ?? '';
+        }
+        // Do not treat element tags as text.
+        if (null !== $tag && '' !== $tag && '#text' !== $tag) {
+            return null;
+        }
+
+        $index = $sourceNode->compileTimeDomChildIndex
+            ?? JitDomNodeChildProperty::$lastFetchedChildIndex;
+        if (null !== $index) {
+            $dstXml = JitDomLoadXMLUserScript::compileTimeXmlFor($documentVar)
+                ?? $documentVar->compileTimeDomLoadXml
+                ?? null;
+            $nodes = self::resolveSourceChildNodes($sourceNode, $dstXml);
+            if (isset($nodes[$index]) && 'text' === ($nodes[$index]['kind'] ?? '')) {
+                return $nodes[$index]['data'];
+            }
+            // Indexed element/comment/etc. — not text.
+            if (isset($nodes[$index])) {
+                return null;
+            }
+        }
+
+        // Detached createTextNode: ARG_SEND may drop TextData but leave lastMaterializedData
+        // and no element child-fetch stamp (peer splitText #32362).
+        if (null === $sourceNode->compileTimeDomNodePath
+            && null === JitDomNodeChildProperty::$lastFetchedTagName
+            && null !== JitDomCreateTextNode::$lastMaterializedData
+        ) {
+            return JitDomCreateTextNode::$lastMaterializedData;
+        }
+
+        return null;
+    }
+
+    /**
+     * Direct children of the import *source* document (exclude destination loadXML).
+     *
+     * @return list<array{kind: string, data: string, content?: string, inner?: string, open?: string}>
+     */
+    private static function resolveSourceChildNodes(
+        JITVariable $sourceNode,
+        ?string $excludeDstXml
+    ): array {
+        $candidates = [];
+        $bound = $sourceNode->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode);
+        if (null !== $bound) {
+            $candidates[] = $bound;
+        }
+        $alt = JitDomLoadXMLUserScript::compileTimeXmlExcluding(
+            $excludeDstXml ?? JitDomLoadXMLUserScript::lastCompileTimeXml()
+        );
+        if (null !== $alt) {
+            $candidates[] = $alt;
+        }
+        $last = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null !== $last && $last !== $excludeDstXml) {
+            $candidates[] = $last;
+        }
+        $seen = [];
+        foreach ($candidates as $xml) {
+            if (isset($seen[$xml])) {
+                continue;
+            }
+            $seen[$xml] = true;
+            $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+            if ([] !== $nodes) {
+                return $nodes;
+            }
+        }
+
+        return [];
     }
 
     /**
