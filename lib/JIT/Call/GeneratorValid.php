@@ -55,11 +55,8 @@ final class GeneratorValid implements Call
         );
         $valid = $context->builder->and($notDone, $context->builder->and($notReturned, $active));
         $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            JitValueBox::pointer($context, $slot),
-            $context->builder->zext($valid, $context->getTypeFromString('int64'))
-        );
+        // __value__writeBool takes i32; JitValueBox::writeBool accepts i1 (#34972).
+        JitValueBox::writeBool($context, $slot, $valid);
 
         return $slot;
     }
