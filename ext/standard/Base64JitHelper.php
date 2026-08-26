@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * base64_encode()/base64_decode() for compiled JIT/AOT modules (#17234, #17249, #26890, #34800).
+ * base64_encode()/base64_decode() for compiled JIT/AOT modules (#17234, #17249, #26890, #34800, #35051).
  *
  * Logic mirrors {@see VmString}::base64_encode / base64_decode — self-contained (no VmString call)
  * so NestedJIT helper units are not ExternalMethod-stubbed (#16075 / peer Bin2hexJitHelper #20452,
- * StrRot13 #26868). Byte ordinal / emit via match tables (no native ord()/chr()/strlen()).
+ * StrRot13 #26868). Byte ordinal / emit via match tables (no native ord()/chr()).
  *
- * Encode walks with `$i++` only (not `$data[$i+1]`) and multiply/intdiv — NestedJIT mis-reads
- * computed indexes / `<<` packing on binary (#34800 / peer MbMimeheaderJitHelper::b64Encode).
+ * Encode: `\strlen` bounds + `$i++` walk (not `$data[$i+1]` / isset length) and small-shift
+ * packing (`>> 2` / `<< 4` / `& 63`) like {@see Bin2hexJitHelper} / openssl returnBase64.
+ * Large 16-bit packing (multiply-65536 / intdiv-262144) both zero high bytes under NestedJIT
+ * (#34800 / #35051).
  *
  * php-src: ext/standard/base64.c
  */
@@ -22,17 +24,13 @@ final class Base64JitHelper
 
     public static function encodeArgv(string $data): string
     {
-        $len = 0;
-        while (isset($data[$len])) {
-            ++$len;
-        }
+        $len = \strlen($data);
         if (0 === $len) {
             return '';
         }
         $alphabet = self::ALPHABET;
         $out = '';
-        // NestedJIT-safe: walk with `$i++` only (not `$data[$i+1]`) and multiply/intdiv
-        // instead of `<<` — peer MbMimeheaderJitHelper::b64Encode / #26890 / #34800.
+        // NestedJIT-safe: strlen + `$i++` walk; small shifts only (peer Bin2hex / #35051).
         $i = 0;
         while ($i < $len) {
             $b0 = self::byteOrd($data[$i]);
@@ -51,16 +49,15 @@ final class Base64JitHelper
                 ++$i;
                 $have2 = 1;
             }
-            $n = ($b0 * 65536) + ($b1 * 256) + $b2;
-            $out .= $alphabet[intdiv($n, 262144) % 64];
-            $out .= $alphabet[intdiv($n, 4096) % 64];
+            $out .= $alphabet[($b0 >> 2) & 63];
+            $out .= $alphabet[(($b0 << 4) & 0x30) | (($b1 >> 4) & 15)];
             if (1 === $have1) {
-                $out .= $alphabet[intdiv($n, 64) % 64];
+                $out .= $alphabet[(($b1 << 2) & 0x3c) | (($b2 >> 6) & 3)];
             } else {
                 $out .= '=';
             }
             if (1 === $have2) {
-                $out .= $alphabet[$n % 64];
+                $out .= $alphabet[$b2 & 63];
             } else {
                 $out .= '=';
             }
@@ -83,25 +80,25 @@ final class Base64JitHelper
     /**
      * RFC 4648 decode — append-only output (no in-place string mutation).
      *
-     * Uses {@see intdiv} / `%` on the i%4 quartets instead of a variable-width bit
-     * accumulator (`$acc >> $nbits`) — NestedJIT mis-lowers the latter and appends
-     * spurious NUL bytes (#26890 / re-open on master Aug 2026).
+     * Collects 4 sextets then emits with small shifts (`<< 2` / `>> 4` / `& 255`) —
+     * NestedJIT zeroes large intdiv peels on sextets in the i%4 path (#35051),
+     * and earlier bit-accumulator variable-width shifts (#26890).
      *
      * @return string|false
      */
     private static function decodeImpl(string $data, bool $strict)
     {
-        $len = 0;
-        while (isset($data[$len])) {
-            ++$len;
-        }
+        $len = \strlen($data);
         if (0 === $len) {
             return '';
         }
         $out = '';
         $i = 0;
         $padding = 0;
-        $buf = 0;
+        $v0 = 0;
+        $v1 = 0;
+        $v2 = 0;
+        $v3 = 0;
         for ($pos = 0; $pos < $len; ++$pos) {
             $ch = $data[$pos];
             if ('=' === $ch) {
@@ -123,19 +120,19 @@ final class Base64JitHelper
             }
             switch ($i % 4) {
                 case 0:
-                    $buf = $d * 4;
+                    $v0 = $d;
                     break;
                 case 1:
-                    $out .= self::byteAt($buf + intdiv($d, 16));
-                    $buf = ($d % 16) * 16;
+                    $v1 = $d;
+                    $out .= self::byteAt((($v0 << 2) | ($v1 >> 4)) & 255);
                     break;
                 case 2:
-                    $out .= self::byteAt($buf + intdiv($d, 4));
-                    $buf = ($d % 4) * 64;
+                    $v2 = $d;
+                    $out .= self::byteAt((($v1 << 4) | ($v2 >> 2)) & 255);
                     break;
                 case 3:
-                    $out .= self::byteAt($buf + $d);
-                    $buf = 0;
+                    $v3 = $d;
+                    $out .= self::byteAt((($v2 << 6) | $v3) & 255);
                     break;
             }
             ++$i;
