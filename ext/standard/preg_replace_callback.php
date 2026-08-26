@@ -160,7 +160,13 @@ final class preg_replace_callback extends Internal
         }
 
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace_callback', 2, 'subject');
-        if (!JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
+        // #35059 / peer #23912 — TYPE_VALUE string locals are stringish, not array subjects.
+        $subjectIsStringish = JitPregSubject::isStringOrCoercibleNullSubject($args[2])
+            || (
+                JITVariable::TYPE_VALUE === $args[2]->type
+                && !JitStrReplaceSubject::isKnownArray($args[2])
+            );
+        if (!$subjectIsStringish) {
             throw new \LogicException(
                 'preg_replace_callback() array subject is not supported for JIT/AOT in this compiler build'
             );

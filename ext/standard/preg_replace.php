@@ -20,6 +20,8 @@ use PHPLLVM\Value;
  * preg_replace() — VM via VmPreg; JIT/AOT via __compiler_preg_replace (issue #1176).
  * Optional $limit (4th arg): VM (#3605); JIT/AOT via __compiler_preg_replace (#4765).
  * Array $subject: VM + JIT (#4055, ext/pcre/php_pcre.c php_pcre_replace).
+ *
+ * AOT string locals are often TYPE_VALUE — must not take invokeArray (#35059 / peer str_replace #23912).
  */
 final class preg_replace extends Internal
 {
@@ -189,7 +191,14 @@ final class preg_replace extends Internal
         }
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace', 2, 'subject');
         $limitLit = 4 === $argc ? self::compileTimeLimit($args[3]) : -1;
-        if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
+        // #35059 / peer #23912 — AOT TYPE_VALUE string locals must not take invokeArray
+        // (empty hashtable → array() / SIGSEGV when treated as string).
+        $subjectIsStringish = JitPregSubject::isStringOrCoercibleNullSubject($args[2])
+            || (
+                JITVariable::TYPE_VALUE === $args[2]->type
+                && !JitStrReplaceSubject::isKnownArray($args[2])
+            );
+        if ($subjectIsStringish) {
             $folded = JitPregReplaceCompileTime::tryFoldReplaceString(
                 $context,
                 $args[0],

@@ -137,8 +137,14 @@ final class preg_filter extends Internal
         }
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_filter', 2, 'subject');
         $limitLit = $argc >= 4 ? self::compileTimeLimit($args[3]) : -1;
+        // #35059 / peer #23912 — TYPE_VALUE string locals are stringish.
+        $subjectIsStringish = JitPregSubject::isStringOrCoercibleNullSubject($args[2])
+            || (
+                JITVariable::TYPE_VALUE === $args[2]->type
+                && !JitStrReplaceSubject::isKnownArray($args[2])
+            );
         // Thin AOT: NestedJIT replace strings are corrupt — fold literal calls (#27181).
-        if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
+        if ($subjectIsStringish) {
             $folded = JitPregReplaceCompileTime::tryFoldFilterString(
                 $context,
                 $args[0],
@@ -166,7 +172,7 @@ final class preg_filter extends Internal
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_filter', 0, 'pattern')
             : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'preg_filter', 0, 'pattern');
         $replacement = JitStringArg::lower($context, $args[1], 'preg_filter() replacement');
-        if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
+        if ($subjectIsStringish) {
             return JitPregFilter::invoke(
                 $context,
                 $pattern,
