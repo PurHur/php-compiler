@@ -344,18 +344,27 @@ final class DomUserScriptLiveTagListLlvm
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbExact);
-        $lit = \PHPCompiler\JIT\JitStringBuiltinArg::compileTimeLiteral($childArg)
-            ?? $childArg->compileTimeString
-            ?? $childArg->compileTimeDomTagName;
-        if (null !== $lit) {
-            $childTag = $context->builder->load(
-                $context->constantStringFromString(strtolower($lit))
-            );
-            self::decrement($context, $childTag);
-        } else {
+        $nsQuery = JitDomGetElementsByTagNameUserScript::lastNsQuery();
+        if (null !== $nsQuery) {
+            // Active getElementsByTagNameNS list: GLOBAL_TAG is "ns|uri|local" (or
+            // "elns|…"), which never equals the child's tagName — so tag strcmp
+            // skipped the decrement and held/fresh lengths stayed stale (#34995).
             self::decrementCountFloored($context, $countGlobal, $one, $zero);
+            $context->builder->branch($bbDone);
+        } else {
+            $lit = \PHPCompiler\JIT\JitStringBuiltinArg::compileTimeLiteral($childArg)
+                ?? $childArg->compileTimeString
+                ?? $childArg->compileTimeDomTagName;
+            if (null !== $lit) {
+                $childTag = $context->builder->load(
+                    $context->constantStringFromString(strtolower($lit))
+                );
+                self::decrement($context, $childTag);
+            } else {
+                self::decrementCountFloored($context, $countGlobal, $one, $zero);
+            }
+            $context->builder->branch($bbDone);
         }
-        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
     }
@@ -429,6 +438,40 @@ final class DomUserScriptLiveTagListLlvm
         $i64 = $context->getTypeFromString('int64');
         $countI64 = $context->builder->intCast($countSz, $i64);
         $tagStr = $context->builder->load($context->constantStringFromString(strtolower($tag)));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $tagStr
+        );
+        $context->builder->store($owned, $context->module->getNamedGlobal(self::GLOBAL_TAG));
+        $context->builder->store($countI64, $context->module->getNamedGlobal(self::GLOBAL_COUNT));
+        self::clearPending($context);
+    }
+
+    /**
+     * Seed live NS list count from a pinned-tree walk (#34995).
+     *
+     * @param bool $fromElement Element::getElementsByTagNameNS — skip root itself
+     */
+    public static function resyncCountFromLiveTreeNs(
+        Context $context,
+        string $namespaceUri,
+        string $localName,
+        bool $fromElement = false
+    ): void {
+        self::ensureGlobals($context);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_us_live_ns_resync');
+        $pinned = DomUserScriptPinnedRootLlvm::load($context);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $root = $pinned ?? $objPtrTy->constNull();
+        $countI64 = JitDomLiveElementsByTagWalk::countMatchingNs(
+            $context,
+            $root,
+            $namespaceUri,
+            $localName,
+            $fromElement
+        );
+        $tagKey = ($fromElement ? 'elns|' : 'ns|').$namespaceUri.'|'.$localName;
+        $tagStr = $context->builder->load($context->constantStringFromString(strtolower($tagKey)));
         $owned = $context->builder->call(
             $context->lookupFunction('__string__separate'),
             $tagStr
