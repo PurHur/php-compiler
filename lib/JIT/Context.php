@@ -401,6 +401,8 @@ class Context {
 
     /** @var array<string, PHPLLVM\Value> */
     private array $arrayConstantMap = [];
+    /** @var array<string, PHPLLVM\Value> file-scope object constants (#35196) */
+    private array $objectConstantMap = [];
 
     /** @var array<string, \PHPCompiler\VM\HashTable> */
 
@@ -3468,6 +3470,80 @@ class Context {
     }
 
     /**
+     * Immortal module global for file-scope {@code const C = new …} (#35196).
+     *
+     * Peer of class-const object globals ({@see Builtin\Type\Object_::defineClassConst}) and
+     * file-scope enum rematerialization (#34783). Copies declared property values from the
+     * VM ObjectEntry so constructor args survive AOT CONST_FETCH.
+     *
+     * php-src: Zend/zend_constants.c — file consts hold persistent object zvals.
+     */
+    public function constantObjectFromVm(string $cacheKey, VMVariable $phpVar): PHPLLVM\Value
+    {
+        if (isset($this->objectConstantMap[$cacheKey])) {
+            return $this->objectConstantMap[$cacheKey];
+        }
+        if (isset($this->constants[$cacheKey][1])) {
+            return $this->constants[$cacheKey][1];
+        }
+        $phpVar = $phpVar->resolveIndirect();
+        if (VMVariable::TYPE_OBJECT !== $phpVar->type) {
+            throw new \LogicException('constantObjectFromVm requires TYPE_OBJECT');
+        }
+        $object = $phpVar->toObject();
+        $className = $object->class->name;
+        $classLc = strtolower(ltrim($className, '\\'));
+        $classId = $this->type->object->lookup($classLc);
+        $objPtrType = $this->getTypeFromString('__object__*');
+        $global = $this->module->addGlobal(
+            $objPtrType,
+            $this->moduleLocalConstGlobalName('object_const_', \count($this->objectConstantMap))
+        );
+        $global->setInitializer($objPtrType->constNull());
+        $this->objectConstantMap[$cacheKey] = $global;
+        /** @var array<string, VMVariable> $propSnapshot */
+        $propSnapshot = [];
+        foreach ($object->propertiesWithNames() as $propName => $propVar) {
+            if (!\is_string($propName) || '' === $propName) {
+                continue;
+            }
+            $propSnapshot[$propName] = \PHPCompiler\VM\ClassConstMaterializer::detachConstantValue($propVar);
+        }
+        $this->emitInInit(function (Context $ctx) use ($classId, $global, $propSnapshot): void {
+            $alloc = $ctx->type->object->allocateClassConstantObject($classId);
+            foreach ($propSnapshot as $propName => $propVm) {
+                $nameId = $ctx->type->object->propNameIdFor($propName);
+                $propset = null !== $nameId
+                    ? $ctx->type->object->resolvePropertySetForNameId($classId, $nameId)
+                    : null;
+                if (null === $propset) {
+                    $jitType = Variable::fromVMVariable($propVm->type);
+                    $ctx->type->object->defineProperty($classId, $propName, $jitType);
+                    $nameId = $ctx->type->object->propNameIdAfterDefine($propName);
+                    if (null === $nameId) {
+                        continue;
+                    }
+                    $propset = $ctx->type->object->resolvePropertySetForNameId($classId, $nameId);
+                }
+                if (null === $propset) {
+                    continue;
+                }
+                try {
+                    $jitVal = VmConstantJit::toVariable($ctx, $propVm);
+                } catch (\Throwable) {
+                    continue;
+                }
+                $slot = $ctx->type->object->propertySlotPtr($alloc, $propset[3]);
+                $ctx->type->object->propertyStore($slot, $jitVal, $propset[2]);
+            }
+            $ctx->builder->store($alloc, $global);
+        });
+        $this->constants[$cacheKey] = [Variable::TYPE_OBJECT, $global];
+
+        return $global;
+    }
+
+    /**
      * LLVM global name for module-local compile-time constants.
      *
      * Helper units set {@see PHP_COMPILER_INIT_SYMBOL_SUFFIX}; the main script uses
@@ -4439,6 +4515,19 @@ class Context {
             // File-scope const / define() with enum case singleton (#34783, peer #31967).
             if (\PHPCompiler\VM\EnumCaseSupport::isEnumCaseVariable($phpVar)) {
                 return $this->constantFetchEnumCaseVariable($name, $phpVar);
+            }
+            // File-scope const holding a user/builtin object (#35196, new-in-initializers).
+            if (VMVariable::TYPE_OBJECT === $phpVar->type) {
+                $global = $this->constantObjectFromVm($name, $phpVar);
+                $var = new Variable(
+                    $this,
+                    Variable::TYPE_OBJECT,
+                    Variable::KIND_VALUE,
+                    $this->builder->load($global)
+                );
+                $var->compileTimeConstantName = $name;
+
+                return $var;
             }
             // convert to PHP variable
             switch ($phpVar->type) {

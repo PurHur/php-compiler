@@ -381,7 +381,12 @@ final class ClassConstMaterializer
     {
         $names = [];
         foreach ($classBody->opCodes as $op) {
-            if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type && $valueSlot === $op->arg2) {
+            // Class-const (#19046) and file-scope const (#35196) share this scan.
+            if (
+                (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type
+                    || OpCode::TYPE_DECLARE_GLOBAL_CONST === $op->type)
+                && $valueSlot === $op->arg2
+            ) {
                 break;
             }
             if (OpCode::TYPE_NEW === $op->type) {
@@ -393,6 +398,98 @@ final class ClassConstMaterializer
         }
 
         return $names;
+    }
+
+    /**
+     * Materialize a file-scope {@code const C = new …} value for AOT (#35196).
+     *
+     * Unlike {@see materializeSlot}, only the init fragment for this constant is collected —
+     * the script block also contains DECLARE_CLASS / other consts that must not enter the
+     * fragment. Includes TYPE_ARG_SEND between NEW and FUNCCALL so ctor args are applied.
+     */
+    public static function materializeGlobalConstSlot(
+        VmEngine $vm,
+        Block $scriptBlock,
+        int $valueSlot
+    ): Variable {
+        $initOps = self::collectGlobalConstInitOps($scriptBlock, $valueSlot);
+        $newResultSlot = self::newFragmentResultSlot($initOps);
+        if (null !== $newResultSlot) {
+            return self::detachConstantValue(
+                $vm->materializeClassConstInitFragment(
+                    $scriptBlock->fragmentForOpcodes($initOps),
+                    $newResultSlot
+                )
+            );
+        }
+        $frame = $scriptBlock->getFrame($vm->context);
+        foreach ($initOps as $op) {
+            if ($vm->isClassBodyConstInitOpcode($op->type)) {
+                $vm->executeClassBodyConstInitOpcode($frame, $op);
+            }
+        }
+        if (!isset($frame->scope[$valueSlot])) {
+            throw new \LogicException('Global constant value must be a compile-time constant');
+        }
+
+        return self::detachConstantValue($frame->scope[$valueSlot]);
+    }
+
+    /**
+     * @return list<OpCode>
+     */
+    public static function collectGlobalConstInitOps(Block $scriptBlock, int $valueSlot): array
+    {
+        $ops = $scriptBlock->opCodes;
+        $declareIndex = null;
+        foreach ($ops as $i => $op) {
+            if (OpCode::TYPE_DECLARE_GLOBAL_CONST === $op->type && $valueSlot === $op->arg2) {
+                $declareIndex = $i;
+                break;
+            }
+        }
+        if (null === $declareIndex) {
+            return [];
+        }
+        $newIndex = null;
+        for ($i = $declareIndex - 1; $i >= 0; --$i) {
+            if (OpCode::TYPE_NEW === $ops[$i]->type && $ops[$i]->arg1 === $valueSlot) {
+                $newIndex = $i;
+                break;
+            }
+        }
+        if (null !== $newIndex) {
+            $start = $newIndex;
+            for ($i = $newIndex - 1; $i >= 0; --$i) {
+                $t = $ops[$i]->type;
+                if (
+                    OpCode::TYPE_INIT_ARRAY === $t
+                    || OpCode::TYPE_ADD_ARRAY_ELEMENT === $t
+                    || OpCode::TYPE_ARRAY_SPREAD === $t
+                ) {
+                    $start = $i;
+                    continue;
+                }
+                break;
+            }
+
+            return array_slice($ops, $start, $declareIndex - $start);
+        }
+        $initOps = [];
+        for ($i = 0; $i < $declareIndex; ++$i) {
+            // Mirror prior JIT DECLARE_GLOBAL_CONST filter for array / scalar inits.
+            if (
+                OpCode::TYPE_INIT_ARRAY === $ops[$i]->type
+                || OpCode::TYPE_ADD_ARRAY_ELEMENT === $ops[$i]->type
+                || OpCode::TYPE_ARRAY_SPREAD === $ops[$i]->type
+                || OpCode::TYPE_CLOSURE === $ops[$i]->type
+                || OpCode::TYPE_FROM_CALLABLE === $ops[$i]->type
+            ) {
+                $initOps[] = $ops[$i];
+            }
+        }
+
+        return $initOps;
     }
 
     /**
