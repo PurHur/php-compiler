@@ -9,5 +9,6 @@
     "published_fresh": 415,
     "kept_live_unpublished": 0,
     "total_bytes": 1198077036,
-    "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env; live-site prune guard #25377) \u2014 DomC14N+MbStrcut refresh #32122"
+    "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env; live-site prune guard #25377) \u2014 DomC14N+MbStrcut refresh #32122",
+    "updated_at": "2026-08-26T03:48:01+00:00"
 }
