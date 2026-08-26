@@ -592,6 +592,13 @@ final class VmIteratorForeach
                 self::objNodeSlot($context, $slotKey)
             );
             self::initHashtableIndex($context, $slotKey);
+            // Match Zend FE_RESET → rewind(): getInfo/current share intern->index (#35030).
+            $sizeT = $context->getTypeFromString('size_t');
+            SplObjectStorageJitHelper::syncIterPosFromForeachIndex(
+                $context,
+                $slotKey,
+                $sizeT->constInt(0, false)
+            );
 
             return;
         }
@@ -679,22 +686,24 @@ final class VmIteratorForeach
         );
         $context->builder->branchIf($isFirst, $init, $advance);
 
+        $sizeT = $context->getTypeFromString('size_t');
         $context->builder->positionAtEnd($init);
         $head = $context->builder->load($context->builder->structGep($ht, $map['objKeys']));
         $context->builder->store($head, $walkSlot);
         // SplObjectStorage::key() is the 0-based insertion index (#28707 / php-src).
-        $sizeT = $context->getTypeFromString('size_t');
-        $context->builder->store($sizeT->constInt(0, false), self::indexSlot($context, $slotKey));
+        $zeroIdx = $sizeT->constInt(0, false);
+        $context->builder->store($zeroIdx, self::indexSlot($context, $slotKey));
+        // Keep __spl_iter_pos in lockstep so getInfo()/current() see the foreach cursor (#35030).
+        SplObjectStorageJitHelper::syncIterPosFromForeachIndex($context, $slotKey, $zeroIdx);
         $context->builder->branch($check);
 
         $context->builder->positionAtEnd($advance);
         $next = $context->builder->load($context->builder->structGep($current, $nodeMap['next']));
         $context->builder->store($next, $walkSlot);
         $idx = $context->builder->load(self::indexSlot($context, $slotKey));
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($idx, $sizeT->constInt(1, false)),
-            self::indexSlot($context, $slotKey)
-        );
+        $nextIdx = $context->builder->addNoSignedWrap($idx, $sizeT->constInt(1, false));
+        $context->builder->store($nextIdx, self::indexSlot($context, $slotKey));
+        SplObjectStorageJitHelper::syncIterPosFromForeachIndex($context, $slotKey, $nextIdx);
         $context->builder->branch($check);
 
         $context->builder->positionAtEnd($check);
