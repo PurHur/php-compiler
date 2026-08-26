@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
@@ -66,6 +67,7 @@ final class MathAbs
 
     private static function implementDouble(Context $context): void
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
@@ -78,10 +80,16 @@ final class MathAbs
             self::COMPILED_HELPERS,
             '#15175'
         );
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementLong(Context $context): void
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $i64 = $context->getTypeFromString('int64');
         JitVmHelperLink::ensureBridge(
             $context,
@@ -94,5 +102,10 @@ final class MathAbs
             self::COMPILED_HELPERS,
             '#15175'
         );
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

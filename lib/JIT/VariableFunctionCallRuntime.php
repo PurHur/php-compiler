@@ -37,15 +37,79 @@ final class VariableFunctionCallRuntime
         array $candidates,
         Variable ...$args
     ): Value {
-        $candidateNames = \array_keys($candidates);
-        $table = \implode("\0", $candidateNames);
-        $index = $context->builder->call(
-            self::matchHelperFunction($context),
-            $nameStr,
-            $context->builder->load($context->constantStringFromString($table))
-        );
+        // Per-candidate strcmp — avoid NUL/newline table + NestedJIT match index (#35075).
+        // The matchCandidateIndex helper mis-dispatched multi-hint foreach $fn() (always index 0).
+        return self::dispatchByStrcmp($context, $nameStr, $candidates, ...$args);
+    }
 
-        return self::dispatchByIndex($context, $index, $candidates, ...$args);
+    /**
+     * @param array<string, Call> $candidates
+     */
+    private static function dispatchByStrcmp(
+        Context $context,
+        Value $nameStr,
+        array $candidates,
+        Variable ...$args
+    ): Value {
+        $tag = 'vf'.(string) ++self::$blockSeq;
+        $merge = BasicBlockHelper::append($context, 'var_fn_merge_'.$tag);
+        $undef = BasicBlockHelper::append($context, 'var_fn_undef_'.$tag);
+        $nativeLong = self::candidatesReturnNativeLong($context, $candidates);
+        if ($nativeLong) {
+            $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int64'));
+            $zero = $context->getTypeFromString('int64')->constInt(0, false);
+        } else {
+            $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+            $zero = $context->getTypeFromString('__value__*')->constNull();
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $zeroCmp = $i64->constInt(0, false);
+        $n = \count($candidates);
+        $entry = BasicBlockHelper::append($context, 'var_fn_strcmp_'.$tag.'_entry');
+        $context->builder->branch($entry);
+        $checkBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $checkBlocks[$i] = 0 === $i
+                ? $entry
+                : BasicBlockHelper::append($context, 'var_fn_strcmp_'.$tag.'_'.$i);
+        }
+
+        $i = 0;
+        foreach ($candidates as $fnName => $proxy) {
+            $context->builder->positionAtEnd($checkBlocks[$i]);
+            $lit = $context->builder->load($context->constantStringFromString($fnName));
+            $cmp = JitStringCompare::strcmp($context, $nameStr, $lit);
+            $isCase = $context->builder->icmp(Builder::INT_EQ, $cmp, $zeroCmp);
+            $onMatch = BasicBlockHelper::append($context, 'var_fn_strcmp_match_'.$tag.'_'.$i);
+            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $undef;
+            $context->builder->branchIf($isCase, $onMatch, $onMiss);
+
+            $context->builder->positionAtEnd($onMatch);
+            $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+            $raw = $proxy->call($context, ...$args);
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            } else {
+                $context->builder->positionAtEnd($onMatch);
+            }
+            if ($nativeLong) {
+                $context->builder->store($raw, $resultSlot);
+            } else {
+                $context->builder->store(self::boxCallResult($context, $fnName, $raw), $resultSlot);
+            }
+            $context->builder->branch($merge);
+            ++$i;
+        }
+
+        $context->builder->positionAtEnd($undef);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->store($zero, $resultSlot);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+
+        return $context->builder->load($resultSlot);
     }
 
     /**
@@ -70,8 +134,15 @@ final class VariableFunctionCallRuntime
         }
 
         $i32 = $context->getTypeFromString('int32');
-        // NestedJIT helpers may surface PHP int as i64; matchCandidateIndex is i32 ABI (#24902 / #34937).
+        // NestedJIT helpers may surface PHP int as i64 or boxed __value__* (#24902 / #34937 / #35075).
         $indexTy = $context->getStringFromType($index->typeOf());
+        if ('__value__*' === $indexTy || '__value__' === $indexTy) {
+            $index = $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                JitValueBox::normalizeValuePtr($context, $index)
+            );
+            $indexTy = 'int64';
+        }
         if ('int64' === $indexTy) {
             $index = $context->builder->trunc($index, $i32);
         } elseif ('int8' === $indexTy || 'int16' === $indexTy) {
@@ -103,7 +174,14 @@ final class VariableFunctionCallRuntime
             $context->builder->branchIf($isCase, $onMatch, $onMiss);
 
             $context->builder->positionAtEnd($onMatch);
+            // Candidate proxies (abs/round ensureBridge) must not steal the insert block (#35075).
+            $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
             $raw = $proxy->call($context, ...$args);
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            } else {
+                $context->builder->positionAtEnd($onMatch);
+            }
             if ($nativeLong) {
                 $context->builder->store($raw, $resultSlot);
             } else {
@@ -164,6 +242,16 @@ final class VariableFunctionCallRuntime
         $rawTy = $context->getStringFromType($raw->typeOf());
         if ('int64' === $rawTy) {
             JitValueBox::writeLong($context, $slot, $raw);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        // abs()/round() etc. return bare double; functionReturnType may still be __value__ (#35075).
+        if ('double' === $rawTy) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                JitValueBox::pointer($context, $slot),
+                $raw
+            );
 
             return JitValueBox::pointer($context, $slot);
         }

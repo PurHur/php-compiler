@@ -13055,6 +13055,15 @@ class JIT {
                         if (null !== $nameSlot) {
                             $this->foldCompileTimeStringFromSlot($block, $nameSlot, $nameVar);
                         }
+                        // foreach (['a','b'] as $fn): fold may pin compileTimeString to the first
+                        // array literal, so every $fn() becomes a() (#35075). Multi-value foreach
+                        // sources must stay dynamic.
+                        $foreachCalleeHints = null !== $nameSlot
+                            ? JIT\VariableFunctionCallHelper::foreachArrayLiteralCalleeHints($block, $nameSlot)
+                            : [];
+                        if (\count($foreachCalleeHints) > 1) {
+                            $nameVar->compileTimeString = null;
+                        }
                         if (null === $nameVar->compileTimeString) {
                             if ($this->shouldUseSelfHostJitStubs()) {
                                 $this->context->scope->toCall = null;
@@ -13064,6 +13073,7 @@ class JIT {
                             }
                             $hints = array_values(array_unique(array_merge(
                                 JIT\VariableFunctionCallHelper::hintedCalleeNames($block, $nameSlot),
+                                $foreachCalleeHints,
                                 JIT\VariableFunctionCallHelper::coalesceBranchLiteralHints($block),
                                 JIT\VariableFunctionCallHelper::funDefNamesInCompilationUnit($block)
                             )));
