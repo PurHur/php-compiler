@@ -30075,17 +30075,23 @@ class JIT {
                     continue;
                 }
                 // Catch/branch reassignment: stale try-path '' on boxed locals (#32570).
-                $resolved = $this->resolveJitCompileTimeStringSlot($block, $slot);
-                if (null !== $resolved) {
-                    foreach ($block->eachNamedScopeSlot() as [$scopeName, $scopeSlot]) {
-                        if ($scopeSlot === $slot
-                            && $this->jitNamedLocalHasDivergentBranchCompileTimeStrings($block, $scopeName)
-                        ) {
-                            $resolved = null;
-                            break;
-                        }
+                // Divergence must be checked before resolve — merge blocks return null from
+                // resolveJitCompileTimeStringSlot when try/catch arms disagree, which skipped
+                // the old guard and left strlen/htmlspecialchars folding to '' (#32636).
+                $divergent = false;
+                foreach ($block->eachNamedScopeSlot() as [$scopeName, $scopeSlot]) {
+                    if ($scopeSlot === $slot
+                        && $this->jitNamedLocalHasDivergentBranchCompileTimeStrings($block, $scopeName)
+                    ) {
+                        $divergent = true;
+                        break;
                     }
                 }
+                if ($divergent) {
+                    $arg->compileTimeString = null;
+                    continue;
+                }
+                $resolved = $this->resolveJitCompileTimeStringSlot($block, $slot);
                 // Do not wipe a good stamp with null (misaligned argOperands used to do this) (#35234).
                 if (null !== $resolved) {
                     $arg->compileTimeString = $resolved;
