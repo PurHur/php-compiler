@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -33,9 +34,6 @@ final class JitOpensslRandomPseudoBytes
 
     public static function emitEmptyCipherAlgoError(Context $context, string $message): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitValueErrorAndAbort($context, $message);
     }
 }
