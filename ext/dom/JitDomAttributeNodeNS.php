@@ -341,8 +341,11 @@ final class JitDomAttributeNodeNS
         $attr = self::loadObjectArg($context, $args[1], 'DOMElement::setAttributeNodeNS() attr');
         // php-src ext/dom/element.c — WRONG_DOCUMENT_ERR before adopt/move (#22709).
         self::assertSameDocumentBeforeSetAttributeNode($context, $element, $attr);
-        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace();
-        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        // Prefer createAttribute orphan key; fall back to getAttributeNode / importNode
+        // rememberCreate (#35118 peer removeAttributeNode #34579).
+        $fetched = JitDomAttrRename::lastFetchedKey();
+        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? ($fetched[0] ?? null);
+        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName() ?? ($fetched[1] ?? null);
         if (null === $ns || null === $local) {
             return self::boxNullResult($context);
         }
@@ -606,36 +609,64 @@ final class JitDomAttributeNodeNS
     /**
      * Compile-time saveXML bag sync after setAttributeNode / setAttributeNodeNS
      * (peer setAttribute #33509 / #33570 / NS #33578).
+     *
+     * loadXML documentElement often has no createElement bag id — still refresh the
+     * compile-time open-tag (peer setAttribute #32981 / importNode Attr #35118).
+     * Prefer createAttribute orphan key; fall back to getAttributeNode lastFetchedKey.
      */
     public static function syncSaveXmlAttrSuffixAfterSetAttributeNode(
         Context $context,
         JITVariable $elementArg
     ): void {
-        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
-        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        $fetched = JitDomAttrRename::lastFetchedKey();
+        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace()
+            ?? ($fetched[0] ?? '');
+        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName()
+            ?? ($fetched[1] ?? null);
         if (null === $local) {
             return;
         }
         $qname = DomUserScriptAttributeCacheLlvm::lastCreateQualifiedName() ?? $local;
         $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
         $id = $elementArg->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
-        if (null === $id) {
+        $bagUpdates = self::openTagAttrUpdates('' === $ns ? null : $ns, $qname, $valueLit);
+        if (null !== $id) {
+            $attrs = $elementArg->compileTimeDomAttributes ?? JitDomCreateElementAttrs::get($id);
+            foreach ($bagUpdates as $name => $val) {
+                unset($attrs[$name]);
+            }
+            $attrs = $bagUpdates + $attrs;
+            foreach ($bagUpdates as $name => $val) {
+                JitDomCreateElementAttrs::set($id, $name, $val);
+            }
+            $elementArg->compileTimeDomAttributes = $attrs;
+            if (null === $elementArg->compileTimeDomElementId) {
+                $elementArg->compileTimeDomElementId = $id;
+            }
+            self::syncSaveXmlAttrSuffix($context, $elementArg, $attrs);
+        }
+
+        // loadXML root C14N fold — required when bag id is absent (#35118 / #32981).
+        if (null === JitDomLoadXMLUserScript::lastCompileTimeXml()) {
             return;
         }
-        $bagUpdates = self::openTagAttrUpdates('' === $ns ? null : $ns, $qname, $valueLit);
-        $attrs = $elementArg->compileTimeDomAttributes ?? JitDomCreateElementAttrs::get($id);
-        foreach ($bagUpdates as $name => $val) {
-            unset($attrs[$name]);
+        $path = $elementArg->compileTimeDomNodePath ?? null;
+        $nested = null !== $path && '' !== $path
+            && substr_count(trim($path, '/'), '/') >= 1;
+        if ($nested) {
+            JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+
+            return;
         }
-        $attrs = $bagUpdates + $attrs;
-        foreach ($bagUpdates as $name => $val) {
-            JitDomCreateElementAttrs::set($id, $name, $val);
+        if ('' !== $ns) {
+            foreach ($bagUpdates as $name => $val) {
+                JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeSet($name, $val);
+            }
+        } else {
+            $openName = ($qname !== $local) ? $qname : $local;
+            JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeSet($openName, $valueLit);
         }
-        $elementArg->compileTimeDomAttributes = $attrs;
-        if (null === $elementArg->compileTimeDomElementId) {
-            $elementArg->compileTimeDomElementId = $id;
-        }
-        self::syncSaveXmlAttrSuffix($context, $elementArg, $attrs);
+        JitDomLoadXMLUserScript::syncElementXmlnsAttrFromCompileTimeXml($context, $elementArg);
     }
 
     /**

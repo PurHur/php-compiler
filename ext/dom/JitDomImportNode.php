@@ -165,6 +165,11 @@ final class JitDomImportNode
      * CharacterData kinds; treating that as text alone materializes `#text` (#35043 /
      * #35098 / peer cloneNode). Element-only fallback would return the destination
      * root tag (e.g. `r`) as a DOMElement.
+     *
+     * Attr sources ({@see JitDomAttrRename::lastFetchedKey} / createAttribute orphan)
+     * must materialize via {@see JitDomAttributeNodeNS::materializeAttrFromLiterals}
+     * **before** lastPath element recovery — otherwise documentElement path poison
+     * yields `nodeType=1` named like the dest root and Attr props SIGSEGV (#35118).
      */
     private static function invokeUserScriptMaterialize(
         Context $context,
@@ -192,6 +197,33 @@ final class JitDomImportNode
                 self::$lastMaterializedTagName = '#text';
                 $object = JitDomCreateTextNode::materialize($context, $leaf['data']);
             }
+
+            return self::boxObjectResult($context, $object);
+        }
+
+        // Attr import before lastPath element recovery (#35118 / php-src xmlCopyProp).
+        $attrSpec = self::resolveSourceAttrImportSpec($sourceNode, $documentVar);
+        if (null !== $attrSpec) {
+            self::$lastMaterializedTagName = $attrSpec['qname'];
+            self::$lastMaterializedInnerXml = '';
+            $object = JitDomAttributeNodeNS::materializeAttrFromLiterals(
+                $context,
+                $attrSpec['namespace'],
+                $attrSpec['qname'],
+                $attrSpec['value']
+            );
+            // setAttributeNode / saveXML sync read lastCreate* + literalValue (#33570).
+            DomUserScriptAttributeCacheLlvm::rememberCreate(
+                $attrSpec['namespace'],
+                $attrSpec['qname']
+            );
+            DomUserScriptAttributeCacheLlvm::storeLiteral(
+                $context,
+                $attrSpec['namespace'],
+                $attrSpec['local'],
+                $object,
+                $attrSpec['value']
+            );
 
             return self::boxObjectResult($context, $object);
         }
@@ -334,6 +366,123 @@ final class JitDomImportNode
         }
 
         return self::boxObjectResult($context, $element);
+    }
+
+    /**
+     * Attr import source: getAttributeNode key / createAttribute orphan (#35118).
+     *
+     * Thin AOT rematerializes importNode arguments from compile-time stamps; Attr
+     * temps lose layout and fall through to documentElement lastPath (`/r` → Element).
+     * Detect Attr **before** that recovery — peer leaf stand-ins (#35043 / #35098).
+     *
+     * @return null|array{namespace: string, local: string, qname: string, value: string}
+     */
+    private static function resolveSourceAttrImportSpec(
+        JITVariable $sourceNode,
+        JITVariable $documentVar
+    ): ?array {
+        // Source Variable already stamped as element / leaf / child — not Attr.
+        $tag = $sourceNode->compileTimeDomTagName;
+        if (null !== $tag && '' !== $tag) {
+            return null;
+        }
+        if (null !== $sourceNode->compileTimeDomTextData) {
+            return null;
+        }
+        if (null !== $sourceNode->compileTimeDomNodePath) {
+            return null;
+        }
+        if (null !== $sourceNode->compileTimeDomChildIndex) {
+            return null;
+        }
+
+        $ns = '';
+        $local = null;
+        $qname = null;
+        $fetched = JitDomAttrRename::lastFetchedKey();
+        if (null !== $fetched) {
+            $ns = $fetched[0];
+            $local = $fetched[1];
+            $qname = $local;
+        } else {
+            $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+            if (null === $local) {
+                return null;
+            }
+            $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+            $qname = DomUserScriptAttributeCacheLlvm::lastCreateQualifiedName() ?? $local;
+        }
+
+        $value = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local);
+        if (null === $value) {
+            $value = self::resolveAttrValueFromSourceXml(
+                $sourceNode,
+                $documentVar,
+                $ns,
+                $local,
+                $qname
+            );
+        }
+        if (null === $value) {
+            $value = '';
+        }
+
+        return [
+            'namespace' => $ns,
+            'local' => $local,
+            'qname' => $qname,
+            'value' => $value,
+        ];
+    }
+
+    /**
+     * Recover Attr value from source-document loadXML open-tag (exclude destination).
+     */
+    private static function resolveAttrValueFromSourceXml(
+        JITVariable $sourceNode,
+        JITVariable $documentVar,
+        string $ns,
+        string $local,
+        string $qname
+    ): ?string {
+        $dstXml = JitDomLoadXMLUserScript::compileTimeXmlFor($documentVar)
+            ?? $documentVar->compileTimeDomLoadXml
+            ?? null;
+        $candidates = [];
+        $bound = $sourceNode->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode);
+        if (null !== $bound) {
+            $candidates[] = $bound;
+        }
+        $alt = JitDomLoadXMLUserScript::compileTimeXmlExcluding(
+            $dstXml ?? JitDomLoadXMLUserScript::lastCompileTimeXml()
+        );
+        if (null !== $alt) {
+            $candidates[] = $alt;
+        }
+        $last = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null !== $last) {
+            $candidates[] = $last;
+        }
+        foreach ($candidates as $xml) {
+            foreach (DomParseSimpleXmlJitHelper::rootAttributesArgv($xml) as $pair) {
+                $pairQ = $pair['qname'];
+                $pos = strpos($pairQ, ':');
+                $pairLocal = false === $pos ? $pairQ : substr($pairQ, $pos + 1);
+                $pairNs = $pair['namespace'] ?? '';
+                if (($pairLocal === $local || $pairQ === $qname || $pairQ === $local)
+                    && $pairNs === $ns
+                ) {
+                    return $pair['value'];
+                }
+                // Empty-NS fetch of prefixed open-tag attr (local or qName match).
+                if ('' === $ns && ($pairQ === $qname || $pairLocal === $local || $pairQ === $local)) {
+                    return $pair['value'];
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
