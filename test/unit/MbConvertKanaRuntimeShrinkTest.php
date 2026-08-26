@@ -7,17 +7,14 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * mb_convert_kana JIT routes through MbConvertKanaJitHelper PHP (#34294).
- *
- * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (peer MbCase #3495).
+ * mb_convert_kana JIT routes through MbConvertKanaJitHelper assertEncodingArgv (#35193).
  */
 final class MbConvertKanaRuntimeShrinkTest extends TestCase
 {
     public function testMbConvertKanaCompilesMbConvertKanaJitHelper(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MbConvertKanaRuntime.php');
-        $this->assertStringContainsString('MbConvertKanaJitHelper::convertArgv', $source);
-        $this->assertStringContainsString('MbConvertKanaJitHelper::convertDefaultArgv', $source);
+        $this->assertStringContainsString('MbConvertKanaJitHelper::assertEncodingArgv', $source);
         $this->assertStringContainsString('/ext/mbstring/MbConvertKanaJitHelper.php', $source);
     }
 
