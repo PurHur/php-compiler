@@ -5,7 +5,7 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT C14N after tree mutation must match Zend — not the loadXML fold (#32972).
+ * AOT C14N after tree mutation must match Zend — not the loadXML fold (#32972 / #34862).
  *
  * @group llvm
  */
@@ -22,6 +22,7 @@ final class DomC14NAfterMutationAotTest extends TestCase
         $this->assertStringContainsString('replace=<r><z></z></r>', $aot);
         $this->assertStringContainsString('remove=<r></r>', $aot);
         $this->assertStringContainsString('plain=<r a="1"><c></c></r>', $aot);
+        $this->assertStringContainsString('move=<r><b></b><a></a></r>', $aot);
     }
 
     private function runPhp(string $src): string

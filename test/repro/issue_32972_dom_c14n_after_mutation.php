@@ -28,3 +28,10 @@ echo 'remove=', $el4->C14N(), "\n";
 $dom5 = new DOMDocument();
 $dom5->loadXML('<r a="1"><c/></r>');
 echo 'plain=', $dom5->documentElement->C14N(), "\n";
+
+// Same-parent appendChild move must reorder C14N fold (not concat) (#34862 / #32929).
+$dom6 = new DOMDocument();
+$dom6->loadXML('<r><a/><b/></r>');
+$r6 = $dom6->documentElement;
+$r6->appendChild($r6->firstChild);
+echo 'move=', $r6->C14N(), "\n";
