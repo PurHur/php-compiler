@@ -12,6 +12,10 @@ use PHPLLVM\BasicBlock;
  * Also clears outer emit-helper / self-host stub env so NestedJIT lowers real helper bodies
  * (e.g. VmUrlRewriterOb during RewriteVarsRuntime — #21965, peer SELFHOST_AOT clear).
  *
+ * Restores outer ?: {@see Context::$coalesceMergeSlotOperands} / coalesceAssignTargets so a
+ * true-arm JUMP that NestedJITs the merge (var_export) cannot wipe phi state before the else
+ * arm compiles (#34956).
+ *
  * Restore must use {@see BasicBlockHelper::restoreInsertBlock}: `positionAtEnd` on a sealed
  * outer block leaves later emits as parentless / terminator-in-middle IR (Runtime::parse
  * host-lower under M5 argv — #26756).
@@ -90,6 +94,11 @@ final class NestedJitCompileScope
         $savedForeachDatePeriodSnapshotHts = $context->foreachDatePeriodSnapshotHts;
         $savedForeachSimpleXmlSnapshotKeys = $context->foreachSimpleXmlSnapshotKeys;
         $savedForeachAggregateInnerHtSlots = $context->foreachAggregateInnerHtSlots;
+        // Outer ?: stack-phi maps must survive NestedJIT (var_export etc.) when the true arm
+        // JUMP compiles the merge before the else arm runs (#34956 / leftover #34944).
+        $savedCoalesceAssignTargets = $context->coalesceAssignTargets;
+        $savedCoalesceMergeSlotOperands = $context->coalesceMergeSlotOperands;
+        $savedTernaryEchoPhiByAliasSlot = $context->ternaryEchoPhiByAliasSlot;
         $context->scope->blockStorage = new \SplObjectStorage();
         $context->scope->blockEntryStorage = new \SplObjectStorage();
         $context->scope->variables = new \SplObjectStorage();
@@ -107,6 +116,9 @@ final class NestedJitCompileScope
         $context->foreachDatePeriodSnapshotHts = [];
         $context->foreachSimpleXmlSnapshotKeys = [];
         $context->foreachAggregateInnerHtSlots = [];
+        $context->coalesceAssignTargets = new \SplObjectStorage();
+        $context->coalesceMergeSlotOperands = [];
+        $context->ternaryEchoPhiByAliasSlot = [];
         // Drop outer activeFunction while insert is cleared — otherwise parentFunction() /
         // entryAlloca pin allocas into the outer fn and NestedJIT bodies load them (#28053).
         $context->activeFunction = '';
@@ -141,6 +153,9 @@ final class NestedJitCompileScope
             $context->foreachDatePeriodSnapshotHts = $savedForeachDatePeriodSnapshotHts;
             $context->foreachSimpleXmlSnapshotKeys = $savedForeachSimpleXmlSnapshotKeys;
             $context->foreachAggregateInnerHtSlots = $savedForeachAggregateInnerHtSlots;
+            $context->coalesceAssignTargets = $savedCoalesceAssignTargets;
+            $context->coalesceMergeSlotOperands = $savedCoalesceMergeSlotOperands;
+            $context->ternaryEchoPhiByAliasSlot = $savedTernaryEchoPhiByAliasSlot;
             self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;
             self::restoreInsertBlock($context, $restoreBlock);

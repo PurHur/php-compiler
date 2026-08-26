@@ -8737,6 +8737,17 @@ class JIT {
                     }
                     $destOp = $block->getOperand($op->arg1);
                     $aliasOp = $block->getOperand($op->arg2);
+                    // ?: else-arm Temporary for the phi slot can differ from the Temporary that
+                    // coalesceMergeSlotOperands registered (true-arm first). Remap so ASSIGN
+                    // writes the stack-phi ARG_SEND reads (#34956 / leftover #34944).
+                    $this->remapArmTemporaryOntoCoalesceMergeSlot(
+                        $aliasOp,
+                        null !== $op->arg2 ? (int) $op->arg2 : null
+                    );
+                    $this->remapArmTemporaryOntoCoalesceMergeSlot(
+                        $destOp,
+                        null !== $op->arg1 ? (int) $op->arg1 : null
+                    );
                     // XMLReader::XML() ASSIGN into CFG-bool `$reader` — promote slots to VALUE
                     // so property fetches keep classUserType (#28670).
                     if ('XMLReader' === ($value->classUserType ?? '')) {
@@ -9854,6 +9865,12 @@ class JIT {
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
                     $resultOp = $block->getOperand($op->arg1);
+                    // True-arm `[$o->x]` INIT_ARRAY into the ?: phi slot — same Temporary skew
+                    // as ASSIGN (#34956); seed the stack-phi HT ARG_SEND will read.
+                    $this->remapArmTemporaryOntoCoalesceMergeSlot(
+                        $resultOp,
+                        null !== $op->arg1 ? (int) $op->arg1 : null
+                    );
                     $result = $this->context->getVariableFromOp($resultOp);
                     JIT\HashTableHelper::initArray($this->context, $result);
                     $result->compileTimeEmptyArrayLiteral = null === $op->arg2;
@@ -29194,6 +29211,33 @@ class JIT {
             return;
         }
         $this->assignOperand($coalesceTarget, $value, false);
+    }
+
+    /**
+     * Remap a ?: arm Temporary onto the stack-phi Variable keyed by CFG slot (#34956).
+     *
+     * php-cfg gives each arm its own Temporary for the shared phi slot number. Stack-phi
+     * registration keeps the Temporary {@see ternaryEchoPhiOperand} saw first. The other
+     * arm's ASSIGN/INIT_ARRAY would otherwise write a sibling Variable while ARG_SEND reads
+     * the empty coalesce box → NULL. php-src: Zend/zend_ast.c ZEND_AST_CONDITIONAL.
+     */
+    private function remapArmTemporaryOntoCoalesceMergeSlot(?Operand $armOp, ?int $slot): void
+    {
+        if (null === $armOp || null === $slot) {
+            return;
+        }
+        if (!isset($this->context->coalesceMergeSlotOperands[$slot])) {
+            return;
+        }
+        $coalesceOp = $this->context->coalesceMergeSlotOperands[$slot];
+        if ($armOp !== $coalesceOp) {
+            $this->ensureCoalesceMergeStackSlot($coalesceOp);
+            $this->context->setVariableOp(
+                $armOp,
+                $this->context->getVariableFromOp($coalesceOp)
+            );
+        }
+        $this->context->coalesceAssignTargets[$armOp] = true;
     }
 
     private function ensureCoalesceMergeStackSlot(Operand $mergeOp): void
