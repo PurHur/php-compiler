@@ -16493,6 +16493,7 @@ class JIT {
      * onto the result (php-src xmlDocCopyNode deep=0; #33097).
      * Attributes are always copied (#33362).
      * Text imports stamp compileTimeDomTextData (#35043).
+     * Comment / CDATA / PI imports stamp leaf tag + TextData — not `#text` (#35098).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -16509,18 +16510,39 @@ class JIT {
             return;
         }
         $resultVar = $this->context->getVariableFromOp($result);
+        $materializedTag = \PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName;
+        $srcTag = $src->compileTimeDomTagName;
+        $leafTag = $materializedTag
+            ?? (
+                \in_array($srcTag, ['#text', '#comment', '#cdata-section', '#pi'], true)
+                    ? $srcTag
+                    : null
+            );
         $textData = $src->compileTimeDomTextData
             ?? (
-                '#text' === ($src->compileTimeDomTagName ?? null)
+                '#text' === ($srcTag ?? null)
                     ? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData
                     : null
             )
             ?? (
-                '#text' === (\PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName ?? null)
+                '#text' === ($materializedTag ?? null)
                     ? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData
                     : null
             );
-        if (null !== $textData) {
+        // Leaf imports: stamp CharacterData body + discriminator (not element tag).
+        if (null !== $leafTag && \in_array($leafTag, ['#text', '#comment', '#cdata-section', '#pi'], true)) {
+            if (null !== $textData) {
+                $this->bindCompileTimeDomTextData($result, $textData);
+            }
+            $resultVar->compileTimeDomTagName = '#text' === $leafTag ? null : $leafTag;
+            $resultVar->compileTimeDomInnerXml = null;
+            $resultVar->compileTimeDomLoadXml = null;
+            $resultVar->compileTimeDomAttributes = null;
+
+            return;
+        }
+        // Legacy text-only stamp when source has TextData but no leaf tag (#35043).
+        if (null !== $textData && (null === $srcTag || '' === $srcTag || '#text' === $srcTag)) {
             $this->bindCompileTimeDomTextData($result, $textData);
             $resultVar->compileTimeDomTagName = null;
             $resultVar->compileTimeDomInnerXml = null;
@@ -16529,11 +16551,13 @@ class JIT {
 
             return;
         }
-        $tag = $src->compileTimeDomTagName ?? null;
+        $tag = $srcTag;
         if (null === $tag || '' === $tag) {
-            $tag = \PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName;
+            $tag = $materializedTag;
         }
-        if (null === $tag || '' === $tag || '#text' === $tag) {
+        if (null === $tag || '' === $tag || '#text' === $tag
+            || \in_array($tag, ['#comment', '#cdata-section', '#pi'], true)
+        ) {
             return;
         }
         $deep = false;

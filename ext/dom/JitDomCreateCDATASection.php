@@ -75,6 +75,8 @@ final class JitDomCreateCDATASection
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
         self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
         self::storeStringLiteral($context, $obj, self::PROP_WHOLE_TEXT, $data);
+        // Stand-in is DOMElement class but nodeType must be CDATA (#35098).
+        JitDomCreateElement::storeNodeType($context, $obj, self::CLASS_STANDIN, DomConstants::XML_CDATA_SECTION_NODE);
 
         return $obj;
     }
@@ -95,6 +97,7 @@ final class JitDomCreateCDATASection
         self::storeStringValue($context, $obj, self::PROP_TEXT_CONTENT, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_DATA, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_WHOLE_TEXT, $dataStr);
+        JitDomCreateElement::storeNodeType($context, $obj, self::CLASS_STANDIN, DomConstants::XML_CDATA_SECTION_NODE);
 
         return $obj;
     }

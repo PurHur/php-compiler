@@ -158,9 +158,13 @@ final class JitDomImportNode
      * `$deep` mirrors php-src xmlDocCopyNode: shallow omits child markup (#33097).
      * Attribute suffix is always applied (deep does not gate attrs; #33362).
      *
-     * Text sources (`createTextNode` / loadXML `#text` siblings) must materialize via
-     * {@see JitDomCreateTextNode} — the element-only fallback otherwise returns the
-     * destination root tag (e.g. `r`) as a DOMElement (#35043 / peer cloneNode).
+     * Character-data / PI leaf sources must materialize via create* stand-ins —
+     * {@see JitDomCreateTextNode} / {@see JitDomCreateComment} /
+     * {@see JitDomCreateCDATASection} / {@see JitDomCreateProcessingInstruction}.
+     * loadXML firstChild stamps {@see JITVariable::$compileTimeDomTextData} for all
+     * CharacterData kinds; treating that as text alone materializes `#text` (#35043 /
+     * #35098 / peer cloneNode). Element-only fallback would return the destination
+     * root tag (e.g. `r`) as a DOMElement.
      */
     private static function invokeUserScriptMaterialize(
         Context $context,
@@ -168,15 +172,28 @@ final class JitDomImportNode
         JITVariable $sourceNode,
         bool $deep
     ): Value {
-        $textData = self::resolveSourceTextData($sourceNode, $documentVar);
-        if (null !== $textData) {
-            self::$lastMaterializedTagName = '#text';
+        $leaf = self::resolveSourceLeafSpec($sourceNode, $documentVar);
+        if (null !== $leaf) {
             self::$lastMaterializedInnerXml = '';
+            if ('comment' === $leaf['kind']) {
+                self::$lastMaterializedTagName = '#comment';
+                $object = JitDomCreateComment::materialize($context, $leaf['data']);
+            } elseif ('cdata' === $leaf['kind']) {
+                self::$lastMaterializedTagName = '#cdata-section';
+                $object = JitDomCreateCDATASection::materialize($context, $leaf['data']);
+            } elseif ('pi' === $leaf['kind']) {
+                self::$lastMaterializedTagName = JitDomCreateProcessingInstruction::TAG_KIND;
+                $object = JitDomCreateProcessingInstruction::materialize(
+                    $context,
+                    $leaf['data'],
+                    $leaf['content'] ?? ''
+                );
+            } else {
+                self::$lastMaterializedTagName = '#text';
+                $object = JitDomCreateTextNode::materialize($context, $leaf['data']);
+            }
 
-            return self::boxObjectResult(
-                $context,
-                JitDomCreateTextNode::materialize($context, $textData)
-            );
+            return self::boxObjectResult($context, $object);
         }
 
         $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
@@ -320,27 +337,53 @@ final class JitDomImportNode
     }
 
     /**
-     * Character data for a text-node import source (#35043).
+     * Leaf import source: text / comment / CDATA / PI (#35043 / #35098).
      *
-     * Returns null when the source is not known to be text (element / unknown).
-     * Empty string is a valid text node body (createTextNode('')).
+     * {@see JITVariable::$compileTimeDomTextData} is shared by CharacterData kinds on
+     * firstChild temps — resolve kind from tag / child index before materializing.
+     * Prefer stamps on the source Variable over cross-document child-list lookup
+     * (lastCompileTimeXml may be a different loadXML).
+     * Empty string is a valid text/comment/CDATA body.
+     *
+     * @return null|array{kind: 'text'|'comment'|'cdata'|'pi', data: string, content?: string}
      */
-    private static function resolveSourceTextData(
+    private static function resolveSourceLeafSpec(
         JITVariable $sourceNode,
         JITVariable $documentVar
-    ): ?string {
-        if (null !== $sourceNode->compileTimeDomTextData) {
-            return $sourceNode->compileTimeDomTextData;
-        }
+    ): ?array {
         $tag = $sourceNode->compileTimeDomTagName;
-        if ('#text' === $tag) {
-            return JitDomCreateTextNode::$lastMaterializedData ?? '';
+        $textData = $sourceNode->compileTimeDomTextData;
+
+        // Explicit leaf discriminators from firstChild/sibling stamps (#35098).
+        if ('#comment' === $tag) {
+            return ['kind' => 'comment', 'data' => $textData ?? ''];
         }
-        // Do not treat element tags as text.
-        if (null !== $tag && '' !== $tag && '#text' !== $tag) {
+        if ('#cdata-section' === $tag) {
+            return ['kind' => 'cdata', 'data' => $textData ?? ''];
+        }
+        if (JitDomCreateProcessingInstruction::TAG_KIND === $tag) {
+            $target = $sourceNode->compileTimeDomAttributes['target']
+                ?? JitDomNodeChildProperty::$lastFetchedPiTarget
+                ?? '';
+
+            return [
+                'kind' => 'pi',
+                'data' => $target,
+                'content' => $textData ?? '',
+            ];
+        }
+        if ('#text' === $tag) {
+            return [
+                'kind' => 'text',
+                'data' => $textData ?? JitDomCreateTextNode::$lastMaterializedData ?? '',
+            ];
+        }
+        // Element tag — not a character-data leaf.
+        if (null !== $tag && '' !== $tag) {
             return null;
         }
 
+        // Indexed child kind when ARG_SEND dropped the tag stamp.
         $index = $sourceNode->compileTimeDomChildIndex
             ?? JitDomNodeChildProperty::$lastFetchedChildIndex;
         if (null !== $index) {
@@ -348,13 +391,28 @@ final class JitDomImportNode
                 ?? $documentVar->compileTimeDomLoadXml
                 ?? null;
             $nodes = self::resolveSourceChildNodes($sourceNode, $dstXml);
-            if (isset($nodes[$index]) && 'text' === ($nodes[$index]['kind'] ?? '')) {
-                return $nodes[$index]['data'];
-            }
-            // Indexed element/comment/etc. — not text.
             if (isset($nodes[$index])) {
+                $node = $nodes[$index];
+                $kind = $node['kind'] ?? '';
+                if ('pi' === $kind) {
+                    return [
+                        'kind' => 'pi',
+                        'data' => $node['data'],
+                        'content' => $node['content'] ?? '',
+                    ];
+                }
+                if ('text' === $kind || 'comment' === $kind || 'cdata' === $kind) {
+                    return ['kind' => $kind, 'data' => $node['data']];
+                }
+
+                // Indexed element / other — not a character-data leaf.
                 return null;
             }
+        }
+
+        if (null !== $textData) {
+            // No index / tag: CharacterData stamp without kind — text (#35043 createTextNode).
+            return ['kind' => 'text', 'data' => $textData];
         }
 
         // Detached createTextNode: ARG_SEND may drop TextData but leave lastMaterializedData
@@ -363,7 +421,7 @@ final class JitDomImportNode
             && null === JitDomNodeChildProperty::$lastFetchedTagName
             && null !== JitDomCreateTextNode::$lastMaterializedData
         ) {
-            return JitDomCreateTextNode::$lastMaterializedData;
+            return ['kind' => 'text', 'data' => JitDomCreateTextNode::$lastMaterializedData];
         }
 
         return null;
