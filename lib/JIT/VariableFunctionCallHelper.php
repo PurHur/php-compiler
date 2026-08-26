@@ -44,6 +44,72 @@ final class VariableFunctionCallHelper
     }
 
     /**
+     * String literals from foreach array sources that bind {@see $nameSlot} (#35075).
+     *
+     * `foreach (['strlen','abs'] as $fn) { $fn(...); }` assigns via ITER_VALUE, so
+     * {@see hintedCalleeNames} never sees a literal ASSIGN — without these hints the
+     * dispatch table misses and {@see VariableFunctionCallRuntime} aborts (rc=134).
+     *
+     * @return list<string>
+     */
+    public static function foreachArrayLiteralCalleeHints(Block $block, ?int $nameSlot): array
+    {
+        if (null === $nameSlot) {
+            return [];
+        }
+
+        $arraySlots = [];
+        foreach (self::blocksForHintScan($block) as $scanBlock) {
+            $iterValueToArray = [];
+            foreach ($scanBlock->opCodes as $op) {
+                if (
+                    OpCode::TYPE_ITER_VALUE === $op->type
+                    && null !== $op->arg1
+                    && null !== $op->arg2
+                ) {
+                    $iterValueToArray[$op->arg1] = $op->arg2;
+                }
+            }
+            foreach ($scanBlock->opCodes as $op) {
+                if (
+                    OpCode::TYPE_ASSIGN !== $op->type
+                    || $op->arg2 !== $nameSlot
+                    || null === $op->arg3
+                ) {
+                    continue;
+                }
+                if (isset($iterValueToArray[$op->arg3])) {
+                    $arraySlots[] = $iterValueToArray[$op->arg3];
+                }
+            }
+        }
+        if ([] === $arraySlots) {
+            return [];
+        }
+
+        $arraySlotSet = array_fill_keys($arraySlots, true);
+        $hints = [];
+        foreach (self::blocksForHintScan($block) as $scanBlock) {
+            foreach ($scanBlock->opCodes as $op) {
+                if (
+                    (OpCode::TYPE_INIT_ARRAY !== $op->type && OpCode::TYPE_ADD_ARRAY_ELEMENT !== $op->type)
+                    || null === $op->arg1
+                    || null === $op->arg2
+                    || !isset($arraySlotSet[$op->arg1])
+                ) {
+                    continue;
+                }
+                $literal = self::literalFromAssignSource($scanBlock, $op->arg2);
+                if (null !== $literal) {
+                    $hints[] = $literal;
+                }
+            }
+        }
+
+        return array_values(array_unique($hints));
+    }
+
+    /**
      * User FUNCDEF names in the current TU (not every registered stdlib native).
      *
      * @return list<string>
@@ -211,6 +277,11 @@ final class VariableFunctionCallHelper
      */
     public static function dispatch(Context $context, Variable $nameVar, array $hintedNames = [], Variable ...$args): Value
     {
+        // Multi-hint foreach $fn must read the runtime name — a stale compileTimeString
+        // from fold would make every iteration call the first literal (#35075).
+        if (\count($hintedNames) > 1) {
+            $nameVar->compileTimeString = null;
+        }
         $nameStr = JitStringArg::lower($context, $nameVar, 'variable function name');
         self::emitForbiddenWhenDynamicGuards($context, $nameStr);
         $candidates = self::dispatchCandidates($context, $hintedNames);

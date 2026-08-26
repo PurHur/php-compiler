@@ -12,14 +12,16 @@ namespace PHPCompiler\VM;
 final class VariableFunctionCallJitHelper
 {
     /**
-     * @param string $candidateTable NUL-delimited lowercase callee names (compile-time hints)
+     * @param string $candidateTable newline-delimited lowercase callee names (compile-time hints).
+     *        NUL was unsafe: constantStringFromString truncates at \0 (#35075).
+     *        Keep explode("\n") — NestedJIT has no preg_split.
      *
      * @return int candidate index, or -1 when none match (LLVM i32 ABI)
      */
     public static function matchCandidateIndex(string $name, string $candidateTable): int
     {
         $names = \array_values(\array_filter(
-            \explode("\0", $candidateTable),
+            \explode("\n", $candidateTable),
             static fn (string $part): bool => '' !== $part
         ));
 
