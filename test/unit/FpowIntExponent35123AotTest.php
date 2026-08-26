@@ -37,7 +37,11 @@ final class FpowIntExponent35123AotTest extends TestCase
         $powInt = (string) file_get_contents(__DIR__.'/../../ext/standard/PowIntJitHelper.php');
         $this->assertStringContainsString('#35123', $powInt);
         $this->assertStringContainsString('floatPowPositive', $powInt);
-        $this->assertStringNotContainsString('$e = $neg ? -$exp : $exp', $powInt);
+        // Executable peel must not remain — comments mentioning the anti-pattern are OK.
+        $this->assertDoesNotMatchRegularExpression(
+            '/^\s*\$e\s*=\s*\$neg\s*\?\s*-\$exp\s*:\s*\$exp\s*;/m',
+            $powInt
+        );
     }
 
     public function testVmFpowIntExponent(): void
