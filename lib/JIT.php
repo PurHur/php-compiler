@@ -1092,6 +1092,18 @@ class JIT {
         if (null === $resultSlot) {
             return null;
         }
+        $mergeIsArgSendPhi = false;
+        foreach ($mergeBlock->opCodes as $mergeOp) {
+            if (
+                OpCode::TYPE_ARG_SEND === $mergeOp->type
+                && null !== $mergeOp->arg1
+                && (int) $mergeOp->arg1 === $resultSlot
+            ) {
+                $mergeIsArgSendPhi = true;
+                break;
+            }
+        }
+        $mergePhi = $mergeIsArgSendPhi ? $mergeBlock->getOperand($resultSlot) : null;
         foreach ([$ifBlock, $elseBlock] as $branch) {
             if (null === $branch) {
                 continue;
@@ -1102,6 +1114,14 @@ class JIT {
                 }
                 if ((int) $branchOp->arg2 !== $resultSlot) {
                     continue;
+                }
+
+                $armOp = $branch->getOperand($branchOp->arg2);
+                // FUNCCALL ARG_SEND merges: arm INIT_ARRAY may mint a distinct Temporary at the
+                // phi slot — coalesce must target the merge ARG_SEND operand (#34956).
+                // ECHO merges keep the arm operand (#34814 / #32912).
+                if (null !== $mergePhi && null !== $armOp && $armOp !== $mergePhi) {
+                    return $mergePhi;
                 }
 
                 // Prefer the shared phi lvalue (arg2) over the per-arm Assign result temp
@@ -9918,6 +9938,20 @@ class JIT {
                     $initTempOp = $resultOp;
                     $nextOp = $block->opCodes[$i + 1] ?? null;
                     if (
+                        null !== $op->arg1
+                        && isset($this->context->coalesceMergeSlotOperands[(int) $op->arg1])
+                    ) {
+                        // True-arm INIT_ARRAY directly at the FUNCCALL ARG_SEND phi slot (#34956 / #34944).
+                        $phiOp = $this->context->coalesceMergeSlotOperands[(int) $op->arg1];
+                        if (!$this->context->hasVariableOp($phiOp)) {
+                            $this->ensureCoalesceMergeStackSlot($phiOp);
+                        }
+                        $this->context->setVariableOp(
+                            $resultOp,
+                            $this->context->getVariableFromOp($phiOp)
+                        );
+                        $resultOp = $phiOp;
+                    } elseif (
                         null !== $nextOp
                         && OpCode::TYPE_ASSIGN === $nextOp->type
                         && null !== $nextOp->arg2
@@ -9926,7 +9960,6 @@ class JIT {
                         && (int) $nextOp->arg3 === (int) $op->arg1
                     ) {
                         // Else-arm `['x']`: INIT_ARRAY(temp) then ASSIGN(result, phiAlias, temp).
-                        // Build into phiAlias so ARG_SEND reads the arm value (#34956).
                         $phiSlot = (int) $nextOp->arg2;
                         $phiOp = $this->context->coalesceMergeSlotOperands[$phiSlot]
                             ?? $block->getOperand($nextOp->arg2);
