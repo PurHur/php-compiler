@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * NestedJIT helpers for mb_strwidth() / mb_strimwidth() / mb_str_pad() (#3495 / #34264 / #34269 / #34270 / #34884).
+ * NestedJIT helpers for mb_strwidth() / mb_strimwidth() / mb_str_pad() (#3495 / #34264 / #34269 / #34270 / #34884 / #35187).
  *
  * NestedJIT zeros int locals copied from params (width-minus-marker temporary) and
  * charLen-minus-from. Compare `$charIndex == $from` /
@@ -259,16 +259,16 @@ final class MbStrwidthJitHelper
         string $encoding
     ): string {
         // NestedJIT-safe peel — VmMbstring::strPad / strlen misbehave under thin AOT (#34270).
-        // Character-oriented for UTF-8/ASCII/8BIT (same as strimwidth peel).
-        unset($encoding);
-        $inputLength = self::utf8CharLength($input);
+        // UTF-8: character units; ASCII/8BIT/BINARY: byte units (php-src mb_str_pad; #35187).
+        $byteMode = self::isByteOrientedEncoding($encoding);
+        $inputLength = $byteMode ? self::byteLength($input) : self::utf8CharLength($input);
         if ($padLength < 0 || $padLength <= $inputLength) {
             return $input;
         }
         if ('' === $padString) {
             return $input;
         }
-        $padUnitLength = self::utf8CharLength($padString);
+        $padUnitLength = $byteMode ? self::byteLength($padString) : self::utf8CharLength($padString);
         if (0 === $padUnitLength) {
             return $input;
         }
@@ -287,18 +287,41 @@ final class MbStrwidthJitHelper
             $rightPad = $numPadUnits - $leftPad;
         }
 
-        return self::repeatUtf8Pad($padString, $padUnitLength, $leftPad)
+        return self::repeatPad($padString, $padUnitLength, $leftPad, $byteMode)
             .$input
-            .self::repeatUtf8Pad($padString, $padUnitLength, $rightPad);
+            .self::repeatPad($padString, $padUnitLength, $rightPad, $byteMode);
     }
 
-    private static function repeatUtf8Pad(string $padString, int $padCharLength, int $charLength): string
+    /** ASCII / 8BIT / BINARY pad by byte; UTF-8 by codepoint (#35187). */
+    private static function isByteOrientedEncoding(string $encoding): bool
     {
-        if ($charLength <= 0) {
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            return true;
+        }
+        if (
+            '8BIT' === $encoding || '8bit' === $encoding
+            || 'BINARY' === $encoding || 'binary' === $encoding
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function repeatPad(
+        string $padString,
+        int $padUnitLength,
+        int $unitLength,
+        bool $byteMode
+    ): string {
+        if ($unitLength <= 0) {
             return '';
         }
-        $fullCopies = \intdiv($charLength, $padCharLength);
-        $remainder = $charLength % $padCharLength;
+        $fullCopies = \intdiv($unitLength, $padUnitLength);
+        $remainder = $unitLength % $padUnitLength;
         $result = '';
         $i = 0;
         while ($i < $fullCopies) {
@@ -306,7 +329,11 @@ final class MbStrwidthJitHelper
             ++$i;
         }
         if ($remainder > 0) {
-            $result .= self::utf8Substr($padString, 0, $remainder);
+            if ($byteMode) {
+                $result .= \substr($padString, 0, $remainder);
+            } else {
+                $result .= self::utf8Substr($padString, 0, $remainder);
+            }
         }
 
         return $result;
