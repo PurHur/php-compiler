@@ -7,17 +7,17 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: loadXML then document baseURI must match Zend (#34904 leftover of #34894).
+ * AOT: DOMDocument::$documentURI write+read match Zend (#34925 leftover of #34919).
  *
  * @group llvm
  * @group aot
  */
-final class Issue34904DomLoadXmlBaseUriAotTest extends TestCase
+final class Issue34925DomDocumentUriWriteAotTest extends TestCase
 {
-    public function testLoadXmlBaseUriMatchZend(): void
+    public function testDocumentUriWriteReadMatchZend(): void
     {
         $root = dirname(__DIR__, 2);
-        $src = $root.'/test/repro/issue_34904_dom_loadxml_baseuri_aot.php';
+        $src = $root.'/test/repro/issue_34925_dom_documenturi_write_aot.php';
         $this->assertFileExists($src);
         if (!LlvmToolchain::isReady($root)) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
@@ -28,7 +28,7 @@ final class Issue34904DomLoadXmlBaseUriAotTest extends TestCase
         exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($src).' 2>&1', $expected, $zendRc);
         $this->assertSame(0, $zendRc);
 
-        $bin = sys_get_temp_dir().'/phpc_34904_'.getmypid().'.bin';
+        $bin = sys_get_temp_dir().'/phpc_34925_'.getmypid().'.bin';
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $root);
         $cmd = [PHP_BINARY, $root.'/bin/compile.php', '-o', $bin, $src];
@@ -50,17 +50,19 @@ final class Issue34904DomLoadXmlBaseUriAotTest extends TestCase
         $this->assertSame(implode("\n", $expected), implode("\n", $out));
     }
 
-    public function testBaseUriPinnedAndFetched(): void
+    public function testDocumentUriSeededNotMetaHardcoded(): void
     {
-        $obj = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
+        $construct = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/DomDocumentConstruct.php');
         $meta = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomDocumentMetaProps.php');
+        $object = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
         $load = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomLoadXMLUserScript.php');
-        $this->assertStringContainsString('PROP_BASE_URI', $obj);
-        $this->assertStringContainsString('#34904', $obj);
-        // baseURI is a read-only MetaProps alias of documentURI; cwd stamped on loadXML (#34925).
-        $this->assertStringContainsString("'baseuri'", $meta);
-        $this->assertStringContainsString('PROP_DOCUMENT_URI', $meta);
+        $this->assertStringContainsString('seedDocumentUriNull', $construct);
+        $this->assertStringContainsString('#34925', $construct);
+        $this->assertStringContainsString('PROP_DOCUMENT_URI', $object);
+        $this->assertStringContainsString('markPropertyWriteReject', $object);
         $this->assertStringContainsString('storeDocumentUriCwd', $load);
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/dom_baseuri.c');
+        $this->assertStringNotContainsString("'documenturi' === \$propLc", $meta);
+        $this->assertStringContainsString('PROP_DOCUMENT_URI', $meta);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/dom_documenturi.c');
     }
 }

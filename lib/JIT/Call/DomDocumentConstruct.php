@@ -70,6 +70,8 @@ final class DomDocumentConstruct implements Call
         self::seedXmlVersion($context, $obj, '1.0');
         // encoding null — writable slot; xmlEncoding/actualEncoding alias via MetaProps (#34919).
         self::seedEncodingNull($context, $obj);
+        // documentURI null — writable; baseURI read-only alias via MetaProps (#34925).
+        self::seedDocumentUriNull($context, $obj);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
@@ -128,6 +130,32 @@ final class DomDocumentConstruct implements Call
         );
         $objectType->propertyStore(
             $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_ENCODING),
+            $propVar,
+            Variable::TYPE_VALUE
+        );
+    }
+
+    /** php-src DOMDocument::$documentURI default null (ext/dom/document.c; #34925). */
+    private static function seedDocumentUriNull(Context $context, Value $obj): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_DOCUMENT_URI)) {
+            $objectType->defineProperty($classId, VmDom::PROP_DOCUMENT_URI, Variable::TYPE_VALUE);
+        }
+        $box = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $box)
+        );
+        $propVar = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $box
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', VmDom::PROP_DOCUMENT_URI),
             $propVar,
             Variable::TYPE_VALUE
         );

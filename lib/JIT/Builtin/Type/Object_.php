@@ -4130,6 +4130,7 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_DOCTYPE, Variable::TYPE_VALUE);
             // Computed document props — late defineProperty after loadXML SIGSEGVs (#34894 / #34887).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_IMPLEMENTATION, Variable::TYPE_VALUE);
+            // documentURI writable; baseURI read-only alias (#34925 leftover of #34919 / #34904).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_DOCUMENT_URI, Variable::TYPE_VALUE);
             // encoding writable; xmlEncoding/actualEncoding read-only aliases (#34919 leftover of #34916).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ENCODING, Variable::TYPE_VALUE);
@@ -4152,6 +4153,7 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_SUBSTITUTE_ENTITIES, Variable::TYPE_VALUE);
             // DOMNode::$baseURI — late defineProperty after loadXML SIGSEGVs (#34904 leftover of #34894).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI, Variable::TYPE_VALUE);
+            $this->markPropertyWriteReject($id, \PHPCompiler\ext\dom\VmDom::PROP_BASE_URI);
             // ParentNode element-nav — JitDomElementNavigationProperty used DOMElement slots on
             // Document and SIGSEGVd (#34910 leftover of #34899 / #34352).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_FIRST_ELEMENT_CHILD, Variable::TYPE_VALUE);
