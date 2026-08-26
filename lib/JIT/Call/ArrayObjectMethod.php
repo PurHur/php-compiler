@@ -208,6 +208,28 @@ final class ArrayObjectMethod implements Call
                     'ArrayObject::setFlags'
                 )
             ),
+            // php-src zim_ArrayObject_serialize/unserialize — thin AOT silent-null (#579 / #35111)
+            'serialize' => $this->compileExact(
+                $context,
+                $args,
+                'ArrayObject::serialize',
+                0,
+                static fn () => ArrayObjectJitHelper::compileLegacySerialize(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::serialize() called without $this')
+                )
+            ),
+            'unserialize' => $this->compileExact(
+                $context,
+                $args,
+                'ArrayObject::unserialize',
+                1,
+                static fn () => ArrayObjectJitHelper::compileLegacyUnserialize(
+                    $context,
+                    $args[0] ?? throw new \LogicException('ArrayObject::unserialize() called without $this'),
+                    $args[1]
+                )
+            ),
             default => throw new \LogicException(
                 'ArrayObject JIT lowering is not implemented for '.$this->method.'()'
             ),

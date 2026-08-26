@@ -232,6 +232,29 @@ final class SplDllistMethod implements Call
                     $this->className
                 )
             ),
+            // php-src zim_SplDoublyLinkedList_serialize/unserialize — silent-null (#579 / #35111)
+            'serialize' => $this->callExactArg(
+                $context,
+                $args,
+                $this->className.'::serialize',
+                0,
+                static fn (Context $ctx, Variable $self): Value => SplDllistJitHelper::compileLegacySerialize(
+                    $ctx,
+                    $self
+                )
+            ),
+            'unserialize' => $this->callExactArg(
+                $context,
+                $args,
+                $this->className.'::unserialize',
+                1,
+                fn (Context $ctx, Variable $self, Variable $data): Value => SplDllistJitHelper::compileLegacyUnserialize(
+                    $ctx,
+                    $self,
+                    $data,
+                    $this->className
+                )
+            ),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),
