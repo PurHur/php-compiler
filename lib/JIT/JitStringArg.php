@@ -265,7 +265,9 @@ final class JitStringArg
         $doneBlock = $fn->appendBasicBlock('prop_name_leading_null_done');
         $context->builder->branchIf($hasLen, $checkFirst, $okBlock);
         $context->builder->positionAtEnd($checkFirst);
-        $valuePtr = $context->builder->load($context->builder->structGep($strPtr, $map['value']));
+        // __string__.value is an inline int8 / flex-array head — GEP is already i8*.
+        // load()+pointerCast used to emit `addrspacecast i8 to i8*` and fail verify (#35005).
+        $valuePtr = $context->builder->structGep($strPtr, $map['value']);
         $valuePtr = $context->builder->pointerCast($valuePtr, $i8p);
         $firstByte = $context->builder->load($valuePtr);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $firstByte, $i8->constInt(0, false));
@@ -328,6 +330,12 @@ final class JitStringArg
 
     private static function compileTimeObjectGivenLabel(Context $context, Variable $arg): string
     {
+        // Only TYPE_OBJECT slots hold __object__* / class_id. Boxed TYPE_VALUE args are
+        // __value__* — structGep(class_id) aborts compile (#35005 / foreach $obj->$p;
+        // peer JitSleep #33422).
+        if (Variable::TYPE_OBJECT !== $arg->type) {
+            return 'object';
+        }
         if (Variable::KIND_VALUE !== $arg->kind) {
             return 'object';
         }
