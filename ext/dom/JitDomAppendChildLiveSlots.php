@@ -982,8 +982,9 @@ final class JitDomAppendChildLiveSlots
      *
      * Only element children (nodeType XML_ELEMENT_NODE) update first/lastElementChild,
      * childElementCount, and next/previousElementSibling. php-src parentnode.c.
+     * Also used by ChildNode::after() fresh append-tail (#35012).
      */
-    private static function syncParentNodeNavOnAppend(
+    public static function syncParentNodeNavOnAppend(
         Context $context,
         Value $parent,
         Value $child

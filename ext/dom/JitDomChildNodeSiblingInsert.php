@@ -17,6 +17,7 @@ use PHPLLVM\Value;
  * php-src: ext/dom/parentnode.c dom_parent_node_after/before (viable_next skip #34791);
  * libxml xmlAddPrevSibling / xmlAddNextSibling for the insert path.
  * Same-parent append-tail moves use AppendChildLiveSlots (#34804).
+ * Fresh append-tail syncs ParentNode element-nav (#35012 / peer appendChild #35007).
  */
 final class JitDomChildNodeSiblingInsert
 {
@@ -141,6 +142,9 @@ final class JitDomChildNodeSiblingInsert
         JitDomParentChildLinkLayout::storeParentNode($context, $newChild, $parentJit);
 
         JitDomInsertBefore::bumpChildNodesLengthPublic($context, $parent, $anchor, $newChild);
+        // ParentNode element-nav (childElementCount / lastElementChild / element siblings).
+        // appendChild already syncs via syncNonFragment; fresh after-tail skipped it (#35012).
+        JitDomAppendChildLiveSlots::syncParentNodeNavOnAppend($context, $parent, $newChild);
         $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parent, 'dom_cn_after_parent');
         $bbSkipRebuild = BasicBlockHelper::append($context, 'dom_cn_after_skip_rebuild');
         $bbRebuild = BasicBlockHelper::append($context, 'dom_cn_after_rebuild');
