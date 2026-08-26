@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-08-26T11:34:13+00:00",
+  "generated_at": "2026-08-26T14:02:05+00:00",
   "arch": "x86_64-linux",
   "role": "committed per-arch split-compilation helper units (#15889) — consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
   "core_fingerprint": "b54201faefd06aaf26a5",
@@ -8,7 +8,7 @@
   "unit_count": 414,
   "published_fresh": 414,
   "kept_live_unpublished": 0,
-  "total_bytes": 1156036956,
-  "refresh": "php script/emit-helper-runtime-object.php --unit=/VM/VariableFunctionCallJitHelper.php (pinned env) — Trust refresh #32122 after #35084",
-  "updated_at": "2026-08-26T11:34:13+00:00"
+  "total_bytes": 1152529580,
+  "refresh": "php script/emit-helper-runtime-object.php --unit=/ext/standard/FpowJitHelper.php + PowIntJitHelper.php (pinned env) — Trust refresh #32122 after #35126",
+  "updated_at": "2026-08-26T14:02:05+00:00"
 }
