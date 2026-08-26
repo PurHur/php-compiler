@@ -4134,6 +4134,14 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_ENCODING, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_VERSION, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_STANDALONE, Variable::TYPE_NATIVE_LONG);
+            // libxml option props — same late-define SIGSEGV class (#34899 leftover of #34894).
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_STRICT_ERROR_CHECKING, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_FORMAT_OUTPUT, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_VALIDATE_ON_PARSE, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_RESOLVE_EXTERNALS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_PRESERVE_WHITE_SPACE, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_RECOVER, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_SUBSTITUTE_ENTITIES, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
         }
         if ('domattr' === $lcname) {

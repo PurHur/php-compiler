@@ -10,7 +10,8 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument computed meta properties (#34894 leftover of #34887).
+ * LLVM lowering for DOMDocument computed meta / option properties
+ * (#34894 leftover of #34887; #34899 option props).
  *
  * Thin AOT has no DomRegistry — undeclared PropertyFetch after loadXML late-defines an
  * uninitialized slot (SIGSEGV). Props are pinned in {@see Object_::allocate} layout;
@@ -40,7 +41,15 @@ final class JitDomDocumentMetaProps
             || 'version' === $propLc
             || 'xmlstandalone' === $propLc
             || 'standalone' === $propLc
-            || 'config' === $propLc;
+            || 'config' === $propLc
+            // libxml option props — defaults from php-src document construct (#34899).
+            || 'stricterrorchecking' === $propLc
+            || 'formatoutput' === $propLc
+            || 'validateonparse' === $propLc
+            || 'resolveexternals' === $propLc
+            || 'preservewhitespace' === $propLc
+            || 'recover' === $propLc
+            || 'substituteentities' === $propLc;
     }
 
     public static function fetch(Object_ $objectType, Value $obj, string $className, string $propName): JITVariable
@@ -58,6 +67,18 @@ final class JitDomDocumentMetaProps
             return self::boxString($context, '1.0');
         }
         if ('xmlstandalone' === $propLc || 'standalone' === $propLc) {
+            return self::boxBool($context, false);
+        }
+        // php-src DOMDocument::__construct defaults (ext/dom/php_dom.c / document.c).
+        if ('stricterrorchecking' === $propLc || 'preservewhitespace' === $propLc) {
+            return self::boxBool($context, true);
+        }
+        if ('formatoutput' === $propLc
+            || 'validateonparse' === $propLc
+            || 'resolveexternals' === $propLc
+            || 'recover' === $propLc
+            || 'substituteentities' === $propLc
+        ) {
             return self::boxBool($context, false);
         }
         if ('xmlencoding' === $propLc || 'actualencoding' === $propLc || 'encoding' === $propLc) {
