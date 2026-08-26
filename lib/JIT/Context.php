@@ -1643,7 +1643,7 @@ class Context {
         $this->type->object->lookup('RecursiveDirectoryIterator');
         foreach (['DirectoryIterator', 'FilesystemIterator', 'RecursiveDirectoryIterator'] as $diClass) {
             $diLc = strtolower($diClass);
-            foreach ([
+            $diMethods = [
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next',
                 'isDot', 'getFilename', 'getSize', 'getRealPath',
                 'getMTime', 'getATime', 'getCTime', 'getPerms', 'getOwner', 'getGroup', 'getInode',
@@ -1651,7 +1651,13 @@ class Context {
                 'isLink', 'getLinkTarget', 'isReadable', 'isWritable', 'isExecutable',
                 'getPathname', 'getPath', 'getExtension', 'getBasename', 'getType', '__toString',
                 'getFileInfo', 'getPathInfo', 'openFile',
-            ] as $diMethod) {
+            ];
+            // FilesystemIterator / RDI — getFlags/setFlags (#34984 leftover of #30937).
+            if ('DirectoryIterator' !== $diClass) {
+                $diMethods[] = 'getFlags';
+                $diMethods[] = 'setFlags';
+            }
+            foreach ($diMethods as $diMethod) {
                 $this->functionProxies[$diLc.'::'.strtolower($diMethod)] = new Call\DirectoryIteratorMethod(
                     $diMethod,
                     $diClass

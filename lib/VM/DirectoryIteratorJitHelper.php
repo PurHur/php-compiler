@@ -67,9 +67,11 @@ final class DirectoryIteratorJitHelper
         $pathStr = self::loadString($context, $pathArg);
         $i64 = $context->getTypeFromString('int64');
         // php-src Z_PARAM_LONG $flags — soft-null DEP+0 outside strict_types (#31721).
+        // FilesystemIterator omitted flags → SKIP_DOTS (4096); RecursiveDirectoryIterator → 0 (#20145 / #34984).
+        $defaultFlags = 'FilesystemIterator' === $className ? 4096 : 0;
         $flags = null !== $flagsArg
             ? JitStrictIntArg::lower($context, $flagsArg, $className.'::__construct', 2, 'flags')
-            : $i64->constInt(0, false);
+            : $i64->constInt($defaultFlags, false);
 
         $ht = $context->builder->call(
             $context->lookupFunction(\PHPCompiler\JIT\Builtin\DirectoryIteratorSnapshotRuntime::ABI),
@@ -1188,6 +1190,50 @@ final class DirectoryIteratorJitHelper
             $context->lookupFunction('__value__readString'),
             JitValueBox::valuePtrFromVariable($context, $slot)
         );
+    }
+
+    /**
+     * FilesystemIterator::getFlags — read `__flags` (#34984).
+     * php-src: zim_FilesystemIterator_getFlags — ZEND_PARSE_PARAMETERS_NONE
+     */
+    public static function compileGetFlags(
+        Context $context,
+        JITVariable $receiver,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $flags = self::loadLongProperty($context, $obj, $className, self::PROP_FLAGS);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            JitValueBox::pointer($context, $slot),
+            $flags
+        );
+
+        return $slot;
+    }
+
+    /**
+     * FilesystemIterator::setFlags — store `__flags` (#34984).
+     * php-src: zim_FilesystemIterator_setFlags — Z_PARAM_LONG soft-null (#31722).
+     */
+    public static function compileSetFlags(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $flagsArg,
+        string $className
+    ): Value {
+        $obj = self::loadObject($context, $receiver);
+        $flags = JitStrictIntArg::lower(
+            $context,
+            $flagsArg,
+            $className.'::setFlags',
+            1,
+            'flags'
+        );
+        self::storeLongPropertyValue($context, $obj, $className, self::PROP_FLAGS, $flags);
+
+        return self::voidResult($context);
     }
 
     private static function loadLongProperty(Context $context, Value $obj, string $class, string $prop): Value

@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\DirectoryIteratorJitHelper;
 use PHPLLVM\Value;
 
 /**
  * DirectoryIterator / FilesystemIterator / RecursiveDirectoryIterator / SplFileInfo / SplFileObject
- * thin-AOT methods (#27289 … #33313, #34624).
+ * thin-AOT methods (#27289 … #33313, #34624, #34984).
  *
  * php-src: ext/spl/spl_directory.c — zim_SplFileInfo___construct / getFileInfo / getPathInfo / openFile / …
  */
@@ -89,6 +92,27 @@ final class DirectoryIteratorMethod implements Call
             'getfileinfo' => DirectoryIteratorJitHelper::compileGetFileInfo($context, $args[0], $this->className),
             'getpathinfo' => DirectoryIteratorJitHelper::compileGetPathInfo($context, $args[0], $this->className),
             'openfile' => DirectoryIteratorJitHelper::compileOpenFile($context, $args[0], $this->className),
+            // php-src zim_FilesystemIterator_getFlags — ZEND_PARSE_PARAMETERS_NONE (#30937 / #34984).
+            'getflags' => $this->compileExact(
+                $context,
+                $args,
+                $this->className.'::getFlags',
+                0,
+                fn () => DirectoryIteratorJitHelper::compileGetFlags($context, $args[0], $this->className)
+            ),
+            // php-src zim_FilesystemIterator_setFlags — exactly 1 user arg (#31009).
+            'setflags' => $this->compileExact(
+                $context,
+                $args,
+                $this->className.'::setFlags',
+                1,
+                fn () => DirectoryIteratorJitHelper::compileSetFlags(
+                    $context,
+                    $args[0],
+                    $args[1],
+                    $this->className
+                )
+            ),
             // DirectoryIterator::__toString → filename; SplFileInfo/SplFileObject → pathname (php-src).
             '__tostring' => \in_array($this->className, ['SplFileInfo', 'SplFileObject'], true)
                 ? DirectoryIteratorJitHelper::compileGetPathname($context, $args[0], $this->className)
@@ -97,5 +121,32 @@ final class DirectoryIteratorMethod implements Call
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),
         };
+    }
+
+    /**
+     * @param callable(): Value $compile
+     */
+    private function compileExact(
+        Context $context,
+        array $args,
+        string $function,
+        int $expected,
+        callable $compile
+    ): Value {
+        $given = max(0, \count($args) - 1);
+        if ($given !== $expected) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                VmClassMethod::exactUserArgCountMessage($function, $expected, $given)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock(
+                $context,
+                'di_'.strtolower($this->method).'_argc_cont'
+            );
+
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+
+        return $compile();
     }
 }
