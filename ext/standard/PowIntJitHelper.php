@@ -154,35 +154,41 @@ final class PowIntJitHelper
             return $inf;
         }
 
-        $neg = $exp < 0;
-        if ($neg) {
+        // NestedJIT: do not `$e = $neg ? -$exp : $exp` / `if ($neg) $e = -$exp` before the
+        // squaring loop — false-path write to `$e` is dropped (#35123 / re-#35058 Fpow peel).
+        if ($exp < 0) {
             if ($exp === \PHP_INT_MIN) {
                 // |exp| = 2^63 — successive-square the float base 63 times, then invert.
                 $b = (float) $base;
                 for ($i = 0; $i < 63; ++$i) {
-                    $b *= $b;
+                    $b = $b * $b;
                 }
 
                 return 1.0 / $b;
             }
+
+            return 1.0 / self::floatPowPositive($base, -$exp);
         }
 
-        $e = $neg ? -$exp : $exp;
+        return self::floatPowPositive($base, $exp);
+    }
+
+    /** Positive-exponent float successive squaring (NestedJIT-safe). */
+    private static function floatPowPositive(int $base, int $exp): float
+    {
         $result = 1.0;
         $b = (float) $base;
+        $e = $exp;
         for ($i = 0; $i < 64; ++$i) {
             if ($e <= 0) {
                 break;
             }
             $half = \intdiv($e, 2);
             if ($e !== $half + $half) {
-                $result *= $b;
+                $result = $result * $b;
             }
-            $b *= $b;
+            $b = $b * $b;
             $e = $half;
-        }
-        if ($neg) {
-            return 1.0 / $result;
         }
 
         return $result;
