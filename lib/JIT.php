@@ -20104,6 +20104,32 @@ class JIT {
         )) {
             return;
         }
+        // __set / ARRAY_AS_PROPS lvalues are KIND_VALUE Temporary placeholders — must dispatch
+        // before temp→stack promotion, which allocates a fresh Variable and drops the markers
+        // (AOT silent no-op; Zend/zend_object_handlers.c zend_std_write_property).
+        if (null !== $result->magicSetReceiver && null !== $result->magicSetName) {
+            $receiverVar = new Variable(
+                $this->context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $result->magicSetReceiver
+            );
+            $receiverVar->objectPropertyClassName = $result->objectPropertyClassName;
+            if (JIT\MagicMethodDispatch::tryEmitMagicSet(
+                $this->context,
+                $receiverVar,
+                $result->magicSetName,
+                $value,
+                $this->context->jitEnclosingBlock
+            )) {
+                return;
+            }
+        }
+        if (null !== $result->arrayAsPropsReceiver && null !== $result->arrayAsPropsName) {
+            \PHPCompiler\VM\ArrayObjectJitHelper::compilePropertyAssign($this->context, $result, $value);
+
+            return;
+        }
         if (
             $force
             && Variable::KIND_VALUE === $result->kind
@@ -20115,6 +20141,8 @@ class JIT {
             && null === $result->objectPropertySlot
             && null === $result->staticPropertyGlobal
             && !$result->functionStaticGlobal
+            && null === $result->magicSetReceiver
+            && null === $result->arrayAsPropsReceiver
         ) {
             // ?? left branch fetch binds a superglobal lvalue; force-assign needs a stack slot (#866).
             // Property lvalues keep objectPropertySlot so ReadonlyClassGuard runs on inc/dec (#3149).
@@ -20136,6 +20164,8 @@ class JIT {
             && Variable::KIND_VALUE === $result->kind
             && null === $result->objectPropertySlot
             && null === $result->staticPropertyGlobal
+            && null === $result->magicSetReceiver
+            && null === $result->arrayAsPropsReceiver
             && (
                 Variable::TYPE_STRING !== $result->type
                 || !JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
@@ -20154,28 +20184,6 @@ class JIT {
                 )
             );
             $result = $this->context->getVariableFromOp($resultOp);
-        }
-        if (null !== $result->magicSetReceiver && null !== $result->magicSetName) {
-            $receiverVar = new Variable(
-                $this->context,
-                Variable::TYPE_OBJECT,
-                Variable::KIND_VALUE,
-                $result->magicSetReceiver
-            );
-            if (JIT\MagicMethodDispatch::tryEmitMagicSet(
-                $this->context,
-                $receiverVar,
-                $result->magicSetName,
-                $value,
-                $this->context->jitEnclosingBlock
-            )) {
-                return;
-            }
-        }
-        if (null !== $result->arrayAsPropsReceiver && null !== $result->arrayAsPropsName) {
-            \PHPCompiler\VM\ArrayObjectJitHelper::compilePropertyAssign($this->context, $result, $value);
-
-            return;
         }
         if (
             null !== $result->objectPropertySlot
