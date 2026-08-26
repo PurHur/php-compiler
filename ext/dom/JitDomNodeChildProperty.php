@@ -29,6 +29,9 @@ final class JitDomNodeChildProperty
     /** @var array<string, string>|null Open-tag attrs for {@see $lastFetchedChildIndex} (#34050). */
     public static ?array $lastFetchedAttributes = null;
 
+    /** PI target when {@see $lastFetchedChildIndex} is a processing-instruction (#35098). */
+    public static ?string $lastFetchedPiTarget = null;
+
     public static function isDomNodeChildProperty(string $classLc, string $propLc): bool
     {
         if (!\in_array(
@@ -317,8 +320,24 @@ final class JitDomNodeChildProperty
                 : $nodes[$index]['data'];
             $result->compileTimeDomTextData = $data;
             JitDomSubstringData::remember($data);
+            // Stamp leaf nodeName discriminators so importNode / cloneNode do not
+            // treat comment/CDATA/PI TextData as `#text` (#35098 / peer #35043).
             if ('text' === $kind) {
+                $result->compileTimeDomTagName = '#text';
                 JitDomCreateTextNode::$lastMaterializedData = $data;
+                self::$lastFetchedPiTarget = null;
+            } elseif ('comment' === $kind) {
+                $result->compileTimeDomTagName = '#comment';
+                self::$lastFetchedPiTarget = null;
+            } elseif ('cdata' === $kind) {
+                $result->compileTimeDomTagName = '#cdata-section';
+                self::$lastFetchedPiTarget = null;
+            } else {
+                $result->compileTimeDomTagName = JitDomCreateProcessingInstruction::TAG_KIND;
+                $piTarget = $nodes[$index]['data'];
+                self::$lastFetchedPiTarget = $piTarget;
+                // PI target on the Variable (global lastFetched* is overwritten by later walks).
+                $result->compileTimeDomAttributes = ['target' => $piTarget];
             }
             self::$lastFetchedTagName = null;
             self::$lastFetchedAttributes = null;

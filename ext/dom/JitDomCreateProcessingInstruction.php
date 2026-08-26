@@ -97,6 +97,13 @@ final class JitDomCreateProcessingInstruction
         self::storeStringLiteral($context, $obj, self::PROP_NODE_VALUE, $data);
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
         self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
+        // Stand-in is DOMElement class but nodeType must be PI (#35098).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            self::CLASS_STANDIN,
+            DomConstants::XML_PROCESSING_INSTRUCTION_NODE
+        );
 
         return $obj;
     }
@@ -116,6 +123,12 @@ final class JitDomCreateProcessingInstruction
         self::storeStringValue($context, $obj, self::PROP_NODE_VALUE, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_TEXT_CONTENT, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_DATA, $dataStr);
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            self::CLASS_STANDIN,
+            DomConstants::XML_PROCESSING_INSTRUCTION_NODE
+        );
 
         return $obj;
     }
