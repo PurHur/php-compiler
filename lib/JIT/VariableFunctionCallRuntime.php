@@ -70,6 +70,13 @@ final class VariableFunctionCallRuntime
         }
 
         $i32 = $context->getTypeFromString('int32');
+        // NestedJIT helpers may surface PHP int as i64; matchCandidateIndex is i32 ABI (#24902 / #34937).
+        $indexTy = $context->getStringFromType($index->typeOf());
+        if ('int64' === $indexTy) {
+            $index = $context->builder->trunc($index, $i32);
+        } elseif ('int8' === $indexTy || 'int16' === $indexTy) {
+            $index = $context->builder->zExt($index, $i32);
+        }
         $minusOne = $i32->constInt(-1, true);
         $isMiss = $context->builder->icmp(Builder::INT_EQ, $index, $minusOne);
         $dispatchEntry = BasicBlockHelper::append($context, 'var_fn_dispatch_'.$tag);

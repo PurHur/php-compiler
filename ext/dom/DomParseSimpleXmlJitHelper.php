@@ -35,9 +35,7 @@ final class DomParseSimpleXmlJitHelper
             $nameEnd = $nameStart;
             while ($nameEnd < $len) {
                 $ch = $xml[$nameEnd];
-                if ('>' === $ch || '/' === $ch || ' ' === $ch || "	" === $ch || "
-" === $ch || "
-" === $ch) {
+                if ('>' === $ch || '/' === $ch || ' ' === $ch || "\t" === $ch || "\n" === $ch || "\r" === $ch) {
                     break;
                 }
                 ++$nameEnd;
