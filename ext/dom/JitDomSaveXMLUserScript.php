@@ -234,9 +234,32 @@ final class JitDomSaveXMLUserScript
             $context->lookupFunction('__value__readString'),
             $pieceVal
         );
+        // DocumentType stand-ins emit "" (DOCTYPE is in $decl via DomUserScriptDoctypeLlvm).
+        // Still concatenating "\n" would insert a blank line before the root (#34874).
+        $pieceEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp(
+                $context,
+                $pieceStr,
+                $context->builder->load($context->constantStringFromString(''))
+            ),
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $bbSkipPiece = BasicBlockHelper::append($context, 'dom_savexml_doc_skip_piece');
+        $bbAddPiece = BasicBlockHelper::append($context, 'dom_savexml_doc_add_piece');
+        $bbPieceDone = BasicBlockHelper::append($context, 'dom_savexml_doc_piece_done');
+        $context->builder->branchIf($pieceEmpty, $bbSkipPiece, $bbAddPiece);
+
+        $context->builder->positionAtEnd($bbAddPiece);
         $withPiece = JitStringConcat::concat($context, $context->builder->load($bodySlot), $pieceStr);
         $withNl = JitStringConcat::concat($context, $withPiece, $nl);
         $context->builder->store($withNl, $bodySlot);
+        $context->builder->branch($bbPieceDone);
+
+        $context->builder->positionAtEnd($bbSkipPiece);
+        $context->builder->branch($bbPieceDone);
+
+        $context->builder->positionAtEnd($bbPieceDone);
         $next = JitDomParentChildLinkLayout::loadSibling(
             $context,
             $cur,
@@ -411,6 +434,9 @@ final class JitDomSaveXMLUserScript
         $bbPiData = BasicBlockHelper::append($context, 'dom_savexml_pi_data');
         $bbEntityCheck = BasicBlockHelper::append($context, 'dom_savexml_check_entity');
         $bbEntity = BasicBlockHelper::append($context, 'dom_savexml_entity');
+        // DocumentType stand-in after #34160 firstChild walk (#34874 / re-#33584).
+        $bbDoctypeCheck = BasicBlockHelper::append($context, 'dom_savexml_check_doctype');
+        $bbDoctype = BasicBlockHelper::append($context, 'dom_savexml_doctype');
         $bbElement = BasicBlockHelper::append($context, 'dom_savexml_element');
         $context->builder->branchIf($isComment, $bbComment, $bbCheckText);
 
@@ -550,7 +576,7 @@ final class JitDomSaveXMLUserScript
             JitStringCompare::strcmp($context, $tagStr, $entityKindLit),
             $zero
         );
-        $context->builder->branchIf($isEntity, $bbEntity, $bbElement);
+        $context->builder->branchIf($isEntity, $bbEntity, $bbDoctypeCheck);
 
         $context->builder->positionAtEnd($bbEntity);
         // libxml xmlNodeDump XML_ENTITY_REF_NODE: `&` + name + `;` (#32343).
@@ -562,6 +588,25 @@ final class JitDomSaveXMLUserScript
             $erefClose
         );
         $context->builder->store(self::boxStringValue($context, $erefXml), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDoctypeCheck);
+        // createDocumentType stand-in: nodeName is the qualified name, tagName is
+        // TAG_KIND. Element dump would treat "html" as a root element and SIGSEGV
+        // (#34874). DOCTYPE markup is already in $decl via DomUserScriptDoctypeLlvm.
+        $doctypeKindLit = $context->builder->load(
+            $context->constantStringFromString(JitDomCreateDocumentType::TAG_KIND)
+        );
+        $isDoctype = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagStr, $doctypeKindLit),
+            $zero
+        );
+        $context->builder->branchIf($isDoctype, $bbDoctype, $bbElement);
+
+        $context->builder->positionAtEnd($bbDoctype);
+        $emptyDoctype = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->store(self::boxStringValue($context, $emptyDoctype), $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbElement);
