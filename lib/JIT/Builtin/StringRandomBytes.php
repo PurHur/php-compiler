@@ -14,7 +14,8 @@ use PHPCompiler\JIT\NestedJitCompileScope;
  *
  * Owns `__compiler_random_bytes` module-locally (getNamedFunction first via
  * {@see JitVmHelperLink::ensureBridge}). Do not re-add empty always-on shells in
- * {@see Type} — leftover decls mint random_bytes.1 (#31894 / #32122).
+ * {@see Type} or eager {@see Context::ensureFullStandaloneBodies} NestedJIT
+ * (#35113 / peer #34578) — leftover decls mint random_bytes.1 (#31894 / #32122).
  *
  * Embed + thin standalone AOT: {@see RandomBytesJitHelper} via {@see JitVmHelperLink}
  * (HashEquals #20469 / Rename #19215 shape — no user-script null stub).

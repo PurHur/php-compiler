@@ -40,9 +40,9 @@ final class ContextFullStandaloneLazyTokenHebrevSuperglobalShrinkTest extends Te
             );
         }
 
-        // Still links refresh + strspn / file helpers used by inventory / standalone main.
+        // Still links refresh used by inventory / standalone main.
+        // StringStrspn left ensureFull in #35089 — do not re-assert eager strspn here.
         $this->assertStringContainsString('SuperglobalRefreshRuntime::ensureStandaloneBodies($this)', $fullBody);
-        $this->assertStringContainsString('StringStrspn::ensureStandaloneBodies($this)', $fullBody);
     }
 
     public function testCallSitesStillEnsureBeforeLookup(): void
