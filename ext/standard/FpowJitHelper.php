@@ -94,29 +94,55 @@ final class FpowJitHelper
         return $nan;
     }
 
-    /** Successive-squaring integer power — NestedJIT-safe (no bit ops). */
+    /**
+     * Successive-squaring integer power — NestedJIT-safe (no bit ops).
+     *
+     * Do **not** peel sign via `$neg = $exp < 0; $e = $exp; if ($neg) $e = -$exp`
+     * (or `$e = $neg ? -$exp : $exp`). NestedJIT drops the false-path write to `$e`,
+     * so the loop sees a vacant `$e`, breaks immediately, and returns 1.0 (#35123 / re-#35058).
+     * Early-return on `$exp < 0` instead (peer Ldexp / Exp peels).
+     */
     private static function powByInt(float $base, int $exp): float
     {
         if (0 === $exp) {
             return 1.0;
         }
-        $neg = $exp < 0;
-        $e = $neg ? -$exp : $exp;
+        if ($exp < 0) {
+            if ($exp === \PHP_INT_MIN) {
+                // |MIN| not representable as positive int — square 63 times then invert.
+                $b = $base;
+                for ($i = 0; $i < 63; ++$i) {
+                    $b = $b * $b;
+                }
+
+                return 1.0 / $b;
+            }
+
+            return 1.0 / self::powByIntPositive($base, -$exp);
+        }
+
+        return self::powByIntPositive($base, $exp);
+    }
+
+    /** Positive-exponent successive squaring (NestedJIT-safe). */
+    private static function powByIntPositive(float $base, int $exp): float
+    {
         $result = 1.0;
         $b = $base;
+        $e = $exp;
         for ($i = 0; $i < 64; ++$i) {
             if ($e <= 0) {
                 break;
             }
             $half = (int) ($e / 2);
             if ($e !== $half + $half) {
-                $result *= $b;
+                $result = $result * $b;
             }
-            $b *= $b;
+            $b = $b * $b;
             $e = $half;
         }
 
-        return $neg ? 1.0 / $result : $result;
+        return $result;
     }
 
     /**
