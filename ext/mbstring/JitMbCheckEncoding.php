@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MbCheckEncodingRuntime;
 use PHPCompiler\JIT\Builtin\StringUtf8Runtime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helpers for mb_check_encoding() (issue #4571).
+ * LLVM JIT/AOT helpers for mb_check_encoding() (#4571, #35211 runtime encoding).
+ *
+ * Compile-time fold + UTF-8 literal via StringUtf8Runtime; runtime encoding via NestedJIT
+ * {@see MbCheckEncodingJitHelper} (peer {@see JitMbStrlen} / #34625).
  */
 final class JitMbCheckEncoding
 {
@@ -30,6 +36,10 @@ final class JitMbCheckEncoding
         }
         $encoding = self::compileTimeEncoding($args, 1);
         if (null === $encoding && isset($args[1])) {
+            return null;
+        }
+        // Unknown / unsupported encoding → NestedJIT (catchable ValueError) (#35211).
+        if (null !== $encoding && null === self::canonicalCheckEncoding($encoding)) {
             return null;
         }
 
@@ -52,28 +62,85 @@ final class JitMbCheckEncoding
             );
         }
 
-        $encoding = self::compileTimeEncoding($args, 1);
-        if (null === $encoding) {
-            throw new \LogicException(
-                'mb_check_encoding() JIT requires compile-time encoding literal in this compiler build'
-            );
+        $argc = \count($args);
+        $encodingLit = null;
+        if ($argc >= 2
+            && JITVariable::TYPE_NULL !== $args[1]->type
+            && !($args[1]->isNullConstant ?? false)
+        ) {
+            $encodingLit = JitStringArg::compileTimeLiteral($args[1]);
         }
-        VmMbstring::assertCheckEncodingName($encoding);
 
-        if ('ASCII' === $encoding || '8BIT' === $encoding) {
-            return $context->constantFromBool(true);
+        // Fast path: omitted / null / known UTF-8|ASCII|8BIT literal (#4571).
+        if (null === $encodingLit && ($argc < 2
+            || JITVariable::TYPE_NULL === $args[1]->type
+            || ($args[1]->isNullConstant ?? false))
+        ) {
+            return self::utf8ValidFromArg($context, $args[0]);
         }
-        if ('UTF-8' !== $encoding) {
-            throw new \LogicException(
-                'mb_check_encoding() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
-            );
+        if (null !== $encodingLit) {
+            $canonical = self::canonicalCheckEncoding($encodingLit);
+            if ('ASCII' === $canonical || '8BIT' === $canonical) {
+                return $context->constantFromBool(true);
+            }
+            if ('UTF-8' === $canonical) {
+                return self::utf8ValidFromArg($context, $args[0]);
+            }
+            // Invalid / unsupported literal → NestedJIT ValueError (#35211).
         }
+
+        // Runtime encoding (TYPE_VALUE / non-literal TYPE_STRING) — NestedJIT (#35211).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbCheckEncodingRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_check_encoding_runtime');
 
         $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_check_encoding', 0, 'var');
+        $enc = null !== $encodingLit
+            ? $context->builder->load($context->constantStringFromString($encodingLit))
+            : JitStringBuiltinArg::lower(
+                $context,
+                $args[1],
+                'mb_check_encoding',
+                1,
+                'encoding'
+            );
+
+        $ok = $context->builder->call(
+            MbCheckEncodingRuntime::checkHelper($context),
+            $str,
+            $enc
+        );
+        $zero = $context->getTypeFromString('int64')->constInt(0, false);
+
+        return $context->builder->icmp(Builder::INT_NE, $ok, $zero);
+    }
+
+    private static function utf8ValidFromArg(Context $context, JITVariable $arg): Value
+    {
+        $str = JitStringBuiltinArg::lower($context, $arg, 'mb_check_encoding', 0, 'var');
         $valid = StringUtf8Runtime::validFromPtr($context, $str);
         $zero = $context->getTypeFromString('int64')->constInt(0, false);
 
         return $context->builder->icmp(Builder::INT_NE, $valid, $zero);
+    }
+
+    private static function canonicalCheckEncoding(string $encoding): ?string
+    {
+        $upper = \strtoupper($encoding);
+        if ('UTF-8' === $upper || 'UTF8' === $upper) {
+            return 'UTF-8';
+        }
+        if ('ASCII' === $upper || 'US-ASCII' === $upper) {
+            return 'ASCII';
+        }
+        if ('8BIT' === $upper || 'BINARY' === $upper) {
+            return '8BIT';
+        }
+
+        return null;
     }
 
     /**
@@ -130,6 +197,8 @@ final class JitMbCheckEncoding
             return null;
         }
 
-        return $args[$index]->compileTimeString ?? null;
+        return JitStringArg::compileTimeLiteral($args[$index])
+            ?? $args[$index]->compileTimeString
+            ?? null;
     }
 }
