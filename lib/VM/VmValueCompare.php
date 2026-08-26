@@ -53,6 +53,9 @@ final class VmValueCompare
                 return self::identicalValueToNativeBool($context, $valuePtr, $typeByte, $native);
             case Variable::TYPE_NATIVE_LONG:
                 return self::identicalValueToNativeLong($context, $valuePtr, $typeByte, $native);
+            case Variable::TYPE_NATIVE_DOUBLE:
+                // Previously fell through to false — $x=1.5; $x === 1.5 was always false (#35201).
+                return self::identicalValueToNativeDouble($context, $valuePtr, $typeByte, $native);
             case Variable::TYPE_NULL:
                 $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
 
@@ -594,6 +597,12 @@ final class VmValueCompare
             $context->builder->icmp(Builder::INT_EQ, $rightType, $longTag)
         );
 
+        $doubleTag = $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false);
+        $bothDouble = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $leftType, $doubleTag),
+            $context->builder->icmp(Builder::INT_EQ, $rightType, $doubleTag)
+        );
+
         $objectTag = $i8->constInt(Variable::TYPE_OBJECT, false);
         $bothObject = $context->builder->and(
             $context->builder->icmp(Builder::INT_EQ, $leftType, $objectTag),
@@ -605,6 +614,8 @@ final class VmValueCompare
         $stringBlock = BasicBlockHelper::append($context, 'identical_value_string');
         $longCheckBlock = BasicBlockHelper::append($context, 'identical_value_long_check');
         $longBlock = BasicBlockHelper::append($context, 'identical_value_long');
+        $doubleCheckBlock = BasicBlockHelper::append($context, 'identical_value_double_check');
+        $doubleBlock = BasicBlockHelper::append($context, 'identical_value_double');
         $objectCheckBlock = BasicBlockHelper::append($context, 'identical_value_object_check');
         $objectBlock = BasicBlockHelper::append($context, 'identical_value_object');
         $typedFalseBlock = BasicBlockHelper::append($context, 'identical_value_typed_false');
@@ -633,12 +644,27 @@ final class VmValueCompare
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($longCheckBlock);
-        $context->builder->branchIf($bothLong, $longBlock, $objectCheckBlock);
+        $context->builder->branchIf($bothLong, $longBlock, $doubleCheckBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $leftLong = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
         $rightLong = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
         $longMatch = self::nativeLongEqualWithResourceIdentity($context, $leftLong, $rightLong);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doubleCheckBlock);
+        $context->builder->branchIf($bothDouble, $doubleBlock, $objectCheckBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        // zend_is_identical IS_DOUBLE: Z_DVAL_P(op1) == Z_DVAL_P(op2) — NAN===NAN is false (#35201).
+        $leftDouble = $context->builder->call($context->lookupFunction('__value__readDouble'), $leftPtr);
+        $rightDouble = $context->builder->call($context->lookupFunction('__value__readDouble'), $rightPtr);
+        $doubleMatch = VmFloatCompare::relationalCompare(
+            $context,
+            OpCode::TYPE_IDENTICAL,
+            $leftDouble,
+            $rightDouble
+        );
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($objectCheckBlock);
@@ -673,6 +699,7 @@ final class VmValueCompare
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($stringsMatch, $stringBlock);
         $phi->addIncoming($longMatch, $longBlock);
+        $phi->addIncoming($doubleMatch, $doubleBlock);
         $phi->addIncoming($objectMatch, $objectBlock);
         $phi->addIncoming($falseVal, $typedFalseBlock);
         $context->builder->branch($exitBlock);
@@ -1731,6 +1758,56 @@ final class VmValueCompare
         $phi = $context->builder->phi($i1, 'identical_value_native_long_phi');
         $phi->addIncoming($falseVal, $falseBlock);
         $phi->addIncoming($longResult, $longBlock);
+
+        return $phi;
+    }
+
+    /**
+     * Strict === between boxed {@see __value__} and native double (#35201).
+     *
+     * Tag-check before {@see __value__readDouble} (same shape as #8555 / #32860).
+     * Zend `zend_is_identical` IS_DOUBLE uses `==` on the payloads — NAN===NAN is false.
+     * Does not coerce long/bool boxes (unlike loose ==).
+     */
+    private static function identicalValueToNativeDouble(
+        Context $context,
+        Value $valuePtr,
+        Value $typeByte,
+        Variable $native
+    ): Value {
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $doubleTag = $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false);
+        $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTag);
+
+        $falseBlock = BasicBlockHelper::append($context, 'identical_value_native_double_false');
+        $doubleBlock = BasicBlockHelper::append($context, 'identical_value_native_double_match');
+        $doneBlock = BasicBlockHelper::append($context, 'identical_value_native_double_done');
+
+        $context->builder->branchIf($isDouble, $doubleBlock, $falseBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $stored = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+        $nativeDouble = $context->helper->loadValue($native);
+        $matches = VmFloatCompare::relationalCompare(
+            $context,
+            OpCode::TYPE_IDENTICAL,
+            $stored,
+            $nativeDouble
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1, 'identical_value_native_double_phi');
+        $phi->addIncoming($falseVal, $falseBlock);
+        $phi->addIncoming($matches, $doubleBlock);
 
         return $phi;
     }
