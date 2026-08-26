@@ -23,6 +23,9 @@ use PHPLLVM\Value;
  * Document receivers must not use DOMElement property indices — that SIGSEGVs (#34910).
  * For Document, first/lastElementChild ≡ documentElement; childElementCount is 0 or 1
  * (php-src parentnode.c / document can have at most one element child).
+ *
+ * Element-receiver FEC/LEC also stamp compile-time tag/index so importNode recovers
+ * the element child after ARG_SEND drops Variable metadata (#35017 / peer firstChild #33918).
  */
 final class JitDomElementNavigationProperty
 {
@@ -67,7 +70,8 @@ final class JitDomElementNavigationProperty
         Object_ $objectType,
         Value $obj,
         string $propName,
-        string $className = self::CLASS_ELEMENT
+        string $className = self::CLASS_ELEMENT,
+        ?JITVariable $receiverVar = null
     ): JITVariable {
         $context = $objectType->jitContext();
         $propLc = strtolower($propName);
@@ -91,13 +95,25 @@ final class JitDomElementNavigationProperty
                 $objectType->defineProperty($classId, $propName, $jitType);
             }
 
-            return ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $result = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
                 $objectType,
                 $obj,
                 self::CLASS_ELEMENT,
                 $propName,
                 $classId
             );
+            // Stamp element-child compile-time metadata so importNode / cloneNode
+            // recover the element — not documentElement — after ARG_SEND (#35017).
+            if ('firstelementchild' === $propLc || 'lastelementchild' === $propLc) {
+                $result->classUserType = self::CLASS_ELEMENT;
+                JitDomNodeChildProperty::annotateCompileTimeElementChild(
+                    $result,
+                    $propName,
+                    $receiverVar
+                );
+            }
+
+            return $result;
         }
 
         DomNodeChildPropertyRuntime::ensureLinked($context, $propName);
