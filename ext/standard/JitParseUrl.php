@@ -211,12 +211,8 @@ final class JitParseUrl
             );
             $keyVar->compileTimeString = (string) $key;
             if (\is_int($value)) {
-                $elem = new JITVariable(
-                    $context,
-                    JITVariable::TYPE_NATIVE_LONG,
-                    JITVariable::KIND_VALUE,
-                    $context->getTypeFromString('int64')->constInt($value, false)
-                );
+                // fromConstantInt sets compileTimeLong so HashTableWriteLlvm can fold (#34905).
+                $elem = JITVariable::fromConstantInt($context, $value);
             } else {
                 $elem = new JITVariable(
                     $context,

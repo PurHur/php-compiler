@@ -29,8 +29,12 @@ final class HashTableWriteLlvm
     /**
      * Track string-keyed constant array literals for filter_var options folds (#29046).
      */
-    private static function trackCompileTimeAssoc(Variable $array, Variable $key, Variable $element): void
-    {
+    private static function trackCompileTimeAssoc(
+        Context $context,
+        Variable $array,
+        Variable $key,
+        Variable $element
+    ): void {
         if (null === $array->compileTimeAssoc) {
             return;
         }
@@ -43,7 +47,7 @@ final class HashTableWriteLlvm
 
             return;
         }
-        $phpVal = self::compileTimePhpScalar($element);
+        $phpVal = self::compileTimePhpScalar($context, $element);
         if (false === $phpVal) {
             $array->compileTimeAssoc = null;
 
@@ -55,7 +59,7 @@ final class HashTableWriteLlvm
     /**
      * @return mixed|false false when not foldable
      */
-    private static function compileTimePhpScalar(Variable $element): mixed
+    private static function compileTimePhpScalar(Context $context, Variable $element): mixed
     {
         if (Variable::TYPE_NULL === $element->type) {
             return null;
@@ -74,12 +78,13 @@ final class HashTableWriteLlvm
 
             return $element->compileTimeLong;
         }
-        // FILTER_* / int literals as KIND_CONSTANT_INT without compileTimeLong still fold
-        // for filter_var_array definition arrays (#34574).
+        // FILTER_* / int literals as KIND_VALUE LLVM const ints without compileTimeLong still fold
+        // for filter_var_array definition arrays (#34574). Use the caller's Context — Variable::$context
+        // is private (#34905; parse_url port materialization).
         if ((Variable::TYPE_NATIVE_LONG === $element->type || Variable::TYPE_VALUE === $element->type)
             && Variable::KIND_VALUE === $element->kind
             && null !== $element->value) {
-            $lib = $element->context->llvm->lib;
+            $lib = $context->llvm->lib;
             if (null !== $lib->LLVMIsAConstantInt($element->value->value)) {
                 return (int) $lib->LLVMConstIntGetZExtValue($element->value->value);
             }
@@ -1005,7 +1010,7 @@ final class HashTableWriteLlvm
         }
         // Keyed writes invalidate packed compile-time string tracking (#27181).
         $array->compileTimeArray = null;
-        self::trackCompileTimeAssoc($array, $key, $element);
+        self::trackCompileTimeAssoc($context, $array, $key, $element);
         if (Variable::TYPE_HASHTABLE === $key->type) {
             // Array-literal array keys: typed TypeError under PROFILE≥8.3 (#28628).
             HashTableReadLlvm::emitIllegalOffsetTypeForKey($context, $key);
