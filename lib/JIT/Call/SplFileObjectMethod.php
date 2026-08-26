@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\SplFileObjectJitHelper;
 use PHPLLVM\Value;
 
@@ -14,7 +17,7 @@ use PHPLLVM\Value;
  * SplFileObject / SplTempFileObject thin-AOT methods
  * (#28709, #33305, #33318, #33319, #33321, #33332, #33336, #33340, #33346, #33347, #33348,
  * #33354, #33358, #33359, #33364, #33368, #33371, #33377, #33378, #33382, #33388, #33390,
- * #33396, #33431, ext/spl/spl_directory.c).
+ * #33396, #33431, #34984, ext/spl/spl_directory.c).
  */
 final class SplFileObjectMethod implements Call
 {
@@ -55,7 +58,14 @@ final class SplFileObjectMethod implements Call
             'getpathname', '__tostring' => SplFileObjectJitHelper::compileGetPathname($context, $args[0]),
             'getpath' => SplFileObjectJitHelper::compileGetPath($context, $args[0]),
             // getCurrentLine is an fgets alias in php-src (zim_SplFileObject_getCurrentLine).
-            'fgets', 'getcurrentline' => SplFileObjectJitHelper::compileFgets($context, $args[0]),
+            // php-src zim_SplFileObject_fgets — ZEND_PARSE_PARAMETERS_NONE (#34984 / #30937).
+            'fgets', 'getcurrentline' => $this->compileExact(
+                $context,
+                $args,
+                'SplFileObject::'.$this->method,
+                0,
+                static fn () => SplFileObjectJitHelper::compileFgets($context, $args[0])
+            ),
             'fread' => SplFileObjectJitHelper::compileFread(
                 $context,
                 $args[0],
@@ -95,7 +105,14 @@ final class SplFileObjectMethod implements Call
                     'SplFileObject::ftruncate() expects exactly 1 argument, 0 given'
                 )
             ),
-            'fflush' => SplFileObjectJitHelper::compileFflush($context, $args[0]),
+            // php-src zim_SplFileObject_fflush — ACE cites SplFileObject even via SplTempFileObject (#34984).
+            'fflush' => $this->compileExact(
+                $context,
+                $args,
+                'SplFileObject::fflush',
+                0,
+                static fn () => SplFileObjectJitHelper::compileFflush($context, $args[0])
+            ),
             'fpassthru' => SplFileObjectJitHelper::compileFpassthru($context, $args[0]),
             'setflags' => SplFileObjectJitHelper::compileSetFlags(
                 $context,
@@ -155,7 +172,14 @@ final class SplFileObjectMethod implements Call
                 $args[3] ?? null
             ),
             'getcsvcontrol' => SplFileObjectJitHelper::compileGetCsvControl($context, $args[0]),
-            'eof' => SplFileObjectJitHelper::compileEof($context, $args[0]),
+            // php-src zim_SplFileObject_eof — ZEND_PARSE_PARAMETERS_NONE (#34984 / #30937).
+            'eof' => $this->compileExact(
+                $context,
+                $args,
+                'SplFileObject::eof',
+                0,
+                static fn () => SplFileObjectJitHelper::compileEof($context, $args[0])
+            ),
             'haschildren' => SplFileObjectJitHelper::compileHasChildren($context, $args[0]),
             'getchildren' => SplFileObjectJitHelper::compileGetChildren($context, $args[0]),
             'rewind' => SplFileObjectJitHelper::compileRewind($context, $args[0]),
@@ -167,5 +191,34 @@ final class SplFileObjectMethod implements Call
                 $classLabel.' JIT lowering is not implemented for '.$this->method.'()'
             ),
         };
+    }
+
+    /**
+     * php-src ZEND_PARSE_PARAMETERS_NONE — $args[0] is $this (#34984).
+     *
+     * @param callable(): Value $compile
+     */
+    private function compileExact(
+        Context $context,
+        array $args,
+        string $function,
+        int $expected,
+        callable $compile
+    ): Value {
+        $given = max(0, \count($args) - 1);
+        if ($given !== $expected) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                VmClassMethod::exactUserArgCountMessage($function, $expected, $given)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock(
+                $context,
+                'sfo_'.strtolower($this->method).'_argc_cont'
+            );
+
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+
+        return $compile();
     }
 }

@@ -1,9 +1,7 @@
+--TEST--
+AOT: SplFileObject eof/fgets/fflush + FilesystemIterator getFlags excess argc (#34984)
+--FILE--
 <?php
-
-/**
- * Repro #30937 — SplFileObject eof/fgets/fflush + FilesystemIterator::getFlags excess argc.
- * php-src: ext/spl/spl_directory.c
- */
 $f = new SplFileObject('/etc/hosts');
 $t = new SplTempFileObject();
 $t->fwrite("x\n");
@@ -31,3 +29,9 @@ echo 'ok=', (
     && true === $okFlush
     && 4096 === $okFlags
 ) ? '1' : '0', "\n";
+--EXPECT--
+eof:ArgumentCountError:SplFileObject::eof() expects exactly 0 arguments, 1 given
+fgets:ArgumentCountError:SplFileObject::fgets() expects exactly 0 arguments, 1 given
+fflush:ArgumentCountError:SplFileObject::fflush() expects exactly 0 arguments, 1 given
+flags:ArgumentCountError:FilesystemIterator::getFlags() expects exactly 0 arguments, 1 given
+ok=1

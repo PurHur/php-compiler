@@ -1636,7 +1636,7 @@ class Context {
             );
         }
         // DirectoryIterator / FilesystemIterator / RecursiveDirectoryIterator / SplFileInfo —
-        // dir snapshot + Iterator (#27289 … #33298, #34624).
+        // dir snapshot + Iterator (#27289 … #33298, #34624); getFlags/setFlags (#34984).
         $this->type->object->lookup('SplFileInfo');
         $this->type->object->lookup('DirectoryIterator');
         $this->type->object->lookup('FilesystemIterator');
@@ -1655,6 +1655,16 @@ class Context {
                 $this->functionProxies[$diLc.'::'.strtolower($diMethod)] = new Call\DirectoryIteratorMethod(
                     $diMethod,
                     $diClass
+                );
+            }
+        }
+        // php-src FilesystemIterator::getFlags/setFlags (+ RecursiveDirectoryIterator inherit) (#34984).
+        foreach (['FilesystemIterator', 'RecursiveDirectoryIterator'] as $fsClass) {
+            $fsLc = strtolower($fsClass);
+            foreach (['getFlags', 'setFlags'] as $fsFlagMethod) {
+                $this->functionProxies[$fsLc.'::'.strtolower($fsFlagMethod)] = new Call\DirectoryIteratorMethod(
+                    $fsFlagMethod,
+                    $fsClass
                 );
             }
         }
