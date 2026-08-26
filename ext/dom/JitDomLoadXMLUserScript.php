@@ -744,6 +744,8 @@ final class JitDomLoadXMLUserScript
         // undersized and SIGSEGVs (#34887 / peer #33565).
         self::storeDoctypeProperty($context, $document, $xml);
         self::storeEncodingFromXml($context, $document, $xml);
+        // Peer encoding (#34919): construct defaults stay until loadXML seeds the decl (#34951).
+        self::storeXmlVersionAndStandaloneFromXml($context, $document, $xml);
         self::storeDocumentUriCwd($context, $document);
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($xml);
@@ -851,6 +853,80 @@ final class JitDomLoadXMLUserScript
         // So getElementsByTagName()->item(0) returns the linked firstChild (#26752).
         DomUserScriptPinnedRootLlvm::pin($context, $element);
         self::pinUserScriptLoadSideEffects($context);
+    }
+
+    /**
+     * Store DOMDocument::$xmlVersion / $xmlStandalone (+ Level-3 aliases) from the
+     * XML declaration (php-src document.c; #34951 leftover of #34916 / #34894).
+     *
+     * Construct seeds defaults (1.0 / false). Thin loadXML must overwrite from
+     * {@code <?xml …?>} like {@see VmDom::parseXmlDeclaration} / loadXML.
+     */
+    private static function storeXmlVersionAndStandaloneFromXml(
+        Context $context,
+        Value $document,
+        string $xml
+    ): void {
+        $version = '1.0';
+        $standalone = false;
+        if (preg_match('/^\s*<\?xml\s+([^?]*)\?>/s', $xml, $match)) {
+            $attrs = $match[1];
+            if (preg_match('/version\s*=\s*(["\'])([^"\']*)\1/i', $attrs, $versionMatch)) {
+                $version = $versionMatch[2];
+            }
+            if (preg_match('/standalone\s*=\s*(["\'])([^"\']*)\1/i', $attrs, $standaloneMatch)) {
+                $standalone = 'yes' === strtolower($standaloneMatch[2]);
+            }
+        }
+
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        $str = $context->builder->load($context->constantStringFromString($version));
+        foreach ([VmDom::PROP_XML_VERSION, VmDom::PROP_VERSION] as $prop) {
+            if (!$objectType->hasProperty($docClassId, $prop)) {
+                $objectType->defineProperty($docClassId, $prop, JITVariable::TYPE_STRING);
+            }
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $str
+            );
+            $propVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_STRING,
+                JITVariable::KIND_VALUE,
+                $owned
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, $prop),
+                $propVar,
+                JITVariable::TYPE_STRING
+            );
+        }
+
+        $i1 = $context->getTypeFromString('int1');
+        $i32 = $context->getTypeFromString('int32');
+        foreach ([VmDom::PROP_XML_STANDALONE, VmDom::PROP_STANDALONE] as $prop) {
+            if (!$objectType->hasProperty($docClassId, $prop)) {
+                $objectType->defineProperty($docClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+            $box = JitValueBox::alloc($context);
+            JitValueBox::writeBool(
+                $context,
+                $box,
+                $context->builder->zext($i1->constInt($standalone ? 1 : 0, false), $i32)
+            );
+            $propVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_VALUE,
+                JITVariable::KIND_VARIABLE,
+                $box
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, $prop),
+                $propVar,
+                JITVariable::TYPE_VALUE
+            );
+        }
     }
 
     /**
