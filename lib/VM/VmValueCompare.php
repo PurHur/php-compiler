@@ -135,6 +135,8 @@ final class VmValueCompare
         $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
         $doubleTag = $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false);
         $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTag);
+        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTag);
 
         $falseBb = BasicBlockHelper::append($context, 'leq_vbox_long_false');
         $longCheckBb = BasicBlockHelper::append($context, 'leq_vbox_long_long_check');
@@ -145,6 +147,8 @@ final class VmValueCompare
         $nullBb = BasicBlockHelper::append($context, 'leq_vbox_long_null');
         $doubleCheckBb = BasicBlockHelper::append($context, 'leq_vbox_long_double_check');
         $doubleBb = BasicBlockHelper::append($context, 'leq_vbox_long_double');
+        $stringCheckBb = BasicBlockHelper::append($context, 'leq_vbox_long_string_check');
+        $stringBb = BasicBlockHelper::append($context, 'leq_vbox_long_string');
         $doneBb = BasicBlockHelper::append($context, 'leq_vbox_long_done');
 
         $context->builder->branchIf($isEnumOrObject, $falseBb, $longCheckBb);
@@ -184,7 +188,7 @@ final class VmValueCompare
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doubleCheckBb);
-        $context->builder->branchIf($isDouble, $doubleBb, $falseBb);
+        $context->builder->branchIf($isDouble, $doubleBb, $stringCheckBb);
 
         $context->builder->positionAtEnd($doubleBb);
         // zend_operators.c compare_function: IS_DOUBLE ⊙ IS_LONG → convert long to double.
@@ -201,6 +205,19 @@ final class VmValueCompare
         $doubleEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
+        $context->builder->positionAtEnd($stringCheckBb);
+        $context->builder->branchIf($isString, $stringBb, $falseBb);
+
+        $context->builder->positionAtEnd($stringBb);
+        // Peer looseEqualValueToNativeDouble string arm — `$x="1"; $x==1` was always false (#35220).
+        $storedStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $stringMatches = self::looseEqualStringToNativeLong($context, $storedStr, $__native);
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
         $context->builder->positionAtEnd($falseBb);
         $context->builder->branch($doneBb);
 
@@ -210,6 +227,7 @@ final class VmValueCompare
         $phi->addIncoming($boolMatches, $boolEnd);
         $phi->addIncoming($nullMatches, $nullEnd);
         $phi->addIncoming($doubleMatches, $doubleEnd);
+        $phi->addIncoming($stringMatches, $stringEnd);
         $phi->addIncoming($falseVal, $falseBb);
 
         return $phi;
