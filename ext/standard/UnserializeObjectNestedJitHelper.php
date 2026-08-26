@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Thin-standalone NestedJIT unserialize() for simple O: public-prop objects (#27030).
+ * Thin-standalone NestedJIT unserialize() for simple O: public-prop objects (#27030 / #35107).
  *
- * Parses `O:len:"Class":n:{s:…;i:…;}` — packed int props via phpc_native_ht_set_long_at
- * (string keys miscompile under NestedJIT; peer JsonDecode uses long_at for arrays).
+ * NestedJIT mishandles `$x++` / `$x += n` in this helper — use `$x = $x + n` (#35107).
+ * `propsInto` fills a props HT via phpc_native_ht_set_string_key_* (peer ArrayObject #33636).
  * php-src: ext/standard/var_unserializer.c
  */
 final class UnserializeObjectNestedJitHelper
@@ -37,18 +37,18 @@ final class UnserializeObjectNestedJitHelper
         $nameLen = 0;
         while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
             $nameLen = $nameLen * 10 + (\ord($payload[$pos]) - 48);
-            ++$pos;
+            $pos = $pos + 1;
         }
         if ($pos >= $len || ':' !== $payload[$pos] || '"' !== $payload[$pos + 1]) {
             return '';
         }
-        $pos += 2;
+        $pos = $pos + 2;
         $name = '';
         $i = 0;
         while ($i < $nameLen && $pos < $len) {
             $name .= $payload[$pos];
-            ++$pos;
-            ++$i;
+            $pos = $pos + 1;
+            $i = $i + 1;
         }
 
         return $name;
@@ -63,61 +63,61 @@ final class UnserializeObjectNestedJitHelper
         }
         $pos = 2;
         while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
-            ++$pos;
+            $pos = $pos + 1;
         }
         if ($pos + 1 >= $len || ':' !== $payload[$pos] || '"' !== $payload[$pos + 1]) {
             return 0;
         }
-        $pos += 2;
+        $pos = $pos + 2;
         while ($pos < $len && '"' !== $payload[$pos]) {
-            ++$pos;
+            $pos = $pos + 1;
         }
         if ($pos >= $len || '"' !== $payload[$pos]) {
             return 0;
         }
-        ++$pos;
+        $pos = $pos + 1;
         if ($pos >= $len || ':' !== $payload[$pos]) {
             return 0;
         }
-        ++$pos;
+        $pos = $pos + 1;
         while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
-            ++$pos;
+            $pos = $pos + 1;
         }
         if ($pos >= $len || ':' !== $payload[$pos] || '{' !== $payload[$pos + 1]) {
             return 0;
         }
-        $pos += 2;
+        $pos = $pos + 2;
         if ($pos + 1 >= $len || 's' !== $payload[$pos] || ':' !== $payload[$pos + 1]) {
             return 0;
         }
-        $pos += 2;
+        $pos = $pos + 2;
         while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
-            ++$pos;
+            $pos = $pos + 1;
         }
         if ($pos + 1 >= $len || ':' !== $payload[$pos] || '"' !== $payload[$pos + 1]) {
             return 0;
         }
-        $pos += 2;
+        $pos = $pos + 2;
         while ($pos < $len && '"' !== $payload[$pos]) {
-            ++$pos;
+            $pos = $pos + 1;
         }
         if ($pos + 1 >= $len || '"' !== $payload[$pos] || ';' !== $payload[$pos + 1]) {
             return 0;
         }
-        $pos += 2;
+        $pos = $pos + 2;
         if ($pos >= $len || 'i' !== $payload[$pos] || ':' !== $payload[$pos + 1]) {
             return 0;
         }
-        $pos += 2;
+        $pos = $pos + 2;
         $neg = false;
         if ($pos < $len && '-' === $payload[$pos]) {
             $neg = true;
-            ++$pos;
+            $pos = $pos + 1;
         }
         $num = 0;
         while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
             $num = $num * 10 + (\ord($payload[$pos]) - 48);
-            ++$pos;
+            $pos = $pos + 1;
         }
         if ($neg) {
             $num = 0 - $num;
@@ -126,7 +126,11 @@ final class UnserializeObjectNestedJitHelper
         return $num;
     }
 
-    /** @return int 1 on success */
+    /**
+     * Parse public prop pairs into $destPtr HT keyed by property name (#35107).
+     *
+     * @return int 1 on success
+     */
     public static function propsInto(int $destPtr, string $payload): int
     {
         if ($destPtr <= 0) {
@@ -138,81 +142,145 @@ final class UnserializeObjectNestedJitHelper
         }
         $pos = 2;
         while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
-            ++$pos;
+            $pos = $pos + 1;
         }
         if ($pos + 1 >= $len || ':' !== $payload[$pos] || '"' !== $payload[$pos + 1]) {
             return 0;
         }
-        $pos += 2;
+        $pos = $pos + 2;
         while ($pos < $len && '"' !== $payload[$pos]) {
-            ++$pos;
+            $pos = $pos + 1;
         }
         if ($pos >= $len || '"' !== $payload[$pos]) {
             return 0;
         }
-        ++$pos;
+        $pos = $pos + 1;
         if ($pos >= $len || ':' !== $payload[$pos]) {
             return 0;
         }
-        ++$pos;
+        $pos = $pos + 1;
         $propCount = 0;
         while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
             $propCount = $propCount * 10 + (\ord($payload[$pos]) - 48);
-            ++$pos;
+            $pos = $pos + 1;
         }
         if ($pos >= $len || ':' !== $payload[$pos] || '{' !== $payload[$pos + 1]) {
             return 0;
         }
-        $pos += 2;
+        $pos = $pos + 2;
         $n = 0;
-        while ($n < $propCount && $pos < $len) {
-            if ('s' !== $payload[$pos] || ':' !== $payload[$pos + 1]) {
+        while ($n < $propCount && $n < 64 && $pos < $len) {
+            if ('s' !== $payload[$pos] || $pos + 1 >= $len || ':' !== $payload[$pos + 1]) {
                 return 0;
             }
-            $pos += 2;
+            $pos = $pos + 2;
             $klen = 0;
             while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
                 $klen = $klen * 10 + (\ord($payload[$pos]) - 48);
-                ++$pos;
+                $pos = $pos + 1;
             }
             if ($pos + 1 >= $len || ':' !== $payload[$pos] || '"' !== $payload[$pos + 1]) {
                 return 0;
             }
-            $pos += 2;
+            $pos = $pos + 2;
             $key = '';
             $ki = 0;
             while ($ki < $klen && $pos < $len) {
                 $key .= $payload[$pos];
-                ++$pos;
-                ++$ki;
+                $pos = $pos + 1;
+                $ki = $ki + 1;
             }
             if ($pos + 1 >= $len || '"' !== $payload[$pos] || ';' !== $payload[$pos + 1]) {
                 return 0;
             }
-            $pos += 2;
-            if ($pos >= $len || 'i' !== $payload[$pos] || ':' !== $payload[$pos + 1]) {
+            $pos = $pos + 2;
+            if ('' !== $key && "\0" === $key[0]) {
                 return 0;
             }
-            $pos += 2;
-            $neg = false;
-            if ($pos < $len && '-' === $payload[$pos]) {
-                $neg = true;
-                ++$pos;
-            }
-            $num = 0;
-            while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
-                $num = $num * 10 + (\ord($payload[$pos]) - 48);
-                ++$pos;
-            }
-            if ($neg) {
-                $num = 0 - $num;
-            }
-            if ($pos >= $len || ';' !== $payload[$pos]) {
+            if ('N' === $payload[$pos] && $pos + 1 < $len && ';' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+                phpc_native_ht_set_string_key_null($destPtr, $key);
+            } elseif ('i' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+                $neg = false;
+                if ($pos < $len && '-' === $payload[$pos]) {
+                    $neg = true;
+                    $pos = $pos + 1;
+                }
+                $num = 0;
+                $saw = false;
+                while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
+                    $saw = true;
+                    $num = $num * 10 + (\ord($payload[$pos]) - 48);
+                    $pos = $pos + 1;
+                }
+                if (!$saw || $pos >= $len || ';' !== $payload[$pos]) {
+                    return 0;
+                }
+                $pos = $pos + 1;
+                if ($neg) {
+                    $num = 0 - $num;
+                }
+                phpc_native_ht_set_string_key_long($destPtr, $key, $num);
+            } elseif ('d' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+                $dstr = '';
+                if ($pos < $len && ('-' === $payload[$pos] || '+' === $payload[$pos])) {
+                    $dstr .= $payload[$pos];
+                    $pos = $pos + 1;
+                }
+                $sawD = false;
+                while ($pos < $len && (($payload[$pos] >= '0' && $payload[$pos] <= '9') || '.' === $payload[$pos])) {
+                    $sawD = true;
+                    $dstr .= $payload[$pos];
+                    $pos = $pos + 1;
+                }
+                if (!$sawD || $pos >= $len || ';' !== $payload[$pos]) {
+                    return 0;
+                }
+                $pos = $pos + 1;
+                phpc_native_ht_set_string_key_double($destPtr, $key, $dstr);
+            } elseif ('b' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+                if ($pos >= $len || ('0' !== $payload[$pos] && '1' !== $payload[$pos])) {
+                    return 0;
+                }
+                $b = ('1' === $payload[$pos]) ? 1 : 0;
+                $pos = $pos + 1;
+                if ($pos >= $len || ';' !== $payload[$pos]) {
+                    return 0;
+                }
+                $pos = $pos + 1;
+                phpc_native_ht_set_string_key_bool($destPtr, $key, $b);
+            } elseif ('s' === $payload[$pos] && $pos + 1 < $len && ':' === $payload[$pos + 1]) {
+                $pos = $pos + 2;
+                $slen = 0;
+                $sawS = false;
+                while ($pos < $len && $payload[$pos] >= '0' && $payload[$pos] <= '9') {
+                    $sawS = true;
+                    $slen = $slen * 10 + (\ord($payload[$pos]) - 48);
+                    $pos = $pos + 1;
+                }
+                if (!$sawS || $pos + 1 >= $len || ':' !== $payload[$pos] || '"' !== $payload[$pos + 1]) {
+                    return 0;
+                }
+                $pos = $pos + 2;
+                $str = '';
+                $si = 0;
+                while ($si < $slen && $pos < $len) {
+                    $str .= $payload[$pos];
+                    $pos = $pos + 1;
+                    $si = $si + 1;
+                }
+                if ($pos + 1 >= $len || '"' !== $payload[$pos] || ';' !== $payload[$pos + 1]) {
+                    return 0;
+                }
+                $pos = $pos + 2;
+                phpc_native_ht_set_string_key($destPtr, $key, $str);
+            } else {
                 return 0;
             }
-            ++$pos;
-            phpc_native_ht_set_long_at($destPtr, $n, $num);
-            ++$n;
+            $n = $n + 1;
         }
 
         return 1;
