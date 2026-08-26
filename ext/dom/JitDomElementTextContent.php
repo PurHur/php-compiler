@@ -318,8 +318,25 @@ final class JitDomElementTextContent
         if (null === $local || 'xmlns' === $local) {
             return;
         }
+        // createAttributeNS open-tag keys are qName (+ xmlns:prefix); bare localName
+        // duplicates the attr in saveXML (#34926 leftover of #34305 / #33578).
+        // Only reuse lastCreateQualifiedName when it names this same Attr (ns+local).
+        $qname = $local;
+        $createdLocal = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        $createdNs = DomUserScriptAttributeCacheLlvm::lastCreateNamespace() ?? '';
+        $createdQ = DomUserScriptAttributeCacheLlvm::lastCreateQualifiedName();
+        if (null !== $createdQ && $createdLocal === $local && $createdNs === $ns) {
+            $qname = $createdQ;
+        }
         DomUserScriptAttributeCacheLlvm::setLiteralValue($ns, $local, $valueLit);
-        self::syncOwnerElementSaveXmlAfterAttrValueWrite($context, $receiver, $local, $valueLit);
+        self::syncOwnerElementSaveXmlAfterAttrValueWrite(
+            $context,
+            $receiver,
+            $ns,
+            $local,
+            $qname,
+            $valueLit
+        );
     }
 
     /**
@@ -327,21 +344,39 @@ final class JitDomElementTextContent
      *
      * Mirror setAttribute / removeAttribute: refresh loadXML compile-time open-tag and
      * push onto Attr::$ownerElement (peer #32981 / #34257).
+     *
+     * Namespaced Attrs must refresh the qName bag key (php-src xmlSetNsProp), not the
+     * localName alone (#34926).
      */
     private static function syncOwnerElementSaveXmlAfterAttrValueWrite(
         Context $context,
         Value $attr,
+        string $ns,
         string $local,
+        string $qname,
         string $valueLit
     ): void {
         $hadLoadXml = null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
             && JitDomLoadXMLUserScript::lastLoadWasPureUserScript();
         $id = JitDomCreateElementAttrs::lastId();
         if (null !== $id) {
-            JitDomCreateElementAttrs::set($id, $local, $valueLit);
+            if ('' !== $ns) {
+                $updates = JitDomAttributeNodeNS::openTagAttrUpdates($ns, $qname, $valueLit);
+                foreach ($updates as $name => $val) {
+                    JitDomCreateElementAttrs::set($id, $name, $val);
+                }
+                // Drop a prior bare-local key if a previous wrong write left one (#34926).
+                if ($qname !== $local) {
+                    JitDomCreateElementAttrs::remove($id, $local);
+                }
+            } else {
+                JitDomCreateElementAttrs::set($id, $local, $valueLit);
+            }
         }
         if ($hadLoadXml) {
-            JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeSet($local, $valueLit);
+            // loadXML open-tag for NS attrs still uses the serialized qName when present.
+            $openName = ('' !== $ns && $qname !== $local) ? $qname : $local;
+            JitDomLoadXMLUserScript::refreshCompileTimeXmlRootAttributeSet($openName, $valueLit);
         }
         if (!$hadLoadXml && null === $id) {
             return;
