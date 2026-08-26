@@ -2517,7 +2517,12 @@ class Context {
             // standalone must not NestedJIT those ABIs during init — leftover Context
             // NestedJIT vs Runtime ABI drift mints utf8_*.1 / define.1 /
             // file_get_contents.1 / readfile.1 / strspn.1 (#31894 / #32122).
-            Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
+            // SuperglobalRefresh always-on removed (#35137 / peer CliArgv #35133): compileToFile
+            // ensures SuperglobalRefreshRuntime for every LOAD_TYPE_STANDALONE before main
+            // emits __superglobals__refresh; thin already used ensureUserScriptRefreshEmit /
+            // ensureStandaloneBodies; JIT.php ensureLinked before resolve. Full standalone
+            // must not NestedJIT __superglobals__refresh during init — leftover Context
+            // NestedJIT vs Runtime ABI drift mints superglobals_refresh.1 (#31894 / #32122).
             // SuperglobalName always-on removed (#35035): JitSuperglobalName / JIT.php
             // StringSuperglobalName::ensureLinked before lookup (peer ensureMinimal #34812 /
             // #33235). Full standalone must not NestedJIT is_superglobal_name during init —
@@ -2574,14 +2579,15 @@ class Context {
             // Every standalone main emits __phpc_cli_store_argv — link before that call.
             // Was ensureFull-only for non-thin (#35133); thin already linked here (#34822).
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
-            if ($this->isThinStandaloneAotMain()) {
-                // IniRuntime always-on removed (#34848): JitIni / IniGet / IniSet / ErrorReporting /
-                // ZendDoubleStringRuntime / ExceptionThrowToStringSeed already ensureLinked before
-                // lookup (peer #34578 / #34822). Thin hello-world must not NestedJIT ini ABI during
-                // compileToFile pre-main — leftover Context NestedJIT vs Runtime ABI drift mints
-                // ini_get.1 / phpc_ini_*.1 (#31894 / #32122).
-                Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshEmit($this);
-            }
+            // Every standalone main emits __superglobals__refresh — link before that call.
+            // Was ensureFull-only for non-thin (#35137); thin used ensureUserScriptRefreshEmit
+            // (#34822). Unify via ensureStandaloneBodies (→ JitSuperglobalRefreshKernel).
+            Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
+            // IniRuntime always-on removed from thin compileToFile (#34848): JitIni / IniGet /
+            // IniSet / ErrorReporting / ZendDoubleStringRuntime / ExceptionThrowToStringSeed
+            // already ensureLinked before lookup (peer #34578 / #34822). Thin hello-world must
+            // not NestedJIT ini ABI during compileToFile pre-main — leftover Context NestedJIT
+            // vs Runtime ABI drift mints ini_get.1 / phpc_ini_*.1 (#31894 / #32122).
         }
 
         // add main function

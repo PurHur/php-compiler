@@ -40,9 +40,13 @@ final class ContextFullStandaloneLazyStdlibRuntimeShrinkTest extends TestCase
             );
         }
 
-        // Still links echo / refresh used by standalone main (#35133: CliArgv at compileToFile).
+        // Still links echo; CliArgv + SuperglobalRefresh deferred (#35133 / #35137).
         $this->assertStringContainsString('ValueEchoRuntime::ensureLinked($this)', $fullBody);
-        $this->assertStringContainsString('SuperglobalRefreshRuntime::ensureStandaloneBodies($this)', $fullBody);
+        $this->assertStringNotContainsString(
+            'SuperglobalRefreshRuntime::ensureStandaloneBodies($this)',
+            $fullBody,
+            'SuperglobalRefresh deferred to compileToFile (#35137)'
+        );
     }
 
     public function testCallSitesStillEnsureBeforeLookup(): void

@@ -38,10 +38,14 @@ final class ContextFullStandaloneLazyJsonOffsetShrinkTest extends TestCase
             );
         }
 
-        // Still links refresh used by inventory / standalone main.
-        // StringStrspn left ensureFull in #35089 — do not re-assert eager strspn here.
-        // StringFormat left ensureFull in #35130 — do not re-assert eager format here.
-        $this->assertStringContainsString('SuperglobalRefreshRuntime::ensureStandaloneBodies($this)', $fullBody);
+        // Still links echo; SuperglobalRefresh deferred to compileToFile (#35137).
+        // StringStrspn / StringFormat already lazy — do not re-assert eager here.
+        $this->assertStringContainsString('ValueEchoRuntime::ensureLinked($this)', $fullBody);
+        $this->assertStringNotContainsString(
+            'SuperglobalRefreshRuntime::ensureStandaloneBodies($this)',
+            $fullBody,
+            'SuperglobalRefresh deferred to compileToFile (#35137)'
+        );
     }
 
     public function testCallSitesStillEnsureBeforeLookup(): void

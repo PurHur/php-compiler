@@ -40,9 +40,13 @@ final class ContextFullStandaloneLazyGetenvShrinkTest extends TestCase
             );
         }
 
-        // Still links echo / refresh (#35130 StringFormat + #35133 CliArgv deferred).
+        // Still links echo; CliArgv + SuperglobalRefresh deferred (#35133 / #35137).
         $this->assertStringContainsString('ValueEchoRuntime::ensureLinked($this)', $fullBody);
-        $this->assertStringContainsString('SuperglobalRefreshRuntime::ensureStandaloneBodies($this)', $fullBody);
+        $this->assertStringNotContainsString(
+            'SuperglobalRefreshRuntime::ensureStandaloneBodies($this)',
+            $fullBody,
+            'SuperglobalRefresh deferred to compileToFile (#35137)'
+        );
     }
 
     public function testCallSitesStillEnsureBeforeLookup(): void

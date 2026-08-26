@@ -37,9 +37,9 @@ final class ContextMinimalStandaloneLazyIniCompileToFileRuntimeShrinkTest extend
             'compileToFile still ensures CliArgv for thin standalone (#34822)'
         );
         $this->assertStringContainsString(
-            'SuperglobalRefreshRuntime::ensureUserScriptRefreshEmit($this)',
+            'SuperglobalRefreshRuntime::ensureStandaloneBodies($this)',
             $body,
-            'compileToFile still emits superglobal refresh for thin standalone'
+            'compileToFile ensures SuperglobalRefresh for every standalone (#35137)'
         );
     }
 
