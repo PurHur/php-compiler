@@ -18,6 +18,9 @@ use PHPLLVM\Value;
  *
  * php-src: ext/dom/document.c / node.c — XML_DOCUMENT_NODE.
  * Must be listed in JIT::isVoidJitConstructCall so markObjectConstructed runs.
+ *
+ * Also seeds libxml option bools (#34908) and xmlVersion/xmlStandalone (#34916)
+ * so PropertyAssign sticks (MetaProps no longer hardcodes those fetches).
  */
 final class DomDocumentConstruct implements Call
 {
@@ -65,6 +68,13 @@ final class DomDocumentConstruct implements Call
         self::seedOptionBool($context, $obj, VmDom::PROP_RECOVER, false);
         self::seedOptionBool($context, $obj, VmDom::PROP_STRICT_ERROR_CHECKING, true);
 
+        // xmlVersion / xmlStandalone (+ legacy aliases) — same seed pattern (#34916).
+        // php-src: ext/dom/document.c — version/xmlVersion, standalone/xmlStandalone.
+        self::seedStringProp($context, $obj, VmDom::PROP_XML_VERSION, '1.0');
+        self::seedStringProp($context, $obj, VmDom::PROP_VERSION, '1.0');
+        self::seedOptionBool($context, $obj, VmDom::PROP_XML_STANDALONE, false);
+        self::seedOptionBool($context, $obj, VmDom::PROP_STANDALONE, false);
+
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
@@ -99,6 +109,27 @@ final class DomDocumentConstruct implements Call
             $objectType->propertySlotFor($obj, 'DOMDocument', $prop),
             $propVar,
             Variable::TYPE_VALUE
+        );
+    }
+
+    private static function seedStringProp(Context $context, Value $obj, string $prop, string $value): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($classId, $prop)) {
+            $objectType->defineProperty($classId, $prop, Variable::TYPE_STRING);
+        }
+        $str = $context->builder->load($context->constantStringFromString($value));
+        $propVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $str
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DOMDocument', $prop),
+            $propVar,
+            Variable::TYPE_STRING
         );
     }
 

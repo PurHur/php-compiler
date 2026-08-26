@@ -15,6 +15,7 @@ use PHPLLVM\Value;
  *
  * Option bools (formatOutput, …) use allocate()+DomDocumentConstruct seeds so
  * writes stick (#34908) — not hardcoded fetch.
+ * xmlVersion / xmlStandalone (+ aliases) likewise (#34916).
  *
  * php-src: ext/dom/php_dom.c — dom_document_*_read; ext/dom/node.c — dom_node_base_uri_read;
  * ext/dom/document.c
@@ -37,10 +38,6 @@ final class JitDomDocumentMetaProps
             || 'xmlencoding' === $propLc
             || 'actualencoding' === $propLc
             || 'encoding' === $propLc
-            || 'xmlversion' === $propLc
-            || 'version' === $propLc
-            || 'xmlstandalone' === $propLc
-            || 'standalone' === $propLc
             || 'config' === $propLc
             // DOMNode::$baseURI — same documentURI cwd stamp after loadXML (#34904).
             || 'baseuri' === $propLc;
@@ -56,12 +53,6 @@ final class JitDomDocumentMetaProps
         }
         if ('implementation' === $propLc) {
             return self::boxImplementation($context);
-        }
-        if ('xmlversion' === $propLc || 'version' === $propLc) {
-            return self::boxString($context, '1.0');
-        }
-        if ('xmlstandalone' === $propLc || 'standalone' === $propLc) {
-            return self::boxBool($context, false);
         }
         if ('xmlencoding' === $propLc || 'actualencoding' === $propLc || 'encoding' === $propLc) {
             $enc = self::encodingFromLoadXmlStamp();
@@ -128,25 +119,6 @@ final class JitDomDocumentMetaProps
             $context->lookupFunction('__value__writeString'),
             JitValueBox::pointer($context, $slot),
             $context->builder->load($context->constantStringFromString($value))
-        );
-
-        return new JITVariable(
-            $context,
-            JITVariable::TYPE_VALUE,
-            JITVariable::KIND_VARIABLE,
-            $slot
-        );
-    }
-
-    private static function boxBool(\PHPCompiler\JIT\Context $context, bool $value): JITVariable
-    {
-        $slot = JitValueBox::alloc($context);
-        $i1 = $context->getTypeFromString('int1');
-        $i32 = $context->getTypeFromString('int32');
-        JitValueBox::writeBool(
-            $context,
-            $slot,
-            $context->builder->zext($i1->constInt($value ? 1 : 0, false), $i32)
         );
 
         return new JITVariable(
