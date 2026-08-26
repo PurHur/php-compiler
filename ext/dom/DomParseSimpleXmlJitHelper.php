@@ -797,14 +797,45 @@ final class DomParseSimpleXmlJitHelper
 
     /**
      * Strip markup tags from element inner XML — Zend textContent for thin AOT (#33014).
+     *
+     * CDATA sections contribute their body (libxml); comments are omitted (#34949).
      */
     public static function textContentFromInnerXmlArgv(string $inner): string
     {
         if ('' === $inner) {
             return '';
         }
+        $out = '';
+        $len = \strlen($inner);
+        $i = 0;
+        while ($i < $len) {
+            if (1 === preg_match('/\G<!\[CDATA\[(.*?)\]\]>/s', $inner, $cdata, 0, $i)) {
+                $out .= $cdata[1];
+                $i += \strlen($cdata[0]);
 
-        return preg_replace('/<[^>]*>/', '', $inner) ?? '';
+                continue;
+            }
+            if (1 === preg_match('/\G<!--.*?-->/s', $inner, $comment, 0, $i)) {
+                $i += \strlen($comment[0]);
+
+                continue;
+            }
+            if (1 === preg_match('/\G<[^>]*>/', $inner, $tag, 0, $i)) {
+                $i += \strlen($tag[0]);
+
+                continue;
+            }
+            if (1 === preg_match('/\G([^<]+)/', $inner, $text, 0, $i)) {
+                $out .= $text[1];
+                $i += \strlen($text[1]);
+
+                continue;
+            }
+
+            break;
+        }
+
+        return $out;
     }
 
     /**
@@ -1041,7 +1072,7 @@ final class DomParseSimpleXmlJitHelper
      * Compile-time only (host preg). Keeps inter-element whitespace so AOT
      * {@code childNodes->length} matches Zend when preserveWhiteSpace is default.
      *
-     * @return list<array{kind: 'comment'|'text'|'element', data: string, inner?: string, open?: string}>
+     * @return list<array{kind: 'comment'|'text'|'cdata'|'element', data: string, inner?: string, open?: string}>
      */
     public static function directChildNodesArgv(string $xml): array
     {
@@ -1053,7 +1084,7 @@ final class DomParseSimpleXmlJitHelper
      *
      * Used by {@see JitDomGetNodePath} nested firstChild walks (#32474).
      *
-     * @return list<array{kind: 'comment'|'text'|'element', data: string, inner?: string, open?: string}>
+     * @return list<array{kind: 'comment'|'text'|'cdata'|'element', data: string, inner?: string, open?: string}>
      */
     public static function parseSiblingNodesArgv(string $inner): array
     {
@@ -1067,6 +1098,13 @@ final class DomParseSimpleXmlJitHelper
             if (1 === preg_match('/\G<!--(.*?)-->/s', $inner, $comment, 0, $i)) {
                 $nodes[] = ['kind' => 'comment', 'data' => $comment[1]];
                 $i += \strlen($comment[0]);
+
+                continue;
+            }
+            // libxml keeps XML_CDATA_SECTION_NODE — must not fall through to break (#34949).
+            if (1 === preg_match('/\G<!\[CDATA\[(.*?)\]\]>/s', $inner, $cdata, 0, $i)) {
+                $nodes[] = ['kind' => 'cdata', 'data' => $cdata[1]];
+                $i += \strlen($cdata[0]);
 
                 continue;
             }
@@ -1118,6 +1156,10 @@ final class DomParseSimpleXmlJitHelper
         if ('text' === $node['kind']) {
             return 'text()';
         }
+        if ('cdata' === $node['kind']) {
+            // libxml xmlGetNodePath: CDATA segments are text() (#34949).
+            return 'text()';
+        }
         if ('comment' === $node['kind']) {
             return 'comment()';
         }
@@ -1157,6 +1199,9 @@ final class DomParseSimpleXmlJitHelper
         $rest = substr($xml, $afterRoot);
         if (preg_match('/^\s*<!--(.*?)-->/s', $rest, $comment)) {
             return ['kind' => 'comment', 'data' => $comment[1]];
+        }
+        if (preg_match('/^\s*<!\[CDATA\[(.*?)\]\]>/s', $rest, $cdata)) {
+            return ['kind' => 'cdata', 'data' => $cdata[1]];
         }
         if (preg_match('/^\s*<([a-zA-Z_][\w:.-]*)(?:\s|\/|>)/', $rest, $child)) {
             return ['kind' => 'element', 'data' => $child[1]];
