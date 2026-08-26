@@ -2013,26 +2013,23 @@ final class JitFilter
             return $str;
         }
         if (JITVariable::TYPE_NATIVE_BOOL === $value->type) {
-            $id = (string) (++self::$blockSerial);
-            $trueBlock = BasicBlockHelper::append($context, 'fvs_bool_true_'.$id);
-            $falseBlock = BasicBlockHelper::append($context, 'fvs_bool_false_'.$id);
-            $doneBlock = BasicBlockHelper::append($context, 'fvs_bool_done_'.$id);
-            $isTrue = $context->helper->loadValue($value);
-            $context->builder->branchIf($isTrue, $trueBlock, $falseBlock);
-            $context->builder->positionAtEnd($trueBlock);
+            // Native bools are usually int1; boxValueSanitize synthesizes TYPE_NATIVE_BOOL
+            // from __value__readLong (i64). branchIf/select require i1 (#34930).
+            $loaded = $context->helper->loadValue($value);
+            $tyName = $context->getStringFromType($loaded->typeOf());
+            if ('int1' === $tyName) {
+                $isTrue = $loaded;
+            } else {
+                $isTrue = $context->builder->icmp(
+                    Builder::INT_NE,
+                    $loaded,
+                    $loaded->typeOf()->constInt(0, false)
+                );
+            }
             $one = $context->builder->load($context->constantStringFromString('1'));
-            $trueTail = $context->builder->getInsertBlock();
-            $context->builder->branch($doneBlock);
-            $context->builder->positionAtEnd($falseBlock);
             $zero = $context->builder->load($context->constantStringFromString(''));
-            $falseTail = $context->builder->getInsertBlock();
-            $context->builder->branch($doneBlock);
-            $context->builder->positionAtEnd($doneBlock);
-            $phi = $context->builder->phi($one->typeOf());
-            $phi->addIncoming($one, $trueTail);
-            $phi->addIncoming($zero, $falseTail);
 
-            return $phi;
+            return $context->builder->select($isTrue, $one, $zero);
         }
 
         return null;
