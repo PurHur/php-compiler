@@ -2498,19 +2498,20 @@ class Context {
             // (#10173). Full standalone must not emit fn-static table ABI during init —
             // leftover Context NestedJIT vs Runtime ABI drift mints phpc_fn_static_*.1
             // (#31894 / #32122).
-            Builtin\StringUtf8Latin1::ensureStandaloneBodies($this);
-            Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
-            Builtin\DefineRuntime::ensureStandaloneBodies($this);
+            // StringUtf8Latin1 / RewriteVars / Define / Strspn / FileGetContents / Readfile
+            // always-on removed (#35089): JitUtf8Latin1 / JitDefine / SpnJitLowering /
+            // JitParseStrUserScriptCstrKernel / JitFileGetContents / readfile.php /
+            // RewriteVarsRuntime::emit* / BootstrapCompileSmokeM3Emit already ensureLinked
+            // before lookup (peer ensureMinimal #34578 / Type #34474 / #34423). Full
+            // standalone must not NestedJIT those ABIs during init — leftover Context
+            // NestedJIT vs Runtime ABI drift mints utf8_*.1 / define.1 /
+            // file_get_contents.1 / readfile.1 / strspn.1 (#31894 / #32122).
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
             // SuperglobalName always-on removed (#35035): JitSuperglobalName / JIT.php
             // StringSuperglobalName::ensureLinked before lookup (peer ensureMinimal #34812 /
             // #33235). Full standalone must not NestedJIT is_superglobal_name during init —
             // leftover Context NestedJIT vs Runtime ABI drift mints is_superglobal_name.1
             // (#31894 / #32122).
-            Builtin\StringStrspn::ensureStandaloneBodies($this);
-            // BootstrapCompileSmokeM3Emit / inventory argv {main} calls __compiler_file_get_contents (#15604).
-            Builtin\StringFileGetContents::ensureStandaloneBodies($this);
-            Builtin\StringReadfile::ensureStandaloneBodies($this);
             // TokenGetAll / Highlight / Hebrev / Hebrevc always-on removed (#35035): each
             // ensureStandaloneBodies is a no-op — helper LLVM compiles on first lowering
             // (TokenGetAll::helperFunction / JitHighlight / JitHebrev). Do not re-add eager
