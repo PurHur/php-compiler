@@ -13968,20 +13968,22 @@ class JIT {
                             break;
                         }
                         $vm = new VM($this->context->runtime->vmContext);
-                        $frame = $block->getFrame($vm->context);
-                        foreach ($block->opCodes as $initOp) {
-                            if (OpCode::TYPE_DECLARE_GLOBAL_CONST === $initOp->type && $op->arg2 === $initOp->arg2) {
-                                break;
-                            }
-                            if ($vm->isClassBodyConstInitOpcode($initOp->type)) {
-                                $vm->executeClassBodyConstInitOpcode($frame, $initOp);
-                            }
-                        }
-                        if (!isset($frame->scope[$op->arg2])) {
-                            throw new \LogicException('Global constant value must be a compile-time constant');
-                        }
-                        $constValue = new VM\Variable();
-                        $constValue->copyFrom($frame->scope[$op->arg2]);
+                        // Seed user classes for `const C = new UserClass` — MODE_AOT skips
+                        // VM DECLARE_CLASS, same gap class-const materialization fixed (#19046 / #35196).
+                        $rootBlock = $this->context->jitFunctionRootBlock
+                            ?? $this->context->jitEnclosingBlock
+                            ?? $block;
+                        VM\ClassConstMaterializer::seedReferencedClasses(
+                            $vm,
+                            $rootBlock,
+                            $block,
+                            $op->arg2
+                        );
+                        $constValue = VM\ClassConstMaterializer::materializeGlobalConstSlot(
+                            $vm,
+                            $block,
+                            $op->arg2
+                        );
                     }
                     $constValue = VM\EnumCaseSupport::materializeConstantValue(
                         $this->context->runtime->vmContext,
@@ -13997,6 +13999,12 @@ class JIT {
                                 $nameOp->value,
                                 $constValue->toArray()
                             );
+                        } elseif (
+                            VM\Variable::TYPE_OBJECT === $constValue->type
+                            && !VM\EnumCaseSupport::isEnumCaseVariable($constValue)
+                        ) {
+                            // Bake immortal object for later CONST_FETCH (#35196, peer #34783).
+                            $this->context->constantObjectFromVm($nameOp->value, $constValue);
                         }
                         break;
                     }

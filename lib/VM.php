@@ -21489,8 +21489,10 @@ restart:
     /**
      * Declare a user class for JIT/AOT class-constant materialization (#19046, Zend/zend_compile.c).
      *
-     * Registers methods (including __construct) without re-running full defineClass(), which would
-     * recursively materialize other class constants and hit incomplete VM opcode paths.
+     * Registers methods (including __construct) and declared properties without re-running full
+     * defineClass(), which would recursively materialize other class constants and hit incomplete
+     * VM opcode paths. Properties are required so constructor promotion does not create dynamic
+     * properties under file-scope {@code const C = new UserClass(...)} (#35196).
      */
     public function ensureClassDeclaredForConstMaterialization(string $name, Block $bodyBlock): void
     {
@@ -21502,6 +21504,25 @@ restart:
         $entry = new ClassEntry(ltrim($name, '\\'));
         \PHPCompiler\ext\standard\VmReflection::markCompilerBootstrapClassInternal($entry);
         foreach ($bodyBlock->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_PROPERTY === $op->type) {
+                $propName = $frame->scope[$op->arg1]->toString();
+                $prototype = $frame->scope[$op->arg3];
+                $property = new VM\ClassProperty(
+                    $propName,
+                    null,
+                    $prototype,
+                    $op->propertyReadonly,
+                    MethodVisibility::mask($op->propertyVisibility),
+                    $lcname,
+                    (int) ($op->propertySetVisibility ?? 0),
+                    (int) ($op->propertyGetVisibility ?? 0),
+                    (bool) ($op->propertyAsymmetricExplicitRead ?? false),
+                    (bool) ($op->propertyLazy ?? false)
+                );
+                $property->fromConstructorPromotion = (bool) ($op->propertyFromConstructorPromotion ?? false);
+                $entry->properties[] = $property;
+                continue;
+            }
             if (OpCode::TYPE_DECLARE_METHOD !== $op->type || null === $op->block1) {
                 continue;
             }
