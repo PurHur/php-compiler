@@ -190,6 +190,13 @@ final class JitDomCloneNode
         $attrs = $spec['attrs'];
         $openAttrs = '' === $attrs ? '' : (str_starts_with($attrs, ' ') ? $attrs : ' '.$attrs);
         $outer = '<'.$spec['tag'].$openAttrs.'>'.$spec['inner'].'</'.$spec['tag'].'>';
+        // Pin Attrs on the clone so getAttribute reads this element's map — not the
+        // process-global name→value cache (#34863 / peer loadXML #32956).
+        JitDomCreateElement::storeAttributesPresence(
+            $context,
+            $obj,
+            DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv('<'.$spec['tag'].$openAttrs.'>')
+        );
         JitDomDocumentElement::syncChildrenFromXmlPublic($context, $obj, $outer);
 
         return $obj;
