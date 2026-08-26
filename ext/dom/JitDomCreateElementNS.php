@@ -261,6 +261,12 @@ final class JitDomCreateElementNS
             );
         }
         self::storeNullProperty($context, $obj, $className, VmDom::PROP_ATTRIBUTES);
+        // Null child/sibling edges so firstChild→nextSibling walks and $el->nextSibling
+        // do not read uninitialized VALUE slots (#34918 / peer createElement #24973).
+        self::storeNullProperty($context, $obj, $className, VmDom::PROP_FIRST_CHILD);
+        self::storeNullProperty($context, $obj, $className, VmDom::PROP_LAST_CHILD);
+        self::storeNullProperty($context, $obj, $className, VmDom::PROP_NEXT_SIBLING);
+        self::storeNullProperty($context, $obj, $className, VmDom::PROP_PREVIOUS_SIBLING);
         // Always seed textContent/nodeValue/INNER_XML — textContent-only store
         // leaves nodeValue as a null __string__* and the fetch SIGSEGVs (#32302 / #32292).
         JitDomCreateElement::storeTextContentSlots($context, $obj, $value, $className);
@@ -308,16 +314,12 @@ final class JitDomCreateElementNS
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
     ): void {
+        // Full Element stand-in (nextSibling / child edges) — NS layout used to omit them
+        // so document saveXML firstChild→nextSibling SIGSEGVd (#34918 leftover of #24973).
+        JitDomCreateElement::ensureDomElementStandInLayout($objectType, $classId);
         foreach ([
-            VmDom::PROP_NODE_NAME => JITVariable::TYPE_STRING,
-            VmDom::PROP_TAG_NAME => JITVariable::TYPE_STRING,
-            VmDom::PROP_LOCAL_NAME => JITVariable::TYPE_STRING,
             VmDom::PROP_PREFIX => JITVariable::TYPE_VALUE,
             VmDom::PROP_NAMESPACE_URI => JITVariable::TYPE_VALUE,
-            VmDom::PROP_ATTRIBUTES => JITVariable::TYPE_VALUE,
-            VmDom::PROP_PARENT_NODE => JITVariable::TYPE_VALUE,
-            VmDom::PROP_OWNER_DOCUMENT => JITVariable::TYPE_VALUE,
-            VmDom::PROP_USER_SCRIPT_XMLNS_ATTR => JITVariable::TYPE_STRING,
         ] as $prop => $type) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, $type);
