@@ -62,16 +62,24 @@ final class Expm1JitHelper
         $y = 1.0 + $r * $y / 2.0;
         $y = 1.0 + $r * $y / 1.0;
 
-        $absN = $n;
-        if ($n < 0) {
-            $absN = -$n;
-        }
-        // Float doubling (not int shift) — NestedJIT-safe (peer Exp #28241).
+        // NestedJIT: no compound `&&` in for-conds (#35058 / peer ExpJitHelper / Ldexp #29578).
         $scale = 1.0;
-        for ($i = 0; $i < $absN && $i < 1024; ++$i) {
-            $scale = $scale + $scale;
-        }
-        if ($n < 0) {
+        if ($n > 0) {
+            $limit = $n;
+            if ($limit > 1024) {
+                $limit = 1024;
+            }
+            for ($i = 0; $i < $limit; ++$i) {
+                $scale = $scale + $scale;
+            }
+        } elseif ($n < 0) {
+            $limit = -$n;
+            if ($limit > 1024) {
+                $limit = 1024;
+            }
+            for ($i = 0; $i < $limit; ++$i) {
+                $scale = $scale + $scale;
+            }
             $scale = 1.0 / $scale;
         }
 
