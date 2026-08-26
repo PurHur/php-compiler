@@ -449,6 +449,12 @@ final class VmIni
         self::$exceptionIgnoreArgs = $ignore;
     }
 
+    /** Sync from thin-AOT IniGetLeaf / JIT ini_set (#35020). */
+    public static function syncSerializePrecision(int $precision): void
+    {
+        self::$serializePrecision = $precision;
+    }
+
     /** php-src PG(serialize_precision) default -1 (zend_dtoa mode 0; issue #7100). */
     public static function getSerializePrecision(): string
     {
