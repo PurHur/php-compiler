@@ -560,6 +560,15 @@ class Context {
     public array $foreachAggregateInnerHtSlots = [];
 
     /**
+     * IteratorAggregate foreach whose getIterator() yields — resume name for the inner Generator (#34980).
+     *
+     * Keyed by {@see foreachSlotMapKey()}; value is the creator resume symbol (e.g. `a::getiterator__resume`).
+     *
+     * @var array<string, string>
+     */
+    public array $foreachAggregateGeneratorResume = [];
+
+    /**
      * SplStack (and LIFO dllist) foreach — packed `__spl_ht` walked descending (#28705).
      *
      * @var array<string, true>
