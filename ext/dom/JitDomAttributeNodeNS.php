@@ -305,10 +305,16 @@ final class JitDomAttributeNodeNS
         // leftover cts stamp, keying the Attr cache as namespace "k" instead of "" (#33534).
         $nsLit = self::compileTimeNullableStringArg($args[1]);
         $localLit = self::compileTimeStringArg($args[2]);
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        // Prefer the receiver's loadXML — lastCompileTimeXml is the globally last load and
+        // steals attrs after a second document (#35131 / peer importNode #32987).
+        $xml = $args[0]->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($args[0])
+            ?? JitDomGetNodePath::$lastDocumentElementXml
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null !== $nsLit && null !== $localLit && null !== $xml) {
             $parsed = DomParseSimpleXmlJitHelper::findAttributeNSArgv($xml, $nsLit, $localLit);
             if (null !== $parsed) {
+                JitDomAttrRename::rememberFetchedKey($nsLit, $localLit);
                 $attr = self::materializeAttrFromLiterals(
                     $context,
                     $parsed['namespace'],
@@ -326,6 +332,7 @@ final class JitDomAttributeNodeNS
         }
 
         if (null !== $nsLit && null !== $localLit) {
+            JitDomAttrRename::rememberFetchedKey($nsLit, $localLit);
             $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, $nsLit, $localLit);
             self::wireOwnerElementIfPresent($context, $element, $attr);
 
