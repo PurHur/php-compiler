@@ -4128,6 +4128,12 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);
             // loadXML $doc->doctype — late defineProperty after new undersizes (#34887 / #32736).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_DOCTYPE, Variable::TYPE_VALUE);
+            // Computed document props — late defineProperty after loadXML SIGSEGVs (#34894 / #34887).
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_IMPLEMENTATION, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_DOCUMENT_URI, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_ENCODING, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_VERSION, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_STANDALONE, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
         }
         if ('domattr' === $lcname) {
