@@ -29,6 +29,12 @@ final class MbStrwidthRuntimeShrinkTest extends TestCase
             'encoding must be a string literal in this compiler build',
             $jit
         );
+        $pad = (string) \file_get_contents(__DIR__.'/../../ext/mbstring/JitMbStrPad.php');
+        $this->assertStringContainsString('assertEncodingHelper', $pad);
+        $this->assertStringNotContainsString(
+            'encoding must be a string literal in this compiler build',
+            $pad
+        );
     }
 
     public function testMbStrwidthUsesJitVmHelperLink(): void
