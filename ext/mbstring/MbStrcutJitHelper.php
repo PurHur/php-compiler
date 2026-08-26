@@ -16,12 +16,50 @@ namespace PHPCompiler\ext\mbstring;
  * - Use `$n = $sliceEnd - $sliceStart` then `\substr($string, $sliceStart, $n)`.
  * - Prefer `$found == 0` and nested range ifs (no elseif / ternaries).
  * - Do not branch on `$encoding` before the UTF-8 walk (NestedJIT mis-slice).
+ * Runtime encoding validation (#34875) — int-returning assert (string-returning NestedJIT throws SIGSEGV).
  */
 final class MbStrcutJitHelper
 {
+    /**
+     * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
+     * SIGSEGVs under thin AOT; int helpers match {@see MbSearchJitHelper::assertEncodingArgv} (#34875 / #34866).
+     *
+     * Encoding is Argument #4 for mb_substr / mb_strcut.
+     */
+    public static function assertEncodingArgv(string $encoding, string $function): int
+    {
+        if ('' === self::canon($encoding)) {
+            // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+            throw new \ValueError(
+                $function.'(): Argument #4 ($encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
+
+        return 1;
+    }
+
+    private static function canon(string $encoding): string
+    {
+        if ('UTF-8' === $encoding || 'utf-8' === $encoding || 'UTF8' === $encoding || 'utf8' === $encoding) {
+            return 'UTF-8';
+        }
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            return 'ASCII';
+        }
+        if ('8BIT' === $encoding || '8bit' === $encoding || 'BINARY' === $encoding || 'binary' === $encoding) {
+            return '8BIT';
+        }
+
+        return '';
+    }
+
     /** @param int $length negative means cut to end */
     public static function strcutArgv(string $string, int $from, int $length, string $encoding): string
     {
+        // Encoding must already be validated via {@see assertEncodingArgv} (#34875).
         if ($from < 0) {
             $from = \strlen($string) + $from;
             if ($from < 0) {
