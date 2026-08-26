@@ -2017,7 +2017,14 @@ final class JitFilter
             $trueBlock = BasicBlockHelper::append($context, 'fvs_bool_true_'.$id);
             $falseBlock = BasicBlockHelper::append($context, 'fvs_bool_false_'.$id);
             $doneBlock = BasicBlockHelper::append($context, 'fvs_bool_done_'.$id);
-            $isTrue = $context->helper->loadValue($value);
+            $loaded = $context->helper->loadValue($value);
+            // boxValueSanitize tags __value__readLong (i64) as TYPE_NATIVE_BOOL;
+            // branchIf requires i1 — coerce any integer width via icmp ne 0 (#34930).
+            $isTrue = $context->builder->icmp(
+                Builder::INT_NE,
+                $loaded,
+                $loaded->typeOf()->constInt(0, false)
+            );
             $context->builder->branchIf($isTrue, $trueBlock, $falseBlock);
             $context->builder->positionAtEnd($trueBlock);
             $one = $context->builder->load($context->constantStringFromString('1'));
