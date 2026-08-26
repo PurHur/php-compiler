@@ -118,7 +118,11 @@ final class JitDomGetElementsByTagNameUserScript
         // another document (importNode destination counted the source tree; #34630 /
         // peer saveXML #33697).
         $markup = JitDomLoadXMLUserScript::compileTimeXmlFor($args[0]);
-        if (null === $markup && null === JitDomLoadXMLUserScript::lastCompileTimeXml()) {
+        // Fall back to last loadXML literal when the receiver binding is unset (#34936).
+        if (null === $markup) {
+            $markup = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        }
+        if (null === $markup) {
             // HTML-only scripts: no XML literal exists to steal.
             $markup = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
         }
