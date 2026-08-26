@@ -2320,16 +2320,17 @@ class JIT {
     }
 
     /**
-     * LLVM 9 crashes lowering these during M3 compile-driver link; keep stubbed until fixed (#1402).
+     * Former LLVM 9 crash denylist for M3 compile-driver link (#1402 / #1514).
+     *
+     * Empty as of #35009: BootstrapAot fixtures are not on the compile spine allowlist, so a deny
+     * fragment never changed lowering. Keep the hook for a proven crasher — do not re-add fixtures
+     * that are merely stubbed via other SELFHOST_AOT paths.
      *
      * @return list<string> lowercase name fragments
      */
     private function m3CompileDriverSpineDenyNames(): array
     {
-        return [
-            // Full emit FUNCDEF LLVM 9 link crash (#1514); inline emit in compile_driver compile mode (#1983).
-            '\\bootstrapaot\\helloworld_compile_smoke',
-        ];
+        return [];
     }
 
     private function isM3CompileDriverSpineDenyName(string $lower): bool
