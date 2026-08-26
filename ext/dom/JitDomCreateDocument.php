@@ -22,6 +22,7 @@ use PHPLLVM\Value;
  *
  * php-src: ext/dom/php_dom.c PHP_METHOD(DOMImplementation, createDocument)
  *          xmlNewDoc + xmlNewDocNode + xmlDocSetRootElement (#32531)
+ *          Non-null \$doctype adopted as \$doc->doctype (#35182).
  */
 final class JitDomCreateDocument
 {
@@ -62,11 +63,7 @@ final class JitDomCreateDocument
                 'DOMImplementation::createDocument() user-script AOT requires compile-time namespace/qualifiedName'
             );
         }
-        if (isset($args[3]) && JITVariable::TYPE_NULL !== $args[3]->type && !$args[3]->isNullConstant) {
-            throw new \LogicException(
-                'DOMImplementation::createDocument() user-script AOT requires a compile-time null $doctype'
-            );
-        }
+        $doctypeArg = self::optionalDoctypeArg($args[3] ?? null);
 
         $objectType = $context->type->object;
         $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
@@ -86,6 +83,11 @@ final class JitDomCreateDocument
 
         if ('' === $qualifiedName) {
             self::storeNullDocumentElement($context, $document);
+            if (null !== $doctypeArg) {
+                self::attachDoctype($context, $document, $doctypeArg);
+            } else {
+                self::storeNullDoctype($context, $document);
+            }
 
             return self::boxObjectResult($context, $document);
         }
@@ -127,7 +129,96 @@ final class JitDomCreateDocument
 
         DomUserScriptPinnedRootLlvm::pin($context, $element);
 
+        // php-src createDocument adopts $doctype as intSubset / $doc->doctype (#35182).
+        if (null !== $doctypeArg) {
+            self::attachDoctype($context, $document, $doctypeArg);
+        } else {
+            // Unset PROP_DOCTYPE slot reads as non-null under detachedFetch (#35182).
+            self::storeNullDoctype($context, $document);
+        }
+
         return self::boxObjectResult($context, $document);
+    }
+
+    /**
+     * null = omit / explicit null; JITVariable = DocumentType stand-in to adopt (#35182).
+     */
+    private static function optionalDoctypeArg(?JITVariable $arg): ?JITVariable
+    {
+        if (null === $arg || JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return null;
+        }
+        if (JITVariable::TYPE_OBJECT !== $arg->type && JITVariable::TYPE_VALUE !== $arg->type) {
+            throw new \LogicException(
+                'DOMImplementation::createDocument() user-script AOT $doctype must be DOMDocumentType or null'
+            );
+        }
+
+        return $arg;
+    }
+
+    /**
+     * Pin $doc->doctype + saveXML <!DOCTYPE> stamp (peer loadXML storeDoctypeProperty).
+     *
+     * php-src: ext/dom/php_dom.c — createDocument adopts doctype via xmlCreateIntSubset.
+     */
+    private static function attachDoctype(Context $context, Value $document, JITVariable $doctypeArg): void
+    {
+        $doctype = self::loadObjectArg($context, $doctypeArg);
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCTYPE)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCTYPE, JITVariable::TYPE_VALUE);
+        }
+        $doctypeJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $doctype
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCTYPE),
+            $doctypeJit,
+            JITVariable::TYPE_VALUE
+        );
+
+        $standInClass = 'DOMElement';
+        $standInId = $objectType->lookup($standInClass);
+        if (!$objectType->hasProperty($standInId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($standInId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        }
+        $docJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $document
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($doctype, $standInClass, VmDom::PROP_PARENT_NODE),
+            $docJit,
+            JITVariable::TYPE_VALUE
+        );
+
+        // createDocumentType already called rememberCreate; mark attached for $doc->doctype /
+        // saveXML prefix (#34887 / #33584).
+        DomUserScriptDoctypeLlvm::markAttached();
+    }
+
+    private static function loadObjectArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
+
+        throw new \LogicException(
+            'DOMImplementation::createDocument() $doctype must be an object'
+        );
     }
 
     private static function materializeRoot(
@@ -204,6 +295,27 @@ final class JitDomCreateDocument
                 self::CLASS_DOCUMENT,
                 VmDom::PROP_DOCUMENT_ELEMENT
             ),
+            $propVar,
+            JITVariable::TYPE_NULL
+        );
+    }
+
+    /** Explicit null so detachedFetch does not read an unset PROP_DOCTYPE slot (#35182). */
+    private static function storeNullDoctype(Context $context, Value $document): void
+    {
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCTYPE)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCTYPE, JITVariable::TYPE_VALUE);
+        }
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+        $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCTYPE),
             $propVar,
             JITVariable::TYPE_NULL
         );
