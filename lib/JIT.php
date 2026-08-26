@@ -924,7 +924,8 @@ class JIT {
     }
 
     /**
-     * Merge-block slot the ?: arms assign into — ECHO arg, or CONCAT operand before ECHO (#32908).
+     * Merge-block slot the ?: arms assign into — ECHO arg, CONCAT operand before ECHO (#32908),
+     * or FUNCCALL ARG_SEND of the phi (#34944).
      *
      * For `echo ($o ? $o->prop : 'x') . '!'` php-cfg emits CONCAT(alias, lit) then ECHO(concat).
      * {@see mergeEchoSlot} alone returns the concat result, so arm ASSIGN.arg2 never matches and
@@ -932,6 +933,10 @@ class JIT {
      *
      * Chained `tern1 . '|' . tern2` emits CONCAT(prior, tern2): both sides are non-literal; prefer
      * the side the arms actually ASSIGN into (usually the right).
+     *
+     * `var_export($o ? [$o->x] : null)` merges into ARG_SEND of the phi with no ECHO of that
+     * slot — without recognizing ARG_SEND here, stack-phi never arms and AOT sends NULL (#34944).
+     * php-src: Zend/zend_ast.c ZEND_AST_CONDITIONAL.
      */
     private function mergeTernaryResultSlot(
         Block $mergeBlock,
@@ -959,6 +964,14 @@ class JIT {
                 return $leftSlot;
             }
             if (OpCode::TYPE_ECHO === $mergeOp->type && null !== $mergeOp->arg1) {
+                return (int) $mergeOp->arg1;
+            }
+            // FUNCCALL merge: ARG_SEND of the ?: phi (Compiler remaps dead call-arg temps).
+            if (
+                OpCode::TYPE_ARG_SEND === $mergeOp->type
+                && null !== $mergeOp->arg1
+                && $this->ternaryArmsAssignIntoSlot($ifBlock, $elseBlock, (int) $mergeOp->arg1)
+            ) {
                 return (int) $mergeOp->arg1;
             }
         }
