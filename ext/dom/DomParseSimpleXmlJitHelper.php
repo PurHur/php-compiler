@@ -18,21 +18,36 @@ final class DomParseSimpleXmlJitHelper
             return 0;
         }
         // DOMDocument::getElementsByTagName("*") — every element open-tag (#33063).
-        // Peer countDescendantTagArgv already routed "*" here via countElementOpenTagsArgv.
         if ('*' === $tag) {
             return self::countElementOpenTagsArgv($xml);
         }
-        $needle = '<'.$tag;
+        // php-src/libxml match on local name — `<x:a>` counts for getElementsByTagName('a') (#34936).
         $count = 0;
         $offset = 0;
-        while (false !== ($pos = stripos($xml, $needle, $offset))) {
-            $after = $pos + \strlen($needle);
-            if ($after >= \strlen($xml)) {
-                break;
+        $len = strlen($xml);
+        while ($offset < $len && false !== ($pos = strpos($xml, '<', $offset))) {
+            $next = $xml[$pos + 1] ?? '';
+            if ('/' === $next || '!' === $next || '?' === $next || '' === $next) {
+                $offset = $pos + 1;
+                continue;
             }
-            $next = $xml[$after];
-            if ('>' === $next || '/' === $next || ' ' === $next) {
-                ++$count;
+            $nameStart = $pos + 1;
+            $nameEnd = $nameStart;
+            while ($nameEnd < $len) {
+                $ch = $xml[$nameEnd];
+                if ('>' === $ch || '/' === $ch || ' ' === $ch || "	" === $ch || "
+" === $ch || "" === $ch) {
+                    break;
+                }
+                ++$nameEnd;
+            }
+            if ($nameEnd > $nameStart) {
+                $qname = strtolower(substr($xml, $nameStart, $nameEnd - $nameStart));
+                $colon = strrpos($qname, ':');
+                $local = false === $colon ? $qname : substr($qname, $colon + 1);
+                if ($local === $tag) {
+                    ++$count;
+                }
             }
             $offset = $pos + 1;
         }
