@@ -5,17 +5,23 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbNumericEntity;
 use PHPCompiler\JIT\CallUnpackHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
 use PHPLLVM\Value;
 
 /**
- * Compile-time folding and runtime lowering for mb_encode_numericentity() / mb_decode_numericentity() (#7237).
+ * Compile-time folding and runtime lowering for mb_encode_numericentity() / mb_decode_numericentity()
+ * (#7237, #35210 runtime encoding).
+ *
+ * Compile-time fold for string literals; runtime haystack/encoding via NestedJIT
+ * {@see MbNumericEntityJitHelper} (peer {@see JitMbTrim} / #35199).
  */
 final class JitMbNumericEntity
 {
@@ -36,22 +42,86 @@ final class JitMbNumericEntity
 
         $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_encode_numericentity', 0, 'string');
         $mapScalars = self::lowerConvMapScalars($context, $args[1]);
-        $encoding = self::runtimeEncodingLiteral($args, 2, 'mb_encode_numericentity');
-        $isHexI8 = self::runtimeIsHexI8($context, $args, 3);
+        $isHexI64 = self::runtimeIsHexI64($context, $args, 3);
 
+        // Link NestedJIT helpers before encoding lower — NestedJIT can invalidate prior IR (#34270 / #35199).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbNumericEntity::ensureLinked($context);
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_encode_numericentity_runtime');
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_mb_encode_numericentity4'),
+        [$encPtr, $needsAssert] = self::encodingPtr($context, $args, $argc, 'mb_encode_numericentity');
+        if ($needsAssert) {
+            $fnName = $context->builder->load($context->constantStringFromString('mb_encode_numericentity'));
+            $context->builder->call(
+                MbNumericEntity::assertEncodingHelper($context),
+                $encPtr,
+                $fnName
+            );
+        }
+
+        $resultStr = $context->builder->call(
+            MbNumericEntity::encode4Helper($context),
             $str,
             $mapScalars[0],
             $mapScalars[1],
             $mapScalars[2],
             $mapScalars[3],
             $encPtr,
-            $isHexI8
+            $isHexI64
         );
+
+        return self::materializeOwnedString($context, $resultStr);
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    public static function invokeDecodeRuntime(Context $context, array $args): Value
+    {
+        $folded = self::tryDecodeCompileTimeFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('mb_decode_numericentity() expects 2 to 3 arguments in this compiler build');
+        }
+
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_decode_numericentity', 0, 'string');
+        $mapScalars = self::lowerConvMapScalars($context, $args[1]);
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbNumericEntity::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_decode_numericentity_runtime');
+
+        [$encPtr, $needsAssert] = self::encodingPtr($context, $args, $argc, 'mb_decode_numericentity');
+        if ($needsAssert) {
+            $fnName = $context->builder->load($context->constantStringFromString('mb_decode_numericentity'));
+            $context->builder->call(
+                MbNumericEntity::assertEncodingHelper($context),
+                $encPtr,
+                $fnName
+            );
+        }
+
+        $resultStr = $context->builder->call(
+            MbNumericEntity::decode4Helper($context),
+            $str,
+            $mapScalars[0],
+            $mapScalars[1],
+            $mapScalars[2],
+            $mapScalars[3],
+            $encPtr
+        );
+
+        return self::materializeOwnedString($context, $resultStr);
     }
 
     /**
@@ -99,36 +169,73 @@ final class JitMbNumericEntity
     }
 
     /**
-     * @param JITVariable[] $args
+     * Literal UTF-8/ASCII → constant string (no assert); otherwise NestedJIT encoding + assert (#35210).
+     *
+     * @param list<JITVariable> $args
+     * @return array{0: Value, 1: bool} encoding ptr, needsAssert
      */
-    public static function invokeDecodeRuntime(Context $context, array $args): Value
+    private static function encodingPtr(Context $context, array $args, int $argc, string $function): array
     {
-        $folded = self::tryDecodeCompileTimeFold($context, $args);
-        if (null !== $folded) {
-            return $folded;
+        if ($argc < 3 || JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
+            return [$context->builder->load($context->constantStringFromString('UTF-8')), false];
         }
 
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('mb_decode_numericentity() expects 2 to 3 arguments in this compiler build');
+        $encodingLit = JitStringArg::compileTimeLiteral($args[2]);
+        if (null !== $encodingLit) {
+            $canonical = self::canonicalNumericEntityEncoding($encodingLit);
+            if (null !== $canonical) {
+                return [$context->builder->load($context->constantStringFromString($canonical)), false];
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_decode_numericentity', 0, 'string');
-        $mapScalars = self::lowerConvMapScalars($context, $args[1]);
-        $encoding = self::runtimeEncodingLiteral($args, 2, 'mb_decode_numericentity');
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[2],
+                $function,
+                2,
+                'encoding'
+            ),
+            true,
+        ];
+    }
 
-        MbNumericEntity::ensureLinked($context);
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+    private static function canonicalNumericEntityEncoding(string $encoding): ?string
+    {
+        $upper = \strtoupper($encoding);
+        if ('UTF-8' === $upper || 'UTF8' === $upper) {
+            return 'UTF-8';
+        }
+        if ('ASCII' === $upper || 'US-ASCII' === $upper) {
+            return 'ASCII';
+        }
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_mb_decode_numericentity4'),
-            $str,
-            $mapScalars[0],
-            $mapScalars[1],
-            $mapScalars[2],
-            $mapScalars[3],
-            $encPtr
+        return null;
+    }
+
+    private static function materializeOwnedString(Context $context, Value $resultStr): Value
+    {
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $resultStr);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
+
+        return $ptr;
+    }
+
+    private static function materializeString(Context $context, string $str): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $context->builder->load($context->constantStringFromString($str))
         );
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
+
+        return $ptr;
     }
 
     /**
@@ -198,6 +305,10 @@ final class JitMbNumericEntity
         if (null === $encoding && isset($args[2])) {
             return null;
         }
+        // Unknown / unsupported encoding → runtime NestedJIT assert (catchable ValueError) (#35210).
+        if (null === self::canonicalNumericEntityEncoding($encoding ?? 'UTF-8')) {
+            return null;
+        }
         $isHex = false;
         if (isset($args[3])) {
             $boolFold = self::compileTimeBool($args, 3);
@@ -207,10 +318,9 @@ final class JitMbNumericEntity
             $isHex = $boolFold;
         }
 
-        return $context->builder->load(
-            $context->constantStringFromString(
-                VmMbstring::encodeNumericEntity($str, $convmap, $encoding ?? 'UTF-8', $isHex)
-            )
+        return self::materializeString(
+            $context,
+            VmMbstring::encodeNumericEntity($str, $convmap, self::canonicalNumericEntityEncoding($encoding ?? 'UTF-8') ?? 'UTF-8', $isHex)
         );
     }
 
@@ -231,10 +341,16 @@ final class JitMbNumericEntity
         if (null === $encoding && isset($args[2])) {
             return null;
         }
+        if (null === self::canonicalNumericEntityEncoding($encoding ?? 'UTF-8')) {
+            return null;
+        }
 
-        return $context->builder->load(
-            $context->constantStringFromString(
-                VmMbstring::decodeNumericEntity($str, $convmap, $encoding ?? 'UTF-8')
+        return self::materializeString(
+            $context,
+            VmMbstring::decodeNumericEntity(
+                $str,
+                $convmap,
+                self::canonicalNumericEntityEncoding($encoding ?? 'UTF-8') ?? 'UTF-8'
             )
         );
     }
@@ -421,34 +537,18 @@ final class JitMbNumericEntity
     /**
      * @param JITVariable[] $args
      */
-    private static function runtimeEncodingLiteral(array $args, int $index, string $function): string
+    private static function runtimeIsHexI64(Context $context, array $args, int $index): Value
     {
-        $encoding = self::compileTimeEncoding($args, $index);
-        if (null === $encoding) {
-            throw new \LogicException(
-                $function.'() JIT requires compile-time encoding literal in this compiler build'
-            );
-        }
-        VmMbstring::resolveNumericEntityEncoding($encoding, $function, $index);
-
-        return $encoding;
-    }
-
-    /**
-     * @param JITVariable[] $args
-     */
-    private static function runtimeIsHexI8(Context $context, array $args, int $index): Value
-    {
-        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
         if (!isset($args[$index])) {
-            return $i8->constInt(0, false);
+            return $i64->constInt(0, false);
         }
         $boolFold = self::compileTimeBool($args, $index);
         if (null !== $boolFold) {
-            return $i8->constInt($boolFold ? 1 : 0, false);
+            return $i64->constInt($boolFold ? 1 : 0, false);
         }
         if (JITVariable::TYPE_NATIVE_BOOL === $args[$index]->type && JITVariable::KIND_VALUE === $args[$index]->kind) {
-            return $context->builder->zExt($context->helper->loadValue($args[$index]), $i8);
+            return $context->builder->zExt($context->helper->loadValue($args[$index]), $i64);
         }
 
         throw new \LogicException(

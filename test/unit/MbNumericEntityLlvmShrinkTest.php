@@ -17,8 +17,9 @@ final class MbNumericEntityLlvmShrinkTest extends TestCase
     public function testMbNumericEntityUsesJitVmHelperLinkForAllPaths(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MbNumericEntity.php');
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
         $this->assertStringContainsString('MbNumericEntityJitHelper', $runtime);
+        $this->assertStringNotContainsString('ensureBridge', $runtime);
         $this->assertStringNotContainsString('MbNumericEntityLlvm', $runtime);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
     }
