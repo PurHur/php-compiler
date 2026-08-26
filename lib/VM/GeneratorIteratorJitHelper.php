@@ -62,10 +62,11 @@ final class GeneratorIteratorJitHelper
             $i1->constInt(0, false),
             $context->builder->structGep($stateParam, $map['has_pending_throw'])
         );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            JitValueBox::pointer($context, $pendingField)
-        );
+        // Do NOT __value__writeNull(pending_throw) before dispatch/return (#35144 / re-#33726).
+        // ExceptionJitHelper stores only the object address (no addref). writeNull can drop the
+        // last GC root and free the Exception before catch instanceof / uncaught print run —
+        // class_id becomes garbage, catch (Exception) misses, caller sees Uncaught Exception.
+        // Keep the field populated so the object stays alive; generator teardown clears it.
         $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
         $branchedToDispatch = false;
         if (null !== $handler && null !== $handler->dispatchBb) {
@@ -87,7 +88,8 @@ final class GeneratorIteratorJitHelper
         }
         if (!$branchedToDispatch) {
             // No in-generator catch: close and return so the caller observes throw-pending
-            // (Zend zend_generator_throw → GeneratorUncaughtThrow).
+            // (Zend zend_generator_throw → GeneratorUncaughtThrow). Keep pending_throw rooted
+            // (same as FiberHelperLlvm no-handler path — writeNull would dangle $excObj).
             $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['done']));
             $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_current']));
             $context->builder->returnValue($i64->constInt(0, false));

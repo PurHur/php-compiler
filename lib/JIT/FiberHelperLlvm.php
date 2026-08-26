@@ -604,10 +604,7 @@ final class FiberHelperLlvm
                 JitThrow::ensureLinked($context);
                 $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excObj);
                 $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_pending_throw']));
-                $context->builder->call(
-                    $context->lookupFunction('__value__writeNull'),
-                    JitValueBox::pointer($context, $pendingField)
-                );
+                // Keep pending_throw rooted — ExceptionJitHelper holds only an address (#35144).
                 $context->builder->branch($handler->dispatchBb);
                 $branchedToDispatch = true;
             } else {
@@ -623,10 +620,7 @@ final class FiberHelperLlvm
                     JitThrow::ensureLinked($context);
                     $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excObj);
                     $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_pending_throw']));
-                    $context->builder->call(
-                        $context->lookupFunction('__value__writeNull'),
-                        JitValueBox::pointer($context, $pendingField)
-                    );
+                    // Keep pending_throw rooted — ExceptionJitHelper holds only an address (#35144).
                     $context->builder->branch($handler->dispatchBb);
                     $branchedToDispatch = true;
                 }
