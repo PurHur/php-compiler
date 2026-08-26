@@ -87,7 +87,12 @@ final class KanaConvert
 
     private static function assertEncoding(string $encoding): void
     {
-        $canonical = MbstringEncodingRegistry::resolve($encoding) ?? $encoding;
+        $canonical = MbstringEncodingRegistry::resolve($encoding);
+        if (null === $canonical) {
+            throw new \ValueError(
+                'mb_convert_kana(): Argument #3 ($encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
         if ('UTF-8' !== $canonical && 'ASCII' !== $canonical && '8BIT' !== $canonical) {
             throw new \LogicException(
                 'mb_convert_kana() requires mbstring for encoding '.$encoding.' in this compiler build'
