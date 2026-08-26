@@ -12,17 +12,56 @@ namespace PHPCompiler\ext\mbstring;
  * + NestedJIT-safe upper/lower maps (Latin-1 + Cyrillic + Greek; peer MbChrOrdJitHelper — no
  * PHP chr()). Illegal UTF-8 bytes emit default `?` (#34344 leftover of #34340).
  *
+ * Runtime encoding via {@see assertEncodingArgv} (#35151 leftover of #34284 / peer #34858).
+ *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_convert_case)
  */
 final class MbConvertCaseJitHelper
 {
+    /**
+     * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
+     * SIGSEGVs under thin AOT; int helpers match {@see MbCaseJitHelper::assertEncodingArgv} (#35151).
+     *
+     * Argument #3 ($encoding) for mb_convert_case.
+     */
+    public static function assertEncodingArgv(string $encoding, string $function): int
+    {
+        $ok = 0;
+        if ('UTF-8' === $encoding || 'utf-8' === $encoding || 'UTF8' === $encoding || 'utf8' === $encoding) {
+            $ok = 1;
+        }
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            $ok = 1;
+        }
+        if ('8BIT' === $encoding || '8bit' === $encoding || 'BINARY' === $encoding || 'binary' === $encoding) {
+            $ok = 1;
+        }
+        if (0 === $ok) {
+            // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+            throw new \ValueError(
+                $function.'(): Argument #3 ($encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
+
+        return 1;
+    }
+
     public static function titleArgv(string $string, string $encoding): string
     {
+        // Encoding must already be validated via {@see assertEncodingArgv} (#35151).
+        unset($encoding);
+
         return self::titleCase($string);
     }
 
     public static function titleSimpleArgv(string $string, string $encoding): string
     {
+        // Encoding must already be validated via {@see assertEncodingArgv} (#35151).
+        unset($encoding);
+
         return self::titleCase($string);
     }
 
