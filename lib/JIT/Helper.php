@@ -850,20 +850,21 @@ restart:
                     $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                     goto return_bool;
                 }
-                if (OpCode::TYPE_EQUAL === $opcode->type) {
+                // zend_is_true(IS_DOUBLE) ⊙ bool — prior code compared float to 0.0 and
+                // ignored the bool, so `1.0 == true` was always false (#35220).
+                if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                     $doubleTy = $this->context->getTypeFromString('double');
                     $zero = $doubleTy->constReal(0.0);
-                    $result = $this->context->builder->fcmp(\PHPLLVM\Builder::REAL_OEQ, $leftValue, $zero);
-                    goto return_bool;
-                }
-                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                    $doubleTy = $this->context->getTypeFromString('double');
-                    $zero = $doubleTy->constReal(0.0);
-                    $eq = $this->context->builder->fcmp(\PHPLLVM\Builder::REAL_OEQ, $leftValue, $zero);
-                    $result = $this->context->builder->xor(
-                        $eq,
-                        $this->context->getTypeFromString('int1')->constInt(1, false)
-                    );
+                    $truthy = $this->context->builder->fcmp(\PHPLLVM\Builder::REAL_UNE, $leftValue, $zero);
+                    $eq = $this->context->builder->icmp(Builder::INT_EQ, $truthy, $rightValue);
+                    if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                        $result = $this->context->builder->xor(
+                            $eq,
+                            $this->context->getTypeFromString('int1')->constInt(1, false)
+                        );
+                    } else {
+                        $result = $eq;
+                    }
                     goto return_bool;
                 }
                 // IS_TRUE/IS_FALSE → double 1.0/0.0 then native-double arith (#32337).
@@ -881,20 +882,19 @@ restart:
                     $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                     goto return_bool;
                 }
-                if (OpCode::TYPE_EQUAL === $opcode->type) {
+                if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                     $doubleTy = $this->context->getTypeFromString('double');
                     $zero = $doubleTy->constReal(0.0);
-                    $result = $this->context->builder->fcmp(\PHPLLVM\Builder::REAL_OEQ, $rightValue, $zero);
-                    goto return_bool;
-                }
-                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                    $doubleTy = $this->context->getTypeFromString('double');
-                    $zero = $doubleTy->constReal(0.0);
-                    $eq = $this->context->builder->fcmp(\PHPLLVM\Builder::REAL_OEQ, $rightValue, $zero);
-                    $result = $this->context->builder->xor(
-                        $eq,
-                        $this->context->getTypeFromString('int1')->constInt(1, false)
-                    );
+                    $truthy = $this->context->builder->fcmp(\PHPLLVM\Builder::REAL_UNE, $rightValue, $zero);
+                    $eq = $this->context->builder->icmp(Builder::INT_EQ, $leftValue, $truthy);
+                    if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                        $result = $this->context->builder->xor(
+                            $eq,
+                            $this->context->getTypeFromString('int1')->constInt(1, false)
+                        );
+                    } else {
+                        $result = $eq;
+                    }
                     goto return_bool;
                 }
                 // IS_TRUE/IS_FALSE → double 1.0/0.0 then native-double arith (#32337).
@@ -1218,6 +1218,23 @@ restart:
                     $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
                     goto return_bool;
                 }
+                // Loose == / != vs native bool: zend_is_true(box) ⊙ bool — not bool→long
+                // ("" == false is true while "" == 0 is false on PHP 8; #35220).
+                if (Variable::TYPE_NATIVE_BOOL === $rightType
+                    && (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type)
+                ) {
+                    $truth = $this->zendIsTrueI1($left);
+                    $eq = $this->context->builder->icmp(Builder::INT_EQ, $truth, $rightValue);
+                    if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                        $result = $this->context->builder->xor(
+                            $eq,
+                            $this->context->getTypeFromString('int1')->constInt(1, false)
+                        );
+                    } else {
+                        $result = $eq;
+                    }
+                    goto return_bool;
+                }
                 if (JitValueNumeric::isArithOpcode($opcode->type)) {
                     return JitValueNumeric::binaryNativeLongValue(
                         $this->context,
@@ -1392,6 +1409,22 @@ restart:
                 }
                 if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                     $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
+                    goto return_bool;
+                }
+                // Native bool == / != boxed — peer VALUE⊙bool above (#35220).
+                if (Variable::TYPE_NATIVE_BOOL === $leftType
+                    && (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type)
+                ) {
+                    $truth = $this->zendIsTrueI1($right);
+                    $eq = $this->context->builder->icmp(Builder::INT_EQ, $leftValue, $truth);
+                    if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                        $result = $this->context->builder->xor(
+                            $eq,
+                            $this->context->getTypeFromString('int1')->constInt(1, false)
+                        );
+                    } else {
+                        $result = $eq;
+                    }
                     goto return_bool;
                 }
                 if (JitValueNumeric::isArithOpcode($opcode->type)) {

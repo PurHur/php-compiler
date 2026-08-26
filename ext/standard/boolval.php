@@ -151,9 +151,12 @@ final class boolval extends Internal
     {
         $i8 = $context->getTypeFromString('int8');
 
-        return $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_BOOLEAN, false)),
-            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false))
+        // Only JIT TYPE_NATIVE_BOOL (2). VM TYPE_BOOLEAN (3) collides with
+        // JIT TYPE_NATIVE_DOUBLE (3) and steals float boxes (#35220).
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
         );
     }
 
@@ -191,6 +194,24 @@ final class boolval extends Internal
         $zeroI64 = $context->getTypeFromString('int64')->constInt(0, false);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
         $intTruthy = $context->builder->icmp(Builder::INT_NE, $longVal, $zeroI64);
+
+        // Boxed floats: only TYPE_NATIVE_DOUBLE (3) — VM TYPE_FLOAT (2) collides with
+        // JIT TYPE_NATIVE_BOOL (#35220 / JitValueNumeric::valueIsDouble note).
+        // zend_is_true(IS_DOUBLE): value != 0.0 including NaN (REAL_UNE).
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $dblVal = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+        $floatTruthy = $context->builder->fcmp(
+            Builder::REAL_UNE,
+            $dblVal,
+            $context->getTypeFromString('double')->constReal(0.0)
+        );
 
         // Objects (and enum cases) are truthy — zend_is_true / isTruthy() (#27410 AOT ternary).
         // Value boxes store JIT tags with IS_REFCOUNTED (TYPE_OBJECT=133); compare kind bits (#15704).
@@ -252,9 +273,13 @@ final class boolval extends Internal
                 $isInt,
                 $intTruthy,
                 $context->builder->select(
-                    $objectTruthy,
-                    $true,
-                    $context->builder->select($isString, $stringTruthy, $arrayTruthy)
+                    $isFloat,
+                    $floatTruthy,
+                    $context->builder->select(
+                        $objectTruthy,
+                        $true,
+                        $context->builder->select($isString, $stringTruthy, $arrayTruthy)
+                    )
                 )
             )
         );

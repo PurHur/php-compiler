@@ -3132,6 +3132,14 @@ class Context {
             case 'int64':
             case 'size_t':
                 return $this->builder->icmp($this->builder::INT_NE, $value, $type->constInt(0, false));
+            case 'double':
+            case 'float':
+                // zend_is_true(IS_DOUBLE): != 0.0 including NaN (#35220 JUMPIF on native float).
+                return $this->builder->fcmp(
+                    $this->builder::REAL_UNE,
+                    $value,
+                    $type->constReal(0.0)
+                );
             case '__value__':
             case '__value__*':
                 $ptr = $value;
