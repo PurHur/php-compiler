@@ -51,8 +51,8 @@ final class JitMbConvertKana
     }
 
     /**
-     * Foldable string + mode, encoding omitted / literal / runtime — assert when needed, convert via
-     * compile-time {@see KanaConvert} (UTF-8 core).
+     * Foldable string + mode, encoding omitted / literal / runtime — assert when needed, convert
+     * via {@see KanaConvert} (NestedJIT {@see MbConvertKanaJitHelper::convertArgv} for runtime enc).
      *
      * @param list<JITVariable> $args
      */
@@ -99,11 +99,26 @@ final class JitMbConvertKana
                 $encPtr,
                 $fnName
             );
+            $utf8 = KanaConvert::convert($strLit, $option, 'UTF-8');
+            $ascii = KanaConvert::convert($strLit, $option, 'ASCII');
+            $eight = KanaConvert::convert($strLit, $option, '8BIT');
+            $resultStr = $context->builder->call(
+                MbConvertKanaRuntime::selectHelper($context),
+                $encPtr,
+                $context->builder->load($context->constantStringFromString($utf8)),
+                $context->builder->load($context->constantStringFromString($ascii)),
+                $context->builder->load($context->constantStringFromString($eight))
+            );
+
+            return self::materializeOwnedString($context, $resultStr);
         }
 
-        // KanaConvert UTF-8 core after leaf gate — encoding name does not change output for
-        // UTF-8/ASCII/8BIT (#35193).
-        return self::materializeString($context, KanaConvert::convert($strLit, $option, 'UTF-8'));
+        $encoding = self::compileTimeEncoding($args, $argc);
+        if (null === $encoding || !self::isSupportedEncoding($encoding)) {
+            return null;
+        }
+
+        return self::materializeString($context, KanaConvert::convert($strLit, $option, $encoding));
     }
 
     /**
