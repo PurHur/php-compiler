@@ -743,6 +743,7 @@ final class JitDomLoadXMLUserScript
         // documentElement — otherwise DocumentType::materialize leaves earlier nodes
         // undersized and SIGSEGVs (#34887 / peer #33565).
         self::storeDoctypeProperty($context, $document, $xml);
+        self::storeEncodingFromXml($context, $document, $xml);
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($xml);
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
@@ -839,6 +840,59 @@ final class JitDomLoadXMLUserScript
         // So getElementsByTagName()->item(0) returns the linked firstChild (#26752).
         DomUserScriptPinnedRootLlvm::pin($context, $element);
         self::pinUserScriptLoadSideEffects($context);
+    }
+
+    /**
+     * Store DOMDocument::$encoding from the XML declaration (php-src document.c; #34919).
+     *
+     * Replaces MetaProps compile-time stamp so writes to $encoding stick and loadXML
+     * reads still match Zend (#34894).
+     */
+    private static function storeEncodingFromXml(
+        Context $context,
+        Value $document,
+        string $xml
+    ): void {
+        $enc = null;
+        if ('' !== $xml
+            && 1 === preg_match('/<\?xml[^>]*encoding\s*=\s*["\']([^"\']+)["\']/i', $xml, $m)
+        ) {
+            $enc = (string) $m[1];
+        }
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_ENCODING)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_ENCODING, JITVariable::TYPE_VALUE);
+        }
+        $box = JitValueBox::alloc($context);
+        if (null === $enc) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $box)
+            );
+        } else {
+            $str = $context->builder->load($context->constantStringFromString($enc));
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $str
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                JitValueBox::pointer($context, $box),
+                $owned
+            );
+        }
+        $propVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $box
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_ENCODING),
+            $propVar,
+            JITVariable::TYPE_VALUE
+        );
     }
 
     /**

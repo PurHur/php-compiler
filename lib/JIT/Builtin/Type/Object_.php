@@ -4131,7 +4131,12 @@ class Object_ extends Type {
             // Computed document props — late defineProperty after loadXML SIGSEGVs (#34894 / #34887).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_IMPLEMENTATION, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_DOCUMENT_URI, Variable::TYPE_VALUE);
+            // encoding writable; xmlEncoding/actualEncoding read-only aliases (#34919 leftover of #34916).
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ENCODING, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_ENCODING, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ACTUAL_ENCODING, Variable::TYPE_VALUE);
+            $this->markPropertyWriteReject($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_ENCODING);
+            $this->markPropertyWriteReject($id, \PHPCompiler\ext\dom\VmDom::PROP_ACTUAL_ENCODING);
             // xmlVersion / xmlStandalone (+ legacy aliases) — slots so writes stick (#34916).
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_XML_VERSION, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_VERSION, Variable::TYPE_STRING);
