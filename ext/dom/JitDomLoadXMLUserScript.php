@@ -744,6 +744,7 @@ final class JitDomLoadXMLUserScript
         // undersized and SIGSEGVs (#34887 / peer #33565).
         self::storeDoctypeProperty($context, $document, $xml);
         self::storeEncodingFromXml($context, $document, $xml);
+        self::storeDocumentUriCwd($context, $document);
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($xml);
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
@@ -890,6 +891,51 @@ final class JitDomLoadXMLUserScript
         );
         $objectType->propertyStore(
             $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_ENCODING),
+            $propVar,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
+    /**
+     * Store DOMDocument::$documentURI to CWD after loadXML(string) (php-src document.c; #34925).
+     *
+     * Replaces MetaProps compile-time cwd stamp so writes to $documentURI stick and
+     * loadXML reads still match Zend (#34894 / #34904). Trailing slash matches Zend
+     * in the pinned container.
+     */
+    private static function storeDocumentUriCwd(Context $context, Value $document): void
+    {
+        $cwd = \getcwd();
+        if (false === $cwd || '' === $cwd) {
+            return;
+        }
+        if ('/' !== substr($cwd, -1)) {
+            $cwd .= '/';
+        }
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCUMENT_URI)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCUMENT_URI, JITVariable::TYPE_VALUE);
+        }
+        $box = JitValueBox::alloc($context);
+        $str = $context->builder->load($context->constantStringFromString($cwd));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $box),
+            $owned
+        );
+        $propVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $box
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCUMENT_URI),
             $propVar,
             JITVariable::TYPE_VALUE
         );

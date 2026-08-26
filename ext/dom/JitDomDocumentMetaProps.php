@@ -13,9 +13,10 @@ use PHPLLVM\Value;
  * LLVM lowering for DOMDocument computed meta / baseURI properties
  * (#34894 leftover of #34887; #34904 baseURI).
  *
- * Option bools (formatOutput, …), xmlVersion / xmlStandalone, and encoding use
- * allocate()+DomDocumentConstruct seeds so writes stick (#34908 / #34916 / #34919)
- * — not hardcoded fetch. xmlEncoding / actualEncoding read the encoding slot
+ * Option bools (formatOutput, …), xmlVersion / xmlStandalone, encoding, and
+ * documentURI use allocate()+DomDocumentConstruct seeds so writes stick
+ * (#34908 / #34916 / #34919 / #34925) — not hardcoded fetch.
+ * xmlEncoding / actualEncoding / baseURI read the encoding / documentURI slots
  * (php-src aliases; write-rejected in Object_.php).
  *
  * php-src: ext/dom/php_dom.c — dom_document_*_read; ext/dom/node.c — dom_node_base_uri_read;
@@ -35,11 +36,10 @@ final class JitDomDocumentMetaProps
         }
 
         return 'implementation' === $propLc
-            || 'documenturi' === $propLc
             || 'xmlencoding' === $propLc
             || 'actualencoding' === $propLc
             || 'config' === $propLc
-            // DOMNode::$baseURI — same documentURI cwd stamp after loadXML (#34904).
+            // DOMNode::$baseURI — read-only alias of documentURI (#34925 / #34904).
             || 'baseuri' === $propLc;
     }
 
@@ -67,22 +67,18 @@ final class JitDomDocumentMetaProps
                 false
             );
         }
-        if ('documenturi' === $propLc || 'baseuri' === $propLc) {
-            // loadXML(string) sets documentURI/baseURI to the CWD in php-src; empty doc stays null.
-            // php-src: dom_node_base_uri_read → xmlNodeGetBase on the document (#34904).
-            if (JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
-                $cwd = \getcwd();
-                if (false !== $cwd && '' !== $cwd) {
-                    // Trailing slash matches Zend cwd documentURI in the pinned container.
-                    if ('/' !== substr($cwd, -1)) {
-                        $cwd .= '/';
-                    }
+        // Read-only alias of $documentURI (php-src node.c base_uri_read; #34925).
+        if ('baseuri' === $propLc) {
+            $classId = $objectType->lookup('DOMDocument');
 
-                    return self::boxString($context, $cwd);
-                }
-            }
-
-            return self::boxNull($context);
+            return \PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $obj,
+                'DOMDocument',
+                VmDom::PROP_DOCUMENT_URI,
+                $classId,
+                false
+            );
         }
 
         return self::boxNull($context);
@@ -100,42 +96,6 @@ final class JitDomDocumentMetaProps
             JITVariable::TYPE_OBJECT,
             JITVariable::KIND_VALUE,
             $impl
-        );
-    }
-
-    private static function boxString(\PHPCompiler\JIT\Context $context, string $value): JITVariable
-    {
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            JitValueBox::pointer($context, $slot),
-            $context->builder->load($context->constantStringFromString($value))
-        );
-
-        return new JITVariable(
-            $context,
-            JITVariable::TYPE_VALUE,
-            JITVariable::KIND_VARIABLE,
-            $slot
-        );
-    }
-
-    private static function boxBool(\PHPCompiler\JIT\Context $context, bool $value): JITVariable
-    {
-        $slot = JitValueBox::alloc($context);
-        $i1 = $context->getTypeFromString('int1');
-        $i32 = $context->getTypeFromString('int32');
-        JitValueBox::writeBool(
-            $context,
-            $slot,
-            $context->builder->zext($i1->constInt($value ? 1 : 0, false), $i32)
-        );
-
-        return new JITVariable(
-            $context,
-            JITVariable::TYPE_VALUE,
-            JITVariable::KIND_VARIABLE,
-            $slot
         );
     }
 
