@@ -161,6 +161,11 @@ final class JitDomDocumentElement
                 'comment' => JitDomCreateComment::materialize($context, $node['data']),
                 'text' => JitDomCreateTextNode::materialize($context, $node['data']),
                 'cdata' => JitDomCreateCDATASection::materialize($context, $node['data']),
+                'pi' => JitDomCreateProcessingInstruction::materialize(
+                    $context,
+                    (string) ($node['target'] ?? ''),
+                    (string) ($node['data'] ?? '')
+                ),
                 // Seed textContent/INNER_XML/attrs + NS props like createElementNS (#33014 / #34924).
                 default => self::materializeElementChild($context, $node, $inScopeNs),
             };

@@ -418,6 +418,11 @@ final class JitDomNodeListItemUserScript
             'comment' => JitDomCreateComment::materialize($context, $node['data']),
             'text' => JitDomCreateTextNode::materialize($context, $node['data']),
             'cdata' => JitDomCreateCDATASection::materialize($context, $node['data']),
+            'pi' => JitDomCreateProcessingInstruction::materialize(
+                $context,
+                (string) ($node['target'] ?? ''),
+                (string) ($node['data'] ?? '')
+            ),
             default => self::materializeDirectElementChild($context, $node, $rootNs),
         };
 

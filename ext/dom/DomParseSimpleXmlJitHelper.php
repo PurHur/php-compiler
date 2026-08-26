@@ -1021,6 +1021,21 @@ final class DomParseSimpleXmlJitHelper
 
                 continue;
             }
+            // Keep PI outer markup (target + data) for ChildNode::before/after (#34952).
+            if (1 === preg_match('/\G<\?([A-Za-z_][\w:.-]*)(?:\s+([\s\S]*?))?\?>/s', $inner, $pi, 0, $i)
+                && 0 !== strcasecmp($pi[1], 'xml')
+            ) {
+                $chunks[] = $pi[0];
+                $i += \strlen($pi[0]);
+
+                continue;
+            }
+            if (1 === preg_match('/\G<!\[CDATA\[.*?\]\]>/s', $inner, $cdata, 0, $i)) {
+                $chunks[] = $cdata[0];
+                $i += \strlen($cdata[0]);
+
+                continue;
+            }
             if (1 === preg_match('/\G<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)(\/?)>/', $inner, $el, 0, $i)) {
                 $start = $i;
                 $tag = $el[1];
@@ -1072,7 +1087,7 @@ final class DomParseSimpleXmlJitHelper
      * Compile-time only (host preg). Keeps inter-element whitespace so AOT
      * {@code childNodes->length} matches Zend when preserveWhiteSpace is default.
      *
-     * @return list<array{kind: 'comment'|'text'|'cdata'|'element', data: string, inner?: string, open?: string}>
+     * @return list<array{kind: 'comment'|'text'|'cdata'|'pi'|'element', data: string, target?: string, inner?: string, open?: string}>
      */
     public static function directChildNodesArgv(string $xml): array
     {
@@ -1084,7 +1099,7 @@ final class DomParseSimpleXmlJitHelper
      *
      * Used by {@see JitDomGetNodePath} nested firstChild walks (#32474).
      *
-     * @return list<array{kind: 'comment'|'text'|'cdata'|'element', data: string, inner?: string, open?: string}>
+     * @return list<array{kind: 'comment'|'text'|'cdata'|'pi'|'element', data: string, target?: string, inner?: string, open?: string}>
      */
     public static function parseSiblingNodesArgv(string $inner): array
     {
@@ -1105,6 +1120,20 @@ final class DomParseSimpleXmlJitHelper
             if (1 === preg_match('/\G<!\[CDATA\[(.*?)\]\]>/s', $inner, $cdata, 0, $i)) {
                 $nodes[] = ['kind' => 'cdata', 'data' => $cdata[1]];
                 $i += \strlen($cdata[0]);
+
+                continue;
+            }
+            // libxml keeps XML_PI_NODE — <? must not fall through to break (#34952).
+            // Peer {@see \PHPCompiler\ext\xml\VmXml::parseProcessingInstructionAt}.
+            if (1 === preg_match('/\G<\?([A-Za-z_][\w:.-]*)(?:\s+([\s\S]*?))?\?>/s', $inner, $pi, 0, $i)
+                && 0 !== strcasecmp($pi[1], 'xml')
+            ) {
+                $nodes[] = [
+                    'kind' => 'pi',
+                    'target' => $pi[1],
+                    'data' => $pi[2] ?? '',
+                ];
+                $i += \strlen($pi[0]);
 
                 continue;
             }
@@ -1163,6 +1192,12 @@ final class DomParseSimpleXmlJitHelper
         if ('comment' === $node['kind']) {
             return 'comment()';
         }
+        if ('pi' === $node['kind']) {
+            // libxml: processing-instruction('target') (#34952).
+            $target = $node['target'] ?? $node['data'] ?? '';
+
+            return "processing-instruction('".$target."')";
+        }
         if ('element' !== $node['kind']) {
             return $node['data'] ?? null;
         }
@@ -1202,6 +1237,15 @@ final class DomParseSimpleXmlJitHelper
         }
         if (preg_match('/^\s*<!\[CDATA\[(.*?)\]\]>/s', $rest, $cdata)) {
             return ['kind' => 'cdata', 'data' => $cdata[1]];
+        }
+        if (preg_match('/^\s*<\?([A-Za-z_][\w:.-]*)(?:\s+([\s\S]*?))?\?>/s', $rest, $pi)
+            && 0 !== strcasecmp($pi[1], 'xml')
+        ) {
+            return [
+                'kind' => 'pi',
+                'target' => $pi[1],
+                'data' => $pi[2] ?? '',
+            ];
         }
         if (preg_match('/^\s*<([a-zA-Z_][\w:.-]*)(?:\s|\/|>)/', $rest, $child)) {
             return ['kind' => 'element', 'data' => $child[1]];
