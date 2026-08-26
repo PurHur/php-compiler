@@ -25,8 +25,10 @@ final class JitDomNodeListItemUserScript
         if (\count($args) < 2) {
             return null;
         }
-        // Fold when the index operand is an LLVM i64 constant. Loop `$i`
-        // keeps stale compileTimeLong=0 as KIND_VALUE (#32831 / peer #32605).
+        // Fold only LLVM i64 constants. Loop `$i` is KIND_VALUE with stale
+        // compileTimeLong=0 (#32831 / peer #32605). Do not trust bare
+        // compileTimeLong / compileTimeString — that re-broke loop item() after
+        // #34936 (re-#35236). Match JitLongArg / JitDomNamedNodeMap.
         $index = null;
         $arg = $args[1];
         if (
@@ -40,19 +42,6 @@ final class JitDomNodeListItemUserScript
             if (null === $index) {
                 $index = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($arg->value->value);
             }
-        }
-        // Literal 0 often arrives as TYPE_NATIVE_LONG KIND_VALUE with compileTimeLong
-        // set — without this, getElementsByTagNameNS()->item(0) never reaches the
-        // NS materialize path and returns NULL (#34936).
-        if (null === $index && null !== $arg->compileTimeLong) {
-            $index = (int) $arg->compileTimeLong;
-        }
-        if (
-            null === $index
-            && null !== $arg->compileTimeString
-            && is_numeric($arg->compileTimeString)
-        ) {
-            $index = (int) $arg->compileTimeString;
         }
 
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
