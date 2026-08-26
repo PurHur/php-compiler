@@ -6534,6 +6534,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/XmlReaderFromString.php';
 require_once __DIR__.'/../../../lib/JIT/Call/XmlReaderXML.php';
 require_once __DIR__.'/../../../lib/JIT/Call/XmlReaderMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/XsltMethod.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ZipArchiveConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/CallUnpackCompileTime.php';
 require_once __DIR__.'/../../../lib/JIT/CallUnpackExpand.php';
 require_once __DIR__.'/../../../lib/JIT/CallUnpackHelper.php';
