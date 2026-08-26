@@ -24028,6 +24028,12 @@ class Compiler {
         $producers = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producers = $this->filterStmtLevelArrayPointerFuncPreludes($producers);
+        // A::inc(); A::inc(); var_dump(A::$n, B::$n) — drop stmt-level StaticCalls when
+        // StaticPropertyFetch producers cover the dead-temp args (#34997).
+        $producers = $this->filterStmtLevelStaticCallBeforeStaticPropertyFetchProducers(
+            $producers,
+            $callArgs
+        );
         // array_walk(new ArrayObject([...]), fn(...)) — New_ + Closure hoisted before consumer (#17504).
         if (
             \in_array($inlineFuncName, ['array_walk', 'array_walk_recursive'], true)
@@ -24105,20 +24111,31 @@ class Compiler {
                         && $hoistedArgCount >= 2
                         && \count($outer) < $callIndex - $firstSibling
                     ) {
-                        $leadingEmbedded = 0;
-                        foreach ($callArgs as $embeddedArg) {
-                            if ($this->isEmbeddedCallLiteralArg($embeddedArg)) {
-                                ++$leadingEmbedded;
-                                continue;
+                        // A::inc(); A::inc(); var_dump(A::$n, B::$n) — intervening
+                        // StaticPropertyFetch producers are the ARG_SEND sources; stmt-level
+                        // void StaticCalls must not steal the dead-temp args (#34997).
+                        // var_dump($g(), $h()) has no intervening fetches, so still binds outer.
+                        if (!$this->interveningFetchProducersCoverDeadTempCallArgs(
+                            $firstSibling,
+                            $callIndex,
+                            $block->orig->children,
+                            $cfgCallOp
+                        )) {
+                            $leadingEmbedded = 0;
+                            foreach ($callArgs as $embeddedArg) {
+                                if ($this->isEmbeddedCallLiteralArg($embeddedArg)) {
+                                    ++$leadingEmbedded;
+                                    continue;
+                                }
+                                break;
                             }
-                            break;
-                        }
-                        $outerOrdinal = $argIndex - $leadingEmbedded;
-                        if ($outerOrdinal >= 0 && isset($outer[$outerOrdinal])) {
-                            return $outer[$outerOrdinal];
-                        }
+                            $outerOrdinal = $argIndex - $leadingEmbedded;
+                            if ($outerOrdinal >= 0 && isset($outer[$outerOrdinal])) {
+                                return $outer[$outerOrdinal];
+                            }
 
-                        return null;
+                            return null;
+                        }
                     }
                 }
                 $immediate = $block->orig->children[$callIndex - 1] ?? null;
@@ -26919,6 +26936,49 @@ class Compiler {
                 && $this->methodCallIsKnownVoidReturn($method)
                 && ($producers[$i + 1] ?? null) instanceof Op\Expr\MethodCall
             ) {
+                continue;
+            }
+            $filtered[] = $producer;
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * Drop statement-level StaticCall preludes when StaticPropertyFetch siblings cover call args (#34997).
+     *
+     * php-cfg: `A::inc(); A::inc(); var_dump(A::$n, B::$n)` lists the void StaticCalls before the
+     * fetches in the inline producer walk; ordinal ARG_SEND wiring then steals the void returns.
+     * `var_dump(Foo::a(), Foo::b())` keeps its StaticCalls (no StaticPropertyFetch siblings).
+     *
+     * @param list<Op\Expr>      $producers
+     * @param list<Operand|null> $callArgs
+     *
+     * @return list<Op\Expr>
+     */
+    private function filterStmtLevelStaticCallBeforeStaticPropertyFetchProducers(
+        array $producers,
+        array $callArgs
+    ): array {
+        $fetchCount = 0;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\StaticPropertyFetch) {
+                ++$fetchCount;
+            }
+        }
+        $deadTempArgCount = 0;
+        foreach ($callArgs as $arg) {
+            if ($arg instanceof Operand && $this->callArgIsDeadInlineTemporary($arg)) {
+                ++$deadTempArgCount;
+            }
+        }
+        if ($fetchCount < 1 || $fetchCount < $deadTempArgCount || $deadTempArgCount < 1) {
+            return $producers;
+        }
+        $filtered = [];
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\StaticCall) {
+                // Statement A::inc() before shared-static multi-arg reads — not var_dump(Foo::a(), Foo::b()).
                 continue;
             }
             $filtered[] = $producer;
@@ -34893,8 +34953,49 @@ class Compiler {
         if (null === $firstSibling) {
             return false;
         }
+        // A::inc(); A::inc(); var_dump(A::$n, B::$n) — fetches cover args; not a call-producer chain (#34997).
+        if ($this->interveningFetchProducersCoverDeadTempCallArgs(
+            $firstSibling,
+            $callIndex,
+            $block->orig->children,
+            $cfgCallOp
+        )) {
+            return false;
+        }
 
         return ($callIndex - $firstSibling) >= 2;
+    }
+
+    /**
+     * True when StaticPropertyFetch/PropertyFetch/ArrayDimFetch between sibling call producers
+     * and the consumer can fill every dead-temp call arg (#34997).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function interveningFetchProducersCoverDeadTempCallArgs(
+        int $firstSibling,
+        int $callIndex,
+        array $cfgChildren,
+        Op $cfgCallOp
+    ): bool {
+        $deadInlineArgCount = $this->deadInlineTemporaryArgCount($cfgCallOp);
+        if ($deadInlineArgCount < 2) {
+            return false;
+        }
+        $interveningFetchProducers = 0;
+        for ($j = $firstSibling; $j < $callIndex; ++$j) {
+            $between = $cfgChildren[$j] ?? null;
+            if (
+                $between instanceof Op\Expr\StaticPropertyFetch
+                || $between instanceof Op\Expr\PropertyFetch
+                || $between instanceof Op\Expr\NullsafePropertyFetch
+                || $between instanceof Op\Expr\ArrayDimFetch
+            ) {
+                ++$interveningFetchProducers;
+            }
+        }
+
+        return $interveningFetchProducers >= $deadInlineArgCount;
     }
 
     /**
@@ -35271,6 +35372,15 @@ class Compiler {
                 }
             }
 
+            return;
+        }
+        // A::inc(); A::inc(); var_dump(A::$n, B::$n) — do not re-emit stmt StaticCalls (#34997).
+        if ($this->interveningFetchProducersCoverDeadTempCallArgs(
+            $firstSibling,
+            $callIndex,
+            $block->orig->children,
+            $cfgCallOp
+        )) {
             return;
         }
         $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude(
@@ -35840,6 +35950,16 @@ class Compiler {
         $outerSlot = $this->outerSiblingInlineCallArgProducerSlot($block, $cfgCallOp, $argIndex, $emitOps);
         if (null !== $outerSlot) {
             return (int) $outerSlot;
+        }
+        // Same intervening-fetch guard as outerSiblingInlineCallArgProducerSlot (#34997):
+        // do not ordinal-map stmt-level StaticCall/FuncCall when StaticPropertyFetch covers args.
+        if ($this->interveningFetchProducersCoverDeadTempCallArgs(
+            $firstSibling,
+            $callIndex,
+            $block->orig->children,
+            $cfgCallOp
+        )) {
+            return null;
         }
         $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude(
             $firstSibling,
@@ -38370,6 +38490,17 @@ class Compiler {
             return null;
         }
         if (\count($outer) >= $callIndex - $firstSibling) {
+            return null;
+        }
+        // A::inc(); A::inc(); var_dump(A::$n, B::$n) — intervening StaticPropertyFetch are the
+        // ARG_SEND sources; stmt-level StaticCalls in $outer must not win (#34997).
+        // var_dump($g(), $h()) has no intervening fetches, so still binds $outer.
+        if ($this->interveningFetchProducersCoverDeadTempCallArgs(
+            $firstSibling,
+            $callIndex,
+            $block->orig->children,
+            $cfgCallOp
+        )) {
             return null;
         }
         $hoistedOrdinal = null;
@@ -49562,6 +49693,72 @@ class Compiler {
                     }
                 }
             }
+            // #34997: A::inc(); A::inc(); var_dump(A::$n, B::$n) — StaticPropertyFetch siblings
+            // cover dead-temp args; stmt-level StaticCalls must not steal ARG_SEND (zend_compile.c).
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && null === $unpackFlag
+                && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                && \is_array($cfgCallOp->args)
+                && \count($cfgCallOp->args) >= 2
+            ) {
+                $staticPropDeadTempCount = 0;
+                foreach ($cfgCallOp->args as $staticPropArg) {
+                    if (
+                        $this->callArgIsDeadInlineTemporary($staticPropArg)
+                        && !$this->isEmbeddedCallLiteralArg($staticPropArg)
+                    ) {
+                        ++$staticPropDeadTempCount;
+                    }
+                }
+                if ($staticPropDeadTempCount >= 2) {
+                    $staticPropProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $staticPropFetches = [];
+                    foreach ($staticPropProducers as $staticPropProducer) {
+                        if ($staticPropProducer instanceof Op\Expr\StaticPropertyFetch) {
+                            $staticPropFetches[] = $staticPropProducer;
+                        }
+                    }
+                    if (\count($staticPropFetches) >= $staticPropDeadTempCount) {
+                        $deadOrdinal = 0;
+                        foreach ($cfgCallOp->args as $i => $ordArg) {
+                            if (
+                                !$this->callArgIsDeadInlineTemporary($ordArg)
+                                || $this->isEmbeddedCallLiteralArg($ordArg)
+                            ) {
+                                continue;
+                            }
+                            if ((int) $i === (int) $argIndex) {
+                                break;
+                            }
+                            ++$deadOrdinal;
+                        }
+                        $fetchProducer = $staticPropFetches[$deadOrdinal] ?? null;
+                        if ($fetchProducer instanceof Op\Expr\StaticPropertyFetch) {
+                            $fetchSlot = $block->slotForOperand($fetchProducer->result);
+                            if (null === $fetchSlot) {
+                                foreach ($this->compileExpr($fetchProducer, $block) as $op) {
+                                    $block->addOpCode($op);
+                                }
+                                $fetchSlot = $block->slotForOperand($fetchProducer->result);
+                            }
+                            if (null !== $fetchSlot) {
+                                $sends[] = new OpCode(
+                                    OpCode::TYPE_ARG_SEND,
+                                    (string) $fetchSlot,
+                                    $nameSlot,
+                                    $unpackFlag
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
             // #19719: MethodCall/FuncCall + trailing PropertyFetch call args (insertBefore(
             // $d->createElement('x'), $r->lastChild)) — wire via producer match before
             // legacy immediate-PropertyFetch paths clobber every dead-temp arg.
@@ -58933,6 +59130,16 @@ class Compiler {
             );
         }
         if (!\is_int($firstSibling) || ($callIndex - $firstSibling) < 2) {
+            return;
+        }
+        // A::inc(); A::inc(); var_dump(A::$n, B::$n) — do not rewire ARG_SEND onto stmt
+        // StaticCall EXEC_RETURN when StaticPropertyFetch covers the dead-temp args (#34997).
+        if ($this->interveningFetchProducersCoverDeadTempCallArgs(
+            $firstSibling,
+            $callIndex,
+            $cfgChildren,
+            $cfgCallOp
+        )) {
             return;
         }
         $chainProducerCount = $this->countContiguousSiblingMultiArgProducers(
