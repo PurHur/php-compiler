@@ -16,11 +16,12 @@ use PHPLLVM\Value;
 
 /**
  * LLVM JIT/AOT helpers for mb_trim() / mb_ltrim() / mb_rtrim()
- * (php-src ext/mbstring/mbstring.c; #5957, #9208, #23883, #34379).
+ * (php-src ext/mbstring/mbstring.c; #5957, #9208, #23883, #34379, #35199).
  *
  * Compile-time fold for string literals; runtime haystack via NestedJIT
- * {@see MbTrimJitHelper} (peer {@see JitMbScrub}). $characters + encoding stay
- * compile-time literals.
+ * {@see MbTrimJitHelper}. Runtime encoding with foldable string/characters: NestedJIT
+ * {@see MbTrimEncodingJitHelper::assertEncodingArgv} then materialize {@see VmMbstring::trimString}
+ * (#35199 leftover of #34379 / peer #35193).
  */
 final class JitMbTrim
 {
@@ -47,6 +48,13 @@ final class JitMbTrim
                 $function.'() characters must be a compile-time string or null in this compiler build'
             );
         }
+
+        // Foldable string + runtime/invalid encoding: NestedJIT assert then materialize (#35199).
+        $gated = self::tryFoldableStringWithEncodingGate($context, $mode, $function, $args, $argc, $what);
+        if (null !== $gated) {
+            return $gated;
+        }
+
         $encoding = self::runtimeEncodingLiteral($args, $argc);
         if (null === $encoding) {
             throw new \LogicException(
@@ -190,6 +198,96 @@ final class JitMbTrim
         return JitStringArg::compileTimeLiteral($args[$index])
             ?? $args[$index]->compileTimeString
             ?? null;
+    }
+
+    /**
+     * Foldable string + characters; encoding omitted / literal / runtime — assert when needed,
+     * convert via compile-time {@see VmMbstring::trimString} (UTF-8 core) (#35199 / peer #35193).
+     *
+     * @param list<JITVariable> $args
+     * @param null|string $what null = default trim set
+     */
+    private static function tryFoldableStringWithEncodingGate(
+        Context $context,
+        int $mode,
+        string $function,
+        array $args,
+        int $argc,
+        ?string $what
+    ): ?Value {
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            return null;
+        }
+        $strLit = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString ?? null;
+        if (null === $strLit) {
+            return null;
+        }
+
+        // Link NestedJIT assert before lowering encoding (#35199).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbTrimRuntime::ensureEncodingLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_encoding_gate');
+
+        [$encPtr, $needsAssert] = self::encodingPtr($context, $args, $argc, $function);
+        if (!$needsAssert) {
+            // Valid compile-time encoding — leave to tryCompileTimeFold / literal runtime path.
+            return null;
+        }
+
+        $fnName = $context->builder->load($context->constantStringFromString($function));
+        $context->builder->call(
+            MbTrimRuntime::assertEncodingHelper($context),
+            $encPtr,
+            $fnName
+        );
+
+        // Empty $characters → no trim (Zend).
+        if (null !== $what && '' === $what) {
+            return self::materializeString($context, $strLit);
+        }
+
+        // UTF-8/ASCII/8BIT share default whitespace peel for ASCII spaces (#35199).
+        return self::materializeString(
+            $context,
+            VmMbstring::trimString($strLit, $what, 'UTF-8', $mode, $function)
+        );
+    }
+
+    /**
+     * Literal UTF-8/ASCII/8BIT → constant (no assert); otherwise NestedJIT encoding + assert (#35199).
+     *
+     * @param list<JITVariable> $args
+     * @return array{0: Value, 1: bool} encoding ptr, needsAssert
+     */
+    private static function encodingPtr(Context $context, array $args, int $argc, string $function): array
+    {
+        if ($argc < 3 || JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
+            return [$context->builder->load($context->constantStringFromString('UTF-8')), false];
+        }
+
+        $encodingLit = JitStringArg::compileTimeLiteral($args[2]);
+        if (null !== $encodingLit) {
+            $canonical = self::canonicalTrimEncoding($encodingLit);
+            if (null !== $canonical) {
+                return [$context->builder->load($context->constantStringFromString($canonical)), false];
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
+        }
+
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[2],
+                $function,
+                2,
+                'encoding'
+            ),
+            true,
+        ];
     }
 
     /**
