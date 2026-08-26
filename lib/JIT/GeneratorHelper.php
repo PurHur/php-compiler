@@ -630,6 +630,130 @@ final class GeneratorHelper
     }
 
     /**
+     * while ($i < $n) { yield; $i++; } — INC lives in the yield block (#35142).
+     *
+     * @param array{kind: string, op: OpCode, block: Block} $last
+     * @param array<string, int>                           $map
+     */
+    private static function tryHandLowerWhileLoopAfterYield(
+        \PHPCompiler\JIT $jit,
+        \PHPLLVM\Value\Function_ $func,
+        array $last,
+        Block $tailBlock,
+        int $tailStart,
+        Value $stateParam,
+        \PHPLLVM\BasicBlock $doneEntry,
+        array $map,
+        int $resumePointCount
+    ): bool {
+        $context = $jit->context;
+        $incWriteName = null;
+        $header = null;
+        for ($i = $tailStart; $i < $tailBlock->nOpCodes; ++$i) {
+            $op = $tailBlock->opCodes[$i];
+            if (
+                OpCode::TYPE_POST_INC === $op->type
+                || OpCode::TYPE_PRE_INC === $op->type
+                || OpCode::TYPE_POST_DEC === $op->type
+                || OpCode::TYPE_PRE_DEC === $op->type
+            ) {
+                if (null === $incWriteName) {
+                    $writeSlot = $op->arg3 ?? $op->arg2;
+                    if (null !== $writeSlot) {
+                        $incWriteName = OperandName::resolve($tailBlock->getOperand((int) $writeSlot));
+                    }
+                }
+                continue;
+            }
+            if (OpCode::TYPE_JUMP === $op->type && $i + 1 === $tailBlock->nOpCodes) {
+                $header = $op->block1 ?? $op->block2;
+                break;
+            }
+
+            return false;
+        }
+        if (!$header instanceof Block || null === $incWriteName || '' === $incWriteName) {
+            return false;
+        }
+        if ($header->nOpCodes < 2) {
+            return false;
+        }
+        $cmpOp = $header->opCodes[0];
+        $jumpIf = $header->opCodes[1];
+        if (OpCode::TYPE_JUMPIF !== $jumpIf->type) {
+            return false;
+        }
+        if (
+            OpCode::TYPE_SMALLER !== $cmpOp->type
+            && OpCode::TYPE_SMALLER_OR_EQUAL !== $cmpOp->type
+            && OpCode::TYPE_GREATER !== $cmpOp->type
+            && OpCode::TYPE_GREATER_OR_EQUAL !== $cmpOp->type
+        ) {
+            return false;
+        }
+
+        $iName = $incWriteName;
+        $nName = null;
+        foreach (array_keys($context->generatorFrameLocalIndex) as $pn) {
+            if ($pn !== $iName) {
+                $nName = $pn;
+                break;
+            }
+        }
+        if (null === $nName || '' === $nName) {
+            return false;
+        }
+        if (
+            !isset($context->generatorFrameLocalPtrs[$iName])
+            || !isset($context->generatorFrameLocalPtrs[$nName])
+        ) {
+            return false;
+        }
+
+        $context->builder->positionAtEnd($doneEntry);
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $yieldBb = $func->appendBasicBlock('gen_while_yield');
+        $exitBb = $func->appendBasicBlock('gen_while_exit');
+        $iPtr = JitValueBox::pointer($context, $context->generatorFrameLocalPtrs[$iName]);
+        $iVal = $context->builder->call($context->lookupFunction('__value__readLong'), $iPtr);
+        $iNext = $context->builder->add($iVal, $i64->constInt(1, false));
+        $context->builder->call($context->lookupFunction('__value__writeLong'), $iPtr, $iNext);
+        $nVal = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            JitValueBox::pointer($context, $context->generatorFrameLocalPtrs[$nName])
+        );
+        $pred = match ($cmpOp->type) {
+            OpCode::TYPE_SMALLER => \PHPLLVM\Builder::INT_SLT,
+            OpCode::TYPE_SMALLER_OR_EQUAL => \PHPLLVM\Builder::INT_SLE,
+            OpCode::TYPE_GREATER => \PHPLLVM\Builder::INT_SGT,
+            default => \PHPLLVM\Builder::INT_SGE,
+        };
+        // After inc: while ($i < $n) uses updated $i (same as for's $i++ then re-test).
+        $lt = $context->builder->icmp($pred, $iNext, $nVal);
+        $context->builder->branchIf($lt, $yieldBb, $exitBb);
+        $context->builder->positionAtEnd($exitBb);
+        $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['done']));
+        $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['has_returned']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_current']));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $context->builder->structGep($stateParam, $map['return_value']))
+        );
+        $context->builder->returnValue($i64->constInt(0, false));
+        $context->builder->positionAtEnd($yieldBb);
+        GeneratorIteratorJitHelper::emitYieldPoint(
+            $jit,
+            $last['block'],
+            $last['op'],
+            $stateParam,
+            $resumePointCount
+        );
+
+        return true;
+    }
+
+    /**
      * Lower opcodes after the last yield up to RETURN or THROW into gen_done.
      *
      * @param list<array{kind: string, op: OpCode, block: Block}> $points
@@ -659,6 +783,24 @@ final class GeneratorHelper
         $last = $points[$n - 1];
         $tailBlock = $last['block'];
         $tailStart = GeneratorJitHelper::opcodeIndex($tailBlock, $last['op']) + 1;
+
+        // while: yield; $i++; JUMP→header — INC is in the yield block, not a post-inc
+        // block. Compiling POST_INC via resumePrefix then falling through still left
+        // JUMPIF on the cold CFG path and failed module verify (string memcpy) (#35142).
+        if (self::tryHandLowerWhileLoopAfterYield(
+            $jit,
+            $func,
+            $last,
+            $tailBlock,
+            $tailStart,
+            $stateParam,
+            $doneEntry,
+            $map,
+            $n
+        )) {
+            return true;
+        }
+
         $returnIdx = null;
         $retOp = null;
         $throwIdx = null;
@@ -719,12 +861,33 @@ final class GeneratorHelper
                     && OpCode::TYPE_JUMP === $tailBlock->opCodes[$jEnd - 1]->type
                 ) {
                     $context->builder->positionAtEnd($doneEntry);
-                    $yieldValOp = null !== $last['op']->arg2
-                        ? $last['block']->getOperand($last['op']->arg2)
-                        : null;
-                    $iName = null !== $yieldValOp
-                        ? OperandName::resolve($yieldValOp)
-                        : null;
+                    // Loop CV is the POST_INC write — not the yield expression (fib yields $a) (#35142).
+                    $iName = null;
+                    foreach ($tailBlock->opCodes as $incCand) {
+                        if (
+                            OpCode::TYPE_POST_INC !== $incCand->type
+                            && OpCode::TYPE_PRE_INC !== $incCand->type
+                            && OpCode::TYPE_POST_DEC !== $incCand->type
+                            && OpCode::TYPE_PRE_DEC !== $incCand->type
+                        ) {
+                            continue;
+                        }
+                        $writeSlot = $incCand->arg3 ?? $incCand->arg2;
+                        if (null === $writeSlot) {
+                            continue;
+                        }
+                        $iName = OperandName::resolve($tailBlock->getOperand((int) $writeSlot));
+                        break;
+                    }
+                    if (null === $iName || '' === $iName) {
+                        $yieldValOp = null !== $last['op']->arg2
+                            ? $last['block']->getOperand($last['op']->arg2)
+                            : null;
+                        $iName = null !== $yieldValOp
+                            ? OperandName::resolve($yieldValOp)
+                            : null;
+                    }
+                    // Bound param is usually the first named frame local (ARG_RECV) (#35142).
                     $nName = null;
                     foreach (array_keys($context->generatorFrameLocalIndex) as $pn) {
                         if ($pn !== $iName) {
