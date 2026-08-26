@@ -63,6 +63,27 @@ final class DomUserScriptDoctypeLlvm
         }
     }
 
+    /** True when loadXML/createDocumentType+appendChild stamped an attached DocumentType (#34887). */
+    public static function isAttached(): bool
+    {
+        return self::$attached && null !== self::$qualifiedName && '' !== self::$qualifiedName;
+    }
+
+    public static function qualifiedName(): ?string
+    {
+        return self::$qualifiedName;
+    }
+
+    public static function publicId(): string
+    {
+        return self::$publicId;
+    }
+
+    public static function systemId(): string
+    {
+        return self::$systemId;
+    }
+
     public static function reset(): void
     {
         self::$qualifiedName = null;

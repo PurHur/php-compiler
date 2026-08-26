@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for Document::$doctype (#28940).
+ * LLVM lowering for Document::$doctype (#28940 / #34887).
  *
  * Living / legacy documents expose doctype as a computed VM property
  * ({@see DomHtmlDocumentPropertySupport} / DomRegistry). Thin AOT has no
@@ -23,7 +23,14 @@ use PHPLLVM\Value;
  * makes {@code $doc->doctype === null} write null back into the property
  * (php-src doctype is read-only / computed).
  *
+ * Pure loadXML cannot {@code defineProperty}+{@code propertyStore} doctype onto an
+ * already-allocated DOMDocument — late layout shifts corrupt documentElement /
+ * firstChild slots (saveXML SIGSEGV). Instead materialize a DocumentType
+ * stand-in from {@see DomUserScriptDoctypeLlvm} at fetch time (#34887 leftover
+ * of #34877). No {@code <!DOCTYPE>} → null.
+ *
  * php-src: ext/dom/php_dom.c — dom_document_doctype_read
+ * php-src: ext/dom/document.c — loadXML populates doc->intSubset / doctype
  */
 final class JitDomDocumentDoctype
 {
@@ -59,6 +66,11 @@ final class JitDomDocumentDoctype
             ) {
                 return self::boxNull($context);
             }
+            // Pure loadXML: computed doctype from compile-time stamp (#34887).
+            // Do not defineProperty/detachedFetch on the live document instance.
+            if (null === $cfsSource) {
+                return self::materializeFromLoadXmlStamp($context);
+            }
         }
         if ($objectType->hasProperty($docClassId, self::PROP_DOCTYPE)
             || JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
@@ -71,6 +83,38 @@ final class JitDomDocumentDoctype
         }
 
         return self::boxNull($context);
+    }
+
+    /**
+     * Build DocumentType stand-in from {@see DomUserScriptDoctypeLlvm} (#34887).
+     *
+     * {@see JitDomCreateDocumentType::materialize} calls rememberCreate (clears
+     * attached) — re-mark so saveXML keeps the #34877 prefix.
+     */
+    private static function materializeFromLoadXmlStamp(
+        \PHPCompiler\JIT\Context $context
+    ): JITVariable {
+        if (!DomUserScriptDoctypeLlvm::isAttached()) {
+            return self::boxNull($context);
+        }
+        $name = DomUserScriptDoctypeLlvm::qualifiedName();
+        if (null === $name || '' === $name) {
+            return self::boxNull($context);
+        }
+        $doctype = JitDomCreateDocumentType::materialize(
+            $context,
+            $name,
+            DomUserScriptDoctypeLlvm::publicId(),
+            DomUserScriptDoctypeLlvm::systemId()
+        );
+        DomUserScriptDoctypeLlvm::markAttached();
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $doctype
+        );
     }
 
     /**
