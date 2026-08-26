@@ -736,7 +736,10 @@ final class VmIteratorForeach
         $context->builder->branch($strEntry);
 
         $context->builder->positionAtEnd($strEntry);
-        $ord = $context->builder->load($slot);
+        // Packed index continues past nextFree into the string-key chain (#34977).
+        // Using the raw index skipped the first nextFree string nodes whenever the
+        // table also had packed elements (mixed [1,2,'x'=>3] / ArrayIterator).
+        $ord = $context->builder->sub($context->builder->load($slot), $nextFree);
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
         $headNull = $context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
         $context->builder->branchIf($headNull, $empty, $strWalk);
@@ -1264,7 +1267,10 @@ final class VmIteratorForeach
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
-        $ord = $context->builder->load(self::indexSlot($context, $slotKey));
+        // Index is packed-nextFree + string ordinal (#34977 / Zend FE_FETCH_R).
+        $idx = $context->builder->load(self::indexSlot($context, $slotKey));
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
+        $ord = $context->builder->sub($idx, $nextFree);
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
         $block = $context->builder->getInsertBlock();
         $fn = $block->getParent();
