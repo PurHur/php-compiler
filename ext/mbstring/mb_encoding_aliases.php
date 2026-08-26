@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * mb_encoding_aliases() — encoding alias list (php-src ext/mbstring/mbstring.c; #13100, #30795).
  *
- * JIT/AOT: compile-time fold via {@see JitMbEncodingRegistry} (peer mb_detect_order / pdo_drivers).
+ * JIT/AOT: compile-time fold + NestedJIT runtime encoding via {@see JitMbEncodingRegistry} (#35216).
  */
 final class mb_encoding_aliases extends Internal
 {
