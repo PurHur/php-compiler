@@ -26,6 +26,7 @@ use PHPLLVM\Value;
  * Dom\HTMLDocument with a pinned {@code body} slot (peer
  * {@see JitDomXmlDocumentCreateFromString}) so body→textContent does not touch
  * NestedJIT ObjectEntry layout.
+ * Must seed {@code nodeType=XML_DOCUMENT_NODE} (#35177 peer #35173).
  */
 final class JitDomHtmlDocumentCreateFromString
 {
@@ -159,6 +160,13 @@ final class JitDomHtmlDocumentCreateFromString
 
         $document = $objectType->allocate($docClassId);
         $objectType->markObjectConstructed($document);
+        // Unset NATIVE_LONG nodeType → empty/SIGSEGV on $doc->nodeType (#35177 peer #35173).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $document,
+            self::CLASS_DOCUMENT,
+            DomConstants::XML_DOCUMENT_NODE
+        );
 
         $html = JitDomCreateElement::materializeElementWithTextContent(
             $context,

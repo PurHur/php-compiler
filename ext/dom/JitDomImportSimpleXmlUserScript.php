@@ -89,6 +89,13 @@ final class JitDomImportSimpleXmlUserScript
         }
         $document = $objectType->allocate($docClassId);
         $objectType->markObjectConstructed($document);
+        // Unset NATIVE_LONG nodeType → empty/SIGSEGV on $doc->nodeType (#35177 peer #35173).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $document,
+            $docClass,
+            DomConstants::XML_DOCUMENT_NODE
+        );
 
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($forParse);
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($forParse);
