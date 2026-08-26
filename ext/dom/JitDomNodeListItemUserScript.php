@@ -345,11 +345,18 @@ final class JitDomNodeListItemUserScript
             return self::boxNull($context);
         }
         $ns = '' === $match['ns'] ? '' : $match['ns'];
+        // Seed textContent from the matched element markup (was always '') (#34936).
+        $text = DomParseSimpleXmlJitHelper::nthElementByTagNameNSTextArgv(
+            $xml,
+            $namespaceUri,
+            $localName,
+            $index
+        ) ?? '';
         $element = JitDomCreateElementNS::materializeElementNSFromLiterals(
             $context,
             $ns,
             $match['qname'],
-            ''
+            $text
         );
 
         return self::boxObject($context, $element);
