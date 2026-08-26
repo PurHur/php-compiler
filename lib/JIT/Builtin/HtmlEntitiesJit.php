@@ -18,6 +18,10 @@ use PHPLLVM\Value;
  * Peer: {@see StringHtmlspecialchars} / Bin2hex (#20452) bridge shape.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString::htmlentities()}
  * php-src: ext/standard/html.c — php_html_entities()
+ *
+ * Do not commit a prelinked helper-runtime unit for this helper until emit NestedJIT
+ * matches consumer NestedJIT for UTF-8 (#35067): emitted units left multi-byte letters
+ * unescaped while in-module NestedJIT (no unit) matches Zend.
  */
 final class HtmlEntitiesJit
 {
