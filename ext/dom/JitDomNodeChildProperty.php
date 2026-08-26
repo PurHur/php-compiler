@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -58,8 +60,28 @@ final class JitDomNodeChildProperty
         string $classLc = 'domnode',
         ?JITVariable $receiverVar = null
     ): JITVariable {
+        $context = $objectType->jitContext();
+        // Attr child/sibling edges must not GEP DOMElement slots (#35227 / #35185).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_child_edge_fetch');
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $obj);
+        $bbAttr = BasicBlockHelper::append($context, 'dom_child_edge_attr');
+        $bbElem = BasicBlockHelper::append($context, 'dom_child_edge_elem');
+        $bbOut = BasicBlockHelper::append($context, 'dom_child_edge_out');
+        $context->builder->branchIf($isAttr, $bbAttr, $bbElem);
+
+        $resultTy = $context->getTypeFromString('__value__*');
+
+        $context->builder->positionAtEnd($bbAttr);
+        // Safe null until Attr tree-link slots are seeded like VmDom::syncAttributeTreeLinks.
+        // Returning null beats SIGSEGV on Element-layout GEP (#35227).
+        $attrNull = self::boxNullChildEdge($context);
+        $attrPtr = JitValueBox::valuePtrFromVariable($context, $attrNull);
+        $attrPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbOut);
+
+        $context->builder->positionAtEnd($bbElem);
         $slotClass = self::childEdgeClass($classLc);
-        $result = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+        $elemResult = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $obj,
             $slotClass,
@@ -71,16 +93,46 @@ final class JitDomNodeChildProperty
         // chained `$el->firstChild->nodeName` would then defineProperty nodeName on
         // stdClass and GEP past the allocation (SIGSEGV after setAttribute adds
         // DOMAttr::$nodeName as a second same-name slot).
-        $result->classUserType = 'DOMElement';
-        self::annotateCompileTimeChild($result, $propName, $receiverVar);
+        $elemResult->classUserType = 'DOMElement';
+        self::annotateCompileTimeChild($elemResult, $propName, $receiverVar);
         $propLc = strtolower($propName);
         // GetNodePath's child-fetch annotator only knows first/last (defaults other
         // props to index 0) — do not let it wipe nextSibling/previousSibling stamps (#33273).
         if (!\in_array($propLc, ['nextsibling', 'previoussibling'], true)) {
-            JitDomGetNodePath::annotateChildFetch($result, $propName);
+            JitDomGetNodePath::annotateChildFetch($elemResult, $propName);
         }
+        $elemPtr = JitValueBox::valuePtrFromVariable($context, $elemResult);
+        $elemPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbOut);
 
-        return $result;
+        $context->builder->positionAtEnd($bbOut);
+        $phi = $context->builder->phi($resultTy);
+        $phi->addIncoming($attrPtr, $attrPred);
+        $phi->addIncoming($elemPtr, $elemPred);
+
+        $out = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $phi)
+        );
+        $out->classUserType = 'DOMElement';
+
+        return $out;
+    }
+
+    private static function boxNullChildEdge(\PHPCompiler\JIT\Context $context): JITVariable
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $ptr)
+        );
     }
 
     /**
