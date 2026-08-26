@@ -245,8 +245,14 @@ final class JitDomCreateElementNS
                 $context->builder->load($context->constantStringFromString($prefix))
             );
         } else {
-            // VM/Zend expose ""; AOT null is acceptable for unprefixed (DomRegistry sync).
-            self::storeNullProperty($context, $obj, $className, VmDom::PROP_PREFIX);
+            // Zend/php-src expose "" for unprefixed NS elements (node.c prefix_read).
+            self::storeBoxedStringProperty(
+                $context,
+                $obj,
+                $className,
+                VmDom::PROP_PREFIX,
+                $context->builder->load($context->constantStringFromString(''))
+            );
         }
         if (null === $namespace) {
             self::storeNullProperty($context, $obj, $className, VmDom::PROP_NAMESPACE_URI);

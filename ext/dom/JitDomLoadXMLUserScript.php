@@ -747,12 +747,31 @@ final class JitDomLoadXMLUserScript
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($xml);
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
-        $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
-        JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
         // Root open-tag attrs for node-scoped saveXML (peer child sync #33014).
         $rootMarkup = DomParseSimpleXmlJitHelper::parseElementMarkupArgv(
             preg_replace('/^\\s*<\\?xml[^?]*\\?>\\s*/i', '', trim($xml)) ?? trim($xml)
         );
+        $rootNs = [];
+        if (null !== $rootMarkup && '' !== $rootMarkup['attrs']) {
+            $rootNs = DomParseSimpleXmlJitHelper::xmlnsDeclsFromOpenTagArgv(
+                '<'.$tag.$rootMarkup['attrs'].'>'
+            );
+        } elseif (preg_match('/<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)\/?>/', $xml, $rootOpen)) {
+            $rootNs = DomParseSimpleXmlJitHelper::xmlnsDeclsFromOpenTagArgv($rootOpen[0]);
+        }
+        // Namespaced documentElement needs ElementNS slots (#34924 / peer children).
+        $rootNsUri = JitDomDocumentElement::resolveElementNamespaceUri($tag, $rootNs);
+        if (null !== $rootNsUri) {
+            $element = JitDomCreateElementNS::materializeElementNSFromLiterals(
+                $context,
+                $rootNsUri,
+                $tag,
+                $text
+            );
+        } else {
+            $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        }
+        JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
         if (null !== $rootMarkup && '' !== $rootMarkup['attrs']) {
             JitDomCreateElement::storeUserScriptXmlnsAttr($context, $element, $rootMarkup['attrs']);
         }

@@ -434,7 +434,21 @@ final class JitDomNodeListItemUserScript
         $tag = $node['data'];
         $inner = $node['inner'] ?? '';
         $text = DomParseSimpleXmlJitHelper::textContentFromInnerXmlArgv($inner);
-        $child = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        $scope = $inheritedNsDecl;
+        if (isset($node['open']) && \is_string($node['open'])) {
+            $scope = DomParseSimpleXmlJitHelper::xmlnsDeclsFromOpenTagArgv($node['open']) + $inheritedNsDecl;
+        }
+        $nsUri = JitDomDocumentElement::resolveElementNamespaceUri($tag, $scope);
+        if (null !== $nsUri) {
+            $child = JitDomCreateElementNS::materializeElementNSFromLiterals(
+                $context,
+                $nsUri,
+                $tag,
+                $text
+            );
+        } else {
+            $child = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        }
         JitDomCreateElement::storeUserScriptInnerXml($context, $child, $inner);
         if (isset($node['open']) && \is_string($node['open'])) {
             JitDomCreateElement::storeUserScriptXmlnsAttr(

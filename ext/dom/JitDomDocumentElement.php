@@ -161,7 +161,8 @@ final class JitDomDocumentElement
                 'comment' => JitDomCreateComment::materialize($context, $node['data']),
                 'text' => JitDomCreateTextNode::materialize($context, $node['data']),
                 // Seed textContent/INNER_XML/attrs like documentElement (#33014 / peer #25475).
-                default => self::materializeElementChild($context, $node),
+                // Prefixed / default-NS children need ElementNS slots (#34924).
+                default => self::materializeElementChild($context, $node, $inScopeNs),
             };
             $segment = DomParseSimpleXmlJitHelper::nodePathSegmentArgv($children, $idx);
             $childScope = $inScopeNs;
@@ -295,18 +296,40 @@ final class JitDomDocumentElement
      * {@see materializeElementFromLiteral} alone left hollow firstChild slots so
      * textContent/saveXML/getElementById diverged from Zend after setIdAttribute.
      *
+     * Prefixed / default-NS QNames use {@see JitDomCreateElementNS} so prefix /
+     * localName / namespaceURI VALUE slots match Zend (php-src node.c); the non-NS
+     * path left localName=QName and namespaceURI unset → AOT SIGSEGV (#34924).
+     *
      * @param array{kind: string, data: string, inner?: string, open?: string} $node
+     * @param array<string, string> $inScopeNs prefix → URI inherited from ancestors
      */
     private static function materializeElementChild(
         \PHPCompiler\JIT\Context $context,
-        array $node
+        array $node,
+        array $inScopeNs = []
     ): Value {
         $tag = $node['data'];
         $inner = $node['inner'] ?? '';
         $text = DomParseSimpleXmlJitHelper::textContentFromInnerXmlArgv($inner);
-        $child = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        $scope = $inScopeNs;
+        if (isset($node['open']) && \is_string($node['open'])) {
+            $scope = DomParseSimpleXmlJitHelper::xmlnsDeclsFromOpenTagArgv($node['open']) + $inScopeNs;
+        }
+        $nsUri = self::resolveElementNamespaceUri($tag, $scope);
+        if (null !== $nsUri) {
+            $child = JitDomCreateElementNS::materializeElementNSFromLiterals(
+                $context,
+                $nsUri,
+                $tag,
+                $text
+            );
+        } else {
+            $child = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        }
         JitDomCreateElement::storeUserScriptInnerXml($context, $child, $inner);
         if (isset($node['open']) && \is_string($node['open'])) {
+            // Prefer the real open-tag attrs over createElementNS's synthetic nsDef
+            // so inherited xmlns is not redeclared on every child for saveXML.
             JitDomCreateElement::storeUserScriptXmlnsAttr(
                 $context,
                 $child,
@@ -315,6 +338,28 @@ final class JitDomDocumentElement
         }
 
         return $child;
+    }
+
+    /**
+     * Resolve in-scope namespace URI for a loadXML element QName (#34924).
+     *
+     * @param array<string, string> $scope prefix → URI ('' key = default xmlns)
+     *
+     * @return string|null URI when namespaced (may be ""); null → non-NS layout
+     */
+    public static function resolveElementNamespaceUri(string $qname, array $scope): ?string
+    {
+        $pos = strpos($qname, ':');
+        if (false !== $pos) {
+            $prefix = substr($qname, 0, $pos);
+
+            return $scope[$prefix] ?? '';
+        }
+        if (\array_key_exists('', $scope)) {
+            return $scope[''];
+        }
+
+        return null;
     }
 
     /**
