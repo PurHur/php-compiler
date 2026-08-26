@@ -263,10 +263,41 @@ final class GeneratorHelper
             }
             // Catch-body yield points resume via gen_catch_resume_* — do not lower catch
             // opcodes into gen_case_* (that left terminators mid-block, #27518).
+            //
+            // When the try-body suffix after the prior yield contains TYPE_THROW,
+            // sequential resume must run that suffix (so the throw reaches dispatch)
+            // instead of jumping into the catch arm with `$e` unbound (#35008).
+            // Otherwise keep the #27518 edge into catch resume (Generator::throw inject).
             if (null !== $catchDispatchBb) {
-                $context->builder->positionAtEnd($prefixEntry);
-                if (null === $prefixEntry->getTerminator()) {
-                    $context->builder->branch($catchDispatchBb);
+                $compiledTryThrowSuffix = false;
+                if ($i > 0 && $points[$i - 1]['block'] !== $pointBlock) {
+                    $prev = $points[$i - 1];
+                    $prevBlock = $prev['block'];
+                    $prevAfter = GeneratorJitHelper::opcodeIndex($prevBlock, $prev['op']) + 1;
+                    $throwEnd = null;
+                    for ($oi = $prevAfter; $oi < $prevBlock->nOpCodes; ++$oi) {
+                        if (OpCode::TYPE_THROW === $prevBlock->opCodes[$oi]->type) {
+                            $throwEnd = $oi + 1;
+                            break;
+                        }
+                    }
+                    if (null !== $throwEnd) {
+                        self::compileYieldPrefix(
+                            $jit,
+                            $func,
+                            $prevBlock,
+                            $prevAfter,
+                            $throwEnd,
+                            $prefixEntry
+                        );
+                        $compiledTryThrowSuffix = true;
+                    }
+                }
+                if (!$compiledTryThrowSuffix) {
+                    $context->builder->positionAtEnd($prefixEntry);
+                    if (null === $prefixEntry->getTerminator()) {
+                        $context->builder->branch($catchDispatchBb);
+                    }
                 }
             } elseif ($i > 0 && $points[$i - 1]['block'] !== $pointBlock) {
                 self::compileCrossBlockResumePrefix($jit, $func, $points[$i - 1], $point, $prefixEntry);

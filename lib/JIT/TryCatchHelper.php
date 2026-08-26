@@ -324,6 +324,12 @@ final class TryCatchHelper
     ): void {
         JitThrow::registerDeclarations($context);
         JitThrow::ensureLinked($context);
+        // Mirror beginTry: dispatchBbFor clears return-pending (#35008). Always-on
+        // JitReturnPending registration was removed in #34621, so generator resume
+        // must link the ABI before catch dispatch — otherwise thin AOT aborts with
+        // "Unable to lookup non-existing function phpc_jit_clear_return_pending".
+        JitReturnPending::registerDeclarations($context);
+        JitReturnPending::ensureLinked($context);
         $mergeBlock = $tryOp->block2;
         if (null === $mergeBlock) {
             throw new \LogicException('TYPE_TRY requires merge block (block2)');
@@ -1053,6 +1059,10 @@ final class TryCatchHelper
         // Catch arms compile before the try body — seed Throwable/Error so getMessage /
         // get_class see full layouts (peer #26854 / #27107, #27106).
         GetClassRuntime::ensureLinked($context);
+        // Defensive: generator resume used to reach here before beginTry linked
+        // ReturnPending (#35008 / #34621). Idempotent with beginTry*.
+        JitReturnPending::registerDeclarations($context);
+        JitReturnPending::ensureLinked($context);
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
         $builder->positionAtEnd($dispatch);
