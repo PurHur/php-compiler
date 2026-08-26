@@ -14,13 +14,24 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * DOMDocument::__construct — seed thin-AOT DOMNode::$nodeType (#33607).
+ * DOMDocument::__construct — seed thin-AOT DOMNode::$nodeType (#33607) and
+ * libxml option bool slots (php-src ext/dom/document.c; #34908 leftover of #34899).
  *
- * php-src: ext/dom/document.c / node.c — XML_DOCUMENT_NODE.
  * Must be listed in JIT::isVoidJitConstructCall so markObjectConstructed runs.
  */
 final class DomDocumentConstruct implements Call
 {
+    /** @var array<string, bool> Zend defaults — VmDom::initDocumentLibxmlDefaults / document.c */
+    private const LIBXML_OPTION_DEFAULTS = [
+        VmDom::PROP_STRICT_ERROR_CHECKING => true,
+        VmDom::PROP_FORMAT_OUTPUT => false,
+        VmDom::PROP_VALIDATE_ON_PARSE => false,
+        VmDom::PROP_RESOLVE_EXTERNALS => false,
+        VmDom::PROP_PRESERVE_WHITE_SPACE => true,
+        VmDom::PROP_RECOVER => false,
+        VmDom::PROP_SUBSTITUTE_ENTITIES => false,
+    ];
+
     public function call(Context $context, Variable ...$args): Value
     {
         if ([] === $args) {
@@ -54,6 +65,26 @@ final class DomDocumentConstruct implements Call
             $nullEl,
             Variable::TYPE_OBJECT
         );
+
+        // Option bools are ClassProperty slots (Object_::allocate layout) — seed Zend
+        // defaults so reads match without MetaProps hardcoding; assigns then stick (#34908).
+        $i1 = $context->getTypeFromString('int1');
+        foreach (self::LIBXML_OPTION_DEFAULTS as $prop => $default) {
+            if (!$objectType->hasProperty($classId, $prop)) {
+                $objectType->defineProperty($classId, $prop, Variable::TYPE_NATIVE_BOOL);
+            }
+            $boolVar = new Variable(
+                $context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $i1->constInt($default ? 1 : 0, false)
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($obj, 'DOMDocument', $prop),
+                $boolVar,
+                Variable::TYPE_NATIVE_BOOL
+            );
+        }
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
