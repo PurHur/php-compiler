@@ -30048,7 +30048,23 @@ class JIT {
         if (null !== $dest->compileTimeString) {
             return;
         }
-        $resolved = $this->resolveJitCompileTimeStringSlot($block, $slot);
+        $scopeName = JIT\OperandName::resolve($block->operandForScopeSlot($slot) ?? $block->getOperand($slot));
+        if (null === $scopeName || '' === $scopeName) {
+            foreach ($block->eachNamedScopeSlot() as [$name, $scopeSlot]) {
+                if ($scopeSlot === $slot) {
+                    $scopeName = $name;
+                    break;
+                }
+            }
+        }
+        if (null !== $scopeName && '' !== $scopeName) {
+            if ($this->jitNamedLocalHasDivergentBranchCompileTimeStrings($block, $scopeName)) {
+                return;
+            }
+            $resolved = $this->jitEffectiveNamedLocalCompileTimeString($block, $scopeName);
+        } else {
+            $resolved = $this->resolveJitCompileTimeStringSlot($block, $slot);
+        }
         if (null !== $resolved) {
             $dest->compileTimeString = $resolved;
         }
@@ -30069,9 +30085,29 @@ class JIT {
             if (null === $slot) {
                 continue;
             }
+            // Named string locals (native or boxed): always re-resolve — php-cfg uses distinct
+            // operands per block for one CV and init compileTimeString ('' before try) survives
+            // on catch reassignment (#32496, #32570, htmlspecialchars #32636 / ThrowsWeb #2076).
+            if (
+                (Variable::TYPE_STRING === $arg->type || Variable::TYPE_VALUE === $arg->type)
+                && !$operand instanceof Operand\Literal
+            ) {
+                $scopeName = JIT\OperandName::resolve($operand);
+                if (null !== $scopeName && '' !== $scopeName) {
+                    if ($this->jitNamedLocalHasDivergentBranchCompileTimeStrings($block, $scopeName)) {
+                        $arg->compileTimeString = null;
+                    } else {
+                        $arg->compileTimeString = $this->jitEffectiveNamedLocalCompileTimeString(
+                            $block,
+                            $scopeName
+                        );
+                    }
+
+                    continue;
+                }
+            }
             if (null !== $arg->compileTimeString) {
-                // fromLiteral string temps carry TYPE_STRING — do not re-resolve (#32398).
-                if ($operand instanceof Operand\Literal || Variable::TYPE_STRING === $arg->type) {
+                if ($operand instanceof Operand\Literal) {
                     continue;
                 }
                 // Catch/branch reassignment: stale try-path '' on boxed locals (#32570).
@@ -30292,6 +30328,22 @@ class JIT {
                     continue;
                 }
                 if (!\in_array($prior->arg2, $this->jitNamedScopeSlotAliases($block, $slot), true)) {
+                    continue;
+                }
+                $branchVisited = [];
+                $rhs = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, $branchVisited);
+                if (null !== $rhs) {
+                    return $rhs;
+                }
+            }
+        } else {
+            // php-cfg catch/try arms may omit the CV from eachNamedScopeSlot (#32570).
+            foreach ($block->opCodes as $prior) {
+                if (OpCode::TYPE_ASSIGN !== $prior->type) {
+                    continue;
+                }
+                $destOp = $block->getOperand($prior->arg2);
+                if (null === $destOp || JIT\OperandName::resolve($destOp) !== $name) {
                     continue;
                 }
                 $branchVisited = [];
