@@ -65,6 +65,17 @@ final class JitDomNodeListItemUserScript
 
         // Dynamic index: live walk when pinned root exists (#33659); else compile-time ladder (#33063).
         if (null === $index) {
+            // NS lists before tag — getElementsByTagNameNS does not clear lastTagQuery (#34936).
+            $nsQueryDyn = JitDomGetElementsByTagNameUserScript::lastNsQuery();
+            if (null !== $xml && null !== $nsQueryDyn) {
+                return self::materializeDynamicIndexNsMatch(
+                    $context,
+                    $xml,
+                    $nsQueryDyn[0],
+                    $nsQueryDyn[1],
+                    $arg
+                );
+            }
             if (null !== $tagQuery) {
                 if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
                     $indexVal = $context->helper->loadValue($arg);
@@ -98,7 +109,17 @@ final class JitDomNodeListItemUserScript
                             $pinned,
                             $objPtrTy->constNull()
                         );
-                        $tagResult = $context->builder->select($pinNull, $compileTime, $live);
+                        $liveObj = $context->builder->call(
+                            $context->lookupFunction('__value__readObject'),
+                            $live
+                        );
+                        $liveMiss = $context->builder->icmp(
+                            Builder::INT_EQ,
+                            $liveObj,
+                            $objPtrTy->constNull()
+                        );
+                        $useCompile = $context->builder->or($pinNull, $liveMiss);
+                        $tagResult = $context->builder->select($useCompile, $compileTime, $live);
                     } else {
                         $tagResult = $live;
                     }
@@ -175,7 +196,17 @@ final class JitDomNodeListItemUserScript
                 $pinned,
                 $objPtrTy->constNull()
             );
-            $tagResult = $context->builder->select($pinNull, $compileTime, $live);
+            $liveObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $live
+            );
+            $liveMiss = $context->builder->icmp(
+                Builder::INT_EQ,
+                $liveObj,
+                $objPtrTy->constNull()
+            );
+            $useCompile = $context->builder->or($pinNull, $liveMiss);
+            $tagResult = $context->builder->select($useCompile, $compileTime, $live);
 
             return null !== $recoveredTagQuery
                 ? self::selectTagWalkUnlessChildNodesOwner(
@@ -345,14 +376,52 @@ final class JitDomNodeListItemUserScript
             return self::boxNull($context);
         }
         $ns = '' === $match['ns'] ? '' : $match['ns'];
+        $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $localName, $index + 1) ?? '';
         $element = JitDomCreateElementNS::materializeElementNSFromLiterals(
             $context,
             $ns,
             $match['qname'],
-            ''
+            $text
         );
 
         return self::boxObject($context, $element);
+    }
+
+    /**
+     * Dynamic-index getElementsByTagNameNS item ladder (#34936 / peer tag #33063).
+     */
+    private static function materializeDynamicIndexNsMatch(
+        Context $context,
+        string $xml,
+        string $namespaceUri,
+        string $localName,
+        JITVariable $indexArg
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_dyn_ns');
+        $count = DomParseSimpleXmlJitHelper::countElementsByTagNameNSArgv($xml, $namespaceUri, $localName);
+        $i64 = $context->getTypeFromString('int64');
+        if (JITVariable::TYPE_NATIVE_LONG === $indexArg->type) {
+            $indexVal = $context->helper->loadValue($indexArg);
+        } elseif (JITVariable::TYPE_VALUE === $indexArg->type) {
+            $indexVal = $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                JitValueBox::valuePtrFromVariable($context, $indexArg)
+            );
+        } else {
+            throw new \LogicException('DOMNodeList::item() dynamic NS index must be an integer (#34936)');
+        }
+        $out = self::boxNull($context);
+        for ($i = 0; $i < $count; ++$i) {
+            $cand = self::materializeNthNsMatch($context, $xml, $namespaceUri, $localName, $i);
+            $isI = $context->builder->icmp(
+                Builder::INT_EQ,
+                $indexVal,
+                $i64->constInt($i, false)
+            );
+            $out = $context->builder->select($isI, $cand, $out);
+        }
+
+        return $out;
     }
 
     /**
@@ -494,17 +563,19 @@ final class JitDomNodeListItemUserScript
                 }
             }
         }
-        // getElementsByTagName("*"): open-tag carries the real element name (#33063).
-        $elementName = $tag;
-        if ('*' === $tag) {
-            $elementName = DomParseSimpleXmlJitHelper::tagNameFromOpenTagArgv($openTag) ?? 'div';
-        }
-        $element = JitDomCreateElement::materializeElementWithTextContent($context, $elementName, $text);
-        // Ancestor xmlns scope at this open-tag (xmlSearchNs / #34618).
+        // Real open-tag QName — getElementsByTagName('a') may match `<x:a>` (#34936).
+        $elementName = DomParseSimpleXmlJitHelper::tagNameFromOpenTagArgv($openTag) ?? $tag;
         $openOffset = DomParseSimpleXmlJitHelper::nthTagOpenTagOffsetArgv($xml, $tag, $position);
         $inherited = $openOffset >= 0
             ? DomParseSimpleXmlJitHelper::xmlnsScopeBeforeOffsetArgv($xml, $openOffset)
             : [];
+        $element = JitDomDocumentElement::materializeElementFromXmlTag(
+            $context,
+            $elementName,
+            $text,
+            $openTag,
+            $inherited
+        );
         foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($openTag, $inherited) as $attrPair) {
             $qname = $attrPair['qname'];
             $value = $attrPair['value'];

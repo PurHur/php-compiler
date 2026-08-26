@@ -475,6 +475,29 @@ final class JitDomLiveElementsByTagWalk
             $context->builder->store($i1->constInt(1, false), $outSlot);
             $context->builder->branch($bbDone);
         } else {
+            // php-src / libxml match on local name — `<x:a>` matches 'a' (#34936).
+            if (!$objectType->hasProperty($elementClassId, VmDom::PROP_LOCAL_NAME)) {
+                $objectType->defineProperty($elementClassId, VmDom::PROP_LOCAL_NAME, JITVariable::TYPE_STRING);
+            }
+            $localStr = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $node,
+                'DOMElement',
+                VmDom::PROP_LOCAL_NAME,
+                $elementClassId
+            );
+            $localStrVal = $context->helper->loadValue($localStr);
+            $localNull = $context->builder->icmp(Builder::INT_EQ, $localStrVal, $strPtr->constNull());
+            $bbCmp = BasicBlockHelper::append($context, 'dom_live_tag_match_cmp');
+            $bbFallback = BasicBlockHelper::append($context, 'dom_live_tag_match_tag');
+            $context->builder->branchIf($localNull, $bbFallback, $bbCmp);
+            $context->builder->positionAtEnd($bbCmp);
+            $want = $context->builder->load($context->constantStringFromString($tagLc));
+            $cmp = JitStringCompare::strcmp($context, $localStrVal, $want);
+            $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+            $context->builder->store($eq, $outSlot);
+            $context->builder->branch($bbDone);
+            $context->builder->positionAtEnd($bbFallback);
             $tagStr = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
                 $objectType,
                 $node,
@@ -484,13 +507,13 @@ final class JitDomLiveElementsByTagWalk
             );
             $tagStrVal = $context->helper->loadValue($tagStr);
             $tagNull = $context->builder->icmp(Builder::INT_EQ, $tagStrVal, $strPtr->constNull());
-            $bbCmp = BasicBlockHelper::append($context, 'dom_live_tag_match_cmp');
-            $context->builder->branchIf($tagNull, $bbDone, $bbCmp);
-            $context->builder->positionAtEnd($bbCmp);
-            $want = $context->builder->load($context->constantStringFromString($tagLc));
-            $cmp = JitStringCompare::strcmp($context, $tagStrVal, $want);
-            $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
-            $context->builder->store($eq, $outSlot);
+            $bbTagCmp = BasicBlockHelper::append($context, 'dom_live_tag_match_tag_cmp');
+            $context->builder->branchIf($tagNull, $bbDone, $bbTagCmp);
+            $context->builder->positionAtEnd($bbTagCmp);
+            $wantTag = $context->builder->load($context->constantStringFromString($tagLc));
+            $cmpTag = JitStringCompare::strcmp($context, $tagStrVal, $wantTag);
+            $eqTag = $context->builder->icmp(Builder::INT_EQ, $cmpTag, $i64->constInt(0, false));
+            $context->builder->store($eqTag, $outSlot);
             $context->builder->branch($bbDone);
         }
 
