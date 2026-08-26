@@ -38,9 +38,9 @@ final class ContextFullStandaloneLazyJsonOffsetShrinkTest extends TestCase
             );
         }
 
-        // Still links format / refresh used by inventory / standalone main.
+        // Still links refresh used by inventory / standalone main.
         // StringStrspn left ensureFull in #35089 — do not re-assert eager strspn here.
-        $this->assertStringContainsString('StringFormat::ensureStandaloneBodies($this)', $fullBody);
+        // StringFormat left ensureFull in #35130 — do not re-assert eager format here.
         $this->assertStringContainsString('SuperglobalRefreshRuntime::ensureStandaloneBodies($this)', $fullBody);
     }
 

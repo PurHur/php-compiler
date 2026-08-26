@@ -2461,7 +2461,13 @@ class Context {
             // beginStandaloneInitPhase() first (#14472 / #20571). Call sites already
             // ensureLinked before lookup (peer ensureMinimal #34578). Do not NestedJIT
             // those ABIs during full init (#31894 / #32122).
-            Builtin\StringFormat::ensureStandaloneBodies($this);
+            // StringFormat always-on removed (#35130): JitSprintf / JitPrintf /
+            // JitNumberFormat / JitFprintf / JitVfprintf / JitVsprintf / vprintf_ /
+            // vfprintf_ already implementIfDeclared / ensureLinked before lookup
+            // (peer #35127 / Type #32921 / #15642). Full standalone must not NestedJIT
+            // __compiler_sprintf / __compiler_printf / __compiler_number_format during
+            // init — leftover Context NestedJIT vs Runtime ABI drift mints sprintf.1 /
+            // printf.1 / number_format.1 (#31894 / #32122).
             // Skip-bundle inventory compile_driver (#23970): bind phpc_str_replace before
             // NestedJIT includes; HelperRuntimeCache supplies the TU when enabled.
             if (\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
