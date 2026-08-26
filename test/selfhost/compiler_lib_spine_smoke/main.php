@@ -519,6 +519,7 @@ require_once __DIR__.'/../../../ext/dom/JitDomDeleteData.php';
 require_once __DIR__.'/../../../ext/dom/JitDomReplaceData.php';
 require_once __DIR__.'/../../../ext/dom/JitDomDocumentElement.php';
 require_once __DIR__.'/../../../ext/dom/JitDomDocumentDoctype.php';
+require_once __DIR__.'/../../../ext/dom/JitDomDocumentMetaProps.php';
 require_once __DIR__.'/../../../ext/dom/JitDomDocumentMethodKernel.php';
 require_once __DIR__.'/../../../ext/dom/JitDomElementNavigationProperty.php';
 require_once __DIR__.'/../../../ext/dom/JitDomElementTextContent.php';

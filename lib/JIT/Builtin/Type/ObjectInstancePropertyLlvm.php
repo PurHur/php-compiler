@@ -66,6 +66,9 @@ final class ObjectInstancePropertyLlvm
         if (\PHPCompiler\ext\dom\JitDomDocumentDoctype::isDomDocumentDoctype($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomDocumentDoctype::fetch($object, $obj, $class);
         }
+        if (\PHPCompiler\ext\dom\JitDomDocumentMetaProps::isDomDocumentMetaProp($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomDocumentMetaProps::fetch($object, $obj, $class, $name, $receiverVar);
+        }
         // childNodes must use the DOMNode slot LiveSlots/loadXML write — fetching via
         // DOMElement defineProperty'd a second index past the allocation (#327xx).
         if (\PHPCompiler\ext\dom\JitDomChildNodesProperty::isDomChildNodesProperty($classLc, strtolower($name))) {

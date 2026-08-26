@@ -144,6 +144,13 @@ final class Variable {
     public ?string $compileTimeDomLoadXml = null;
 
     /**
+     * loadXML meta props for this DOMDocument (xmlVersion/encoding/standalone/URI) (#34894).
+     *
+     * @var array{version: string, encoding: ?string, standalone: bool, documentUri: string}|null
+     */
+    public ?array $compileTimeDomXmlMeta = null;
+
+    /**
      * Document-wide saveXML must dump pinned slots — never another doc's lastCompileTimeXml (#33697).
      *
      * Set when DOMDocument::appendChild installs a root on a document that never loadXML'd.

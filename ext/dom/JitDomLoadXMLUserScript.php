@@ -73,9 +73,36 @@ final class JitDomLoadXMLUserScript
     /** Document class that owns PROP_DOCUMENT_ELEMENT for the last pure materialize (#27108). */
     private static ?string $lastDocumentClass = null;
 
+    /**
+     * XML declaration from the last pure loadXML (#34894).
+     *
+     * @var array{version: string, encoding: ?string, standalone: bool}
+     */
+    private static array $lastXmlDeclaration = [
+        'version' => '1.0',
+        'encoding' => null,
+        'standalone' => false,
+    ];
+
+    /** documentURI stamped by the last pure loadXML (#34894). */
+    private static string $lastDocumentUri = '/';
+
     public static function lastCompileTimeXml(): ?string
     {
         return self::$lastCompileTimeXml;
+    }
+
+    /**
+     * @return array{version: string, encoding: ?string, standalone: bool}
+     */
+    public static function lastXmlDeclaration(): array
+    {
+        return self::$lastXmlDeclaration;
+    }
+
+    public static function lastDocumentUri(): string
+    {
+        return self::$lastDocumentUri;
     }
 
     /**
@@ -659,6 +686,7 @@ final class JitDomLoadXMLUserScript
         self::$loadXmlRegisteredIds = [];
         // Stable documentElement + inner markup so saveXML($node)/appendChild see children (#26757).
         // Also pins $doc->doctype DocumentType stand-in (#34887 / peer #28940).
+        // And document meta props (xmlVersion/xmlEncoding/…) (#34894 / peer #34887).
         self::materializeAndStoreDocumentElement($context, $args[0], $lit);
         self::$loadXmlIdAttrsByElement = [];
         self::$loadXmlRegisteredIds = [];
@@ -743,6 +771,7 @@ final class JitDomLoadXMLUserScript
         // documentElement — otherwise DocumentType::materialize leaves earlier nodes
         // undersized and SIGSEGVs (#34887 / peer #33565).
         self::storeDoctypeProperty($context, $document, $xml);
+        self::storeMetaDocumentProperties($context, $receiver, $document, $xml);
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($xml);
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
@@ -888,6 +917,95 @@ final class JitDomLoadXMLUserScript
             JITVariable::TYPE_VALUE
         );
         DomUserScriptDoctypeLlvm::markAttached();
+    }
+
+    /**
+     * Initialize DOMDocument meta props for user-script loadXML (#34894).
+     *
+     * Mirrors {@see VmDom::loadXML} xml declaration + defaultDocumentUri stamping
+     * (php-src ext/dom/document.c / php_dom.c). Props are pinned in allocate() layout.
+     */
+    private static function storeMetaDocumentProperties(
+        Context $context,
+        JITVariable $receiver,
+        Value $document,
+        string $xml
+    ): void {
+        $decl = self::parseXmlDeclarationPublic($xml);
+        $uri = self::defaultDocumentUriPublic();
+        self::$lastXmlDeclaration = $decl;
+        self::$lastDocumentUri = $uri;
+        $meta = [
+            'version' => $decl['version'],
+            'encoding' => $decl['encoding'],
+            'standalone' => $decl['standalone'],
+            'documentUri' => $uri,
+        ];
+        $receiver->compileTimeDomXmlMeta = $meta;
+        if (isset($context->namedVariableBindings) && \is_array($context->namedVariableBindings)) {
+            $docVal = $receiver->value ?? null;
+            foreach ($context->namedVariableBindings as $bound) {
+                if (!$bound instanceof JITVariable) {
+                    continue;
+                }
+                if ($bound === $receiver || (null !== $docVal && $bound->value === $docVal)) {
+                    $bound->compileTimeDomXmlMeta = $meta;
+                }
+            }
+        }
+        JitDomDocumentMetaProps::storeAfterLoadXml(
+            $context,
+            $document,
+            $decl,
+            $uri
+        );
+    }
+
+    /**
+     * @return array{version: string, encoding: ?string, standalone: bool}
+     */
+    public static function parseXmlDeclarationPublic(string $xml): array
+    {
+        $version = '1.0';
+        $encoding = null;
+        $standalone = false;
+        if (!preg_match('/^\s*<\?xml\s+([^?]*)\?>/s', $xml, $match)) {
+            return [
+                'version' => $version,
+                'encoding' => $encoding,
+                'standalone' => $standalone,
+            ];
+        }
+        $attrs = $match[1];
+        if (preg_match('/version\s*=\s*(["\'])([^"\']*)\1/i', $attrs, $versionMatch)) {
+            $version = $versionMatch[2];
+        }
+        if (preg_match('/encoding\s*=\s*(["\'])([^"\']*)\1/i', $attrs, $encodingMatch)) {
+            $encoding = $encodingMatch[2];
+        }
+        if (preg_match('/standalone\s*=\s*(["\'])([^"\']*)\1/i', $attrs, $standaloneMatch)) {
+            $standalone = 'yes' === strtolower($standaloneMatch[2]);
+        }
+
+        return [
+            'version' => $version,
+            'encoding' => $encoding,
+            'standalone' => $standalone,
+        ];
+    }
+
+    /** cwd/ form matching {@see VmDom} defaultDocumentUri for loadXML (#34894). */
+    public static function defaultDocumentUriPublic(): string
+    {
+        $cwd = getenv('PHP_COMPILER_CLI_INVOCATION_CWD');
+        if (!\is_string($cwd) || '' === $cwd) {
+            $cwd = getcwd();
+        }
+        if (false === $cwd || '' === $cwd) {
+            return '/';
+        }
+
+        return str_ends_with($cwd, '/') ? $cwd : $cwd.'/';
     }
 
     /**
