@@ -25,14 +25,16 @@ final class UrlencodeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('formEncoding', $source);
     }
 
-    public function testUrlencodeJitHelperDelegatesToVmString(): void
+    public function testUrlencodeJitHelperSelfContainedMatchesVmString(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UrlencodeJitHelper.php');
-        $this->assertStringContainsString('VmString::urlencode', $source);
-        $this->assertStringContainsString('VmString::rawurlencode', $source);
+        $this->assertStringNotContainsString('VmString::', $source);
+        $this->assertStringContainsString('\\strlen($data)', $source);
+        $this->assertStringContainsString('byteOrd', $source);
 
         $this->assertSame('foo+bar', UrlencodeJitHelper::urlencodeArgv('foo bar'));
         $this->assertSame('foo%20bar', UrlencodeJitHelper::rawurlencodeArgv('foo bar'));
+        $this->assertSame('a+b%26c', UrlencodeJitHelper::urlencodeArgv('a b&c'));
         $this->assertSame('foo+bar', VmString::urlencode('foo bar'));
         $this->assertSame('foo%20bar', VmString::rawurlencode('foo bar'));
     }
