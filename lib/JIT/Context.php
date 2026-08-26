@@ -1490,6 +1490,9 @@ class Context {
         $this->functionProxies['splobjectstorage::setinfo'] = new Call\SplObjectStorageMethod('setinfo');
         // getHash — thin AOT returned empty; same wire as spl_object_hash (#33854 / #24292).
         $this->functionProxies['splobjectstorage::gethash'] = new Call\SplObjectStorageMethod('gethash');
+        // Serializable::serialize/unserialize — silent-null (#579 / #35117; #35111 leftover).
+        $this->functionProxies['splobjectstorage::serialize'] = new Call\SplObjectStorageMethod('serialize');
+        $this->functionProxies['splobjectstorage::unserialize'] = new Call\SplObjectStorageMethod('unserialize');
         // ArrayIterator / RecursiveArrayIterator — `__spl_ht` for thin AOT foreach (#26783, #26775).
         // Seed Countable + ArrayAccess so count()/offset* candidates resolve (#32910).
         $this->type->object->lookup('ArrayIterator');

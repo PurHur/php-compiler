@@ -167,6 +167,36 @@ final class SplObjectStorageMethod implements Call
                     $args[0],
                     $args[1]
                 );
+            // php-src zim_SplObjectStorage_serialize/unserialize — silent-null (#579 / #35117)
+            case 'serialize':
+                if (!VmClassMethod::requireExactJitUserArgCount(
+                    $context,
+                    $args,
+                    'SplObjectStorage::serialize',
+                    0
+                )) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileLegacySerialize(
+                    $context,
+                    $args[0]
+                );
+            case 'unserialize':
+                if (!VmClassMethod::requireExactJitUserArgCount(
+                    $context,
+                    $args,
+                    'SplObjectStorage::unserialize',
+                    1
+                )) {
+                    return VmClassMethod::jitArgcDummyReturn($context);
+                }
+
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileLegacyUnserialize(
+                    $context,
+                    $args[0],
+                    $args[1]
+                );
             default:
                 throw new \LogicException(
                     'SplObjectStorage JIT lowering is not implemented for '.$this->method.'()'
