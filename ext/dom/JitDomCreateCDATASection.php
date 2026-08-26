@@ -23,6 +23,9 @@ use PHPLLVM\Value;
  */
 final class JitDomCreateCDATASection
 {
+    /** Compile-time data of the last materialized CDATA stand-in (#35098). */
+    public static ?string $lastMaterializedData = null;
+
     private const CLASS_STANDIN = 'DOMElement';
 
     private const PROP_NODE_NAME = 'nodeName';
@@ -57,11 +60,15 @@ final class JitDomCreateCDATASection
             return self::materialize($context, $lit);
         }
 
+        self::$lastMaterializedData = null;
+
         return self::materializeFromRuntimeData($context, $args[1]);
     }
 
     public static function materialize(Context $context, string $data): Value
     {
+        self::$lastMaterializedData = $data;
+        JitDomImportNode::$lastCreateLeafKind = 'cdata';
         JitDomSubstringData::remember($data);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
@@ -75,6 +82,8 @@ final class JitDomCreateCDATASection
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
         self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
         self::storeStringLiteral($context, $obj, self::PROP_WHOLE_TEXT, $data);
+        // Stand-in is DOMElement class but nodeType must be CDATA (#35098).
+        JitDomCreateElement::storeNodeType($context, $obj, self::CLASS_STANDIN, DomConstants::XML_CDATA_SECTION_NODE);
 
         return $obj;
     }
@@ -95,6 +104,7 @@ final class JitDomCreateCDATASection
         self::storeStringValue($context, $obj, self::PROP_TEXT_CONTENT, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_DATA, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_WHOLE_TEXT, $dataStr);
+        JitDomCreateElement::storeNodeType($context, $obj, self::CLASS_STANDIN, DomConstants::XML_CDATA_SECTION_NODE);
 
         return $obj;
     }

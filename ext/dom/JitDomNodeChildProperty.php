@@ -310,7 +310,8 @@ final class JitDomNodeChildProperty
         self::$lastFetchedChildIndex = $index;
         $kind = $nodes[$index]['kind'] ?? '';
         // Text/comment/PI/CDATA payloads for CharacterData methods on firstChild temps
-        // (#34314 / #34475 / #34952 / #34949).
+        // (#34314 / #34475 / #34952 / #34949). Stamp tagName so importNode does not
+        // treat Comment/CDATA/PI TextData as `#text` (#35098 / leftover #35043).
         if ('text' === $kind || 'comment' === $kind || 'pi' === $kind || 'cdata' === $kind) {
             $data = 'pi' === $kind
                 ? ($nodes[$index]['content'] ?? '')
@@ -318,9 +319,21 @@ final class JitDomNodeChildProperty
             $result->compileTimeDomTextData = $data;
             JitDomSubstringData::remember($data);
             if ('text' === $kind) {
+                $result->compileTimeDomTagName = '#text';
                 JitDomCreateTextNode::$lastMaterializedData = $data;
+            } elseif ('comment' === $kind) {
+                $result->compileTimeDomTagName = '#comment';
+            } elseif ('cdata' === $kind) {
+                $result->compileTimeDomTagName = '#cdata-section';
+            } else {
+                // PI: Zend nodeName is the target, but compile-time tag must be TAG_KIND
+                // so importNode does not materialize an element named like the target (#35098).
+                $result->compileTimeDomTagName = JitDomCreateProcessingInstruction::TAG_KIND;
+                JitDomCreateProcessingInstruction::$lastMaterializedTarget = $nodes[$index]['data'];
+                JitDomCreateProcessingInstruction::$lastMaterializedData = $nodes[$index]['content'] ?? '';
+                JitDomImportNode::$lastCreateLeafKind = 'pi';
             }
-            self::$lastFetchedTagName = null;
+            self::$lastFetchedTagName = $result->compileTimeDomTagName;
             self::$lastFetchedAttributes = null;
 
             return;

@@ -21,6 +21,9 @@ use PHPLLVM\Value;
  */
 final class JitDomCreateComment
 {
+    /** Compile-time data of the last materialized comment stand-in (#35098). */
+    public static ?string $lastMaterializedData = null;
+
     private const CLASS_STANDIN = 'DOMElement';
 
     private const PROP_NODE_NAME = 'nodeName';
@@ -53,11 +56,15 @@ final class JitDomCreateComment
             return self::materialize($context, $lit);
         }
 
+        self::$lastMaterializedData = null;
+
         return self::materializeFromRuntimeData($context, $args[1]);
     }
 
     public static function materialize(Context $context, string $data): Value
     {
+        self::$lastMaterializedData = $data;
+        JitDomImportNode::$lastCreateLeafKind = 'comment';
         JitDomSubstringData::remember($data);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);

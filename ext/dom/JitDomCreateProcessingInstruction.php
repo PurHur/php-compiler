@@ -26,6 +26,11 @@ final class JitDomCreateProcessingInstruction
     /** Internal saveXML discriminator; not a Zend PI nodeName. */
     public const TAG_KIND = '#pi';
 
+    /** Compile-time target/data of the last materialized PI stand-in (#35098). */
+    public static ?string $lastMaterializedTarget = null;
+
+    public static ?string $lastMaterializedData = null;
+
     private const PROP_NODE_NAME = 'nodeName';
 
     private const PROP_TAG_NAME = 'tagName';
@@ -74,6 +79,8 @@ final class JitDomCreateProcessingInstruction
             return self::materialize($context, $targetLit, (string) $dataLit);
         }
 
+        self::$lastMaterializedTarget = null;
+        self::$lastMaterializedData = null;
         $targetStr = self::loadStringArg($context, $args[1]);
         $dataStr = null === $dataArg
             ? $context->builder->load($context->constantStringFromString(''))
@@ -84,6 +91,9 @@ final class JitDomCreateProcessingInstruction
 
     public static function materialize(Context $context, string $target, string $data): Value
     {
+        self::$lastMaterializedTarget = $target;
+        self::$lastMaterializedData = $data;
+        JitDomImportNode::$lastCreateLeafKind = 'pi';
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);
@@ -97,6 +107,13 @@ final class JitDomCreateProcessingInstruction
         self::storeStringLiteral($context, $obj, self::PROP_NODE_VALUE, $data);
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, $data);
         self::storeStringLiteral($context, $obj, self::PROP_DATA, $data);
+        // Stand-in is DOMElement class but nodeType must be PI (#35098).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            self::CLASS_STANDIN,
+            DomConstants::XML_PROCESSING_INSTRUCTION_NODE
+        );
 
         return $obj;
     }
@@ -116,6 +133,12 @@ final class JitDomCreateProcessingInstruction
         self::storeStringValue($context, $obj, self::PROP_NODE_VALUE, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_TEXT_CONTENT, $dataStr);
         self::storeStringValue($context, $obj, self::PROP_DATA, $dataStr);
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            self::CLASS_STANDIN,
+            DomConstants::XML_PROCESSING_INSTRUCTION_NODE
+        );
 
         return $obj;
     }

@@ -13724,6 +13724,15 @@ class JIT {
                     $this->propagateDomCreateTextNodeCompileTimeData(
                         $block->getOperand($op->arg1)
                     );
+                    $this->propagateDomCreateCommentCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
+                    $this->propagateDomCreateCDATASectionCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
+                    $this->propagateDomCreateProcessingInstructionCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
                     $this->propagateDomTextSplitTextCompileTimeData(
                         $block->getOperand($op->arg1)
                     );
@@ -16439,6 +16448,7 @@ class JIT {
      * onto the result (php-src xmlDocCopyNode deep=0; #33097).
      * Attributes are always copied (#33362).
      * Text imports stamp compileTimeDomTextData (#35043).
+     * Comment/CDATA/PI must not be stamped as text from TextData alone (#35098).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -16455,18 +16465,49 @@ class JIT {
             return;
         }
         $resultVar = $this->context->getVariableFromOp($result);
-        $textData = $src->compileTimeDomTextData
-            ?? (
-                '#text' === ($src->compileTimeDomTagName ?? null)
-                    ? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData
-                    : null
-            )
-            ?? (
-                '#text' === (\PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName ?? null)
-                    ? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData
-                    : null
-            );
-        if (null !== $textData) {
+        $materialized = \PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName;
+        if ('#comment' === $materialized
+            || '#cdata-section' === $materialized
+            || \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::TAG_KIND === $materialized
+        ) {
+            $resultVar->compileTimeDomTagName = $materialized;
+            $resultVar->compileTimeDomTextData = $src->compileTimeDomTextData;
+            $resultVar->compileTimeDomInnerXml = null;
+            $resultVar->compileTimeDomLoadXml = null;
+            $resultVar->compileTimeDomAttributes = null;
+
+            return;
+        }
+        $srcTag = $src->compileTimeDomTagName;
+        // Comment/CDATA stamped on the source — never promote their TextData to #text.
+        if ('#comment' === $srcTag || '#cdata-section' === $srcTag) {
+            $resultVar->compileTimeDomTagName = $srcTag;
+            $resultVar->compileTimeDomTextData = $src->compileTimeDomTextData;
+            $resultVar->compileTimeDomInnerXml = null;
+            $resultVar->compileTimeDomLoadXml = null;
+            $resultVar->compileTimeDomAttributes = null;
+
+            return;
+        }
+        $textData = null;
+        if ('#text' === $srcTag || '#text' === $materialized) {
+            $textData = $src->compileTimeDomTextData
+                ?? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData;
+        } elseif (null === $srcTag || '' === $srcTag) {
+            // Detached createTextNode / ARG_SEND drop: TextData without an element tag.
+            $textData = $src->compileTimeDomTextData
+                ?? (
+                    null !== $materialized && '#text' === $materialized
+                        ? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData
+                        : null
+                );
+            // Refuse when TextData came from a non-text leaf without tag recovery —
+            // indexed comment/PI path should have set lastMaterializedTagName above.
+            if (null !== $textData && null !== $materialized && '#text' !== $materialized) {
+                $textData = null;
+            }
+        }
+        if (null !== $textData && (null === $srcTag || '' === $srcTag || '#text' === $srcTag)) {
             $this->bindCompileTimeDomTextData($result, $textData);
             $resultVar->compileTimeDomTagName = null;
             $resultVar->compileTimeDomInnerXml = null;
@@ -16475,11 +16516,14 @@ class JIT {
 
             return;
         }
-        $tag = $src->compileTimeDomTagName ?? null;
+        $tag = $srcTag;
         if (null === $tag || '' === $tag) {
-            $tag = \PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedTagName;
+            $tag = $materialized;
         }
-        if (null === $tag || '' === $tag || '#text' === $tag) {
+        if (null === $tag || '' === $tag || '#text' === $tag
+            || '#comment' === $tag || '#cdata-section' === $tag
+            || \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::TAG_KIND === $tag
+        ) {
             return;
         }
         $deep = false;
@@ -16709,6 +16753,53 @@ class JIT {
             return;
         }
         $this->bindCompileTimeDomTextData($result, $data);
+        $this->context->getVariableFromOp($result)->compileTimeDomTagName = '#text';
+    }
+
+    /** Remember createComment('lit') for importNode leaf materialize (#35098). */
+    private function propagateDomCreateCommentCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateComment)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomCreateComment::$lastMaterializedData;
+        if (null === $data || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->bindCompileTimeDomTextData($result, $data);
+        $this->context->getVariableFromOp($result)->compileTimeDomTagName = '#comment';
+    }
+
+    /** Remember createCDATASection('lit') for importNode leaf materialize (#35098). */
+    private function propagateDomCreateCDATASectionCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateCDATASection)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomCreateCDATASection::$lastMaterializedData;
+        if (null === $data || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->bindCompileTimeDomTextData($result, $data);
+        $this->context->getVariableFromOp($result)->compileTimeDomTagName = '#cdata-section';
+    }
+
+    /** Remember createProcessingInstruction for importNode leaf materialize (#35098). */
+    private function propagateDomCreateProcessingInstructionCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateProcessingInstruction)) {
+            return;
+        }
+        $target = \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::$lastMaterializedTarget;
+        if (null === $target || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::$lastMaterializedData ?? '';
+        $this->bindCompileTimeDomTextData($result, $data);
+        // TAG_KIND discriminates PI from elements; target lives in lastMaterializedTarget
+        // and is recovered in resolveSourceLeafSpec / materialize.
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeDomTagName = \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::TAG_KIND;
     }
 
     /** Remember splitText() tail data on the result Variable (#32362). */
