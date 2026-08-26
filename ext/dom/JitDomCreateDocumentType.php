@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT materialization for DOMImplementation::createDocumentType() (#19797).
+ * User-script AOT materialization for DOMImplementation::createDocumentType() (#19797, #35168).
  *
  * Uses a DOMElement stand-in (same pattern as {@see JitDomCreateComment}) because
  * allocating an unregistered DOMDocumentType class aborts LLVM codegen in standalone AOT.
@@ -19,6 +19,7 @@ use PHPLLVM\Value;
  *
  * {@see TAG_KIND} (`#document-type`) is the appendChild / saveXML discriminator — Zend
  * {@code nodeName} is the qualified name (#33565 peer of #33556 / #33559).
+ * Stand-in must seed {@code nodeType=XML_DOCUMENT_TYPE_NODE} (#35168 peer #35148).
  *
  * php-src: ext/dom/domimplementation.stub.php
  *   createDocumentType(string $qualifiedName, string $publicId = "", string $systemId = "")
@@ -98,6 +99,14 @@ final class JitDomCreateDocumentType
         self::storeStringLiteral($context, $obj, self::PROP_NAME, $qualifiedName);
         self::storeStringLiteral($context, $obj, self::PROP_PUBLIC_ID, $publicId);
         self::storeStringLiteral($context, $obj, self::PROP_SYSTEM_ID, $systemId);
+        // Stand-in is DOMElement class but nodeType must be DOCUMENT_TYPE (#35168).
+        // Unset NATIVE_LONG nodeType SIGSEGVs on $dt->nodeType (peer entity-ref #35148).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            self::CLASS_STANDIN,
+            DomConstants::XML_DOCUMENT_TYPE_NODE
+        );
         DomUserScriptDoctypeLlvm::rememberCreate($qualifiedName, $publicId, $systemId);
 
         return $obj;
@@ -131,6 +140,12 @@ final class JitDomCreateDocumentType
         self::storeStringValue($context, $obj, self::PROP_NAME, $nameStr);
         self::storeStringValue($context, $obj, self::PROP_PUBLIC_ID, $publicStr);
         self::storeStringValue($context, $obj, self::PROP_SYSTEM_ID, $systemStr);
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            self::CLASS_STANDIN,
+            DomConstants::XML_DOCUMENT_TYPE_NODE
+        );
 
         return $obj;
     }
