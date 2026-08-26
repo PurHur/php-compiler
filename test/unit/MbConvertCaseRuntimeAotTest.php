@@ -34,6 +34,15 @@ final class MbConvertCaseRuntimeAotTest extends TestCase
         $this->assertSame($this->runVm($src), $this->runAot($src));
     }
 
+    public function testAotRuntimeTitleEncodingMatchVm(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $src = __DIR__.'/../repro/mb_convert_case_title_runtime_encoding_aot.php';
+        $this->assertSame($this->runVm($src), $this->runAot($src));
+    }
+
     public function testAotRuntimeTitleUnicodeMatchVm(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
@@ -51,12 +60,17 @@ final class MbConvertCaseRuntimeAotTest extends TestCase
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbConvertCaseRuntime.php');
         $this->assertStringContainsString('JitMbCase::invokeStrtoupper', $jit);
         $this->assertStringContainsString('MbConvertCaseRuntime::titleHelper', $jit);
+        $this->assertStringContainsString('assertEncodingHelper', $jit);
         $this->assertStringContainsString('titleArgv', $helper);
+        $this->assertStringContainsString('assertEncodingArgv', $helper);
+        $this->assertStringContainsString('Argument #3', $helper);
         $this->assertStringContainsString('0x430', $helper);
         $this->assertStringContainsString('0x3B1', $helper);
         $this->assertStringContainsString('TITLE_LOGICAL', $runtime);
+        $this->assertStringContainsString('ASSERT_ENCODING_LOGICAL', $runtime);
         $this->assertStringNotContainsString('transformAllAscii', $jit);
         $this->assertStringNotContainsString('asciiTitleRuntime', $jit);
+        $this->assertStringNotContainsString('encoding must be a string literal', $jit);
         $this->assertFileDoesNotExist($root.'/lib/AOT/runtime/mb_convert_case.c');
     }
 

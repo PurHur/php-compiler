@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbConvertCaseRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -19,6 +20,7 @@ use PHPLLVM\Value;
  * UPPER/LOWER/FOLD runtime delegates to {@see JitMbCase}. TITLE/TITLE_SIMPLE use
  * {@see MbConvertCaseJitHelper::titleArgv} / {@see MbConvertCaseJitHelper::titleSimpleArgv}
  * (ASCII peel left ü uncased — #34284). Compile-time folds use {@see VmMbstring::convertCase}.
+ * TITLE runtime encoding via NestedJIT assertEncodingArgv (#35151 leftover of #34284 / peer #34858).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_convert_case)
  */
@@ -98,6 +100,7 @@ final class JitMbConvertCase
 
     /**
      * TITLE / TITLE_SIMPLE via NestedJIT (peer {@see JitMbCase}; #34284).
+     * Runtime encoding via NestedJIT assert (#35151 leftover of #34284 / peer #34858).
      *
      * @param list<JITVariable> $args
      */
@@ -114,12 +117,20 @@ final class JitMbConvertCase
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_convert_case_title_runtime');
 
         $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_convert_case', 0, 'string');
-        $encoding = self::runtimeEncodingFromCaseArgs($args, $argc, $context);
-        self::assertSupportedEncoding($encoding);
+        [$encPtr, $needsAssert] = self::encodingPtr($context, $args, $argc);
 
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
+        if ($needsAssert) {
+            $fnName = $context->builder->load($context->constantStringFromString('mb_convert_case'));
+            $context->builder->call(
+                MbConvertCaseRuntime::assertEncodingHelper($context),
+                $encPtr,
+                $fnName
+            );
+        }
+
         $helper = $simple
             ? MbConvertCaseRuntime::titleSimpleHelper($context)
             : MbConvertCaseRuntime::titleHelper($context);
@@ -129,30 +140,50 @@ final class JitMbConvertCase
     }
 
     /**
+     * Literal UTF-8/ASCII/8BIT → constant string (no assert); otherwise NestedJIT encoding + assert (#35151).
+     *
      * @param list<JITVariable> $args
+     * @return array{0: Value, 1: bool} encoding ptr, needsAssert
      */
-    private static function runtimeEncodingFromCaseArgs(array $args, int $argc, Context $context): string
+    private static function encodingPtr(Context $context, array $args, int $argc): array
     {
-        if ($argc < 2) {
-            return MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
-        }
-        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
-            return MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
-        }
-        if (JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('mb_convert_case() encoding must be a string literal in this compiler build');
-        }
-        $encoding = $args[1]->compileTimeString ?? null;
-        if (null === $encoding) {
-            throw new \LogicException('mb_convert_case() encoding must be a string literal in this compiler build');
+        if ($argc < 2 || JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            $encoding = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
+            self::assertSupportedEncoding($encoding);
+
+            return [$context->builder->load($context->constantStringFromString($encoding)), false];
         }
 
-        return $encoding;
+        $encodingLit = JitStringArg::compileTimeLiteral($args[1]);
+        if (null !== $encodingLit) {
+            $canonical = MbstringEncodingRegistry::resolve($encodingLit);
+            if (null !== $canonical && self::isSupportedEncoding($canonical)) {
+                return [$context->builder->load($context->constantStringFromString($canonical)), false];
+            }
+            // Invalid / unsupported literal — NestedJIT assert throws catchable ValueError (#35151).
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
+        }
+
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[1],
+                'mb_convert_case',
+                2,
+                'encoding'
+            ),
+            true,
+        ];
+    }
+
+    private static function isSupportedEncoding(string $encoding): bool
+    {
+        return 'UTF-8' === $encoding || 'ASCII' === $encoding || '8BIT' === $encoding;
     }
 
     private static function assertSupportedEncoding(string $encoding): void
     {
-        if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
+        if (!self::isSupportedEncoding($encoding)) {
             throw new \LogicException(
                 'mb_convert_case() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
             );
