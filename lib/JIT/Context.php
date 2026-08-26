@@ -2461,7 +2461,11 @@ class Context {
             // ensureJitHelperCompiled before lookup (peer #35035). Full standalone must not
             // NestedJIT json_* during init — leftover Context NestedJIT vs Runtime ABI drift
             // mints json_encode_*.1 / json_decode*.1 (#31894 / #32122).
-            Builtin\StringRandomBytes::implement($this);
+            // StringRandomBytes always-on removed (#35113): JitRandomBytes / ArrayRandLlvm /
+            // SessionCreateIdRuntime already StringRandomBytes::ensureLinked before lookup
+            // (peer ensureMinimal #34578 / Type #33160 / #34332). Full standalone must not
+            // NestedJIT __compiler_random_bytes during init — leftover Context NestedJIT vs
+            // Runtime ABI drift mints random_bytes.1 (#31894 / #32122).
             // ScalarDimFetchRuntime / StringOffsetRuntime always-on removed (#35065):
             // emitWarning / dimFetch / readDimAsString / … already ensureLinked before ABI use
             // (peer #35035). Do not NestedJIT offset / scalar-dim helpers during full init.
