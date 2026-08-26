@@ -41,6 +41,21 @@ final class JitCallUserFunc
         if (null !== $literal && '' !== $literal && !str_contains($literal, '::')) {
             return self::invokeCompileTimeFunction($context, $literal, $extraArgs);
         }
+        // Fold compile-time 'Class::method' like array callables (#35100 / peer #35090).
+        if (null !== $literal && str_contains($literal, '::')) {
+            [$className, $methodName] = explode('::', $literal, 2);
+            if ('' !== $className && '' !== $methodName) {
+                $folded = self::tryInvokeCompileTimeClassMethodString(
+                    $context,
+                    $className,
+                    $methodName,
+                    $extraArgs
+                );
+                if (null !== $folded) {
+                    return $folded;
+                }
+            }
+        }
 
         // Fold compile-time ['Class','method'] before TYPE_VALUE → RuntimeVariableFunction
         // (that path aborts when the boxed value is an array, #35090 / peer #32299).
@@ -193,6 +208,37 @@ final class JitCallUserFunc
     }
 
     /**
+     * Fold compile-time `call_user_func('Class::method', …)` (#35100 / peer #35090 array form).
+     *
+     * @param list<JITVariable> $extraArgs
+     */
+    private static function tryInvokeCompileTimeClassMethodString(
+        Context $context,
+        string $className,
+        string $methodName,
+        array $extraArgs
+    ): ?Value {
+        $classLc = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($methodName);
+        $proxyName = self::resolveStaticProxyForClass($context, $classLc, $methodLc);
+        if (null === $proxyName || !$context->functionIsRegistered($proxyName)) {
+            return null;
+        }
+        $proxy = $context->resolveFunctionProxy($proxyName);
+        if ($proxy instanceof ExternalMethod) {
+            return null;
+        }
+        if (LateStaticBindingHelper::useRuntimeLateStatic($context)) {
+            LateStaticBindingHelper::emitStoreClassId(
+                $context,
+                $context->constantFromInteger($context->type->object->lookup($className), 'int64')
+            );
+        }
+
+        return self::boxRawCallResult($context, $proxy->call($context, ...$extraArgs));
+    }
+
+    /**
      * Fold compile-time `call_user_func(['Class','method'], …)` to a static method proxy (#35090).
      *
      * Peer: {@see \PHPCompiler\JIT::tryInitStaticArrayCallableDirect} / #32299 for `$c()` form.
@@ -224,31 +270,19 @@ final class JitCallUserFunc
         if ('' === $className || '' === $methodName) {
             return null;
         }
-        $classLc = strtolower(ltrim($className, '\\'));
-        $methodLc = strtolower($methodName);
-        $proxyName = self::resolveStaticProxyForClass($context, $classLc, $methodLc);
-        if (null === $proxyName || !$context->functionIsRegistered($proxyName)) {
-            throw new \LogicException(
-                "call_user_func() callback [{$className}, {$methodName}] is not a defined static method "
-                .'in this compile unit (#35090)'
-            );
+        $folded = self::tryInvokeCompileTimeClassMethodString(
+            $context,
+            $className,
+            $methodName,
+            $extraArgs
+        );
+        if (null !== $folded) {
+            return $folded;
         }
-        $proxy = $context->resolveFunctionProxy($proxyName);
-        if ($proxy instanceof ExternalMethod) {
-            throw new \LogicException(
-                "call_user_func() callback [{$className}, {$methodName}] is not a defined static method "
-                .'in this compile unit (#35090)'
-            );
-        }
-        // Match direct ['Class','method']() (#32299): store LSB then invoke the static proxy.
-        if (LateStaticBindingHelper::useRuntimeLateStatic($context)) {
-            LateStaticBindingHelper::emitStoreClassId(
-                $context,
-                $context->constantFromInteger($context->type->object->lookup($className), 'int64')
-            );
-        }
-
-        return self::boxRawCallResult($context, $proxy->call($context, ...$extraArgs));
+        throw new \LogicException(
+            "call_user_func() callback [{$className}, {$methodName}] is not a defined static method "
+            .'in this compile unit (#35090)'
+        );
     }
 
     /**
@@ -315,53 +349,15 @@ final class JitCallUserFunc
         return self::boxRawCallResult($context, $proxy->call($context, ...$callArgs));
     }
 
-    /** Box a single Call::call() result the same way as {@see boxCallResult} without re-invoking. */
+    /**
+     * Box a Call::call() result for call_user_func* return (#35100).
+     *
+     * User Func proxies return `__value__` by value; treating that like `__value__*` and
+     * structGep-ing crashes the compiler. {@see JitValueBox::coerceToValuePtrForStore}.
+     */
     private static function boxRawCallResult(Context $context, Value $raw): Value
     {
-        $slot = JitValueBox::alloc($context);
-        $rawTy = $context->getStringFromType($raw->typeOf());
-        if ('int64' === $rawTy) {
-            JitValueBox::writeLong($context, $slot, $raw);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('double' === $rawTy) {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeDouble'),
-                JitValueBox::pointer($context, $slot),
-                $raw
-            );
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('int1' === $rawTy || 'bool' === $rawTy) {
-            JitValueBox::writeBool($context, $slot, $raw);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('__value__*' === $rawTy || '__value__' === $rawTy) {
-            return JitValueBox::normalizeValuePtr($context, $raw);
-        }
-        if ('__string__*' === $rawTy) {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeString'),
-                JitValueBox::pointer($context, $slot),
-                $raw
-            );
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        // Object / other pointer results: treat as already-materialized value pointer when possible.
-        if (str_ends_with($rawTy, '*')) {
-            return JitValueBox::normalizeValuePtr($context, $raw);
-        }
-        JitValueBox::copyFromPointer(
-            $context,
-            $slot,
-            JitValueBox::normalizeValuePtr($context, $raw)
-        );
-
-        return JitValueBox::pointer($context, $slot);
+        return JitValueBox::coerceToValuePtrForStore($context, $raw);
     }
 
     private static function resolveStaticProxyForClass(Context $context, string $classLc, string $methodLc): ?string
@@ -393,53 +389,7 @@ final class JitCallUserFunc
         Call|string|null $label,
         JITVariable ...$extraArgs
     ): Value {
-        $raw = $proxy->call($context, ...$extraArgs);
-        $slot = JitValueBox::alloc($context);
-        $rawTy = $context->getStringFromType($raw->typeOf());
-        if ('int64' === $rawTy) {
-            JitValueBox::writeLong($context, $slot, $raw);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('double' === $rawTy) {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeDouble'),
-                JitValueBox::pointer($context, $slot),
-                $raw
-            );
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('int1' === $rawTy || 'bool' === $rawTy) {
-            JitValueBox::writeBool($context, $slot, $raw);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('__value__*' === $rawTy || '__value__' === $rawTy) {
-            JitValueBox::copyFromPointer(
-                $context,
-                $slot,
-                JitValueBox::normalizeValuePtr($context, $raw)
-            );
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('__string__*' === $rawTy) {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeString'),
-                JitValueBox::pointer($context, $slot),
-                $raw
-            );
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        JitValueBox::copyFromPointer(
-            $context,
-            $slot,
-            JitValueBox::normalizeValuePtr($context, $raw)
-        );
-
-        return JitValueBox::pointer($context, $slot);
+        return self::boxRawCallResult($context, $proxy->call($context, ...$extraArgs));
     }
 
     /**

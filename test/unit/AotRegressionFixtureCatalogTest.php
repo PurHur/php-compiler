@@ -129,6 +129,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'named_args_23507_base_convert_addcslashes_hash_file.phpt',
         'debug_print_backtrace_void_28909.phpt',
         'array_callable_static_invoke.phpt',
+        'call_user_func_user_fn_35100.phpt',
         'aot_catch_if_htmlspecialchars_32636.phpt',
         'dom_createdocumentfragment_savexml.phpt',
         'dom_createentityreference_savexml.phpt',
