@@ -308,16 +308,13 @@ final class JitDomCreateElementNS
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
     ): void {
+        // Full Element stand-in first — allocate() bakes prop count; a thin NS-only
+        // layout left nextSibling/previousSibling missing so document saveXML's
+        // firstChild→nextSibling walk (__value__readObject) SIGSEGVs (#34918 / peer #24973).
+        JitDomCreateElement::ensureDomElementStandInLayout($objectType, $classId);
         foreach ([
-            VmDom::PROP_NODE_NAME => JITVariable::TYPE_STRING,
-            VmDom::PROP_TAG_NAME => JITVariable::TYPE_STRING,
-            VmDom::PROP_LOCAL_NAME => JITVariable::TYPE_STRING,
             VmDom::PROP_PREFIX => JITVariable::TYPE_VALUE,
             VmDom::PROP_NAMESPACE_URI => JITVariable::TYPE_VALUE,
-            VmDom::PROP_ATTRIBUTES => JITVariable::TYPE_VALUE,
-            VmDom::PROP_PARENT_NODE => JITVariable::TYPE_VALUE,
-            VmDom::PROP_OWNER_DOCUMENT => JITVariable::TYPE_VALUE,
-            VmDom::PROP_USER_SCRIPT_XMLNS_ATTR => JITVariable::TYPE_STRING,
         ] as $prop => $type) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, $type);
