@@ -330,8 +330,18 @@ final class DomNodeLiveMutationRuntime
                 // child chain — only refresh the loadXML literal for C14N fold (#32972 /
                 // importNode #32987). Merging compile-time delta onto the slot again
                 // duplicated deep importNode subtrees in saveXML (#33918 regression).
-                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind, true);
-                JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+                // Same-parent move must reorder fold XML (not concat) or C14N duplicates
+                // the moved child while saveXML stays correct via LiveSlots (#32929).
+                $moved = 1 === \count($extraArgs)
+                    && self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0]);
+                if (!$moved) {
+                    self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind, true);
+                }
+                // Do not markTreeMutated after refresh — DomC14NRuntime returns null for
+                // LiveSlots nodes without DomRegistry (#32972 regression after #34666).
+                // refreshCompileTimeXmlWithRootInner already cleared the flag with updated
+                // XML (peer insertBefore/removeChild). #33918 importNode uses
+                // skipInnerXmlSlotMerge + clearPending instead of mark.
 
                 return self::nullValuePtr($context);
             }
@@ -393,14 +403,16 @@ final class DomNodeLiveMutationRuntime
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
                 // insertBefore LiveSlots already rebuilds INNER_XML; the old compile-time
                 // tag concat path duplicated the prepended markup in saveXML (#33637).
-                // Peer append (#31684 / #33404): rebuild from live children + mark
-                // loadXML fold stale.
+                // Peer append (#31684 / #33404): rebuild from live children + refresh
+                // C14N fold (#32972). Do not markTreeMutated — DomC14NRuntime returns null
+                // for LiveSlots nodes without DomRegistry (regression after #34666).
                 JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren(
                     $context,
                     $parentObj
                 );
                 JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
-                JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+                // Pass $extraArgs (document order), not $orderedArgs (reverse link order).
+                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind, true);
 
                 return self::nullValuePtr($context);
             }

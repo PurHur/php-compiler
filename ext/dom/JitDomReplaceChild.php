@@ -78,11 +78,11 @@ final class JitDomReplaceChild
             $context->builder->positionAtEnd($bbEnd);
 
             // Dual-emit runs invokeDocumentReplace *and* syncUserScriptReplaceSlots at
-            // compile time. refreshCompileTimeXmlReplaceRoot rewrites every
-            // compileTimeDomLoadXml binding to the replacement outer markup (#33379),
-            // which poisons DOMElement::replaceChild saveXML to just <x/>. Force the
-            // mutated flag after both arms so saveXML serializes from live slots.
-            JitDomLoadXMLUserScript::markTreeMutatedSinceLoad();
+            // compile time. Do not call refreshCompileTimeXmlReplaceRoot (poisons element
+            // saveXML to just <x/> — #33379). syncUserScriptReplaceSlots uses
+            // refreshCompileTimeXmlWithRootInner for C14N fold (#32972). Do not
+            // markTreeMutated — DomC14NRuntime returns null for LiveSlots without
+            // DomRegistry (#32972 / #34666). saveXML already prefers live INNER_XML slots.
 
             return $context->builder->load($resultSlot);
         }
