@@ -37,6 +37,9 @@ use PHPLLVM\Value;
  */
 final class DirectoryIteratorJitHelper
 {
+    /** php-src SPL_FILE_DIR_SKIP_DOTS — applied at iteration, not snapshot (#34984). */
+    private const FLAG_SKIP_DOTS = 4096;
+
     public const PROP_HT = '__spl_ht';
 
     public const PROP_POS = '__spl_iter_pos';
@@ -68,15 +71,17 @@ final class DirectoryIteratorJitHelper
         $i64 = $context->getTypeFromString('int64');
         // php-src Z_PARAM_LONG $flags — soft-null DEP+0 outside strict_types (#31721).
         // FilesystemIterator omitted flags → SKIP_DOTS (4096); RecursiveDirectoryIterator → 0 (#20145 / #34984).
-        $defaultFlags = 'FilesystemIterator' === $className ? 4096 : 0;
-        $flags = null !== $flagsArg
+        $defaultFlags = 'FilesystemIterator' === $className ? self::FLAG_SKIP_DOTS : 0;
+        $userFlags = null !== $flagsArg
             ? JitStrictIntArg::lower($context, $flagsArg, $className.'::__construct', 2, 'flags')
             : $i64->constInt($defaultFlags, false);
 
+        // Full scandir snapshot — NestedJIT SKIP_DOTS filter in entriesArgv SIGSEGV'd (#34984).
+        // php-src skips dot entries in readCurrent; mirror via syncFilenameFromPos + __flags.
         $ht = $context->builder->call(
             $context->lookupFunction(\PHPCompiler\JIT\Builtin\DirectoryIteratorSnapshotRuntime::ABI),
             $pathStr,
-            $flags
+            $i64->constInt(0, false)
         );
         $htVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht);
         $slot = $objectType->propertySlotFor($obj, $className, self::PROP_HT);
@@ -88,7 +93,7 @@ final class DirectoryIteratorJitHelper
             $pathVar,
             JITVariable::TYPE_STRING
         );
-        self::storeLongPropertyValue($context, $obj, $className, self::PROP_FLAGS, $flags);
+        self::storeLongPropertyValue($context, $obj, $className, self::PROP_FLAGS, $userFlags);
         self::storeLongPropertyValue($context, $obj, $className, self::PROP_POS, $i64->constInt(0, false));
         self::syncFilenameFromPos($context, $obj, $className);
         $objectType->markObjectConstructed($obj);
@@ -1083,31 +1088,60 @@ final class DirectoryIteratorJitHelper
     private static function syncFilenameFromPos(Context $context, Value $obj, string $className): void
     {
         $ht = self::htPtr($context, $obj, $className);
-        $pos = self::loadLongProperty($context, $obj, $className, self::PROP_POS);
+        $startPos = self::loadLongProperty($context, $obj, $className, self::PROP_POS);
         $map = $context->structFieldMap['__hashtable__'];
         $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
         $n64 = $context->builder->truncOrBitCast($n, $i64);
-        $inRange = $context->builder->icmp(Builder::INT_SLT, $pos, $n64);
-        $okBb = BasicBlockHelper::append($context, 'di_sync_ok');
+        $storedFlags = self::loadLongProperty($context, $obj, $className, self::PROP_FLAGS);
+        $skipDots = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($storedFlags, $i64->constInt(self::FLAG_SKIP_DOTS, false)),
+            $i64->constInt(0, false)
+        );
+
+        $loopBb = BasicBlockHelper::append($context, 'di_sync_loop');
+        $readBb = BasicBlockHelper::append($context, 'di_sync_read');
+        $skipBb = BasicBlockHelper::append($context, 'di_sync_skip');
+        $storeBb = BasicBlockHelper::append($context, 'di_sync_store');
         $emptyBb = BasicBlockHelper::append($context, 'di_sync_empty');
         $done = BasicBlockHelper::append($context, 'di_sync_done');
-        $context->builder->branchIf($inRange, $okBb, $emptyBb);
 
-        $context->builder->positionAtEnd($emptyBb);
-        $empty = $context->builder->load($context->constantStringFromString(''));
-        self::storeStringProperty($context, $obj, $className, self::PROP_FILENAME, $empty);
-        $context->builder->branch($done);
+        $entryBb = $context->builder->getInsertBlock();
+        $context->builder->branch($loopBb);
 
-        $context->builder->positionAtEnd($okBb);
-        $idx = $context->builder->truncOrBitCast($pos, $sizeT);
+        $context->builder->positionAtEnd($loopBb);
+        $posPhi = $context->builder->phi($i64);
+        $posPhi->addIncoming($startPos, $entryBb);
+        $inRange = $context->builder->icmp(Builder::INT_SLT, $posPhi, $n64);
+        $context->builder->branchIf($inRange, $readBb, $emptyBb);
+
+        $context->builder->positionAtEnd($readBb);
+        $idx = $context->builder->truncOrBitCast($posPhi, $sizeT);
         $fetched = HashTableHelper::readIndexedToValueBox($context, $ht, $idx);
         $str = $context->builder->call(
             $context->lookupFunction('__value__readString'),
             JitValueBox::valuePtrFromVariable($context, $fetched)
         );
+        $isDot = self::emitIsDotName($context, $str);
+        $shouldSkip = $context->builder->and($skipDots, $isDot);
+        $context->builder->branchIf($shouldSkip, $skipBb, $storeBb);
+
+        $context->builder->positionAtEnd($skipBb);
+        $nextPos = $context->builder->addNoSignedWrap($posPhi, $i64->constInt(1, false));
+        $posPhi->addIncoming($nextPos, $skipBb);
+        $context->builder->branch($loopBb);
+
+        $context->builder->positionAtEnd($storeBb);
+        self::storeLongPropertyValue($context, $obj, $className, self::PROP_POS, $posPhi);
         self::storeStringProperty($context, $obj, $className, self::PROP_FILENAME, $str);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($emptyBb);
+        self::storeLongPropertyValue($context, $obj, $className, self::PROP_POS, $posPhi);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        self::storeStringProperty($context, $obj, $className, self::PROP_FILENAME, $empty);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
