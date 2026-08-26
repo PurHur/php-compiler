@@ -30,6 +30,17 @@ final class FilterVarArray34574AotTest extends TestCase
         );
     }
 
+    /** #35016 — EMAIL/URL were missing from FilterVarArrayLlvm::applyFilter switch. */
+    public function testDefinitionEmailAndUrlMatchZend(): void
+    {
+        $this->assertAotExport(
+            "<?php \$r=filter_var_array(['e'=>'a@b.com','u'=>'https://example.com','bad'=>'nope'],"
+            ."['e'=>FILTER_VALIDATE_EMAIL,'u'=>FILTER_VALIDATE_URL,'bad'=>FILTER_VALIDATE_EMAIL]);"
+            ."echo \$r['e'],'|',\$r['u'],'|',var_export(\$r['bad'],true);",
+            "a@b.com|https://example.com|false"
+        );
+    }
+
     public function testRuntimeArrayFilterIdMatchesZend(): void
     {
         $this->assertAotExport(

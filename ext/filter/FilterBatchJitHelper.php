@@ -17,6 +17,7 @@ use PHPCompiler\Web\Superglobals;
  * {@see VmFilter} — NestedJIT of that call graph SIGSEGVs under standalone AOT
  * (peer #34572). VM {@see filter_var_array::execute()} still uses VmFilter.
  * Thin AOT user scripts use {@see \PHPCompiler\JIT\Builtin\FilterVarArrayLlvm}.
+ * String validators EMAIL/URL/IP/MAC/DOMAIN wired in applyFilter (#35016).
  *
  * filter_input_array* returns {@see HashTable}|null (ArrayChunk `__hashtable__*` ABI).
  * Variable returns abort under thin AOT (#34580; peer #34574).
@@ -30,6 +31,17 @@ final class FilterBatchJitHelper
     private const FILTER_VALIDATE_BOOLEAN = 0x0102;
 
     private const FILTER_VALIDATE_FLOAT = 0x0103;
+
+    /** php-src FILTER_VALIDATE_URL / EMAIL / IP / MAC / DOMAIN (#35016). */
+    private const FILTER_VALIDATE_URL = 0x0111;
+
+    private const FILTER_VALIDATE_EMAIL = 0x0112;
+
+    private const FILTER_VALIDATE_IP = 0x0113;
+
+    private const FILTER_VALIDATE_MAC = 0x0114;
+
+    private const FILTER_VALIDATE_DOMAIN = 0x0115;
 
     private const FILTER_DEFAULT = 0x0204;
 
@@ -143,6 +155,57 @@ final class FilterBatchJitHelper
                 $out->bool(false);
             } else {
                 $out->float($parsed);
+            }
+
+            return $out;
+        }
+        // String validators — NestedJIT-safe helpers (no VmFilter / preg_match) (#35016).
+        if (self::FILTER_VALIDATE_EMAIL === $filterId) {
+            $s = $value->toString();
+            if (FilterEmailValidate::isValid($s)) {
+                $out->string($s);
+            } else {
+                $out->bool(false);
+            }
+
+            return $out;
+        }
+        if (self::FILTER_VALIDATE_URL === $filterId) {
+            $ok = FilterUrlJitHelper::validate($value->toString());
+            if (null === $ok) {
+                $out->bool(false);
+            } else {
+                $out->string($ok);
+            }
+
+            return $out;
+        }
+        if (self::FILTER_VALIDATE_IP === $filterId) {
+            $ok = FilterIpJitHelper::validate($value->toString());
+            if (null === $ok) {
+                $out->bool(false);
+            } else {
+                $out->string($ok);
+            }
+
+            return $out;
+        }
+        if (self::FILTER_VALIDATE_MAC === $filterId) {
+            $ok = FilterMacJitHelper::validate($value->toString());
+            if (null === $ok) {
+                $out->bool(false);
+            } else {
+                $out->string($ok);
+            }
+
+            return $out;
+        }
+        if (self::FILTER_VALIDATE_DOMAIN === $filterId) {
+            $ok = FilterDomainJitHelper::validate($value->toString());
+            if (null === $ok) {
+                $out->bool(false);
+            } else {
+                $out->string($ok);
             }
 
             return $out;
