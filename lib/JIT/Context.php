@@ -560,6 +560,14 @@ class Context {
     public array $foreachAggregateInnerHtSlots = [];
 
     /**
+     * IteratorAggregate foreach whose getIterator() yields — store resume name and walk
+     * via GeneratorIteratorJitHelper (#34980). Keyed by {@see foreachSlotMapKey()}.
+     *
+     * @var array<string, string>
+     */
+    public array $foreachAggregateGeneratorSlots = [];
+
+    /**
      * SplStack (and LIFO dllist) foreach — packed `__spl_ht` walked descending (#28705).
      *
      * @var array<string, true>

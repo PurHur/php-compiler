@@ -526,6 +526,14 @@ final class GeneratorIteratorJitHelper
         ) {
             return false;
         }
+        // Compile-time class hint: never treat IteratorAggregate / user objects as the
+        // unit's sole generator creator (foreach would SIGSEGV on Generator IR, #34980).
+        $classHint = $genVar->classUserType ?? null;
+        if (null !== $classHint && '' !== $classHint) {
+            if (0 !== strcasecmp(ltrim($classHint, '\\'), 'Generator')) {
+                return false;
+            }
+        }
         try {
             self::normalizeGeneratorObjectVariable($context, $genVar);
             self::loadStateFromGeneratorObject($context, $genVar);
@@ -561,6 +569,16 @@ final class GeneratorIteratorJitHelper
 
     private static function inferResumeNameFromContext(Context $context, Variable $genVar): ?string
     {
+        // Sole-creator inference is only safe for values already known to be Generator.
+        // Otherwise IteratorAggregate + yielding getIterator() steals the resume name (#34980).
+        $classHint = $genVar->classUserType ?? null;
+        if (null !== $classHint && '' !== $classHint) {
+            if (0 !== strcasecmp(ltrim($classHint, '\\'), 'Generator')) {
+                return null;
+            }
+        } elseif (!$genVar->isJitGenerator && null === $genVar->generatorResumeName) {
+            return null;
+        }
         $creators = array_values(array_unique($context->generatorCreators));
         if (1 === \count($creators)) {
             return $creators[0];
