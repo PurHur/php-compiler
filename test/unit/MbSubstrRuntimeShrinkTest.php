@@ -22,7 +22,9 @@ final class MbSubstrRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('PHP_INT_MIN', $helper);
         $this->assertStringNotContainsString('private static function', $helper);
         $this->assertStringContainsString('$n = $sliceEnd - $sliceStart', $helper);
-        $this->assertStringContainsString('$endAt = $start + $length', $helper);
+        $this->assertStringContainsString('$endAt = $startAt + $lenAt', $helper);
+        $this->assertStringContainsString('Never reassign', $helper);
+        $this->assertStringContainsString('function assertEncodingArgv', $helper);
     }
 
     public function testMbSubstrUsesJitVmHelperLink(): void
