@@ -12,10 +12,12 @@ use PHPLLVM\Value;
 
 /**
  * Pure LLVM for array_map(null|compile-time-string-builtin|Closure) under thin standalone AOT
- * (#23974 / #24156 / #33705 / #33977).
+ * (#23974 / #24156 / #33705 / #33977 / #34978).
  *
  * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayMapJitHelper} still segfaults / returns
- * null on foreach + PHP-array collect for Closures (#24156). Peer of {@see HashTableSliceLlvm}.
+ * null on foreach + PHP-array collect for Closures (#24156). Multi-array null zip used the same
+ * NestedJIT bridge and aborted under thin AOT (#34978) — route through {@see mapNullZipMultiple}.
+ * Peer of {@see HashTableSliceLlvm} / {@see HashTableChunkLlvm}.
  * Packed walks skip TYPE_UNDEFINED only — TYPE_NULL is kept (#33705 / #33699).
  *
  * Typed allowlist (`strtoupper`, `strlen`, …) keeps native set*At stores. Other registered
@@ -46,6 +48,133 @@ final class ArrayMapLlvm
     public static function mapNull(Context $context, Value $src): Value
     {
         return self::mapPacked($context, $src, null, Variable::TYPE_VALUE, 'array_map_null');
+    }
+
+    /**
+     * Null-callback zip across multiple source hashtables (php-src php_array_map).
+     *
+     * Zips by **parallel iteration order** (zend_hash_move_forward on each array), not by
+     * matching keys — so `['a'=>1,'b'=>2]` with `['a'=>3,'c'=>4]` yields `[[1,3],[2,4]]`.
+     * Each result row is a new packed hashtable. Avoids NestedJIT of
+     * {@see \PHPCompiler\ext\standard\ArrayMapJitHelper::mapNullZipMultiple} (#34978).
+     *
+     * @param list<Value> $sources __hashtable__* pointers (length ≥ 2)
+     */
+    public static function mapNullZipMultiple(Context $context, array $sources): Value
+    {
+        if (\count($sources) < 2) {
+            throw new \LogicException('array_map(null) multi-zip requires ≥2 source hashtables (#34978)');
+        }
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $prefix = 'array_map_null_zip';
+
+        // Export each source to an ordered key/value pair list; zip by pair index.
+        $exports = [];
+        foreach ($sources as $srcHt) {
+            $exports[] = Call\HashTableExportKeyValuePairs::exportPairsForSlice($context, $srcHt);
+        }
+        $primaryPairs = $exports[0];
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $primaryPairs
+        );
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, $prefix.'_empty');
+        $workBlock = BasicBlockHelper::append($context, $prefix.'_work');
+        $doneBlock = BasicBlockHelper::append($context, $prefix.'_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $idxSlot = $context->builder->alloca($sizeT, 1, $prefix.'_idx');
+        $outIdxSlot = $context->builder->alloca($sizeT, 1, $prefix.'_out');
+        $context->builder->store($zero, $idxSlot);
+        $context->builder->store($zero, $outIdxSlot);
+
+        // Per-source lengths for past-end → null.
+        $exportLens = [];
+        foreach ($exports as $ei => $exportHt) {
+            $exportLens[$ei] = $context->builder->call(
+                $context->lookupFunction('__hashtable__getNumElements'),
+                $exportHt
+            );
+        }
+
+        $head = BasicBlockHelper::append($context, $prefix.'_head');
+        $body = BasicBlockHelper::append($context, $prefix.'_body');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $past = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $context->builder->branchIf($past, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $row = HashTableHelper::alloc($context);
+        foreach ($exports as $col => $exportHt) {
+            $have = BasicBlockHelper::append($context, $prefix.'_have_'.$col);
+            $miss = BasicBlockHelper::append($context, $prefix.'_miss_'.$col);
+            $after = BasicBlockHelper::append($context, $prefix.'_after_'.$col);
+            $inRange = $context->builder->icmp(Builder::INT_SLT, $idx, $exportLens[$col]);
+            $context->builder->branchIf($inRange, $have, $miss);
+
+            $context->builder->positionAtEnd($have);
+            $pair = HashTableReadLlvm::readIndexedToValueBox($context, $exportHt, $idx);
+            $pairHt = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                JitValueBox::valuePtrFromVariable($context, $pair)
+            );
+            $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $one);
+            HashTableHelper::setAtIndex(
+                $context,
+                $row,
+                $sizeT->constInt($col, false),
+                $valVar
+            );
+            $context->builder->branch($after);
+
+            $context->builder->positionAtEnd($miss);
+            $nullBox = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $nullBox)
+            );
+            $nullVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $nullBox);
+            HashTableHelper::setAtIndex(
+                $context,
+                $row,
+                $sizeT->constInt($col, false),
+                $nullVar
+            );
+            $context->builder->branch($after);
+
+            $context->builder->positionAtEnd($after);
+        }
+        $rowVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $row);
+        $outIdx = $context->builder->load($outIdxSlot);
+        HashTableHelper::setAtIndex($context, $dest, $outIdx, $rowVar);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($outIdx, $one),
+            $outIdxSlot
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
     }
 
     /** Map each packed element through a compile-time string builtin (strtoupper, strval, abs, …). */

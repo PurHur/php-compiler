@@ -29,6 +29,7 @@ final class ArrayMapRuntimeShrinkTest extends TestCase
 
         $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayMapLlvm.php');
         $this->assertStringContainsString('mapNull', $llvm);
+        $this->assertStringContainsString('mapNullZipMultiple', $llvm);
         $this->assertStringContainsString('mapBuiltin', $llvm);
         $this->assertStringContainsString('strtoupper', $llvm);
 
