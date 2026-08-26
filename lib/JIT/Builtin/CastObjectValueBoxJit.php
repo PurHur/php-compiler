@@ -17,7 +17,7 @@ use PHPLLVM\Builder;
 /**
  * (object) cast from boxed TYPE_VALUE operands (#10046).
  *
- * php-src: Zend/zend_operators.c — cast_object (#30098, #30793).
+ * php-src: Zend/zend_operators.c — cast_object (#30098, #30793, #35079).
  */
 final class CastObjectValueBoxJit
 {
@@ -33,27 +33,36 @@ final class CastObjectValueBoxJit
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        // Mask IS_REFCOUNTED; arrays may be VM TYPE_ARRAY or JIT TYPE_HASHTABLE
+        // (peer CastArrayValueBoxJit #33863). Miss → stdClass.scalar wrap (#35079).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
 
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(VmVariable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(VmVariable::TYPE_OBJECT & 0x7f, false)
         );
         $isEnumCase = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(VmVariable::TYPE_ENUM_CASE, false)
+            $kind,
+            $i8->constInt(VmVariable::TYPE_ENUM_CASE & 0x7f, false)
         );
-        $isArray = $context->builder->icmp(
+        $isVmArray = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(VmVariable::TYPE_ARRAY, false)
+            $kind,
+            $i8->constInt(VmVariable::TYPE_ARRAY & 0x7f, false)
         );
+        $isJitHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isArray = $context->builder->or($isVmArray, $isJitHt);
 
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(VmVariable::TYPE_NULL, false)
+            $kind,
+            $i8->constInt(VmVariable::TYPE_NULL & 0x7f, false)
         );
 
         $objectBlock = BasicBlockHelper::append($context, 'cast_object_vb_obj');
