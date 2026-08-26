@@ -11,13 +11,18 @@ namespace PHPCompiler\ext\standard;
  * NestedJIT/AOT does not call into VmString — that path returned null and
  * segfaulted user-script AOT (peer #23204 / #23911).
  *
+ * Length via strlen/substr — the former isset($str[$i]) walk returned 0 under
+ * NestedJIT for this helper shape (#35032 / peer #33334), which skipped all
+ * padding (differential c11_strcmp / e15_str_fns). Peer: {@see VmChunkSplit},
+ * {@see CsvFputcsvJitHelper}.
+ *
  * php-src: ext/standard/string.c — PHP_FUNCTION(str_pad)
  */
 final class StrPadJitHelper
 {
     public static function padArgv(string $input, int $padLength, string $padString, int $padType): string
     {
-        $inputLen = self::byteLength($input);
+        $inputLen = \strlen($input);
         if ($padLength <= 0 || $padLength <= $inputLen) {
             return $input;
         }
@@ -29,7 +34,7 @@ final class StrPadJitHelper
         }
         $need = $padLength - $inputLen;
         if (2 === $padType) {
-            $leftNeed = intdiv($need, 2);
+            $leftNeed = \intdiv($need, 2);
             $rightNeed = $need - $leftNeed;
 
             return self::repeatPad($padString, $leftNeed).$input.self::repeatPad($padString, $rightNeed);
@@ -42,33 +47,23 @@ final class StrPadJitHelper
         return $input.$padding;
     }
 
-    private static function byteLength(string $string): int
-    {
-        $len = 0;
-        while (isset($string[$len])) {
-            ++$len;
-        }
-
-        return $len;
-    }
-
     private static function repeatPad(string $padString, int $length): string
     {
         if ($length <= 0) {
             return '';
         }
-        $padLen = self::byteLength($padString);
+        $padLen = \strlen($padString);
         if ($padLen <= 0) {
             return '';
         }
-        $fullCopies = intdiv($length, $padLen);
+        $fullCopies = \intdiv($length, $padLen);
         $remainder = $length % $padLen;
         $padding = '';
         for ($i = 0; $i < $fullCopies; ++$i) {
             $padding .= $padString;
         }
-        for ($i = 0; $i < $remainder; ++$i) {
-            $padding .= $padString[$i];
+        if ($remainder > 0) {
+            $padding .= \substr($padString, 0, $remainder);
         }
 
         return $padding;
