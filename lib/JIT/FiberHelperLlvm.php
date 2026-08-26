@@ -150,9 +150,12 @@ final class FiberHelperLlvm
         );
         $stateParam = $func->getParam(0);
         $savedBuilder = $context->builder;
+        $savedIntrinsic = $context->intrinsic;
         $savedLowering = $context->loweringLlvmFunction;
         $savedActive = $context->activeFunction;
         $context->builder = $context->context->builderCreate();
+        // Keep intrinsic on the resume builder — same skew as GeneratorHelper (#35178).
+        $context->intrinsic = $context->module->intrinsic($context->builder);
         // parentFunction() prefers loweringLlvmFunction over the insert block (#31101).
         // Without this, value_copy_* / ret i64 from emitSuspendPoint spill into the
         // in-flight app fn (void @internal_N) → Module.php:180 (#32856).
@@ -248,6 +251,7 @@ final class FiberHelperLlvm
         } finally {
             $context->builder->clearInsertionPosition();
             $context->builder = $savedBuilder;
+            $context->intrinsic = $savedIntrinsic;
             $context->loweringLlvmFunction = $savedLowering;
             $context->activeFunction = $savedActive;
             $context->compilingFiberResume = false;
