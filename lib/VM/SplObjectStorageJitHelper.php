@@ -47,6 +47,25 @@ final class SplObjectStorageJitHelper
         return self::voidResult($context);
     }
 
+    /**
+     * Sync `__spl_iter_pos` from the foreach HT-walk index (#35030).
+     *
+     * Foreach walks `objKeys` with a private size_t index; getInfo/current/setInfo
+     * read this property. Without this, every foreach body sees position 0.
+     *
+     * php-src: ext/spl/spl_observer.c — intern->index shared by iterator + getInfo
+     */
+    public static function syncIterPosFromForeachIndex(
+        Context $context,
+        JITVariable $receiver,
+        Value $indexSizeT
+    ): void {
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $pos = $context->builder->zExtOrBitCast($indexSizeT, $i64);
+        self::storeLongPropertyValue($context, $obj, $pos);
+    }
+
     public static function compileValid(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);
