@@ -8,40 +8,46 @@ use PHPCompiler\VM\ObjectEntry;
 
 /**
  * DOMElement::setIdAttribute{,NS,Node}() — user-script AOT (#29257, #29284).
- * Void NestedJIT ABI; DomRegistry only (no PROP_ELEMENT_ID_MAP sync).
+ * Sync PROP_ELEMENT_ID_MAP so multi-id getElementById hits the hashtable (#34696).
  */
 final class DomSetIdAttributeJitHelper
 {
     public static function setIdTrueArgv(ObjectEntry $element, string $name): void
     {
-        VmDom::setIdAttributeWithoutIdMapSync($element, $name, true);
+        VmDom::syncDomRegistryParentChainFromProperties($element);
+        VmDom::setIdAttribute($element, $name, true);
     }
 
     public static function setIdFalseArgv(ObjectEntry $element, string $name): void
     {
-        VmDom::setIdAttributeWithoutIdMapSync($element, $name, false);
+        VmDom::syncDomRegistryParentChainFromProperties($element);
+        VmDom::setIdAttribute($element, $name, false);
     }
 
     /** Empty $namespace → null URI (peer getAttributeNodeNS ABI). */
     public static function setIdNsTrueArgv(ObjectEntry $element, string $namespace, string $localName): void
     {
+        VmDom::syncDomRegistryParentChainFromProperties($element);
         $ns = '' === $namespace ? null : $namespace;
-        VmDom::setIdAttributeNSWithoutIdMapSync($element, $ns, $localName, true);
+        VmDom::setIdAttributeNS($element, $ns, $localName, true);
     }
 
     public static function setIdNsFalseArgv(ObjectEntry $element, string $namespace, string $localName): void
     {
+        VmDom::syncDomRegistryParentChainFromProperties($element);
         $ns = '' === $namespace ? null : $namespace;
-        VmDom::setIdAttributeNSWithoutIdMapSync($element, $ns, $localName, false);
+        VmDom::setIdAttributeNS($element, $ns, $localName, false);
     }
 
     public static function setIdNodeTrueArgv(ObjectEntry $element, ObjectEntry $attr): void
     {
-        VmDom::setIdAttributeNodeWithoutIdMapSync($element, $attr, true);
+        VmDom::syncDomRegistryParentChainFromProperties($element);
+        VmDom::setIdAttributeNode($element, $attr, true);
     }
 
     public static function setIdNodeFalseArgv(ObjectEntry $element, ObjectEntry $attr): void
     {
-        VmDom::setIdAttributeNodeWithoutIdMapSync($element, $attr, false);
+        VmDom::syncDomRegistryParentChainFromProperties($element);
+        VmDom::setIdAttributeNode($element, $attr, false);
     }
 }
