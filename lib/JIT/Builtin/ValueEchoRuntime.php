@@ -24,6 +24,8 @@ use PHPLLVM\Value;
  * {@see JitVmHelperLink} (StringOffset #21497 / ChunkSplit #21399 shape — no STANDALONE
  * icmp fork). Nested helper compile leaf: thin icmp matching {@see ValueEchoJitHelper::typeIs*}
  * without re-entering NestedJIT (#17279).
+ * Context::ensureFullStandaloneBodies must not NestedJIT this ABI (#35143 / peer #35137) —
+ * {@see emitValue} / dump peers ensureLinked before lookup (#32122 .1 mint class).
  * SSOT: {@see \PHPCompiler\VM\ValueEchoSupport}, {@see \PHPCompiler\VM\ValueEchoJitHelper}
  */
 final class ValueEchoRuntime

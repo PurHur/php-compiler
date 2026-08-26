@@ -63,8 +63,12 @@ final class ContextFullStandaloneLazyExceptionErrorBridgeRuntimeShrinkTest exten
             );
         }
 
-        // Still links echo; CliArgv/#35133 + SuperglobalRefresh/#35137 at compileToFile.
-        $this->assertStringContainsString('ValueEchoRuntime::ensureLinked($this)', $fullBody);
+        // ValueEcho deferred to call sites (#35143); CliArgv/#35133 + SuperglobalRefresh/#35137 at compileToFile.
+        $this->assertStringNotContainsString(
+            'ValueEchoRuntime::ensureLinked($this)',
+            $fullBody,
+            'ValueEcho deferred to emitValue/helpers (#35143)'
+        );
         $this->assertStringNotContainsString(
             'SuperglobalRefreshRuntime::ensureStandaloneBodies($this)',
             $fullBody,

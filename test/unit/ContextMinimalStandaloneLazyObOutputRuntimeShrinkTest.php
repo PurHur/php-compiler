@@ -47,19 +47,23 @@ final class ContextMinimalStandaloneLazyObOutputRuntimeShrinkTest extends TestCa
             'ensureMinimal must not eagerly ExceptionBridge (#34732)'
         );
 
-        // ensureFull must not re-add ObOutput before ValueEcho (ValueEcho → ObOutput).
+        // ensureFull must not re-add ObOutput or ValueEcho (both lazy — #34695 / #35143).
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullEnd = strpos($context, 'private function ', $fullPos + 1);
-        $fullHead = false === $fullEnd
-            ? substr($context, $fullPos, 2500)
-            : substr($context, $fullPos, min(2500, $fullEnd - $fullPos));
-        $this->assertStringContainsString('ValueEchoRuntime::ensureLinked($this)', $fullHead);
+        $fullEnd = strpos($context, 'public function compileToFile', $fullPos);
+        $this->assertNotFalse($fullEnd);
+        $fullHead = substr($context, $fullPos, $fullEnd - $fullPos);
+        $this->assertStringNotContainsString(
+            'ValueEchoRuntime::ensureLinked($this)',
+            $fullHead,
+            'ensureFull must not eagerly ValueEcho (#35143)'
+        );
         $this->assertStringNotContainsString(
             'ObOutputRuntime::ensureLinked($this)',
             $fullHead,
-            'ensureFull must not eagerly ObOutput before ValueEcho (#34695)'
+            'ensureFull must not eagerly ObOutput (#34695)'
         );
+        $this->assertStringContainsString('#35143', $fullHead);
     }
 
     public function testValueEchoHelperEnsuresBeforeObLookup(): void

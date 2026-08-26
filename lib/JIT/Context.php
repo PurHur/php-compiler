@@ -2450,9 +2450,13 @@ class Context {
             // NestedJIT assert_fail* / assert_options / return_pending / trigger_error
             // during init — leftover Context NestedJIT vs Runtime ABI drift mints *.1
             // (#31894 / #32122).
-            // ObOutput always-on removed (#34695): ValueEchoRuntime::ensureLinked → ObOutput
-            // (and ValueEchoHelper call sites). Do not re-add before ValueEcho here.
-            Builtin\ValueEchoRuntime::ensureLinked($this);
+            // ObOutput always-on removed (#34695): ValueEchoHelper / ValueEchoRuntime::emitValue
+            // ensureLinked ObOutput before __phpc_ob_echo_* lookup (peer #34642).
+            // ValueEcho always-on removed (#35143): emitValue / StringVarDump / StringPrintR /
+            // StringVarExport already ValueEchoRuntime::ensureLinked before type-bridge use
+            // (peer #35137 SuperglobalRefresh / #35133 CliArgv). Full standalone must not
+            // NestedJIT value_echo_* during init — leftover Context NestedJIT vs Runtime ABI
+            // drift mints value_echo_*.1 (#31894 / #32122).
             // CliArgv always-on removed (#35133 / peer ensureMinimal #34822): compileToFile
             // ensures CliArgvRuntime for every LOAD_TYPE_STANDALONE before main emits
             // __phpc_cli_store_argv; CliArgvGlobalInit / JitGetopt ensureLinked before lookup.
