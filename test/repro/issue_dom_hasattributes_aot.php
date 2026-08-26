@@ -2,7 +2,8 @@
 declare(strict_types=1);
 
 /**
- * AOT DOMNode::hasAttributes() must not abort as object::hasattributes() (#32458).
+ * AOT DOMNode::hasAttributes() must match Zend properties != NULL (#32458 / #34854).
+ * Empty NamedNodeMap after #33128 must still yield false for attribute-less children.
  * php-src ext/dom/node.c PHP_METHOD(DOMNode, hasAttributes) → xmlNode->properties.
  */
 $doc = new DOMDocument();
