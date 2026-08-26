@@ -66,12 +66,21 @@ final class EmptyDimensionLlvm
         if ($container->type & Variable::IS_NATIVE_ARRAY) {
             return self::compileNativeArrayOffsetIsEmpty($context, $container, $dim);
         }
-        if ($container->type === Variable::TYPE_HASHTABLE || Variable::TYPE_VALUE === $container->type) {
-            $htVar = Variable::TYPE_VALUE === $container->type
-                ? self::hashtableFromValueBox($context, $container)
-                : $container;
+        if (Variable::TYPE_VALUE === $container->type) {
+            // Peer isset (#32621 / #35039): inferred-string VALUE boxes must use string-offset
+            // empty, not hashtable-from-value-box (always empty / miss).
+            if (self::isInferredString($containerOp)) {
+                return self::compileStringOffsetIsEmpty(
+                    $context,
+                    self::stringFromValueBox($context, $container),
+                    $dim
+                );
+            }
 
-            return self::compileHashTableOffsetIsEmpty($context, $htVar, $dim, $containerOp);
+            return self::compileValueBoxDimIsEmpty($context, $container, $dim, $containerOp);
+        }
+        if ($container->type === Variable::TYPE_HASHTABLE) {
+            return self::compileHashTableOffsetIsEmpty($context, $container, $dim, $containerOp);
         }
 
         $isset = IssetHelper::compile($context, $container, $dim, $dimOp, $containerOp, false);
@@ -102,7 +111,11 @@ final class EmptyDimensionLlvm
                 Variable::KIND_VALUE,
                 $context->constantFromInteger(0)
             );
-        } elseif (Variable::TYPE_NATIVE_LONG !== $dim->type) {
+        } elseif (
+            Variable::TYPE_NATIVE_LONG !== $dim->type
+            && Variable::TYPE_VALUE !== $dim->type
+        ) {
+            // TYPE_VALUE locals are coerced by normalizeOffset (same as isset) — #35039.
             return $context->constantFromBool(true);
         }
         $str = $context->helper->loadValue($container);
@@ -130,16 +143,24 @@ final class EmptyDimensionLlvm
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($inBlock);
-        $charStr = StringOffsetHelper::dimFetch($context, $str, $dim);
-        $charVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $charStr);
-        $valueEmpty = EmptyObjectPropertyLlvm::compileEmptyFromValue($context, $charVar);
+        // Length-1 string empty: only "0" is empty ("" unreachable in-range). Prefer a byte
+        // compare over readDimAsString+boolval PHI (invalid predecessors) — #35039.
+        $charPtr = StringOffsetHelper::dimFetch($context, $str, $dim);
+        $byte = $context->builder->load($charPtr);
+        $i8 = $context->getTypeFromString('int8');
+        $valueEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $byte,
+            $i8->constInt(ord('0'), false)
+        );
+        $inEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i1);
         // PHPLLVM Value::addIncoming(Value, BasicBlock) — array pairs mint invalid PHI (#33079).
         $phi->addIncoming($oobEmpty, $oobBlock);
-        $phi->addIncoming($valueEmpty, $inBlock);
+        $phi->addIncoming($valueEmpty, $inEnd);
 
         return $phi;
     }
@@ -280,6 +301,86 @@ final class EmptyDimensionLlvm
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($resultSlot);
+    }
+
+    private static function isInferredString(?Operand $op): bool
+    {
+        if (null === $op || null === $op->type) {
+            return false;
+        }
+
+        return Type::TYPE_STRING === $op->type->type;
+    }
+
+    private static function stringFromValueBox(Context $context, Variable $container): Variable
+    {
+        $ptr = JitValueBox::valuePtrFromVariable($context, $container);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $ptr
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $str
+        );
+    }
+
+    /**
+     * Runtime type-byte dispatch for empty($valueBox[$dim]) — peer isset (#32622 / #35039).
+     */
+    private static function compileValueBoxDimIsEmpty(
+        Context $context,
+        Variable $container,
+        Variable $dim,
+        ?Operand $containerOp
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_STRING, false)
+        );
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $strBlock = $fn->appendBasicBlock('empty_vbox_str');
+        $htBlock = $fn->appendBasicBlock('empty_vbox_ht');
+        $doneBlock = $fn->appendBasicBlock('empty_vbox_done');
+        $context->builder->branchIf($isString, $strBlock, $htBlock);
+
+        $context->builder->positionAtEnd($strBlock);
+        $strResult = self::compileStringOffsetIsEmpty(
+            $context,
+            self::stringFromValueBox($context, $container),
+            $dim
+        );
+        $strEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $htResult = self::compileHashTableOffsetIsEmpty(
+            $context,
+            self::hashtableFromValueBox($context, $container),
+            $dim,
+            $containerOp
+        );
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1, 'empty_vbox_dim_phi');
+        $phi->addIncoming($strResult, $strEnd);
+        $phi->addIncoming($htResult, $htEnd);
+
+        return $phi;
     }
 
     private static function hashtableFromValueBox(Context $context, Variable $container): Variable

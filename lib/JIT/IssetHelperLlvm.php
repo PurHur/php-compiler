@@ -602,7 +602,11 @@ final class IssetHelperLlvm
                 Variable::KIND_VALUE,
                 $context->constantFromInteger(0)
             );
-        } elseif (Variable::TYPE_NATIVE_LONG !== $dim->type) {
+        } elseif (
+            Variable::TYPE_NATIVE_LONG !== $dim->type
+            && Variable::TYPE_VALUE !== $dim->type
+        ) {
+            // TYPE_VALUE locals are coerced by normalizeOffset (same as dim-fetch) — #35039.
             return $i1->constInt(0, false);
         }
         $str = $context->helper->loadValue($container);
