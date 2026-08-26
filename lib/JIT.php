@@ -20165,6 +20165,7 @@ class JIT {
                     $slot
                 );
                 $var->addref();
+                $this->copyValueBoxJitFlags($var, $value, false);
                 $this->context->setVariableOp($resultOp, $var);
                 $resolved = JIT\OperandName::resolve($resultOp);
                 if (null !== $resolved && '' !== $resolved) {
@@ -20181,6 +20182,8 @@ class JIT {
             ) {
                 // HT dim-fetch copies into stack __value__ slots — first-bind must copy the
                 // slot, not loadValue()+makeVariableFromValueOp (AOT abort / empty chain) (#31938).
+                // Also copy isNullConstant / compile-time flags — ConstFetch null for
+                // mb_trim($s, null, $enc) otherwise loses the null marker (#35199).
                 $slot = JIT\JitValueBox::alloc($this->context);
                 JIT\JitValueBox::copyFromPointer(
                     $this->context,
@@ -20194,6 +20197,7 @@ class JIT {
                     $slot
                 );
                 $var->addref();
+                $this->copyValueBoxJitFlags($var, $value, false);
                 $this->context->setVariableOp($resultOp, $var);
                 $resolved = JIT\OperandName::resolve($resultOp);
                 if (null !== $resolved && '' !== $resolved) {

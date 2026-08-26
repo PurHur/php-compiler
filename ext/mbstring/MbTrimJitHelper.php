@@ -15,33 +15,63 @@ namespace PHPCompiler\ext\mbstring;
  * Rtrim NBSP uses a C2-hold deferral — `$last = $i - 1` / `$last === $n - 1` miscompile
  * under thin AOT (#34396 leftover).
  *
+ * Runtime encoding via {@see assertEncodingArgv} (#35199 leftover of #34379 / peer #35161).
+ *
  * Default charset: ASCII ws + U+00A0 (C2 A0). php-src: ext/mbstring/mbstring.c
  */
 final class MbTrimJitHelper
 {
+    /**
+     * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
+     * SIGSEGVs under thin AOT; int helpers match {@see MbScrubJitHelper::assertEncodingArgv}.
+     *
+     * Argument #3 ($encoding) for mb_trim / mb_ltrim / mb_rtrim.
+     */
+    public static function assertEncodingArgv(string $encoding, string $function): int
+    {
+        $ok = 0;
+        if ('UTF-8' === $encoding || 'utf-8' === $encoding || 'UTF8' === $encoding || 'utf8' === $encoding) {
+            $ok = 1;
+        }
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            $ok = 1;
+        }
+        if ('8BIT' === $encoding || '8bit' === $encoding || 'BINARY' === $encoding || 'binary' === $encoding) {
+            $ok = 1;
+        }
+        if (0 === $ok) {
+            // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+            throw new \ValueError(
+                $function.'(): Argument #3 ($encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
+
+        return 1;
+    }
+
     public static function trimDefault(string $value, string $encoding): string
     {
-        if ('8BIT' === $encoding) {
-            return $value;
-        }
+        // Encoding already validated via {@see assertEncodingArgv} (#35199).
+        // UTF-8 / ASCII / 8BIT share the default trim set for ASCII ws (+ UTF-8 NBSP);
+        // php-src mb_trim uses single-byte trim for ASCII/8BIT (VmMbstring::trimString).
+        unset($encoding);
 
         return self::trimRightBody(self::trimLeftBody($value));
     }
 
     public static function ltrimDefault(string $value, string $encoding): string
     {
-        if ('8BIT' === $encoding) {
-            return $value;
-        }
+        unset($encoding);
 
         return self::trimLeftBody($value);
     }
 
     public static function rtrimDefault(string $value, string $encoding): string
     {
-        if ('8BIT' === $encoding) {
-            return $value;
-        }
+        unset($encoding);
 
         return self::trimRightBody($value);
     }

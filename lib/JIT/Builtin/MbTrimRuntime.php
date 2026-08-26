@@ -11,6 +11,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link hook for mb_trim() / mb_ltrim() / mb_rtrim() — MbTrimJitHelper (#34379).
  *
+ * Runtime encoding assert: {@see MbTrimJitHelper::assertEncodingArgv} (#35199 leftover of #34379).
+ *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_trim)
  */
 final class MbTrimRuntime
@@ -25,12 +27,15 @@ final class MbTrimRuntime
 
     private const TRIM_CHARS = 'PHPCompiler\\ext\\mbstring\\MbTrimJitHelper::trimChars';
 
+    private const ASSERT_ENCODING = 'PHPCompiler\\ext\\mbstring\\MbTrimJitHelper::assertEncodingArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::TRIM_DEFAULT,
         self::LTRIM_DEFAULT,
         self::RTRIM_DEFAULT,
         self::TRIM_CHARS,
+        self::ASSERT_ENCODING,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -64,6 +69,13 @@ final class MbTrimRuntime
         self::ensureJitHelperCompiled($context);
 
         return JitVmHelperLink::lookupCompiled($context, self::TRIM_CHARS, 'mb_trim_chars');
+    }
+
+    public static function assertEncodingHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::ASSERT_ENCODING, 'mb_trim_encoding');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
