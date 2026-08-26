@@ -18,6 +18,7 @@ use PHPCompiler\JIT\Builtin\StringStrpos;
  * — those methods silent-return 0 under thin AOT NestedJIT. Search is inlined with strlen/ord/substr
  * only; UTF-8 width uses range compares (NestedJIT bitwise `&` loops hang on multibyte lead bytes).
  * Case-insensitive APIs use NestedJIT-safe UTF-8 lower (Latin-1 / Greek / Cyrillic; #34703).
+ * Runtime encoding validation (#34866) — int-returning assert (string-returning NestedJIT throws SIGSEGV).
  *
  * SSOT (VM / compile-time fold): {@see VmMbstring::strpos()} / stripos / strrpos / strripos / strstr / stristr /
  * strrchr / strrichr
@@ -26,12 +27,31 @@ use PHPCompiler\JIT\Builtin\StringStrpos;
  */
 final class MbSearchJitHelper
 {
+    /**
+     * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
+     * SIGSEGVs under thin AOT; int helpers match {@see MbCaseJitHelper::assertEncodingArgv} (#34866 / #34858).
+     *
+     * Encoding is Argument #4 for all mb_* search builtins in this unit.
+     */
+    public static function assertEncodingArgv(string $encoding, string $function): int
+    {
+        if ('' === self::canon($encoding)) {
+            // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+            throw new \ValueError(
+                $function.'(): Argument #4 ($encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
+
+        return 1;
+    }
+
     public static function strposArgv(
         string $haystack,
         string $needle,
         int $offset,
         string $encoding
     ): int {
+        $encoding = self::canon($encoding);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             return self::byteStrpos($haystack, $needle, $offset);
         }
@@ -51,6 +71,7 @@ final class MbSearchJitHelper
         int $offset,
         string $encoding
     ): int {
+        $encoding = self::canon($encoding);
         $haystack = self::utf8CaseLower($haystack);
         $needle = self::utf8CaseLower($needle);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
@@ -71,6 +92,7 @@ final class MbSearchJitHelper
         int $offset,
         string $encoding
     ): int {
+        $encoding = self::canon($encoding);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             return self::byteStrrpos($haystack, $needle, $offset);
         }
@@ -89,6 +111,7 @@ final class MbSearchJitHelper
         int $offset,
         string $encoding
     ): int {
+        $encoding = self::canon($encoding);
         $haystack = self::utf8CaseLower($haystack);
         $needle = self::utf8CaseLower($needle);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
@@ -109,6 +132,7 @@ final class MbSearchJitHelper
         bool $beforeNeedle,
         string $encoding
     ) {
+        $encoding = self::canon($encoding);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             $pos = self::byteStrpos($haystack, $needle, 0);
             if (StringStrpos::NOT_FOUND === $pos) {
@@ -146,6 +170,7 @@ final class MbSearchJitHelper
         bool $beforeNeedle,
         string $encoding
     ) {
+        $encoding = self::canon($encoding);
         $hayLower = self::utf8CaseLower($haystack);
         $needleLower = self::utf8CaseLower($needle);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
@@ -183,6 +208,7 @@ final class MbSearchJitHelper
         bool $beforeNeedle,
         string $encoding
     ) {
+        $encoding = self::canon($encoding);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             $pos = self::byteStrrpos($haystack, $needle, 0);
             if (StringStrpos::NOT_FOUND === $pos) {
@@ -220,6 +246,7 @@ final class MbSearchJitHelper
         bool $beforeNeedle,
         string $encoding
     ) {
+        $encoding = self::canon($encoding);
         $hayLower = self::utf8CaseLower($haystack);
         $needleLower = self::utf8CaseLower($needle);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
@@ -601,5 +628,23 @@ final class MbSearchJitHelper
         }
 
         return \substr($string, $start, $bytePos - $start);
+    }
+
+    private static function canon(string $encoding): string
+    {
+        if ('UTF-8' === $encoding || 'utf-8' === $encoding || 'UTF8' === $encoding || 'utf8' === $encoding) {
+            return 'UTF-8';
+        }
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            return 'ASCII';
+        }
+        if ('8BIT' === $encoding || '8bit' === $encoding || 'BINARY' === $encoding || 'binary' === $encoding) {
+            return '8BIT';
+        }
+
+        return '';
     }
 }
