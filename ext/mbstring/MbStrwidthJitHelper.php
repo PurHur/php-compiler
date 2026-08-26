@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * NestedJIT helpers for mb_strwidth() / mb_strimwidth() / mb_str_pad() (#3495 / #34264 / #34269 / #34270).
+ * NestedJIT helpers for mb_strwidth() / mb_strimwidth() / mb_str_pad() (#3495 / #34264 / #34269 / #34270 / #34884).
  *
  * NestedJIT zeros int locals copied from params (width-minus-marker temporary) and
  * charLen-minus-from. Compare `$charIndex == $from` /
@@ -18,12 +18,54 @@ namespace PHPCompiler\ext\mbstring;
  * NestedJIT display width = 1 per UTF-8 character. Compile-time fold uses VmMbstring (full EAW).
  * Subject length via isset-index (strlen silent-0 under NestedJIT, #34264).
  *
+ * Runtime encoding validation (#34884) — int-returning assert (string-returning NestedJIT throws SIGSEGV).
+ * Canon is inlined (no private helpers in assert — peer MbStrcutJitHelper #34881).
+ *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_strwidth / mb_strimwidth / mb_str_pad).
  */
 final class MbStrwidthJitHelper
 {
+    /**
+     * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
+     * SIGSEGVs under thin AOT; int helpers match {@see MbStrcutJitHelper::assertEncodingArgv} (#34884 / #34875).
+     *
+     * Argument #2 for mb_strwidth; Argument #5 for mb_strimwidth / mb_str_pad.
+     */
+    public static function assertEncodingArgv(string $encoding, string $function): int
+    {
+        $ok = 0;
+        if ('UTF-8' === $encoding || 'utf-8' === $encoding || 'UTF8' === $encoding || 'utf8' === $encoding) {
+            $ok = 1;
+        }
+        if (
+            'ASCII' === $encoding || 'ascii' === $encoding
+            || 'US-ASCII' === $encoding || 'us-ascii' === $encoding
+        ) {
+            $ok = 1;
+        }
+        if ('8BIT' === $encoding || '8bit' === $encoding || 'BINARY' === $encoding || 'binary' === $encoding) {
+            $ok = 1;
+        }
+        if (0 === $ok) {
+            $argN = '2';
+            if ('mb_strimwidth' === $function) {
+                $argN = '5';
+            }
+            if ('mb_str_pad' === $function) {
+                $argN = '5';
+            }
+            // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+            throw new \ValueError(
+                $function.'(): Argument #'.$argN.' ($encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
+
+        return 1;
+    }
+
     public static function strwidth(string $string, string $encoding): int
     {
+        // Encoding must already be validated via {@see assertEncodingArgv} (#34884).
         unset($encoding);
         $n = 0;
         $byteLen = 0;
@@ -66,6 +108,7 @@ final class MbStrwidthJitHelper
         string $trimmarker,
         string $encoding
     ): string {
+        // Encoding must already be validated via {@see assertEncodingArgv} (#34884).
         unset($encoding);
 
         $byteLen = 0;
