@@ -8,12 +8,15 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbSubstrCountRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * LLVM lowering for mb_substr_count() — MbSubstrCountJitHelper in-module (#4637 AOT leftover).
+ *
+ * Runtime encoding via NestedJIT assertEncodingArgv (#35155 leftover of #4637 / peer #34884).
  */
 final class JitMbSubstrCount
 {
@@ -41,6 +44,14 @@ final class JitMbSubstrCount
             );
         }
 
+        // Link NestedJIT helpers before lowering args — NestedJIT can invalidate prior IR (#34270 / #35155).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbSubstrCountRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_substr_count_runtime');
+
         $haystack = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $args[0],
@@ -55,16 +66,15 @@ final class JitMbSubstrCount
             1,
             'needle'
         );
-        $encoding = self::runtimeEncodingLiteral($args, $argc, $context);
-        self::assertSupportedEncoding($encoding);
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbSubstrCountRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        [$encPtr, $needsAssert] = self::encodingPtr($context, $args, $argc);
+        if ($needsAssert) {
+            $fnName = $context->builder->load($context->constantStringFromString('mb_substr_count'));
+            $context->builder->call(
+                MbSubstrCountRuntime::assertEncodingHelper($context),
+                $encPtr,
+                $fnName
+            );
         }
-
-        $encPtr = $context->builder->load($context->constantStringFromString($encoding));
 
         return $context->builder->call(
             MbSubstrCountRuntime::substrCountHelper($context),
@@ -75,37 +85,46 @@ final class JitMbSubstrCount
     }
 
     /**
+     * Literal UTF-8/ASCII/8BIT → constant string (no assert); otherwise NestedJIT encoding + assert (#35155).
+     *
      * @param list<JITVariable> $args
+     * @return array{0: Value, 1: bool} encoding ptr, needsAssert
      */
-    private static function runtimeEncodingLiteral(array $args, int $argc, Context $context): string
+    private static function encodingPtr(Context $context, array $args, int $argc): array
     {
-        if ($argc < 3) {
-            return 'UTF-8';
-        }
-        if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
-            return 'UTF-8';
-        }
-        if (JITVariable::TYPE_STRING !== $args[2]->type) {
-            throw new \LogicException(
-                'mb_substr_count() encoding must be a string literal in this compiler build'
-            );
-        }
-        $encoding = $args[2]->compileTimeString ?? null;
-        if (null === $encoding) {
-            throw new \LogicException(
-                'mb_substr_count() encoding must be a string literal in this compiler build'
-            );
+        if ($argc < 3 || JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
+            $encoding = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
+            if (!self::isSupportedEncoding($encoding)) {
+                $encoding = 'UTF-8';
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encoding)), false];
         }
 
-        return $encoding;
+        $encodingLit = JitStringArg::compileTimeLiteral($args[2]);
+        if (null !== $encodingLit) {
+            $canonical = MbstringEncodingRegistry::resolve($encodingLit);
+            if (null !== $canonical && self::isSupportedEncoding($canonical)) {
+                return [$context->builder->load($context->constantStringFromString($canonical)), false];
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
+        }
+
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[2],
+                'mb_substr_count',
+                2,
+                'encoding'
+            ),
+            true,
+        ];
     }
 
-    private static function assertSupportedEncoding(string $encoding): void
+    private static function isSupportedEncoding(string $encoding): bool
     {
-        if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
-            throw new \LogicException(
-                'mb_substr_count() requires UTF-8, ASCII, or 8BIT encoding in this compiler build'
-            );
-        }
+        return 'UTF-8' === $encoding || 'ASCII' === $encoding || '8BIT' === $encoding;
     }
 }

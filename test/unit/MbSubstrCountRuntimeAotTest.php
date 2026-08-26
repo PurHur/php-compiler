@@ -7,7 +7,8 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: mb_substr_count() runtime args via MbSubstrCountJitHelper (#4637 AOT leftover).
+ * AOT: mb_substr_count() runtime args + runtime encoding via MbSubstrCountJitHelper
+ * (#4637 AOT leftover / #35155 leftover of #4637).
  *
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_substr_count)
  *
@@ -24,13 +25,30 @@ final class MbSubstrCountRuntimeAotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/mb_substr_count_runtime_aot.php');
     }
 
+    public function testAotRuntimeEncodingMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(__DIR__.'/../repro/mb_substr_count_runtime_encoding_aot.php');
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
         $helper = (string) file_get_contents($root.'/ext/mbstring/MbSubstrCountJitHelper.php');
         $this->assertStringContainsString('function substrCountArgv', $helper);
+        $this->assertStringContainsString('function assertEncodingArgv', $helper);
+        $this->assertStringContainsString('Argument #3', $helper);
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbSubstrCountRuntime.php');
         $this->assertStringContainsString('substrCountHelper', $runtime);
+        $this->assertStringContainsString('assertEncodingHelper', $runtime);
+        $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbSubstrCount.php');
+        $this->assertStringContainsString('encodingPtr', $jit);
+        $this->assertStringNotContainsString(
+            'encoding must be a string literal in this compiler build',
+            $jit
+        );
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_substr_count.php');
         $this->assertStringContainsString('JitMbSubstrCount::invoke', $src);
         $this->assertStringNotContainsString(
