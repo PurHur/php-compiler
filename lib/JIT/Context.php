@@ -2466,12 +2466,16 @@ class Context {
             if (\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
                 Builtin\StringStrReplace::ensureStandaloneBodies($this);
             }
-            Builtin\StringJsonEncode::ensureStandaloneBodies($this);
-            Builtin\StringJsonDecode::ensureStandaloneBodies($this);
+            // StringJsonEncode / StringJsonDecode always-on removed (#35065): JitJsonEncode /
+            // JitJsonDecode / JsonEncodeArrayLlvm / JitJsonValidate / … already ensureLinked /
+            // ensureJitHelperCompiled before lookup (peer #35035). Full standalone must not
+            // NestedJIT json_* during init — leftover Context NestedJIT vs Runtime ABI drift
+            // mints json_encode_*.1 / json_decode*.1 (#31894 / #32122).
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\StringRandomBytes::implement($this);
-            Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
-            Builtin\StringOffsetRuntime::ensureStandaloneBodies($this);
+            // ScalarDimFetchRuntime / StringOffsetRuntime always-on removed (#35065):
+            // emitWarning / dimFetch / readDimAsString / … already ensureLinked before ABI use
+            // (peer #35035). Do not NestedJIT offset / scalar-dim helpers during full init.
             // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
             // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
             // NestedJIT StreamFilterJitHelper during full standalone init (#21041 / peer #20998).

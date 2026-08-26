@@ -26,6 +26,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Embed + thin standalone AOT: single {@see __compiler_json_decode} bridge with tag dispatch
  * (Unserialize #20785 / Explode #14750 shape — no thin null stubs).
  * Validate/last_error live in {@see JsonValidateJitHelper} (separate NestedJIT TU).
+ * Call sites ensureLinked before lookup; ensureFullStandaloneBodies must not NestedJIT this
+ * during init (#35065) — peer #35035 / #32122 `.1` mint class.
  * php-src: ext/json/php_json.c — php_json_decode_ex / php_json_validate
  */
 final class StringJsonDecode
