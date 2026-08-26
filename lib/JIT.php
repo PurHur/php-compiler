@@ -8757,6 +8757,11 @@ class JIT {
             $this->rebindEnumCaseConstantSlots($block, $op);
             switch ($op->type) {
                 case OpCode::TYPE_ARG_RECV:
+                    // Resume fn has no PHP argv — formals live in heap frame filled at
+                    // generator create (emitCreateFromCall) (#35142).
+                    if ($this->context->compilingGeneratorResume) {
+                        break;
+                    }
                     $recvSlot = $op->arg2 + $thisParamOffset;
                     $isVariadicSlot = null !== $block->variadicParamIndex
                         && $block->variadicParamIndex === (int) $op->arg2;
@@ -12687,6 +12692,35 @@ class JIT {
 
                     return $origBasicBlock;
                 case OpCode::TYPE_RETURN_VOID:
+                    if ($this->context->compilingGeneratorResume) {
+                        $stateParam = $this->context->generatorStateParam;
+                        assert(null !== $stateParam);
+                        $map = $this->context->structFieldMap['__generator_state__'];
+                        $i1 = $this->context->getTypeFromString('int1');
+                        $i64 = $this->context->getTypeFromString('int64');
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__value__writeNull'),
+                            JIT\JitValueBox::pointer(
+                                $this->context,
+                                $this->context->builder->structGep($stateParam, $map['return_value'])
+                            )
+                        );
+                        $this->context->builder->store(
+                            $i1->constInt(1, false),
+                            $this->context->builder->structGep($stateParam, $map['has_returned'])
+                        );
+                        $this->context->builder->store(
+                            $i1->constInt(1, false),
+                            $this->context->builder->structGep($stateParam, $map['done'])
+                        );
+                        $this->context->builder->store(
+                            $i1->constInt(0, false),
+                            $this->context->builder->structGep($stateParam, $map['has_current'])
+                        );
+                        $this->context->builder->returnValue($i64->constInt(0, false));
+
+                        return $origBasicBlock;
+                    }
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
                     $this->markJitThisConstructedIfLeavingConstruct($block);
@@ -12761,6 +12795,45 @@ class JIT {
                         ? $returnBlock
                         : $origBasicBlock;
                 case OpCode::TYPE_RETURN:
+                    if ($this->context->compilingGeneratorResume) {
+                        $stateParam = $this->context->generatorStateParam;
+                        assert(null !== $stateParam);
+                        $map = $this->context->structFieldMap['__generator_state__'];
+                        $i1 = $this->context->getTypeFromString('int1');
+                        $i64 = $this->context->getTypeFromString('int64');
+                        $returnOperand = $block->getOperand($op->arg1);
+                        if (null !== $returnOperand) {
+                            $return = $this->context->getVariableFromOp($returnOperand);
+                            $this->assignValueToGeneratorField(
+                                $this->context->builder->structGep($stateParam, $map['return_value']),
+                                $return,
+                                $returnOperand
+                            );
+                        } else {
+                            $this->context->builder->call(
+                                $this->context->lookupFunction('__value__writeNull'),
+                                JIT\JitValueBox::pointer(
+                                    $this->context,
+                                    $this->context->builder->structGep($stateParam, $map['return_value'])
+                                )
+                            );
+                        }
+                        $this->context->builder->store(
+                            $i1->constInt(1, false),
+                            $this->context->builder->structGep($stateParam, $map['has_returned'])
+                        );
+                        $this->context->builder->store(
+                            $i1->constInt(1, false),
+                            $this->context->builder->structGep($stateParam, $map['done'])
+                        );
+                        $this->context->builder->store(
+                            $i1->constInt(0, false),
+                            $this->context->builder->structGep($stateParam, $map['has_current'])
+                        );
+                        $this->context->builder->returnValue($i64->constInt(0, false));
+
+                        return $origBasicBlock;
+                    }
                     $returnOperand = $block->getOperand($op->arg1);
                     $return = $this->context->getVariableFromOp($returnOperand);
                     $this->recordFunctionReturnedClosureCall($block, $return);
@@ -13018,7 +13091,39 @@ class JIT {
                 case OpCode::TYPE_YIELD:
                 case OpCode::TYPE_YIELD_FROM:
                     if ($this->context->compilingGeneratorResume) {
-                        throw new \LogicException('yield should be lowered via GeneratorHelper resume switch (issue #3074)');
+                        $yieldId = spl_object_id($op);
+                        if (!isset($this->context->generatorYieldPointIndex[$yieldId])) {
+                            throw new \LogicException('yield opcode missing from resume-point index (#35142)');
+                        }
+                        $pointIndex = $this->context->generatorYieldPointIndex[$yieldId];
+                        $stateParam = $this->context->generatorStateParam;
+                        assert(null !== $stateParam);
+                        if (OpCode::TYPE_YIELD_FROM === $op->type) {
+                            \PHPCompiler\VM\GeneratorYieldFromJitHelper::emitYieldFromPoint(
+                                $this,
+                                $block,
+                                $op,
+                                $stateParam,
+                                $pointIndex
+                            );
+                        } else {
+                            \PHPCompiler\VM\GeneratorIteratorJitHelper::emitYieldPoint(
+                                $this,
+                                $block,
+                                $op,
+                                $stateParam,
+                                $pointIndex + 1
+                            );
+                        }
+                        $contIp = $pointIndex + 1;
+                        if (!isset($this->context->generatorResumeContinuations[$contIp])) {
+                            throw new \LogicException('generator resume continuation missing for ip '.$contIp.' (#35142)');
+                        }
+                        $cont = $this->context->generatorResumeContinuations[$contIp];
+                        $this->context->builder->positionAtEnd($cont);
+                        $basicBlock = $cont;
+                        $origBasicBlock = $cont;
+                        break;
                     }
                     throw new \LogicException('Generators (yield) are VM-only (issue #167)');
                 case OpCode::TYPE_FUNCCALL_INIT:
@@ -13391,8 +13496,27 @@ class JIT {
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
                     try {
                     if (is_null($this->context->scope->toCall)) {
-                        // Self-host stub/short-circuit (eg runtime variable function): represent as null.
                         $this->context->callSiteLine = (int) ($op->arg2 ?? 0);
+                        $resumeNameEarly = $this->context->scope->generatorResumeCallee;
+                        if (null !== $resumeNameEarly) {
+                            $this->context->scope->generatorResumeCallee = null;
+                            $genArgs = [];
+                            foreach ($this->context->scope->args as $a) {
+                                if ($a instanceof Variable) {
+                                    $genArgs[] = $a;
+                                } elseif (\is_array($a) && isset($a['value']) && $a['value'] instanceof Variable) {
+                                    $genArgs[] = $a['value'];
+                                }
+                            }
+                            $genVar = JIT\GeneratorHelper::emitCreateFromCall(
+                                $this,
+                                $resumeNameEarly,
+                                $genArgs
+                            );
+                            $this->assignOperandForced($block->getOperand($op->arg1), $genVar);
+                            break;
+                        }
+                        // Self-host stub/short-circuit (eg runtime variable function): represent as null.
                         if ($this->context->scope->preserveNewResultOnNullCall) {
                             $this->context->scope->preserveNewResultOnNullCall = false;
                             break;
@@ -13597,9 +13721,21 @@ class JIT {
                     $resumeName = $this->context->scope->generatorResumeCallee;
                     $this->context->scope->generatorResumeCallee = null;
                     if (null !== $resumeName) {
+                        // Prefer resolved callArgs; fall back to raw scope argv (#35142).
+                        $genArgs = $callArgs;
+                        if ([] === $genArgs && [] !== $this->context->scope->args) {
+                            foreach ($this->context->scope->args as $a) {
+                                if ($a instanceof Variable) {
+                                    $genArgs[] = $a;
+                                } elseif (\is_array($a) && isset($a['value']) && $a['value'] instanceof Variable) {
+                                    $genArgs[] = $a['value'];
+                                }
+                            }
+                        }
                         $genVar = JIT\GeneratorHelper::emitCreateFromCall(
                             $this,
-                            $resumeName
+                            $resumeName,
+                            $genArgs
                         );
                         $this->assignOperandForced($block->getOperand($op->arg1), $genVar);
                         break;

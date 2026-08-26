@@ -250,6 +250,34 @@ class Context {
 
     public ?\PHPLLVM\Value $generatorStateParam = null;
 
+    /**
+     * Named CV → index into generator state frame_slots (#35142).
+     *
+     * @var array<string, int>
+     */
+    public array $generatorFrameLocalIndex = [];
+
+    /**
+     * Named CV → LLVM pointer to heap __value__ slot (dominates all resume BBs) (#35142).
+     *
+     * @var array<string, \PHPLLVM\Value>
+     */
+    public array $generatorFrameLocalPtrs = [];
+
+    /**
+     * Yield opcode object id → resume-point index while compiling resume CFG (#35142).
+     *
+     * @var array<int, int>
+     */
+    public array $generatorYieldPointIndex = [];
+
+    /**
+     * Continuation LLVM BBs keyed by resume_ip after each yield (#35142).
+     *
+     * @var array<int, \PHPLLVM\BasicBlock>
+     */
+    public array $generatorResumeContinuations = [];
+
     /** While lowering fiber resume LLVM (issue #4019). */
     public bool $compilingFiberResume = false;
 
@@ -263,6 +291,20 @@ class Context {
 
     /** @var array<string, string> user func lc => resume LLVM symbol */
     public array $generatorCreators = [];
+
+    /**
+     * user func lc => ordered formal names for frame init at create (#35142).
+     *
+     * @var array<string, list<string>>
+     */
+    public array $generatorCreatorParamNames = [];
+
+    /**
+     * resume LLVM symbol lc => frame local name => index (#35142).
+     *
+     * @var array<string, array<string, int>>
+     */
+    public array $generatorCreatorFrameIndex = [];
 
     /**
      * Catch-body CFG block id => LLVM entry for generator try/catch dispatch (#4069).
