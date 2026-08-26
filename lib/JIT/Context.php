@@ -2519,11 +2519,13 @@ class Context {
             // __compiler_sprintf / __compiler_printf / __compiler_number_format during
             // init — leftover Context NestedJIT vs Runtime ABI drift mints sprintf.1 /
             // printf.1 / number_format.1 (#31894 / #32122).
-            // Skip-bundle inventory compile_driver (#23970): bind phpc_str_replace before
-            // NestedJIT includes; HelperRuntimeCache supplies the TU when enabled.
-            if (\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
-                Builtin\StringStrReplace::ensureStandaloneBodies($this);
-            }
+            // StringStrReplace always-on removed (#35160): JitStrReplace / StringStrReplace::invoke
+            // already ensureLinked before lookup. With HelperRuntimeCache enabled, ensureLinked
+            // still implements under NestedJitCompileScope (the #23970 no-op is cache-off only);
+            // bin/compile.php already forces PHP_COMPILER_HELPER_RUNTIME_O=1 for skip-bundle
+            // compile_driver. Full standalone must not NestedJIT phpc_str_replace during init —
+            // leftover Context NestedJIT vs Runtime ABI drift mints phpc_str_replace.1
+            // (#31894 / #32122).
             // StringJsonEncode / StringJsonDecode always-on removed (#35065): JitJsonEncode /
             // JitJsonDecode / JsonEncodeArrayLlvm / JitJsonValidate / … already ensureLinked /
             // ensureJitHelperCompiled before lookup (peer #35035). Full standalone must not

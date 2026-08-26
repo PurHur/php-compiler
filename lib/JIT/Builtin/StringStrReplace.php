@@ -10,10 +10,14 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for phpc_str_replace/phpc_str_ireplace via StrReplaceJitHelper PHP (#14779, #23912).
+ * JIT/AOT link for phpc_str_replace/phpc_str_ireplace via StrReplaceJitHelper PHP (#14779, #23912, #35160).
  *
  * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
  * env clear — no hand-rolled NestedJit compile loop). Peer: StringStrPad #23911 / #23204.
+ * {@see Context::ensureFullStandaloneBodies} must not NestedJIT this during init (#35160) —
+ * peer #35143 / #32122 `.1` mint class; {@see invoke} / JitStrReplace ensure via
+ * {@see ensureLinked} before lookup. Skip-bundle compile_driver still gets helper-runtime .o
+ * from `bin/compile.php` (#23970) — cache-on NestedJIT can ensureLinked without an early bind.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — php_str_replace
  */
