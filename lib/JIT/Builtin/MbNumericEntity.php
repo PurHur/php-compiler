@@ -4,108 +4,78 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for mb_encode/decode_numericentity() via MbNumericEntityJitHelper PHP (#7237).
+ * JIT/AOT link hook for mb_encode/decode_numericentity() — MbNumericEntityJitHelper (#35210 leftover of #7237).
  *
- * SSOT: {@see \PHPCompiler\ext\mbstring\VmMbstring}
+ * Direct NestedJIT (peer {@see MbTrimRuntime}) — not the old `__compiler_mb_*_numericentity4`
+ * bridge ABI (function-return `__string__*` SIGSEGVs under thin AOT).
+ *
+ * Runtime encoding assert: {@see MbNumericEntityJitHelper::assertEncodingArgv}.
+ *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_encode_numericentity)
  */
 final class MbNumericEntity
 {
-    private const ABI_ENCODE4 = '__compiler_mb_encode_numericentity4';
-    private const ABI_DECODE4 = '__compiler_mb_decode_numericentity4';
-
     private const HELPER_PATH = '/ext/mbstring/MbNumericEntityJitHelper.php';
 
-    private const ENCODE4_HELPER = 'PHPCompiler\\ext\\mbstring\\MbNumericEntityJitHelper::encode4';
-    private const DECODE4_HELPER = 'PHPCompiler\\ext\\mbstring\\MbNumericEntityJitHelper::decode4';
+    private const ENCODE4 = 'PHPCompiler\\ext\\mbstring\\MbNumericEntityJitHelper::encode4';
 
-    private const ENCODE4_BRIDGE_ENTRY = 'mb_encode_numericentity4_bridge_entry';
-    private const DECODE4_BRIDGE_ENTRY = 'mb_decode_numericentity4_bridge_entry';
+    private const DECODE4 = 'PHPCompiler\\ext\\mbstring\\MbNumericEntityJitHelper::decode4';
+
+    private const DECODE_SCAN = 'PHPCompiler\\ext\\mbstring\\MbNumericEntityJitHelper::decodeDecScan';
+
+    private const ASSERT_ENCODING = 'PHPCompiler\\ext\\mbstring\\MbNumericEntityJitHelper::assertEncodingArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::ENCODE4_HELPER,
-        self::DECODE4_HELPER,
+        self::ENCODE4,
+        self::DECODE4,
+        self::DECODE_SCAN,
+        self::ASSERT_ENCODING,
     ];
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::ensureJitHelperCompiled($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
+        self::ensureJitHelperCompiled($context);
     }
 
-    private static function implement(Context $context): void
+    public static function encode4Helper(Context $context): LlvmFunction
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
+        self::ensureJitHelperCompiled($context);
 
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        self::implementEncode4Bridge($context);
-        self::implementDecode4Bridge($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        return JitVmHelperLink::lookupCompiled($context, self::ENCODE4, '#35210');
     }
 
-    private static function implementEncode4Bridge(Context $context): void
+    public static function decode4Helper(Context $context): LlvmFunction
     {
-        $probe = $context->module->getNamedFunction(self::ABI_ENCODE4);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI_ENCODE4, $probe);
+        self::ensureJitHelperCompiled($context);
 
-            return;
-        }
+        return JitVmHelperLink::lookupCompiled($context, self::DECODE4, '#35210');
+    }
 
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        JitVmHelperLink::ensureBridge(
+    public static function assertEncodingHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::ASSERT_ENCODING, '#35210');
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
             $context,
-            self::ABI_ENCODE4,
-            self::ENCODE4_BRIDGE_ENTRY,
-            [$strPtr, $i64, $i64, $i64, $i64, $strPtr, $i8],
-            $strPtr,
-            self::ENCODE4_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#7237'
-        );
-    }
-
-    private static function implementDecode4Bridge(Context $context): void
-    {
-        $probe = $context->module->getNamedFunction(self::ABI_DECODE4);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI_DECODE4, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_DECODE4,
-            self::DECODE4_BRIDGE_ENTRY,
-            [$strPtr, $i64, $i64, $i64, $i64, $strPtr],
-            $strPtr,
-            self::DECODE4_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#7237'
+            'mb_numericentity'
         );
     }
 }
