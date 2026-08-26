@@ -12,7 +12,3 @@ $o = new C();
 $f = false;
 var_export($f ? [$o->x] : ['x']);
 echo "\n";
-var_export($o ? [$o->x] : null);
-echo "\n";
-var_export($f ? [$o->x] : null);
-echo "\n";
