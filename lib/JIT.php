@@ -937,6 +937,9 @@ class JIT {
      * `var_export($o ? [$o->x] : null)` merges into ARG_SEND of the phi with no ECHO of that
      * slot — without recognizing ARG_SEND here, stack-phi never arms and AOT sends NULL (#34944).
      * php-src: Zend/zend_ast.c ZEND_AST_CONDITIONAL.
+     *
+     * `$x = $cond ? [$o->a] : [9]; var_export($x)` merges as ASSIGN($x, armPhi) then
+     * ARG_SEND($x). Arms write armPhi, not $x — return armPhi so stack-phi arms (#34970).
      */
     private function mergeTernaryResultSlot(
         Block $mergeBlock,
@@ -966,6 +969,22 @@ class JIT {
             if (OpCode::TYPE_ECHO === $mergeOp->type && null !== $mergeOp->arg1) {
                 return (int) $mergeOp->arg1;
             }
+            // Merge copies arm phi into a named local before FUNCCALL/ECHO (#34970).
+            if (
+                OpCode::TYPE_ASSIGN === $mergeOp->type
+                && null !== $mergeOp->arg2
+                && null !== $mergeOp->arg3
+                && (int) $mergeOp->arg1 !== (int) $mergeOp->arg2
+            ) {
+                $srcSlot = (int) $mergeOp->arg3;
+                if ($this->ternaryArmsAssignIntoSlot($ifBlock, $elseBlock, $srcSlot)) {
+                    return $srcSlot;
+                }
+                $destSlot = (int) $mergeOp->arg2;
+                if ($this->ternaryArmsAssignIntoSlot($ifBlock, $elseBlock, $destSlot)) {
+                    return $destSlot;
+                }
+            }
             // FUNCCALL merge: ARG_SEND of the ?: phi (Compiler remaps dead call-arg temps).
             if (
                 OpCode::TYPE_ARG_SEND === $mergeOp->type
@@ -977,6 +996,50 @@ class JIT {
         }
 
         return null;
+    }
+
+    /**
+     * INIT_ARRAY(temp); ADD_ARRAY_ELEMENT(temp,…)*; ASSIGN(_, phi, temp) — multi-element
+     * ?: true-arm when a later PROPERTY_FETCH reused the phi slot (#34970 / #34944).
+     */
+    private function initArrayCoalescePhiAfterElementTrail(
+        Block $block,
+        int $initIndex,
+        int $initDestSlot
+    ): ?int {
+        $n = $block->nOpCodes;
+        $j = $initIndex + 1;
+        while ($j < $n) {
+            $trail = $block->opCodes[$j];
+            if (
+                OpCode::TYPE_ADD_ARRAY_ELEMENT === $trail->type
+                && null !== $trail->arg1
+                && (int) $trail->arg1 === $initDestSlot
+            ) {
+                ++$j;
+                continue;
+            }
+            break;
+        }
+        if ($j >= $n) {
+            return null;
+        }
+        $assign = $block->opCodes[$j];
+        if (
+            OpCode::TYPE_ASSIGN !== $assign->type
+            || null === $assign->arg2
+            || null === $assign->arg3
+            || (int) $assign->arg1 === (int) $assign->arg2
+            || (int) $assign->arg3 !== $initDestSlot
+        ) {
+            return null;
+        }
+        $phiSlot = (int) $assign->arg2;
+        if (!isset($this->context->coalesceMergeSlotOperands[$phiSlot])) {
+            return null;
+        }
+
+        return $phiSlot;
     }
 
     /** True when a ?: arm ASSIGN.arg2 targets $slot (php-cfg phi alias). */
@@ -8734,7 +8797,10 @@ class JIT {
                     ) {
                         $prevAssignOp = $block->opCodes[$i - 1];
                         if (
-                            OpCode::TYPE_INIT_ARRAY === $prevAssignOp->type
+                            (
+                                OpCode::TYPE_INIT_ARRAY === $prevAssignOp->type
+                                || OpCode::TYPE_ADD_ARRAY_ELEMENT === $prevAssignOp->type
+                            )
                             && null !== $prevAssignOp->arg1
                             && (int) $prevAssignOp->arg1 === $rhsSlot
                         ) {
@@ -8858,12 +8924,15 @@ class JIT {
                     ) {
                         $prevOp = $block->opCodes[$i - 1];
                         if (
-                            OpCode::TYPE_INIT_ARRAY === $prevOp->type
+                            (
+                                OpCode::TYPE_INIT_ARRAY === $prevOp->type
+                                || OpCode::TYPE_ADD_ARRAY_ELEMENT === $prevOp->type
+                            )
                             && null !== $prevOp->arg1
                             && (int) $prevOp->arg1 === $rhsSlot
                         ) {
-                            // INIT_ARRAY(temp); ASSIGN(result, phi, temp) else-arm of ?:
-                            // when coalesce slot map is not armed (#34956).
+                            // INIT_ARRAY(temp); [ADD_ARRAY_ELEMENT]*; ASSIGN(result, phi, temp)
+                            // else/true-arm of ?: when coalesce slot map is not armed (#34956/#34970).
                             $coalesceTarget = $aliasOp;
                         }
                     }
@@ -9967,6 +10036,28 @@ class JIT {
                             if (!$this->context->hasVariableOp($phiOp)) {
                                 $this->ensureCoalesceMergeStackSlot($phiOp);
                             }
+                            $resultOp = $phiOp;
+                        }
+                    } elseif (
+                        null !== $op->arg1
+                        && null !== ($trailPhiSlot = $this->initArrayCoalescePhiAfterElementTrail(
+                            $block,
+                            $i,
+                            (int) $op->arg1
+                        ))
+                    ) {
+                        // Multi-element true-arm: INIT_ARRAY(temp); ADD_*; ASSIGN(_, phi, temp)
+                        // when PROPERTY_FETCH reused the phi slot (#34970).
+                        $phiOp = $this->context->coalesceMergeSlotOperands[$trailPhiSlot]
+                            ?? $block->getOperand($trailPhiSlot);
+                        if ($phiOp instanceof Operand) {
+                            if (!$this->context->hasVariableOp($phiOp)) {
+                                $this->ensureCoalesceMergeStackSlot($phiOp);
+                            }
+                            $this->context->setVariableOp(
+                                $resultOp,
+                                $this->context->getVariableFromOp($phiOp)
+                            );
                             $resultOp = $phiOp;
                         }
                     }
