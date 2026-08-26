@@ -37,10 +37,8 @@ final class ContextFullStandaloneLazyRandomBytesShrinkTest extends TestCase
             );
         }
 
-        // Still links echo / argv / refresh used by standalone main.
-        // StringFormat left ensureFull in #35130 — do not re-assert eager format here.
+        // Still links echo / refresh (#35130 StringFormat + #35133 CliArgv deferred).
         $this->assertStringContainsString('ValueEchoRuntime::ensureLinked($this)', $fullBody);
-        $this->assertStringContainsString('CliArgvRuntime::ensureStandaloneBodies($this)', $fullBody);
         $this->assertStringContainsString('SuperglobalRefreshRuntime::ensureStandaloneBodies($this)', $fullBody);
     }
 

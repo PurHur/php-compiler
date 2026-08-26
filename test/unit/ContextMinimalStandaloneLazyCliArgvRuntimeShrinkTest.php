@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
  * Drop Context::ensureMinimalUserStandaloneBodies always-on CliArgvRuntime (#34822 / peer #34812).
  *
  * Thin AOT hello-world must not eagerly link CLI argv ABI during ensureMinimal —
- * compileToFile thin path + CliArgvGlobalInit already ensureLinked (#32122 .1 mint class).
+ * compileToFile (all standalone, #35133) + CliArgvGlobalInit already ensureLinked (#32122 .1 mint class).
  */
 final class ContextMinimalStandaloneLazyCliArgvRuntimeShrinkTest extends TestCase
 {
@@ -42,7 +42,7 @@ final class ContextMinimalStandaloneLazyCliArgvRuntimeShrinkTest extends TestCas
         $this->assertStringContainsString(
             'CliArgvRuntime::ensureStandaloneBodies($this)',
             $context,
-            'compileToFile / full / bootstrap-aot still ensureStandaloneBodies (#34822)'
+            'compileToFile / bootstrap-aot still ensureStandaloneBodies (#34822 / #35133)'
         );
 
         $init = (string) file_get_contents(__DIR__.'/../../lib/JIT/CliArgvGlobalInit.php');
