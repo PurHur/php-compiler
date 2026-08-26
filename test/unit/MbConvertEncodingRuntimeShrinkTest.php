@@ -17,6 +17,8 @@ final class MbConvertEncodingRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MbConvertEncodingRuntime.php');
         $this->assertStringContainsString('MbConvertEncodingJitHelper::convertArgv', $source);
+        $this->assertStringContainsString('MbConvertEncodingJitHelper::assertToEncodingArgv', $source);
+        $this->assertStringContainsString('MbConvertEncodingJitHelper::assertFromEncodingArgv', $source);
         $this->assertStringContainsString('/ext/mbstring/MbConvertEncodingJitHelper.php', $source);
         $this->assertStringNotContainsString('convertDefaultArgv', $source);
     }

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\iconv\CharsetEngine;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbConvertEncodingRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -15,8 +17,8 @@ use PHPLLVM\Value;
 /**
  * LLVM JIT/AOT for mb_convert_encoding() (php-src ext/mbstring/mbstring.c; #6251, #34309).
  *
- * Compile-time fold for string literals; runtime string + literal encodings via NestedJIT
- * {@see MbConvertEncodingJitHelper} (convert_kana / #34294 call shape — direct helper call).
+ * Compile-time fold for string literals; runtime string + encodings via NestedJIT
+ * {@see MbConvertEncodingJitHelper} (#35165 leftover of #34309 / peer #35161).
  */
 final class JitMbConvertEncoding
 {
@@ -38,42 +40,13 @@ final class JitMbConvertEncoding
             );
         }
 
-        $toLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
-        if (null === $toLit) {
-            throw new \LogicException(
-                'mb_convert_encoding() to_encoding must be a string literal in this compiler build'
-            );
+        // Link NestedJIT helpers before lowering args — NestedJIT can invalidate prior IR (#34270 / #35165).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbConvertEncodingRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         }
-        $fromIsDefault = 2 === $argc
-            || (
-                3 === $argc
-                && (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant)
-            );
-        $fromLit = null;
-        if (!$fromIsDefault) {
-            $fromLit = JitStringBuiltinArg::compileTimeLiteral($args[2]);
-            if (null === $fromLit) {
-                throw new \LogicException(
-                    'mb_convert_encoding() from_encoding must be a string literal in this compiler build'
-                );
-            }
-        } else {
-            $fromLit = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
-        }
-
-        if (!self::encodingsAreValid($toLit, $fromLit)) {
-            return self::foldFalse($context);
-        }
-        if (VmMbstring::isMbConvertPseudoEncoding($toLit) || VmMbstring::isMbConvertPseudoEncoding($fromLit)) {
-            throw new \LogicException(
-                'mb_convert_encoding() pseudo encodings are not lowered for JIT/AOT runtime in this compiler build'
-            );
-        }
-        if (str_contains($fromLit, ',')) {
-            throw new \LogicException(
-                'mb_convert_encoding() detect-then-convert from_encoding lists are not lowered for JIT/AOT runtime in this compiler build'
-            );
-        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_convert_encoding_runtime');
 
         // Soft-null DEP already emitted by caller; NestedJIT recovers '' (#21282).
         $str = $sourceIsNull
@@ -86,10 +59,33 @@ final class JitMbConvertEncoding
                 'string'
             );
 
-        MbConvertEncodingRuntime::ensureLinked($context);
-        $toPtr = $context->builder->load($context->constantStringFromString($toLit));
-        // Always pass resolved from_encoding — NestedJIT of MbstringState::internalEncoding aborts.
-        $fromPtr = $context->builder->load($context->constantStringFromString($fromLit));
+        [$toPtr, $assertTo] = self::toEncodingPtr($context, $args[1]);
+        if ($assertTo) {
+            $context->builder->call(
+                MbConvertEncodingRuntime::assertToEncodingHelper($context),
+                $toPtr
+            );
+        }
+
+        $fromIsDefault = 2 === $argc
+            || (
+                3 === $argc
+                && (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant)
+            );
+        if ($fromIsDefault) {
+            $fromLit = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
+            // Always pass resolved from_encoding — NestedJIT of MbstringState::internalEncoding aborts.
+            $fromPtr = $context->builder->load($context->constantStringFromString($fromLit));
+        } else {
+            [$fromPtr, $assertFrom] = self::fromEncodingPtr($context, $args[2]);
+            if ($assertFrom) {
+                $context->builder->call(
+                    MbConvertEncodingRuntime::assertFromEncodingHelper($context),
+                    $fromPtr
+                );
+            }
+        }
+
         $resultStr = $context->builder->call(
             MbConvertEncodingRuntime::convertHelper($context),
             $str,
@@ -98,6 +94,91 @@ final class JitMbConvertEncoding
         );
 
         return self::materializeOwnedString($context, $resultStr);
+    }
+
+    /**
+     * Literal leaf encoding → constant string (no assert); otherwise NestedJIT + assert (#35165).
+     *
+     * @return array{0: Value, 1: bool} encoding ptr, needsAssert
+     */
+    private static function toEncodingPtr(Context $context, JITVariable $arg): array
+    {
+        $encodingLit = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $encodingLit) {
+            if (VmMbstring::isMbConvertPseudoEncoding($encodingLit)) {
+                throw new \LogicException(
+                    'mb_convert_encoding() pseudo encodings are not lowered for JIT/AOT runtime in this compiler build'
+                );
+            }
+            if (self::isLeafEncoding($encodingLit)) {
+                return [$context->builder->load($context->constantStringFromString($encodingLit)), false];
+            }
+            if (null === CharsetEngine::parseEncodingSpec($encodingLit)) {
+                // Known-invalid literal: assert → Zend ValueError (#35165).
+                return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
+            }
+            // Non-leaf but CharsetEngine-valid (e.g. UTF-16): NestedJIT leaf returns ''.
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), false];
+        }
+
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $arg,
+                'mb_convert_encoding',
+                1,
+                'to_encoding'
+            ),
+            true,
+        ];
+    }
+
+    /**
+     * @return array{0: Value, 1: bool}
+     */
+    private static function fromEncodingPtr(Context $context, JITVariable $arg): array
+    {
+        $encodingLit = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $encodingLit) {
+            if (VmMbstring::isMbConvertPseudoEncoding($encodingLit)) {
+                throw new \LogicException(
+                    'mb_convert_encoding() pseudo encodings are not lowered for JIT/AOT runtime in this compiler build'
+                );
+            }
+            if (str_contains($encodingLit, ',')) {
+                throw new \LogicException(
+                    'mb_convert_encoding() detect-then-convert from_encoding lists are not lowered for JIT/AOT runtime in this compiler build'
+                );
+            }
+            if (self::isLeafEncoding($encodingLit)) {
+                return [$context->builder->load($context->constantStringFromString($encodingLit)), false];
+            }
+            if (null === CharsetEngine::parseEncodingSpec($encodingLit)) {
+                return [$context->builder->load($context->constantStringFromString($encodingLit)), true];
+            }
+
+            return [$context->builder->load($context->constantStringFromString($encodingLit)), false];
+        }
+
+        return [
+            JitStringBuiltinArg::lower(
+                $context,
+                $arg,
+                'mb_convert_encoding',
+                2,
+                'from_encoding'
+            ),
+            true,
+        ];
+    }
+
+    private static function isLeafEncoding(string $encoding): bool
+    {
+        $e = strtoupper($encoding);
+
+        return 'UTF8' === $e || 'UTF-8' === $e
+            || 'LATIN1' === $e || 'LATIN-1' === $e || 'ISO-8859-1' === $e
+            || 'ASCII' === $e || 'US-ASCII' === $e;
     }
 
     /**
@@ -155,24 +236,6 @@ final class JitMbConvertEncoding
             || (($arg->type & JITVariable::IS_NATIVE_ARRAY) !== 0)
             || ($arg->compileTimeEmptyArrayLiteral ?? false)
             || null !== ($arg->compileTimeArray ?? null);
-    }
-
-    private static function encodingsAreValid(string $to, string $from): bool
-    {
-        if (
-            !VmMbstring::isMbConvertPseudoEncoding($to)
-            && null === CharsetEngine::parseEncodingSpec($to)
-        ) {
-            return false;
-        }
-        if (
-            !VmMbstring::isMbConvertPseudoEncoding($from)
-            && null === CharsetEngine::parseEncodingSpec($from)
-        ) {
-            return false;
-        }
-
-        return true;
     }
 
     private static function materializeOwnedString(Context $context, Value $resultStr): Value

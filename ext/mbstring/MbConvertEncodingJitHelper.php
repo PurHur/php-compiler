@@ -10,12 +10,63 @@ namespace PHPCompiler\ext\mbstring;
  * Minimal UTF-8 / ISO-8859-1 / ASCII leaf — avoids NestedJIT of full CharsetEngine
  * (SEGV at c:main_before_php). From-encoding is always passed explicitly (internal
  * encoding resolved at compile time — NestedJIT MbstringState aborts).
+ * Runtime encodings via {@see assertToEncodingArgv} / {@see assertFromEncodingArgv}
+ * (#35165 leftover of #34309 / peer #35161).
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_convert_encoding)
  */
 final class MbConvertEncodingJitHelper
 {
+    /**
+     * Int-returning encoding check — NestedJIT ValueError from string-returning helpers
+     * SIGSEGVs under thin AOT; int helpers match {@see MbScrubJitHelper::assertEncodingArgv}.
+     *
+     * Argument #2 ($to_encoding).
+     */
+    public static function assertToEncodingArgv(string $encoding): int
+    {
+        if (0 === self::isLeafEncoding($encoding)) {
+            // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+            throw new \ValueError(
+                'mb_convert_encoding(): Argument #2 ($to_encoding) must be a valid encoding, "'.$encoding.'" given'
+            );
+        }
+
+        return 1;
+    }
+
+    /**
+     * Argument #3 ($from_encoding) — Zend wording is "contains invalid encoding".
+     */
+    public static function assertFromEncodingArgv(string $encoding): int
+    {
+        if (0 === self::isLeafEncoding($encoding)) {
+            throw new \ValueError(
+                'mb_convert_encoding(): Argument #3 ($from_encoding) contains invalid encoding "'.$encoding.'"'
+            );
+        }
+
+        return 1;
+    }
+
+    private static function isLeafEncoding(string $encoding): int
+    {
+        $e = strtoupper($encoding);
+        if ('UTF8' === $e || 'UTF-8' === $e) {
+            return 1;
+        }
+        if ('LATIN1' === $e || 'LATIN-1' === $e || 'ISO-8859-1' === $e) {
+            return 1;
+        }
+        if ('ASCII' === $e || 'US-ASCII' === $e) {
+            return 1;
+        }
+
+        return 0;
+    }
+
     public static function convertArgv(string $string, string $toEncoding, string $fromEncoding): string
     {
+        // Encodings must already be validated via assert*EncodingArgv when runtime (#35165).
         $from = self::canon($fromEncoding);
         $to = self::canon($toEncoding);
         if ($from === $to) {
