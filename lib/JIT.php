@@ -8707,6 +8707,52 @@ class JIT {
                         $this->context->callSiteLine = $op->sourceLocation->startLine;
                     }
                     $rhsSlot = $this->assignRhsSlot($op);
+                    if (
+                        $i > 0
+                        && null !== $op->arg2
+                        && $op->arg1 !== $op->arg2
+                    ) {
+                        $prevAssignOp = $block->opCodes[$i - 1];
+                        if (
+                            OpCode::TYPE_INIT_ARRAY === $prevAssignOp->type
+                            && null !== $prevAssignOp->arg1
+                            && (int) $prevAssignOp->arg1 === $rhsSlot
+                        ) {
+                            $phiSlot = (int) $op->arg2;
+                            $phiOp = $this->context->coalesceMergeSlotOperands[$phiSlot] ?? null;
+                            if ($phiOp instanceof Operand) {
+                                $initRhsOp = $block->getOperand($rhsSlot);
+                                assert(null !== $initRhsOp);
+                                $arrayValue = $this->context->getVariableFromOp($initRhsOp);
+                                if (!$this->context->hasVariableOp($phiOp)) {
+                                    $this->ensureCoalesceMergeStackSlot($phiOp);
+                                }
+                                $phiVar = $this->context->getVariableFromOp($phiOp);
+                                if (
+                                    Variable::TYPE_VALUE === $phiVar->type
+                                    && Variable::KIND_VARIABLE === $phiVar->kind
+                                ) {
+                                    JIT\JitValueBox::assignToPointer(
+                                        $this->context,
+                                        JIT\JitValueBox::pointer($this->context, $phiVar->value),
+                                        $arrayValue
+                                    );
+                                    JIT\JitValueBox::publishAfterWrite(
+                                        $this->context,
+                                        JIT\JitValueBox::pointer($this->context, $phiVar->value)
+                                    );
+                                } else {
+                                    $this->assignOperand($phiOp, $arrayValue, true);
+                                }
+                                $this->bindCoalesceMergeSlotVariable(
+                                    $block,
+                                    $phiSlot,
+                                    $this->context->getVariableFromOp($phiOp)
+                                );
+                                break;
+                            }
+                        }
+                    }
                     $rhsOperand = $block->getOperand($rhsSlot);
                     $formalRhs = $this->tryResolveFormalParamVariableForRhs($block, $rhsOperand);
                     if (isset($this->context->coalesceMergeSlotOperands[(int) $rhsSlot])) {
@@ -8783,11 +8829,23 @@ class JIT {
                         $this->emitJitReturnFromValue($func, $block, $value);
                         break;
                     }
-                    $coalesceTarget = null;
-                    if (null !== $destOp && $this->context->coalesceAssignTargets->contains($destOp)) {
-                        $coalesceTarget = $destOp;
-                    } elseif (null !== $aliasOp && $this->context->coalesceAssignTargets->contains($aliasOp)) {
-                        $coalesceTarget = $aliasOp;
+                    $coalesceTarget = $this->resolveCoalesceMergeAssignTarget($destOp, $aliasOp, $block);
+                    if (
+                        null === $coalesceTarget
+                        && $i > 0
+                        && null !== $aliasOp
+                        && $op->arg1 !== $op->arg2
+                    ) {
+                        $prevOp = $block->opCodes[$i - 1];
+                        if (
+                            OpCode::TYPE_INIT_ARRAY === $prevOp->type
+                            && null !== $prevOp->arg1
+                            && (int) $prevOp->arg1 === $rhsSlot
+                        ) {
+                            // INIT_ARRAY(temp); ASSIGN(result, phi, temp) else-arm of ?:
+                            // when coalesce slot map is not armed (#34956).
+                            $coalesceTarget = $aliasOp;
+                        }
                     }
                     $forceCoalesce = null !== $coalesceTarget;
                     $srcOp = $block->getOperand($rhsSlot);
@@ -8856,11 +8914,14 @@ class JIT {
                     if (
                         $forceCoalesce
                         && null !== $coalesceTarget
-                        && $coalesceTarget === $destOp
                         && null !== $aliasOp
                         && $op->arg1 !== $op->arg2
+                        && ($coalesceTarget === $destOp || $coalesceTarget === $aliasOp)
                     ) {
-                        $ternaryEchoPhiDest = $destOp;
+                        // php-cfg ?: arms use ASSIGN(resultTemp, phiAlias, rhs). Null arms hit
+                        // forceCoalesce+isNullSource above; non-null else arms (e.g. `['x']`)
+                        // must write the stack phi at phiAlias, not only the dead result temp (#34956).
+                        $ternaryEchoPhiDest = $coalesceTarget;
                     }
                     $aliasName = null !== $aliasOp ? JIT\OperandName::resolve($aliasOp) : null;
                     $needsNamedStorageAssign = null !== $aliasOp
@@ -9854,7 +9915,42 @@ class JIT {
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
                     $resultOp = $block->getOperand($op->arg1);
+                    $initTempOp = $resultOp;
+                    $nextOp = $block->opCodes[$i + 1] ?? null;
+                    if (
+                        null !== $nextOp
+                        && OpCode::TYPE_ASSIGN === $nextOp->type
+                        && null !== $nextOp->arg2
+                        && null !== $nextOp->arg3
+                        && (int) $nextOp->arg1 !== (int) $nextOp->arg2
+                        && (int) $nextOp->arg3 === (int) $op->arg1
+                    ) {
+                        // Else-arm `['x']`: INIT_ARRAY(temp) then ASSIGN(result, phiAlias, temp).
+                        // Build into phiAlias so ARG_SEND reads the arm value (#34956).
+                        $phiSlot = (int) $nextOp->arg2;
+                        $phiOp = $this->context->coalesceMergeSlotOperands[$phiSlot]
+                            ?? $block->getOperand($nextOp->arg2);
+                        if ($phiOp instanceof Operand) {
+                            if (!$this->context->hasVariableOp($phiOp)) {
+                                $this->ensureCoalesceMergeStackSlot($phiOp);
+                            }
+                            $resultOp = $phiOp;
+                        }
+                    }
                     $result = $this->context->getVariableFromOp($resultOp);
+                    if ($resultOp !== $initTempOp) {
+                        // If-arm PROPERTY_FETCH often shares slot indices with else-arm
+                        // INIT_ARRAY temps; drop fetch-arm SSA before writing the phi (#34956).
+                        $result->objectPropertySlot = null;
+                        $result->objectPropertyType = null;
+                        $result->objectPropertyReceiver = null;
+                        $result->objectPropertyReceiverOp = null;
+                        $result->objectPropertyName = null;
+                        $result->objectPropertyClassName = null;
+                        $result->objectPropertyDnfArms = null;
+                        $result->compileTimeArray = null;
+                        $result->compileTimeAssoc = null;
+                    }
                     JIT\HashTableHelper::initArray($this->context, $result);
                     $result->compileTimeEmptyArrayLiteral = null === $op->arg2;
                     // Keep named locals (e.g. `$out = []`) flagged so DateTime New_ sync
@@ -9881,6 +9977,23 @@ class JIT {
                             $this->registerArrayElementClosureCallProxy($block, $block->getOperand($op->arg1), $op->arg3, $element);
                             $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
                         }
+                    }
+                    if (null !== $initTempOp && $initTempOp !== $resultOp) {
+                        if ($this->context->hasVariableOp($initTempOp)) {
+                            $tempVar = $this->context->getVariableFromOp($initTempOp);
+                            $tempVar->objectPropertySlot = null;
+                            $tempVar->objectPropertyType = null;
+                            $tempVar->objectPropertyReceiver = null;
+                            $tempVar->objectPropertyReceiverOp = null;
+                            $tempVar->objectPropertyName = null;
+                            $tempVar->objectPropertyClassName = null;
+                            $tempVar->objectPropertyDnfArms = null;
+                        }
+                        $this->context->setVariableOp($initTempOp, $result);
+                    }
+                    if ($resultOp !== $initTempOp && null !== $nextOp && OpCode::TYPE_ASSIGN === $nextOp->type) {
+                        $phiSlot = (int) $nextOp->arg2;
+                        $this->bindCoalesceMergeSlotVariable($block, $phiSlot, $result);
                     }
                     break;
                 case OpCode::TYPE_ADD_ARRAY_ELEMENT:
@@ -29194,6 +29307,56 @@ class JIT {
             return;
         }
         $this->assignOperand($coalesceTarget, $value, false);
+    }
+
+    /**
+     * ?: / ?? merge ASSIGN dest — match coalesceAssignTargets or the stack-phi slot map.
+     *
+     * php-cfg reuses slot numbers across JUMPIF arms but not always the same Operand
+     * instance; the else arm alias temp must resolve via coalesceMergeSlotOperands (#34956).
+     */
+    private function bindCoalesceMergeSlotVariable(Block $block, int $slot, Variable $var): void
+    {
+        if (isset($this->context->coalesceMergeSlotOperands[$slot])) {
+            $this->context->setVariableOp($this->context->coalesceMergeSlotOperands[$slot], $var);
+        }
+        $aliasOp = $block->getOperand($slot);
+        if ($aliasOp instanceof Operand) {
+            $this->context->setVariableOp($aliasOp, $var);
+        }
+        foreach ($this->context->scope->variables as $scopeOp) {
+            if (!$scopeOp instanceof Operand) {
+                continue;
+            }
+            if ($block->slotForOperand($scopeOp) !== $slot) {
+                continue;
+            }
+            $this->context->setVariableOp($scopeOp, $var);
+        }
+    }
+
+    private function resolveCoalesceMergeAssignTarget(
+        ?Operand $destOp,
+        ?Operand $aliasOp,
+        Block $block
+    ): ?Operand {
+        if (null !== $destOp && $this->context->coalesceAssignTargets->contains($destOp)) {
+            return $destOp;
+        }
+        if (null !== $aliasOp && $this->context->coalesceAssignTargets->contains($aliasOp)) {
+            return $aliasOp;
+        }
+        foreach ([$aliasOp, $destOp] as $op) {
+            if (null === $op) {
+                continue;
+            }
+            $slot = $block->slotForOperand($op);
+            if (null !== $slot && isset($this->context->coalesceMergeSlotOperands[$slot])) {
+                return $this->context->coalesceMergeSlotOperands[$slot];
+            }
+        }
+
+        return null;
     }
 
     private function ensureCoalesceMergeStackSlot(Operand $mergeOp): void
