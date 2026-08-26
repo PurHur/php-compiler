@@ -76,6 +76,13 @@ final class JitDomCreateDocument
 
         $document = $objectType->allocate($docClassId);
         $objectType->markObjectConstructed($document);
+        // Unset NATIVE_LONG nodeType SIGSEGVs on $doc->nodeType (#35173 leftover of #35168).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $document,
+            self::CLASS_DOCUMENT,
+            DomConstants::XML_DOCUMENT_NODE
+        );
 
         if ('' === $qualifiedName) {
             self::storeNullDocumentElement($context, $document);
