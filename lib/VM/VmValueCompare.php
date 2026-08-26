@@ -94,6 +94,10 @@ final class VmValueCompare
 
     /**
      * Loose == between boxed __value__ and native long (PHP scalar coercion rules).
+     *
+     * Tag-check before {@see __value__read*} (same shape as #8555 / #32860 / #35201).
+     * Boxed {@see Variable::TYPE_NATIVE_DOUBLE} must coerce the native long to double —
+     * previously fell through to false so `$x = 1.0; $x == 1` was always false (#35213).
      */
     public static function looseEqualValueToNativeLong(
         Context $context,
@@ -110,8 +114,10 @@ final class VmValueCompare
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
         $i64 = $context->getTypeFromString('int64');
-        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        $double = $context->getTypeFromString('double');
+        $falseVal = $i1->constInt(0, false);
         $__native = $context->builder->intCast($nativeLong, $i64);
 
         // Zend: enum case loose == with backing scalar is false (#5798, #5819/#5835/#8880 switch labels).
@@ -123,36 +129,90 @@ final class VmValueCompare
 
         $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
         $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longTag);
-        $stored = $context->builder->call(
+        $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
+        $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
+        $doubleTag = $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false);
+        $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTag);
+
+        $falseBb = BasicBlockHelper::append($context, 'leq_vbox_long_false');
+        $longCheckBb = BasicBlockHelper::append($context, 'leq_vbox_long_long_check');
+        $longBb = BasicBlockHelper::append($context, 'leq_vbox_long_long');
+        $boolCheckBb = BasicBlockHelper::append($context, 'leq_vbox_long_bool_check');
+        $boolBb = BasicBlockHelper::append($context, 'leq_vbox_long_bool');
+        $nullCheckBb = BasicBlockHelper::append($context, 'leq_vbox_long_null_check');
+        $nullBb = BasicBlockHelper::append($context, 'leq_vbox_long_null');
+        $doubleCheckBb = BasicBlockHelper::append($context, 'leq_vbox_long_double_check');
+        $doubleBb = BasicBlockHelper::append($context, 'leq_vbox_long_double');
+        $doneBb = BasicBlockHelper::append($context, 'leq_vbox_long_done');
+
+        $context->builder->branchIf($isEnumOrObject, $falseBb, $longCheckBb);
+
+        $context->builder->positionAtEnd($longCheckBb);
+        $context->builder->branchIf($isLong, $longBb, $boolCheckBb);
+
+        $context->builder->positionAtEnd($longBb);
+        $storedLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
-        $isResource = self::nativeLongIsResource($context, $stored);
-        $longMatches = self::nativeLongEqualWithResourceIdentity($context, $stored, $__native);
+        $isResource = self::nativeLongIsResource($context, $storedLong);
+        $longMatches = self::nativeLongEqualWithResourceIdentity($context, $storedLong, $__native);
+        $longResult = $context->builder->select($isResource, $falseVal, $longMatches);
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
-        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
+        $context->builder->positionAtEnd($boolCheckBb);
+        $context->builder->branchIf($isBool, $boolBb, $nullCheckBb);
+
+        $context->builder->positionAtEnd($boolBb);
         $boolMatches = $context->builder->icmp(
             Builder::INT_EQ,
-            $context->builder->zExt($stored, $i64),
+            $context->builder->zExt(self::readBoolBoxedAsLong($context, $valuePtr), $i64),
             $__native
         );
+        $boolEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
+        $context->builder->positionAtEnd($nullCheckBb);
+        $context->builder->branchIf($isNull, $nullBb, $doubleCheckBb);
+
+        $context->builder->positionAtEnd($nullBb);
         $nullMatches = $context->builder->icmp(Builder::INT_EQ, $__native, $i64->constInt(0, false));
+        $nullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        $scalarMatches = $context->builder->select(
-            $isLong,
-            $context->builder->select($isResource, $falseVal, $longMatches),
-            $context->builder->select(
-                $isBool,
-                $boolMatches,
-                $context->builder->select($isNull, $nullMatches, $falseVal)
-            )
+        $context->builder->positionAtEnd($doubleCheckBb);
+        $context->builder->branchIf($isDouble, $doubleBb, $falseBb);
+
+        $context->builder->positionAtEnd($doubleBb);
+        // zend_operators.c compare_function: IS_DOUBLE ⊙ IS_LONG → convert long to double.
+        $storedDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
         );
+        $doubleMatches = VmFloatCompare::relationalCompare(
+            $context,
+            OpCode::TYPE_EQUAL,
+            $storedDouble,
+            $context->builder->sitofp($__native, $double)
+        );
+        $doubleEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        return $context->builder->select($isEnumOrObject, $falseVal, $scalarMatches);
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i1, 'leq_vbox_long_phi');
+        $phi->addIncoming($longResult, $longEnd);
+        $phi->addIncoming($boolMatches, $boolEnd);
+        $phi->addIncoming($nullMatches, $nullEnd);
+        $phi->addIncoming($doubleMatches, $doubleEnd);
+        $phi->addIncoming($falseVal, $falseBb);
+
+        return $phi;
     }
 
     public static function looseEqualNativeLongToValue(
