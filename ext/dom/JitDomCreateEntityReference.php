@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT materialization for DOMEntityReference (#32343).
+ * User-script AOT materialization for DOMEntityReference (#32343, #35148).
  *
  * Uses a DOMElement stand-in (peer {@see JitDomCreateComment}) because allocating an
  * unregistered DOMEntityReference class aborts LLVM codegen in standalone AOT.
@@ -69,6 +69,14 @@ final class JitDomCreateEntityReference
         self::storeStringLiteral($context, $obj, self::PROP_TAG_NAME, self::TAG_KIND);
         // saveXML fetches textContent on every node (#32315). Entity-ref xmlNodeDump is `&name;`.
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, '');
+        // Stand-in is DOMElement class but nodeType must be ENTITY_REF (#35148).
+        // Unset NATIVE_LONG nodeType SIGSEGVs in syncParentNodeNavOnAppend (#35007 path).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            self::CLASS_STANDIN,
+            DomConstants::XML_ENTITY_REF_NODE
+        );
 
         return $obj;
     }
@@ -85,6 +93,12 @@ final class JitDomCreateEntityReference
         self::storeStringValue($context, $obj, self::PROP_NODE_NAME, $nameStr);
         self::storeStringLiteral($context, $obj, self::PROP_TAG_NAME, self::TAG_KIND);
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, '');
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            self::CLASS_STANDIN,
+            DomConstants::XML_ENTITY_REF_NODE
+        );
 
         return $obj;
     }
