@@ -14486,6 +14486,15 @@ class JIT {
                         );
                     }
                     $this->initJitMethodCall($block, $receiverOp, $methodName, $op->objectCallInvoke);
+                    // initJitMethodCall seeds args=[receiver] but not argOperands. ARG_SEND only
+                    // appends user-arg operands — without this prefix, promoteCompileTimeStringOnCallArgs
+                    // pairs each arg with the *next* operand and shifts compileTimeString (#35234).
+                    if (
+                        1 === \count($this->context->scope->args)
+                        && ($this->context->scope->args[0] ?? null) instanceof Variable
+                    ) {
+                        $this->context->scope->argOperands = [$receiverOp];
+                    }
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                 case OpCode::TYPE_PROPERTY_FETCH_WRITE:
@@ -30077,7 +30086,10 @@ class JIT {
                         }
                     }
                 }
-                $arg->compileTimeString = $resolved;
+                // Do not wipe a good stamp with null (misaligned argOperands used to do this) (#35234).
+                if (null !== $resolved) {
+                    $arg->compileTimeString = $resolved;
+                }
 
                 continue;
             }

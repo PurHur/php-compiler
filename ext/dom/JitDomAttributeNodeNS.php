@@ -1214,18 +1214,25 @@ final class JitDomAttributeNodeNS
         $nsLit = self::compileTimeNullableStringArg($args[1]);
         $qnameLit = self::compileTimeStringArg($args[2]);
         $valueLit = self::compileTimeStringArg($args[3]);
-        if (null === $nsLit || null === $qnameLit || null === $valueLit) {
-            throw new \LogicException(
-                'DOMElement::setAttributeNS() user-script AOT requires compile-time namespace, name, and value'
-            );
-        }
-        // php-src xmlns / xmlns:* → nsDef, no Attr (#24538 / element.c).
-        if ('xmlns' === $qnameLit || str_starts_with($qnameLit, 'xmlns:')) {
-            return self::boxNullResult($context);
-        }
-        [, $local] = self::splitQualifiedName($qnameLit);
-        $attr = self::setAttributeNsLiteralReuseOrCreate($context, $nsLit, $qnameLit, $local, $valueLit);
         $element = self::loadObjectArg($context, $args[0], 'DOMElement::setAttributeNS() receiver');
+        if (null !== $nsLit && null !== $qnameLit && null !== $valueLit) {
+            // php-src xmlns / xmlns:* → nsDef, no Attr (#24538 / element.c).
+            if ('xmlns' === $qnameLit || str_starts_with($qnameLit, 'xmlns:')) {
+                return self::boxNullResult($context);
+            }
+            [, $local] = self::splitQualifiedName($qnameLit);
+            $attr = self::setAttributeNsLiteralReuseOrCreate($context, $nsLit, $qnameLit, $local, $valueLit);
+            JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+
+            return self::boxObjectResult($context, $attr);
+        }
+        // Runtime namespace/name/value — peer setAttribute materializeAttrFromRuntime (#35234).
+        $ns = (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))
+            ? $context->builder->load($context->constantStringFromString(''))
+            : self::loadStringArg($context, $args[1]);
+        $qname = self::loadStringArg($context, $args[2]);
+        $value = self::loadStringArg($context, $args[3]);
+        $attr = self::materializeAttrFromRuntime($context, $ns, $qname, $value);
         JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
 
         return self::boxObjectResult($context, $attr);
