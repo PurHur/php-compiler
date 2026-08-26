@@ -147,6 +147,9 @@ final class IniGetLeafJitHelper
         if (17 === $n) {
             return '17';
         }
+        if (15 === $n) {
+            return '15';
+        }
         if (2 === $n) {
             return '2';
         }
@@ -230,8 +233,70 @@ final class IniGetLeafJitHelper
         if ('20' === $raw) {
             return 20;
         }
+        // Hot serialize_precision values NestedJIT digit-walk has missed (#35027).
+        if ('15' === $raw) {
+            return 15;
+        }
+        if ('3' === $raw) {
+            return 3;
+        }
+        if ('5' === $raw) {
+            return 5;
+        }
+        if ('7' === $raw) {
+            return 7;
+        }
+        if ('9' === $raw) {
+            return 9;
+        }
+        if ('11' === $raw) {
+            return 11;
+        }
+        if ('13' === $raw) {
+            return 13;
+        }
+        if ('18' === $raw) {
+            return 18;
+        }
+        if ('19' === $raw) {
+            return 19;
+        }
 
         return self::parseIntDigits($raw, $default);
+    }
+
+    /**
+     * php-src zend_gcvt / PG(serialize_precision) for NestedJIT json_encode + serialize (#35027).
+     *
+     * JsonEncodeNestedJitHelper / SerializeNestedJitHelper must not use `(string)` float
+     * (that follows PG(precision), not serialize_precision).
+     */
+    public static function formatSerializeDouble(float $num): string
+    {
+        self::seed();
+
+        return VmSerializeFormat::formatDoubleWithPrecision($num, self::$serializePrecision);
+    }
+
+    /** Same as {@see formatSerializeDouble} with JSON lowercase exponent (#25111 / #23545). */
+    public static function formatJsonDouble(float $num): string
+    {
+        $text = self::formatSerializeDouble($num);
+        // NestedJIT: no str_replace — walk chars (#27078).
+        $out = '';
+        $len = \strlen($text);
+        $i = 0;
+        while ($i < $len) {
+            $ch = $text[$i];
+            if ('E' === $ch) {
+                $out .= 'e';
+            } else {
+                $out .= $ch;
+            }
+            $i = $i + 1;
+        }
+
+        return $out;
     }
 
     /** Char-walk signed decimal; NestedJIT-safe (no intval / (int) cast). */

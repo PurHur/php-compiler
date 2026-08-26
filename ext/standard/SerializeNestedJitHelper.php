@@ -14,6 +14,8 @@ use PHPCompiler\VM\Variable;
  * Mirrors {@see JsonEncodeNestedJitHelper} (#27020) structure closely — NestedJIT is
  * sensitive to helper shape (extra methods in the same TU have mis-typed $pair slots).
  * AOT HT export keeps JIT tags (#33520): NATIVE_BOOL=2, NATIVE_DOUBLE=3 (#33682).
+ * Float wire uses {@see IniGetLeafJitHelper::formatSerializeDouble} / PG(serialize_precision)
+ * (#35027) — not `(string)` cast (PG(precision)).
  *
  * Non-empty array HT ABI is {@see \PHPCompiler\JIT\SerializeArrayLlvm} via
  * {@see \PHPCompiler\JIT\Builtin\StringSerialize} (#34483) — NestedJIT encodeHashtable
@@ -40,8 +42,8 @@ final class SerializeNestedJitHelper
             return 'b:0;';
         }
         if (3 === $t) {
-            // JIT TYPE_NATIVE_DOUBLE (#33682 / #33520)
-            return 'd:'.((string) $value->toFloat()).';';
+            // JIT TYPE_NATIVE_DOUBLE — PG(serialize_precision), not (string) cast (#35027)
+            return 'd:'.IniGetLeafJitHelper::formatSerializeDouble($value->toFloat()).';';
         }
         if (4 === $t) {
             return self::quote($value->toString());
@@ -93,7 +95,7 @@ final class SerializeNestedJitHelper
                     $body .= 'b:0;';
                 }
             } elseif (3 === $t) {
-                $body .= 'd:'.((string) $val->toFloat()).';';
+                $body .= 'd:'.IniGetLeafJitHelper::formatSerializeDouble($val->toFloat()).';';
             } elseif (4 === $t) {
                 $body .= self::quote($val->toString());
             } else {
