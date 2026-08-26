@@ -13598,12 +13598,20 @@ class JIT {
                         $this->context->jitXmlrpcEncodeValueOperand = $callOperands[0];
                     }
                     $savedCallUserFuncArrayOperand = $this->context->jitCallUserFuncArrayParamsOperand;
+                    $savedCallUserFuncCallbackOperand = $this->context->jitCallUserFuncCallbackOperand;
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
                         && 'call_user_func_array' === strtolower($this->context->scope->toCall->getName())
                         && isset($callOperands[1])
                     ) {
                         $this->context->jitCallUserFuncArrayParamsOperand = $callOperands[1];
+                    }
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'call_user_func' === strtolower($this->context->scope->toCall->getName())
+                        && isset($callOperands[0])
+                    ) {
+                        $this->context->jitCallUserFuncCallbackOperand = $callOperands[0];
                     }
                     $savedMbNumericEntityConvmapOperand = $this->context->jitMbNumericEntityConvmapOperand;
                     $savedMbNumericEntityConvmapBlock = $this->context->jitMbNumericEntityConvmapBlock;
@@ -13632,6 +13640,7 @@ class JIT {
                     $this->context->jitIteratorToArrayIteratorOperand = $savedIteratorToArrayOperand;
                     $this->context->jitXmlrpcEncodeValueOperand = $savedXmlrpcEncodeValueOperand;
                     $this->context->jitCallUserFuncArrayParamsOperand = $savedCallUserFuncArrayOperand;
+                    $this->context->jitCallUserFuncCallbackOperand = $savedCallUserFuncCallbackOperand;
                     $this->context->jitMbNumericEntityConvmapOperand = $savedMbNumericEntityConvmapOperand;
                     $this->context->jitMbNumericEntityConvmapBlock = $savedMbNumericEntityConvmapBlock;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
