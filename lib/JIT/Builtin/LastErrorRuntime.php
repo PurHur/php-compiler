@@ -17,7 +17,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ExecutionLimits #25269).
  * Thin LLVM bridges forward the __phpc_last_error_* ABI. Mid-{main} ensureLinked restores
- * builder insert (#34631 / peer JitHelperAbiBridge #34621). php-src: ext/standard/basic_functions.c
+ * builder insert (#34631 / peer JitHelperAbiBridge #34621). Context ensureFull no longer
+ * eagerly NestedJITs this (#35073). php-src: ext/standard/basic_functions.c
  */
 final class LastErrorRuntime
 {

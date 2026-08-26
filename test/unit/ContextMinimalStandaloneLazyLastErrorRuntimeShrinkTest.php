@@ -58,11 +58,18 @@ final class ContextMinimalStandaloneLazyLastErrorRuntimeShrinkTest extends TestC
             'ensureMinimal must not eagerly StringTriggerError (#34641)'
         );
 
-        // Full standalone still links LastError after TriggerError.
+        // Full standalone also drops LastError (#35073).
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullBody = substr($context, $fullPos);
-        $this->assertStringContainsString('LastErrorRuntime::ensureStandaloneBodies($this)', $fullBody);
+        $fullEnd = strpos($context, 'public function compileToFile', $fullPos);
+        $this->assertNotFalse($fullEnd);
+        $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
+        $this->assertStringNotContainsString(
+            'LastErrorRuntime::ensureStandaloneBodies($this)',
+            $fullBody,
+            'ensureFullStandaloneBodies must not eagerly LastErrorRuntime (#35073)'
+        );
+        $this->assertStringContainsString('#35073', $context);
     }
 
     public function testCallSitesEnsureBeforeLookup(): void

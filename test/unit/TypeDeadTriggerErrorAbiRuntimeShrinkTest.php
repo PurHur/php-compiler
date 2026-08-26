@@ -98,17 +98,33 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testContextLinksTriggerErrorBeforeAssertFail(): void
+    public function testAssertFailEnsureLinkedCoversTriggerErrorOrdering(): void
     {
         $assert = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/AssertFail.php');
         $this->assertStringContainsString('#33234', $assert);
+        $this->assertStringContainsString('#35073', $assert);
+        $this->assertStringContainsString(
+            'StringTriggerError::ensureLinked($context)',
+            $assert,
+            'AssertFail::ensureLinked must ensure StringTriggerError first (#33234 / #35073)'
+        );
         $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('#33234', $ctx);
-        $posTrig = strpos($ctx, 'StringTriggerError::ensureStandaloneBodies($this)');
-        $posAssert = strpos($ctx, 'AssertFail::ensureStandaloneBodies($this)');
-        $this->assertNotFalse($posTrig);
-        $this->assertNotFalse($posAssert);
-        $this->assertLessThan($posAssert, $posTrig, 'StringTriggerError must precede AssertFail (#33234)');
+        $this->assertStringContainsString('#35073', $ctx);
+        $fullPos = strpos($ctx, 'private function ensureFullStandaloneBodies');
+        $this->assertNotFalse($fullPos);
+        $fullEnd = strpos($ctx, 'public function compileToFile', $fullPos);
+        $this->assertNotFalse($fullEnd);
+        $fullBody = substr($ctx, $fullPos, $fullEnd - $fullPos);
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureStandaloneBodies($this)',
+            $fullBody,
+            'ensureFull must not eagerly StringTriggerError (#35073)'
+        );
+        $this->assertStringNotContainsString(
+            'AssertFail::ensureStandaloneBodies($this)',
+            $fullBody,
+            'ensureFull must not eagerly AssertFail (#35073)'
+        );
     }
 
     public function testNoNewRuntimeCForTriggerErrorAbi(): void

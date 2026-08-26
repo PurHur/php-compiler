@@ -62,11 +62,19 @@ final class ContextMinimalStandaloneLazyReturnPendingRuntimeShrinkTest extends T
             'ensureMinimal must not eagerly LastErrorRuntime (#34631)'
         );
 
-        // Full standalone still links return-pending after TriggerError.
+        // Full standalone also drops return-pending (#35073); compileToFile ensureLinked.
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullBody = substr($context, $fullPos);
-        $this->assertStringContainsString('JitReturnPending::ensureStandaloneBodies($this)', $fullBody);
+        $fullEnd = strpos($context, 'public function compileToFile', $fullPos);
+        $this->assertNotFalse($fullEnd);
+        $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
+        $this->assertStringNotContainsString(
+            'JitReturnPending::ensureStandaloneBodies($this)',
+            $fullBody,
+            'ensureFullStandaloneBodies must not eagerly JitReturnPending (#35073)'
+        );
+        $this->assertStringContainsString('JitReturnPending::ensureLinked($this)', $context);
+        $this->assertStringContainsString('#35073', $context);
     }
 
     public function testCallSitesEnsureBeforeLookup(): void

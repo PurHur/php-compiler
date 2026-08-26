@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ErrorReporter;
@@ -18,6 +19,8 @@ use PHPLLVM\Value;
  * (getNamedFunction first, then addFunction if absent). Do not re-add always-on
  * empty decls in {@see Type} — leftover decls mint assert_fail.1 /
  * assert_fail_string.1 (#31894 / #32122 / #33237 / #33241).
+ * Context ensureFull no longer eagerly NestedJITs this (#35073); call sites
+ * {@see ensureLinked} before lookup (peer AssertOptions #34463 / ensureMinimal #34605).
  * php-src: ext/standard/assert.c
  */
 final class AssertFail
@@ -30,24 +33,20 @@ final class AssertFail
 
     public static function ensureLinked(Context $context): void
     {
+        // Always implement — JitAssert / mid-{main} must not leave empty assert_fail
+        // decls after ensureFull always-on drop (#35073 / peer AssertOptions #34463).
+        // StringTriggerError first (#33234); restore insert after NestedJIT (#32122).
+        StringTriggerError::ensureLinked($context);
         AssertIniRuntime::ensureGlobals($context);
         AssertionErrorRaise::registerDeclarations($context);
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            self::implementBodies($context);
-        } else {
-            // Thin/standalone: declare empty ABI so later ensureStandaloneBodies
-            // can fill; no Type always-on shell (#33237 / #33241).
-            self::declareAssertFailAbi($context);
-            self::declareAssertFailStringAbi($context);
-        }
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        self::implementBodies($context);
+        BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        // Context must call StringTriggerError::ensureStandaloneBodies first (#33234).
-        AssertIniRuntime::ensureGlobals($context);
-        AssertionErrorRaise::registerDeclarations($context);
-        self::implementBodies($context);
+        self::ensureLinked($context);
     }
 
     /**

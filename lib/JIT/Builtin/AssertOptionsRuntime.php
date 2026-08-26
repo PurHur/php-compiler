@@ -103,7 +103,7 @@ final class AssertOptionsRuntime
     {
         // Always implement — thin/standalone call sites (JitAssertOptions) must not
         // leave an empty `__compiler_assert_options` decl (#34463). Peer LastErrorRuntime.
-        // Context::ensureFullStandaloneBodies still calls ensureStandaloneBodies.
+        // Context ensureFull no longer eagerly NestedJITs this (#35073).
         self::implement($context);
     }
 

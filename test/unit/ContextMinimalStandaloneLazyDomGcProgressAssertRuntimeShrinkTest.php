@@ -72,13 +72,24 @@ final class ContextMinimalStandaloneLazyDomGcProgressAssertRuntimeShrinkTest ext
             );
         }
 
-        // Full standalone still links AssertFail / ProgressNote / Gc after TriggerError (#33234).
+        // Full standalone also drops AssertFail / ProgressNote / Gc (#35073).
         $fullPos = strpos($context, 'private function ensureFullStandaloneBodies');
         $this->assertNotFalse($fullPos);
-        $fullBody = substr($context, $fullPos);
-        $this->assertStringContainsString('AssertFail::ensureStandaloneBodies($this)', $fullBody);
-        $this->assertStringContainsString('ProgressNoteRuntime::ensureStandaloneBodies($this)', $fullBody);
-        $this->assertStringContainsString('GcCollectCyclesRuntime::ensureStandaloneBodies($this)', $fullBody);
+        $fullEnd = strpos($context, 'public function compileToFile', $fullPos);
+        $this->assertNotFalse($fullEnd);
+        $fullBody = substr($context, $fullPos, $fullEnd - $fullPos);
+        foreach ([
+            'AssertFail::ensureStandaloneBodies($this)',
+            'ProgressNoteRuntime::ensureStandaloneBodies($this)',
+            'GcCollectCyclesRuntime::ensureStandaloneBodies($this)',
+        ] as $dropped) {
+            $this->assertStringNotContainsString(
+                $dropped,
+                $fullBody,
+                "ensureFullStandaloneBodies must not eagerly {$dropped} (#35073)"
+            );
+        }
+        $this->assertStringContainsString('#35073', $context);
     }
 
     public function testCallSitesEnsureBeforeLookup(): void

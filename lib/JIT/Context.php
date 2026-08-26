@@ -2420,11 +2420,13 @@ class Context {
             // NestedJIT StreamLifecycle/StreamRead helpers during full standalone init (#20966 / #20982).
             Builtin\StreamLifecycleRuntime::ensureLinked($this);
             Builtin\StreamReadRuntime::ensureLinked($this);
-            // StringTriggerError before AssertFail (#33234 Type always-on drop).
-            Builtin\StringTriggerError::ensureStandaloneBodies($this);
-            Builtin\AssertFail::ensureStandaloneBodies($this);
-            Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
-            Builtin\JitReturnPending::ensureStandaloneBodies($this);
+            // StringTriggerError / AssertFail / AssertOptions / JitReturnPending always-on
+            // removed (#35073): JitAssert / JitAssertOptions / TryCatchHelper /
+            // AssertFail::ensureLinked (→ StringTriggerError) already ensure before lookup
+            // (peer ensureMinimal #34605 / #34621 / #34641). Full standalone must not
+            // NestedJIT assert_fail* / assert_options / return_pending / trigger_error
+            // during init — leftover Context NestedJIT vs Runtime ABI drift mints *.1
+            // (#31894 / #32122).
             // ObOutput always-on removed (#34695): ValueEchoRuntime::ensureLinked → ObOutput
             // (and ValueEchoHelper call sites). Do not re-add before ValueEcho here.
             Builtin\ValueEchoRuntime::ensureLinked($this);
@@ -2471,20 +2473,20 @@ class Context {
             // ensureJitHelperCompiled before lookup (peer #35035). Full standalone must not
             // NestedJIT json_* during init — leftover Context NestedJIT vs Runtime ABI drift
             // mints json_encode_*.1 / json_decode*.1 (#31894 / #32122).
-            Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\StringRandomBytes::implement($this);
             // ScalarDimFetchRuntime / StringOffsetRuntime always-on removed (#35065):
             // emitWarning / dimFetch / readDimAsString / … already ensureLinked before ABI use
             // (peer #35035). Do not NestedJIT offset / scalar-dim helpers during full init.
             // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
-            // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
+            // (call sites / AssertFail ensure StringTriggerError; avoid duplicate bodies — #10524 / #35073).
             // NestedJIT StreamFilterJitHelper during full standalone init (#21041 / peer #20998).
             Builtin\StreamFilter::ensureLinked($this);
-            Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
+            // GcToggle / FunctionStatic / GcCollect / ProgressNote / LastError always-on
+            // removed (#35073): JitGcToggle / JitGcCollectCycles / ProgressNoteRuntime /
+            // JitErrorGetLast / JitTriggerErrorKernel / Object_ delref already ensureLinked
+            // before lookup (peer ensureMinimal #34605 / #34631). Full standalone must not
+            // NestedJIT gc_* / progress_note / last_error during init (#31894 / #32122).
             Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
-            Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
-            Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
-            Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
             Builtin\StringUtf8Latin1::ensureStandaloneBodies($this);
             Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
             Builtin\DefineRuntime::ensureStandaloneBodies($this);
@@ -2590,7 +2592,8 @@ class Context {
                 if (!$this->isThinStandaloneAotMain()) {
                     $emitInStandaloneMain(fn () => Builtin\JitThrow::registerDeclarations($this));
                     $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending')));
-                    $emitInStandaloneMain(fn () => Builtin\JitReturnPending::registerDeclarations($this));
+                    // ensureLinked fills return-pending bodies after ensureFull drop (#35073).
+                    $emitInStandaloneMain(fn () => Builtin\JitReturnPending::ensureLinked($this));
                     $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending')));
                 } else {
                     // Thin path: still clear Error/Readonly pending buffers (#23665).
