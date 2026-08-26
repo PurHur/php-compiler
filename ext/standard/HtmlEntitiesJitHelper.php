@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * JIT/AOT runtime helper for htmlentities() UTF-8 entity translation (#10734, #26889).
+ * JIT/AOT runtime helper for htmlentities() UTF-8 entity translation (#10734, #26889, #35050).
  *
  * Self-contained for NestedJIT thin AOT (#16075 / peer HtmlspecialcharsJitHelper #25345):
  * no VmString call, no loop-carried string accumulator — recurse with char.$rest.
  * php-src: ext/standard/html.c — php_html_entities()
+ *
+ * Bound UTF-8 walks with `\strlen` — NestedJIT `isset($s[$i+1])` is always false for
+ * this helper shape (#35050 / peer #35045 / #35039), so multi-byte widths collapsed to 1
+ * and letters like `é` never hit the entity map.
  */
 final class HtmlEntitiesJitHelper
 {
@@ -21,7 +25,8 @@ final class HtmlEntitiesJitHelper
     /** Public so NestedJIT helper TUs bind the recursive callee (#25345 / #26889). */
     public static function escapeFrom(string $string, int $flags, int $i, bool $doubleEncode): string
     {
-        if (!isset($string[$i])) {
+        $len = \strlen($string);
+        if ($i >= $len) {
             return '';
         }
         $width = self::utf8CharWidth($string, $i);
@@ -363,22 +368,26 @@ final class HtmlEntitiesJitHelper
             || ($uniCp >= 0xE000 && $uniCp <= 0x10FFFF);
     }
 
-    /** UTF-8 scalar at $i (php-src get_next_char). NestedJIT-safe: no strlen/substr. */
+    /** UTF-8 scalar at $i (php-src get_next_char). NestedJIT-safe: strlen bounds (#35050). */
     public static function utf8CodePointAt(string $string, int $i): int
     {
+        $len = \strlen($string);
+        if ($i >= $len) {
+            return 0;
+        }
         $byte = \ord($string[$i]);
         if ($byte < 0x80) {
             return $byte;
         }
-        if (($byte & 0xE0) === 0xC0 && isset($string[$i + 1])) {
+        if (($byte & 0xE0) === 0xC0 && ($i + 1) < $len) {
             return (($byte & 0x1F) << 6) | (\ord($string[$i + 1]) & 0x3F);
         }
-        if (($byte & 0xF0) === 0xE0 && isset($string[$i + 1]) && isset($string[$i + 2])) {
+        if (($byte & 0xF0) === 0xE0 && ($i + 2) < $len) {
             return (($byte & 0x0F) << 12)
                 | ((\ord($string[$i + 1]) & 0x3F) << 6)
                 | (\ord($string[$i + 2]) & 0x3F);
         }
-        if (($byte & 0xF8) === 0xF0 && isset($string[$i + 1]) && isset($string[$i + 2]) && isset($string[$i + 3])) {
+        if (($byte & 0xF8) === 0xF0 && ($i + 3) < $len) {
             return (($byte & 0x07) << 18)
                 | ((\ord($string[$i + 1]) & 0x3F) << 12)
                 | ((\ord($string[$i + 2]) & 0x3F) << 6)
@@ -390,7 +399,8 @@ final class HtmlEntitiesJitHelper
 
     public static function utf8CharWidth(string $string, int $i): int
     {
-        if (!isset($string[$i])) {
+        $len = \strlen($string);
+        if ($i >= $len) {
             return 0;
         }
         $b = \ord($string[$i]);
@@ -398,22 +408,23 @@ final class HtmlEntitiesJitHelper
             return 1;
         }
         if ($b < 0xE0) {
-            return isset($string[$i + 1]) ? 2 : 1;
+            return ($i + 1) < $len ? 2 : 1;
         }
         if ($b < 0xF0) {
-            return (isset($string[$i + 1]) && isset($string[$i + 2])) ? 3 : 1;
+            return ($i + 2) < $len ? 3 : 1;
         }
 
-        return (isset($string[$i + 1]) && isset($string[$i + 2]) && isset($string[$i + 3])) ? 4 : 1;
+        return ($i + 3) < $len ? 4 : 1;
     }
 
     /**
      * Width of a well-formed UTF-8 sequence at $i, or 0 if illegal (php-src html.c
-     * get_next_char). NestedJIT-safe: no strlen/substr/VmString (#32063).
+     * get_next_char). NestedJIT-safe: strlen bounds (#35050 / was isset #32063).
      */
     public static function utf8ValidWidthAt(string $string, int $i): int
     {
-        if (!isset($string[$i])) {
+        $len = \strlen($string);
+        if ($i >= $len) {
             return 0;
         }
         $byte = \ord($string[$i]);
@@ -421,7 +432,7 @@ final class HtmlEntitiesJitHelper
             return 1;
         }
         if (($byte & 0xE0) === 0xC0) {
-            if (!isset($string[$i + 1])) {
+            if (($i + 1) >= $len) {
                 return 0;
             }
             $next = \ord($string[$i + 1]);
@@ -436,7 +447,7 @@ final class HtmlEntitiesJitHelper
             return 2;
         }
         if (($byte & 0xF0) === 0xE0) {
-            if (!isset($string[$i + 1]) || !isset($string[$i + 2])) {
+            if (($i + 2) >= $len) {
                 return 0;
             }
             $n1 = \ord($string[$i + 1]);
@@ -452,7 +463,7 @@ final class HtmlEntitiesJitHelper
             return 3;
         }
         if (($byte & 0xF8) === 0xF0) {
-            if (!isset($string[$i + 1]) || !isset($string[$i + 2]) || !isset($string[$i + 3])) {
+            if (($i + 3) >= $len) {
                 return 0;
             }
             $n1 = \ord($string[$i + 1]);
@@ -474,7 +485,8 @@ final class HtmlEntitiesJitHelper
 
     public static function existingEntityLen(string $string, int $i): int
     {
-        if (!isset($string[$i]) || '&' !== $string[$i]) {
+        $len = \strlen($string);
+        if ($i >= $len || '&' !== $string[$i]) {
             return 0;
         }
         if (self::entityMatch($string, $i, '&amp;', 0)) {
@@ -507,10 +519,12 @@ final class HtmlEntitiesJitHelper
 
     public static function entityMatch(string $string, int $i, string $entity, int $j): bool
     {
-        if (!isset($entity[$j])) {
+        $entityLen = \strlen($entity);
+        if ($j >= $entityLen) {
             return true;
         }
-        if (!isset($string[$i + $j]) || $string[$i + $j] !== $entity[$j]) {
+        $len = \strlen($string);
+        if (($i + $j) >= $len || $string[$i + $j] !== $entity[$j]) {
             return false;
         }
 
@@ -528,19 +542,20 @@ final class HtmlEntitiesJitHelper
 
     public static function numericEntityLen(string $string, int $i): int
     {
-        if (!isset($string[$i]) || '&' !== $string[$i]) {
+        $len = \strlen($string);
+        if ($i >= $len || '&' !== $string[$i]) {
             return 0;
         }
-        if (!isset($string[$i + 1]) || '#' !== $string[$i + 1]) {
+        if (($i + 1) >= $len || '#' !== $string[$i + 1]) {
             return 0;
         }
-        if (!isset($string[$i + 2])) {
+        if (($i + 2) >= $len) {
             return 0;
         }
         $j = $i + 2;
         if ('x' === $string[$j] || 'X' === $string[$j]) {
             $j = $j + 1;
-            if (!isset($string[$j]) || !self::isHexDigit($string[$j])) {
+            if ($j >= $len || !self::isHexDigit($string[$j])) {
                 return 0;
             }
 
@@ -555,7 +570,8 @@ final class HtmlEntitiesJitHelper
 
     public static function scanHexEntityEnd(string $string, int $start, int $j): int
     {
-        if (!isset($string[$j])) {
+        $len = \strlen($string);
+        if ($j >= $len) {
             return 0;
         }
         if (self::isHexDigit($string[$j])) {
@@ -570,7 +586,8 @@ final class HtmlEntitiesJitHelper
 
     public static function scanDecEntityEnd(string $string, int $start, int $j): int
     {
-        if (!isset($string[$j])) {
+        $len = \strlen($string);
+        if ($j >= $len) {
             return 0;
         }
         if (self::isDigit($string[$j])) {
