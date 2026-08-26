@@ -16117,8 +16117,12 @@ class JIT {
         if (
             $toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
             || $toCall instanceof JIT\Call\RuntimeIndirectStaticMethodCall
+            || $toCall instanceof JIT\Call\RuntimeVariableStaticMethodCall
         ) {
-            foreach ($toCall->candidatesByClassId as $candidate) {
+            $candidateList = $toCall instanceof JIT\Call\RuntimeVariableStaticMethodCall
+                ? $toCall->candidatesByMethodLc
+                : $toCall->candidatesByClassId;
+            foreach ($candidateList as $candidate) {
                 if (
                     ($candidate instanceof JIT\Call\Native || $candidate instanceof JIT\Call\Vararg)
                     && $this->nativeOrVarargReturnsByRef($candidate)
@@ -26646,13 +26650,90 @@ class JIT {
             $nameOp = new Operand\Literal($block->constants[$nameOpIdx]->toString());
         }
         if (!$nameOp instanceof Operand\Literal) {
+            // `Class::$m()` — fold compile-time string like METHODCALL_INIT (#34937).
+            $nameVar = $this->context->getVariableFromOp($nameOp);
+            $this->foldCompileTimeStringFromSlot($block, $nameOpIdx, $nameVar);
+            if (null !== $nameVar->compileTimeString && '' !== $nameVar->compileTimeString) {
+                $nameOp = new Operand\Literal($nameVar->compileTimeString);
+            }
+        }
+        if (!$nameOp instanceof Operand\Literal) {
             if (\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('object::__unknownStatic');
                 $this->context->scope->args = [];
 
                 return;
             }
-            throw new \LogicException('Static call method must be a literal');
+            // Runtime method name: NamedClass::$m() / static::$m() / $class::$m() (#34937).
+            $nameVar = $this->context->getVariableFromOp($nameOp);
+            if ($classOp instanceof Operand\Literal) {
+                $selfScope = 'self' === strtolower((string) $classOp->value);
+                $staticScope = 'static' === strtolower((string) $classOp->value);
+                $className = $this->resolveJitStaticScopeClass($block, $classOp);
+                $declaringClassLc = strtolower($className);
+                if (
+                    $staticScope
+                    && !$parentScope
+                    && JIT\LateStaticBindingHelper::useRuntimeLateStatic($this->context)
+                ) {
+                    $candidates = $this->buildMethodNameToIndirectStaticCandidates(
+                        $block,
+                        false
+                    );
+                } else {
+                    $candidates = $this->buildRuntimeStaticMethodCandidatesByMethodName(
+                        $declaringClassLc
+                    );
+                    if (!$parentScope && !$selfScope && $this->context->type->object->hasDeclaredClass($declaringClassLc)) {
+                        $this->context->scope->lateStaticCallClassId = $this->context->type->object->lookup(
+                            $declaringClassLc
+                        );
+                    }
+                }
+                if ([] === $candidates) {
+                    throw new \LogicException(
+                        'Call to undefined method '.$className.'::{runtime}()'
+                    );
+                }
+                $this->context->scope->toCall = new JIT\Call\RuntimeVariableStaticMethodCall(
+                    $nameVar,
+                    $candidates
+                );
+                $this->context->scope->args = [];
+
+                return;
+            }
+            // `$class::$m()` — both operands runtime (#34937).
+            $classVar = $this->context->getVariableFromOp($classOp);
+            if (
+                JIT\Variable::TYPE_OBJECT !== $classVar->type
+                && JIT\Variable::TYPE_STRING !== $classVar->type
+                && JIT\Variable::TYPE_VALUE !== $classVar->type
+                && \PHPCompiler\VM\InstanceOfJitHelper::jitRhsTypeIsInvalidClass($classVar->type)
+            ) {
+                JIT\InstanceOfHelper::emitInvalidClassOperandError($this->context);
+                $this->context->scope->toCall = null;
+                $this->context->scope->args = [];
+                $this->context->scope->argOperands = [];
+
+                return;
+            }
+            $candidates = $this->buildMethodNameToIndirectStaticCandidates(
+                $block,
+                false,
+                $classVar,
+                $classOp
+            );
+            if ([] === $candidates) {
+                throw new \LogicException('Call to undefined method {runtime}::{runtime}()');
+            }
+            $this->context->scope->toCall = new JIT\Call\RuntimeVariableStaticMethodCall(
+                $nameVar,
+                $candidates
+            );
+            $this->context->scope->args = [];
+
+            return;
         }
         if (!$classOp instanceof Operand\Literal) {
             // `$class::method()` / non-literal class operand — fall through under
@@ -26976,6 +27057,105 @@ class JIT {
         }
 
         return $candidates;
+    }
+
+    /**
+     * Map static method names on one class to their proxies for `Class::$m()` (#34937).
+     *
+     * @return array<string, JIT\Call> lowercase method => proxy
+     */
+    private function buildRuntimeStaticMethodCandidatesByMethodName(string $classLc): array
+    {
+        $classLc = strtolower(ltrim($classLc, '\\'));
+        if (!$this->context->type->object->hasDeclaredClass($classLc)) {
+            return [];
+        }
+        $classId = $this->context->type->object->lookup($classLc);
+        $candidates = [];
+        foreach ($this->context->type->object->allMethodNamesForClassId($classId, 0) as $display) {
+            $methodLc = strtolower($display);
+            $proxyName = $this->resolveJitStaticMethodProxyName($classLc, $methodLc);
+            if (!$this->context->functionIsRegistered($proxyName)) {
+                continue;
+            }
+            // Prefer static methods; skip instance-only names (peer buildRuntimeStaticMethodCandidatesByClassId).
+            $resolvedLc = explode('::', $proxyName, 2)[0];
+            if ($this->context->type->object->hasDeclaredClass($resolvedLc)) {
+                $resolvedId = $this->context->type->object->lookup($resolvedLc);
+                if ($this->context->type->object->hasMethod($resolvedId, $methodLc)) {
+                    $resolvedVis = $this->context->type->object->methodVisibility($resolvedId, $methodLc);
+                    if (0 === ($resolvedVis & \PHPCfg\Func::FLAG_STATIC)) {
+                        continue;
+                    }
+                }
+            }
+            $candidates[$methodLc] = $this->context->resolveFunctionProxy($proxyName);
+        }
+        ksort($candidates);
+
+        return $candidates;
+    }
+
+    /**
+     * For `static::$m()` / `$class::$m()`: each method name nests a class-id dispatch (#34937).
+     *
+     * @return array<string, JIT\Call> lowercase method => RuntimeIndirectStaticMethodCall
+     */
+    private function buildMethodNameToIndirectStaticCandidates(
+        Block $block,
+        bool $allowInstanceMethods = false,
+        ?Variable $runtimeClassVar = null,
+        ?\PHPCfg\Operand $runtimeClassOp = null
+    ): array {
+        $methodNames = [];
+        foreach ($this->context->type->object->allClassNamesById() as $classId => $_className) {
+            foreach ($this->context->type->object->allMethodNamesForClassId($classId, 0) as $display) {
+                $methodLc = strtolower($display);
+                $proxyName = $this->resolveJitStaticMethodProxyName(
+                    strtolower(ltrim((string) $_className, '\\')),
+                    $methodLc
+                );
+                if (!$this->context->functionIsRegistered($proxyName)) {
+                    continue;
+                }
+                $resolvedLc = explode('::', $proxyName, 2)[0];
+                if ($this->context->type->object->hasDeclaredClass($resolvedLc)) {
+                    $resolvedId = $this->context->type->object->lookup($resolvedLc);
+                    if ($this->context->type->object->hasMethod($resolvedId, $methodLc)) {
+                        $vis = $this->context->type->object->methodVisibility($resolvedId, $methodLc);
+                        $isStatic = (0 !== ($vis & \PHPCfg\Func::FLAG_STATIC));
+                        if (!$allowInstanceMethods && !$isStatic) {
+                            continue;
+                        }
+                        if ($allowInstanceMethods && $isStatic) {
+                            continue;
+                        }
+                    }
+                }
+                $methodNames[$methodLc] = true;
+            }
+        }
+        $out = [];
+        foreach (array_keys($methodNames) as $methodLc) {
+            $byClass = $this->buildRuntimeStaticMethodCandidatesByClassId(
+                $methodLc,
+                $allowInstanceMethods
+            );
+            if ([] === $byClass) {
+                continue;
+            }
+            $out[$methodLc] = new JIT\Call\RuntimeIndirectStaticMethodCall(
+                $methodLc,
+                $byClass,
+                $block,
+                $allowInstanceMethods,
+                $runtimeClassVar,
+                $runtimeClassOp
+            );
+        }
+        ksort($out);
+
+        return $out;
     }
 
     /**
