@@ -11,12 +11,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT materialization for DOMDocument::createDocumentFragment() (#20203).
+ * User-script AOT materialization for DOMDocument::createDocumentFragment() (#20203, #35168).
  *
  * Uses a DOMElement stand-in (same pattern as {@see JitDomCreateComment}) because
  * allocating an unregistered DOMDocumentFragment class aborts LLVM codegen in standalone AOT.
  * Stores ownerDocument = creating document so `$frag->ownerDocument === $doc` matches php-src.
  * Seeds empty textContent / INNER_XML so saveXML slot fetches are defined (#32334).
+ * Stand-in must seed {@code nodeType=XML_DOCUMENT_FRAG_NODE} (#35168 peer #35148).
  *
  * php-src: ext/dom/document.c — dom_document_create_document_fragment
  */
@@ -59,6 +60,14 @@ final class JitDomCreateDocumentFragment
         );
         // ParentNode nav on fragment stand-in (#35007 leftover of #34910).
         JitDomCreateElement::seedEmptyParentNodeNavigation($context, $obj, self::CLASS_STANDIN);
+        // Stand-in is DOMElement class but nodeType must be DOCUMENT_FRAG (#35168).
+        // Unset NATIVE_LONG nodeType SIGSEGVs on $frag->nodeType (peer entity-ref #35148).
+        JitDomCreateElement::storeNodeType(
+            $context,
+            $obj,
+            self::CLASS_STANDIN,
+            DomConstants::XML_DOCUMENT_FRAG_NODE
+        );
 
         return $obj;
     }
