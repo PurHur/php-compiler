@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Context;
@@ -18,6 +19,11 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * NestedJIT of {@see StreamContextJitHelper} fails LLVM verify under thin standalone.
  * Build create/set_params/get_params in LLVM from hashtable markers — peer {@see JitStreamMetaThinAot}.
+ *
+ * HashTableMergeLlvm / HashTableReadLlvm append via {@see BasicBlockHelper::parentFunction()},
+ * which prefers {@see Context::$loweringLlvmFunction} (app main) over the thin ABI insert
+ * block — wrap each ABI body in {@see BasicBlockHelper::scopeLoweringToFunction} (peer
+ * {@see \PHPCompiler\JIT\Builtin\ArrayMergeRuntime} / #27211 / #35167).
  *
  * php-src: ext/standard/streamsfuncs.c — stream_context_* / parse_context_params
  */
@@ -49,37 +55,45 @@ final class JitStreamContextThinAot
             '__phpc_stream_context_create',
             $context->context->functionType($htPtr, false, $htPtr, $htPtr)
         );
-        $entry = $fn->appendBasicBlock('sctx_thin_create');
-        $context->builder->positionAtEnd($entry);
+        // Keep HashTableMergeLlvm BBs inside this ABI — not app main (#35167 / #27211).
+        BasicBlockHelper::scopeLoweringToFunction(
+            $context,
+            $fn,
+            '__phpc_stream_context_create',
+            static function () use ($context, $fn, $htPtr): void {
+                $entry = $fn->appendBasicBlock('sctx_thin_create');
+                $context->builder->positionAtEnd($entry);
 
-        $out = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+                $out = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
 
-        $options = $fn->getParam(0);
-        $nullHt = $htPtr->constNull();
-        $hasOptions = $context->builder->icmp(Builder::INT_NE, $options, $nullHt);
-        $optsBb = $fn->appendBasicBlock('sctx_thin_create_opts');
-        $afterOpts = $fn->appendBasicBlock('sctx_thin_create_after_opts');
-        $context->builder->branchIf($hasOptions, $optsBb, $afterOpts);
+                $options = $fn->getParam(0);
+                $nullHt = $htPtr->constNull();
+                $hasOptions = $context->builder->icmp(Builder::INT_NE, $options, $nullHt);
+                $optsBb = $fn->appendBasicBlock('sctx_thin_create_opts');
+                $afterOpts = $fn->appendBasicBlock('sctx_thin_create_after_opts');
+                $context->builder->branchIf($hasOptions, $optsBb, $afterOpts);
 
-        $context->builder->positionAtEnd($optsBb);
-        HashTableMergeLlvm::mergeArrayInto($context, $out, $options);
-        $context->builder->branch($afterOpts);
+                $context->builder->positionAtEnd($optsBb);
+                HashTableMergeLlvm::mergeArrayInto($context, $out, $options);
+                $context->builder->branch($afterOpts);
 
-        $context->builder->positionAtEnd($afterOpts);
-        self::stampMarker($context, $out);
+                $context->builder->positionAtEnd($afterOpts);
+                self::stampMarker($context, $out);
 
-        $params = $fn->getParam(1);
-        $hasParams = $context->builder->icmp(Builder::INT_NE, $params, $nullHt);
-        $paramsBb = $fn->appendBasicBlock('sctx_thin_create_params');
-        $retBb = $fn->appendBasicBlock('sctx_thin_create_ret');
-        $context->builder->branchIf($hasParams, $paramsBb, $retBb);
+                $params = $fn->getParam(1);
+                $hasParams = $context->builder->icmp(Builder::INT_NE, $params, $nullHt);
+                $paramsBb = $fn->appendBasicBlock('sctx_thin_create_params');
+                $retBb = $fn->appendBasicBlock('sctx_thin_create_ret');
+                $context->builder->branchIf($hasParams, $paramsBb, $retBb);
 
-        $context->builder->positionAtEnd($paramsBb);
-        self::storeParamsBag($context, $out, $params);
-        $context->builder->branch($retBb);
+                $context->builder->positionAtEnd($paramsBb);
+                self::storeParamsBag($context, $out, $params);
+                $context->builder->branch($retBb);
 
-        $context->builder->positionAtEnd($retBb);
-        $context->builder->returnValue($out);
+                $context->builder->positionAtEnd($retBb);
+                $context->builder->returnValue($out);
+            }
+        );
         $context->registerFunction('__phpc_stream_context_create', $fn);
     }
 
@@ -91,25 +105,32 @@ final class JitStreamContextThinAot
             '__phpc_stream_context_merge_options',
             $context->context->functionType($context->getTypeFromString('void'), false, $htPtr, $htPtr)
         );
-        $entry = $fn->appendBasicBlock('sctx_thin_merge');
-        $fail = $fn->appendBasicBlock('sctx_thin_merge_fail');
-        $body = $fn->appendBasicBlock('sctx_thin_merge_body');
-        $context->builder->positionAtEnd($entry);
+        BasicBlockHelper::scopeLoweringToFunction(
+            $context,
+            $fn,
+            '__phpc_stream_context_merge_options',
+            static function () use ($context, $fn, $htPtr): void {
+                $entry = $fn->appendBasicBlock('sctx_thin_merge');
+                $fail = $fn->appendBasicBlock('sctx_thin_merge_fail');
+                $body = $fn->appendBasicBlock('sctx_thin_merge_body');
+                $context->builder->positionAtEnd($entry);
 
-        $dest = $fn->getParam(0);
-        $src = $fn->getParam(1);
-        $nullHt = $htPtr->constNull();
-        $destOk = $context->builder->icmp(Builder::INT_NE, $dest, $nullHt);
-        $srcOk = $context->builder->icmp(Builder::INT_NE, $src, $nullHt);
-        $bothOk = $context->builder->and($destOk, $srcOk);
-        $context->builder->branchIf($bothOk, $body, $fail);
+                $dest = $fn->getParam(0);
+                $src = $fn->getParam(1);
+                $nullHt = $htPtr->constNull();
+                $destOk = $context->builder->icmp(Builder::INT_NE, $dest, $nullHt);
+                $srcOk = $context->builder->icmp(Builder::INT_NE, $src, $nullHt);
+                $bothOk = $context->builder->and($destOk, $srcOk);
+                $context->builder->branchIf($bothOk, $body, $fail);
 
-        $context->builder->positionAtEnd($fail);
-        $context->builder->returnVoid();
+                $context->builder->positionAtEnd($fail);
+                $context->builder->returnVoid();
 
-        $context->builder->positionAtEnd($body);
-        HashTableMergeLlvm::mergeArrayInto($context, $dest, $src);
-        $context->builder->returnVoid();
+                $context->builder->positionAtEnd($body);
+                HashTableMergeLlvm::mergeArrayInto($context, $dest, $src);
+                $context->builder->returnVoid();
+            }
+        );
         $context->registerFunction('__phpc_stream_context_merge_options', $fn);
     }
 
