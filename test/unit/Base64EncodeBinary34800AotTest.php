@@ -22,10 +22,13 @@ final class Base64EncodeBinary34800AotTest extends TestCase
     {
         $src = (string) file_get_contents(__DIR__.'/../../ext/standard/Base64JitHelper.php');
         $this->assertStringContainsString('#34800', $src);
-        $this->assertStringContainsString('intdiv($n, 262144)', $src);
+        $this->assertStringContainsString('\\strlen($data)', $src);
+        $this->assertStringContainsString('$b0 >> 2', $src);
+        $this->assertStringContainsString('(($b0 & 3) << 4)', $src);
         $this->assertStringNotContainsString('$data[$i + 1]', $src);
         $this->assertStringNotContainsString('$data[$i + 2]', $src);
         $this->assertStringNotContainsString('<< 16', $src);
+        $this->assertStringNotContainsString('* 65536', $src);
 
         $cache = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
         $this->assertStringContainsString(
