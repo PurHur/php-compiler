@@ -267,12 +267,19 @@ final class StringFormat
 
         $entry = $fn->appendBasicBlock(self::NUMBER_FORMAT_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
+        // Pass both separator ordinals — NumberFormatRuntime snprintf used to ignore
+        // $decimal_separator and libc-round (#35056 / re-#26991).
+        $decSep = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $fn->getParam(2)
+        );
         $thouSep = $context->builder->call(
             $context->lookupFunction('__string__separate'),
             $fn->getParam(3)
         );
+        $decOrd = self::stringFirstByteOrd($context, $fn, $decSep);
         $thouOrd = self::stringFirstByteOrd($context, $fn, $thouSep);
-        NumberFormatRuntime::emitBridgeBody($context, $fn, $thouOrd);
+        NumberFormatRuntime::emitBridgeBody($context, $fn, $decOrd, $thouOrd);
         $context->registerFunction($abiName, $fn);
     }
 

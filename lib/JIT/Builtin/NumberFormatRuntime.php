@@ -15,6 +15,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * number_format() via snprintf + LLVM thousands grouping (#31963).
  *
  * Bypasses NestedJIT `(string)$n` concat SIGSEGV. php-src: ext/standard/math.c
+ *
+ * #35056: PHP_ROUND_HALF_UP pre-round (not libc half-even) + apply $decimal_separator
+ * after thousands grouping (scan still keys off '.').
  */
 final class NumberFormatRuntime
 {
@@ -22,9 +25,18 @@ final class NumberFormatRuntime
 
     private static int $seq = 0;
 
-    /** Emit bridge body; ends with returnValue in $fn. */
-    public static function emitBridgeBody(Context $context, LlvmFunction $fn, Value $thouOrd): void
-    {
+    /**
+     * Emit bridge body; ends with returnValue in $fn.
+     *
+     * @param Value $decOrd  first byte of decimal_separator (0 = empty → strip '.')
+     * @param Value $thouOrd first byte of thousands_separator (0 = skip grouping)
+     */
+    public static function emitBridgeBody(
+        Context $context,
+        LlvmFunction $fn,
+        Value $decOrd,
+        Value $thouOrd
+    ): void {
         self::ensureDecls($context);
         ++self::$seq;
         $s = (string) self::$seq;
@@ -35,7 +47,6 @@ final class NumberFormatRuntime
         $charPtr = $context->getTypeFromString('char*');
         $sizeT = $context->getTypeFromString('size_t');
         $strPtr = $context->getTypeFromString('__string__*');
-        $stringMap = $context->structFieldMap['__string__'];
 
         $number = $fn->getParam(0);
         $decimals = $fn->getParam(1);
@@ -47,6 +58,10 @@ final class NumberFormatRuntime
             $i32->constInt(0, true),
             $decI32
         );
+        $decI64 = $context->builder->zExt($decI32, $i64);
+
+        // php-src _php_math_number_format_ex: PHP_ROUND_HALF_UP before formatting (#35056).
+        $number = self::halfUpRound($context, $fn, $number, $decI64, $s);
 
         $buf = $context->builder->call(
             $context->lookupFunction('__mm__malloc'),
@@ -77,23 +92,216 @@ final class NumberFormatRuntime
 
         $noSepBb = $fn->appendBasicBlock('nf_no_sep_'.$s);
         $groupBb = $fn->appendBasicBlock('nf_group_'.$s);
-        $doneBb = $fn->appendBasicBlock('nf_done_'.$s);
+        $afterGroupBb = $fn->appendBasicBlock('nf_after_group_'.$s);
         $hasSep = $context->builder->icmp(Builder::INT_UGT, $thouOrd, $i64->constInt(0, false));
         $context->builder->branchIf($hasSep, $groupBb, $noSepBb);
 
         $context->builder->positionAtEnd($noSepBb);
-        $context->builder->branch($doneBb);
+        $context->builder->branch($afterGroupBb);
 
         $context->builder->positionAtEnd($groupBb);
         $grouped = self::insertThousands($context, $fn, $rawStr, $thouOrd, $s);
         $groupEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($afterGroupBb);
+
+        $context->builder->positionAtEnd($afterGroupBb);
+        $groupedPhi = $context->builder->phi($strPtr);
+        $groupedPhi->addIncoming($rawStr, $noSepBb);
+        $groupedPhi->addIncoming($grouped, $groupEnd);
+
+        // Apply decimal_separator after thousands scan (which keys off '.') (#35056).
+        $final = self::applyDecimalSeparator($context, $fn, $groupedPhi, $decOrd, $decI64, $s);
+        $context->builder->returnValue($final);
+    }
+
+    /**
+     * PHP_ROUND_HALF_UP at $decimals places (php-src math.c / SprintfJitHelper::numberFormat).
+     * Uses libm floor(3): abs*scale+0.5 then floor, restore sign.
+     */
+    private static function halfUpRound(
+        Context $context,
+        LlvmFunction $fn,
+        Value $number,
+        Value $decimals,
+        string $s
+    ): Value {
+        $double = $context->getTypeFromString('double');
+        $i64 = $context->getTypeFromString('int64');
+        self::ensureFloor($context);
+
+        $scalePtr = BasicBlockHelper::entryAlloca($context, $double);
+        $context->builder->store($double->constReal(1.0), $scalePtr);
+        $iPtr = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt(0, false), $iPtr);
+
+        $scaleHead = $fn->appendBasicBlock('nf_scale_h_'.$s);
+        $scaleBody = $fn->appendBasicBlock('nf_scale_b_'.$s);
+        $scaleDone = $fn->appendBasicBlock('nf_scale_d_'.$s);
+        $context->builder->branch($scaleHead);
+        $context->builder->positionAtEnd($scaleHead);
+        $i = $context->builder->load($iPtr);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_ULT, $i, $decimals),
+            $scaleBody,
+            $scaleDone
+        );
+        $context->builder->positionAtEnd($scaleBody);
+        $sc = $context->builder->load($scalePtr);
+        $context->builder->store(
+            $context->builder->fmul($sc, $double->constReal(10.0)),
+            $scalePtr
+        );
+        $context->builder->store($context->builder->add($i, $i64->constInt(1, false)), $iPtr);
+        $context->builder->branch($scaleHead);
+        $context->builder->positionAtEnd($scaleDone);
+
+        $scale = $context->builder->load($scalePtr);
+        $zero = $double->constReal(0.0);
+        $neg = $context->builder->fcmp(Builder::REAL_OLT, $number, $zero);
+        $abs = $context->builder->select(
+            $neg,
+            $context->builder->fsub($zero, $number),
+            $number
+        );
+        $scaled = $context->builder->fmul($abs, $scale);
+        $biased = $context->builder->fadd($scaled, $double->constReal(0.5));
+        $floored = $context->builder->call($context->lookupFunction('floor'), $biased);
+        $roundedAbs = $context->builder->fdiv($floored, $scale);
+
+        return $context->builder->select(
+            $neg,
+            $context->builder->fsub($zero, $roundedAbs),
+            $roundedAbs
+        );
+    }
+
+    /**
+     * Replace or strip the '.' left by snprintf after grouping.
+     * decOrd==0 → remove '.' (empty decimal_separator); else replace when != '.'.
+     */
+    private static function applyDecimalSeparator(
+        Context $context,
+        LlvmFunction $fn,
+        Value $str,
+        Value $decOrd,
+        Value $decimals,
+        string $s
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $stringMap = $context->structFieldMap['__string__'];
+
+        $skipBb = $fn->appendBasicBlock('nf_dec_skip_'.$s);
+        $workBb = $fn->appendBasicBlock('nf_dec_work_'.$s);
+        $doneBb = $fn->appendBasicBlock('nf_dec_done_'.$s);
+
+        // No fractional digits → snprintf emitted no '.'.
+        $hasFrac = $context->builder->icmp(Builder::INT_UGT, $decimals, $i64->constInt(0, false));
+        $dotOrd = $i64->constInt(46, false); // '.'
+        $needsChange = $context->builder->icmp(Builder::INT_NE, $decOrd, $dotOrd);
+        $doWork = $context->builder->and($hasFrac, $needsChange);
+        $context->builder->branchIf($doWork, $workBb, $skipBb);
+
+        $context->builder->positionAtEnd($skipBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($workBb);
+        $len = $context->builder->load($context->builder->structGep($str, $stringMap['length']));
+        $data = $context->builder->structGep($str, $stringMap['value']);
+        $emptySep = $context->builder->icmp(Builder::INT_EQ, $decOrd, $i64->constInt(0, false));
+
+        // Decimal point sits at len - decimals - 1 after thousands grouping (frac untouched).
+        // Do NOT scan for '.' — thousands_separator may also be '.' (#35056).
+        $dotPos = $context->builder->sub(
+            $context->builder->sub($len, $decimals),
+            $i64->constInt(1, false)
+        );
+        $noDotBb = $fn->appendBasicBlock('nf_dec_nodot_'.$s);
+        $hasDotBb = $fn->appendBasicBlock('nf_dec_hasdot_'.$s);
+        $inRange = $context->builder->icmp(Builder::INT_ULT, $dotPos, $len);
+        $context->builder->branchIf($inRange, $hasDotBb, $noDotBb);
+
+        $context->builder->positionAtEnd($noDotBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($hasDotBb);
+        // Only rewrite when the expected slot is still snprintf's '.'.
+        $slotByte = $context->builder->load($context->builder->gep($data, $dotPos));
+        $isDot = $context->builder->icmp(Builder::INT_EQ, $slotByte, $i8->constInt(46, false));
+        $notDotBb = $fn->appendBasicBlock('nf_dec_slot_nodot_'.$s);
+        $doEditBb = $fn->appendBasicBlock('nf_dec_edit_'.$s);
+        $context->builder->branchIf($isDot, $doEditBb, $notDotBb);
+        $context->builder->positionAtEnd($notDotBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doEditBb);
+        $replaceBb = $fn->appendBasicBlock('nf_dec_repl_'.$s);
+        $stripBb = $fn->appendBasicBlock('nf_dec_strip_'.$s);
+        $context->builder->branchIf($emptySep, $stripBb, $replaceBb);
+
+        $context->builder->positionAtEnd($replaceBb);
+        $decByte = $context->builder->trunc($decOrd, $i8);
+        $context->builder->store($decByte, $context->builder->gep($data, $dotPos));
+        $context->builder->branch($doneBb);
+
+        // Empty decimal_separator: drop the '.' byte (php-src concatenates without it).
+        $context->builder->positionAtEnd($stripBb);
+        $newLen = $context->builder->sub($len, $i64->constInt(1, false));
+        $outBuf = $context->builder->call(
+            $context->lookupFunction('__mm__malloc'),
+            $context->builder->add($newLen, $sizeT->constInt(1, false))
+        );
+        $outI8 = $context->builder->pointerCast($outBuf, $i8p);
+        $outPosPtr = BasicBlockHelper::entryAlloca($context, $i64);
+        $srcPosPtr = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt(0, false), $outPosPtr);
+        $context->builder->store($i64->constInt(0, false), $srcPosPtr);
+        self::copyBytes($context, $fn, $data, $outI8, $outPosPtr, $srcPosPtr, $dotPos, 'ds_'.$s);
+        $context->builder->store(
+            $context->builder->add($dotPos, $i64->constInt(1, false)),
+            $srcPosPtr
+        );
+        $tail = $context->builder->sub($len, $context->builder->add($dotPos, $i64->constInt(1, false)));
+        self::copyBytes($context, $fn, $data, $outI8, $outPosPtr, $srcPosPtr, $tail, 'dt_'.$s);
+        $stripped = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $newLen,
+            $outI8
+        );
+        $stripEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
         $phi = $context->builder->phi($strPtr);
-        $phi->addIncoming($rawStr, $noSepBb);
-        $phi->addIncoming($grouped, $groupEnd);
-        $context->builder->returnValue($phi);
+        $phi->addIncoming($str, $skipBb);
+        $phi->addIncoming($str, $noDotBb);
+        $phi->addIncoming($str, $notDotBb);
+        $phi->addIncoming($str, $replaceBb);
+        $phi->addIncoming($stripped, $stripEnd);
+
+        return $phi;
+    }
+
+    private static function ensureFloor(Context $context): void
+    {
+        try {
+            $context->lookupFunction('floor');
+
+            return;
+        } catch (\Throwable) {
+        }
+        $double = $context->getTypeFromString('double');
+        $fn = $context->module->getNamedFunction('floor');
+        if (null === $fn) {
+            $fn = $context->module->addFunction(
+                'floor',
+                $context->context->functionType($double, false, $double)
+            );
+        }
+        $context->registerFunction('floor', $fn);
     }
 
     private static function insertThousands(
