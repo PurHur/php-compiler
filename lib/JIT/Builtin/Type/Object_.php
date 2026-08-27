@@ -3689,6 +3689,12 @@ class Object_ extends Type {
                 'include_end_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_INCLUDE_END_DATE,
             ]);
         }
+        // DateTimeInterface format strings live on the interface (php_date.c); concrete
+        // DateTime/DateTimeImmutable already inherit via VM ClassEntry, but thin AOT
+        // ClassConstFetch on DateTimeInterface::* needs an explicit seed (#35368 peer of #35360).
+        if ('datetimeinterface' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\VM\DateTimeInterfaceSupport::classConstants());
+        }
         // Normalizer::normalize Call proxy is always registered (#28654); seed FORM_* so
         // ClassConstFetch folds to compile-time long. Without this, pending ErrorRaise leaves
         // a null form arg and thin AOT segfaults (re-#28654 / AotTest normalizer_normalize_28654).
