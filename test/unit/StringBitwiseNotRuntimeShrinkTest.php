@@ -7,23 +7,39 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\StringBitwiseNotJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** String unary ~ JIT: StringBitwiseNotJitHelper via JitVmHelperLink (#14823, #24513). */
+/**
+ * String bitwise: call-site LLVM for AOT (#32431 / #35301); PHP helper remains SSOT for VM probes.
+ */
 final class StringBitwiseNotRuntimeShrinkTest extends TestCase
 {
-    public function testStringBitwiseNotUsesJitHelperNotInlineLlvm(): void
+    public function testStringBitwiseNotUsesCallSiteLlvmNotNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringBitwiseNot.php');
-        $this->assertStringContainsString('StringBitwiseNotJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('emitUnary', $source);
+        $this->assertStringContainsString('emitBinary', $source);
+        $this->assertStringContainsString('str_bitnot_body', $source);
+        $this->assertStringContainsString('#35301', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
-        $this->assertStringNotContainsString('bitwise_not_loop', $source);
-        $this->assertStringNotContainsString('bitwise_not_body', $source);
-        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
-        $this->assertStringContainsString('emitBinary', $source);
+        $this->assertLessThan(280, \substr_count($source, "\n") + 1);
+    }
+
+    public function testHelperUnaryOpUsesEmitUnary(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Helper.php');
+        $this->assertStringContainsString('StringBitwiseNot::emitUnary', $source);
+        $this->assertStringContainsString('#35301', $source);
+        $fn = strpos($source, 'function unaryOp');
+        $this->assertNotFalse($fn);
+        $end = strpos($source, 'function binaryOp', $fn);
+        $this->assertNotFalse($end);
+        $chunk = substr($source, $fn, $end - $fn);
+        $this->assertStringContainsString('TYPE_STRING', $chunk);
+        $this->assertStringContainsString('StringBitwiseNot::emitUnary', $chunk);
     }
 
     public function testStringBitwiseBinaryJitHelperMatchesZendByteWise(): void
