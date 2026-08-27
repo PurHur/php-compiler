@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Builtin\StringFilePutContents;
 use PHPCompiler\JIT\Builtin\ZipArchiveEmbedBridge;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -891,6 +892,60 @@ final class JitZipArchive
         );
 
         return $ptr;
+    }
+
+    /** ZipArchive::isWritable — NestedJIT is_writable (#35478 leftover of #35424). */
+    public static function isWritable(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::isWritable', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        $ok = self::execLong(
+            $context,
+            'is_writable',
+            $handle,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /** ZipArchive::setReadOnly — NestedJIT set_readonly (#35478 leftover of #35424). */
+    public static function setReadOnly(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::setReadOnly', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $flag = JitBoolArg::lower(
+            $context,
+            $args[1],
+            'ZipArchive::setReadOnly(): Argument #1 ($readonly)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $flagI64 = $context->builder->zExt($flag, $i64);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'set_readonly',
+            $flagI64,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
     }
 
     public static function ensureHandle(Context $context, Value $obj): Value

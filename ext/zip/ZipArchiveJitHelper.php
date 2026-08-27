@@ -35,6 +35,9 @@ final class ZipArchiveJitHelper
 
     private static int $h1status = 0;
 
+    /** AFL_RDONLY-style session flag (#35478). */
+    private static int $h1readonly = 0;
+
     public static function exec(string $op, int $a, int $b, string $s1, string $s2): string
     {
         if ('alloc' === $op) {
@@ -55,6 +58,7 @@ final class ZipArchiveJitHelper
             self::$h1name2 = '';
             self::$h1data2 = '';
             self::$h1status = 0;
+            self::$h1readonly = 0;
 
             return self::pack($h);
         }
@@ -72,6 +76,7 @@ final class ZipArchiveJitHelper
             self::$h1name2 = '';
             self::$h1data2 = '';
             self::$h1open = 0;
+            self::$h1readonly = 0;
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
                 $nlen = ord($data[26]) | (ord($data[27]) << 8);
                 $xlen = ord($data[28]) | (ord($data[29]) << 8);
@@ -503,6 +508,29 @@ final class ZipArchiveJitHelper
             }
 
             return self::pack(2);
+        }
+        // isWritable — open && !readonly (#35478 leftover of #35424 / #20412).
+        if ('is_writable' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            self::$h1status = 0;
+
+            return self::pack(0 === self::$h1readonly ? 1 : 0);
+        }
+        // setReadOnly — $a != 0 ⇒ readonly (#35478).
+        if ('set_readonly' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            self::$h1readonly = 0 !== $a ? 1 : 0;
+            self::$h1status = 0;
+
+            return self::pack(1);
         }
 
         return self::pack(0);

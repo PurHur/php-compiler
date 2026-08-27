@@ -46,9 +46,11 @@ final class ZipArchiveMethod implements Call
             'extractto' => JitZipArchive::extractTo($context, ...$args),
             'getstatusstring' => JitZipArchive::getStatusString($context, ...$args),
             'count' => JitZipArchive::count($context, ...$args),
+            'iswritable' => JitZipArchive::isWritable($context, ...$args),
+            'setreadonly' => JitZipArchive::setReadOnly($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35437/#35440/#35449/#35450/#35455/#35465/#35466/#35467/#35472)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35478)'
             ),
         };
     }
