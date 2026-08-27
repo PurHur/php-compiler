@@ -6,31 +6,22 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\OpCode;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Unary ~ via StringBitwiseNotJitHelper NestedJIT (#14823, #24513).
- * Binary string⊙string &|^ is call-site LLVM — NestedJIT of the helper into
- * user-script AOT segfaults after c:main_before_php (#32431 leftover of #32407).
+ * String bitwise ops as call-site LLVM (#14823, #24513, #32431, #35301).
+ *
+ * Unary ~ and binary string⊙string &|^ — NestedJIT of StringBitwiseNotJitHelper into
+ * user-script AOT mismatches ABI (`__string__*` vs `__value__*`) / segfaults after
+ * c:main_before_php (#32431 leftover of #32407; #35301).
  *
  * php-src: Zend/zend_operators.c bitwise_*_function string/string + unary ~
  */
 final class StringBitwiseNot
 {
-    private const HELPER_PATH = '/ext/standard/StringBitwiseNotJitHelper.php';
-
-    private const BITWISE_NOT_HELPER = 'PHPCompiler\\ext\\standard\\StringBitwiseNotJitHelper::bitwiseNotArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::BITWISE_NOT_HELPER,
-    ];
-
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
         '__string__bitwiseNot',
@@ -73,7 +64,6 @@ final class StringBitwiseNot
         } catch (\Throwable) {
         }
 
-        self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
         self::registerLinkedRuntime($context);
 
@@ -82,6 +72,45 @@ final class StringBitwiseNot
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    /**
+     * Byte-wise unary ~ (each byte inverted & 0xFF).
+     *
+     * @see php-src Zend/zend_operators.c bitwise_not_function
+     */
+    public static function emitUnary(Context $context, Value $str): Variable
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'str_bitwise_not_cont');
+        $b = $context->builder;
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $len = $b->load($b->structGep($str, $map['length']));
+        $dataIn = $b->structGep($str, $map['value']);
+        $out = $b->call($context->lookupFunction('__string__alloc'), $len);
+        $dataOut = $b->structGep($out, $map['value']);
+
+        $iPtr = BasicBlockHelper::entryAlloca($context, $i64);
+        $b->store($i64->constInt(0, false), $iPtr);
+
+        $head = BasicBlockHelper::append($context, 'str_bitnot_head');
+        $body = BasicBlockHelper::append($context, 'str_bitnot_body');
+        $done = BasicBlockHelper::append($context, 'str_bitnot_done');
+        $b->branch($head);
+
+        $b->positionAtEnd($head);
+        $i = $b->load($iPtr);
+        $b->branchIf($b->icmp(Builder::INT_ULT, $i, $len), $body, $done);
+
+        $b->positionAtEnd($body);
+        $byte = $b->load($b->gep($dataIn, $i));
+        $b->store($b->not($byte), $b->gep($dataOut, $i));
+        $b->store($b->add($i, $i64->constInt(1, false)), $iPtr);
+        $b->branch($head);
+
+        $b->positionAtEnd($done);
+
+        return new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $out);
     }
 
     /**
@@ -175,29 +204,11 @@ final class StringBitwiseNot
 
         $entry = $fn->appendBasicBlock('bitwise_not_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::BITWISE_NOT_HELPER),
-            $fn->getParam(0)
-        );
-        $context->builder->returnValue($result);
+        // Call-site LLVM body (peer emitBinary #32431) — NestedJIT helper ABI is __value__*
+        // while this shell is __string__* (#35301).
+        $result = self::emitUnary($context, $fn->getParam(0));
+        $context->builder->returnValue($result->value);
         $context->registerFunction($abiName, $fn);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#24513');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#24513'
-        );
     }
 
     private static function registerLinkedRuntime(Context $context): void

@@ -200,12 +200,10 @@ class Helper {
                 break;
             case Variable::TYPE_STRING:
                 if (OpCode::TYPE_BITWISE_NOT === $opcode->type) {
-                    $result = $this->context->builder->call(
-                        $this->context->lookupFunction('__string__bitwiseNot'),
-                        $varValue
-                    );
-
-                    goto return_string;
+                    // Call-site LLVM byte-wise ~ (peer emitBinary #32431). NestedJIT helper
+                    // ABI is __value__* while the registered shell is __string__* — link/verify
+                    // fails under thin AOT (#35301 leftover of #14823/#24513).
+                    return Builtin\StringBitwiseNot::emitUnary($this->context, $varValue);
                 }
                 break;
         }
