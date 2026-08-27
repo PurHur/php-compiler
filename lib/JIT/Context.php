@@ -117,6 +117,9 @@ class Context {
     /** Operand for json_encode() value arg during FUNCCALL lowering (#14040). */
     public ?Operand $jitJsonEncodeValueOperand = null;
 
+    /** Operand for json_encode() flags arg — fold JSON_* | JSON_* (#35339). */
+    public ?Operand $jitJsonEncodeFlagsOperand = null;
+
     /** Compile-time json_encode() result for assignCallResultOperand (#24137). */
     public ?string $jitJsonEncodeFoldedString = null;
 

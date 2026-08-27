@@ -581,8 +581,10 @@ restart:
                     case OpCode::TYPE_BITWISE_XOR:
                         $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
                         if (null !== $folded) {
-                            $result = $this->context->getTypeFromString('int64')->constInt($folded, false);
-                            goto return_long;
+                            // Preserve compileTimeLong for json_encode / sort flag consumers (#35339).
+                            return $this->nativeLongResultVariable(
+                                $this->context->getTypeFromString('int64')->constInt($folded, false)
+                            );
                         }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         if (OpCode::TYPE_BITWISE_AND === $opcode->type) {
@@ -3112,6 +3114,10 @@ return_bool:
     {
         if (Variable::KIND_VALUE !== $var->kind) {
             return null;
+        }
+        // CONST_FETCH int globals store foldable long beside the Load instruction (#26774 / #35339).
+        if (null !== $var->compileTimeLong) {
+            return $var->compileTimeLong;
         }
         $lib = $this->context->llvm->lib;
         if (Variable::TYPE_NATIVE_LONG === $var->type

@@ -13777,12 +13777,17 @@ class JIT {
                         $this->context->jitUnserializeOptionsOperand = $callOperands[1];
                     }
                     $savedJsonEncodeValueOperand = $this->context->jitJsonEncodeValueOperand;
+                    $savedJsonEncodeFlagsOperand = $this->context->jitJsonEncodeFlagsOperand;
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
                         && 'json_encode' === strtolower($this->context->scope->toCall->getName())
-                        && isset($callOperands[0])
                     ) {
-                        $this->context->jitJsonEncodeValueOperand = $callOperands[0];
+                        if (isset($callOperands[0])) {
+                            $this->context->jitJsonEncodeValueOperand = $callOperands[0];
+                        }
+                        if (isset($callOperands[1])) {
+                            $this->context->jitJsonEncodeFlagsOperand = $callOperands[1];
+                        }
                     }
                     $savedIteratorToArrayOperand = $this->context->jitIteratorToArrayIteratorOperand;
                     if (
@@ -13841,6 +13846,7 @@ class JIT {
                     $result = $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
+                    $this->context->jitJsonEncodeFlagsOperand = $savedJsonEncodeFlagsOperand;
                     $this->context->jitIteratorToArrayIteratorOperand = $savedIteratorToArrayOperand;
                     $this->context->jitXmlrpcEncodeValueOperand = $savedXmlrpcEncodeValueOperand;
                     $this->context->jitCallUserFuncArrayParamsOperand = $savedCallUserFuncArrayOperand;
