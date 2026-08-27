@@ -138,6 +138,11 @@ final class JitDomNodeChildProperty
     /**
      * Nested firstChild/lastChild must inherit ownerDocument for setIdAttribute id-map
      * seeding — direct loadXML children get this at materialize time (#21644).
+     *
+     * After DocumentFragment expand, firstChild/lastChild are TYPE_NULL boxes
+     * ({@see JitDomAppendChildLiveSlots::expandFragmentChildrenAppend}). Do not
+     * {@see __value__readObject} those — AOT SIGSEGVs (#35518 / #33716 peer).
+     * php-src: ext/dom/node.c — fragment expand leaves the fragment empty.
      */
     private static function seedChildOwnerFromParent(
         \PHPCompiler\JIT\Context $context,
@@ -146,10 +151,35 @@ final class JitDomNodeChildProperty
         Value $parentObj,
         string $parentClass
     ): void {
+        unset($parentClass);
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return;
         }
+        if (JITVariable::TYPE_NULL === $childVar->type || ($childVar->isNullConstant ?? false)) {
+            return;
+        }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_child_seed_owner');
+
+        $doneBlock = null;
+        if (JITVariable::TYPE_OBJECT !== $childVar->type) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $childVar);
+            $map = $context->structFieldMap['__value__'];
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($valuePtr, $map['type'])
+            );
+            $i8 = $context->getTypeFromString('int8');
+            $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+            $isNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt(JITVariable::TYPE_NULL, false)
+            );
+            $seedBlock = BasicBlockHelper::append($context, 'dom_child_seed_ok');
+            $doneBlock = BasicBlockHelper::append($context, 'dom_child_seed_done');
+            $context->builder->branchIf($isNull, $doneBlock, $seedBlock);
+            $context->builder->positionAtEnd($seedBlock);
+        }
+
         $childObj = self::loadObjectFromChildVar($context, $childVar);
         $elementClass = 'DOMElement';
         $elementClassId = $objectType->lookup($elementClass);
@@ -181,6 +211,11 @@ final class JitDomNodeChildProperty
             $docJit,
             JITVariable::TYPE_VALUE
         );
+
+        if (null !== $doneBlock) {
+            $context->builder->branch($doneBlock);
+            $context->builder->positionAtEnd($doneBlock);
+        }
     }
 
     private static function loadObjectFromChildVar(\PHPCompiler\JIT\Context $context, JITVariable $var): Value
