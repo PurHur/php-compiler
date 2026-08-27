@@ -3712,6 +3712,11 @@ class Object_ extends Type {
         if ('numberformatter' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmNumberFormatter::classConstants());
         }
+        // Transliterator::create Call proxy is linked even when host lacks ext-intl; seed
+        // FORWARD/REVERSE so ClassConstFetch folds to compile-time long (#35383 peer of #35366).
+        if ('transliterator' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmTransliterator::classConstants());
+        }
         // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
         // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
         // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
