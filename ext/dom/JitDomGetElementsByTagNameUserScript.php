@@ -254,7 +254,24 @@ final class JitDomGetElementsByTagNameUserScript
         }
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml) {
-            return null;
+            // createElement / appendChild trees never loadXML — seed from live pinned
+            // tree (peer Document tryInvoke #34630). Required for DOMNode-typed
+            // appendChild receivers that now hit this Element path (#35277).
+            self::$lastTagQuery = $tagLit;
+            self::$liveItemTagQuery = $tagLit;
+            self::$lastTagQueryFromElement = true;
+            DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
+
+            return self::boxNodeList($context, 0);
+        }
+        // LiveSlots mutations after loadXML leave compile-time markup stale (#33918).
+        if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()) {
+            self::$lastTagQuery = $tagLit;
+            self::$liveItemTagQuery = $tagLit;
+            self::$lastTagQueryFromElement = true;
+            DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
+
+            return self::boxNodeList($context, 0);
         }
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $count = DomParseSimpleXmlJitHelper::countDescendantTagArgv($inner, $tagLit);
@@ -288,9 +305,6 @@ final class JitDomGetElementsByTagNameUserScript
             return null;
         }
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xml) {
-            return null;
-        }
         self::$lastNsUri = $nsLit;
         self::$lastNsLocal = $localLit;
         self::$lastNsFromElement = true;
@@ -298,6 +312,12 @@ final class JitDomGetElementsByTagNameUserScript
         self::$liveItemNsLocal = $localLit;
         self::$liveItemNsFromElement = true;
         $tagKey = 'elns|'.$nsLit.'|'.$localLit;
+        if (null === $xml) {
+            // No loadXML — live createElementNS tree (#35277 peer Document #34630).
+            DomUserScriptLiveTagListLlvm::resyncCountFromLiveTreeNs($context, $nsLit, $localLit, true);
+
+            return self::boxNodeList($context, 0);
+        }
         if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()) {
             DomUserScriptLiveTagListLlvm::resyncCountFromLiveTreeNs($context, $nsLit, $localLit, true);
 
