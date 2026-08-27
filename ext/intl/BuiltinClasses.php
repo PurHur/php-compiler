@@ -119,6 +119,15 @@ final class BuiltinClasses
         }
 
         $entry = new ClassEntry('Locale');
+        $entry->isInternal = true;
+        // Exact Zend casing for defined()/hasConstant after #25910 (#30000 / #28132).
+        foreach (VmLocale::classConstants() as $name => $value) {
+            $key = ClassConstName::key($name);
+            $const = new \PHPCompiler\VM\Variable(\PHPCompiler\VM\Variable::TYPE_INTEGER);
+            $const->int($value);
+            $entry->constants[$key] = $const;
+            $entry->constNames[$key] = $name;
+        }
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
         $methods = [
             'getdefault' => [new LocaleGetDefault(), 'getDefault'],

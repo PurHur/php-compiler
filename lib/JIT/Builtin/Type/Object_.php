@@ -3766,6 +3766,12 @@ class Object_ extends Type {
         if ('intlchar' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlChar::classConstants());
         }
+        // Locale Call proxies are linked (#6696/#9576); seed ACTUAL_LOCALE/VALID_LOCALE so
+        // ClassConstFetch folds to compile-time long (#35416 peer of #35413). Without this,
+        // thin AOT raises Undefined constant Locale::ACTUAL_LOCALE at runtime.
+        if ('locale' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmLocale::classConstants());
+        }
         // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
         // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
         // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
