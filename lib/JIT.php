@@ -16865,10 +16865,11 @@ class JIT {
     }
 
     /**
-     * appendChild() returns the child node — copy compile-time DOM metadata onto the
-     * result Variable so later cloneNode/saveXML on `$n = $p->appendChild(...)` still
-     * see createElement tag/inner/attrs (php-src returns the same node; #35373 leftover
-     * of #35361 / peer #35261).
+     * appendChild() / insertBefore() return the (new) child node — copy compile-time DOM
+     * metadata onto the result Variable so later cloneNode/saveXML on
+     * `$n = $p->appendChild(...)` / `$n = $p->insertBefore(...)` still see createElement
+     * tag/inner/attrs (php-src returns the same node; #35373 leftover of #35361; insertBefore
+     * peer #35377 — null-ref ≡ append still keeps toCall as DomNodeInsertBefore).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -16878,6 +16879,7 @@ class JIT {
         if (!(
             $toCall instanceof JIT\Call\DomNodeAppendChild
             || $toCall instanceof JIT\Call\DomDocumentAppendChild
+            || $toCall instanceof JIT\Call\DomNodeInsertBefore
         )) {
             return;
         }
