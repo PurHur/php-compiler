@@ -13464,6 +13464,7 @@ class JIT {
                     }
                     $this->rewritePendingDateTimeGetOffsetIfNeeded($callArgs);
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
+                    $this->promoteCompileTimeDomOnCallArgs($block, $callOperands, $callArgs);
                     $this->applyDateTimeLocalInstantsToCallArgs($callArgs, $callOperands);
                     $this->applyDateMetaToDatePeriodConstructArgs(
                         $this->context->scope->toCall,
@@ -13820,6 +13821,7 @@ class JIT {
                         $this->context->jitMbNumericEntityConvmapBlock = $block;
                     }
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
+                    $this->promoteCompileTimeDomOnCallArgs($block, $callOperands, $callArgs);
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
@@ -22123,6 +22125,9 @@ class JIT {
         if ($force || null !== $src->compileTimeDomInnerXml) {
             $dest->compileTimeDomInnerXml = $src->compileTimeDomInnerXml;
         }
+        if ($force || null !== $src->compileTimeDomInnerXmlParent) {
+            $dest->compileTimeDomInnerXmlParent = $src->compileTimeDomInnerXmlParent;
+        }
         // firstChild/lastChild index for thin-AOT replaceChild INNER_XML rebuild (#28671).
         if ($force || null !== $src->compileTimeDomChildIndex) {
             $dest->compileTimeDomChildIndex = $src->compileTimeDomChildIndex;
@@ -30087,6 +30092,9 @@ class JIT {
         if (null !== $source->compileTimeDomInnerXml && null === $dest->compileTimeDomInnerXml) {
             $dest->compileTimeDomInnerXml = $source->compileTimeDomInnerXml;
         }
+        if (null !== $source->compileTimeDomInnerXmlParent && null === $dest->compileTimeDomInnerXmlParent) {
+            $dest->compileTimeDomInnerXmlParent = $source->compileTimeDomInnerXmlParent;
+        }
         if (null !== $source->compileTimeDomChildIndex && null === $dest->compileTimeDomChildIndex) {
             $dest->compileTimeDomChildIndex = $source->compileTimeDomChildIndex;
         }
@@ -30135,6 +30143,42 @@ class JIT {
         }
         if (null !== $resolved) {
             $dest->compileTimeString = $resolved;
+        }
+    }
+
+    /**
+     * Named CVs keep firstChild/lastChild open-tag stamps; ARG_SEND temps often
+     * reuse lastFetched* from a later nested walk (#21644 / #34050).
+     *
+     * @param list<Operand|null> $operands
+     * @param list<Variable>     $args
+     */
+    private function promoteCompileTimeDomOnCallArgs(Block $block, array $operands, array $args): void
+    {
+        foreach ($args as $i => $arg) {
+            if (!$arg instanceof Variable) {
+                continue;
+            }
+            $operand = $operands[$i] ?? null;
+            if (!$operand instanceof \PHPCfg\Operand) {
+                continue;
+            }
+            $scopeName = JIT\OperandName::resolve($operand);
+            if (null === $scopeName || '' === $scopeName) {
+                continue;
+            }
+            $resolved = $this->context->resolveRefAliasName($scopeName);
+            $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+            if (!$bound instanceof Variable || $bound === $arg) {
+                continue;
+            }
+            if (null === $bound->compileTimeDomAttributes || [] === $bound->compileTimeDomAttributes) {
+                continue;
+            }
+            $this->syncCompileTimeDomTagName($arg, $bound, true);
+            if (null !== $bound->classUserType && '' !== $bound->classUserType) {
+                $arg->classUserType = $bound->classUserType;
+            }
         }
     }
 

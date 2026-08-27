@@ -52,6 +52,7 @@ final class JitDomSetIdAttribute
         }
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_cont');
+        self::seedReceiverCompileTimeAttrs($context, $args[0]);
         $nameLlvm = JitStringArg::lower($context, $args[1], 'DOMElement::setIdAttribute() name');
         $element = self::loadObjectArg($context, $args[0]);
         $isIdTrue = self::resolveIsIdTrue($context, $args[2]);
@@ -73,6 +74,11 @@ final class JitDomSetIdAttribute
             // global name→value Attr cache — that cache returns the last id= in the doc (#34050).
             $nameLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
             $elemAttrVal = self::compileTimeReceiverAttrValue($args[0], $nameLit);
+            if (null === $elemAttrVal || '' === $elemAttrVal) {
+                $elemAttrVal = self::compileTimeAttrFromInnerParentStamp($args[0], $nameLit)
+                    ?? self::compileTimeAttrValueFromNodePath($args[0], $nameLit)
+                    ?? self::compileTimeAttrValueFromRootChildTag($args[0], $nameLit);
+            }
             $idLitForSkip = $elemAttrVal;
             if (null === $idLitForSkip || '' === $idLitForSkip) {
                 $idLitForSkip = self::$setAttributeIdValues !== []
@@ -80,7 +86,8 @@ final class JitDomSetIdAttribute
                     : null;
             }
             // After replaceChild, xmlAddID fails when this id is still owned by a detached
-            // node — do not seed the LLVM cache (#29694 / re-#25274).
+            // node — do not seed the LLVM cache (#29694 / re-#25274). Duplicate setIdAttribute
+            // first-wins is handled by storeFirstWins / id-map first-wins (#34050).
             $skipCache = JitDomLoadXMLUserScript::treeMutatedSinceLoad()
                 && null !== $idLitForSkip
                 && '' !== $idLitForSkip
@@ -91,7 +98,6 @@ final class JitDomSetIdAttribute
                     self::storeCacheFromRuntimeIdString($context, $element, $idStr, $elemAttrVal);
                     self::$registeredIdLiterals[$elemAttrVal] = true;
                 } else {
-                    // Live Attr cache value — NestedJIT getAttribute is empty after loadXML (#33957).
                     self::storeCacheFromRuntimeGetAttribute(
                         $context,
                         $element,
@@ -242,6 +248,25 @@ final class JitDomSetIdAttribute
             $context->builder->branch($done);
 
             $context->builder->positionAtEnd($hit);
+            JitDomDocumentMethodKernel::ensureGetAttributeBridge($context);
+            $idNested = $context->builder->call(
+                $context->lookupFunction(DomImportNodeRuntime::ABI_GET_ATTRIBUTE),
+                $element,
+                $nameLlvm
+            );
+            $map = $context->structFieldMap['__string__'];
+            $i64 = $context->getTypeFromString('int64');
+            $nestedLen = $context->builder->load($context->builder->structGep($idNested, $map['length']));
+            $nestedOk = $context->builder->icmp(Builder::INT_NE, $nestedLen, $i64->constInt(0, false));
+            $nestedStore = BasicBlockHelper::append($context, 'dom_setid_live_nested_store');
+            $attrStore = BasicBlockHelper::append($context, 'dom_setid_live_attr_store');
+            $context->builder->branchIf($nestedOk, $nestedStore, $attrStore);
+
+            $context->builder->positionAtEnd($nestedStore);
+            self::storeCacheFromRuntimeIdString($context, $element, $idNested, $idLitForMap);
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($attrStore);
             $attrClass = JitDomAttributeNodeNS::attrClassForUserScriptCache();
             JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
             $valueVar = $context->type->object->propertyFetch($attr, $attrClass, 'value');
@@ -324,7 +349,14 @@ final class JitDomSetIdAttribute
         // Multi-id documents: single-slot cache is first-wins; every setIdAttribute id
         // must also land in PROP_ELEMENT_ID_MAP (#34696 / maintainer_gap replaceChild idmap).
         if (null !== $idLitForMap && '' !== $idLitForMap) {
-            JitDomLoadXMLUserScript::storeElementInIdMap($context, $document, $idLitForMap, $element);
+            JitDomLoadXMLUserScript::storeElementInIdMapFromValueFirstWins(
+                $context,
+                $document,
+                $context->builder->load($context->constantStringFromString($idLitForMap)),
+                $element
+            );
+        } else {
+            JitDomLoadXMLUserScript::storeElementInIdMapFromValueFirstWins($context, $document, $idStr, $element);
         }
         $context->builder->branch($cont);
         $context->builder->positionAtEnd($cont);
@@ -350,11 +382,345 @@ final class JitDomSetIdAttribute
     }
 
     /**
+     * ARG_SEND drops child-edge stamps — recover before id-map seeding (#21644 / #34050).
+     */
+    private static function seedReceiverCompileTimeAttrs(Context $context, JITVariable $receiver): void
+    {
+        self::mergeNamedDomStamps($context, $receiver);
+        if (null !== $receiver->compileTimeDomAttributes && [] !== $receiver->compileTimeDomAttributes) {
+            $fetched = JitDomNodeChildProperty::$lastFetchedAttributes;
+            if (null === $fetched || $receiver->compileTimeDomAttributes !== $fetched) {
+                return;
+            }
+        }
+        $fromInner = self::compileTimeAttrsFromParentInner($receiver);
+        if (null !== $fromInner && [] !== $fromInner) {
+            $receiver->compileTimeDomAttributes = $fromInner;
+
+            return;
+        }
+        $fromRoot = self::compileTimeAttrsFromRootChildTag($receiver);
+        if (null !== $fromRoot && [] !== $fromRoot) {
+            $receiver->compileTimeDomAttributes = $fromRoot;
+
+            return;
+        }
+        $fromPath = self::compileTimeAttrsFromNodePath($receiver);
+        if (null !== $fromPath && [] !== $fromPath) {
+            $receiver->compileTimeDomAttributes = $fromPath;
+
+            return;
+        }
+        $fetched = JitDomNodeChildProperty::$lastFetchedAttributes;
+        if (null === $fetched || [] === $fetched) {
+            return;
+        }
+        $lastPath = JitDomGetNodePath::$lastPath;
+        $recvPath = $receiver->compileTimeDomNodePath;
+        if (null === $lastPath || null === $recvPath || $lastPath !== $recvPath) {
+            return;
+        }
+        $recvTag = (string) ($receiver->compileTimeDomTagName ?? '');
+        if ('' === $recvTag) {
+            $path = $receiver->compileTimeDomNodePath;
+            if (null !== $path && '' !== $path) {
+                $segments = array_values(array_filter(
+                    explode('/', $path),
+                    static fn (string $s): bool => '' !== $s
+                ));
+                if ([] !== $segments) {
+                    $recvTag = strtolower((string) end($segments));
+                }
+            }
+        } else {
+            $recvTag = strtolower($recvTag);
+        }
+        $fetchTag = strtolower((string) (JitDomNodeChildProperty::$lastFetchedTagName ?? ''));
+        if ('' === $recvTag || '' === $fetchTag || $recvTag !== $fetchTag) {
+            return;
+        }
+        $receiver->compileTimeDomAttributes = $fetched;
+    }
+
+    private static function mergeNamedDomStamps(Context $context, JITVariable $receiver): void
+    {
+        if (!isset($context->namedVariableBindings)) {
+            return;
+        }
+        $recvVal = $receiver->value ?? null;
+        foreach ($context->namedVariableBindings as $bound) {
+            if (!$bound instanceof JITVariable) {
+                continue;
+            }
+            $match = null !== $recvVal && $bound->value === $recvVal;
+            if (!$match) {
+                continue;
+            }
+            foreach ([
+                'compileTimeDomTagName',
+                'compileTimeDomInnerXml',
+                'compileTimeDomInnerXmlParent',
+                'compileTimeDomChildIndex',
+                'compileTimeDomNodePath',
+                'compileTimeDomLoadXml',
+                'compileTimeDomAttributes',
+            ] as $prop) {
+                if (null !== $bound->$prop && null === $receiver->$prop) {
+                    $receiver->$prop = $bound->$prop;
+                }
+            }
+
+            return;
+        }
+        // ARG_SEND temps often diverge from the CV value pointer — recover by unique path.
+        $recvPath = $receiver->compileTimeDomNodePath;
+        if (null !== $recvPath && '' !== $recvPath) {
+            foreach ($context->namedVariableBindings as $bound) {
+                if (!$bound instanceof JITVariable || ($bound->compileTimeDomNodePath ?? null) !== $recvPath) {
+                    continue;
+                }
+                self::copyNamedDomStamps($receiver, $bound);
+
+                return;
+            }
+        }
+    }
+
+    private static function copyNamedDomStamps(JITVariable $receiver, JITVariable $bound): void
+    {
+        foreach ([
+            'compileTimeDomTagName',
+            'compileTimeDomInnerXml',
+            'compileTimeDomInnerXmlParent',
+            'compileTimeDomChildIndex',
+            'compileTimeDomNodePath',
+            'compileTimeDomLoadXml',
+            'compileTimeDomAttributes',
+        ] as $prop) {
+            if (null !== $bound->$prop && null === $receiver->$prop) {
+                $receiver->$prop = $bound->$prop;
+            }
+        }
+    }
+
+    /**
+     * Walk compile-time loadXML along {@see JITVariable::$compileTimeDomNodePath} (#21644).
+     *
+     * @return array<string, string>|null
+     */
+    private static function compileTimeAttrsFromNodePath(JITVariable $receiver): ?array
+    {
+        $path = $receiver->compileTimeDomNodePath;
+        if (null === $path || '' === $path) {
+            $lastPath = JitDomGetNodePath::$lastPath;
+            $lastTag = JitDomNodeChildProperty::$lastFetchedTagName;
+            $recvTag = $receiver->compileTimeDomTagName;
+            if (
+                null !== $lastPath
+                && null !== $lastTag
+                && '' !== $lastTag
+                && null !== $recvTag
+                && $recvTag === $lastTag
+            ) {
+                $segments = array_values(array_filter(
+                    explode('/', $lastPath),
+                    static fn (string $s): bool => '' !== $s
+                ));
+                if ([] !== $segments && ($segments[\count($segments) - 1] ?? '') === $lastTag) {
+                    $path = $lastPath;
+                    if (null === $receiver->compileTimeDomChildIndex) {
+                        $receiver->compileTimeDomChildIndex = JitDomNodeChildProperty::$lastFetchedChildIndex;
+                    }
+                }
+            }
+        }
+        if (null === $path || '' === $path) {
+            return null;
+        }
+        $segments = array_values(array_filter(
+            explode('/', $path),
+            static fn (string $s): bool => '' !== $s
+        ));
+        if (\count($segments) < 2) {
+            return null;
+        }
+        $xml = $receiver->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml) {
+            return null;
+        }
+        $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+        $open = null;
+        for ($depth = 1, $n = \count($segments); $depth < $n; ++$depth) {
+            $tag = $segments[$depth];
+            $nodes = DomParseSimpleXmlJitHelper::parseSiblingNodesArgv($inner);
+            $index = ($depth === $n - 1 && null !== $receiver->compileTimeDomChildIndex)
+                ? $receiver->compileTimeDomChildIndex
+                : null;
+            $found = null;
+            if (null !== $index && isset($nodes[$index]) && 'element' === ($nodes[$index]['kind'] ?? '')) {
+                $candidate = $nodes[$index]['data'] ?? '';
+                if ($candidate === $tag) {
+                    $found = $nodes[$index];
+                }
+            }
+            if (null === $found) {
+                foreach ($nodes as $node) {
+                    if ('element' === ($node['kind'] ?? '') && ($node['data'] ?? '') === $tag) {
+                        $found = $node;
+                        break;
+                    }
+                }
+            }
+            if (null === $found) {
+                return null;
+            }
+            if ($depth === $n - 1) {
+                $open = $found['open'] ?? null;
+                break;
+            }
+            $inner = $found['inner'] ?? '';
+        }
+        if (null === $open || '' === $open) {
+            return null;
+        }
+        $attrs = [];
+        foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open) as $pair) {
+            $attrs[$pair['qname']] = $pair['value'];
+            $pos = strpos($pair['qname'], ':');
+            if (false !== $pos) {
+                $attrs[substr($pair['qname'], $pos + 1)] = $pair['value'];
+            }
+        }
+
+        return [] !== $attrs ? $attrs : null;
+    }
+
+    /**
+     * @return array<string, string>|null
+     */
+    private static function compileTimeAttrsFromParentInner(JITVariable $receiver): ?array
+    {
+        $parentInner = $receiver->compileTimeDomInnerXmlParent ?? null;
+        if (null === $parentInner || '' === $parentInner) {
+            $path = $receiver->compileTimeDomNodePath;
+            $segments = null !== $path && '' !== $path
+                ? array_values(array_filter(explode('/', $path), static fn (string $s): bool => '' !== $s))
+                : [];
+            if (2 === \count($segments)) {
+                $bound = $receiver->compileTimeDomLoadXml
+                    ?? JitDomLoadXMLUserScript::compileTimeXmlFor($receiver);
+                if (null !== $bound) {
+                    $parentInner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($bound);
+                }
+            } elseif (\count($segments) >= 3 && null === $receiver->compileTimeDomChildIndex) {
+                return null;
+            }
+        }
+        if (null === $parentInner || '' === $parentInner) {
+            return null;
+        }
+        $index = $receiver->compileTimeDomChildIndex;
+        if (null === $index) {
+            return null;
+        }
+        $nodes = DomParseSimpleXmlJitHelper::parseSiblingNodesArgv($parentInner);
+        if (!isset($nodes[$index]) || 'element' !== ($nodes[$index]['kind'] ?? '')) {
+            return null;
+        }
+        $recvTag = $receiver->compileTimeDomTagName;
+        if (null === $recvTag || '' === $recvTag) {
+            $path = $receiver->compileTimeDomNodePath;
+            if (null !== $path && '' !== $path) {
+                $segments = array_values(array_filter(
+                    explode('/', $path),
+                    static fn (string $s): bool => '' !== $s
+                ));
+                if ([] !== $segments) {
+                    $recvTag = end($segments);
+                }
+            }
+        }
+        $nodeTag = $nodes[$index]['data'] ?? '';
+        if (null !== $recvTag && '' !== $recvTag && $nodeTag !== $recvTag) {
+            return null;
+        }
+        if (null === $recvTag || '' === $recvTag) {
+            return null;
+        }
+        $open = $nodes[$index]['open'] ?? null;
+        if (null === $open || '' === $open) {
+            return null;
+        }
+        $attrs = [];
+        foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open) as $pair) {
+            $attrs[$pair['qname']] = $pair['value'];
+            $pos = strpos($pair['qname'], ':');
+            if (false !== $pos) {
+                $attrs[substr($pair['qname'], $pos + 1)] = $pair['value'];
+            }
+        }
+
+        return [] !== $attrs ? $attrs : null;
+    }
+
+    /**
+     * documentElement->firstChild (/root/child) attrs when nested walks stale (#21644).
+     *
+     * @return array<string, string>|null
+     */
+    private static function compileTimeAttrsFromRootChildTag(JITVariable $receiver): ?array
+    {
+        $tag = $receiver->compileTimeDomTagName;
+        if (null === $tag || '' === $tag) {
+            $path = $receiver->compileTimeDomNodePath;
+            if (null === $path || '' === $path) {
+                return null;
+            }
+            $segments = array_values(array_filter(
+                explode('/', $path),
+                static fn (string $s): bool => '' !== $s
+            ));
+            if (2 !== \count($segments)) {
+                return null;
+            }
+            $tag = $segments[1];
+        }
+        $xml = $receiver->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml) {
+            return null;
+        }
+        foreach (DomParseSimpleXmlJitHelper::directChildNodesArgv($xml) as $node) {
+            if ('element' !== ($node['kind'] ?? '') || ($node['data'] ?? '') !== $tag) {
+                continue;
+            }
+            $open = $node['open'] ?? null;
+            if (null === $open || '' === $open) {
+                return null;
+            }
+            $attrs = [];
+            foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open) as $pair) {
+                $attrs[$pair['qname']] = $pair['value'];
+                $pos = strpos($pair['qname'], ':');
+                if (false !== $pos) {
+                    $attrs[substr($pair['qname'], $pos + 1)] = $pair['value'];
+                }
+            }
+
+            return [] !== $attrs ? $attrs : null;
+        }
+
+        return null;
+    }
+
+    /**
      * Attribute value from the receiver's loadXML open-tag stamp (#34050).
      *
      * ARG_SEND / method temps often drop {@see JITVariable::$compileTimeDomAttributes};
-     * do not fall back to {@see JitDomNodeChildProperty::$lastFetchedAttributes} — it
-     * reflects the last firstChild walk, not this receiver (#35241 / #34050).
+     * re-parse under stamped parent inner / lastFetched child walk (#21644 / #34050).
      */
     private static function compileTimeReceiverAttrValue(JITVariable $receiver, ?string $nameLit): ?string
     {
@@ -374,6 +740,85 @@ final class JitDomSetIdAttribute
             if (isset($attrs[$local]) && '' !== $attrs[$local]) {
                 return $attrs[$local];
             }
+        }
+
+        return null;
+    }
+
+    private static function compileTimeAttrValueFromNodePath(JITVariable $receiver, ?string $nameLit): ?string
+    {
+        if (null === $nameLit || '' === $nameLit) {
+            return null;
+        }
+        $attrs = self::compileTimeAttrsFromNodePath($receiver);
+        if (null === $attrs || [] === $attrs) {
+            return null;
+        }
+        if (isset($attrs[$nameLit]) && '' !== $attrs[$nameLit]) {
+            return $attrs[$nameLit];
+        }
+        $pos = strpos($nameLit, ':');
+        if (false !== $pos) {
+            $local = substr($nameLit, $pos + 1);
+            if (isset($attrs[$local]) && '' !== $attrs[$local]) {
+                return $attrs[$local];
+            }
+        }
+
+        return null;
+    }
+
+    private static function compileTimeAttrValueFromRootChildTag(JITVariable $receiver, ?string $nameLit): ?string
+    {
+        if (null === $nameLit || '' === $nameLit) {
+            return null;
+        }
+        $attrs = self::compileTimeAttrsFromRootChildTag($receiver);
+        if (null === $attrs || [] === $attrs) {
+            return null;
+        }
+        if (isset($attrs[$nameLit]) && '' !== $attrs[$nameLit]) {
+            return $attrs[$nameLit];
+        }
+        $pos = strpos($nameLit, ':');
+        if (false !== $pos) {
+            $local = substr($nameLit, $pos + 1);
+            if (isset($attrs[$local]) && '' !== $attrs[$local]) {
+                return $attrs[$local];
+            }
+        }
+
+        return null;
+    }
+
+    private static function compileTimeAttrFromInnerParentStamp(JITVariable $receiver, ?string $nameLit): ?string
+    {
+        if (null === $nameLit || '' === $nameLit) {
+            return null;
+        }
+        $parentInner = $receiver->compileTimeDomInnerXmlParent ?? null;
+        $index = $receiver->compileTimeDomChildIndex;
+        if (null === $parentInner || '' === $parentInner || null === $index) {
+            return null;
+        }
+        $nodes = DomParseSimpleXmlJitHelper::parseSiblingNodesArgv($parentInner);
+        if (!isset($nodes[$index]) || 'element' !== ($nodes[$index]['kind'] ?? '')) {
+            return null;
+        }
+        $open = $nodes[$index]['open'] ?? null;
+        if (null === $open || '' === $open) {
+            return null;
+        }
+        $attrs = [];
+        foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open) as $pair) {
+            $attrs[$pair['qname']] = $pair['value'];
+            $pos = strpos($pair['qname'], ':');
+            if (false !== $pos) {
+                $attrs[substr($pair['qname'], $pos + 1)] = $pair['value'];
+            }
+        }
+        if (isset($attrs[$nameLit]) && '' !== $attrs[$nameLit]) {
+            return $attrs[$nameLit];
         }
 
         return null;

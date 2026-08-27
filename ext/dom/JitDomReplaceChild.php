@@ -332,10 +332,17 @@ final class JitDomReplaceChild
         );
 
         $childCount = null;
-        $xml = $parentVar->compileTimeDomLoadXml
-            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null !== $xml && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
-            $childCount = \count(DomParseSimpleXmlJitHelper::directChildNodesArgv($xml));
+        if (JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            $inner = $parentVar->compileTimeDomInnerXml;
+            if (null !== $inner && '' !== $inner) {
+                $childCount = \count(DomParseSimpleXmlJitHelper::parseSiblingNodesArgv($inner));
+            } else {
+                $xml = $parentVar->compileTimeDomLoadXml
+                    ?? JitDomLoadXMLUserScript::compileTimeXmlFor($parentVar);
+                if (null !== $xml) {
+                    $childCount = \count(DomParseSimpleXmlJitHelper::directChildNodesArgv($xml));
+                }
+            }
         }
 
         JitDomReplaceChildLiveSlots::sync($context, $parent, $newChild, $oldChild, $childCount);

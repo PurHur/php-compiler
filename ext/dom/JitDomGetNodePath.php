@@ -153,6 +153,10 @@ final class JitDomGetNodePath
             $index
         );
         self::$lastChildFetchWasFirstChild = 'firstchild' === $propLc;
+        // Parent list used above — rememberWalk() overwrites lastInner with this child's
+        // payload; nested setIdAttribute ARG_SEND recovery needs the parent inner (#21644).
+        self::$lastParentPath = $parentPath;
+        self::$lastParentInner = (string) $parentInner;
         self::rememberWalk($path, $inner);
     }
 
