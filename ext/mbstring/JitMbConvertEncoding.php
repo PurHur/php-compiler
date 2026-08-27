@@ -8,6 +8,7 @@ use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbConvertEncodingRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -19,6 +20,8 @@ use PHPLLVM\Value;
  *
  * Compile-time fold for string literals; runtime string + encodings via NestedJIT
  * {@see MbConvertEncodingJitHelper} (#35165 leftover of #34309 / peer #35161).
+ * Array / comma-list `$from_encoding` folds via {@see VmMbstring::convertEncodingWithFromList}
+ * (#35296 leftover of #23562) — do not lower hashtable args as strings (SEGV).
  */
 final class JitMbConvertEncoding
 {
@@ -37,6 +40,18 @@ final class JitMbConvertEncoding
         if (self::isArrayArg($args[0])) {
             throw new \LogicException(
                 'mb_convert_encoding() array $string is not lowered for JIT/AOT in this compiler build'
+            );
+        }
+
+        $fromIsDefault = 2 === $argc
+            || (
+                3 === $argc
+                && (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant)
+            );
+        // Runtime / non-literal array $from_encoding — never JitStringBuiltinArg::lower (#35296).
+        if (!$fromIsDefault && self::isArrayArg($args[2])) {
+            throw new \LogicException(
+                'mb_convert_encoding() array $from_encoding is not lowered for JIT/AOT runtime in this compiler build'
             );
         }
 
@@ -67,11 +82,6 @@ final class JitMbConvertEncoding
             );
         }
 
-        $fromIsDefault = 2 === $argc
-            || (
-                3 === $argc
-                && (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant)
-            );
         if ($fromIsDefault) {
             $fromLit = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
             // Always pass resolved from_encoding — NestedJIT of MbstringState::internalEncoding aborts.
@@ -192,34 +202,25 @@ final class JitMbConvertEncoding
     ): ?Value {
         $sourceLit = $sourceIsNull ? '' : JitStringBuiltinArg::compileTimeLiteral($args[0]);
         $toLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
-        $fromIsDefault = 2 === $argc
-            || (
-                3 === $argc
-                && (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant)
-            );
-        $fromLit = $fromIsDefault
-            ? (MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding())
-            : JitStringBuiltinArg::compileTimeLiteral($args[2]);
-        if (null === $sourceLit || null === $toLit || null === $fromLit) {
+        $fromList = self::compileTimeFromEncodingList($context, $args, $argc);
+        if (null === $sourceLit || null === $toLit || null === $fromList) {
             return null;
         }
-        $fromList = preg_split('/\s*,\s*/', $fromLit) ?: [];
-        $fromList = array_values(array_filter($fromList, static fn (string $p): bool => '' !== $p));
         if ([] === $fromList) {
-            return self::foldFalse($context);
+            return self::emitFromEncodingValueError(
+                $context,
+                'mb_convert_encoding(): Argument #3 ($from_encoding) must specify at least one encoding'
+            );
         }
         foreach ($fromList as $from) {
-            if (
-                !VmMbstring::isMbConvertPseudoEncoding($from)
-                && null === CharsetEngine::parseEncodingSpec($from)
-            ) {
-                return self::foldFalse($context);
+            if (!self::isValidMbConvertEncodingName($from)) {
+                return self::emitFromEncodingValueError(
+                    $context,
+                    'mb_convert_encoding(): Argument #3 ($from_encoding) contains invalid encoding "'.$from.'"'
+                );
             }
         }
-        if (
-            !VmMbstring::isMbConvertPseudoEncoding($toLit)
-            && null === CharsetEngine::parseEncodingSpec($toLit)
-        ) {
+        if (!self::isValidMbConvertEncodingName($toLit)) {
             return self::foldFalse($context);
         }
         $converted = VmMbstring::convertEncodingWithFromList($sourceLit, $toLit, $fromList);
@@ -228,6 +229,108 @@ final class JitMbConvertEncoding
         }
 
         return self::foldString($context, $converted);
+    }
+
+    /**
+     * Compile-time `$from_encoding` as encoding name list (string / comma-list / array).
+     * Peer {@see JitMbDetectEncoding} order extraction (#35296 / #23562).
+     *
+     * @param list<JITVariable> $args
+     * @return list<string>|null null when not fully resolvable at compile time
+     */
+    private static function compileTimeFromEncodingList(Context $context, array $args, int $argc): ?array
+    {
+        $fromIsDefault = 2 === $argc
+            || (
+                3 === $argc
+                && (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant)
+            );
+        if ($fromIsDefault) {
+            return [MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding()];
+        }
+
+        $arg = $args[2];
+        if ($arg->compileTimeEmptyArrayLiteral ?? false) {
+            return [];
+        }
+
+        $fromLit = JitStringBuiltinArg::compileTimeLiteral($arg);
+        if (null !== $fromLit) {
+            $parts = preg_split('/\s*,\s*/', $fromLit) ?: [];
+
+            return array_values(array_filter($parts, static fn (string $p): bool => '' !== $p));
+        }
+
+        $arr = $arg->compileTimeArray ?? null;
+        if (null !== $arr) {
+            $order = [];
+            foreach ($arr as $elem) {
+                if (\is_string($elem)) {
+                    $order[] = $elem;
+                } elseif ($elem instanceof JITVariable) {
+                    $s = JitStringArg::compileTimeLiteral($elem);
+                    if (null === $s) {
+                        return null;
+                    }
+                    $order[] = $s;
+                } else {
+                    return null;
+                }
+            }
+
+            return $order;
+        }
+
+        return self::compileTimeFromEncodingNativeArray($context, $arg);
+    }
+
+    /**
+     * Packed native-array encoding list (`['UTF-8','ISO-8859-1']`) via dimFetch.
+     *
+     * @return list<string>|null
+     */
+    private static function compileTimeFromEncodingNativeArray(Context $context, JITVariable $arg): ?array
+    {
+        if (0 === ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return null;
+        }
+        $n = $arg->nextFreeElement;
+        if ($n <= 0) {
+            return [];
+        }
+        $order = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $elem = $arg->dimFetch(JITVariable::fromConstantInt($context, $i));
+            $s = JitStringArg::compileTimeLiteral($elem);
+            if (null === $s) {
+                return null;
+            }
+            $order[] = $s;
+        }
+
+        return $order;
+    }
+
+    private static function isValidMbConvertEncodingName(string $name): bool
+    {
+        if (VmMbstring::isMbConvertPseudoEncoding($name)) {
+            return true;
+        }
+        $canonical = MbstringEncodingRegistry::resolve($name);
+        if (null !== $canonical && null !== CharsetEngine::parseEncodingSpec($canonical)) {
+            return true;
+        }
+
+        return null === $canonical && null !== CharsetEngine::parseEncodingSpec($name);
+    }
+
+    private static function emitFromEncodingValueError(Context $context, string $message): Value
+    {
+        ExceptionBridge::ensureLinked($context);
+        ExceptionBridge::emitValueErrorAndAbort($context, $message);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_convert_encoding_from_err');
+
+        return JitValueBox::pointer($context, JitValueBox::alloc($context));
     }
 
     private static function isArrayArg(JITVariable $arg): bool
