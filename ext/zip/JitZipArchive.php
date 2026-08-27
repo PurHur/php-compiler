@@ -1269,6 +1269,104 @@ final class JitZipArchive
         return self::boxBoolFromI64($context, $ok);
     }
 
+    /**
+     * ZipArchive::replaceFile — file_get_contents in IR + NestedJIT rpl (#35496 leftover of #35489).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_replaceFile
+     * Optional $start/$length/$flags accepted for arity; slice/flags deferred (full-file replace).
+     */
+    public static function replaceFile(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::replaceFile', 2, 5)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $filepath = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::replaceFile',
+            0,
+            'filepath'
+        );
+        $index = JitLongArg::lower($context, $args[2], 'ZipArchive::replaceFile(): Argument #2 ($index)');
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $zero = $i64->constInt(0, false);
+        $id = (string) (++self::$serial);
+
+        // Empty filepath → ValueError in IR (#35481 peer; NestedJIT throw SIGSEGVs).
+        $strMap = $context->structFieldMap['__string__'];
+        $pathLen = $context->builder->load(
+            $context->builder->structGep($filepath, $strMap['length'])
+        );
+        $isEmptyPath = $context->builder->icmp(Builder::INT_EQ, $pathLen, $zero);
+        $emptyPathBlock = BasicBlockHelper::append($context, 'zip_rpl_empty_'.$id);
+        $negCheckBlock = BasicBlockHelper::append($context, 'zip_rpl_negchk_'.$id);
+        $context->builder->branchIf($isEmptyPath, $emptyPathBlock, $negCheckBlock);
+
+        $context->builder->positionAtEnd($emptyPathBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::replaceFile(): Argument #1 ($filepath) must not be empty'
+        );
+
+        // Negative index → ValueError (php-src / VmZipArchive).
+        $context->builder->positionAtEnd($negCheckBlock);
+        $isNeg = $context->builder->icmp(Builder::INT_SLT, $index, $zero);
+        $negErrBlock = BasicBlockHelper::append($context, 'zip_rpl_neg_'.$id);
+        $probeBlock = BasicBlockHelper::append($context, 'zip_rpl_probe_'.$id);
+        $context->builder->branchIf($isNeg, $negErrBlock, $probeBlock);
+
+        $context->builder->positionAtEnd($negErrBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::replaceFile(): Argument #2 ($index) must be greater than or equal to 0'
+        );
+
+        // Probe path like addFile() — string contents ⇒ readable file.
+        $context->builder->positionAtEnd($probeBlock);
+        $contentsPtr = JitFileGetContents::invoke($context, $filepath);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($contentsPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $stringTag = $i8->constInt(JITVariable::TYPE_STRING, false);
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTag);
+
+        $okBlock = BasicBlockHelper::append($context, 'zip_rpl_ok_'.$id);
+        $missBlock = BasicBlockHelper::append($context, 'zip_rpl_miss_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_rpl_done_'.$id);
+        $context->builder->branchIf($isString, $okBlock, $missBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $rcMiss = self::execLong($context, 'fail_noent', $handle, $zero, $empty, $empty);
+        $missTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $content = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $contentsPtr
+        );
+        $rcOk = self::execLong($context, 'rpl', $index, $zero, $empty, $content);
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $rcPhi = $context->builder->phi($i64);
+        $rcPhi->addIncoming($rcOk, $okTail);
+        $rcPhi->addIncoming($rcMiss, $missTail);
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $rcPhi);
+    }
+
     public static function close(Context $context, JITVariable ...$args): Value
     {
         if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::close', 0)) {

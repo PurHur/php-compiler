@@ -6,8 +6,9 @@ namespace PHPCompiler\ext\zip;
 
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
- * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491) — CREATE/add/close/get/
- * locate/index/rename/delete/extract/status/count/archive-comment/entry-comment/unchange path.
+ * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496) — CREATE/add/
+ * close/get/locate/index/rename/delete/extract/status/count/archive-comment/entry-comment/
+ * unchange/replaceFile path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -20,7 +21,7 @@ namespace PHPCompiler\ext\zip;
  * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
- * unchangeName)
+ * unchangeName / replaceFile)
  */
 final class ZipArchiveJitHelper
 {
@@ -753,6 +754,30 @@ final class ZipArchiveJitHelper
             }
             if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
                 return self::pack(self::unchangeSlot1() ? 1 : 0);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        // replaceFile — replace slot data, keep name (#35496 / php-src zim_ZipArchive_replaceFile).
+        // Content is read in IR via file_get_contents; $s2 is the new bytes. $a = index.
+        if ('rpl' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if (0 === $a && '' !== self::$h1name) {
+                self::$h1data = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1data2 = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
             }
             self::$h1status = 9;
 
