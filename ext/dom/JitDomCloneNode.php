@@ -36,6 +36,20 @@ final class JitDomCloneNode
     /** Tag of the last materialized clone — JIT copies onto the result Variable. */
     public static ?string $lastResultTagName = null;
 
+    /**
+     * Markup of the most recent replaceChild/removeChild detached child (#35421).
+     * documentElement re-fetch clears lastFetched* before the mutation, and the
+     * loadXML SSOT is refreshed so chunk lookup no longer finds the detached node.
+     */
+    private static ?string $lastDetachedChildMarkup = null;
+
+    /** Remember pre-mutation child markup for a later cloneNode on the return value. */
+    public static function rememberDetachedChildMarkup(string $markup): void
+    {
+        $markup = trim($markup);
+        self::$lastDetachedChildMarkup = '' === $markup ? null : $markup;
+    }
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         self::$lastResultTagName = null;
@@ -88,10 +102,47 @@ final class JitDomCloneNode
             $index = JitDomNodeChildProperty::$lastFetchedChildIndex;
             $tagHint = $tagHint ?? JitDomNodeChildProperty::$lastFetchedTagName;
         }
+
+        $rootTag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
+
+        // Detached replaceChild/removeChild child remembered *before* SSOT refresh
+        // (#35421). Must run before index/chunk lookup: a stale childIndex still points
+        // into the *post*-mutation tree (wrong sibling) after the refresh.
+        if (null !== self::$lastDetachedChildMarkup) {
+            $fromDetached = self::specFromMarkup(self::$lastDetachedChildMarkup, $deep);
+            if (null !== $fromDetached) {
+                // documentElement->cloneNode stamps nodePath + root tag and must not
+                // steal a prior mutation's detached snapshot (#32949).
+                $isDocumentElementClone = null !== $receiver->compileTimeDomNodePath
+                    && null === $receiver->compileTimeDomChildIndex
+                    && null !== $tagHint
+                    && null !== $rootTag
+                    && strtolower((string) $tagHint) === strtolower((string) $rootTag);
+                if (!$isDocumentElementClone) {
+                    self::$lastDetachedChildMarkup = null;
+
+                    return $fromDetached;
+                }
+            }
+        }
+
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks($inner);
         if (null !== $index && isset($chunks[$index])) {
-            return self::specFromMarkup($chunks[$index], $deep);
+            // replaceChild refreshes the loadXML SSOT: a stale child index then points
+            // at the *new* sibling. Only trust the slot when the tag still matches.
+            $parsedAt = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($chunks[$index]);
+            $expectTag = $tagHint ?? JitDomNodeChildProperty::$lastFetchedTagName;
+            if (
+                null !== $expectTag
+                && null !== $parsedAt
+                && strtolower($parsedAt['tag']) === strtolower($expectTag)
+            ) {
+                return self::specFromMarkup($chunks[$index], $deep);
+            }
+            if (null === $expectTag && null === self::$lastDetachedChildMarkup) {
+                return self::specFromMarkup($chunks[$index], $deep);
+            }
         }
         if (null !== $tagHint && null !== $receiver->compileTimeDomChildIndex) {
             foreach ($chunks as $chunk) {
@@ -118,10 +169,25 @@ final class JitDomCloneNode
             if (null !== $fromRecv) {
                 return $fromRecv;
             }
+        } elseif (null === $receiver->compileTimeDomNodePath) {
+            // replaceChild/removeChild returns: ARG_SEND often drops Variable metadata
+            // while lastFetched* still names the detached child. loadXML SSOT was
+            // refreshed so chunk lookup misses — do not fall through to documentElement
+            // (#35421 leftover of #35386).
+            $fromRecv = self::specFromCreateElementReceiver($receiver, $deep);
+            if (
+                null !== $fromRecv
+                && (
+                    null === $rootTag
+                    || strtolower($fromRecv['tag']) !== strtolower((string) $rootTag)
+                )
+            ) {
+                return $fromRecv;
+            }
         }
 
         // documentElement / unannotated node: clone the document element.
-        $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
+        $tag = $rootTag;
         $attrs = self::rootAttrSuffix($xml);
         $childInner = $deep ? DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml) : '';
         $text = $deep ? DomParseSimpleXmlJitHelper::rootTextContentArgv($xml) : '';
