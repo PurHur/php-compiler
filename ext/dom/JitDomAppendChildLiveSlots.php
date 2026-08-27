@@ -586,6 +586,10 @@ final class JitDomAppendChildLiveSlots
      * {@code <!--…-->}, {@code <![CDATA[…]]>}, PI, entity-ref (#33335 / #33575).
      * Used after fragment insertBefore/append/replace expand.
      *
+     * Also refreshes {@code textContent}/{@code nodeValue} from the same live child
+     * chain (#35300 / leftover #33438) — INNER_XML alone left those STRING slots at
+     * the empty createElement seed while saveXML/firstChild stayed correct.
+     *
      * Hardened for repeated inlining into one {@code main} (#33335): uniquified BB
      * labels, entry allocas, piece merge via alloca (not phi across concat continue
      * hops), and {@see JitStringConcat::concat} without fresh-continue BB pairs.
@@ -905,6 +909,156 @@ final class JitDomAppendChildLiveSlots
             $propVar,
             JITVariable::TYPE_STRING
         );
+        // Aggregate descendant text into textContent/nodeValue (#35300).
+        self::refreshTextContentSlotsFromChildren($context, $parent);
+    }
+
+    /**
+     * Rewrite Element textContent/nodeValue from live children (#35300 / #33438).
+     *
+     * php-src {@code xmlNodeGetContent}: concatenate Text/CDATA and nested Element
+     * textContent; skip Comment / PI / entity-ref stand-ins.
+     */
+    public static function refreshTextContentSlotsFromChildren(Context $context, Value $parent): void
+    {
+        $tag = self::tag('dom_rc_refresh_tc');
+        BasicBlockHelper::ensureOpenInsertBlock($context, $tag);
+        self::ensureLayout($context);
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        foreach (['textContent', 'nodeValue', 'nodeName', 'tagName'] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_STRING);
+            }
+        }
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $strTy = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $accAlloca = BasicBlockHelper::entryAlloca($context, $strTy);
+        $curAlloca = BasicBlockHelper::entryAlloca($context, $objPtrTy);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $context->builder->store($empty, $accAlloca);
+
+        $first = self::loadChildEdge($context, $parent, VmDom::PROP_FIRST_CHILD, self::tag('dom_rc_tc_first'));
+        $context->builder->store($first, $curAlloca);
+        $bbLoop = BasicBlockHelper::append($context, self::tag('dom_rc_tc_loop'));
+        $bbBody = BasicBlockHelper::append($context, self::tag('dom_rc_tc_body'));
+        $bbDone = BasicBlockHelper::append($context, self::tag('dom_rc_tc_done'));
+        $context->builder->branch($bbLoop);
+
+        $context->builder->positionAtEnd($bbLoop);
+        $cur = $context->builder->load($curAlloca);
+        $curNull = $context->builder->icmp(Builder::INT_EQ, $cur, $objPtrTy->constNull());
+        $context->builder->branchIf($curNull, $bbDone, $bbBody);
+
+        $context->builder->positionAtEnd($bbBody);
+        $nameVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $cur,
+            'DOMElement',
+            'nodeName',
+            $elementClassId
+        );
+        $nameStr = $context->helper->loadValue($nameVar);
+        $textVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $cur,
+            'DOMElement',
+            'textContent',
+            $elementClassId
+        );
+        $textStr = $context->helper->loadValue($textVar);
+        $textNameLit = $context->builder->load($context->constantStringFromString('#text'));
+        $cdataLit = $context->builder->load($context->constantStringFromString('#cdata-section'));
+        $commentLit = $context->builder->load($context->constantStringFromString('#comment'));
+        $isText = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $textNameLit),
+            $zero
+        );
+        $isCdata = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $cdataLit),
+            $zero
+        );
+        $isComment = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $nameStr, $commentLit),
+            $zero
+        );
+        $isTextOrCdata = $context->builder->or($isText, $isCdata);
+        $bbAdd = BasicBlockHelper::append($context, self::tag('dom_rc_tc_add'));
+        $bbSkipChar = BasicBlockHelper::append($context, self::tag('dom_rc_tc_skip_char'));
+        $bbCheckElem = BasicBlockHelper::append($context, self::tag('dom_rc_tc_check_elem'));
+        $bbNext = BasicBlockHelper::append($context, self::tag('dom_rc_tc_next'));
+        $context->builder->branchIf($isTextOrCdata, $bbAdd, $bbSkipChar);
+
+        $context->builder->positionAtEnd($bbAdd);
+        $acc = $context->builder->load($accAlloca);
+        $merged = JitStringConcat::concat($context, $acc, $textStr, false);
+        $context->builder->store($merged, $accAlloca);
+        $context->builder->branch($bbNext);
+
+        $context->builder->positionAtEnd($bbSkipChar);
+        $context->builder->branchIf($isComment, $bbNext, $bbCheckElem);
+
+        $context->builder->positionAtEnd($bbCheckElem);
+        // Skip PI / entity-ref stand-ins (tagName kind markers); Element children contribute
+        // their already-aggregated textContent slot.
+        $tagVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $cur,
+            'DOMElement',
+            'tagName',
+            $elementClassId
+        );
+        $tagStr = $context->helper->loadValue($tagVar);
+        $piKindLit = $context->builder->load(
+            $context->constantStringFromString(JitDomCreateProcessingInstruction::TAG_KIND)
+        );
+        $entityKindLit = $context->builder->load(
+            $context->constantStringFromString(JitDomCreateEntityReference::TAG_KIND)
+        );
+        $isPi = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagStr, $piKindLit),
+            $zero
+        );
+        $isEntity = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $tagStr, $entityKindLit),
+            $zero
+        );
+        $skipKind = $context->builder->or($isPi, $isEntity);
+        $bbElemAdd = BasicBlockHelper::append($context, self::tag('dom_rc_tc_elem_add'));
+        $context->builder->branchIf($skipKind, $bbNext, $bbElemAdd);
+
+        $context->builder->positionAtEnd($bbElemAdd);
+        $accEl = $context->builder->load($accAlloca);
+        $mergedEl = JitStringConcat::concat($context, $accEl, $textStr, false);
+        $context->builder->store($mergedEl, $accAlloca);
+        $context->builder->branch($bbNext);
+
+        $context->builder->positionAtEnd($bbNext);
+        $next = self::loadSibling($context, $cur, VmDom::PROP_NEXT_SIBLING, self::tag('dom_rc_tc_sib'));
+        $context->builder->store($next, $curAlloca);
+        $context->builder->branch($bbLoop);
+
+        $context->builder->positionAtEnd($bbDone);
+        $final = $context->builder->load($accAlloca);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $final
+        );
+        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
+        foreach (['textContent', 'nodeValue'] as $textProp) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($parent, 'DOMElement', $textProp),
+                $propVar,
+                JITVariable::TYPE_STRING
+            );
+        }
     }
 
     /** Set held childNodes length to 0 without replacing the list object (#33312). */
