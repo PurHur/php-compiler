@@ -99,6 +99,10 @@ final class NestedJitCompileScope
         $savedCoalesceAssignTargets = $context->coalesceAssignTargets;
         $savedCoalesceMergeSlotOperands = $context->coalesceMergeSlotOperands;
         $savedTernaryEchoPhiByAliasSlot = $context->ternaryEchoPhiByAliasSlot;
+        // Isolate NestedJIT from generator resume — emitGeneratorResumeComplete / GEPs on
+        // stateParam must not land in void helper fns (#35144).
+        $savedCompilingGeneratorResume = $context->compilingGeneratorResume;
+        $savedGeneratorStateParam = $context->generatorStateParam;
         $context->scope->blockStorage = new \SplObjectStorage();
         $context->scope->blockEntryStorage = new \SplObjectStorage();
         $context->scope->variables = new \SplObjectStorage();
@@ -119,6 +123,8 @@ final class NestedJitCompileScope
         $context->coalesceAssignTargets = new \SplObjectStorage();
         $context->coalesceMergeSlotOperands = [];
         $context->ternaryEchoPhiByAliasSlot = [];
+        $context->compilingGeneratorResume = false;
+        $context->generatorStateParam = null;
         // Drop outer activeFunction while insert is cleared — otherwise parentFunction() /
         // entryAlloca pin allocas into the outer fn and NestedJIT bodies load them (#28053).
         $context->activeFunction = '';
@@ -156,6 +162,8 @@ final class NestedJitCompileScope
             $context->coalesceAssignTargets = $savedCoalesceAssignTargets;
             $context->coalesceMergeSlotOperands = $savedCoalesceMergeSlotOperands;
             $context->ternaryEchoPhiByAliasSlot = $savedTernaryEchoPhiByAliasSlot;
+            $context->compilingGeneratorResume = $savedCompilingGeneratorResume;
+            $context->generatorStateParam = $savedGeneratorStateParam;
             self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;
             self::restoreInsertBlock($context, $restoreBlock);

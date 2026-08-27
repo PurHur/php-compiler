@@ -644,9 +644,12 @@ final class Variable {
         }
         // Generator resume: named CVs live in state->frame_slots so they survive
         // across resume calls (stack allocas die on ret) (#35142).
+        // NestedJIT helper params (e.g. ReturnPendingJitHelper::$isVoid) must not use
+        // frame slots — ptrs are materialized once at resume entry (#35144).
         if (
             $context->compilingGeneratorResume
             && null !== $context->generatorStateParam
+            && !NestedJitCompileScope::isActive()
             && null !== $name
             && '' !== $name
             && 'this' !== $name
