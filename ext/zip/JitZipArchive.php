@@ -2007,6 +2007,90 @@ final class JitZipArchive
         return self::boxBoolFromI64($context, $rcPhi);
     }
 
+    /**
+     * ZipArchive::setArchiveFlag — NestedJIT saf (#35522 leftover of #35515 / #21831).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setArchiveFlag
+     * AFL_RDONLY cannot be cleared once set (libzip).
+     */
+    public static function setArchiveFlag(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::setArchiveFlag', 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $flag = JitLongArg::lower($context, $args[1], 'ZipArchive::setArchiveFlag(): Argument #1 ($flag)');
+        $value = JitLongArg::lower($context, $args[2], 'ZipArchive::setArchiveFlag(): Argument #2 ($value)');
+        $i64 = $context->getTypeFromString('int64');
+        if ($flag->typeOf() !== $i64) {
+            $flag = $context->builder->sext($flag, $i64);
+        }
+        if ($value->typeOf() !== $i64) {
+            $value = $context->builder->sext($value, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'saf',
+            $flag,
+            $value,
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::getArchiveFlag — NestedJIT gaf (#35522 leftover of #35515 / #21831).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getArchiveFlag
+     * Returns 0/1; optional $flags with FL_UNCHANGED uses open-time snapshot.
+     */
+    public static function getArchiveFlag(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::getArchiveFlag', 1, 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $flag = JitLongArg::lower($context, $args[1], 'ZipArchive::getArchiveFlag(): Argument #1 ($flag)');
+        $i64 = $context->getTypeFromString('int64');
+        if ($flag->typeOf() !== $i64) {
+            $flag = $context->builder->sext($flag, $i64);
+        }
+        $flagsVal = $i64->constInt(0, false);
+        if (\count($args) >= 3) {
+            $flagsVal = JitLongArg::lower($context, $args[2], 'ZipArchive::getArchiveFlag(): Argument #2 ($flags)');
+            if ($flagsVal->typeOf() !== $i64) {
+                $flagsVal = $context->builder->sext($flagsVal, $i64);
+            }
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $n = self::execLong(
+            $context,
+            'gaf',
+            $flag,
+            $flagsVal,
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $ptr,
+            $n
+        );
+
+        return $ptr;
+    }
+
     public static function close(Context $context, JITVariable ...$args): Value
     {
         if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::close', 0)) {

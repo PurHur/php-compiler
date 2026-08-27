@@ -68,6 +68,11 @@ final class ZipArchiveJitHelper
     /** AFL_RDONLY-style session flag (#35478). */
     private static int $h1readonly = 0;
 
+    /** Archive flag bits + open snapshot for getArchiveFlag FL_UNCHANGED (#35522 / #21831). */
+    private static int $h1flags = 0;
+
+    private static int $h1flags_snap = 0;
+
     /** Session password for setEncryption* (#35500 / #19873). */
     private static string $h1password = '';
 
@@ -124,6 +129,8 @@ final class ZipArchiveJitHelper
             self::$h1ecomment2 = '';
             self::$h1status = 0;
             self::$h1readonly = 0;
+            self::$h1flags = 0;
+            self::$h1flags_snap = 0;
             self::$h1password = '';
             self::$h1comp = 0;
             self::$h1comp2 = 0;
@@ -159,6 +166,8 @@ final class ZipArchiveJitHelper
             self::$h1ecomment2 = '';
             self::$h1open = 0;
             self::$h1readonly = 0;
+            self::$h1flags = 0;
+            self::$h1flags_snap = 0;
             self::$h1password = '';
             self::$h1comp = 0;
             self::$h1comp2 = 0;
@@ -845,6 +854,11 @@ final class ZipArchiveJitHelper
                 return self::pack(0);
             }
             self::$h1readonly = 0 !== $a ? 1 : 0;
+            if (0 !== $a) {
+                self::$h1flags = self::$h1flags | 2;
+            } else {
+                self::$h1flags = self::$h1flags & (~2);
+            }
             self::$h1status = 0;
 
             return self::pack(1);
@@ -1185,6 +1199,53 @@ final class ZipArchiveJitHelper
 
             return self::pack(0);
         }
+        // setArchiveFlag / getArchiveFlag — $a=flag, $b=value|flags (#35522 / zim_ZipArchive_*ArchiveFlag).
+        // Known AFL_*: 2,4,8,16. AFL_RDONLY (2) cannot be cleared once set.
+        if ('saf' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if (2 !== $a && 4 !== $a && 8 !== $a && 16 !== $a) {
+                self::$h1status = 18;
+
+                return self::pack(0);
+            }
+            if (2 === $a && 0 === $b && 0 !== self::$h1readonly) {
+                self::$h1status = 18;
+
+                return self::pack(0);
+            }
+            if (0 !== $b) {
+                self::$h1flags = self::$h1flags | $a;
+                if (2 === $a) {
+                    self::$h1readonly = 1;
+                }
+            } else {
+                self::$h1flags = self::$h1flags & (~$a);
+            }
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        if ('gaf' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            $bits = self::$h1flags;
+            if (0 !== ($b & 8)) {
+                $bits = self::$h1flags_snap;
+            }
+            self::$h1status = 0;
+            if (0 !== ($bits & $a)) {
+                return self::pack(1);
+            }
+
+            return self::pack(0);
+        }
 
         return self::pack(0);
     }
@@ -1228,6 +1289,7 @@ final class ZipArchiveJitHelper
         self::$h1snap_comment = self::$h1comment;
         self::$h1snap_ecomment = self::$h1ecomment;
         self::$h1snap_ecomment2 = self::$h1ecomment2;
+        self::$h1flags_snap = self::$h1flags;
     }
 
     /**
