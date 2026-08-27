@@ -36,6 +36,17 @@ final class DateTimeInterfaceSupport
         'w3c' => 'Y-m-d\\TH:i:sP',
     ];
 
+    /**
+     * Format constants for JIT/AOT ClassConstFetch seeding (#35368).
+     * Keys are lowercase; seedExternalClassConstants uppercases them.
+     *
+     * @return array<string, string>
+     */
+    public static function classConstants(): array
+    {
+        return self::FORMAT_CONSTANTS;
+    }
+
     public static function register(Context $ctx): void
     {
         $entry = new ClassEntry(self::INTERFACE_NAME);
