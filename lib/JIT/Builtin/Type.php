@@ -597,25 +597,22 @@ class Type extends Builtin {
         // is an intentional no-op.
         // __compiler_undefined_array_key_warning_cstr / _long always-on shells removed
         // (#33249): StringTriggerError / JitTriggerErrorKernel owns the ABIs
-        // (getNamedFunction first via declareUndefinedArrayKeyAbis / implementUndefKey*Bridge;
-        // Type::register declares via owner before HashTable::implement looks them up;
-        // Type::initialize always-on ensureLinked removed (#34513) — register still
-        // ensureLinked for HELPER_RUNTIME_O=0). Leftover Type empty decls vs Runtime
-        // ABI drift mint undefined_array_key_warning_*.1 (#31894 / #32122).
-        StringTriggerError::declareUndefinedArrayKeyAbis($this->context);
+        // (getNamedFunction first via declareUndefinedArrayKeyAbis / implementUndefKey*Bridge).
+        // Type::register always-on declare+ensureLinked removed (#35392): HashTable::implement
+        // declares/ensures at entry; HashTableReadLlvm / call sites ensure before lookup
+        // (peer initialize #34513 / Context #34641 / #35073). SessionStartOptions NestedJIT
+        // moved to call-site (#33945). HELPER_RUNTIME_O=0 stays green via HashTable::implement
+        // + call-site ensure (#33248). Leftover Type NestedJIT vs Runtime ABI drift mint
+        // undefined_array_key_warning_*.1 (#31894 / #32122).
         // __compiler_trigger_error always-on shell removed (#33234): StringTriggerError
         // / JitTriggerErrorKernel owns the ABI (getNamedFunction first via
-        // implementTriggerErrorBridge). Type::register must ensureLinked before any
-        // NestedJIT in register() when HELPER_RUNTIME_O=0 (#33248) — HashTable /
-        // other register NestedJIT looks up the ABI. SessionStartOptions NestedJIT
-        // moved to call-site (#33945) and also ensureLinked trigger_error inside
-        // SessionStartOptionsRuntime::ensureLinked. Type::initialize always-on
-        // ensureLinked removed (#34513); Context ensureStandaloneBodies + call-site
-        // ensureLinked before lookup. Leftover Type empty decls vs Runtime ABI drift
-        // mint trigger_error.1 (#31894 / #32122). User-script trigger_error()/
-        // user_error() stay trigger_error_ / JitBuiltinWarning (php-src
-        // Zend/zend_execute_API.c, main/php_errors.c, ext/standard/basic_functions.c).
-        StringTriggerError::ensureLinked($this->context);
+        // implementTriggerErrorBridge). Type::register always-on ensureLinked removed
+        // (#35392 / peer #34513 initialize): HashTable::implement + AssertFail /
+        // trigger_error_ / JitBuiltinWarning / JitIncDec ensureLinked before lookup.
+        // Leftover Type NestedJIT vs Runtime ABI drift mint trigger_error.1
+        // (#31894 / #32122). User-script trigger_error()/user_error() stay
+        // trigger_error_ / JitBuiltinWarning (php-src Zend/zend_execute_API.c,
+        // main/php_errors.c, ext/standard/basic_functions.c).
         // __compiler_assert_fail / __compiler_assert_fail_string always-on shells
         // removed (#33237 / #33241): AssertFail owns both ABIs (getNamedFunction
         // first, then addFunction if absent). Type::initialize always-on
@@ -962,13 +959,14 @@ class Type extends Builtin {
         // session_start_apply.1 / define.1 / … (#31894 / #32122).
         // StringTime / EnvLocal / StringTriggerError(initialize) / PendingHeaders
         // always-on ensureLinked removed (#34513): StringTime::invoke /
-        // TouchLibcRuntime / Context::ensureStandaloneBodies (EnvLocal +
-        // StringTriggerError) / trigger_error_ / JitBuiltinWarning / header_ /
+        // TouchLibcRuntime / Context::ensureStandaloneBodies (EnvLocal) /
+        // HashTable::implement + trigger_error_ / JitBuiltinWarning / header_ /
         // PendingHeaders already ensureLinked before lookup (peer #34474).
-        // Type::register still StringTriggerError::ensureLinked for
-        // HELPER_RUNTIME_O=0 NestedJIT (#33248). Eager NestedJIT on every full
-        // load vs Runtime ABI drift mints time.1 / env_local_lookup.1 /
-        // trigger_error.1 / pending_header_*.1 (#31894 / #32122).
+        // Type::register always-on StringTriggerError also dropped (#35392) —
+        // HELPER_RUNTIME_O=0 NestedJIT covered by HashTable::implement + call sites
+        // (#33248). Eager NestedJIT on every full load vs Runtime ABI drift mints
+        // time.1 / env_local_lookup.1 / trigger_error.1 / pending_header_*.1
+        // (#31894 / #32122).
         // StringCslashes::ensureStandaloneBodies always-on removed (#34534):
         // addcslashes.php / stripcslashes.php / StringStripcslashesRuntime already
         // ensureLinked / ensureStripcslashes before lookup (peer #34513). Eager

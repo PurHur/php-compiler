@@ -72,6 +72,9 @@ final class SilenceRuntime
     {
         $probe = $context->module->getNamedFunction('__compiler_begin_silence');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            // Prior NestedJIT ensureLinked may have built silence bridges while
+            // StreamLifecycle no-op'd under NestedJitCompileScope (#35392 / #33248 O=0).
+            StreamLifecycleRuntime::ensureLinked($context);
             self::registerLinkedRuntime($context);
 
             return;

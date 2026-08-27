@@ -29,8 +29,11 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_trigger_error (#33234)'
         );
-        // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StringTriggerError::ensureLinked', $type);
+        // No further Type always-on leftover after #33267 exit/abort drop;
+        // StringTriggerError register ensure moved to HashTable::implement (#35392).
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
+        $ht = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
+        $this->assertStringContainsString('StringTriggerError::ensureLinked', $ht);
     }
 
     public function testRuntimeOwnerDeclaresTriggerErrorAbiModuleLocally(): void
@@ -62,11 +65,16 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
             $initBody,
             'Type::initialize must not eagerly StringTriggerError::ensureLinked (#34513)'
         );
-        // register() still links for HELPER_RUNTIME_O=0 NestedJIT (#33248).
+        // register() also dropped (#35392); HashTable::implement + call sites cover #33248.
         $regPos = strpos($type, 'public function register(): void');
         $this->assertNotFalse($regPos);
         $regBody = substr($type, $regPos, $initPos - $regPos);
-        $this->assertStringContainsString('StringTriggerError::ensureLinked($this->context)', $regBody);
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureLinked($this->context)',
+            $regBody,
+            'Type::register must not eagerly StringTriggerError::ensureLinked (#35392)'
+        );
+        $this->assertStringContainsString('#35392', $type);
     }
 
     public function testTypeRegisterNoLongerEagerLinksSessionStartOptionsNestedJit(): void
@@ -79,22 +87,38 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
             $type,
             'Type::register must not eagerly NestedJIT SessionStartOptions (#33945)'
         );
-        // Former register pair (#33248) is gone; register still ensureLinked trigger_error
-        // for HELPER_RUNTIME_O=0 NestedJIT (#33248); initialize lazy as of #34513.
+        // Former register pair (#33248) is gone; StringTriggerError register ensure
+        // also dropped (#35392) — HashTable::implement + call sites cover O=0.
         $this->assertDoesNotMatchRegularExpression(
             '/StringTriggerError::ensureLinked\(\$this->context\);\s*\n\s*SessionStartOptionsRuntime::ensureLinked\(\$this->context\);/',
             $type,
             'Type::register must not pair trigger_error ensureLinked with SessionStartOptions NestedJIT (#33945)'
         );
-        $this->assertStringContainsString(
+        $this->assertStringNotContainsString(
             'StringTriggerError::declareUndefinedArrayKeyAbis($this->context)',
             $type,
-            'Type::register still declares undef-key ABIs for HashTable (#33249)'
+            'Type::register must not declare undef-key ABIs (#35392; HashTable::implement owns it)'
+        );
+        $regPos = strpos($type, 'public function register(): void');
+        $initPos = strpos($type, 'public function initialize(): void');
+        $this->assertNotFalse($regPos);
+        $this->assertNotFalse($initPos);
+        $regBody = substr($type, $regPos, $initPos - $regPos);
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureLinked($this->context)',
+            $regBody,
+            'Type::register must not ensureLinked StringTriggerError (#35392)'
+        );
+        $ht = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
+        $this->assertStringContainsString(
+            'StringTriggerError::declareUndefinedArrayKeyAbis($this->context)',
+            $ht,
+            'HashTable::implement declares undef-key ABIs (#35392 / #33249)'
         );
         $this->assertStringContainsString(
             'StringTriggerError::ensureLinked($this->context)',
-            $type,
-            'Type::register still ensureLinked StringTriggerError (#33248 / #34513)'
+            $ht,
+            'HashTable::implement ensureLinked StringTriggerError (#35392 / #33248)'
         );
     }
 

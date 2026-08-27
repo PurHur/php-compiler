@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\StringNaturalCompare;
 use PHPCompiler\JIT\Builtin\StringStrcoll;
+use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\LibcExtern;
@@ -168,6 +169,10 @@ class HashTable extends Type
 
     public function implement(): void
     {
+        // Undef-key + trigger_error ABIs before any implement* lookup (#35392 / #33249).
+        // Type::register no longer eagerly NestedJIT StringTriggerError (#32122 .1 mint).
+        StringTriggerError::declareUndefinedArrayKeyAbis($this->context);
+        StringTriggerError::ensureLinked($this->context);
         $this->ensureStringCompareAbis();
         $this->ensureLibcStrtol();
         $this->implementAlloc();

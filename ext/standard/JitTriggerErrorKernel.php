@@ -62,6 +62,11 @@ final class JitTriggerErrorKernel
         $probe = $context->module->getNamedFunction('__compiler_trigger_error');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             // trigger_error body present — still ensure undef-key ABIs (#33249 Type drop).
+            // Also SilenceRuntime → StreamLifecycle when a prior NestedJIT ensureLinked
+            // implemented trigger_error early and skipped those deps (#35392 / #33248 O=0).
+            LastErrorRuntime::ensureLinked($context);
+            SilenceRuntime::ensureLinked($context);
+            ErrorHandlerJitRuntime::ensureLinked($context);
             self::ensureUndefHelpersCompiled($context);
             self::ensureValueHelpers($context);
             self::implementUndefKeyCstrBridge($context);
