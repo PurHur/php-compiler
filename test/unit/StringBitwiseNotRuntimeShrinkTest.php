@@ -14,7 +14,7 @@ final class StringBitwiseNotRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringBitwiseNot.php');
         $this->assertStringContainsString('StringBitwiseNotJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -24,6 +24,7 @@ final class StringBitwiseNotRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('bitwise_not_body', $source);
         $this->assertLessThan(220, \substr_count($source, "\n") + 1);
         $this->assertStringContainsString('emitBinary', $source);
+        $this->assertStringContainsString('ensureLinked', $source);
     }
 
     public function testStringBitwiseBinaryJitHelperMatchesZendByteWise(): void

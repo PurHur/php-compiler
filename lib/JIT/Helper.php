@@ -200,6 +200,9 @@ class Helper {
                 break;
             case Variable::TYPE_STRING:
                 if (OpCode::TYPE_BITWISE_NOT === $opcode->type) {
+                    // NestedJIT body deferred under LOAD_TYPE_STANDALONE (#13571); peer
+                    // StringHtmlspecialchars ensureLinked-before-lookup (#34642 / #35301).
+                    Builtin\StringBitwiseNot::ensureLinked($this->context);
                     $result = $this->context->builder->call(
                         $this->context->lookupFunction('__string__bitwiseNot'),
                         $varValue
