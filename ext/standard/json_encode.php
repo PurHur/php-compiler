@@ -94,13 +94,14 @@ final class json_encode extends Internal
         // Arrays / stdClass with literal props before string fold — object temps stash
         // class names in compileTimeString (#26872) and would fold to "\"stdClass\"" (#28638).
         // Skip fold when $depth is runtime-unknown — baked 512 would ignore the arg (#34544).
+        // Skip fold when $flags is runtime-unknown — baked 0 drops JSON_PRETTY_PRINT|… (#35339).
         $arrayLiteral = null;
-        if (null !== $knownDepth) {
+        if (null !== $knownDepth && null !== $knownFlags) {
             $arrayLiteral = JitJsonEncodeCompileTime::tryEncode(
                 $context,
                 $context->jitEnclosingBlock,
                 $context->jitJsonEncodeValueOperand,
-                $knownFlags ?? 0,
+                $knownFlags,
                 $knownDepth
             );
         }
@@ -297,6 +298,11 @@ final class json_encode extends Internal
         if (null !== ($flagsArg->compileTimeLong ?? null)) {
             return (int) $flagsArg->compileTimeLong;
         }
+        // Inline JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES (peer sort flags / #35339).
+        $fromBlock = self::tryCompileTimeFlagsFromBlock($context);
+        if (null !== $fromBlock) {
+            return $fromBlock;
+        }
         $constName = $flagsArg->compileTimeConstantName ?? null;
         if (null !== $constName) {
             $jsonFlags = VmJsonFlags::constants();
@@ -339,5 +345,125 @@ final class json_encode extends Internal
         }
 
         return $phpVar->toInt();
+    }
+
+    /**
+     * Resolve flags from CFG when ARG_SEND lost compileTimeLong on BITWISE_OR (#35339).
+     */
+    private static function tryCompileTimeFlagsFromBlock(Context $context): ?int
+    {
+        $block = $context->jitEnclosingBlock;
+        $flagsOp = $context->jitJsonEncodeFlagsOperand;
+        if (null === $block || null === $flagsOp) {
+            return null;
+        }
+        $slot = self::operandSlot($block, $flagsOp);
+        if (null === $slot) {
+            return null;
+        }
+
+        return self::slotJsonFlags($context, $block, $slot, []);
+    }
+
+    private static function operandSlot(\PHPCompiler\Block $block, \PHPCfg\Operand $op): ?int
+    {
+        foreach ($block->opCodes as $opcode) {
+            foreach ([$opcode->arg1, $opcode->arg2, $opcode->arg3] as $slot) {
+                if (null === $slot) {
+                    continue;
+                }
+                try {
+                    if ($block->getOperand($slot) === $op) {
+                        return $slot;
+                    }
+                } catch (\Throwable) {
+                    continue;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, true> $visited
+     */
+    private static function slotJsonFlags(
+        Context $context,
+        \PHPCompiler\Block $block,
+        int $slot,
+        array $visited
+    ): ?int {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+
+        if (isset($block->constants[$slot])) {
+            $const = $block->constants[$slot];
+            if (Variable::TYPE_INTEGER === $const->type) {
+                return $const->toInt();
+            }
+        }
+
+        foreach ($block->opCodes as $code) {
+            if ($code->arg1 !== $slot) {
+                continue;
+            }
+            if (\PHPCompiler\OpCode::TYPE_CONST_FETCH === $code->type) {
+                return self::jsonFlagsFromConstFetch($context, $block, $code);
+            }
+            if (\PHPCompiler\OpCode::TYPE_BITWISE_AND === $code->type
+                || \PHPCompiler\OpCode::TYPE_BITWISE_OR === $code->type
+                || \PHPCompiler\OpCode::TYPE_BITWISE_XOR === $code->type
+            ) {
+                $left = null !== $code->arg2
+                    ? self::slotJsonFlags($context, $block, $code->arg2, $visited)
+                    : null;
+                $right = null !== $code->arg3
+                    ? self::slotJsonFlags($context, $block, $code->arg3, $visited)
+                    : null;
+                if (null === $left || null === $right) {
+                    return null;
+                }
+
+                return match ($code->type) {
+                    \PHPCompiler\OpCode::TYPE_BITWISE_AND => $left & $right,
+                    \PHPCompiler\OpCode::TYPE_BITWISE_OR => $left | $right,
+                    \PHPCompiler\OpCode::TYPE_BITWISE_XOR => $left ^ $right,
+                    default => null,
+                };
+            }
+        }
+
+        return null;
+    }
+
+    private static function jsonFlagsFromConstFetch(
+        Context $context,
+        \PHPCompiler\Block $block,
+        \PHPCompiler\OpCode $op
+    ): ?int {
+        $nameOp = null !== $op->arg3 ? $block->getOperand($op->arg3) : $block->getOperand($op->arg2);
+        if (!$nameOp instanceof \PHPCfg\Operand\Literal) {
+            return null;
+        }
+        $name = (string) $nameOp->value;
+        $jsonFlags = VmJsonFlags::constants();
+        if (isset($jsonFlags[$name])) {
+            return $jsonFlags[$name];
+        }
+        $upper = strtoupper($name);
+        if (isset($jsonFlags[$upper])) {
+            return $jsonFlags[$upper];
+        }
+        if (null !== $context->runtime->vmContext) {
+            $phpVar = $context->runtime->vmContext->constantFetch($name);
+            if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+                return $phpVar->toInt();
+            }
+        }
+
+        return null;
     }
 }
