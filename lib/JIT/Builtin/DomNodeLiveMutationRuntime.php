@@ -1199,6 +1199,11 @@ final class DomNodeLiveMutationRuntime
             ?? JitDomNodeChildProperty::$lastFetchedChildIndex
             ?? null;
         $delta = implode('', $pieces);
+        // Keep Variable metadata so createElement trees can cloneNode without loadXML (#35361).
+        $priorMeta = $receiver->compileTimeDomInnerXml ?? '';
+        $receiver->compileTimeDomInnerXml = 'prepend' === $kind
+            ? $delta.$priorMeta
+            : $priorMeta.$delta;
         // Nested firstChild/lastChild + createTextNode: slot often lacks loadXML-seeded
         // inner ("1"), so runtime load+concat yields only the delta (#33000).
         if (
@@ -1215,6 +1220,7 @@ final class DomNodeLiveMutationRuntime
                 $seedInner = $node['inner'] ?? '';
             }
             $newInner = 'prepend' === $kind ? $delta.$seedInner : $seedInner.$delta;
+            $receiver->compileTimeDomInnerXml = $newInner;
             JitDomCreateElement::storeUserScriptInnerXml($context, $receiverObj, $newInner);
             foreach ($rawTexts as $rawText) {
                 JitDomLoadXMLUserScript::refreshCompileTimeXmlAppendTextToChild(
