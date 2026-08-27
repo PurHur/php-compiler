@@ -41,16 +41,33 @@ final class VmClosure
         }
         if (null !== $receiver->closureCall) {
             $call = $receiver->closureCall;
-            // Create-time ClosureWithBinding may hold a method-local $this snapshot / SSA
-            // value. Prefer RuntimeIndirect → wrapCallWithBindingFromObject so invoke
-            // reloads __closure_bound_this from the Closure heap (#35456, peer #28612).
-            if ($call instanceof \PHPCompiler\JIT\Call\ClosureWithBinding
-                && null === $call->closureObject()
+            // Bare Native `Class::{closure}` / `{closure}_N` (precompile return map) must not
+            // invoke without reloading __closure_bound_this (#35456).
+            if ($call instanceof \PHPCompiler\JIT\Call\Native
+                && (
+                    str_starts_with(strtolower($call->name), '{closure}_')
+                    || str_contains(strtolower($call->name), '::{closure}')
+                    || '{closure}' === strtolower($call->name)
+                )
+                && (JitVariable::TYPE_OBJECT === $receiver->type
+                    || JitVariable::TYPE_VALUE === $receiver->type)
             ) {
                 $indirect = self::resolveIndirectCall($context, $receiver);
                 if (null !== $indirect) {
                     return $indirect;
                 }
+            }
+            // Always reload __closure_bound_this from the Closure object at the call site.
+            if ($call instanceof \PHPCompiler\JIT\Call\ClosureWithBinding
+                && (JitVariable::TYPE_OBJECT === $receiver->type
+                    || JitVariable::TYPE_VALUE === $receiver->type)
+            ) {
+                $indirect = self::resolveIndirectCall($context, $receiver);
+                if (null !== $indirect) {
+                    return $indirect;
+                }
+
+                return $call->withClosureObject($receiver);
             }
 
             return $call;

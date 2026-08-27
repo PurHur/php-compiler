@@ -3108,6 +3108,9 @@ class JIT {
             }
             $proxy = $this->context->functionProxies[$lcname];
             // Captures wrap must wait until TYPE_CLOSURE (enclosing locals exist then).
+            // Recording bare Native here is OK: FUNCCALL_INIT / resolveCall promote
+            // `Class::{closure}` Native to RuntimeIndirect so $this reloads from the heap
+            // (#35456). TYPE_CLOSURE also refreshes with ClosureWithBinding when present.
             $n = \count($block->opCodes);
             for ($j = $i + 1; $j < $n; ++$j) {
                 $next = $block->opCodes[$j];
@@ -3159,6 +3162,16 @@ class JIT {
             }
         }
         $this->context->functionReturnedClosureCall[$lc] = $proxy;
+    }
+
+    /** Native invoke names for closures: `{closure}_N` or `Class::{closure}` (#35456). */
+    private static function isClosureNativeInvokeName(string $name): bool
+    {
+        $lc = strtolower($name);
+
+        return str_starts_with($lc, '{closure}_')
+            || str_contains($lc, '::{closure}')
+            || '{closure}' === $lc;
     }
 
   /** LLVM/C symbols reserved for the AOT entry wrapper and runtime init (#2779). */
@@ -13071,52 +13084,48 @@ class JIT {
                         );
                         $boundScope->compileTimeString = $scopeName;
 
-                        $boundThisObj = null;
+                        // Store the live TYPE_OBJECT $this into Closure's TYPE_OBJECT
+                        // __closure_bound_this slot (Object_ seeds TYPE_OBJECT — a VALUE box
+                        // store corrupts the pointer slot and cross-function reload sees null).
+                        // Create-time ClosureWithBinding still uses a snapshot for in-method
+                        // `$g()` (#28612); invoke after return reloads via closureObject /
+                        // RuntimeIndirect (#35456).
+                        $boundThis = JIT\ClosureHelper::nullCapture($this->context);
+                        $boundThisForSlot = $boundThis;
                         if (!$isStaticClosure) {
-                            // Prefer resolveThisVariable so methods that never mention $this in the
-                            // enclosing body still bind via LLVM param 0 / implicitThisArgument
-                            // (#28612 — AOT arrow/closure $this was null and segfaulted on invoke).
                             $thisVar = $this->resolveThisVariable($block)
                                 ?? $this->context->variableForScopedName('this');
-                            if (null === $thisVar) {
-                                throw new \LogicException(
-                                    'Non-static method closure missing $this at TYPE_CLOSURE (#35456)'
-                                );
-                            }
-                            if (Variable::TYPE_OBJECT === $thisVar->type) {
-                                $boundThisObj = $thisVar;
-                            } else {
-                                $objPtr = $this->context->builder->call(
-                                    $this->context->lookupFunction('__value__readObject'),
-                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $thisVar)
-                                );
-                                $boundThisObj = new Variable(
-                                    $this->context,
-                                    Variable::TYPE_OBJECT,
-                                    Variable::KIND_VALUE,
-                                    $objPtr
-                                );
-                                $boundThisObj->addref();
+                            if (null !== $thisVar) {
+                                $boundThis = JIT\ClosureHelper::snapshotCapture($this->context, $thisVar);
+                                if (Variable::TYPE_OBJECT === $thisVar->type) {
+                                    $boundThisForSlot = $thisVar;
+                                } else {
+                                    $objPtr = $this->context->builder->call(
+                                        $this->context->lookupFunction('__value__readObject'),
+                                        JIT\JitValueBox::valuePtrFromVariable($this->context, $thisVar)
+                                    );
+                                    $boundThisForSlot = new Variable(
+                                        $this->context,
+                                        Variable::TYPE_OBJECT,
+                                        Variable::KIND_VALUE,
+                                        $objPtr
+                                    );
+                                    $boundThisForSlot->addref();
+                                }
                             }
                         }
-                        $boundThis = $boundThisObj ?? JIT\ClosureHelper::nullCapture($this->context);
 
                         $obj = $this->context->helper->loadValue($closureObj);
-                        // Same durable store path as FCC method callables (#28613) — writeObject
-                        // into the Closure heap slot so cross-function invoke can reload $this.
                         JIT\ClosureBindHelper::storeFccBoundThisAndScope(
                             $this->context,
                             $obj,
-                            $boundThis,
+                            $boundThisForSlot,
                             $boundScope
                         );
-                        // Always tie invoke to this Closure object so $this is reloaded from
-                        // heap slots — never reuse create-time SSA/alloca across returns (#35456).
                         $closureObj->closureCall = new JIT\Call\ClosureWithBinding(
                             $callProxy,
                             $boundThis,
-                            $boundScope,
-                            $closureObj
+                            $boundScope
                         );
                         $this->context->lastClosureCallProxy = $closureObj->closureCall;
                     }
@@ -13240,13 +13249,29 @@ class JIT {
                             }
                         }
                         if (null !== $closureCall) {
-                            // Cross-function `$f = $obj->m(); $f()`: create-time ClosureWithBinding
-                            // may hold a method-local $this snapshot alloca. Reload from the
-                            // Closure object's __closure_bound_this (#35456, peer #28612).
-                            if ($closureCall instanceof JIT\Call\ClosureWithBinding
+                            // Method-returned closures are recorded as Native `Class::{closure}`
+                            // by precompileClosuresBeforeQueue (before ClosureWithBinding is
+                            // applied). Invoke must reload $this from the Closure heap (#35456).
+                            if ($closureCall instanceof JIT\Call\Native
+                                && self::isClosureNativeInvokeName($closureCall->name)
                                 && (Variable::TYPE_OBJECT === $nameVar->type
                                     || Variable::TYPE_VALUE === $nameVar->type)
-                                && null === $closureCall->closureObject()
+                            ) {
+                                $candidates = array_merge(
+                                    JIT\ClosureHelper::closureCandidates($this->context),
+                                    $this->context->fccCallableProxies
+                                );
+                                if ([] !== $candidates) {
+                                    $closureCall = new JIT\Call\RuntimeIndirectClosureCall(
+                                        $nameVar,
+                                        $candidates,
+                                        $this->context->type->object->lookup('Closure')
+                                    );
+                                    $nameVar->closureCall = $closureCall;
+                                }
+                            } elseif ($closureCall instanceof JIT\Call\ClosureWithBinding
+                                && (Variable::TYPE_OBJECT === $nameVar->type
+                                    || Variable::TYPE_VALUE === $nameVar->type)
                             ) {
                                 $closureCall = $closureCall->withClosureObject($nameVar);
                                 $nameVar->closureCall = $closureCall;
@@ -20298,9 +20323,8 @@ class JIT {
             return;
         }
         $var = $this->context->getVariableFromOp($resultOp);
-        // Tie binding to the returned Closure object so later `$f()` reloads $this
-        // from heap slots (#35456) rather than a create-time method-local snapshot.
-        if ($proxy instanceof JIT\Call\ClosureWithBinding && null === $proxy->closureObject()) {
+        // Caller-frame result Variable — safe to use as closureObject for heap reload (#35456).
+        if ($proxy instanceof JIT\Call\ClosureWithBinding) {
             $proxy = $proxy->withClosureObject($var);
         }
         $var->closureCall = $proxy;
