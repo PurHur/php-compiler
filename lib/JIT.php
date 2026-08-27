@@ -13917,6 +13917,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $callArgs
                     );
+                    $this->propagateDomAppendChildCompileTimeTag(
+                        $block->getOperand($op->arg1),
+                        $callArgs
+                    );
                     $this->propagateDomCreateDocumentTypeCompileTimeTag(
                         $block->getOperand($op->arg1)
                     );
@@ -16858,6 +16862,38 @@ class JIT {
             $inner = htmlspecialchars($valueArg->compileTimeString, ENT_QUOTES | ENT_XML1, 'UTF-8');
         }
         $resultVar->compileTimeDomInnerXml = $inner;
+    }
+
+    /**
+     * appendChild() returns the child node — copy compile-time DOM metadata onto the
+     * result Variable so later cloneNode/saveXML on `$n = $p->appendChild(...)` still
+     * see createElement tag/inner/attrs (php-src returns the same node; #35373 leftover
+     * of #35361 / peer #35261).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private function propagateDomAppendChildCompileTimeTag(Operand $result, array $callArgs): void
+    {
+        $toCall = $this->context->scope->toCall;
+        if (!(
+            $toCall instanceof JIT\Call\DomNodeAppendChild
+            || $toCall instanceof JIT\Call\DomDocumentAppendChild
+        )) {
+            return;
+        }
+        $child = $callArgs[1] ?? null;
+        if (!$child instanceof Variable) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        // Force-sync present child metadata (result is a fresh box of the same node).
+        $this->syncCompileTimeDomTagName($resultVar, $child, true);
+        if (null !== $child->classUserType) {
+            $resultVar->classUserType = $child->classUserType;
+        }
     }
 
     /** Stamp createDocumentType stand-in tag for Document append/insertBefore (#33584). */
