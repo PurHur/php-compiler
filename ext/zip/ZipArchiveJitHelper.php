@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 /**
- * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 / #35467) —
- * CREATE/add/close/get/locate/index/rename/delete/extract/status path.
+ * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 / #35466 / #35467) —
+ * CREATE/add/close/get/locate/index/rename/delete/extract/status/count path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -16,7 +16,7 @@ namespace PHPCompiler\ext\zip;
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / addFile / close /
  * getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
- * renameName / deleteName / deleteIndex / extractTo)
+ * renameName / deleteName / deleteIndex / extractTo / count)
  */
 final class ZipArchiveJitHelper
 {
