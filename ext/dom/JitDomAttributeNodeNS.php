@@ -1183,8 +1183,12 @@ final class JitDomAttributeNodeNS
                 if ('' !== $valueLit) {
                     JitDomLoadXMLUserScript::storeElementInIdMap($context, $document, $valueLit, $element);
                 }
-                DomUserScriptElementCacheLlvm::rebindId($context, $valueLit);
+                // Only retarget the single-slot cache when it holds this receiver (#35321).
+                DomUserScriptElementCacheLlvm::rebindIdIfElement($context, $element, $valueLit);
                 JitDomSetIdAttribute::rememberSetAttributeIdValue($valueLit);
+                if (null !== $args[0]->compileTimeDomAttributes) {
+                    $args[0]->compileTimeDomAttributes['id'] = $valueLit;
+                }
                 // Keep setIdAttribute cache in sync when setAttribute runs after a prior
                 // setIdAttribute in the same script (multi-document #29257).
                 $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
@@ -1502,19 +1506,22 @@ final class JitDomAttributeNodeNS
 
     /**
      * Prior id= literal before setAttribute/removeAttribute mutates the live Attr cache (#19870).
+     *
+     * Prefer the receiver's compile-time attrs over the name-keyed Attr cache — that cache
+     * collapses sibling id= values to the last one in the document (#35321 / #34050).
      */
     private static function compileTimePriorIdLiteral(JITVariable $receiver, string $nameLit): ?string
     {
         if ('id' !== $nameLit) {
             return null;
         }
-        $cached = DomUserScriptAttributeCacheLlvm::literalValue('', 'id');
-        if (null !== $cached && '' !== $cached) {
-            return $cached;
-        }
         $attrs = $receiver->compileTimeDomAttributes;
         if (null !== $attrs && isset($attrs['id']) && '' !== $attrs['id']) {
             return $attrs['id'];
+        }
+        $cached = DomUserScriptAttributeCacheLlvm::literalValue('', 'id');
+        if (null !== $cached && '' !== $cached) {
+            return $cached;
         }
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
 
