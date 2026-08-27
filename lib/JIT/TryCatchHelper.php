@@ -85,6 +85,29 @@ final class TryCatchHelper
         return $last->block1;
     }
 
+    /**
+     * Normal finally fallthrough when no return/throw/leave pending (#35547 nested).
+     *
+     * Inner finally CFG often ends with JUMP to an enclosing finally block, not directly
+     * to the try merge — epilogue must follow that edge instead of jumping straight to merge.
+     */
+    private static function finallyNormalFallthroughBb(Context $context, TryCatchHandler $handler): ?BasicBlock
+    {
+        $mergeBb = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
+        $finallyCfg = $handler->finallyOp->block1 ?? null;
+        if (null === $finallyCfg) {
+            return $mergeBb;
+        }
+        $trail = self::tryBodyTrailingJumpTarget($finallyCfg);
+        if (null === $trail || $trail === $handler->mergeBlock) {
+            return $mergeBb;
+        }
+
+        return $context->scope->blockEntryStorage[$trail]
+            ?? $context->scope->blockStorage[$trail]
+            ?? $mergeBb;
+    }
+
     public static function findFinallyOp(Block $handlerBlock, int $afterTryIndex): ?OpCode
     {
         $n = $handlerBlock->nOpCodes;
@@ -455,8 +478,10 @@ final class TryCatchHelper
             $cursor = $nextBb;
         }
         $builder->positionAtEnd($cursor);
-        if (null !== $mergeBb) {
-            $builder->branch($mergeBb);
+        $fallthroughBb = self::finallyNormalFallthroughBb($context, $handler)
+            ?? ($context->scope->blockStorage[$handler->mergeBlock] ?? null);
+        if (null !== $fallthroughBb) {
+            $builder->branch($fallthroughBb);
         } else {
             $builder->returnVoid();
         }
@@ -1916,6 +1941,7 @@ final class TryCatchHelper
             return $handler->finallyEpilogueBb;
         }
         $mergeBb = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
+        $fallthroughBb = self::finallyNormalFallthroughBb($context, $handler) ?? $mergeBb;
         // Do not call dispatchBbFor here — it is unused and forced catch lowering before
         // beginTry finished wiring the handler (#24105).
         $epilogue = self::appendBlock($func, 'try_finally_epilogue_'.self::blockSuffix($handler));
@@ -1946,15 +1972,15 @@ final class TryCatchHelper
             $leaveDispatch = self::appendBlock($func, 'try_leave_dispatch_'.self::blockSuffix($handler));
             $handler->leaveDispatchBb = $leaveDispatch;
             $builder->positionAtEnd($leaveDispatch);
-            if (null !== $mergeBb) {
-                $builder->branch($mergeBb);
+            if (null !== $fallthroughBb) {
+                $builder->branch($fallthroughBb);
             } else {
                 $builder->returnVoid();
             }
             $builder->positionAtEnd($afterThrowCheck);
         }
-        if (null !== $mergeBb) {
-            $builder->branchIf($hasLeave, $leaveDispatch, $mergeBb);
+        if (null !== $fallthroughBb) {
+            $builder->branchIf($hasLeave, $leaveDispatch, $fallthroughBb);
         } else {
             $builder->branchIf($hasLeave, $leaveDispatch, $uncaught);
         }
