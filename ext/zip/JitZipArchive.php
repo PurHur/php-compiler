@@ -23,8 +23,8 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for ZipArchive open/add/close/get/locate/index/rename/extract/comment
- * (#35424 / #35437 / #35440 / #35449 / #35450 / #35465 / #35467 / #35472 / #35476 / #35486).
+ * LLVM lowering for ZipArchive open/add/close/get/locate/index/rename/extract/comment/unchange
+ * (#35424 / #35437 / #35440 / #35449 / #35450 / #35465 / #35467 / #35472 / #35476 / #35486 / #35490).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -1341,6 +1341,34 @@ final class JitZipArchive
             $context,
             'set_readonly',
             $flagI64,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::unchangeAll — NestedJIT uca (#35490 leftover of #35486 / #20387).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_unchangeAll / zip_unchange_all
+     */
+    public static function unchangeAll(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::unchangeAll', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        $ok = self::execLong(
+            $context,
+            'uca',
+            $handle,
             $i64->constInt(0, false),
             $empty,
             $empty
