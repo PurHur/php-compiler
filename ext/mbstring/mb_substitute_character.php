@@ -11,7 +11,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** mb_substitute_character() — illegal-byte replacement (php-src ext/mbstring/mbstring.c; #13100). */
+/**
+ * mb_substitute_character() — illegal-byte replacement (php-src ext/mbstring/mbstring.c; #13100, #29919, #35263).
+ *
+ * JIT/AOT: compile-time fold + NestedJIT via {@see JitMbSubstituteCharacter}.
+ */
 final class mb_substitute_character extends Internal
 {
     public function __construct()
@@ -55,27 +59,6 @@ final class mb_substitute_character extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc > 1) {
-            throw new \ArgumentCountError(sprintf(
-                'mb_substitute_character() expects at most 1 argument, %d given',
-                $argc
-            ));
-        }
-        // Compile-time omitted/null getter fold (php-src Z_PARAM_STR_OR_LONG_OR_NULL); setters stay VM-only.
-        if (0 === $argc
-            || (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
-        ) {
-            $value = MbstringState::substituteCharacter();
-            if (\is_int($value)) {
-                return $context->getTypeFromString('int64')->constInt($value, false);
-            }
-
-            return $context->builder->load($context->constantStringFromString($value));
-        }
-
-        throw new \LogicException(
-            'mb_substitute_character() JIT setter is not supported in this compiler build'
-        );
+        return JitMbSubstituteCharacter::invoke($context, $args);
     }
 }
