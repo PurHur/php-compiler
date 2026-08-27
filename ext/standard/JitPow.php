@@ -60,12 +60,8 @@ final class JitPow
             return $slotPtr;
         }
 
-        // Boxed locals may be int or float — zend_pow_function branches at runtime (#35058).
-        if (JitValueBox::isValueOperand($args[0]) && JitValueBox::isValueOperand($args[1])) {
-            return self::invokeBoxedRuntimeDispatch($context, $slotPtr, $args[0], $args[1]);
-        }
-
-        return self::writeLibcPowToSlot($context, $slotPtr, ...$args);
+        // Runtime int vs float dispatch (numeric strings, boxed locals, floats — #35058, #35337).
+        return self::invokeBoxedRuntimeDispatch($context, $slotPtr, $args[0], $args[1]);
     }
 
     /**
@@ -80,14 +76,14 @@ final class JitPow
         PowIntRuntime::ensureLinked($context);
         MathFpow::ensureLinked($context);
 
-        $bothLong = $context->builder->and(
-            self::valueIsNativeLong($context, $base),
-            self::valueIsNativeLong($context, $exp)
+        $bothIntegral = $context->builder->and(
+            self::operandIsIntegralForPow($context, $base),
+            self::operandIsIntegralForPow($context, $exp)
         );
         $intBlock = BasicBlockHelper::append($context, 'pow_runtime_int');
         $floatBlock = BasicBlockHelper::append($context, 'pow_runtime_float');
         $done = BasicBlockHelper::append($context, 'pow_runtime_done');
-        $context->builder->branchIf($bothLong, $intBlock, $floatBlock);
+        $context->builder->branchIf($bothIntegral, $intBlock, $floatBlock);
 
         $context->builder->positionAtEnd($intBlock);
         $baseL = JitLongArg::lower($context, $base, 'pow() base');
@@ -133,21 +129,156 @@ final class JitPow
         );
     }
 
-    private static function writeLibcPowToSlot(Context $context, Value $slotPtr, JITVariable ...$args): Value
+    /**
+     * Zend pow_function integer fast path — operand coerces to int, not float (#35337).
+     */
+    private static function operandIsIntegralForPow(Context $context, JITVariable $arg): Value
     {
-        JitPowNumericOperandGuard::guardOperands($context, $args[0], $args[1]);
-        JitEnumNumericOperandGuard::guardPow($context, $args[0], $args[1]);
-        $double = $context->getTypeFromString('double');
-        $baseD = pow::toJitDouble($context, $args[0], $double);
-        $expD = pow::toJitDouble($context, $args[1], $double);
-        $result = MathFpow::invoke($context, $baseD, $expD);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeDouble'),
-            $slotPtr,
-            $result
-        );
+        $i1 = $context->getTypeFromString('int1');
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            return $i1->constInt(1, false);
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return $i1->constInt(0, false);
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type || JITVariable::TYPE_NULL === $arg->type) {
+            return $i1->constInt(1, false);
+        }
+        if (JITVariable::TYPE_STRING === $arg->type && null !== $arg->compileTimeString) {
+            return $i1->constInt(
+                \PHPCompiler\VM\Variable::isIntegralNumericString($arg->compileTimeString) ? 1 : 0,
+                false
+            );
+        }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return self::nativeStringIsIntegralForPow($context, $arg);
+        }
+        if (
+            null !== $arg->compileTimeLong
+            && null === $arg->compileTimeFloat
+            && !JitValueBox::isValueOperand($arg)
+        ) {
+            return $i1->constInt(1, false);
+        }
+        if (!JitValueBox::isValueOperand($arg)) {
+            return $i1->constInt(0, false);
+        }
 
-        return $slotPtr;
+        $isLong = self::valueIsNativeLong($context, $arg);
+        $isBool = JitValueNumeric::valueIsBool($context, $arg);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NULL, false)
+        );
+        $stringIntegral = self::boxedStringIsIntegralForPow($context, $arg);
+
+        return $context->builder->or(
+            $isLong,
+            $context->builder->or(
+                $isBool,
+                $context->builder->or($isNull, $stringIntegral)
+            )
+        );
+    }
+
+    /** i1: 1 when boxed operand is an integral numeric string, else 0. */
+    private static function boxedStringIsIntegralForPow(Context $context, JITVariable $boxed): Value
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $isString = JitValueNumeric::valueIsString($context, $boxed);
+        $entryEnd = $context->builder->getInsertBlock();
+        $strBlock = BasicBlockHelper::append($context, 'pow_str_integral');
+        $done = BasicBlockHelper::append($context, 'pow_str_integral_done');
+        $context->builder->branchIf($isString, $strBlock, $done);
+
+        $context->builder->positionAtEnd($strBlock);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $strPtr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $strOk = self::stringStructIsIntegralForPow($context, $strPtr);
+        $strEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($i1, 'pow_str_integral_phi');
+        $phi->addIncoming($falseVal, $entryEnd);
+        $phi->addIncoming($strOk, $strEnd);
+
+        return $phi;
+    }
+
+    /** i1: 1 when a native __string__* operand is an integral numeric string. */
+    private static function nativeStringIsIntegralForPow(Context $context, JITVariable $strVar): Value
+    {
+        $strPtr = $context->helper->loadValue($strVar);
+
+        return self::stringStructIsIntegralForPow($context, $strPtr);
+    }
+
+    /**
+     * Zend _is_numeric_string_ex IS_LONG shape for pow — no '.' or exponent (#35337).
+     *
+     * Matches {@see \PHPCompiler\VM\Variable::isIntegralNumericString} for common cases
+     * (e.g. "2" vs "2.5"); overflow digit strings fall through to float via strtod mismatch.
+     */
+    private static function stringStructIsIntegralForPow(Context $context, Value $strPtr): Value
+    {
+        $i8ptr = self::stringDataPtr($context, $strPtr);
+        $i1 = $context->getTypeFromString('int1');
+        $i32 = $context->getTypeFromString('int32');
+        $null = $i8ptr->typeOf()->constNull();
+        $hasDot = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call(
+                $context->lookupFunction('strchr'),
+                $i8ptr,
+                $i32->constInt(ord('.'), false)
+            ),
+            $null
+        );
+        $hasExp = $context->builder->or(
+            $context->builder->icmp(
+                Builder::INT_NE,
+                $context->builder->call(
+                    $context->lookupFunction('strchr'),
+                    $i8ptr,
+                    $i32->constInt(ord('e'), false)
+                ),
+                $null
+            ),
+            $context->builder->icmp(
+                Builder::INT_NE,
+                $context->builder->call(
+                    $context->lookupFunction('strchr'),
+                    $i8ptr,
+                    $i32->constInt(ord('E'), false)
+                ),
+                $null
+            )
+        );
+        $hasFractionalSyntax = $context->builder->or($hasDot, $hasExp);
+
+        return $context->builder->xor($hasFractionalSyntax, $i1->constInt(1, false));
+    }
+
+    private static function stringDataPtr(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+
+        return $context->builder->pointerCast(
+            $context->builder->structGep($strPtr, $map['value']),
+            $context->getTypeFromString('int8*')
+        );
     }
 
     /**
