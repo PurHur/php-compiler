@@ -1195,8 +1195,8 @@ final class JitUnlikeCompare
                 : $eqPhi;
             $strLongEnd = $context->builder->getInsertBlock();
             $context->builder->branch($doneBb);
-        } elseif (OpCode::TYPE_SPACESHIP === $opType) {
-            // Boxed numeric-string <=> boxed long — bypass NestedJIT spaceshipNumberString (#35317).
+        } elseif (self::isCompareOp($opType)) {
+            // Boxed numeric-string <=> / < / > boxed long — bypass NestedJIT (#35317 leftover).
             $strLongBb = BasicBlockHelper::append($context, $tag.'_sp_str_long');
             $context->builder->positionAtEnd($preGenBb);
             $context->builder->branchIf($strVsLong, $strLongBb, $genBb);
@@ -1242,7 +1242,9 @@ final class JitUnlikeCompare
             $cmpPhi = $context->builder->phi($i64, $tag.'_sp_str_long_phi');
             $cmpPhi->addIncoming($cmpL, $strLeftEnd);
             $cmpPhi->addIncoming($cmpR, $strRightEnd);
-            $strLongVal = $cmpPhi;
+            $strLongVal = OpCode::TYPE_SPACESHIP === $opType
+                ? $cmpPhi
+                : \PHPCompiler\VM\VmValueCompare::boolFromSpaceshipCmp($context, $opType, $cmpPhi);
             $strLongEnd = $context->builder->getInsertBlock();
             $context->builder->branch($doneBb);
         } else {
