@@ -564,10 +564,12 @@ class Type extends Builtin {
         // JitRandomBytesKernel open/read (#29531 / #31817). No NestedJIT getrandom
         // lookups remain. Peer sprintf drop (#32110).
         // exit(3)/abort(3) always-on shells removed (#33267): LibcExtern::ensureExitAbort
-        // owns the ABI (getNamedFunction first). Leftover Type empty decls vs libc ABI
-        // drift mint exit.1 / abort.1 (#31894 / #32122). User-script exit()/die() stay
+        // owns the ABI (getNamedFunction first). Type::register always-on ensureExitAbort
+        // removed (#35428 / peer #35392): Context::lookupFunction lazy-ensures exit/abort
+        // for the ~292 call sites that lookup without a nearby ensure; ScriptExit still
+        // may ensureExitAbort before lookup. Leftover Type empty decls vs libc ABI drift
+        // mint exit.1 / abort.1 (#31894 / #32122). User-script exit()/die() stay
         // ScriptExit (php-src Zend/zend_builtin_functions.c).
-        \PHPCompiler\JIT\LibcExtern::ensureExitAbort($this->context);
         // __compiler_format_datetime always-on shell removed (#33215): StringDateTime
         // owns the ABI (getNamedFunction first via implementFormatDatetimeBridge;
         // Type::initialize still StringDateTime::ensureLinked on the full load path).
@@ -634,7 +636,8 @@ class Type extends Builtin {
         // strerror(3) — SocketErrorRuntime::ensureStrerrorLibc / JitFtok::ensureWarningLibc.
         // getpwuid(3)+geteuid(2) — JitGetCurrentUser::ensureLibcGeteuid/Getpwuid (#32217).
         // Dead calendar/sleep/getloadavg already dropped (#32173).
-        // exit/abort — LibcExtern::ensureExitAbort (#33267).
+        // exit/abort — LibcExtern::ensureExitAbort (#33267); Type::register always-on
+        // ensure removed (#35428) — Context::lookupFunction lazy-ensures.
         // __compiler_preg_split always-on shell removed (#33199): StringPregMatch /
         // PregMatchRuntime owns the ABI (getNamedFunction first via implementSplitBridge;
         // Type::initialize still StringPregMatch::ensureLinked). Leftover Type empty decls

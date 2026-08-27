@@ -67,6 +67,8 @@ final class JitDomReplaceChild
             $context->builder->branch($bbEnd);
 
             $context->builder->positionAtEnd($bbElem);
+            // Snapshot before LiveSlots restamps sticky/lastFetched (#35421).
+            self::rememberDetachedChildBeforeLiveSlots($args[0], $args[2]);
             self::syncUserScriptReplaceSlots($context, $args[0], $args[1], $args[2]);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_replace_child_post');
             $context->builder->store(
@@ -119,6 +121,78 @@ final class JitDomReplaceChild
         $context->builder->positionAtEnd($bbEnd);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Capture pre-mutation oldChild markup for cloneNode on the replaceChild return (#35421).
+     * Must run before {@see JitDomReplaceChildLiveSlots::sync} restamps sticky/lastFetched.
+     */
+    private static function rememberDetachedChildBeforeLiveSlots(
+        JITVariable $parentVar,
+        JITVariable $oldChildVar
+    ): void {
+        $xml = $parentVar->compileTimeDomLoadXml
+            ?? (JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+                ? JitDomLoadXMLUserScript::lastCompileTimeXml()
+                : null);
+        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
+        }
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        $index = $oldChildVar->compileTimeDomChildIndex
+            ?? JitDomNodeListItem::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$stickyChildEdgeChildIndex
+            ?? null;
+        if (null === $index) {
+            $oldTag = $oldChildVar->compileTimeDomTagName
+                ?? JitDomNodeListItem::$lastFetchedTagName
+                ?? JitDomNodeChildProperty::$lastFetchedTagName
+                ?? JitDomNodeChildProperty::$stickyChildEdgeTagName
+                ?? null;
+            if (null !== $oldTag) {
+                foreach ($nodes as $i => $node) {
+                    if ('element' === ($node['kind'] ?? '')
+                        && strtolower($oldTag) === ($node['data'] ?? null)
+                    ) {
+                        $index = $i;
+                        break;
+                    }
+                }
+            } elseif (1 === \count($nodes)) {
+                $index = 0;
+            }
+        }
+        if (null === $index) {
+            return;
+        }
+        $preChunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks(
+            DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml)
+        );
+        if (!isset($preChunks[$index])) {
+            return;
+        }
+        $parsedOld = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($preChunks[$index]);
+        if (null === $parsedOld) {
+            return;
+        }
+        // Dual-emit / second compile-time pass may see a refreshed SSOT; do not
+        // overwrite a prior good snapshot with the wrong sibling (#35421).
+        $expectTag = $oldChildVar->compileTimeDomTagName
+            ?? JitDomNodeChildProperty::$stickyChildEdgeTagName
+            ?? JitDomNodeChildProperty::$lastFetchedTagName
+            ?? null;
+        if (
+            null !== $expectTag
+            && strtolower($parsedOld['tag']) !== strtolower($expectTag)
+        ) {
+            return;
+        }
+        JitDomCloneNode::rememberDetachedChildMarkup($preChunks[$index]);
+        $oldChildVar->compileTimeDomTagName = $parsedOld['tag'];
+        $oldChildVar->compileTimeDomChildIndex = $index;
+        $oldChildVar->compileTimeDomInnerXml = $parsedOld['inner'];
+        $oldChildVar->compileTimeDomNodePath = null;
     }
 
     /**
@@ -458,6 +532,7 @@ final class JitDomReplaceChild
         JITVariable $oldChildVar,
         ?string $xml
     ): void {
+        // Detached markup already snapshotted in rememberDetachedChildBeforeLiveSlots (#35421).
         $newTag = $newChildVar->compileTimeDomTagName ?? null;
         if (null === $newTag || '' === $newTag) {
             return;
@@ -486,11 +561,13 @@ final class JitDomReplaceChild
             $index = $oldChildVar->compileTimeDomChildIndex
                 ?? JitDomNodeListItem::$lastFetchedChildIndex
                 ?? JitDomNodeChildProperty::$lastFetchedChildIndex
+                ?? JitDomNodeChildProperty::$stickyChildEdgeChildIndex
                 ?? null;
             if (null === $index) {
                 $oldTag = $oldChildVar->compileTimeDomTagName
                     ?? JitDomNodeListItem::$lastFetchedTagName
                     ?? JitDomNodeChildProperty::$lastFetchedTagName
+                    ?? JitDomNodeChildProperty::$stickyChildEdgeTagName
                     ?? null;
                 if (null !== $oldTag) {
                     foreach ($nodes as $i => $node) {
@@ -524,6 +601,7 @@ final class JitDomReplaceChild
                 ) {
                     return;
                 }
+                // Detached markup already snapshotted in rememberDetachedChildBeforeLiveSlots (#35421).
                 $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, $replacement);
                 if (null !== $inner) {
                     JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);

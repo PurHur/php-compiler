@@ -16917,37 +16917,29 @@ class JIT {
                 $bound = $this->context->namedVariableBindings[$resolved] ?? null;
                 if ($bound instanceof Variable && $bound !== $child) {
                     if (
-                        (null === $child->compileTimeDomTagName || '' === $child->compileTimeDomTagName)
-                        && null !== $bound->compileTimeDomTagName
-                        && '' !== $bound->compileTimeDomTagName
-                    ) {
-                        $this->syncCompileTimeDomTagName($child, $bound, true);
-                    } elseif (
                         null !== $bound->compileTimeDomTagName
                         && '' !== $bound->compileTimeDomTagName
                     ) {
-                        // Binding is SSOT for the moved node — always refresh the ARG temp
-                        // so stale/empty bags do not win over nextSibling stamps (#35425).
                         $this->syncCompileTimeDomTagName($child, $bound, true);
                     }
                 }
             }
         }
-        // Fallback: lastFetched* when the receiver path never bound a named local
-        // (inline firstChild: appendChild($p->firstChild)).
+        // Fallback: lastFetched* / sticky edges when the receiver path never bound a
+        // named local (inline firstChild; replaceChild/removeChild #35421).
         if (
             (null === $child->compileTimeDomTagName || '' === $child->compileTimeDomTagName)
-            && null !== \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName
         ) {
             $child->compileTimeDomTagName =
-                \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName;
+                \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName
+                ?? \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedTagName
+                ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeTagName;
         }
-        if (
-            null === $child->compileTimeDomChildIndex
-            && null !== \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedChildIndex
-        ) {
+        if (null === $child->compileTimeDomChildIndex) {
             $child->compileTimeDomChildIndex =
-                \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedChildIndex;
+                \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedChildIndex
+                ?? \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedChildIndex
+                ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeChildIndex;
         }
         $resultVar = $this->context->getVariableFromOp($result);
         // Force-sync present child metadata (result is a fresh box of the same node).

@@ -7,12 +7,12 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Drop leftover always-on exit/abort ABI shells from Builtin\Type (#33267).
+ * Drop leftover always-on exit/abort ABI shells from Builtin\Type (#33267 / #35428).
  *
- * NestedJIT/AOT libc decls stay LibcExtern::ensureExitAbort; user-script exit()/die()
- * stay ScriptExit (php-src Zend/zend_builtin_functions.c). Owner declares module-locally
- * (getNamedFunction first) so leftover Type empty decls cannot mint exit.1 / abort.1
- * (#31894 / #32122).
+ * NestedJIT/AOT libc decls stay LibcExtern::ensureExitAbort (lazy via Context::lookupFunction
+ * after #35428); user-script exit()/die() stay ScriptExit (php-src Zend/zend_builtin_functions.c).
+ * Owner declares module-locally (getNamedFunction first) so leftover Type empty decls cannot
+ * mint exit.1 / abort.1 (#31894 / #32122).
  */
 final class TypeDeadExitAbortAbiRuntimeShrinkTest extends TestCase
 {
@@ -20,6 +20,7 @@ final class TypeDeadExitAbortAbiRuntimeShrinkTest extends TestCase
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
         $this->assertStringContainsString('#33267', $type);
+        $this->assertStringContainsString('#35428', $type);
         $this->assertDoesNotMatchRegularExpression(
             '/addFunction\(\s*[\'"]exit[\'"]/',
             $type,
@@ -41,6 +42,16 @@ final class TypeDeadExitAbortAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register abort (#33267)'
         );
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
+        $regPos = strpos($type, 'public function register(): void');
+        $this->assertNotFalse($regPos);
+        $initPos = strpos($type, 'public function initialize(): void');
+        $this->assertNotFalse($initPos);
+        $regBody = substr($type, $regPos, $initPos - $regPos);
+        $this->assertStringNotContainsString(
+            'ensureExitAbort($this->context)',
+            $regBody,
+            'Type::register must not always-on ensureExitAbort (#35428)'
+        );
         // No further Type always-on leftover after #33267 exit/abort drop.
         $this->assertStringNotContainsString("addFunction('exit'", $type);
     }
@@ -49,6 +60,7 @@ final class TypeDeadExitAbortAbiRuntimeShrinkTest extends TestCase
     {
         $owner = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
         $this->assertStringContainsString('#33267', $owner);
+        $this->assertStringContainsString('#35428', $owner);
         $this->assertStringContainsString('ensureExitAbort', $owner);
         $this->assertStringContainsString('getNamedFunction', $owner);
         $this->assertStringContainsString("'exit'", $owner);
@@ -56,6 +68,9 @@ final class TypeDeadExitAbortAbiRuntimeShrinkTest extends TestCase
 
         $scriptExit = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ScriptExit.php');
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $scriptExit);
+
+        $ctx = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $ctx);
     }
 
     public function testNoNewRuntimeCForExitAbortAbi(): void

@@ -43,6 +43,9 @@ final class JitDomRemoveChild
             // php-src: Attr is not a content child — Not Found before LiveSlots (#33596).
             // Must not walk Element sibling slots on a DOMAttr allocation (SIGSEGV).
             self::rejectAttrAsChildBeforeLiveSlots($context, $child);
+            // Snapshot before LiveSlots — sync re-stamps sticky/lastFetched onto the
+            // remaining firstChild and would make cloneNode pick the wrong sibling (#35421).
+            self::rememberDetachedChildBeforeLiveSlots($args[0], $args[1]);
             JitDomRemoveChildLiveSlots::sync($context, $parent, $child);
             DomUserScriptElementCacheLlvm::invalidateIfElement($context, $child);
             self::syncUserScriptInnerXmlAfterRemove($context, $args[0], $args[1]);
@@ -68,6 +71,89 @@ final class JitDomRemoveChild
     }
 
     /**
+     * Capture pre-mutation child markup for cloneNode on the removeChild return (#35421).
+     * Must run before {@see JitDomRemoveChildLiveSlots::sync} restamps sticky/lastFetched.
+     */
+    private static function rememberDetachedChildBeforeLiveSlots(
+        JITVariable $parentVar,
+        JITVariable $childVar
+    ): void {
+        $xml = $parentVar->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
+        }
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        $index = $childVar->compileTimeDomChildIndex
+            ?? JitDomNodeListItem::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$stickyChildEdgeChildIndex
+            ?? null;
+        if (null === $index) {
+            $oldTag = $childVar->compileTimeDomTagName
+                ?? JitDomNodeListItem::$lastFetchedTagName
+                ?? JitDomNodeChildProperty::$lastFetchedTagName
+                ?? JitDomNodeChildProperty::$stickyChildEdgeTagName
+                ?? null;
+            if (null !== $oldTag) {
+                foreach ($nodes as $i => $node) {
+                    if ('element' === ($node['kind'] ?? '')
+                        && strtolower($oldTag) === ($node['data'] ?? null)
+                    ) {
+                        $index = $i;
+                        break;
+                    }
+                }
+            } elseif (1 === \count($nodes)) {
+                $index = 0;
+            }
+        }
+        if (null === $index) {
+            return;
+        }
+        $preChunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks(
+            DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml)
+        );
+        if (isset($preChunks[$index])) {
+            $parsedOld = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($preChunks[$index]);
+            if (null !== $parsedOld) {
+                $expectTag = $childVar->compileTimeDomTagName
+                    ?? JitDomNodeChildProperty::$stickyChildEdgeTagName
+                    ?? JitDomNodeChildProperty::$lastFetchedTagName
+                    ?? null;
+                if (
+                    null === $expectTag
+                    || strtolower($parsedOld['tag']) === strtolower($expectTag)
+                ) {
+                    JitDomCloneNode::rememberDetachedChildMarkup($preChunks[$index]);
+                    $childVar->compileTimeDomTagName = $parsedOld['tag'];
+                    $childVar->compileTimeDomChildIndex = $index;
+                    $childVar->compileTimeDomInnerXml = $parsedOld['inner'];
+                    $childVar->compileTimeDomNodePath = null;
+
+                    return;
+                }
+            }
+        }
+
+        // SSOT already refreshed (dual-emit): synthesize from Variable/sticky tag (#35421).
+        $expectTag = $childVar->compileTimeDomTagName
+            ?? JitDomNodeChildProperty::$stickyChildEdgeTagName
+            ?? JitDomNodeChildProperty::$lastFetchedTagName
+            ?? null;
+        if (null === $expectTag || '' === $expectTag) {
+            return;
+        }
+        $inner = $childVar->compileTimeDomInnerXml ?? '';
+        $markup = '' === $inner
+            ? '<'.$expectTag.'/>'
+            : '<'.$expectTag.'>'.$inner.'</'.$expectTag.'>';
+        JitDomCloneNode::rememberDetachedChildMarkup($markup);
+        $childVar->compileTimeDomTagName = $expectTag;
+        $childVar->compileTimeDomNodePath = null;
+    }
+
+    /**
      * Drop the removed child's tag from PROP_USER_SCRIPT_INNER_XML when the
      * loadXML seed is still pure user-script (saveXML sibling fidelity).
      *
@@ -88,11 +174,13 @@ final class JitDomRemoveChild
         $index = $childVar->compileTimeDomChildIndex
             ?? JitDomNodeListItem::$lastFetchedChildIndex
             ?? JitDomNodeChildProperty::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$stickyChildEdgeChildIndex
             ?? null;
         if (null === $index) {
             $oldTag = $childVar->compileTimeDomTagName
                 ?? JitDomNodeListItem::$lastFetchedTagName
                 ?? JitDomNodeChildProperty::$lastFetchedTagName
+                ?? JitDomNodeChildProperty::$stickyChildEdgeTagName
                 ?? null;
             if (null !== $oldTag) {
                 foreach ($nodes as $i => $node) {
@@ -109,6 +197,7 @@ final class JitDomRemoveChild
             // Multi-child without proven index: leave seeded INNER_XML (do not collapse).
             return;
         }
+        // Detached markup already snapshotted in rememberDetachedChildBeforeLiveSlots (#35421).
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, '');
         if (null !== $inner) {
             $parent = self::loadObjectArg($context, $parentVar);
