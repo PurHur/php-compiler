@@ -13,9 +13,10 @@ use PHPLLVM\Value;
 /**
  * ZipArchive thin-AOT methods — open / add / close / get / locate / index / rename / delete /
  * extract / status / count / writable / archive comment / entry comment / unchange / replaceFile /
- * isCompressionMethodSupported / isEncryptionMethodSupported / setPassword / statName / statIndex
+ * isCompressionMethodSupported / isEncryptionMethodSupported / setPassword / setCompression* /
+ * statName / statIndex
  * (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35465 / #35466 / #35467 / #35472 /
- * #35476 / #35478 / #35486 / #35489 / #35491 / #35496 / #35498 / #35500 / #35504).
+ * #35476 / #35478 / #35486 / #35489 / #35491 / #35496 / #35498 / #35500 / #35504 / #35506).
  *
  * php-src: ext/zip/php_zip.c
  */
@@ -38,6 +39,10 @@ final class ZipArchiveMethod implements Call
         if ('iscompressionmethodsupported' === $lc || 'isencryptionmethodsupported' === $lc) {
             $this->paramNames = ['method', 'enc='];
             $this->namedArgsReceiverPrefix = 0;
+        } elseif ('setcompressionname' === $lc) {
+            $this->paramNames = ['name', 'method', 'compflags='];
+        } elseif ('setcompressionindex' === $lc) {
+            $this->paramNames = ['index', 'method', 'compflags='];
         }
     }
 
@@ -80,11 +85,13 @@ final class ZipArchiveMethod implements Call
             'iscompressionmethodsupported' => JitZipArchive::isCompressionMethodSupported($context, ...$args),
             'isencryptionmethodsupported' => JitZipArchive::isEncryptionMethodSupported($context, ...$args),
             'setpassword' => JitZipArchive::setPassword($context, ...$args),
+            'setcompressionname' => JitZipArchive::setCompressionName($context, ...$args),
+            'setcompressionindex' => JitZipArchive::setCompressionIndex($context, ...$args),
             'statname' => JitZipArchive::statName($context, ...$args),
             'statindex' => JitZipArchive::statIndex($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35498/#35500/#35504)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35504/#35506)'
             ),
         };
     }
