@@ -3754,6 +3754,12 @@ class Object_ extends Type {
         if ('uconverter' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmUConverter::classConstants());
         }
+        // IntlListFormatter VM class entry is linked (#28132); seed TYPE_*/WIDTH_* so
+        // ClassConstFetch folds to compile-time long (#35407 peer of #35401). Without this,
+        // thin AOT raises Undefined constant IntlListFormatter::TYPE_AND at runtime.
+        if ('intllistformatter' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlListFormatter::classConstants());
+        }
         // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
         // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
         // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
