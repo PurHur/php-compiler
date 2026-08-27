@@ -42,11 +42,15 @@ final class VmNonNumericStringArithGuard
             return false;
         }
         // string⊙string &|^ is byte-wise in zend bitwise_*_function (#32431).
-        if ($isBitwise
-            && Variable::TYPE_STRING === $left->type
-            && Variable::TYPE_STRING === $right->type
-        ) {
-            return false;
+        // STRING/VALUE pairs may still be string⊙string at runtime (#35312).
+        if ($isBitwise) {
+            $leftStrOrVal = Variable::TYPE_STRING === $left->type
+                || Variable::TYPE_VALUE === $left->type;
+            $rightStrOrVal = Variable::TYPE_STRING === $right->type
+                || Variable::TYPE_VALUE === $right->type;
+            if ($leftStrOrVal && $rightStrOrVal) {
+                return false;
+            }
         }
 
         $leftCompileBad = self::isCompileTimeNonNumericString($left);
