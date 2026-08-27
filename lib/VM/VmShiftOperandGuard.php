@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -15,27 +15,32 @@ use PHPCompiler\OpCode;
 use PHPLLVM\Builder;
 
 /**
- * SSOT for JIT shift operand guards (#30138, zend_operators.c, #9976).
+ * SSOT for JIT shift operand guards (#30138, #35308, zend_operators.c, #9976).
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitShiftOperandGuard}
  */
 final class VmShiftOperandGuard
 {
+    /**
+     * @return bool true when compile-time TypeError+abort was emitted (caller must not continue lowering)
+     */
     public static function guardOperands(
         Context $context,
         int $opCode,
         Variable $left,
         Variable $right
-    ): void {
+    ): bool {
         $message = self::compileTimeMessage($context, $opCode, $left, $right);
         if (null !== $message) {
             self::emitTypeErrorAndAbort($context, $message);
 
-            return;
+            return true;
         }
         self::guardOperand($context, $opCode, $left, $right);
         self::guardOperand($context, $opCode, $right, $left);
         ShiftOperandRuntime::guardRuntimeOperands($context, $opCode, $left, $right);
+
+        return false;
     }
 
     private static function compileTimeMessage(
@@ -189,9 +194,8 @@ final class VmShiftOperandGuard
 
     private static function emitTypeErrorAndAbort(Context $context, string $message): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        // Standalone AOT must flush pending TypeError via ExceptionBridge — raw abort()
+        // SIGABRTs with empty stderr (#35308 leftover of #30138; peer #34449/#34453).
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
     }
 }
