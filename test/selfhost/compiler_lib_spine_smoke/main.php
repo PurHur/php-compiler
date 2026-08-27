@@ -2281,6 +2281,7 @@ require_once __DIR__.'/../../../ext/sodium/SodiumConstants.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumGenerichashFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumHex2binJitHelper.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumJitHelper.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumKdfDeriveFromKeyFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumKeygenFunction.php';

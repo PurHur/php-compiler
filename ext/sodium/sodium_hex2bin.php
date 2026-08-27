@@ -8,12 +8,19 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** sodium_hex2bin() — hex to binary (php-src ext/sodium/libsodium.c; #3438, #24772). */
+/**
+ * sodium_hex2bin() — hex to binary (php-src ext/sodium/libsodium.c; #3438, #24772, #35357).
+ *
+ * JIT/AOT: NestedJIT via {@see SodiumHex2binJitHelper} / {@see JitSodium::invokeHex2bin} — no new C.
+ * Compile-time `$ignore` is peeled at the call site (NestedJIT cannot dim-fetch two strings).
+ */
 final class sodium_hex2bin extends Internal
 {
     public function __construct()
@@ -38,8 +45,6 @@ final class sodium_hex2bin extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR $string / $ignore — soft-null DEP+coerce on forward profile (#24772, reverts #20196
-        // TypeError half; match sodium_bin2hex / Zend 8.4 ext/sodium/libsodium.c).
         $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'sodium_hex2bin', 0, 'string');
         $ignore = '';
         if ($argc >= 2) {
@@ -53,6 +58,93 @@ final class sodium_hex2bin extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() JIT is not supported in this compiler build');
+        $argc = \count($args);
+        if (!$this->requireAtLeastJitArgCount($context, $args, $this->getName(), 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+        if (!$this->requireAtMostJitArgCount($context, $args, $this->getName(), 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+
+        $stringLit = null;
+        if (JITVariable::TYPE_VALUE !== $args[0]->type) {
+            $stringLit = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
+        }
+        $ignoreLit = '';
+        if ($argc >= 2 && JITVariable::TYPE_VALUE !== $args[1]->type) {
+            $ignoreLit = $args[1]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[1]);
+            if (null === $ignoreLit) {
+                $ignoreLit = null;
+            }
+        } elseif ($argc < 2) {
+            $ignoreLit = '';
+        } else {
+            $ignoreLit = null;
+        }
+        if (null !== $stringLit && null !== $ignoreLit) {
+            try {
+                $folded = VmSodium::hex2bin($stringLit, $ignoreLit);
+
+                return $context->builder->load($context->constantStringFromString($folded));
+            } catch (\SodiumException) {
+                // Invalid constant hex must throw at run time, not abort compile.
+            }
+        }
+
+        $string = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[0],
+                $this->getName(),
+                0,
+                'string'
+            )
+            : JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[0],
+                $this->getName(),
+                0,
+                'string'
+            );
+
+        // Peel compile-time ignore at the call site — NestedJIT two-string dim-fetch is broken.
+        if (null !== $ignoreLit && '' !== $ignoreLit) {
+            $len = \strlen($ignoreLit);
+            for ($i = 0; $i < $len; ++$i) {
+                $ch = $context->builder->load($context->constantStringFromString($ignoreLit[$i]));
+                $string = JitSodium::invokeStripChar($context, $string, $ch);
+            }
+
+            return JitSodium::invokeDecode($context, $string);
+        }
+
+        if (null === $ignoreLit) {
+            // Runtime ignore: peel chars via single-string NestedJIT helpers (two-string
+            // dim-fetch is broken under NestedJIT — #35357).
+            $ignore = $context->callerStrictTypes
+                ? JitStringBuiltinArg::lowerStrictOrCoercible(
+                    $context,
+                    $args[1],
+                    $this->getName(),
+                    1,
+                    'ignore'
+                )
+                : JitStringBuiltinArg::lowerTrimFamilyString(
+                    $context,
+                    $args[1],
+                    $this->getName(),
+                    1,
+                    'ignore'
+                );
+            for ($n = 0; $n < 16; ++$n) {
+                $byte = JitSodium::invokeIgnoreByte($context, $ignore);
+                $string = JitSodium::invokeStripByte($context, $string, $byte);
+                $ignore = JitSodium::invokeIgnoreRest($context, $ignore);
+            }
+
+            return JitSodium::invokeDecode($context, $string);
+        }
+
+        return JitSodium::invokeDecode($context, $string);
     }
 }
