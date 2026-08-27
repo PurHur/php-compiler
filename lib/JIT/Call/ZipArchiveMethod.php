@@ -11,8 +11,8 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * ZipArchive thin-AOT methods — open / add / close / get / locate / index / rename / delete / status
- * (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35465).
+ * ZipArchive thin-AOT methods — open / add / close / get / locate / index / rename / delete / status / count
+ * (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35465 / #35466).
  *
  * php-src: ext/zip/php_zip.c
  */
@@ -43,9 +43,10 @@ final class ZipArchiveMethod implements Call
             'deletename' => JitZipArchive::deleteName($context, ...$args),
             'deleteindex' => JitZipArchive::deleteIndex($context, ...$args),
             'getstatusstring' => JitZipArchive::getStatusString($context, ...$args),
+            'count' => JitZipArchive::count($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35437/#35440/#35449/#35450/#35455/#35465)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35437/#35440/#35449/#35450/#35455/#35465/#35466)'
             ),
         };
     }
