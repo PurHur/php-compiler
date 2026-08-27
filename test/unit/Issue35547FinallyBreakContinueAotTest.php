@@ -28,7 +28,7 @@ final class Issue35547FinallyBreakContinueAotTest extends TestCase
 
     public function testFinallyRunsOnContinueAndBreakInTry(): void
     {
-        $repro = $this->repoRoot.'/test/repro/issue_25240_aot_finally_continue.php';
+        $repro = $this->repoRoot.'/test/repro/issue_25240_aot_finally_cont_break.php';
         $this->assertFileExists($repro);
         $expected = <<<'OUT'
 B0F0F1B2F2
