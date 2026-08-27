@@ -558,28 +558,35 @@ final class ObjectInstancePropertyLlvm
             return;
         }
         if (Variable::TYPE_NATIVE_LONG === $propertyType) {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeLong'),
-                $destPtr,
-                $context->builder->load($fetched->value)
-            );
+            $longVal = $context->helper->loadValue($fetched);
+            $longTy = $context->getStringFromType($longVal->typeOf());
+            if ('int64*' === $longTy || 'long long*' === $longTy) {
+                $longVal = $context->builder->load($longVal);
+            }
+            JitValueBox::writeLong($context, $destSlot, $longVal);
 
             return;
         }
         if (Variable::TYPE_NATIVE_BOOL === $propertyType) {
-            JitValueBox::writeBool(
-                $context,
-                $destSlot,
-                $context->builder->load($fetched->value)
-            );
+            $boolVal = $context->helper->loadValue($fetched);
+            $boolTy = $context->getStringFromType($boolVal->typeOf());
+            if ('int1*' === $boolTy || 'i1*' === $boolTy) {
+                $boolVal = $context->builder->load($boolVal);
+            }
+            JitValueBox::writeBool($context, $destSlot, $boolVal);
 
             return;
         }
         if (Variable::TYPE_NATIVE_DOUBLE === $propertyType) {
+            $doubleVal = $context->helper->loadValue($fetched);
+            $doubleTy = $context->getStringFromType($doubleVal->typeOf());
+            if ('double*' === $doubleTy) {
+                $doubleVal = $context->builder->load($doubleVal);
+            }
             $context->builder->call(
                 $context->lookupFunction('__value__writeDouble'),
                 $destPtr,
-                $context->builder->load($fetched->value)
+                $doubleVal
             );
 
             return;
