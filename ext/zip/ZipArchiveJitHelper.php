@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\zip;
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
  * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500 /
- * #35504) — CREATE/add/close/get/locate/index/rename/delete/extract/status/count/
- * archive-comment/entry-comment/unchange/replaceFile/setPassword/statName/statIndex path.
+ * #35504 / #35506) — CREATE/add/close/get/locate/index/rename/delete/extract/status/count/
+ * archive-comment/entry-comment/unchange/replaceFile/setPassword/stat/setCompression path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -21,7 +21,8 @@ namespace PHPCompiler\ext\zip;
  * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
- * unchangeName / replaceFile / setPassword / statName / statIndex)
+ * unchangeName / replaceFile / setPassword / setCompressionName / setCompressionIndex /
+ * statName / statIndex)
  */
 final class ZipArchiveJitHelper
 {
@@ -70,6 +71,11 @@ final class ZipArchiveJitHelper
     /** Session password for setEncryption* (#35500 / #19873). */
     private static string $h1password = '';
 
+    /** Per-entry compression method for slots 0/1 (#35506 / #20363). CM_DEFAULT stored as CM_STORE. */
+    private static int $h1comp = 0;
+
+    private static int $h1comp2 = 0;
+
     public static function exec(string $op, int $a, int $b, string $s1, string $s2): string
     {
         if ('alloc' === $op) {
@@ -95,6 +101,8 @@ final class ZipArchiveJitHelper
             self::$h1status = 0;
             self::$h1readonly = 0;
             self::$h1password = '';
+            self::$h1comp = 0;
+            self::$h1comp2 = 0;
             self::snapSave();
 
             return self::pack($h);
@@ -118,6 +126,8 @@ final class ZipArchiveJitHelper
             self::$h1open = 0;
             self::$h1readonly = 0;
             self::$h1password = '';
+            self::$h1comp = 0;
+            self::$h1comp2 = 0;
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
                 $nlen = ord($data[26]) | (ord($data[27]) << 8);
                 $xlen = ord($data[28]) | (ord($data[29]) << 8);
@@ -229,12 +239,14 @@ final class ZipArchiveJitHelper
                 self::$h1name = $s1;
                 self::$h1data = $s2;
                 self::$h1ecomment = '';
+                self::$h1comp = 0;
             } elseif ($s1 === self::$h1name) {
                 self::$h1data = $s2;
             } elseif ('' === self::$h1name2) {
                 self::$h1name2 = $s1;
                 self::$h1data2 = $s2;
                 self::$h1ecomment2 = '';
+                self::$h1comp2 = 0;
             } elseif ($s1 === self::$h1name2) {
                 self::$h1data2 = $s2;
             } else {
@@ -260,6 +272,7 @@ final class ZipArchiveJitHelper
                 self::$h1name = $s1;
                 self::$h1data = '';
                 self::$h1ecomment = '';
+                self::$h1comp = 0;
             } elseif ($s1 === self::$h1name) {
                 self::$h1status = 10;
 
@@ -268,6 +281,7 @@ final class ZipArchiveJitHelper
                 self::$h1name2 = $s1;
                 self::$h1data2 = '';
                 self::$h1ecomment2 = '';
+                self::$h1comp2 = 0;
             } elseif ($s1 === self::$h1name2) {
                 self::$h1status = 10;
 
@@ -912,6 +926,70 @@ final class ZipArchiveJitHelper
 
             return self::pack(0);
         }
+        // setCompressionName — $a = method, $s1 = name (#35506 / zim_ZipArchive_setCompressionName).
+        // CM_DEFAULT (-1) → CM_STORE. Unsupported encode methods → ER_COMPNOTSUPP.
+        if ('cpm' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if ('' === $s1) {
+                self::$h1status = 18;
+
+                return self::pack(0);
+            }
+            if (0 !== $a && -1 !== $a) {
+                self::$h1status = 16;
+
+                return self::pack(0);
+            }
+            $normalized = -1 === $a ? 0 : $a;
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1comp = $normalized;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1comp2 = $normalized;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        // setCompressionIndex — $a = index, $b = method (#35506 / zim_ZipArchive_setCompressionIndex).
+        if ('cpi' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if (0 !== $b && -1 !== $b) {
+                self::$h1status = 16;
+
+                return self::pack(0);
+            }
+            $normalized = -1 === $b ? 0 : $b;
+            if (0 === $a && '' !== self::$h1name) {
+                self::$h1comp = $normalized;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1comp2 = $normalized;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
 
         return self::pack(0);
     }
@@ -928,12 +1006,13 @@ final class ZipArchiveJitHelper
         if ($crc < 0) {
             $crc += 0x100000000;
         }
+        $comp = 0 === $index ? self::$h1comp : self::$h1comp2;
         $payload = self::pack($index)
             .self::pack((int) $crc)
             .self::pack($size)
             .self::pack(time())
             .self::pack($size)
-            .self::pack(0)
+            .self::pack($comp)
             .self::pack(0)
             .$name;
 

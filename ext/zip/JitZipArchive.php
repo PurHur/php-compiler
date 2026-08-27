@@ -1490,6 +1490,114 @@ final class JitZipArchive
         return self::boxStatOrFalse($context, $found, $payload);
     }
 
+    /**
+     * ZipArchive::setCompressionName — NestedJIT cpm (#35506 leftover of #35500 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setCompressionName
+     * Optional $compflags accepted and ignored (VmZipArchive).
+     */
+    public static function setCompressionName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::setCompressionName', 2, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::setCompressionName',
+            0,
+            'name'
+        );
+        $method = JitLongArg::lower(
+            $context,
+            $args[2],
+            'ZipArchive::setCompressionName(): Argument #2 ($method)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        if ($method->typeOf() !== $i64) {
+            $method = $context->builder->sext($method, $i64);
+        }
+        // Empty name → ValueError in IR (#35481 peer; NestedJIT throw SIGSEGVs).
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($name, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_cpm_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_cpm_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::setCompressionName(): Argument #1 ($name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'cpm',
+            $method,
+            $zero,
+            $name,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::setCompressionIndex — NestedJIT cpi (#35506 leftover of #35500 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setCompressionIndex
+     * Optional $compflags accepted and ignored (VmZipArchive).
+     */
+    public static function setCompressionIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::setCompressionIndex', 2, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower(
+            $context,
+            $args[1],
+            'ZipArchive::setCompressionIndex(): Argument #1 ($index)'
+        );
+        $method = JitLongArg::lower(
+            $context,
+            $args[2],
+            'ZipArchive::setCompressionIndex(): Argument #2 ($method)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        if ($method->typeOf() !== $i64) {
+            $method = $context->builder->sext($method, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'cpi',
+            $index,
+            $method,
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
     public static function close(Context $context, JITVariable ...$args): Value
     {
         if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::close', 0)) {
