@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\zip;
 
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
- * #35465 / #35466 / #35467 / #35472) — CREATE/add/close/get/locate/index/rename/delete/extract/
- * status/count path.
+ * #35465 / #35466 / #35467 / #35472 / #35476) — CREATE/add/close/get/locate/index/rename/delete/
+ * extract/status/count/archive-comment path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -17,7 +17,8 @@ namespace PHPCompiler\ext\zip;
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / addFile / addEmptyDir /
  * close / getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
- * renameName / renameIndex / deleteName / deleteIndex / extractTo / count)
+ * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
+ * setArchiveComment / getArchiveComment)
  */
 final class ZipArchiveJitHelper
 {
@@ -32,6 +33,9 @@ final class ZipArchiveJitHelper
     private static string $h1name2 = '';
 
     private static string $h1data2 = '';
+
+    /** EOCD archive comment — php-src zip_set_archive_comment (#35476 / #20386). */
+    private static string $h1comment = '';
 
     private static int $h1status = 0;
 
@@ -57,6 +61,7 @@ final class ZipArchiveJitHelper
             self::$h1data = '';
             self::$h1name2 = '';
             self::$h1data2 = '';
+            self::$h1comment = '';
             self::$h1status = 0;
             self::$h1readonly = 0;
 
@@ -75,6 +80,7 @@ final class ZipArchiveJitHelper
             self::$h1data = '';
             self::$h1name2 = '';
             self::$h1data2 = '';
+            self::$h1comment = '';
             self::$h1open = 0;
             self::$h1readonly = 0;
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
@@ -103,6 +109,26 @@ final class ZipArchiveJitHelper
                     }
                     self::$h1open = 1;
                     self::$h1status = 0;
+                    // EOCD archive comment — bounded scan only (NestedJIT rejects open-ended while, #35476).
+                    self::$h1comment = '';
+                    $bi = 0;
+                    for ($bi = 0; $bi < 64; $bi++) {
+                        if ($len < 22 + $bi) {
+                            break;
+                        }
+                        $eoff = $len - 22 - $bi;
+                        $sigE = ord($data[$eoff]) | (ord($data[$eoff + 1]) << 8)
+                            | (ord($data[$eoff + 2]) << 16) | (ord($data[$eoff + 3]) << 24);
+                        if (0x06054b50 === $sigE) {
+                            $cmtLen = ord($data[$eoff + 20]) | (ord($data[$eoff + 21]) << 8);
+                            if ($cmtLen === $bi && $eoff + 22 + $cmtLen === $len) {
+                                if ($cmtLen > 0) {
+                                    self::$h1comment = substr($data, $eoff + 22, $cmtLen);
+                                }
+                            }
+                            break;
+                        }
+                    }
 
                     return self::pack($h);
                 }
@@ -446,20 +472,47 @@ final class ZipArchiveJitHelper
             }
             $clen = strlen($central);
             $llen = strlen($local);
+            $comment = self::$h1comment;
+            $cmtLen = strlen($comment);
             $eocd = chr(0x50).chr(0x4b).chr(0x05).chr(0x06)
                 .chr(0).chr(0).chr(0).chr(0)
                 .chr($countLow).chr(0).chr($countLow).chr(0)
                 .chr($clen & 255).chr(($clen >> 8) & 255).chr(($clen >> 16) & 255).chr(($clen >> 24) & 255)
                 .chr($llen & 255).chr(($llen >> 8) & 255).chr(($llen >> 16) & 255).chr(($llen >> 24) & 255)
-                .chr(0).chr(0);
+                .chr($cmtLen & 255).chr(($cmtLen >> 8) & 255)
+                .$comment;
             self::$h1open = 0;
             self::$h1name = '';
             self::$h1data = '';
             self::$h1name2 = '';
             self::$h1data2 = '';
+            self::$h1comment = '';
             self::$h1status = 0;
 
             return self::packPayload(1, $local.$central.$eocd);
+        }
+        // setArchiveComment / getArchiveComment (#35476 leftover of #35472 / #20386).
+        // Short op names — NestedJIT long string constants can mis-bind (#35476).
+        if ('sac' === $op) {
+            if (1 !== self::$h1open) {
+                throw new \ValueError('Invalid or uninitialized Zip object');
+            }
+            // Length guard omitted in NestedJIT path — Zend VM still enforces 65535 (#20386).
+            self::$h1comment = $s1;
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        if ('gac' === $op) {
+            if (1 !== self::$h1open) {
+                throw new \ValueError('Invalid or uninitialized Zip object');
+            }
+            self::$h1status = 0;
+            if ('' === self::$h1comment) {
+                return self::pack(0);
+            }
+
+            return self::packPayload(1, self::$h1comment);
         }
         if ('status' === $op) {
             return self::pack(self::$h1status);
