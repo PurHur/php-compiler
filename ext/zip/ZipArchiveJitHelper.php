@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\zip;
 
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
- * #35465 / #35466 / #35467 / #35472 / #35476) — CREATE/add/close/get/locate/index/rename/delete/
- * extract/status/count/archive-comment path.
+ * #35465 / #35466 / #35467 / #35472 / #35476 / #35486) — CREATE/add/close/get/locate/index/
+ * rename/delete/extract/status/count/archive-comment/entry-comment path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -18,7 +18,8 @@ namespace PHPCompiler\ext\zip;
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / addFile / addEmptyDir /
  * close / getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
  * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
- * setArchiveComment / getArchiveComment)
+ * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
+ * setCommentIndex / getCommentIndex)
  */
 final class ZipArchiveJitHelper
 {
@@ -36,6 +37,11 @@ final class ZipArchiveJitHelper
 
     /** EOCD archive comment — php-src zip_set_archive_comment (#35476 / #20386). */
     private static string $h1comment = '';
+
+    /** Per-entry comments for slots 0/1 (#35486 leftover of #35476 / #20386). */
+    private static string $h1ecomment = '';
+
+    private static string $h1ecomment2 = '';
 
     private static int $h1status = 0;
 
@@ -62,6 +68,8 @@ final class ZipArchiveJitHelper
             self::$h1name2 = '';
             self::$h1data2 = '';
             self::$h1comment = '';
+            self::$h1ecomment = '';
+            self::$h1ecomment2 = '';
             self::$h1status = 0;
             self::$h1readonly = 0;
 
@@ -81,6 +89,8 @@ final class ZipArchiveJitHelper
             self::$h1name2 = '';
             self::$h1data2 = '';
             self::$h1comment = '';
+            self::$h1ecomment = '';
+            self::$h1ecomment2 = '';
             self::$h1open = 0;
             self::$h1readonly = 0;
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
@@ -147,11 +157,13 @@ final class ZipArchiveJitHelper
             if ('' === self::$h1name) {
                 self::$h1name = $s1;
                 self::$h1data = $s2;
+                self::$h1ecomment = '';
             } elseif ($s1 === self::$h1name) {
                 self::$h1data = $s2;
             } elseif ('' === self::$h1name2) {
                 self::$h1name2 = $s1;
                 self::$h1data2 = $s2;
+                self::$h1ecomment2 = '';
             } elseif ($s1 === self::$h1name2) {
                 self::$h1data2 = $s2;
             } else {
@@ -176,6 +188,7 @@ final class ZipArchiveJitHelper
             if ('' === self::$h1name) {
                 self::$h1name = $s1;
                 self::$h1data = '';
+                self::$h1ecomment = '';
             } elseif ($s1 === self::$h1name) {
                 self::$h1status = 10;
 
@@ -183,6 +196,7 @@ final class ZipArchiveJitHelper
             } elseif ('' === self::$h1name2) {
                 self::$h1name2 = $s1;
                 self::$h1data2 = '';
+                self::$h1ecomment2 = '';
             } elseif ($s1 === self::$h1name2) {
                 self::$h1status = 10;
 
@@ -345,6 +359,7 @@ final class ZipArchiveJitHelper
             }
             self::$h1name = '';
             self::$h1data = '';
+            self::$h1ecomment = '';
             self::$h1status = 0;
 
             return self::pack(1);
@@ -358,6 +373,7 @@ final class ZipArchiveJitHelper
             }
             self::$h1name = '';
             self::$h1data = '';
+            self::$h1ecomment = '';
             self::$h1status = 0;
 
             return self::pack(1);
@@ -478,6 +494,8 @@ final class ZipArchiveJitHelper
             self::$h1name2 = '';
             self::$h1data2 = '';
             self::$h1comment = '';
+            self::$h1ecomment = '';
+            self::$h1ecomment2 = '';
             self::$h1status = 0;
 
             return self::packPayload(1, $local.$central.$eocd);
@@ -504,6 +522,92 @@ final class ZipArchiveJitHelper
             }
 
             return self::packPayload(1, self::$h1comment);
+        }
+        // Entry comments (#35486 leftover of #35476 / #20386) — short ops scn/gcn/sci/gci.
+        // Empty $name rejected in IR (NestedJIT throw SIGSEGVs under thin AOT — peer #35481).
+        if ('scn' === $op) {
+            if (1 !== self::$h1open || '' === $s1) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1ecomment = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1ecomment2 = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        if ('gcn' === $op) {
+            if (1 !== self::$h1open || '' === $s1) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1ecomment);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1ecomment2);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        if ('sci' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 18;
+
+                return self::pack(0);
+            }
+            if (0 === $a && '' !== self::$h1name) {
+                self::$h1ecomment = $s1;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1ecomment2 = $s1;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+        if ('gci' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 18;
+
+                return self::pack(0);
+            }
+            if (0 === $a && '' !== self::$h1name) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1ecomment);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1ecomment2);
+            }
+            self::$h1status = 18;
+
+            return self::pack(0);
         }
         if ('status' === $op) {
             return self::pack(self::$h1status);
