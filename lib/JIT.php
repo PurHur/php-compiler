@@ -1537,7 +1537,7 @@ class JIT {
      * previously lowered into another LLVM function, re-lower into {@see $func} once —
      * parent checks use {@see TryCatchHelper::sameLlvmFunction} (wrapper === is unstable; #31101).
      */
-    private function jitBranchEntryBlock(Block $branch, PHPLLVM\Value\Function_ $func): PHPLLVM\BasicBlock
+    public function jitBranchEntryBlock(Block $branch, PHPLLVM\Value\Function_ $func): PHPLLVM\BasicBlock
     {
         $this->bindBlockStorageForFunc($func);
         if ($this->context->scope->blockEntryStorage->contains($branch)) {
@@ -12148,7 +12148,14 @@ class JIT {
                     $this->context->listUnpackAssignCallerBlock = $block;
                     $this->compileBlockInternal($func, $op->block1, null, $mergeLlvm, 0, $allowRecompile, ...$args);
                     $this->context->listUnpackAssignCallerBlock = null;
-                    $targetEntry = $this->jitBranchEntryBlock($op->block1, $func);
+                    $targetEntry = JIT\TryCatchHelper::leaveBranchTarget(
+                        $this,
+                        $this->context,
+                        $func,
+                        $block,
+                        $op->block1,
+                        $args
+                    );
                     if ($this->context->inlineIncludeDepth > 0) {
                         // Use the merge block itself (not getInsertBlock — callee may be cached) (#846, #784).
                         $this->context->inlineIncludeExitBlock = $targetEntry;
@@ -12159,19 +12166,6 @@ class JIT {
                         && !$this->mergeBlockInheritsCallerLocals($op->block1)
                     ) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
-                    }
-                    if (
-                        $func instanceof PHPLLVM\Value\Function_
-                        && JIT\TryCatchHelper::deferLeaveIfNeeded(
-                            $this,
-                            $this->context,
-                            $func,
-                            $block,
-                            $op->block1,
-                            $targetEntry
-                        )
-                    ) {
-                        return $origBasicBlock;
                     }
                     $builder->branch($targetEntry);
                     return $origBasicBlock;
@@ -12596,8 +12590,22 @@ class JIT {
                             $this->compileBlockInternal($func, $firstArm, null, null, 0, false, ...$args);
                             $this->compileBlockInternal($func, $secondArm, null, null, 0, false, ...$args);
                         }
-                        $ifEntry = $this->jitBranchEntryBlock($op->block1, $func);
-                        $elseEntry = $this->jitBranchEntryBlock($op->block2, $func);
+                        $ifEntry = JIT\TryCatchHelper::leaveBranchTarget(
+                            $this,
+                            $this->context,
+                            $func,
+                            $block,
+                            $op->block1,
+                            $args
+                        );
+                        $elseEntry = JIT\TryCatchHelper::leaveBranchTarget(
+                            $this,
+                            $this->context,
+                            $func,
+                            $block,
+                            $op->block2,
+                            $args
+                        );
                         $builder->positionAtEnd($branchBlock);
                         if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                             $this->context->freeDeadVariables($func, $branchBlock, $block);
@@ -12658,32 +12666,22 @@ class JIT {
                             ?? $this->context->inlineIncludeExitBlock
                             ?? $savedIncludeExit;
                     }
-                    $ifEntry = $this->jitBranchEntryBlock($op->block1, $func);
-                    $elseEntry = $this->jitBranchEntryBlock($op->block2, $func);
-                    if ($func instanceof PHPLLVM\Value\Function_) {
-                        $ifTramp = JIT\TryCatchHelper::leaveEdgeTrampoline(
-                            $this,
-                            $this->context,
-                            $func,
-                            $block,
-                            $op->block1,
-                            $ifEntry
-                        );
-                        if (null !== $ifTramp) {
-                            $ifEntry = $ifTramp;
-                        }
-                        $elseTramp = JIT\TryCatchHelper::leaveEdgeTrampoline(
-                            $this,
-                            $this->context,
-                            $func,
-                            $block,
-                            $op->block2,
-                            $elseEntry
-                        );
-                        if (null !== $elseTramp) {
-                            $elseEntry = $elseTramp;
-                        }
-                    }
+                    $ifEntry = JIT\TryCatchHelper::leaveBranchTarget(
+                        $this,
+                        $this->context,
+                        $func,
+                        $block,
+                        $op->block1,
+                        $args
+                    );
+                    $elseEntry = JIT\TryCatchHelper::leaveBranchTarget(
+                        $this,
+                        $this->context,
+                        $func,
+                        $block,
+                        $op->block2,
+                        $args
+                    );
                     $tmpTerm = $jumpIfTestBlock->getTerminator();
                     if (
                         null !== $tmpTerm

@@ -3019,6 +3019,7 @@ class Context {
         }
         $this->registerAotDebugSourceGlobal();
         Progress::noteFunction('jit_context_compile_common_phase_seal_functions');
+        TryCatchHelper::materializeAllPendingGotoResumeHandlers($this);
         $function = $this->module->getFirstFunction();
         while (null !== $function) {
             if ($function instanceof PHPLLVM\Value\Function_) {
