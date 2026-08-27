@@ -1195,6 +1195,12 @@ final class JitDomAttributeNodeNS
                 if (null !== $args[0]->compileTimeDomAttributes) {
                     $args[0]->compileTimeDomAttributes['id'] = $valueLit;
                 }
+                // HTML htmlSetProp: creating a *new* id attr stamps ID-bearing (#23514).
+                if (null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
+                    && (null === $oldIdLit || '' === $oldIdLit)
+                ) {
+                    DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', true);
+                }
                 // Keep setIdAttribute cache in sync when setAttribute runs after a prior
                 // setIdAttribute in the same script (multi-document #29257).
                 $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
@@ -1492,6 +1498,10 @@ final class JitDomAttributeNodeNS
                     JitDomLoadXMLUserScript::removeElementFromIdMap($context, $document, $oldIdLit);
                 }
                 DomUserScriptElementCacheLlvm::clearId($context);
+                DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', false);
+                if (null !== $args[0]->compileTimeDomAttributes) {
+                    unset($args[0]->compileTimeDomAttributes['id']);
+                }
                 $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
                 if (null !== $parsed) {
                     $parsed['id'] = '';

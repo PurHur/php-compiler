@@ -42,6 +42,59 @@ final class DomParseSimpleHtmlJitHelper
     }
 
     /**
+     * True when the compile-time literal is a full {@code <html>…} document (optional doctype),
+     * even when no nested {@code id=} element exists (#23514 / re-#32996).
+     */
+    public static function isFullHtmlDocumentArgv(string $html): bool
+    {
+        $trimmed = trim($html);
+        if ('' === $trimmed || '<' !== $trimmed[0]) {
+            return false;
+        }
+        $pos = 0;
+        $len = \strlen($trimmed);
+        while ($pos < $len) {
+            if ('<' !== $trimmed[$pos]) {
+                return false;
+            }
+            if ($pos + 1 >= $len) {
+                return false;
+            }
+            $next = $trimmed[$pos + 1];
+            if ('!' === $next) {
+                $end = strpos($trimmed, '>', $pos);
+                if (false === $end) {
+                    return false;
+                }
+                $pos = $end + 1;
+                continue;
+            }
+            if ('?' === $next) {
+                $end = strpos($trimmed, '?>', $pos);
+                if (false === $end) {
+                    return false;
+                }
+                $pos = $end + 2;
+                continue;
+            }
+            if ('/' === $next) {
+                return false;
+            }
+            $gt = strpos($trimmed, '>', $pos);
+            if (false === $gt || $gt <= $pos + 1) {
+                return false;
+            }
+            $openTag = substr($trimmed, $pos + 1, $gt - $pos - 1);
+            $space = strpos($openTag, ' ');
+            $tag = strtolower(false === $space ? $openTag : substr($openTag, 0, $space));
+
+            return 'html' === $tag;
+        }
+
+        return false;
+    }
+
+    /**
      * Locate a specific id= element inside a compile-time HTML literal (#32996).
      *
      * @return array{tag: string, id: string, text: string}|null

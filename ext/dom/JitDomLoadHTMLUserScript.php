@@ -99,8 +99,12 @@ final class JitDomLoadHTMLUserScript
         if (null !== self::tryParseCompileTimeHtml($htmlArg)) {
             return true;
         }
+        if (self::hasCompileTimeFragmentLoad($htmlArg)) {
+            return true;
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($htmlArg) ?? $htmlArg->compileTimeString;
 
-        return self::hasCompileTimeFragmentLoad($htmlArg);
+        return null !== $lit && DomParseSimpleHtmlJitHelper::isFullHtmlDocumentArgv($lit);
     }
 
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -119,6 +123,10 @@ final class JitDomLoadHTMLUserScript
         if (null === $parsed) {
             if (self::hasCompileTimeFragmentLoad($args[1])) {
                 return $i1->constInt(1, false);
+            }
+            $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null !== $lit && DomParseSimpleHtmlJitHelper::isFullHtmlDocumentArgv($lit)) {
+                return self::materializeEmptyHtmlDocument($context, $args[0]);
             }
 
             return $i1->constInt(0, false);
@@ -252,14 +260,31 @@ final class JitDomLoadHTMLUserScript
     }
 
     /**
+     * Full {@code <html><body>…} without any {@code id=} — materialize html/body skeleton
+     * so getElementsByTagName('body')->item() returns the live body, not a detached remat
+     * that SIGSEGVs on appendChild after importNode (#23514 / re-#32996).
+     */
+    private static function materializeEmptyHtmlDocument(Context $context, JITVariable $receiver): Value
+    {
+        JitDomLoadXMLUserScript::markLastLoadPureUserScript();
+        $document = self::loadObjectArg($context, $receiver);
+        self::materializeAndStoreHtmlDocumentElement($context, $document, null);
+        self::pinUserScriptLoadSideEffects($context);
+
+        return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    /**
      * libxml htmlReadMemory wraps fragments in {@code <html><body>…</body></html>}.
      * Pin {@code html} as documentElement and attach the id-mapped element under body
      * so appendChild / documentElement fetch match Zend (#29487).
+     *
+     * @param null|Value $bodyChild first/last child of body; null for an empty body
      */
     private static function materializeAndStoreHtmlDocumentElement(
         Context $context,
         Value $document,
-        Value $idElement
+        ?Value $bodyChild
     ): void {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_loadhtml_us_document_element');
         $html = JitDomCreateElement::materializeElementFromLiteral($context, 'html');
@@ -285,8 +310,21 @@ final class JitDomLoadHTMLUserScript
 
         $htmlJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $html);
         $bodyJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $body);
-        $idJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $idElement);
         $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $document);
+        $nullJit = null;
+        if (null !== $bodyChild) {
+            $idJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $bodyChild);
+        } else {
+            $nullBox = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullBox);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+            $nullJit = new JITVariable(
+                $context,
+                JITVariable::TYPE_VALUE,
+                JITVariable::KIND_VALUE,
+                JitValueBox::normalizeValuePtr($context, $nullPtr)
+            );
+        }
 
         $objectType->propertyStore(
             $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCUMENT_ELEMENT),
@@ -303,11 +341,13 @@ final class JitDomLoadHTMLUserScript
             $htmlJit,
             JITVariable::TYPE_VALUE
         );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($idElement, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
-            $bodyJit,
-            JITVariable::TYPE_VALUE
-        );
+        if (null !== $bodyChild) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($bodyChild, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+                $bodyJit,
+                JITVariable::TYPE_VALUE
+            );
+        }
         $objectType->propertyStore(
             $objectType->propertySlotFor($html, self::CLASS_ELEMENT, VmDom::PROP_FIRST_CHILD),
             $bodyJit,
@@ -318,14 +358,15 @@ final class JitDomLoadHTMLUserScript
             $bodyJit,
             JITVariable::TYPE_VALUE
         );
+        $bodyFirst = null !== $bodyChild ? $idJit : $nullJit;
         $objectType->propertyStore(
             $objectType->propertySlotFor($body, self::CLASS_ELEMENT, VmDom::PROP_FIRST_CHILD),
-            $idJit,
+            $bodyFirst,
             JITVariable::TYPE_VALUE
         );
         $objectType->propertyStore(
             $objectType->propertySlotFor($body, self::CLASS_ELEMENT, VmDom::PROP_LAST_CHILD),
-            $idJit,
+            $bodyFirst,
             JITVariable::TYPE_VALUE
         );
         // Document child edges so DOMDocument::appendChild takes linkNext (#29487).
