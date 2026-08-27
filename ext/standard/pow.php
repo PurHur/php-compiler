@@ -63,6 +63,12 @@ final class pow extends Internal
 
             return $context->builder->siToFp($v, $double);
         }
+        // Numeric strings must use strtod — JitLongArg truncates "2.5" → 2 (#35344 leftover).
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            $str = $context->helper->loadValue($arg);
+
+            return JitLongArg::lowerStringToDouble($context, $str);
+        }
         $v = JitLongArg::lower($context, $arg, 'pow() argument');
 
         return $context->builder->siToFp($v, $double);

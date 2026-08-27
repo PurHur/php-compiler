@@ -291,13 +291,15 @@ final class JitPow
         JITVariable $base,
         JITVariable $exp
     ): ?Value {
-        if (null === $base->compileTimeLong || null === $exp->compileTimeLong) {
+        $baseLong = self::compileTimeIntegralLong($base);
+        $expLong = self::compileTimeIntegralLong($exp);
+        if (null === $baseLong || null === $expLong) {
             return null;
         }
         if (null !== $base->compileTimeFloat || null !== $exp->compileTimeFloat) {
             return null;
         }
-        $result = $base->compileTimeLong ** $exp->compileTimeLong;
+        $result = $baseLong ** $expLong;
         if (\is_int($result)) {
             JitValueBox::writeLong($context, $slot, $context->constantFromInteger($result));
         } else {
@@ -312,31 +314,51 @@ final class JitPow
     }
 
     /**
-     * Zend pow_function / ** operator: integer fast path only when both are known longs.
+     * Zend pow_function / ** : integer fast path when both operands are integral.
+     * Includes integer-shaped numeric strings ({@code "2"**3} → int(8)); float-shaped
+     * strings ({@code "2.5"}) stay on the float path (#35344, peer #35337).
      * Boxed TYPE_VALUE may hold floats — do not truncate via JitLongArg (#35058).
      */
     private static function preferIntegerPowPath(JITVariable $base, JITVariable $exp): bool
     {
-        if (JITVariable::TYPE_NATIVE_DOUBLE === $base->type
-            || JITVariable::TYPE_NATIVE_DOUBLE === $exp->type
-            || null !== $base->compileTimeFloat
-            || null !== $exp->compileTimeFloat) {
+        return self::isIntegerPowOperand($base) && self::isIntegerPowOperand($exp);
+    }
+
+    private static function isIntegerPowOperand(JITVariable $operand): bool
+    {
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $operand->type
+            || null !== $operand->compileTimeFloat) {
             return false;
         }
-        if (JITVariable::TYPE_OBJECT === $base->type
-            || JITVariable::TYPE_OBJECT === $exp->type
-            || JITVariable::TYPE_HASHTABLE === $base->type
-            || JITVariable::TYPE_HASHTABLE === $exp->type) {
+        if (JITVariable::TYPE_OBJECT === $operand->type
+            || JITVariable::TYPE_HASHTABLE === $operand->type) {
             return false;
         }
-        if (JITVariable::TYPE_NATIVE_LONG === $base->type
-            && JITVariable::TYPE_NATIVE_LONG === $exp->type) {
+        if (JITVariable::TYPE_NATIVE_LONG === $operand->type
+            || JITVariable::TYPE_NATIVE_BOOL === $operand->type
+            || null !== $operand->compileTimeLong) {
             return true;
         }
-        if (null !== $base->compileTimeLong && null !== $exp->compileTimeLong) {
-            return true;
+        // Compile-time integer numeric string — zend converts to IS_LONG before pow (#35344).
+        if (null !== $operand->compileTimeString) {
+            return \PHPCompiler\VM\Variable::isIntegralNumericString($operand->compileTimeString);
         }
 
         return false;
+    }
+
+    /** Compile-time long for fold — includes integral numeric strings (#35344). */
+    private static function compileTimeIntegralLong(JITVariable $operand): ?int
+    {
+        if (null !== $operand->compileTimeLong) {
+            return $operand->compileTimeLong;
+        }
+        if (null !== $operand->compileTimeString
+            && \PHPCompiler\VM\Variable::isIntegralNumericString($operand->compileTimeString)
+        ) {
+            return (int) $operand->compileTimeString;
+        }
+
+        return null;
     }
 }
