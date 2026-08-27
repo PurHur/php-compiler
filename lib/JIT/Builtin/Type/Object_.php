@@ -3730,6 +3730,12 @@ class Object_ extends Type {
         if ('intlcalendar' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlCalendar::classConstants());
         }
+        // IntlGregorianCalendar extends IntlCalendar (calendar.stub.php); seed the same FIELD_*/DOW_*
+        // table for ClassConstFetch (#35422 peer of #35389). Without this, thin AOT raises
+        // Undefined constant IntlGregorianCalendar::FIELD_YEAR at runtime.
+        if ('intlgregoriancalendar' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlCalendar::classConstants());
+        }
         // Spoofchecker Call proxies are linked (#20035); seed SINGLE_SCRIPT/INVISIBLE/… so
         // ClassConstFetch folds to compile-time long (#35396 peer of #35389). Without this,
         // thin AOT raises Undefined constant Spoofchecker::INVISIBLE at runtime.
@@ -3747,6 +3753,18 @@ class Object_ extends Type {
         // thin AOT raises Undefined constant IntlBreakIterator::DONE at runtime.
         if ('intlbreakiterator' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmBreakIterator::classConstants());
+        }
+        // IntlRuleBasedBreakIterator / IntlCodePointBreakIterator extend IntlBreakIterator
+        // (breakiterator.stub.php); seed the same DONE/WORD_* table (#35422 peer of #35401).
+        // Without this, thin AOT raises Undefined constant …::DONE at runtime.
+        if ('intlrulebasedbreakiterator' === $lcname || 'intlcodepointbreakiterator' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmBreakIterator::classConstants());
+        }
+        // IntlPartsIterator KEY_* live on the parts iterator ClassEntry (#20985); seed for
+        // ClassConstFetch (#35422 peer of #35401). Without this, thin AOT raises
+        // Undefined constant IntlPartsIterator::KEY_SEQUENTIAL at runtime.
+        if ('intlpartsiterator' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmBreakIterator::partsIteratorConstants());
         }
         // UConverter Call proxies are linked (#6171/#20770); seed REASON_*/UTF8/… so
         // ClassConstFetch folds to compile-time long (#35408 peer of #35401). Without this,
