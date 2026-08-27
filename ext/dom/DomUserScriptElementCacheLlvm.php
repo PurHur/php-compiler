@@ -93,18 +93,41 @@ final class DomUserScriptElementCacheLlvm
     /** Rekey cache after setAttribute('id', …) (#19870). */
     public static function rebindId(Context $context, string $newIdLit): void
     {
+        self::rebindIdIfElement($context, null, $newIdLit);
+    }
+
+    /**
+     * Rekey single-slot id cache only when it currently holds $element (#35321).
+     *
+     * Unconditional rebindId retargets the id string while keeping a stale element pointer,
+     * so getElementById(old) can still resolve via PROP_ELEMENT_ID_MAP and getElementById(new)
+     * can point at the wrong node after a sibling also carried id=.
+     */
+    public static function rebindIdIfElement(Context $context, ?Value $element, string $newIdLit): void
+    {
         self::ensureGlobals($context);
         $i1 = $context->getTypeFromString('int1');
+        $objPtr = $context->getTypeFromString('__object__*');
 
         $storedOk = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_OK));
         $hasStore = $context->builder->icmp(Builder::INT_EQ, $storedOk, $i1->constInt(1, false));
         $skipBlock = BasicBlockHelper::append($context, 'dom_us_rebind_skip');
+        $checkBlock = BasicBlockHelper::append($context, 'dom_us_rebind_check');
         $doBlock = BasicBlockHelper::append($context, 'dom_us_rebind_do');
         $doneBlock = BasicBlockHelper::append($context, 'dom_us_rebind_done');
-        $context->builder->branchIf($hasStore, $doBlock, $skipBlock);
+        $context->builder->branchIf($hasStore, $checkBlock, $skipBlock);
 
         $context->builder->positionAtEnd($skipBlock);
         $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($checkBlock);
+        if (null !== $element) {
+            $cachedElem = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ELEM));
+            $isReceiver = $context->builder->icmp(Builder::INT_EQ, $cachedElem, $element);
+            $context->builder->branchIf($isReceiver, $doBlock, $skipBlock);
+        } else {
+            $context->builder->branch($doBlock);
+        }
 
         $context->builder->positionAtEnd($doBlock);
         $newIdStr = $context->builder->load($context->constantStringFromString($newIdLit));
@@ -113,6 +136,9 @@ final class DomUserScriptElementCacheLlvm
             $newIdStr
         );
         $context->builder->store($ownedId, $context->module->getNamedGlobal(self::GLOBAL_ID));
+        if ('' === $newIdLit) {
+            $context->builder->store($objPtr->constNull(), $context->module->getNamedGlobal(self::GLOBAL_ELEM));
+        }
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
