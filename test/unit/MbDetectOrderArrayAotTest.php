@@ -28,8 +28,10 @@ final class MbDetectOrderArrayAotTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_detect_order.php');
-        $this->assertStringContainsString('compileTimeOrderFromNativeArray', $src);
-        $this->assertStringContainsString('compile-time string or array of string literals', $src);
+        $this->assertStringContainsString('JitMbDetectOrder::invoke', $src);
+        $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbDetectOrder.php');
+        $this->assertStringContainsString('compileTimeOrderFromNativeArray', $jit);
+        $this->assertStringContainsString('compile-time string or array of string literals', $jit);
         $this->assertStringNotContainsString(
             'JIT setter requires a compile-time string in this compiler build',
             $src
