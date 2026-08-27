@@ -2488,6 +2488,7 @@
         "ext/sodium/SodiumExtensionPolicy.php",
         "ext/sodium/SodiumFunction.php",
         "ext/sodium/SodiumGenerichashFunction.php",
+        "ext/sodium/SodiumHex2binJitHelper.php",
         "ext/sodium/SodiumJitHelper.php",
         "ext/sodium/SodiumKdfDeriveFromKeyFunction.php",
         "ext/sodium/SodiumKeygenFunction.php",
@@ -7076,6 +7077,7 @@
         "lib/JIT/MagicMethodDispatch.php",
         "lib/JIT/MagicMethodLlvm.php",
         "lib/JIT/MatchUnhandledJitHelper.php",
+        "lib/JIT/MbConvertVariablesLlvm.php",
         "lib/JIT/McjitEmbedHostEcho.php",
         "lib/JIT/McjitEmbedRuntime.php",
         "lib/JIT/MultipleIteratorZipLlvm.php",
@@ -8179,9 +8181,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7945,
+        "inventory_files": 7947,
         "excluded": 0,
-        "eligible": 7945,
+        "eligible": 7947,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
