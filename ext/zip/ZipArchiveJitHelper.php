@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 /**
- * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35450) — CREATE/add/close/get/locate/index/rename/delete path.
+ * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450) —
+ * CREATE/add/close/get/locate/index/rename/delete/status path.
  *
  * Single concurrent archive slot (scalars, not array tables): NestedJIT aborts on
  * nested-array state / refs. Sequential open→close→reopen matches php-src repros.
@@ -13,8 +14,9 @@ namespace PHPCompiler\ext\zip;
  * Result encoding: 4-byte LE int32 + optional payload (get/close). Int returns via
  * NestedJIT arrive as ptrtoint of __value__ boxes, so the ABI is string-packed.
  *
- * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / close /
- * getFromName / locateName / getFromIndex / getNameIndex / renameName / deleteName)
+ * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / addFile / close /
+ * getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
+ * renameName / deleteName)
  */
 final class ZipArchiveJitHelper
 {
@@ -90,6 +92,21 @@ final class ZipArchiveJitHelper
             self::$h1status = 0;
 
             return self::pack(1);
+        }
+        // basename for addFile default entryname (#35449) — strrpos/substr only.
+        if ('basename' === $op) {
+            $p = $s1;
+            $slash = strrpos($p, '/');
+            if (false === $slash) {
+                return self::packPayload(1, $p);
+            }
+
+            return self::packPayload(1, substr($p, $slash + 1));
+        }
+        if ('fail_noent' === $op) {
+            self::$h1status = 9;
+
+            return self::pack(0);
         }
         if ('get' === $op) {
             if (1 !== self::$h1open) {
@@ -211,6 +228,26 @@ final class ZipArchiveJitHelper
         }
         if ('status' === $op) {
             return self::pack(self::$h1status);
+        }
+        // getStatusString (#35449) — NestedJIT-safe literals only (no match / cross-class).
+        if ('status_string' === $op) {
+            $code = self::$h1status;
+            $msg = 'No error';
+            if (0 !== $code) {
+                if (9 === $code) {
+                    $msg = 'No such file';
+                } elseif (8 === $code) {
+                    $msg = 'Containing zip archive was closed';
+                } elseif (5 === $code) {
+                    $msg = 'Read error';
+                } elseif (18 === $code) {
+                    $msg = 'Invalid argument';
+                } else {
+                    $msg = 'Unknown status '.$code;
+                }
+            }
+
+            return self::packPayload(1, $msg);
         }
         if ('status_sys' === $op) {
             return self::pack(0);

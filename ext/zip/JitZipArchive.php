@@ -20,7 +20,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for ZipArchive open/add/close/get/locate/index (#35424 / #35437 / #35440).
+ * LLVM lowering for ZipArchive open/add/close/get/locate/index (#35424 / #35437 / #35440 / #35449).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -237,6 +237,88 @@ final class JitZipArchive
         self::syncProps($context, $obj, $handle);
 
         return self::boxBoolFromI64($context, $ok);
+    }
+
+    /** ZipArchive::addFile — file_get_contents in IR + NestedJIT add (#35449 leftover of #35424). */
+    public static function addFile(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::addFile', 1, 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $filepath = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::addFile',
+            0,
+            'filepath'
+        );
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $hasEntryname = isset($args[2]);
+        $entrynameArg = $empty;
+        if ($hasEntryname) {
+            $entrynameArg = JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[2],
+                'ZipArchive::addFile',
+                1,
+                'entryname'
+            );
+        }
+
+        // Probe path like open() — string contents ⇒ readable file.
+        $contentsPtr = JitFileGetContents::invoke($context, $filepath);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($contentsPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $stringTag = $i8->constInt(JITVariable::TYPE_STRING, false);
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTag);
+        $zero = $i64->constInt(0, false);
+
+        $id = (string) (++self::$serial);
+        $okBlock = BasicBlockHelper::append($context, 'zip_af_ok_'.$id);
+        $missBlock = BasicBlockHelper::append($context, 'zip_af_miss_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_af_done_'.$id);
+        $context->builder->branchIf($isString, $okBlock, $missBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $rcMiss = self::execLong($context, 'fail_noent', $handle, $zero, $empty, $empty);
+        $missTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $content = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $contentsPtr
+        );
+        if ($hasEntryname) {
+            $name = $entrynameArg;
+        } else {
+            [, $name] = self::execLongAndPayload(
+                $context,
+                'basename',
+                $handle,
+                $zero,
+                $filepath,
+                $empty
+            );
+        }
+        $rcOk = self::execLong($context, 'add', $handle, $zero, $name, $content);
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $rcPhi = $context->builder->phi($i64);
+        $rcPhi->addIncoming($rcOk, $okTail);
+        $rcPhi->addIncoming($rcMiss, $missTail);
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $rcPhi);
     }
 
     public static function getFromName(Context $context, JITVariable ...$args): Value
@@ -582,6 +664,37 @@ final class JitZipArchive
         self::syncProps($context, $obj, $handle);
 
         return self::boxBoolFromI64($context, $ok);
+    }
+
+    /** ZipArchive::getStatusString — NestedJIT status_string payload (#35449 leftover of #35424). */
+    public static function getStatusString(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::getStatusString', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        [, $msg] = self::execLongAndPayload(
+            $context,
+            'status_string',
+            $handle,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $msg
+        );
+
+        return $ptr;
     }
 
     public static function ensureHandle(Context $context, Value $obj): Value
