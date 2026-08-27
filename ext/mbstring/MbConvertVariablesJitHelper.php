@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * mb_convert_variables() NestedJIT runtime — string by-ref (#35315 leftover of #4572).
+ * mb_convert_variables() NestedJIT runtime — string leaf convert/detect (#35315 leftover #4572).
  *
- * Leaf UTF-8 / ISO-8859-1 / ASCII via {@see MbConvertEncodingJitHelper::convertArgv}.
- * Array/object by-ref remain compile-time LogicException until a NestedJIT-safe walk lands.
+ * Array/object by-ref use pure LLVM {@see \PHPCompiler\JIT\MbConvertVariablesLlvm}.
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_convert_variables)
  */
