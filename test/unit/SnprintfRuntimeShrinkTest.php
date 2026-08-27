@@ -26,7 +26,9 @@ final class SnprintfRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("'snprintf' =>", $source);
         $this->assertStringContainsString('ensureSnprintf', $source);
         $this->assertStringContainsString('#32092', $source);
-        $this->assertStringContainsString("'__phpc_host_snprintf' =>", $source);
+        $this->assertStringContainsString('ensureSyscall', $source);
+        $this->assertStringContainsString('#35457', $source);
+        $this->assertStringNotContainsString("'__phpc_host_snprintf' =>", $source);
     }
 
     public function testNumberFormatAndDateRouteSnprintfThroughEnsure(): void

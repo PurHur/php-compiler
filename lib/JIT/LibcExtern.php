@@ -7,24 +7,25 @@ namespace PHPCompiler\JIT;
 /**
  * Canonical C library extern declarations for AOT/MCJIT modules.
  *
- * Always-on table is the small MCJIT alias set (syscall / __phpc_host_*).
- * libc malloc/realloc/free are module-local via {@see ensureMallocFamily} (#32273)
- * with int8* / size_t so NestedJIT leaves cannot mint malloc.1.
+ * Always-on table is empty (#35457): leftover syscall / __phpc_host_* LLVM decls
+ * vs NestedJIT addFunction minted *.1 (#31894 / #32122). libc malloc/realloc/free
+ * are module-local via {@see ensureMallocFamily} (#32273) with int8* / size_t.
  * {@see ensureResolveStreamDecl} owns __phpc_resolve_stream after the always-on
  * drop (#32287) — StreamGlobalsJit / JitStreamLibcHandleKernel still implement the body.
+ * {@see ensureSyscall} owns syscall(2) for EMBED write trampoline; MCJIT echo uses
+ * {@see McjitEmbedHostEcho} function-pointer globals (#21124), not __phpc_host_* decls.
  */
 final class LibcExtern
 {
     public static function register(Context $context): void
     {
-        $ctx = $context->context;
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i8p = $context->getTypeFromString('int8*');
+        // Always-on table emptied (#35457). Callers still invoke register() as a no-op
+        // (HashTable / NestedJIT kernels). Unused $context kept for signature stability.
+        unset($context);
 
-        /** @var array<string, array{0: mixed, 1: bool, 2: list<mixed>}> $specs */
-        $specs = [
+        /*
+         * Historical always-on rows (comments only — do not re-add live specs).
+         */
             // malloc/realloc/free dropped (#32273): NestedJIT leaves call ensureMallocFamily
             // before lookup; MemoryManager\Native::register() does the same. Canonical i8*
             // / size_t ABI — leaves that declared void* or i64 size used to mint malloc.1
@@ -143,10 +144,10 @@ final class LibcExtern
             // stays on JitPrintf / __compiler_printf / printf_ (#3681) — not libc.
             // snprintf dropped (#32092): NestedJIT leaves call ensureSnprintf before lookup
             // (warnings/number_format/session/OB/Reflection + dec* / sprintf kernel); kernels that
-            // already declare snprintf module-locally stay as-is. EMBED MCJIT still gets
-            // __phpc_host_snprintf always-on alias (#98 / #21109 / #21124). Peer printf drop
-            // (#31706) / strlen (#32068). User-script sprintf()/printf() stay on JitPrintf /
-            // SprintfSnprintfRuntime (#31963) — not libc.
+            // already declare snprintf module-locally stay as-is. EMBED MCJIT echo uses
+            // McjitEmbedHostEcho function-pointer globals (#21124), not __phpc_host_snprintf
+            // LLVM decls (#35457). Peer printf drop (#31706) / strlen (#32068). User-script
+            // sprintf()/printf() stay on JitPrintf / SprintfSnprintfRuntime (#31963) — not libc.
             // popen/pclose/fileno dropped (#31606): JitStreamIoKernel / JitStreamSyncKernel
             // declare module-locally (peer fflush/ferror/fgets above); user-script popen/pclose
             // stay on PHP helpers (`ext/standard` + `__compiler_*`).
@@ -162,18 +163,15 @@ final class LibcExtern
             // Dead FS/string/process decls removed (#28850): ChownRuntime / StringStrspn /
             // StringStrpbrk / sync helpers own PHP or phpc_* ABIs — no lookupFunction remains.
             // libc strcspn removed (#29050): last consumer was JitParseStrUserScriptCstrKernel.
-
-            // x86_64 SYS_* trampoline — MCJIT relocates varargs libc better than write(2) (#21109)
-            'syscall' => [$i64, true, [$i64]],
-            // Host aliases — custom names so MCJIT resolves via LLVMAddSymbol (#21124, #98).
-            // php_write is ob-aware (PHPUnit ob_start / SAPI); libc write(2) is not.
-            '__phpc_host_php_write' => [$sizeT, false, [$i8p, $sizeT]],
-            '__phpc_host_snprintf' => [$i32, true, [$i8p, $sizeT, $i8p]],
-        ];
-
-        foreach ($specs as $name => [$ret, $vararg, $params]) {
-            self::ensure($context, $name, $ctx->functionType($ret, $vararg, ...$params));
-        }
+            // syscall dropped (#35457): EMBED write trampoline calls ensureSyscall before
+            // getNamedFunction (implementWriteViaHostAlias / SYS_write #21109). Leftover
+            // always-on vs NestedJIT ABI drift mints syscall.1 (#31894 / #32122).
+            // Thin hello-world AOT must not declare unused syscall(2) during init.
+            // __phpc_host_php_write / __phpc_host_snprintf dropped (#35457): no lookupFunction
+            // consumers after McjitEmbedHostEcho function-pointer globals (#21124 / #98).
+            // McjitEmbedRuntime may still LLVMAddSymbol the aliases at MCJIT bind.
+            // Leftover always-on LLVM decls vs NestedJIT addFunction mint *.1
+            // (#31894 / #32122). php-src main/SAPI.c — php_write / sapi_module.ub_write.
     }
 
     /**
@@ -337,6 +335,31 @@ final class LibcExtern
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /**
+     * Module-local syscall(2) after LibcExtern always-on drop (#35457).
+     *
+     * EMBED MCJIT write trampoline ({@see implementWriteViaHostAlias}) calls this
+     * before getNamedFunction('syscall') — SYS_write on x86_64 (#21109). Must not
+     * call lookupFunction (re-entrancy if Context later lazy-ensures). Peer:
+     * ensureExitAbort (#35428). Leftover always-on vs NestedJIT ABI drift mints
+     * syscall.1 (#31894 / #32122).
+     */
+    public static function ensureSyscall(Context $context): void
+    {
+        if (null !== $context->tryGetRegisteredFunction('syscall')) {
+            return;
+        }
+        $fn = $context->module->getNamedFunction('syscall');
+        if (null === $fn) {
+            $i64 = $context->getTypeFromString('int64');
+            $fn = $context->module->addFunction(
+                'syscall',
+                $context->context->functionType($i64, true, $i64)
+            );
+        }
+        $context->registerFunction('syscall', $fn);
     }
 
     /**
@@ -567,6 +590,7 @@ final class LibcExtern
     private static function implementWriteViaHostAlias(Context $context): void
     {
         self::ensurePosixFd($context);
+        self::ensureSyscall($context);
         $fn = $context->module->getNamedFunction('write');
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;
@@ -1097,10 +1121,5 @@ final class LibcExtern
             $fn = $context->module->addFunction($name, $fnType);
         }
         $context->registerFunction($name, $fn);
-    }
-
-    private static function ensure(Context $context, string $name, $fnType): void
-    {
-        self::ensureExternalDecl($context, $name, $fnType);
     }
 }

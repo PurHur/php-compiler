@@ -148,16 +148,18 @@ final class LibcExternDeadDeclsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureChownFamily', $source);
     }
 
-    public function testLibcExternKeepsLiveFsAndMcjitAliases(): void
+    public function testLibcExternDropsAlwaysOnMcjitHostAliases(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
         foreach (['syscall', '__phpc_host_php_write', '__phpc_host_snprintf'] as $sym) {
-            $this->assertStringContainsString(
+            $this->assertStringNotContainsString(
                 "'{$sym}' =>",
                 $source,
-                "LibcExtern must keep live {$sym} (#28850)"
+                "LibcExtern always-on table must not declare {$sym} (#35457)"
             );
         }
+        $this->assertStringContainsString('ensureSyscall', $source);
+        $this->assertStringContainsString('#35457', $source);
         $this->assertStringNotContainsString(
             "'mkstemp' =>",
             $source,
