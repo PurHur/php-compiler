@@ -13,7 +13,7 @@ use PHPLLVM\Value;
  *
  * VALUE×VALUE and native⊙VALUE used to always call {@see JitLongArg::lower}, which
  * truncates doubles (2.5×2.5 → 4). Match php-src add/mul/sub/div: promote to double
- * when either operand is a double; `/` always yields double.
+ * when either operand is a double; `/` yields int when long/long division is exact.
  */
 final class JitValueNumeric
 {
@@ -269,8 +269,14 @@ final class JitValueNumeric
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
 
-        // PHP `/` is always float (zend_div).
         if (OpCode::TYPE_DIV === $opType) {
+            $isDouble = self::valueIsDouble($context, $boxed);
+            $floatBlock = BasicBlockHelper::append($context, 'native_vbox_div_float');
+            $longBlock = BasicBlockHelper::append($context, 'native_vbox_div_long');
+            $doneBlock = BasicBlockHelper::append($context, 'native_vbox_div_done');
+            $context->builder->branchIf($isDouble, $floatBlock, $longBlock);
+
+            $context->builder->positionAtEnd($floatBlock);
             self::writeNativeLongValueFloat(
                 $context,
                 $opType,
@@ -279,6 +285,18 @@ final class JitValueNumeric
                 $nativeSide,
                 $slotPtr
             );
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($longBlock);
+            $boxedLong = JitLongArg::lower($context, $boxed, 'binary op boxed operand');
+            if ('left' === $nativeSide) {
+                JitLongDiv::writeBoxedBinary($context, $nativeLong, $boxedLong, $slotPtr);
+            } else {
+                JitLongDiv::writeBoxedBinary($context, $boxedLong, $nativeLong, $slotPtr);
+            }
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($doneBlock);
 
             return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
         }
@@ -368,31 +386,21 @@ final class JitValueNumeric
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
 
-        // `/` is always float in PHP (zend_div). Numeric strings use strtod (#32325).
-        if (OpCode::TYPE_DIV === $opType) {
-            $ld = self::valueBoxToDouble($context, $left);
-            $rd = self::valueBoxToDouble($context, $right);
-            JitNumericDivisionGuard::emitZeroDoubleDivisorGuard($context, $rd, 'Division by zero');
-            $fres = $context->builder->fdiv($ld, $rd);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeDouble'),
-                $slotPtr,
-                $fres
-            );
-
-            return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
-        }
-
-        $eitherPromote = $context->builder->or(
-            $context->builder->or(
+        $eitherPromote = OpCode::TYPE_DIV === $opType
+            ? $context->builder->or(
                 self::valueIsDouble($context, $left),
                 self::valueIsDouble($context, $right)
-            ),
-            $context->builder->or(
-                self::valueIsString($context, $left),
-                self::valueIsString($context, $right)
             )
-        );
+            : $context->builder->or(
+                $context->builder->or(
+                    self::valueIsDouble($context, $left),
+                    self::valueIsDouble($context, $right)
+                ),
+                $context->builder->or(
+                    self::valueIsString($context, $left),
+                    self::valueIsString($context, $right)
+                )
+            );
         $floatBlock = BasicBlockHelper::append($context, 'vbox_vbox_arith_float');
         $longBlock = BasicBlockHelper::append($context, 'vbox_vbox_arith_long');
         $doneBlock = BasicBlockHelper::append($context, 'vbox_vbox_arith_done');
@@ -401,7 +409,12 @@ final class JitValueNumeric
         $context->builder->positionAtEnd($floatBlock);
         $ld = self::valueBoxToDouble($context, $left);
         $rd = self::valueBoxToDouble($context, $right);
-        $fres = self::emitDoubleOp($context, $opType, $ld, $rd);
+        if (OpCode::TYPE_DIV === $opType) {
+            JitNumericDivisionGuard::emitZeroDoubleDivisorGuard($context, $rd, 'Division by zero');
+            $fres = $context->builder->fdiv($ld, $rd);
+        } else {
+            $fres = self::emitDoubleOp($context, $opType, $ld, $rd);
+        }
         $context->builder->call(
             $context->lookupFunction('__value__writeDouble'),
             $slotPtr,
@@ -413,7 +426,9 @@ final class JitValueNumeric
         // Bool boxes are TYPE_NATIVE_BOOL (2); __value__readLong returns 0 — use JitLongArg (#34678).
         $ll = JitLongArg::lower($context, $left, 'binary op left');
         $rl = JitLongArg::lower($context, $right, 'binary op right');
-        if (JitLongArithOverflow::supportsOpcode($opType)) {
+        if (OpCode::TYPE_DIV === $opType) {
+            JitLongDiv::writeBoxedBinary($context, $ll, $rl, $slotPtr);
+        } elseif (JitLongArithOverflow::supportsOpcode($opType)) {
             JitLongArithOverflow::writeBoxedBinary($context, $opType, $ll, $rl, $slotPtr);
         } else {
             $lres = self::emitLongOp($context, $opType, $ll, $rl);
@@ -462,8 +477,7 @@ final class JitValueNumeric
             case OpCode::TYPE_MUL:
                 return $context->builder->mulNoSignedWrap($left, $right);
             case OpCode::TYPE_DIV:
-                // Callers early-return DIV onto the float path (zend_div). Do not sdiv here (#31968).
-                throw new \LogicException('JitValueNumeric: int/int `/` must use emitDoubleOp');
+                throw new \LogicException('JitValueNumeric: int/int `/` must use JitLongDiv::writeBoxedBinary');
             default:
                 throw new \LogicException('JitValueNumeric: unsupported long opcode');
         }
