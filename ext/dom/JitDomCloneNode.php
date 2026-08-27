@@ -21,7 +21,9 @@ use PHPLLVM\Value;
  * ({@see JIT::propagateDomAppendChildCompileTimeTag}, #35373 / #35377 / #35386)
  * or cloneNode still aborts. importNode also stamps tag/inner/attrs (and may copy
  * compileTimeDomNodePath from the source); clone must prefer that Variable markup
- * over lastCompileTimeXml's document element (#35417 leftover of #35373). NestedJIT
+ * over lastCompileTimeXml's document element (#35417 leftover of #35373). After a
+ * loadXML mutation the Variable may still carry a pre-move child index — reject
+ * that chunk when its tag disagrees with compileTimeDomTagName (#35425). NestedJIT
  * DomRegistry clone would SIGSEGV on the returned object like importNode before the
  * user-script materialize path (#19212).
  *
@@ -29,7 +31,7 @@ use PHPLLVM\Value;
  * {@see JitDomDocumentElement::syncChildrenFromXmlPublic} so firstChild walks
  * on the clone do not SIGSEGV (#32949).
  *
- * php-src: ext/dom/node.c php_dom_clone_node → xmlDocCopyNode (#32355, #32949, #35361, #35373, #35386, #35417)
+ * php-src: ext/dom/node.c php_dom_clone_node → xmlDocCopyNode (#32355, #32949, #35361, #35373, #35386, #35417, #35425)
  */
 final class JitDomCloneNode
 {
@@ -88,10 +90,28 @@ final class JitDomCloneNode
             $index = JitDomNodeChildProperty::$lastFetchedChildIndex;
             $tagHint = $tagHint ?? JitDomNodeChildProperty::$lastFetchedTagName;
         }
+        // Mutation returns may keep compileTimeDomNodePath while ARG_SEND dropped the
+        // tag — still recover lastFetchedTagName so tag recovery can run (#35425).
+        if ((null === $tagHint || '' === $tagHint)
+            && null !== JitDomNodeChildProperty::$lastFetchedTagName
+        ) {
+            $tagHint = JitDomNodeChildProperty::$lastFetchedTagName;
+        }
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks($inner);
         if (null !== $index && isset($chunks[$index])) {
-            return self::specFromMarkup($chunks[$index], $deep);
+            $chunk = $chunks[$index];
+            // Stale pre-move index after appendChild/insertBefore (#35425): refreshed
+            // SSOT chunks no longer match compileTimeDomChildIndex. Trust the index only
+            // when tagHint is absent or the chunk tag agrees.
+            if (null === $tagHint || '' === $tagHint) {
+                return self::specFromMarkup($chunk, $deep);
+            }
+            $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($chunk);
+            if (null !== $parsed && strtolower($parsed['tag']) === strtolower($tagHint)) {
+                return self::specFromMarkup($chunk, $deep);
+            }
+            // Fall through to tag recovery.
         }
         if (null !== $tagHint && null !== $receiver->compileTimeDomChildIndex) {
             foreach ($chunks as $chunk) {

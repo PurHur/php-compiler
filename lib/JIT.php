@@ -13919,7 +13919,8 @@ class JIT {
                     );
                     $this->propagateDomAppendChildCompileTimeTag(
                         $block->getOperand($op->arg1),
-                        $callArgs
+                        $callArgs,
+                        $callOperands
                     );
                     $this->propagateDomCreateDocumentTypeCompileTimeTag(
                         $block->getOperand($op->arg1)
@@ -16876,9 +16877,13 @@ class JIT {
      * - replaceChild → `$callArgs[2]` (oldChild — NOT the new child)
      *
      * @param array<int, Variable> $callArgs
+     * @param array<int, \PHPCfg\Operand|null> $callOperands
      */
-    private function propagateDomAppendChildCompileTimeTag(Operand $result, array $callArgs): void
-    {
+    private function propagateDomAppendChildCompileTimeTag(
+        Operand $result,
+        array $callArgs,
+        array $callOperands = []
+    ): void {
         $toCall = $this->context->scope->toCall;
         $sourceIndex = null;
         if (
@@ -16901,11 +16906,76 @@ class JIT {
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
+        // ARG_SEND often drops compile-time DOM metadata on the source arg (#32903).
+        // Prefer the named local binding (e.g. `$b` from nextSibling): documentElement
+        // fetch clears lastFetched* before insertBefore runs (#35425).
+        $operand = $callOperands[$sourceIndex] ?? null;
+        if ($operand instanceof \PHPCfg\Operand) {
+            $scopeName = JIT\OperandName::resolve($operand);
+            if (null !== $scopeName && '' !== $scopeName) {
+                $resolved = $this->context->resolveRefAliasName($scopeName);
+                $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+                if ($bound instanceof Variable && $bound !== $child) {
+                    if (
+                        (null === $child->compileTimeDomTagName || '' === $child->compileTimeDomTagName)
+                        && null !== $bound->compileTimeDomTagName
+                        && '' !== $bound->compileTimeDomTagName
+                    ) {
+                        $this->syncCompileTimeDomTagName($child, $bound, true);
+                    } elseif (
+                        null !== $bound->compileTimeDomTagName
+                        && '' !== $bound->compileTimeDomTagName
+                    ) {
+                        // Binding is SSOT for the moved node — always refresh the ARG temp
+                        // so stale/empty bags do not win over nextSibling stamps (#35425).
+                        $this->syncCompileTimeDomTagName($child, $bound, true);
+                    }
+                }
+            }
+        }
+        // Fallback: lastFetched* when the receiver path never bound a named local
+        // (inline firstChild: appendChild($p->firstChild)).
+        if (
+            (null === $child->compileTimeDomTagName || '' === $child->compileTimeDomTagName)
+            && null !== \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName
+        ) {
+            $child->compileTimeDomTagName =
+                \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName;
+        }
+        if (
+            null === $child->compileTimeDomChildIndex
+            && null !== \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedChildIndex
+        ) {
+            $child->compileTimeDomChildIndex =
+                \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedChildIndex;
+        }
         $resultVar = $this->context->getVariableFromOp($result);
         // Force-sync present child metadata (result is a fresh box of the same node).
         $this->syncCompileTimeDomTagName($resultVar, $child, true);
         if (null !== $child->classUserType) {
             $resultVar->classUserType = $child->classUserType;
+        }
+        // If ARG recovery still left the result without a tag, copy from the named
+        // binding of the source arg (insertBefore return vs `$b->cloneNode`, #35425).
+        if (
+            (null === $resultVar->compileTimeDomTagName || '' === $resultVar->compileTimeDomTagName)
+            && $operand instanceof \PHPCfg\Operand
+        ) {
+            $scopeName = JIT\OperandName::resolve($operand);
+            if (null !== $scopeName && '' !== $scopeName) {
+                $resolved = $this->context->resolveRefAliasName($scopeName);
+                $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+                if (
+                    $bound instanceof Variable
+                    && null !== $bound->compileTimeDomTagName
+                    && '' !== $bound->compileTimeDomTagName
+                ) {
+                    $this->syncCompileTimeDomTagName($resultVar, $bound, true);
+                    if (null !== $bound->classUserType) {
+                        $resultVar->classUserType = $bound->classUserType;
+                    }
+                }
+            }
         }
         // replaceChild returns oldChild: a non-empty compileTimeDomAttributes snapshot
         // shadows later setAttribute updates that only refresh CreateElementAttrs /
@@ -16913,6 +16983,23 @@ class JIT {
         // (#35386). Clear the bag and keep ElementId — clone reads the side-table.
         if ($toCall instanceof JIT\Call\DomNodeReplaceChild) {
             $resultVar->compileTimeDomAttributes = null;
+        }
+        // Keep named locals ($ret = $p->insertBefore(...)) on the same Variable the
+        // call result uses — otherwise cloneNode resolves the CV binding without the
+        // tag we just stamped (peer BcMath/DatePeriod propagate, #35425).
+        $resultName = JIT\OperandName::resolve($result);
+        if (null !== $resultName && '' !== $resultName) {
+            $resolvedResult = $this->context->resolveRefAliasName($resultName);
+            if (isset($this->context->namedVariableBindings[$resolvedResult])) {
+                $named = $this->context->namedVariableBindings[$resolvedResult];
+                if ($named !== $resultVar) {
+                    $this->syncCompileTimeDomTagName($named, $resultVar, true);
+                    if (null !== $resultVar->classUserType) {
+                        $named->classUserType = $resultVar->classUserType;
+                    }
+                }
+            }
+            $this->context->bindVariableByName($resolvedResult, $resultVar);
         }
     }
 
@@ -25366,6 +25453,25 @@ class JIT {
                     return;
                 }
             }
+            // documentElement temps (:object) — same shape as appendChild (#27044 / #35425):
+            // insertBefore/replaceChild/removeChild must resolve to DomNode* Call classes so
+            // propagateDomAppendChildCompileTimeTag can stamp cloneNode metadata. Without
+            // ensureProxy here they fall through to ExternalMethod and clone the root.
+            if (
+                \in_array($methodLcEarly, ['insertbefore', 'replacechild', 'removechild'], true)
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                $proxy = 'domnode::'.$methodLcEarly;
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, $proxy);
+                if ($this->context->functionIsRegistered($proxy)) {
+                    $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                    $resolved = $this->context->resolveFunctionProxy($proxy);
+                    $this->context->scope->toCall = $resolved;
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             // documentElement temps (:object) — Element getElementsByTagName SIGABRT via RuntimeIndirect (#32454).
             if (
                 'getelementsbytagname' === $methodLcEarly
@@ -25678,15 +25784,24 @@ class JIT {
             } elseif ('replacechildren' === $methodLc && $this->context->functionIsRegistered('domnode::replacechildren')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
-            } elseif ('removechild' === $methodLc && $this->context->functionIsRegistered('domnode::removechild')) {
-                $className = 'DOMNode';
-                $declaringClassLc = 'domnode';
-            } elseif ('replacechild' === $methodLc && $this->context->functionIsRegistered('domnode::replacechild')) {
-                $className = 'DOMNode';
-                $declaringClassLc = 'domnode';
-            } elseif ('insertbefore' === $methodLc && $this->context->functionIsRegistered('domnode::insertbefore')) {
-                $className = 'DOMNode';
-                $declaringClassLc = 'domnode';
+            } elseif ('removechild' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::removechild');
+                if ($this->context->functionIsRegistered('domnode::removechild')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
+            } elseif ('replacechild' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::replacechild');
+                if ($this->context->functionIsRegistered('domnode::replacechild')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
+            } elseif ('insertbefore' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::insertbefore');
+                if ($this->context->functionIsRegistered('domnode::insertbefore')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('comparedocumentposition' === $methodLc && $this->context->functionIsRegistered('domnode::comparedocumentposition')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
@@ -26614,6 +26729,19 @@ class JIT {
             $this->context->scope->args = [$receiverVar];
 
             return;
+        }
+        // Peer #27480 / #35425: documentElement temps lose userType and would bind
+        // ExternalMethod for insertBefore/replaceChild/removeChild — cloneNode then
+        // never sees propagateDomAppendChildCompileTimeTag metadata.
+        if (\in_array($methodLc, ['insertbefore', 'replacechild', 'removechild'], true)) {
+            $forceProxy = 'domnode::'.$methodLc;
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, $forceProxy);
+            if ($this->context->functionIsRegistered($forceProxy)) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($forceProxy);
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
         }
         if ('clonenode' === $methodLc) {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::clonenode');
