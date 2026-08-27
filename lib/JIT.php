@@ -8976,6 +8976,10 @@ class JIT {
                         && $i > 0
                         && null !== $aliasOp
                         && $op->arg1 !== $op->arg2
+                        // Only when arg2 is a real ?: / ?? merge phi — bare `$a = [1]` matches
+                        // INIT_ARRAY(temp); ASSIGN(result, $a, temp) and must not forceCoalesce
+                        // (#35258 / re-#33709 leftover of #34956/#34970).
+                        && isset($this->context->coalesceMergeSlotOperands[(int) $op->arg2])
                     ) {
                         $prevOp = $block->opCodes[$i - 1];
                         if (
@@ -8987,7 +8991,7 @@ class JIT {
                             && (int) $prevOp->arg1 === $rhsSlot
                         ) {
                             // INIT_ARRAY(temp); [ADD_ARRAY_ELEMENT]*; ASSIGN(result, phi, temp)
-                            // else/true-arm of ?: when coalesce slot map is not armed (#34956/#34970).
+                            // else/true-arm of ?: (#34956/#34970).
                             $coalesceTarget = $aliasOp;
                         }
                     }
@@ -10082,11 +10086,13 @@ class JIT {
                         && null !== $nextOp->arg3
                         && (int) $nextOp->arg1 !== (int) $nextOp->arg2
                         && (int) $nextOp->arg3 === (int) $op->arg1
+                        // Require an armed coalesce phi — ordinary `$a = [1]` shares this
+                        // opcode shape and must not steal the named local (#35258 / re-#33709).
+                        && isset($this->context->coalesceMergeSlotOperands[(int) $nextOp->arg2])
                     ) {
                         // Else-arm `['x']`: INIT_ARRAY(temp) then ASSIGN(result, phiAlias, temp).
                         $phiSlot = (int) $nextOp->arg2;
-                        $phiOp = $this->context->coalesceMergeSlotOperands[$phiSlot]
-                            ?? $block->getOperand($nextOp->arg2);
+                        $phiOp = $this->context->coalesceMergeSlotOperands[$phiSlot];
                         if ($phiOp instanceof Operand) {
                             if (!$this->context->hasVariableOp($phiOp)) {
                                 $this->ensureCoalesceMergeStackSlot($phiOp);
@@ -10102,9 +10108,9 @@ class JIT {
                         ))
                     ) {
                         // Multi-element true-arm: INIT_ARRAY(temp); ADD_*; ASSIGN(_, phi, temp)
-                        // when PROPERTY_FETCH reused the phi slot (#34970).
-                        $phiOp = $this->context->coalesceMergeSlotOperands[$trailPhiSlot]
-                            ?? $block->getOperand($trailPhiSlot);
+                        // when PROPERTY_FETCH reused the phi slot (#34970). Trail helper already
+                        // requires coalesceMergeSlotOperands (#35258).
+                        $phiOp = $this->context->coalesceMergeSlotOperands[$trailPhiSlot];
                         if ($phiOp instanceof Operand) {
                             if (!$this->context->hasVariableOp($phiOp)) {
                                 $this->ensureCoalesceMergeStackSlot($phiOp);
