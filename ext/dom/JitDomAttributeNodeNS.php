@@ -1231,6 +1231,8 @@ final class JitDomAttributeNodeNS
             [, $local] = self::splitQualifiedName($qnameLit);
             $attr = self::setAttributeNsLiteralReuseOrCreate($context, $nsLit, $qnameLit, $local, $valueLit);
             JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
+            // Peer setAttribute('id', …) — setIdAttributeNS may follow (#35303).
+            JitDomSetIdAttribute::rememberSetAttributeIdValue($valueLit);
 
             return self::boxObjectResult($context, $attr);
         }

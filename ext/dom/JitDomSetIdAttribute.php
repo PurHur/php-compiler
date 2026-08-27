@@ -151,15 +151,34 @@ final class JitDomSetIdAttribute
         if (JitDomDocumentMethodKernel::shouldUse($context) && $isIdTrue) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_ns_post');
             $localLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+            $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString ?? '';
+            // loadXML open-tag stamp first; createElement+setAttributeNS stores under ns\0local
+            // (#35303). Bare getAttribute(localName) is empty for x:id and skipped the id-map.
             $elemAttrVal = self::compileTimeReceiverAttrValue($args[0], $localLit);
+            if (null === $elemAttrVal || '' === $elemAttrVal) {
+                $elemAttrVal = DomUserScriptAttributeCacheLlvm::literalValue(
+                    (string) $nsLit,
+                    (string) ($localLit ?? '')
+                );
+            }
+            if (null === $elemAttrVal || '' === $elemAttrVal) {
+                $elemAttrVal = self::$setAttributeIdValues !== []
+                    ? self::$setAttributeIdValues[\count(self::$setAttributeIdValues) - 1]
+                    : null;
+            }
             if (null !== $elemAttrVal && '' !== $elemAttrVal) {
                 $idStr = $context->builder->load($context->constantStringFromString($elemAttrVal));
                 self::storeCacheFromRuntimeIdString($context, $element, $idStr, $elemAttrVal);
             } else {
-                // getAttribute(localName) live cache — DomRegistry empty after loadXML (#33957).
-                self::storeCacheFromRuntimeGetAttribute($context, $element, $localLlvm, $localLit);
+                // NS Attr object cache — getAttribute(local) misses namespaced props (#35303).
+                self::storeCacheFromRuntimeGetAttributeNS(
+                    $context,
+                    $element,
+                    (string) $nsLit,
+                    $localLit,
+                    $localLlvm
+                );
             }
-            $nsLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString ?? '';
             if (null !== $localLit && '' !== $localLit) {
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral((string) $nsLit, $localLit, true);
             }
@@ -283,6 +302,52 @@ final class JitDomSetIdAttribute
             return;
         }
         self::storeCacheFromNestedGetAttribute($context, $element, $nameLlvm, $idLitForMap);
+    }
+
+    /**
+     * Thin-AOT getElementById cache from a namespaced Attr (#35303).
+     *
+     * {@see storeCacheFromRuntimeGetAttribute} uses getAttribute(localName), which is empty
+     * for {@code x:id="y"} — seed from the NS Attr cache object instead.
+     */
+    private static function storeCacheFromRuntimeGetAttributeNS(
+        Context $context,
+        Value $element,
+        string $namespace,
+        ?string $localLit,
+        Value $localLlvm
+    ): void {
+        if (null !== $localLit && '' !== $localLit) {
+            $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, $namespace, $localLit);
+            $objPtr = $context->getTypeFromString('__object__*');
+            $isNull = $context->builder->icmp(Builder::INT_EQ, $attr, $objPtr->constNull());
+            $miss = BasicBlockHelper::append($context, 'dom_setidns_live_miss');
+            $hit = BasicBlockHelper::append($context, 'dom_setidns_live_hit');
+            $done = BasicBlockHelper::append($context, 'dom_setidns_live_done');
+            $context->builder->branchIf($isNull, $miss, $hit);
+
+            $context->builder->positionAtEnd($miss);
+            // Last resort: non-NS getAttribute (loadXML unprefixed id= edge).
+            self::storeCacheFromNestedGetAttribute($context, $element, $localLlvm, null);
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($hit);
+            $attrClass = JitDomAttributeNodeNS::attrClassForUserScriptCache();
+            JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
+            $valueVar = $context->type->object->propertyFetch($attr, $attrClass, 'value');
+            self::storeCacheFromRuntimeIdString(
+                $context,
+                $element,
+                $context->helper->loadValue($valueVar),
+                DomUserScriptAttributeCacheLlvm::literalValue($namespace, $localLit)
+            );
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($done);
+
+            return;
+        }
+        self::storeCacheFromNestedGetAttribute($context, $element, $localLlvm, null);
     }
 
     private static function storeCacheFromNestedGetAttribute(
