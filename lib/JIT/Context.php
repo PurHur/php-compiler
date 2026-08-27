@@ -2237,6 +2237,8 @@ class Context {
             'getStream',
             'getStreamIndex',
             'getStreamName',
+            'addGlob',
+            'addPattern',
         ] as $zipMethod) {
             $this->functionProxies['ziparchive::'.strtolower($zipMethod)] = new Call\ZipArchiveMethod(
                 $zipMethod

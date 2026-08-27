@@ -69,11 +69,20 @@ final class ZipArchiveEmbedBridge
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
+        // NestedJIT ag/ap lower glob/scandir/file_get_contents/preg_match (#35537).
+        // Peer RegexIteratorFilterRuntime (#26825) / StringFsGlobVecJit (#29986).
+        StringFsGlobVecJit::implement($context);
+        StringFileGetContents::ensureLinked($context);
+        StringPregMatch::ensureLinked($context);
         JitVmHelperLink::ensureCompiled(
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#35424'
         );
+        // NestedJIT may declare ABI symbols after first ensureLinked — re-bind (#26825 peer).
+        StringFsGlobVecJit::implement($context);
+        StringFileGetContents::ensureLinked($context);
+        StringPregMatch::ensureLinked($context);
     }
 }
