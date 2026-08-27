@@ -1195,6 +1195,56 @@ final class JitUnlikeCompare
                 : $eqPhi;
             $strLongEnd = $context->builder->getInsertBlock();
             $context->builder->branch($doneBb);
+        } elseif (OpCode::TYPE_SPACESHIP === $opType) {
+            // Boxed numeric-string <=> boxed long — bypass NestedJIT spaceshipNumberString (#35317).
+            $strLongBb = BasicBlockHelper::append($context, $tag.'_sp_str_long');
+            $context->builder->positionAtEnd($preGenBb);
+            $context->builder->branchIf($strVsLong, $strLongBb, $genBb);
+
+            $context->builder->positionAtEnd($strLongBb);
+            $readStrFn = $context->lookupFunction('__value__readString');
+            $readLongFn = $context->lookupFunction('__value__readLong');
+            $strLeftBb = BasicBlockHelper::append($context, $tag.'_sp_str_left');
+            $strRightBb = BasicBlockHelper::append($context, $tag.'_sp_str_right');
+            $strLongJoin = BasicBlockHelper::append($context, $tag.'_sp_str_long_join');
+            $context->builder->branchIf($leftIsStr, $strLeftBb, $strRightBb);
+
+            $context->builder->positionAtEnd($strLeftBb);
+            $strL = $context->builder->call(
+                $readStrFn,
+                $context->builder->pointerCast($leftPtr, $readStrFn->getParam(0)->typeOf())
+            );
+            $longR = $context->builder->call(
+                $readLongFn,
+                $context->builder->pointerCast($rightPtr, $readLongFn->getParam(0)->typeOf())
+            );
+            $cmpL = \PHPCompiler\VM\VmValueCompare::spaceshipStringToNativeLong($context, $strL, $longR);
+            $strLeftEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($strLongJoin);
+
+            $context->builder->positionAtEnd($strRightBb);
+            $longL = $context->builder->call(
+                $readLongFn,
+                $context->builder->pointerCast($leftPtr, $readLongFn->getParam(0)->typeOf())
+            );
+            $strR = $context->builder->call(
+                $readStrFn,
+                $context->builder->pointerCast($rightPtr, $readStrFn->getParam(0)->typeOf())
+            );
+            $cmpR = $context->builder->sub(
+                $i64->constInt(0, false),
+                \PHPCompiler\VM\VmValueCompare::spaceshipStringToNativeLong($context, $strR, $longL)
+            );
+            $strRightEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($strLongJoin);
+
+            $context->builder->positionAtEnd($strLongJoin);
+            $cmpPhi = $context->builder->phi($i64, $tag.'_sp_str_long_phi');
+            $cmpPhi->addIncoming($cmpL, $strLeftEnd);
+            $cmpPhi->addIncoming($cmpR, $strRightEnd);
+            $strLongVal = $cmpPhi;
+            $strLongEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBb);
         } else {
             $context->builder->positionAtEnd($preGenBb);
             $context->builder->branch($genBb);
@@ -1363,6 +1413,9 @@ final class JitUnlikeCompare
         if (OpCode::TYPE_SPACESHIP === $opType) {
             $phi = $context->builder->phi($i64, $tag.'_done_phi');
             $phi->addIncoming($unlikeVal, $unlikeEnd);
+            if (null !== $strLongEnd && null !== $strLongVal) {
+                $phi->addIncoming($strLongVal, $strLongEnd);
+            }
             $phi->addIncoming($genVal, $genEnd);
 
             return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $phi);
