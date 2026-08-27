@@ -16,7 +16,8 @@ final class MbPreferredMimeNameRuntimeShrinkTest extends TestCase
     public function testMbPreferredMimeNameCompilesHelper(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MbPreferredMimeNameRuntime.php');
-        $this->assertStringContainsString('MbPreferredMimeNameJitHelper::preferredArgv', $source);
+        $this->assertStringContainsString('MbPreferredMimeNameJitHelper::assertEncodingArgv', $source);
+        $this->assertStringContainsString('MbPreferredMimeNameJitHelper::preferredMimeArgv', $source);
         $this->assertStringContainsString('/ext/mbstring/MbPreferredMimeNameJitHelper.php', $source);
     }
 
