@@ -2270,6 +2270,7 @@ require_once __DIR__.'/../../../ext/sodium/SodiumAeadDecryptFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumAeadEncryptFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumAuthFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumAuthVerifyFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumBase64JitHelper.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumBoxFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumBoxKeypairExtractFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumBoxKeypairFromFunction.php';

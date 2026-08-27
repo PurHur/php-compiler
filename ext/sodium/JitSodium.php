@@ -156,6 +156,12 @@ final class JitSodium
         return StringSodium::invokeDecodeHelper($context, $string);
     }
 
+    /** #35378 — sodium_bin2base64 NestedJIT. */
+    public static function invokeBin2base64(Context $context, Value $string, Value $id): Value
+    {
+        return StringSodium::invokeBin2base64Helper($context, $string, $id);
+    }
+
     public static function invokeStreamXor(
         Context $context,
         string $name,
