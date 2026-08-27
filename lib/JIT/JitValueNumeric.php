@@ -13,7 +13,7 @@ use PHPLLVM\Value;
  *
  * VALUE×VALUE and native⊙VALUE used to always call {@see JitLongArg::lower}, which
  * truncates doubles (2.5×2.5 → 4). Match php-src add/mul/sub/div: promote to double
- * when either operand is a double; `/` always yields double.
+ * when either operand is a double; `/` uses exact-int when both are long (#35337).
  */
 final class JitValueNumeric
 {
@@ -269,8 +269,15 @@ final class JitValueNumeric
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
 
-        // PHP `/` is always float (zend_div).
+        // Exact long÷long → IS_LONG; float operand or inexact → double (#35337).
         if (OpCode::TYPE_DIV === $opType) {
+            $isDouble = self::valueIsDouble($context, $boxed);
+            $floatBlock = BasicBlockHelper::append($context, 'native_vbox_div_float');
+            $longBlock = BasicBlockHelper::append($context, 'native_vbox_div_long');
+            $doneBlock = BasicBlockHelper::append($context, 'native_vbox_div_done');
+            $context->builder->branchIf($isDouble, $floatBlock, $longBlock);
+
+            $context->builder->positionAtEnd($floatBlock);
             self::writeNativeLongValueFloat(
                 $context,
                 $opType,
@@ -279,6 +286,18 @@ final class JitValueNumeric
                 $nativeSide,
                 $slotPtr
             );
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($longBlock);
+            $boxedLong = JitLongArg::lower($context, $boxed, 'binary op boxed operand');
+            if ('left' === $nativeSide) {
+                JitExactIntDiv::writeBoxed($context, $nativeLong, $boxedLong, $slotPtr);
+            } else {
+                JitExactIntDiv::writeBoxed($context, $boxedLong, $nativeLong, $slotPtr);
+            }
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($doneBlock);
 
             return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
         }
@@ -368,8 +387,18 @@ final class JitValueNumeric
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
 
-        // `/` is always float in PHP (zend_div). Numeric strings use strtod (#32325).
+        // Exact long÷long → IS_LONG; any double (or inexact) → double (#35337 / #32325).
         if (OpCode::TYPE_DIV === $opType) {
+            $eitherDouble = $context->builder->or(
+                self::valueIsDouble($context, $left),
+                self::valueIsDouble($context, $right)
+            );
+            $floatBlock = BasicBlockHelper::append($context, 'vbox_vbox_div_float');
+            $longBlock = BasicBlockHelper::append($context, 'vbox_vbox_div_long');
+            $doneBlock = BasicBlockHelper::append($context, 'vbox_vbox_div_done');
+            $context->builder->branchIf($eitherDouble, $floatBlock, $longBlock);
+
+            $context->builder->positionAtEnd($floatBlock);
             $ld = self::valueBoxToDouble($context, $left);
             $rd = self::valueBoxToDouble($context, $right);
             JitNumericDivisionGuard::emitZeroDoubleDivisorGuard($context, $rd, 'Division by zero');
@@ -379,6 +408,15 @@ final class JitValueNumeric
                 $slotPtr,
                 $fres
             );
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($longBlock);
+            $ll = JitLongArg::lower($context, $left, 'binary op left');
+            $rl = JitLongArg::lower($context, $right, 'binary op right');
+            JitExactIntDiv::writeBoxed($context, $ll, $rl, $slotPtr);
+            $context->builder->branch($doneBlock);
+
+            $context->builder->positionAtEnd($doneBlock);
 
             return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
         }
@@ -462,7 +500,7 @@ final class JitValueNumeric
             case OpCode::TYPE_MUL:
                 return $context->builder->mulNoSignedWrap($left, $right);
             case OpCode::TYPE_DIV:
-                // Callers early-return DIV onto the float path (zend_div). Do not sdiv here (#31968).
+                // DIV is handled by JitExactIntDiv before emitLongOp (#35337 / #31968).
                 throw new \LogicException('JitValueNumeric: int/int `/` must use emitDoubleOp');
             default:
                 throw new \LogicException('JitValueNumeric: unsupported long opcode');
