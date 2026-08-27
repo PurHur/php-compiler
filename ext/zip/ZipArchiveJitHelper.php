@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\zip;
 
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
- * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489) — CREATE/add/close/get/locate/
- * index/rename/delete/extract/status/count/archive-comment/entry-comment/unchange path.
+ * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491) — CREATE/add/close/get/
+ * locate/index/rename/delete/extract/status/count/archive-comment/entry-comment/unchange path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -19,7 +19,8 @@ namespace PHPCompiler\ext\zip;
  * close / getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
  * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
- * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive)
+ * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
+ * unchangeName)
  */
 final class ZipArchiveJitHelper
 {
@@ -723,6 +724,40 @@ final class ZipArchiveJitHelper
 
             return self::packPayload(1, self::$h1comment);
         }
+        // unchangeIndex — restore slot from open snapshot (#35491 / php-src zip_unchange).
+        if ('uci' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if (0 === $a) {
+                return self::pack(self::unchangeSlot0() ? 1 : 0);
+            }
+            if (1 === $a) {
+                return self::pack(self::unchangeSlot1() ? 1 : 0);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        // unchangeName — restore by current name (#35491 / php-src zip_unchange).
+        if ('ucn' === $op) {
+            if (1 !== self::$h1open || '' === $s1) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                return self::pack(self::unchangeSlot0() ? 1 : 0);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                return self::pack(self::unchangeSlot1() ? 1 : 0);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
 
         return self::pack(0);
     }
@@ -736,6 +771,56 @@ final class ZipArchiveJitHelper
         self::$h1snap_comment = self::$h1comment;
         self::$h1snap_ecomment = self::$h1ecomment;
         self::$h1snap_ecomment2 = self::$h1ecomment2;
+    }
+
+    /**
+     * Restore slot 0 from open snapshot. Empty snap + occupied slot ⇒ remove (added after open).
+     */
+    private static function unchangeSlot0(): bool
+    {
+        if ('' === self::$h1snap_name) {
+            if ('' === self::$h1name) {
+                self::$h1status = 9;
+
+                return false;
+            }
+            self::$h1name = '';
+            self::$h1data = '';
+            self::$h1ecomment = '';
+            self::$h1status = 0;
+
+            return true;
+        }
+        self::$h1name = self::$h1snap_name;
+        self::$h1data = self::$h1snap_data;
+        self::$h1ecomment = self::$h1snap_ecomment;
+        self::$h1status = 0;
+
+        return true;
+    }
+
+    /** Restore slot 1 from open snapshot (#35491). */
+    private static function unchangeSlot1(): bool
+    {
+        if ('' === self::$h1snap_name2) {
+            if ('' === self::$h1name2) {
+                self::$h1status = 9;
+
+                return false;
+            }
+            self::$h1name2 = '';
+            self::$h1data2 = '';
+            self::$h1ecomment2 = '';
+            self::$h1status = 0;
+
+            return true;
+        }
+        self::$h1name2 = self::$h1snap_name2;
+        self::$h1data2 = self::$h1snap_data2;
+        self::$h1ecomment2 = self::$h1snap_ecomment2;
+        self::$h1status = 0;
+
+        return true;
     }
 
     private static function pack(int $rc): string
