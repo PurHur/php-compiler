@@ -93,8 +93,9 @@ final class VmConstantJit
     private static function enumCaseVariable(Context $context, VmVariable $vm): Variable
     {
         $case = $vm->toEnumCase();
-        $classLc = strtolower(ltrim($case->enumClass->name, '\\'));
-        $classId = $context->type->object->lookup($classLc);
+        // Pass declared spelling — lookup() lowercases the key but keeps $name as display
+        // (#35332; strtolower-only sealed enum(e::A) into classIdToName before DECLARE_ENUM).
+        $classId = $context->type->object->lookup(ltrim($case->enumClass->name, '\\'));
         $caseKey = \PHPCompiler\ClassConstName::key($case->caseName);
 
         return $context->type->object->jitEnumCaseFromBacking($classId, $caseKey);

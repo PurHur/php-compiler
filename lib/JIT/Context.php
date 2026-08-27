@@ -4492,8 +4492,8 @@ class Context {
         if (null === $enumClass || '' === $caseName) {
             throw new \LogicException('Enum case constant missing class/name: '.$name);
         }
-        $classLc = strtolower(ltrim($enumClass->name, '\\'));
-        $classId = $this->type->object->lookup($classLc);
+        // Declared spelling for display name (#35332); lookup keys remain lowercase.
+        $classId = $this->type->object->lookup(ltrim($enumClass->name, '\\'));
         $caseKey = \PHPCompiler\ClassConstName::key($caseName);
         $var = $this->type->object->jitEnumCaseFromBacking($classId, $caseKey);
         $var->compileTimeConstantName = $name;

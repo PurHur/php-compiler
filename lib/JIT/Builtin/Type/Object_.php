@@ -1400,9 +1400,14 @@ class Object_ extends Type {
         }
         $lc = strtolower($name->value);
         if (isset($this->classes[$lc])) {
-            unset($this->externalOnlyClassIds[$this->classes[$lc]]);
+            $id = $this->classes[$lc];
+            unset($this->externalOnlyClassIds[$id]);
+            // Early lookup(strtolower(...)) from file-scope const rematerialize (#34783)
+            // may have sealed lowercase into classIdToName; DECLARE_* restores display
+            // spelling for get_class()/var_dump (#35332, peer #23641 / #26885).
+            $this->classIdToName[$id] = $name->value;
 
-            return $this->classes[$lc];
+            return $id;
         }
         $id = count($this->classes);
         $this->properties[$id] = [];
@@ -6453,7 +6458,7 @@ class Object_ extends Type {
             if (null === $enumClass) {
                 throw new \LogicException('Enum case property default requires enum class');
             }
-            $enumClassId = $this->lookup(strtolower($enumClass->name));
+            $enumClassId = $this->lookup(ltrim($enumClass->name, '\\'));
             $caseKey = \PHPCompiler\ClassConstName::key(EnumCaseSupport::enumCaseNameForVariable($value));
             $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
             $this->propertyDefaults[$classId][$propset[3]] = [
@@ -6508,7 +6513,7 @@ class Object_ extends Type {
             $this->defineClassConstEnumCaseRef(
                 $classId,
                 $name,
-                $this->lookup(strtolower(ltrim($case->enumClass->name, '\\'))),
+                $this->lookup(ltrim($case->enumClass->name, '\\')),
                 $case->caseName
             );
 
@@ -6543,9 +6548,13 @@ class Object_ extends Type {
         if (VMVariable::TYPE_OBJECT === $value->type) {
             $object = $value->toObject();
             if (EnumCaseSupport::isEnumCase($object)) {
-                $enumClassLc = strtolower($object->class->name);
                 $caseKey = \PHPCompiler\ClassConstName::key((string) ($object->enumCaseName ?? ''));
-                $this->defineClassConstEnumCaseRef($classId, $key, $this->lookup($enumClassLc), $caseKey);
+                $this->defineClassConstEnumCaseRef(
+                    $classId,
+                    $key,
+                    $this->lookup(ltrim($object->class->name, '\\')),
+                    $caseKey
+                );
 
                 return;
             }
