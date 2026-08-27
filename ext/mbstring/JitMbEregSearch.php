@@ -132,33 +132,8 @@ final class JitMbEregSearch
      */
     public static function foldRegexEncoding(Context $context, array $args): Value
     {
-        $argc = \count($args);
-        if ($argc > 1) {
-            throw new \ArgumentCountError(sprintf(
-                'mb_regex_encoding() expects at most 1 argument, %d given',
-                $argc
-            ));
-        }
-        if (0 === $argc
-            || (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
-        ) {
-            $enc = MbstringAotFoldState::regexEncoding($context)
-                ?? (string) MbstringState::regexEncoding();
-
-            return $context->builder->load($context->constantStringFromString($enc));
-        }
-
-        $encodingLit = JitStringArg::compileTimeLiteral($args[0]);
-        if (null === $encodingLit) {
-            throw new \LogicException(
-                'mb_regex_encoding() encoding must be a compile-time string in this compiler build'
-            );
-        }
-        $valid = MbstringEncodingRegistry::assertValid($encodingLit, 'mb_regex_encoding', 0);
-        MbstringAotFoldState::setRegexEncoding($context, $valid);
-        MbstringState::regexEncoding($valid);
-
-        return $context->getTypeFromString('int1')->constInt(1, false);
+        // Runtime + compile-time via NestedJIT module global (#35284 / peer #35221).
+        return JitMbRegexEncoding::invoke($context, $args);
     }
 
     /**

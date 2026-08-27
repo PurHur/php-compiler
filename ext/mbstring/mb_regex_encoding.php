@@ -13,7 +13,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_regex_encoding() — get/set mbregex encoding (php-src ext/mbstring/php_mbregex.c; #4635, #30781 AOT).
+ * mb_regex_encoding() — get/set mbregex encoding (php-src ext/mbstring/php_mbregex.c; #4635, #30781, #35284).
+ *
+ * JIT/AOT: compile-time fold + NestedJIT runtime via {@see JitMbRegexEncoding}.
  */
 final class mb_regex_encoding extends Internal
 {
