@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 /**
- * ZipArchive NestedJIT helper (#35424 / #35437) — CREATE/add/close/get/locate path.
+ * ZipArchive NestedJIT helper (#35424 / #35437 / #35440) — CREATE/add/close/get/locate/index path.
  *
  * Single concurrent archive slot (scalars, not array tables): NestedJIT aborts on
  * nested-array state / refs. Sequential open→close→reopen matches php-src repros.
@@ -14,7 +14,7 @@ namespace PHPCompiler\ext\zip;
  * NestedJIT arrive as ptrtoint of __value__ boxes, so the ABI is string-packed.
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / close /
- * getFromName / locateName / getFromIndex)
+ * getFromName / locateName / getFromIndex / getNameIndex)
  */
 final class ZipArchiveJitHelper
 {
@@ -124,6 +124,17 @@ final class ZipArchiveJitHelper
             self::$h1status = 0;
 
             return self::packPayload(1, self::$h1data);
+        }
+        // getNameIndex — only index 0 in the single-entry slot (#35440 leftover of #35437).
+        if ('name_index' === $op) {
+            if (1 !== self::$h1open || '' === self::$h1name || 0 !== $a) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            self::$h1status = 0;
+
+            return self::packPayload(1, self::$h1name);
         }
         if ('close' === $op) {
             if (1 !== self::$h1open) {
