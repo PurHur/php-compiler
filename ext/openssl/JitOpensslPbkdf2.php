@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\ext\standard\VmHashNative;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
@@ -21,6 +22,7 @@ use PHPLLVM\Value;
  * Compile-time literal bake (peer {@see JitOpensslCipherIvLength}): {@see VmHashNative::hashPbkdf2}
  * in the compiler process. {@see \PHPCompiler\ext\standard\JitHash::hashPbkdf2} SIGSEGVs under AOT
  * on this tree (hash_pbkdf2 itself). key_length <= 0 is catchable ValueError.
+ * Unknown digest softfail E_WARNING via {@see JitBuiltinWarning} (#35399 peer #35382).
  */
 final class JitOpensslPbkdf2
 {
@@ -61,7 +63,12 @@ final class JitOpensslPbkdf2
             return self::boxedFalse($context);
         }
 
-        if ($iterations <= 0 || !OpensslCipherRegistry::digestImplemented($algo)) {
+        if ($iterations <= 0) {
+            return self::boxedFalse($context);
+        }
+        if (!OpensslCipherRegistry::digestImplemented($algo)) {
+            JitBuiltinWarning::emit($context, 'openssl_pbkdf2(): Unknown digest algorithm');
+
             return self::boxedFalse($context);
         }
 
