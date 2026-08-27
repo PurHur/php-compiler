@@ -91,6 +91,15 @@ final class ZipArchiveJitHelper
 
     private static int $h1mtime2 = 0;
 
+    /** Per-entry opsys + external_attr for slots 0/1 (#35515 / #20363). */
+    private static int $h1opsys = 3;
+
+    private static int $h1opsys2 = 3;
+
+    private static int $h1attr = 0;
+
+    private static int $h1attr2 = 0;
+
     public static function exec(string $op, int $a, int $b, string $s1, string $s2): string
     {
         if ('alloc' === $op) {
@@ -124,6 +133,10 @@ final class ZipArchiveJitHelper
             self::$h1encpw2 = '';
             self::$h1mtime = 0;
             self::$h1mtime2 = 0;
+            self::$h1opsys = 3;
+            self::$h1opsys2 = 3;
+            self::$h1attr = 0;
+            self::$h1attr2 = 0;
             self::snapSave();
 
             return self::pack($h);
@@ -155,6 +168,10 @@ final class ZipArchiveJitHelper
             self::$h1encpw2 = '';
             self::$h1mtime = 0;
             self::$h1mtime2 = 0;
+            self::$h1opsys = 3;
+            self::$h1opsys2 = 3;
+            self::$h1attr = 0;
+            self::$h1attr2 = 0;
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
                 $nlen = ord($data[26]) | (ord($data[27]) << 8);
                 $xlen = ord($data[28]) | (ord($data[29]) << 8);
@@ -268,6 +285,8 @@ final class ZipArchiveJitHelper
                 self::$h1ecomment = '';
                 self::$h1comp = 0;
                 self::$h1mtime = 0;
+                self::$h1opsys = 3;
+                self::$h1attr = 0;
             } elseif ($s1 === self::$h1name) {
                 self::$h1data = $s2;
             } elseif ('' === self::$h1name2) {
@@ -276,6 +295,8 @@ final class ZipArchiveJitHelper
                 self::$h1ecomment2 = '';
                 self::$h1comp2 = 0;
                 self::$h1mtime2 = 0;
+                self::$h1opsys2 = 3;
+                self::$h1attr2 = 0;
             } elseif ($s1 === self::$h1name2) {
                 self::$h1data2 = $s2;
             } else {
@@ -303,6 +324,8 @@ final class ZipArchiveJitHelper
                 self::$h1ecomment = '';
                 self::$h1comp = 0;
                 self::$h1mtime = 0;
+                self::$h1opsys = 3;
+                self::$h1attr = 0;
             } elseif ($s1 === self::$h1name) {
                 self::$h1status = 10;
 
@@ -313,6 +336,8 @@ final class ZipArchiveJitHelper
                 self::$h1ecomment2 = '';
                 self::$h1comp2 = 0;
                 self::$h1mtime2 = 0;
+                self::$h1opsys2 = 3;
+                self::$h1attr2 = 0;
             } elseif ($s1 === self::$h1name2) {
                 self::$h1status = 10;
 
@@ -338,6 +363,11 @@ final class ZipArchiveJitHelper
         }
         if ('fail_noent' === $op) {
             self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        if ('fail_inval' === $op) {
+            self::$h1status = 18;
 
             return self::pack(0);
         }
@@ -631,6 +661,10 @@ final class ZipArchiveJitHelper
             self::$h1comp2 = 0;
             self::$h1mtime = 0;
             self::$h1mtime2 = 0;
+            self::$h1opsys = 3;
+            self::$h1opsys2 = 3;
+            self::$h1attr = 0;
+            self::$h1attr2 = 0;
             self::$h1status = 0;
 
             return self::packPayload(1, $local.$central.$eocd);
@@ -1114,6 +1148,40 @@ final class ZipArchiveJitHelper
                 return self::pack(1);
             }
             self::$h1status = 18;
+
+            return self::pack(0);
+        }
+
+        // setExternalAttributesName — $s1=name, $a=opsys, $b=attr (#35515 / #20363).
+        if ('ean' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if ('' === $s1) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            // opsys is 0..255; mask without signed compares NestedJIT dislikes.
+            $opsys = $a & 255;
+            $attr = $b;
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1opsys = $opsys;
+                self::$h1attr = $attr;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1opsys2 = $opsys;
+                self::$h1attr2 = $attr;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 9;
 
             return self::pack(0);
         }
