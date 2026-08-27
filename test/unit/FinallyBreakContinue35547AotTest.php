@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * AOT: continue in try must still run finally (#35547 / re-#25240).
+ * AOT: break/continue in try must run finally (Zend ZEND_BRK/ZEND_CONT, #35547 / #25240).
  *
  * @group llvm
  */
@@ -28,46 +28,54 @@ final class FinallyBreakContinue35547AotTest extends TestCase
 
     public function testContinueInTryFinallyMatchesZend(): void
     {
-        $src = <<<'PHP'
-<?php
-$out = '';
-for ($i = 0; $i < 3; $i++) {
-    try {
-        if ($i === 1) {
-            continue;
-        }
-        $out .= 'B'.$i;
-    } finally {
-        $out .= 'F'.$i;
-    }
-}
-echo $out, "\n";
-PHP;
-        $this->assertAotSourceOutput($src, "B0F0F1B2F2\n");
+        $this->assertAotFileOutput(
+            $this->repoRoot.'/test/repro/issue_25240_aot_finally_continue.php',
+            "B0F0F1B2F2\n"
+        );
     }
 
-    public function testReproFileMatchesZend(): void
+    public function testContinueRepro35547FileMatchesZend(): void
     {
         $repro = $this->repoRoot.'/test/repro/issue_35547_aot_finally_continue.php';
         $this->assertFileExists($repro);
         $this->assertAotFileOutput($repro, "B0F0F1B2F2\n");
     }
 
-    private function assertAotSourceOutput(string $source, string $expected): void
+    public function testBreakInTryFinallyMatchesZend(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'phpc_fin_leave_src_');
-        $this->assertNotFalse($path);
-        $path .= '.php';
-        file_put_contents($path, $source);
-        try {
-            $this->assertAotFileOutput($path, $expected);
-        } finally {
-            @unlink($path);
-        }
+        $this->assertAotFileOutput(
+            $this->repoRoot.'/test/repro/issue_25240_aot_finally_break.php',
+            "B0F0B1F1\n"
+        );
+    }
+
+    public function testNestedContinueRunsOuterFinally(): void
+    {
+        $this->assertAotFileOutput(
+            $this->repoRoot.'/test/repro/issue_25240_aot_finally_nested.php',
+            "B0I0O0I1O1B2I2O2\n"
+        );
+    }
+
+    public function testSequentialTryFinallyLeaveIndependent(): void
+    {
+        $this->assertAotFileOutput(
+            $this->repoRoot.'/test/repro/issue_25240_aot_finally_cont_break.php',
+            "B0F0F1B2F2\nB0F0B1F1\n"
+        );
+    }
+
+    public function testComplianceCaseMatchesZend(): void
+    {
+        $this->assertAotFileOutput(
+            $this->repoRoot.'/test/repro/issue_25240_aot_finally_compliance.php',
+            "B0F0F1B2F2\nB0F0B1F1\nB0I0O0I1O1B2I2O2\n"
+        );
     }
 
     private function assertAotFileOutput(string $path, string $expected): void
     {
+        $this->assertFileExists($path);
         $out = tempnam(sys_get_temp_dir(), 'phpc_fin_leave_aot_');
         $this->assertNotFalse($out);
         $env = $this->llvmEnv();

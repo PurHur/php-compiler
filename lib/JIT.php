@@ -12160,6 +12160,19 @@ class JIT {
                     ) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
                     }
+                    if (
+                        $func instanceof PHPLLVM\Value\Function_
+                        && JIT\TryCatchHelper::deferLeaveIfNeeded(
+                            $this,
+                            $this->context,
+                            $func,
+                            $block,
+                            $op->block1,
+                            $targetEntry
+                        )
+                    ) {
+                        return $origBasicBlock;
+                    }
                     $builder->branch($targetEntry);
                     return $origBasicBlock;
                 case OpCode::TYPE_COALESCE:
@@ -12647,6 +12660,30 @@ class JIT {
                     }
                     $ifEntry = $this->jitBranchEntryBlock($op->block1, $func);
                     $elseEntry = $this->jitBranchEntryBlock($op->block2, $func);
+                    if ($func instanceof PHPLLVM\Value\Function_) {
+                        $ifTramp = JIT\TryCatchHelper::leaveEdgeTrampoline(
+                            $this,
+                            $this->context,
+                            $func,
+                            $block,
+                            $op->block1,
+                            $ifEntry
+                        );
+                        if (null !== $ifTramp) {
+                            $ifEntry = $ifTramp;
+                        }
+                        $elseTramp = JIT\TryCatchHelper::leaveEdgeTrampoline(
+                            $this,
+                            $this->context,
+                            $func,
+                            $block,
+                            $op->block2,
+                            $elseEntry
+                        );
+                        if (null !== $elseTramp) {
+                            $elseEntry = $elseTramp;
+                        }
+                    }
                     $tmpTerm = $jumpIfTestBlock->getTerminator();
                     if (
                         null !== $tmpTerm
