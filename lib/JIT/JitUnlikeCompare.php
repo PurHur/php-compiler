@@ -1100,6 +1100,10 @@ final class JitUnlikeCompare
         );
         $needsUnlike = $context->builder->or($objVsStr, $objVsLong);
         $bothStr = $context->builder->and($leftIsStr, $rightIsStr);
+        $strVsLong = $context->builder->or(
+            $context->builder->and($leftIsStr, $rightIsLong),
+            $context->builder->and($leftIsLong, $rightIsStr)
+        );
         $tag = 'vbox_pair_'.spl_object_id($context);
         $unlikeBb = BasicBlockHelper::append($context, $tag.'_unlike');
         $preGenBb = BasicBlockHelper::append($context, $tag.'_pre_gen');
@@ -1112,11 +1116,20 @@ final class JitUnlikeCompare
 
         $bothStrEnd = null;
         $bothStrVal = null;
+        $strLongEnd = null;
+        $strLongVal = null;
         if (self::isLooseEqualOp($opType)) {
             // Two boxed IS_STRING operands: strcmp + numeric-string (Zend compare_function).
             // __value__spaceship can read stale after switch JUMPIF chains (#33800).
+            // Boxed numeric-string == boxed long must not rely on __value__spaceship
+            // (#35313) — use looseEqualStringToNativeLong (peer #35220 string×native long).
+            $strLongCheck = BasicBlockHelper::append($context, $tag.'_str_long_check');
+            $strLongBb = BasicBlockHelper::append($context, $tag.'_str_long');
             $context->builder->positionAtEnd($preGenBb);
-            $context->builder->branchIf($bothStr, $bothStrBb, $genBb);
+            $context->builder->branchIf($bothStr, $bothStrBb, $strLongCheck);
+
+            $context->builder->positionAtEnd($strLongCheck);
+            $context->builder->branchIf($strVsLong, $strLongBb, $genBb);
 
             $context->builder->positionAtEnd($bothStrBb);
             $readStr = $context->lookupFunction('__value__readString');
@@ -1137,6 +1150,50 @@ final class JitUnlikeCompare
                 ? $context->builder->xor($eq, $i1->constInt(1, false))
                 : $eq;
             $bothStrEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBb);
+
+            $context->builder->positionAtEnd($strLongBb);
+            $readStrFn = $context->lookupFunction('__value__readString');
+            $readLongFn = $context->lookupFunction('__value__readLong');
+            $strLeftBb = BasicBlockHelper::append($context, $tag.'_eq_str_left');
+            $strRightBb = BasicBlockHelper::append($context, $tag.'_eq_str_right');
+            $strLongJoin = BasicBlockHelper::append($context, $tag.'_eq_str_long_join');
+            $context->builder->branchIf($leftIsStr, $strLeftBb, $strRightBb);
+
+            $context->builder->positionAtEnd($strLeftBb);
+            $strL = $context->builder->call(
+                $readStrFn,
+                $context->builder->pointerCast($leftPtr, $readStrFn->getParam(0)->typeOf())
+            );
+            $longR = $context->builder->call(
+                $readLongFn,
+                $context->builder->pointerCast($rightPtr, $readLongFn->getParam(0)->typeOf())
+            );
+            $eqL = \PHPCompiler\VM\VmValueCompare::looseEqualStringToNativeLong($context, $strL, $longR);
+            $strLeftEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($strLongJoin);
+
+            $context->builder->positionAtEnd($strRightBb);
+            $longL = $context->builder->call(
+                $readLongFn,
+                $context->builder->pointerCast($leftPtr, $readLongFn->getParam(0)->typeOf())
+            );
+            $strR = $context->builder->call(
+                $readStrFn,
+                $context->builder->pointerCast($rightPtr, $readStrFn->getParam(0)->typeOf())
+            );
+            $eqR = \PHPCompiler\VM\VmValueCompare::looseEqualStringToNativeLong($context, $strR, $longL);
+            $strRightEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($strLongJoin);
+
+            $context->builder->positionAtEnd($strLongJoin);
+            $eqPhi = $context->builder->phi($i1, $tag.'_eq_str_long_phi');
+            $eqPhi->addIncoming($eqL, $strLeftEnd);
+            $eqPhi->addIncoming($eqR, $strRightEnd);
+            $strLongVal = OpCode::TYPE_NOT_EQUAL === $opType
+                ? $context->builder->xor($eqPhi, $i1->constInt(1, false))
+                : $eqPhi;
+            $strLongEnd = $context->builder->getInsertBlock();
             $context->builder->branch($doneBb);
         } else {
             $context->builder->positionAtEnd($preGenBb);
@@ -1314,6 +1371,9 @@ final class JitUnlikeCompare
         $phi->addIncoming($unlikeVal, $unlikeEnd);
         if (null !== $bothStrEnd && null !== $bothStrVal) {
             $phi->addIncoming($bothStrVal, $bothStrEnd);
+        }
+        if (null !== $strLongEnd && null !== $strLongVal) {
+            $phi->addIncoming($strLongVal, $strLongEnd);
         }
         $phi->addIncoming($genVal, $genEnd);
 
