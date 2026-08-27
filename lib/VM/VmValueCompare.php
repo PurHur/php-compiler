@@ -1210,9 +1210,9 @@ final class VmValueCompare
     }
 
     /**
-     * Boxed __value__ <=> native long — promote long to double when boxed is float (#34542).
+     * Boxed __value__ <=> native long — float promote (#34542); string via numeric path (#35317).
      *
-     * php-src: Zend/zend_operators.c compare_function — IS_DOUBLE vs IS_LONG.
+     * php-src: Zend/zend_operators.c compare_function — IS_DOUBLE / IS_STRING vs IS_LONG.
      */
     public static function spaceshipValueToNativeLong(
         Context $context,
@@ -1223,46 +1223,79 @@ final class VmValueCompare
             throw new \LogicException('Expected boxed __value__ operand');
         }
 
-        $isDouble = \PHPCompiler\JIT\JitValueNumeric::valueIsDouble($context, $boxed);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
         $floatBb = BasicBlockHelper::append($context, 'sp_vbox_long_float');
+        $stringCheckBb = BasicBlockHelper::append($context, 'sp_vbox_long_string_check');
+        $stringBb = BasicBlockHelper::append($context, 'sp_vbox_long_string');
         $longBb = BasicBlockHelper::append($context, 'sp_vbox_long_long');
         $doneBb = BasicBlockHelper::append($context, 'sp_vbox_long_done');
-        $context->builder->branchIf($isDouble, $floatBb, $longBb);
+        $context->builder->branchIf($isDouble, $floatBb, $stringCheckBb);
 
         $context->builder->positionAtEnd($floatBb);
         $f64 = $context->getTypeFromString('double');
         $boxedDouble = $context->builder->call(
             $context->lookupFunction('__value__readDouble'),
-            JitValueBox::valuePtrFromVariable($context, $boxed)
+            $valuePtr
         );
         $nativeDouble = $context->builder->siToFp($nativeLong, $f64);
         $floatResult = VmFloatCompare::spaceship($context, $boxedDouble, $nativeDouble);
         $floatEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
+        $context->builder->positionAtEnd($stringCheckBb);
+        $context->builder->branchIf($isString, $stringBb, $longBb);
+
+        $context->builder->positionAtEnd($stringBb);
+        // Do not readLong on IS_STRING ("10"→0 → 0<=>10→-1) (#35317 leftover of #35313).
+        $storedStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $stringResult = self::spaceshipStringToNativeLong($context, $storedStr, $nativeLong);
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
         $context->builder->positionAtEnd($longBb);
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $leftLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
         $__right = $context->builder->intCast($nativeLong, $leftLong->typeOf());
-        $longResult = self::spaceshipLongPair($context, $leftLong, $__right);
-        $i64 = $context->getTypeFromString('int64');
-        $longResult = $context->builder->intCast($longResult, $i64);
+        $longResult = $context->builder->intCast(
+            self::spaceshipLongPair($context, $leftLong, $__right),
+            $i64
+        );
         $longEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
         $phi = $context->builder->phi($i64, 'sp_vbox_long_phi');
         $phi->addIncoming($floatResult, $floatEnd);
+        $phi->addIncoming($stringResult, $stringEnd);
         $phi->addIncoming($longResult, $longEnd);
 
         return $phi;
     }
 
     /**
-     * Native long <=> boxed __value__ — promote long to double when boxed is float (#34542).
+     * Native long <=> boxed __value__ — float promote (#34542); string via numeric path (#35317).
      */
     public static function spaceshipNativeLongToValue(
         Context $context,
@@ -1273,40 +1306,146 @@ final class VmValueCompare
             throw new \LogicException('Expected boxed __value__ operand');
         }
 
-        $isDouble = \PHPCompiler\JIT\JitValueNumeric::valueIsDouble($context, $boxed);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
         $floatBb = BasicBlockHelper::append($context, 'sp_long_vbox_float');
+        $stringCheckBb = BasicBlockHelper::append($context, 'sp_long_vbox_string_check');
+        $stringBb = BasicBlockHelper::append($context, 'sp_long_vbox_string');
         $longBb = BasicBlockHelper::append($context, 'sp_long_vbox_long');
         $doneBb = BasicBlockHelper::append($context, 'sp_long_vbox_done');
-        $context->builder->branchIf($isDouble, $floatBb, $longBb);
+        $context->builder->branchIf($isDouble, $floatBb, $stringCheckBb);
 
         $context->builder->positionAtEnd($floatBb);
         $f64 = $context->getTypeFromString('double');
         $boxedDouble = $context->builder->call(
             $context->lookupFunction('__value__readDouble'),
-            JitValueBox::valuePtrFromVariable($context, $boxed)
+            $valuePtr
         );
         $nativeDouble = $context->builder->siToFp($nativeLong, $f64);
         $floatResult = VmFloatCompare::spaceship($context, $nativeDouble, $boxedDouble);
         $floatEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
+        $context->builder->positionAtEnd($stringCheckBb);
+        $context->builder->branchIf($isString, $stringBb, $longBb);
+
+        $context->builder->positionAtEnd($stringBb);
+        $storedStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $stringResult = $context->builder->sub(
+            $i64->constInt(0, false),
+            self::spaceshipStringToNativeLong($context, $storedStr, $nativeLong)
+        );
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
         $context->builder->positionAtEnd($longBb);
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $rightLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
         $__left = $context->builder->intCast($nativeLong, $rightLong->typeOf());
-        $longResult = self::spaceshipLongPair($context, $__left, $rightLong);
-        $i64 = $context->getTypeFromString('int64');
-        $longResult = $context->builder->intCast($longResult, $i64);
+        $longResult = $context->builder->intCast(
+            self::spaceshipLongPair($context, $__left, $rightLong),
+            $i64
+        );
         $longEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
         $phi = $context->builder->phi($i64, 'sp_long_vbox_phi');
         $phi->addIncoming($floatResult, $floatEnd);
+        $phi->addIncoming($stringResult, $stringEnd);
         $phi->addIncoming($longResult, $longEnd);
+
+        return $phi;
+    }
+
+    /**
+     * Native __string__* <=> native long (Zend compare_function numeric-string path).
+     *
+     * Peer {@see looseEqualStringToNativeLong} (#35220). Used by #35317 so NestedJIT
+     * {@see CompareJitHelperScalars::spaceshipNumberString} is not required for the hot path.
+     */
+    public static function spaceshipStringToNativeLong(
+        Context $context,
+        Value $strPtr,
+        Value $nativeLong
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $f64 = $context->getTypeFromString('double');
+        $__native = $context->builder->intCast($nativeLong, $i64);
+        $isIntegerNumeric = self::stringIsIntegerNumeric($context, $strPtr);
+        $isNumeric = self::stringIsNumeric($context, $strPtr);
+        $isFloatNumeric = $context->builder->and(
+            $isNumeric,
+            $context->builder->not($isIntegerNumeric)
+        );
+
+        $intBb = BasicBlockHelper::append($context, 'sp_str_long_int');
+        $floatCheckBb = BasicBlockHelper::append($context, 'sp_str_long_float_check');
+        $floatBb = BasicBlockHelper::append($context, 'sp_str_long_float');
+        $nonNumBb = BasicBlockHelper::append($context, 'sp_str_long_nonnum');
+        $doneBb = BasicBlockHelper::append($context, 'sp_str_long_done');
+        $context->builder->branchIf($isIntegerNumeric, $intBb, $floatCheckBb);
+
+        $context->builder->positionAtEnd($intBb);
+        $map = $context->structFieldMap['__string__'];
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $i8p = $context->getTypeFromString('int8*');
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'sp_str_long_strtol_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        LibcExtern::ensureStrtolDecl($context);
+        $parsed = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $parsedI64 = $parsed->typeOf() === $i64 ? $parsed : $context->builder->zExt($parsed, $i64);
+        $intResult = self::spaceshipLongPair($context, $parsedI64, $__native);
+        $intEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($floatCheckBb);
+        $context->builder->branchIf($isFloatNumeric, $floatBb, $nonNumBb);
+
+        $context->builder->positionAtEnd($floatBb);
+        $strDouble = self::stringToDouble($context, $strPtr);
+        $nativeDouble = $context->builder->sitofp($__native, $f64);
+        $floatResult = VmFloatCompare::spaceship($context, $strDouble, $nativeDouble);
+        $floatEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($nonNumBb);
+        // Non-numeric / empty: treat string as 0 (legacy NestedJIT spaceshipNumberString empty path).
+        $nonNumResult = self::spaceshipLongPair($context, $i64->constInt(0, false), $__native);
+        $nonNumEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i64, 'sp_str_long_phi');
+        $phi->addIncoming($intResult, $intEnd);
+        $phi->addIncoming($floatResult, $floatEnd);
+        $phi->addIncoming($nonNumResult, $nonNumEnd);
 
         return $phi;
     }

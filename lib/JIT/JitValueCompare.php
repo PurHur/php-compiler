@@ -272,6 +272,14 @@ final class JitValueCompare
         return VmValueCompare::boolFromSpaceshipCmp($context, $opcodeType, $cmp);
     }
 
+    public static function spaceshipStringToNativeLong(
+        Context $context,
+        Value $strPtr,
+        Value $nativeLong
+    ): Value {
+        return VmValueCompare::spaceshipStringToNativeLong($context, $strPtr, $nativeLong);
+    }
+
     public static function looseEqualStringToNativeLong(
         Context $context,
         Value $strPtr,
