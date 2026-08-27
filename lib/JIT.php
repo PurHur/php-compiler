@@ -16957,11 +16957,18 @@ class JIT {
     }
 
     /**
-     * Stamp childNodes->item(N) compile-time index for thin-AOT replaceChild InnerXml (#32903).
+     * Stamp childNodes / getElementsByTagName item(N) compile-time index for thin-AOT (#32903).
      *
      * LiveSlots already refresh held pins (#32784); saveXML still reads PROP_USER_SCRIPT_INNER_XML.
      * Without this index, {@see \PHPCompiler\ext\dom\JitDomReplaceChild} leaves seeded InnerXml
      * unchanged so serialization keeps the replaced sibling.
+     *
+     * getElementsByTagName()->item($N) is the Nth **tag match**, not childNodes[$N]. Using the
+     * raw NodeList index as {@see JIT\Variable::$compileTimeDomChildIndex} stamped tag `a` for
+     * `getElementsByTagName('b')->item(0)` and setIdAttribute registered id `x` on `<b>` (#35433
+     * re-#33957). Prefer {@see \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedChildIndex}
+     * (mapped in {@see \PHPCompiler\ext\dom\JitDomNodeListItem::rememberTagListItemChildIndex},
+     * #34780).
      *
      * @param array<int, Variable> $callArgs
      */
@@ -16996,17 +17003,34 @@ class JIT {
             return;
         }
         $resultVar = $this->context->getVariableFromOp($result);
-        $resultVar->compileTimeDomChildIndex = $index;
+        // rememberCompileTimeChildIndex already ran in DomNodeListItem::invoke — use its
+        // tag-list → direct-child mapping when present (#35433 / #34780).
+        $resolvedIndex = \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedChildIndex;
+        $resolvedTag = \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedTagName;
+        if (null !== $resolvedIndex) {
+            $resultVar->compileTimeDomChildIndex = $resolvedIndex;
+        }
+        // Nested getElementsByTagName match: lastFetchedChildIndex is null — do not poison
+        // with the NodeList index (that made setIdAttribute read sibling 0's attrs; #35433).
         // Thin AOT materializes NodeList::item elements like firstChild (#32315).
         // Without classUserType, `$list->item(0)->hasAttributeNS(...)` ExternalMethod-nulls
         // even when loadXML seeded the Attr cache (#34618).
         $resultVar->classUserType = 'DOMElement';
+        if (null !== $resolvedTag && '' !== $resolvedTag) {
+            $resultVar->compileTimeDomTagName = $resolvedTag;
+        }
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
-                $this->context->namedVariableBindings[$resolved]->classUserType = 'DOMElement';
-                $this->context->namedVariableBindings[$resolved]->compileTimeDomChildIndex = $index;
+                $bound = $this->context->namedVariableBindings[$resolved];
+                $bound->classUserType = 'DOMElement';
+                if (null !== $resolvedIndex) {
+                    $bound->compileTimeDomChildIndex = $resolvedIndex;
+                }
+                if (null !== $resolvedTag && '' !== $resolvedTag) {
+                    $bound->compileTimeDomTagName = $resolvedTag;
+                }
             }
             $this->context->bindVariableByName($resolved, $resultVar);
         }
@@ -17018,13 +17042,39 @@ class JIT {
         ) {
             return;
         }
-        $nodes = \PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
-        if (!isset($nodes[$index]) || 'element' !== ($nodes[$index]['kind'] ?? null)) {
+        if (null === $resolvedIndex) {
             return;
         }
-        $tag = $nodes[$index]['data'] ?? null;
+        $nodes = \PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        if (!isset($nodes[$resolvedIndex]) || 'element' !== ($nodes[$resolvedIndex]['kind'] ?? null)) {
+            return;
+        }
+        $tag = $nodes[$resolvedIndex]['data'] ?? null;
         if (null !== $tag && '' !== $tag && null === $resultVar->compileTimeDomTagName) {
             $resultVar->compileTimeDomTagName = $tag;
+        }
+        // Open-tag attrs for setIdAttribute / getAttribute on the item() result (#35433).
+        $open = $nodes[$resolvedIndex]['open'] ?? null;
+        if (null === $open || '' === $open || !\is_string($open)) {
+            return;
+        }
+        $attrs = [];
+        foreach (\PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open) as $pair) {
+            $attrs[$pair['qname']] = $pair['value'];
+            $pos = strpos($pair['qname'], ':');
+            if (false !== $pos) {
+                $attrs[substr($pair['qname'], $pos + 1)] = $pair['value'];
+            }
+        }
+        if ([] === $attrs) {
+            return;
+        }
+        $resultVar->compileTimeDomAttributes = $attrs;
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->compileTimeDomAttributes = $attrs;
+            }
         }
     }
 
