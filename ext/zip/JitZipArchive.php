@@ -24,7 +24,8 @@ use PHPLLVM\Value;
 
 /**
  * LLVM lowering for ZipArchive open/add/close/get/locate/index/rename/extract/comment
- * (#35424 / #35437 / #35440 / #35449 / #35450 / #35465 / #35467 / #35472 / #35476 / #35486).
+ * /isCompressionMethodSupported/isEncryptionMethodSupported
+ * (#35424 / #35437 / #35440 / #35449 / #35450 / #35465 / #35467 / #35472 / #35476 / #35486 / #35498).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -1571,6 +1572,129 @@ final class JitZipArchive
         self::syncProps($context, $obj, $handle);
 
         return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::isCompressionMethodSupported — static pure IR (#35498 leftover of #35478 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_isCompressionMethodSupported
+     * Pure-PHP ZipEngine: CM_STORE / CM_DEFAULT only (enc ignored).
+     */
+    public static function isCompressionMethodSupported(Context $context, JITVariable ...$args): Value
+    {
+        if (!self::requireStaticArgCountRange(
+            $context,
+            $args,
+            'ZipArchive::isCompressionMethodSupported',
+            1,
+            2
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $method = JitLongArg::lower(
+            $context,
+            $args[0],
+            'ZipArchive::isCompressionMethodSupported(): Argument #1 ($method)'
+        );
+        // Optional $enc is accepted and ignored (php-src / VmZipArchive).
+        $i64 = $context->getTypeFromString('int64');
+        $isStore = $context->builder->icmp(
+            Builder::INT_EQ,
+            $method,
+            $i64->constInt(ZipArchiveConstants::CM_STORE, false)
+        );
+        $isDefault = $context->builder->icmp(
+            Builder::INT_EQ,
+            $method,
+            $i64->constInt(ZipArchiveConstants::CM_DEFAULT, true)
+        );
+        $ok = $context->builder->or($isStore, $isDefault);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $ok);
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * ZipArchive::isEncryptionMethodSupported — static pure IR (#35498 leftover of #35478 / #20378).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_isEncryptionMethodSupported
+     * Pure-PHP ZipEngine: EM_NONE / TRAD_PKWARE / AES_128/192/256 (enc ignored).
+     */
+    public static function isEncryptionMethodSupported(Context $context, JITVariable ...$args): Value
+    {
+        if (!self::requireStaticArgCountRange(
+            $context,
+            $args,
+            'ZipArchive::isEncryptionMethodSupported',
+            1,
+            2
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $method = JitLongArg::lower(
+            $context,
+            $args[0],
+            'ZipArchive::isEncryptionMethodSupported(): Argument #1 ($method)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $ok = $context->builder->icmp(
+            Builder::INT_EQ,
+            $method,
+            $i64->constInt(ZipArchiveConstants::EM_NONE, false)
+        );
+        foreach ([
+            ZipArchiveConstants::EM_TRAD_PKWARE,
+            ZipArchiveConstants::EM_AES_128,
+            ZipArchiveConstants::EM_AES_192,
+            ZipArchiveConstants::EM_AES_256,
+        ] as $code) {
+            $eq = $context->builder->icmp(
+                Builder::INT_EQ,
+                $method,
+                $i64->constInt($code, false)
+            );
+            $ok = $context->builder->or($ok, $eq);
+        }
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $ok);
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * Static ZipArchive method argc — no implicit $this (peer PDO::getAvailableDrivers / #35498).
+     *
+     * @param JITVariable[] $args
+     */
+    private static function requireStaticArgCountRange(
+        Context $context,
+        array $args,
+        string $function,
+        int $minimum,
+        int $maximum
+    ): bool {
+        $given = \count($args);
+        if ($given < $minimum) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                VmClassMethod::atLeastUserArgCountMessage($function, $minimum, $given)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
+
+            return false;
+        }
+        if ($given > $maximum) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                VmClassMethod::atMostUserArgCountMessage($function, $maximum, $given)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, $function.'_argc_cont');
+
+            return false;
+        }
+
+        return true;
     }
 
     public static function ensureHandle(Context $context, Value $obj): Value
