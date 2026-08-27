@@ -1171,6 +1171,7 @@ final class JitDomAttributeNodeNS
             if ('xmlns' === $nameLit) {
                 return self::boxBoolResult($context, true);
             }
+            $hadIdAttr = 'id' === $nameLit && DomUserScriptAttributeCacheLlvm::hasPresentLiteral('', 'id');
             $oldIdLit = 'id' === $nameLit ? self::compileTimePriorIdLiteral($args[0], $nameLit) : null;
             $attr = self::setAttributeLiteralReuseOrCreate($context, $nameLit, $valueLit);
             // Live NamedNodeMap pins/length (#33128).
@@ -1197,9 +1198,10 @@ final class JitDomAttributeNodeNS
                 }
                 // HTML htmlSetProp: creating a *new* id attr stamps ID-bearing (#23514).
                 if (null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
-                    && (null === $oldIdLit || '' === $oldIdLit)
+                    && !$hadIdAttr
                 ) {
                     DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', true);
+                    DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, true);
                 }
                 // Keep setIdAttribute cache in sync when setAttribute runs after a prior
                 // setIdAttribute in the same script (multi-document #29257).
@@ -1499,6 +1501,7 @@ final class JitDomAttributeNodeNS
                 }
                 DomUserScriptElementCacheLlvm::clearId($context);
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', false);
+                DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, false);
                 if (null !== $args[0]->compileTimeDomAttributes) {
                     unset($args[0]->compileTimeDomAttributes['id']);
                 }

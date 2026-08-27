@@ -152,6 +152,36 @@ final class DomUserScriptAttributeCacheLlvm
         unset($state);
     }
 
+    /** Module-global runtime isId bearing for empty-NS {@code id} (user functions; #23514). */
+    public static function storeIdBearingGlobal(Context $context, bool $isId): void
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $context->builder->store(
+            $i1->constInt($isId ? 1 : 0, false),
+            self::idBearingGlobal($context)
+        );
+    }
+
+    public static function loadIdBearingGlobal(Context $context): Value
+    {
+        return $context->builder->load(self::idBearingGlobal($context));
+    }
+
+    private static function idBearingGlobal(Context $context): Value
+    {
+        $module = $context->module;
+        $name = '__phpc_dom_us_attr_id_is_bearing';
+        $existing = $module->getNamedGlobal($name);
+        if (null !== $existing) {
+            return $existing;
+        }
+        $i1 = $context->getTypeFromString('int1');
+        $global = $module->addGlobal($i1, $name);
+        $global->setInitializer($i1->constInt(0, false));
+
+        return $global;
+    }
+
     /** @var array<string, true> */
     private static array $pendingIdBearing = [];
 

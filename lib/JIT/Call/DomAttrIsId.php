@@ -33,6 +33,10 @@ final class DomAttrIsId implements Call
         }
         $key = JitDomAttrRename::lastFetchedKey();
         if (null !== $key) {
+            $active = $context->activeFunction;
+            if ('' !== $active && !str_starts_with($active, '__') && '' === $key[0] && 'id' === $key[1]) {
+                return DomUserScriptAttributeCacheLlvm::loadIdBearingGlobal($context);
+            }
             $bearing = DomUserScriptAttributeCacheLlvm::isIdBearingLiteral($key[0], $key[1]);
 
             return $context->getTypeFromString('int1')->constInt($bearing ? 1 : 0, false);
