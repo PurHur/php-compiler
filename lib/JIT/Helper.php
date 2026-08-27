@@ -249,8 +249,14 @@ return_string:
         if (null !== $unlike) {
             return $unlike;
         }
+        // Non-numeric string/object << >>: zend_type_error (#30138); standalone must use
+        // ExceptionBridge abort flush — raw abort SIGABRTs silent (#35308).
         if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
-            JitShiftOperandGuard::guardOperands($this->context, $opcode->type, $left, $right);
+            if (JitShiftOperandGuard::guardOperands($this->context, $opcode->type, $left, $right)) {
+                return $this->nativeLongResultVariable(
+                    $this->context->getTypeFromString('int64')->constInt(0, false)
+                );
+            }
         }
         if (OpCode::TYPE_BITWISE_AND === $opcode->type
             || OpCode::TYPE_BITWISE_OR === $opcode->type

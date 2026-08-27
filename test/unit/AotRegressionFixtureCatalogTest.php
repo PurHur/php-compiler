@@ -163,6 +163,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'dom/dom_hasattr_bool_33762.phpt',
         'dom/dom_getattrnode_false_33773.phpt',
         'filter_var_sanitize_full_special_chars.phpt',
+        'string_shift_typeerror_35308.phpt',
     ];
 
     /**
