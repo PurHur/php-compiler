@@ -2282,7 +2282,7 @@ final class BuiltinParamNames
             case 'substr_count':
                 return ['haystack', 'needle', 'offset=', 'length='];
             case 'substr_compare':
-                return ['haystack', 'needle', 'offset', 'length', 'case_insensitive'];
+                return ['haystack', 'needle', 'offset', 'length=', 'case_insensitive='];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/repl/start (#23183)
             // length = null optional (#23588)
             case 'substr_replace':
