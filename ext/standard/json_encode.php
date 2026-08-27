@@ -93,8 +93,8 @@ final class json_encode extends Internal
         \PHPCompiler\JIT\JsonEncodeDepthLlvm::resetForEncode($context, $depthVal);
         // Arrays / stdClass with literal props before string fold — object temps stash
         // class names in compileTimeString (#26872) and would fold to "\"stdClass\"" (#28638).
-        // Skip fold when $depth is runtime-unknown — baked 512 would ignore the arg (#34544).
-        // Skip fold when $flags is runtime-unknown — baked 0 drops JSON_PRETTY_PRINT|… (#35339).
+        // Skip fold when $depth or $flags is runtime-unknown — baking 512 or flags=0 ignores
+        // the arg (#34544, #35339: JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES must not fold as 0).
         $arrayLiteral = null;
         if (null !== $knownDepth && null !== $knownFlags) {
             $arrayLiteral = JitJsonEncodeCompileTime::tryEncode(

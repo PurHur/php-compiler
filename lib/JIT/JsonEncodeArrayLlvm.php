@@ -90,12 +90,26 @@ final class JsonEncodeArrayLlvm
         $closeList = $context->builder->load($context->constantStringFromString(']'));
         $comma = $context->builder->load($context->constantStringFromString(','));
         $colon = $context->builder->load($context->constantStringFromString(':'));
+        // JSON_PRETTY_PRINT — VmJsonFormat parity; compile-time fold misses runtime OR combos (#35339).
+        $isPretty = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->and($flags, $i64->constInt(VmJsonFlags::PRETTY_PRINT, false)),
+            $i64->constInt(0, false)
+        );
+        $colonPretty = $context->builder->load($context->constantStringFromString(': '));
+        $colon = $context->builder->select($isPretty, $colonPretty, $colon);
+        $commaPretty = $context->builder->load($context->constantStringFromString(",\n    "));
+        $commaSep = $context->builder->select($isPretty, $commaPretty, $comma);
+        $openSuffix = $context->builder->load($context->constantStringFromString("\n    "));
+        $closePrefix = $context->builder->load($context->constantStringFromString("\n"));
 
         $open = $context->builder->select($packed, $openList, $openAssoc);
         $close = $context->builder->select($packed, $closeList, $closeAssoc);
+        $openWithSuffix = JitStringConcat::concat($context, $open, $openSuffix);
+        $openStored = $context->builder->select($isPretty, $openWithSuffix, $open);
 
         $accSlot = BasicBlockHelper::entryAlloca($context, $strPtr);
-        $context->builder->store($open, $accSlot);
+        $context->builder->store($openStored, $accSlot);
         $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $needCommaSlot = BasicBlockHelper::entryAlloca($context, $i1);
         $context->builder->store($i1->constInt(0, false), $needCommaSlot);
@@ -117,7 +131,7 @@ final class JsonEncodeArrayLlvm
         $acc = $context->builder->load($accSlot);
         $withComma = $context->builder->select(
             $needComma,
-            JitStringConcat::concat($context, $acc, $comma),
+            JitStringConcat::concat($context, $acc, $commaSep),
             $acc
         );
 
@@ -202,7 +216,13 @@ final class JsonEncodeArrayLlvm
 
         $context->builder->positionAtEnd($done);
         $accFinal = $context->builder->load($accSlot);
-        $closed = JitStringConcat::concat($context, $accFinal, $close);
+        $closedCompact = JitStringConcat::concat($context, $accFinal, $close);
+        $closedPretty = JitStringConcat::concat(
+            $context,
+            JitStringConcat::concat($context, $accFinal, $closePrefix),
+            $close
+        );
+        $closed = $context->builder->select($isPretty, $closedPretty, $closedCompact);
         JsonEncodeDepthLlvm::leave($context);
         $doneEnd = $context->builder->getInsertBlock();
         $context->builder->branch($merge);
