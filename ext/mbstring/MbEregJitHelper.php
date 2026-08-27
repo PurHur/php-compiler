@@ -14,7 +14,7 @@ use PHPCompiler\VM\HashTable;
  * {@see VmMbstring::eregReplace()}
  * php-src: ext/mbstring/php_mbregex.c — PHP_FUNCTION(mb_ereg) / mb_ereg_match / mb_ereg_replace
  *
- * {@see self::$lastMatch} pairs match argv with {@see lastRegistersHt()} for future &$regs (#33811).
+ * {@see self::$lastMatch} pairs match argv with {@see lastRegistersHt()} for &$regs (#33811 / #35297).
  */
 final class MbEregJitHelper
 {
@@ -31,7 +31,7 @@ final class MbEregJitHelper
         return self::matchArgv($pattern, $string, true, 'mb_eregi');
     }
 
-    /** Reserved for &$regs lowering once by-ref FUNCCALL IR is fixed (#33811). */
+    /** By-ref $regs after {@see eregMatchArgv} / {@see eregiMatchArgv} (#35297). */
     public static function lastRegistersHt(): HashTable
     {
         $out = self::$lastMatch ?? ['matched' => false, 'registers' => []];

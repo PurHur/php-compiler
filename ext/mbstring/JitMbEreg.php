@@ -20,17 +20,17 @@ use PHPLLVM\Value;
 
 /**
  * LLVM lowering for mb_ereg() / mb_eregi() / mb_ereg_match() / mb_ereg*_replace() /
- * mb_split() via MbEregJitHelper / MbSplitJitHelper (#33811, #34389, #34391).
+ * mb_split() via MbEregJitHelper / MbSplitJitHelper (#33811, #34389, #34391, #35297).
  *
  * Compile-time fold stays in {@see JitMbEregSearch}; runtime uses NestedJIT helper calls
- * (peer {@see JitMbStrSplit} / #26870). &$regs write deferred — 3-arg FUNCCALL IR (#33811).
+ * (peer {@see JitMbStrSplit} / #26870). 3-arg &$regs via {@see MbEregJitHelper::lastRegistersHt()}.
  *
  * php-src: ext/mbstring/php_mbregex.c
  */
 final class JitMbEreg
 {
     /**
-     * mb_ereg() / mb_eregi() — runtime pattern/string (2-arg path; &$regs follow-up).
+     * mb_ereg() / mb_eregi() — runtime pattern/string; optional &$regs (#35297 leftover #33811).
      *
      * @param list<JITVariable> $args
      */
@@ -56,6 +56,10 @@ final class JitMbEreg
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         }
+        BasicBlockHelper::ensureOpenInsertBlock(
+            $context,
+            $caseInsensitive ? 'mb_eregi_runtime' : 'mb_ereg_runtime'
+        );
 
         $matchFn = $caseInsensitive
             ? MbEregRuntime::eregiMatchHelper($context)
@@ -66,7 +70,32 @@ final class JitMbEreg
             [$pattern, $string]
         );
 
+        if (\count($args) >= 3) {
+            self::writeEregRegistersRuntime($context, $args[2]);
+        }
+
         return self::boolBoxFromI64($context, $matchedRaw);
+    }
+
+    /**
+     * Store MbEregJitHelper::$lastMatch into by-ref $regs (peer JitPregMatchEx / #35297).
+     */
+    private static function writeEregRegistersRuntime(Context $context, JITVariable $regsArg): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_ereg_regs_write');
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            MbEregRuntime::lastRegistersHelper($context),
+            []
+        );
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $regsArg);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $outPtr,
+            $ht
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
     }
 
     /**

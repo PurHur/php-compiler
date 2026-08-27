@@ -20,7 +20,7 @@ use PHPLLVM\Value;
  * mb_ereg() — multibyte POSIX regex match (php-src ext/mbstring/php_mbregex.c; #4635, #33648).
  *
  * JIT/AOT: catchable argc/TypeError (#33648); literal fold via {@see JitMbEregSearch::tryEregFold};
- * runtime via {@see JitMbEreg} → {@see MbEregJitHelper} (#33811).
+ * runtime via {@see JitMbEreg} → {@see MbEregJitHelper} (#33811); &$regs (#35297).
  */
 final class mb_ereg extends Internal
 {
