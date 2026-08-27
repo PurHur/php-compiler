@@ -289,14 +289,9 @@ final class ZipArchiveJitHelper
             return self::pack(0);
         }
         // renameName — name swap on either slot (#35450 leftover of #35424 / #35454).
+        // Empty $s2 rejected in IR (#35481) — NestedJIT throw SIGSEGVs under thin AOT.
         if ('rename' === $op) {
-            if ('' === $s2) {
-                // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
-                throw new \ValueError(
-                    'ZipArchive::renameName(): Argument #2 ($new_name) must not be empty'
-                );
-            }
-            if (1 !== self::$h1open) {
+            if (1 !== self::$h1open || '' === $s2) {
                 self::$h1status = 9;
 
                 return self::pack(0);
@@ -318,13 +313,9 @@ final class ZipArchiveJitHelper
             return self::pack(0);
         }
         // renameIndex — rename by slot index 0/1 (#35472 leftover of #35450 / #35454).
+        // Empty $s2 rejected in IR (#35481) — NestedJIT throw SIGSEGVs under thin AOT.
         if ('rename_index' === $op) {
-            if ('' === $s2) {
-                throw new \ValueError(
-                    'ZipArchive::renameIndex(): Argument #2 ($new_name) must not be empty'
-                );
-            }
-            if (1 !== self::$h1open) {
+            if (1 !== self::$h1open || '' === $s2) {
                 self::$h1status = 9;
 
                 return self::pack(0);
