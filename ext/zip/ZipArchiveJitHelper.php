@@ -6,9 +6,9 @@ namespace PHPCompiler\ext\zip;
 
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
- * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496) — CREATE/add/
+ * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500) — CREATE/add/
  * close/get/locate/index/rename/delete/extract/status/count/archive-comment/entry-comment/
- * unchange/replaceFile path.
+ * unchange/replaceFile/setPassword path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -21,7 +21,7 @@ namespace PHPCompiler\ext\zip;
  * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
- * unchangeName / replaceFile)
+ * unchangeName / replaceFile / setPassword)
  */
 final class ZipArchiveJitHelper
 {
@@ -65,6 +65,9 @@ final class ZipArchiveJitHelper
     /** AFL_RDONLY-style session flag (#35478). */
     private static int $h1readonly = 0;
 
+    /** Session password for setEncryption* (#35500 / #19873). */
+    private static string $h1password = '';
+
     public static function exec(string $op, int $a, int $b, string $s1, string $s2): string
     {
         if ('alloc' === $op) {
@@ -89,6 +92,7 @@ final class ZipArchiveJitHelper
             self::$h1ecomment2 = '';
             self::$h1status = 0;
             self::$h1readonly = 0;
+            self::$h1password = '';
             self::snapSave();
 
             return self::pack($h);
@@ -111,6 +115,7 @@ final class ZipArchiveJitHelper
             self::$h1ecomment2 = '';
             self::$h1open = 0;
             self::$h1readonly = 0;
+            self::$h1password = '';
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
                 $nlen = ord($data[26]) | (ord($data[27]) << 8);
                 $xlen = ord($data[28]) | (ord($data[29]) << 8);
@@ -566,6 +571,7 @@ final class ZipArchiveJitHelper
             self::$h1comment = '';
             self::$h1ecomment = '';
             self::$h1ecomment2 = '';
+            self::$h1password = '';
             self::$h1status = 0;
 
             return self::packPayload(1, $local.$central.$eocd);
@@ -833,6 +839,24 @@ final class ZipArchiveJitHelper
             self::$h1status = 9;
 
             return self::pack(0);
+        }
+        // setPassword — store session password (#35500 / zim_ZipArchive_setPassword).
+        // Empty password → false (php-src). Short op spw.
+        if ('spw' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if ('' === $s1) {
+                self::$h1status = 0;
+
+                return self::pack(0);
+            }
+            self::$h1password = $s1;
+            self::$h1status = 0;
+
+            return self::pack(1);
         }
 
         return self::pack(0);
