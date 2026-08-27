@@ -18744,13 +18744,47 @@ class Compiler {
 
     /**
      * Normal try/catch completion must run finally before merge; php-cfg jumps straight to end (#2114, #195).
+     * Also rewrite nested blocks and JUMPIF→merge leave edges so AOT matches VM (#25240 / #35547).
+     * Non-merge leaves (break → loop exit) still need an AOT leave trampoline; VM unwinds those.
      */
     private function rewriteMergeJumpsToFinally(Block $source, Block $merge, Block $finally): void
     {
+        $seen = [];
+        $this->rewriteMergeJumpsToFinallyRecursive($source, $merge, $finally, $seen);
+    }
+
+    /**
+     * @param array<int, true> $seen
+     */
+    private function rewriteMergeJumpsToFinallyRecursive(
+        Block $source,
+        Block $merge,
+        Block $finally,
+        array &$seen
+    ): void {
+        $id = spl_object_id($source);
+        if (isset($seen[$id]) || $source === $merge || $source === $finally) {
+            return;
+        }
+        $seen[$id] = true;
         for ($i = 0; $i < $source->nOpCodes; ++$i) {
             $op = $source->opCodes[$i];
             if (OpCode::TYPE_JUMP === $op->type && $op->block1 === $merge) {
                 $op->block1 = $finally;
+            } elseif (OpCode::TYPE_JUMPIF === $op->type) {
+                // continue / fallthrough leave: JumpIf arm targets merge (#25240 / #35547).
+                if ($op->block1 === $merge) {
+                    $op->block1 = $finally;
+                }
+                if ($op->block2 === $merge) {
+                    $op->block2 = $finally;
+                }
+            }
+            if (null !== $op->block1) {
+                $this->rewriteMergeJumpsToFinallyRecursive($op->block1, $merge, $finally, $seen);
+            }
+            if (null !== $op->block2) {
+                $this->rewriteMergeJumpsToFinallyRecursive($op->block2, $merge, $finally, $seen);
             }
         }
     }
