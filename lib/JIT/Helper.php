@@ -1287,6 +1287,22 @@ restart:
                     }
                     goto return_bool;
                 }
+                // Loose == / != vs native long: compare without JitLongArg::lower truncating boxed
+                // double (f(1.5) == 1 must not E_DEPRECATED — Zend promotes long to double; #35213).
+                if (Variable::TYPE_NATIVE_LONG === $rightType
+                    && (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type)
+                ) {
+                    $__right = $this->context->builder->intCast(
+                        $rightValue,
+                        $this->context->getTypeFromString('int64')
+                    );
+                    if (OpCode::TYPE_EQUAL === $opcode->type) {
+                        $result = JitValueCompare::looseEqualValueToNativeLong($this->context, $left, $__right);
+                    } else {
+                        $result = JitValueCompare::notLooseEqualValueToNativeLong($this->context, $left, $__right);
+                    }
+                    goto return_bool;
+                }
                 if (JitValueNumeric::isArithOpcode($opcode->type)) {
                     return JitValueNumeric::binaryNativeLongValue(
                         $this->context,
