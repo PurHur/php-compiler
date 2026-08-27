@@ -7809,13 +7809,18 @@ class Object_ extends Type {
                 continue;
             }
 
+            // inheritParentInstanceProperties copies parent-private slots onto the child for
+            // allocation (#27565). Visibility / get_object_vars must still use prop_info->ce
+            // (zend_check_property_access) — not the child ClassEntry that holds the copy (#35479).
+            $declaringId = $this->instancePropertyDeclaringClassId[$currentId][$key] ?? $currentId;
+
             return [
                 'visibility' => $this->propertyVisibility($currentId, $name),
                 'setVisibility' => $this->propertySetVisibility($currentId, $name),
                 'getVisibility' => $this->propertyGetVisibility($currentId, $name),
                 'asymmetricExplicitRead' => $this->propertyAsymmetricExplicitRead($currentId, $name),
-                'declaringClassId' => $currentId,
-                'declaringClassName' => $this->classNameForId($currentId),
+                'declaringClassId' => $declaringId,
+                'declaringClassName' => $this->classNameForId($declaringId),
             ];
         }
 
