@@ -21,7 +21,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for ZipArchive open/add/close/get/locate/index (#35424 / #35437 / #35440 / #35449 / #35465).
+ * LLVM lowering for ZipArchive open/add/close/get/locate/index/extract (#35424 / #35437 / #35440 / #35449 / #35465 / #35467).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -750,6 +750,42 @@ final class JitZipArchive
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::extractTo — NestedJIT extract + file_put_contents leaf (#35467 leftover of #35424).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_extractTo
+     */
+    public static function extractTo(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::extractTo', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        StringFilePutContents::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $pathto = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::extractTo',
+            0,
+            'pathto'
+        );
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        $ok = self::execLong(
+            $context,
+            'extract',
+            $handle,
+            $i64->constInt(0, false),
+            $pathto,
+            $empty
+        );
         self::syncProps($context, $obj, $handle);
 
         return self::boxBoolFromI64($context, $ok);

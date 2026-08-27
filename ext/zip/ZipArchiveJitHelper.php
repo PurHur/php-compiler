@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 /**
- * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 / #35465 / #35466) —
- * CREATE/add/close/get/locate/index/rename/delete/status/count path.
+ * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 / #35465 / #35466 / #35467) —
+ * CREATE/add/close/get/locate/index/rename/delete/extract/status/count path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -16,7 +16,7 @@ namespace PHPCompiler\ext\zip;
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / addFile / addEmptyDir /
  * close / getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
- * renameName / deleteName / deleteIndex / count)
+ * renameName / deleteName / deleteIndex / extractTo / count)
  */
 final class ZipArchiveJitHelper
 {
@@ -296,6 +296,51 @@ final class ZipArchiveJitHelper
             }
             self::$h1name = '';
             self::$h1data = '';
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        // extractTo — write entry slots under $s1 (pathto); optional $s2 name filter (#35467).
+        // @file_put_contents NestedJIT libc leaf (peer FtpTransferJitHelper / #30127).
+        if ('extract' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if ('' === $s1) {
+                self::$h1status = 11;
+
+                return self::pack(0);
+            }
+            $base = $s1;
+            $filter = $s2;
+            $wrote = 0;
+            if ('' !== self::$h1name && ('' === $filter || $filter === self::$h1name)) {
+                $target = $base.'/'.self::$h1name;
+                $n = @\file_put_contents($target, self::$h1data);
+                if (false === $n) {
+                    self::$h1status = 6;
+
+                    return self::pack(0);
+                }
+                $wrote = 1;
+            }
+            if ('' !== self::$h1name2 && ('' === $filter || $filter === self::$h1name2)) {
+                $target2 = $base.'/'.self::$h1name2;
+                $n2 = @\file_put_contents($target2, self::$h1data2);
+                if (false === $n2) {
+                    self::$h1status = 6;
+
+                    return self::pack(0);
+                }
+                $wrote = 1;
+            }
+            if ('' !== $filter && 0 === $wrote) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
             self::$h1status = 0;
 
             return self::pack(1);
