@@ -31,9 +31,11 @@ final class MallocRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("'free' =>", $source);
         $this->assertStringContainsString('ensureMallocFamily', $source);
         $this->assertStringContainsString('#32273', $source);
-        $this->assertStringContainsString("'syscall' =>", $source);
-        $this->assertStringContainsString("'__phpc_host_php_write' =>", $source);
-        $this->assertStringContainsString("'__phpc_host_snprintf' =>", $source);
+        $this->assertStringContainsString('ensureSyscall', $source);
+        $this->assertStringContainsString('#35457', $source);
+        $this->assertStringNotContainsString("'syscall' =>", $source);
+        $this->assertStringNotContainsString("'__phpc_host_php_write' =>", $source);
+        $this->assertStringNotContainsString("'__phpc_host_snprintf' =>", $source);
     }
 
     public function testPackArgvSerializeUsesCanonicalI8MallocNotVoidStar(): void

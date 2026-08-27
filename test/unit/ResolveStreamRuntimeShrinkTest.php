@@ -18,9 +18,11 @@ final class ResolveStreamRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("'__phpc_resolve_stream' =>", $source);
         $this->assertStringContainsString('ensureResolveStreamDecl', $source);
         $this->assertStringContainsString('#32287', $source);
-        $this->assertStringContainsString("'syscall' =>", $source);
-        $this->assertStringContainsString("'__phpc_host_php_write' =>", $source);
-        $this->assertStringContainsString("'__phpc_host_snprintf' =>", $source);
+        $this->assertStringContainsString('ensureSyscall', $source);
+        $this->assertStringContainsString('#35457', $source);
+        $this->assertStringNotContainsString("'syscall' =>", $source);
+        $this->assertStringNotContainsString("'__phpc_host_php_write' =>", $source);
+        $this->assertStringNotContainsString("'__phpc_host_snprintf' =>", $source);
     }
 
     public function testNestedJitStreamKernelsDeclareResolveStreamModuleLocally(): void

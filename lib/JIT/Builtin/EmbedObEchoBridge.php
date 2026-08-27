@@ -13,9 +13,10 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * MCJIT embed echo bridges — php_write (ob-aware) + IR int format (#9956, #21124).
  *
- * Double formatting still uses host snprintf via {@see __phpc_host_snprintf}
- * (parity with {@see EmbedObJitHelper} PHP SSOT). Int echo avoids snprintf so
- * LLVM 9 MCJIT does not call through a null libc reloc.
+ * Double formatting still uses host snprintf via {@see McjitEmbedHostEcho}
+ * (parity with {@see EmbedObJitHelper} PHP SSOT; leftover __phpc_host_snprintf
+ * LLVM decl dropped #35457). Int echo avoids snprintf so LLVM 9 MCJIT does not
+ * call through a null libc reloc.
  */
 final class EmbedObEchoBridge
 {
