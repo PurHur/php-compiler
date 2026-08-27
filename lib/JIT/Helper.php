@@ -147,6 +147,36 @@ class Helper {
                                 $this->context->builder->structGep($valuePtr, $map['type'])
                             );
                             $i8 = $this->context->getTypeFromString('int8');
+                            // String tag → byte-wise ~ (Zend bitwise_not_function); do not
+                            // fall through to readLong ("a"→0→~0→-1) (#35305 leftover of #35301).
+                            $resultSlot = JitValueBox::alloc($this->context);
+                            $stringBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_string');
+                            $afterString = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_after_string');
+                            $mergeBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_merge');
+                            $isString = $this->context->builder->or(
+                                $this->context->builder->icmp(
+                                    Builder::INT_EQ,
+                                    $typeByte,
+                                    $i8->constInt(Variable::TYPE_STRING, false)
+                                ),
+                                $this->context->builder->icmp(
+                                    Builder::INT_EQ,
+                                    $typeByte,
+                                    $i8->constInt(\PHPCompiler\VM\Variable::TYPE_STRING, false)
+                                )
+                            );
+                            $this->context->builder->branchIf($isString, $stringBlock, $afterString);
+
+                            $this->context->builder->positionAtEnd($stringBlock);
+                            $strPtr = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readString'),
+                                $valuePtr
+                            );
+                            $strOut = Builtin\StringBitwiseNot::emitUnary($this->context, $strPtr);
+                            JitValueBox::assignToPointer($this->context, $resultSlot, $strOut);
+                            $this->context->builder->branch($mergeBlock);
+
+                            $this->context->builder->positionAtEnd($afterString);
                             $isDouble = $this->context->builder->icmp(
                                 Builder::INT_EQ,
                                 $typeByte,
@@ -178,8 +208,17 @@ class Helper {
                             $resultPhi = $this->context->builder->phi($i64, 'bitwise_not_vbox_long_phi');
                             $resultPhi->addIncoming($notDouble, $doubleEnd);
                             $resultPhi->addIncoming($notLong, $longEnd);
-                            $result = $resultPhi;
-                            goto return_long;
+                            JitValueBox::writeLong($this->context, $resultSlot, $resultPhi);
+                            $this->context->builder->branch($mergeBlock);
+
+                            $this->context->builder->positionAtEnd($mergeBlock);
+
+                            return new Variable(
+                                $this->context,
+                                Variable::TYPE_VALUE,
+                                Variable::KIND_VALUE,
+                                $resultSlot
+                            );
                         }
                         $long = JitLongArg::lower($this->context, $var, 'bitwise not operand');
                         $result = $this->context->builder->not($long);
