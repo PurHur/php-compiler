@@ -254,7 +254,24 @@ final class JitDomGetElementsByTagNameUserScript
         }
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml) {
-            return null;
+            // createElement / appendChild trees with no loadXML — same as Document
+            // tryInvoke (#34630). Without this, Element path LogicException'd and
+            // DOMNode-typed receivers ExternalMethod-null SIGSEGV'd (#35277).
+            self::$lastTagQuery = $tagLit;
+            self::$liveItemTagQuery = $tagLit;
+            self::$lastTagQueryFromElement = true;
+            DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
+
+            return self::boxNodeList($context, 0);
+        }
+        // LiveSlots mutations after loadXML leave compile-time markup stale (#33918 peer).
+        if (JitDomLoadXMLUserScript::treeMutatedSinceLoad()) {
+            self::$lastTagQuery = $tagLit;
+            self::$liveItemTagQuery = $tagLit;
+            self::$lastTagQueryFromElement = true;
+            DomUserScriptLiveTagListLlvm::resyncCountFromLiveTree($context, $tagLit);
+
+            return self::boxNodeList($context, 0);
         }
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
         $count = DomParseSimpleXmlJitHelper::countDescendantTagArgv($inner, $tagLit);
@@ -289,7 +306,16 @@ final class JitDomGetElementsByTagNameUserScript
         }
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml) {
-            return null;
+            // createElement trees — live NS walk (peer Document tryInvoke / #35277).
+            self::$lastNsUri = $nsLit;
+            self::$lastNsLocal = $localLit;
+            self::$lastNsFromElement = true;
+            self::$liveItemNsUri = $nsLit;
+            self::$liveItemNsLocal = $localLit;
+            self::$liveItemNsFromElement = true;
+            DomUserScriptLiveTagListLlvm::resyncCountFromLiveTreeNs($context, $nsLit, $localLit, true);
+
+            return self::boxNodeList($context, 0);
         }
         self::$lastNsUri = $nsLit;
         self::$lastNsLocal = $localLit;
