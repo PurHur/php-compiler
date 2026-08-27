@@ -19,14 +19,17 @@ use PHPLLVM\Value;
  * / {@see compileTimeDomInnerXml} instead (#35361). Mutation returns (appendChild /
  * insertBefore / replaceChild / removeChild) must propagate that metadata
  * ({@see JIT::propagateDomAppendChildCompileTimeTag}, #35373 / #35377 / #35386)
- * or cloneNode still aborts. NestedJIT DomRegistry clone would SIGSEGV on the returned
- * object like importNode before the user-script materialize path (#19212).
+ * or cloneNode still aborts. importNode also stamps tag/inner/attrs (and may copy
+ * compileTimeDomNodePath from the source); clone must prefer that Variable markup
+ * over lastCompileTimeXml's document element (#35417 leftover of #35373). NestedJIT
+ * DomRegistry clone would SIGSEGV on the returned object like importNode before the
+ * user-script materialize path (#19212).
  *
  * Materialize stores InnerXml for saveXML (#32355) and seeds LiveSlots via
  * {@see JitDomDocumentElement::syncChildrenFromXmlPublic} so firstChild walks
  * on the clone do not SIGSEGV (#32949).
  *
- * php-src: ext/dom/node.c php_dom_clone_node → xmlDocCopyNode (#32355, #32949, #35361, #35373, #35386)
+ * php-src: ext/dom/node.c php_dom_clone_node → xmlDocCopyNode (#32355, #32949, #35361, #35373, #35386, #35417)
  */
 final class JitDomCloneNode
 {
@@ -98,13 +101,22 @@ final class JitDomCloneNode
                 }
             }
         }
-        // Also recover tag-only object temps (no nodePath, no child index on receiver).
-        if (null !== $tagHint && null === $receiver->compileTimeDomNodePath) {
+        // Tag recovery must run even when compileTimeDomNodePath is set: importNode
+        // copies the source path onto the detached result (#35417). Requiring
+        // nodePath === null skipped this branch and fell through to cloning the
+        // source documentElement (wrong tag/xml).
+        if (null !== $tagHint) {
             foreach ($chunks as $chunk) {
                 $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($chunk);
                 if (null !== $parsed && strtolower($parsed['tag']) === strtolower($tagHint)) {
                     return self::specFromMarkup($chunk, $deep);
                 }
+            }
+            // Imported / createElement-shaped nodes carry their own markup on the
+            // Variable — prefer that over lastCompileTimeXml's root.
+            $fromRecv = self::specFromCreateElementReceiver($receiver, $deep);
+            if (null !== $fromRecv) {
+                return $fromRecv;
             }
         }
 
