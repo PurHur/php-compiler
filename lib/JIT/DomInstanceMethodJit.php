@@ -163,6 +163,11 @@ final class DomInstanceMethodJit
         // appendChild() returns DOMNode — setAttributeNode must still hit the user-script proxy (#33604).
         'domnode::setattributenode' => true,
         'domnode::setattributenodens' => true,
+        // NS twins of #35261 (#35272).
+        'domnode::setattributens' => true,
+        'domnode::hasattributens' => true,
+        'domnode::removeattributens' => true,
+        'domnode::getattributens' => true,
         'domelement::removeattributenode' => true,
         'dom\\element::removeattributenode' => true,
         'dom\\htmlelement::removeattributenode' => true,
@@ -329,9 +334,13 @@ final class DomInstanceMethodJit
         // Living attribute APIs via LLVM user-script path (#27108).
         'domelement::hasattribute' => true,
         'domelement::hasattributens' => true,
+        'domnode::hasattributens' => true,
         'domelement::setattributens' => true,
+        'domnode::setattributens' => true,
         'domelement::removeattributens' => true,
+        'domnode::removeattributens' => true,
         'domelement::getattributens' => true,
+        'domnode::getattributens' => true,
         'dom\\element::hasattribute' => true,
         'dom\\element::hasattributens' => true,
         'dom\\element::setattributens' => true,
@@ -502,6 +511,7 @@ final class DomInstanceMethodJit
                 return;
             }
             if ('domelement::getattributens' === $lc
+                || 'domnode::getattributens' === $lc
                 || 'dom\\element::getattributens' === $lc
                 || 'dom\\htmlelement::getattributens' === $lc
             ) {
@@ -518,12 +528,13 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domelement::hasattributens' === $lc) {
+            if ('domelement::hasattributens' === $lc || 'domnode::hasattributens' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementHasAttributeNS();
 
                 return;
             }
             if ('domelement::setattributens' === $lc
+                || 'domnode::setattributens' === $lc
                 || 'dom\\element::setattributens' === $lc
                 || 'dom\\htmlelement::setattributens' === $lc
             ) {
@@ -532,6 +543,7 @@ final class DomInstanceMethodJit
                 return;
             }
             if ('domelement::removeattributens' === $lc
+                || 'domnode::removeattributens' === $lc
                 || 'dom\\element::removeattributens' === $lc
                 || 'dom\\htmlelement::removeattributens' === $lc
             ) {
@@ -1430,13 +1442,17 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::hasattribute');
             self::ensureProxy($context, 'domnode::hasattribute');
             self::ensureProxy($context, 'domelement::hasattributens');
+            self::ensureProxy($context, 'domnode::hasattributens');
             self::ensureProxy($context, 'domelement::getattributens');
+            self::ensureProxy($context, 'domnode::getattributens');
             self::ensureProxy($context, 'domelement::setattribute');
             self::ensureProxy($context, 'domnode::setattribute');
             self::ensureProxy($context, 'domelement::setattributens');
+            self::ensureProxy($context, 'domnode::setattributens');
             self::ensureProxy($context, 'domelement::removeattribute');
             self::ensureProxy($context, 'domnode::removeattribute');
             self::ensureProxy($context, 'domelement::removeattributens');
+            self::ensureProxy($context, 'domnode::removeattributens');
             self::ensureProxy($context, 'domelement::getattributenode');
             self::ensureProxy($context, 'domnode::getattributenode');
             self::ensureProxy($context, 'domelement::getattributenodens');
@@ -1507,7 +1523,7 @@ final class DomInstanceMethodJit
     /** @var array<string, list<string>> */
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid', 'getnodepath', 'getlineno'],
-        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getattribute', 'setattribute', 'removeattribute', 'hasattribute', 'getattributenode', 'getattributenodens', 'setattributenode', 'setattributenodens', 'getnodepath', 'issupported', 'lookupprefix', 'lookupnamespaceuri', 'isdefaultnamespace', 'getlineno'],
+        'domnode' => ['appendchild', 'clonenode', 'haschildnodes', 'hasattributes', 'getattribute', 'setattribute', 'removeattribute', 'hasattribute', 'getattributens', 'setattributens', 'removeattributens', 'hasattributens', 'getattributenode', 'getattributenodens', 'setattributenode', 'setattributenodens', 'getnodepath', 'issupported', 'lookupprefix', 'lookupnamespaceuri', 'isdefaultnamespace', 'getlineno'],
         'domimplementation' => ['createdocument', 'createdocumenttype', 'hasfeature'],
         'domtext' => ['substringdata', 'splittext', 'appenddata', 'insertdata', 'deletedata', 'replacedata', 'iswhitespaceinelementcontent', 'iselementcontentwhitespace'],
         'domcomment' => ['substringdata', 'appenddata', 'insertdata', 'deletedata', 'replacedata'],
