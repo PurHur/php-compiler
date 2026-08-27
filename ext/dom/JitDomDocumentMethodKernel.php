@@ -14,6 +14,7 @@ use PHPCompiler\JIT\Builtin\DomGetElementByIdRuntime;
 use PHPCompiler\JIT\Builtin\DomGetElementsByTagNameRuntime;
 use PHPCompiler\JIT\Builtin\DomAdoptNodeRuntime;
 use PHPCompiler\JIT\Builtin\DomAttrIsIdRuntime;
+use PHPCompiler\JIT\Builtin\DomDocumentValidateRuntime;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Builtin\DomInsertAdjacentRuntime;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
@@ -885,6 +886,120 @@ final class JitDomDocumentMethodKernel
             $context->getTypeFromString('int1'),
             'PHPCompiler\\ext\\dom\\DomAttrIsIdJitHelper::isIdArgv',
             '/ext/dom/DomAttrIsIdJitHelper.php'
+        );
+    }
+
+    public static function ensureDocumentValidateBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomDocumentValidateRuntime::ABI_VALIDATE,
+            'dom_document_validate_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomDocumentValidateJitHelper::validateArgv',
+            '/ext/dom/DomDocumentValidateJitHelper.php'
+        );
+    }
+
+    public static function ensureDocumentSchemaValidateBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomDocumentValidateRuntime::ABI_SCHEMA_VALIDATE,
+            'dom_document_schema_validate_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomDocumentValidateJitHelper::schemaValidateArgv',
+            '/ext/dom/DomDocumentValidateJitHelper.php'
+        );
+    }
+
+    public static function ensureDocumentSchemaValidateSourceBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomDocumentValidateRuntime::ABI_SCHEMA_VALIDATE_SOURCE,
+            'dom_document_schema_validate_source_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomDocumentValidateJitHelper::schemaValidateSourceArgv',
+            '/ext/dom/DomDocumentValidateJitHelper.php'
+        );
+    }
+
+    public static function ensureDocumentRelaxNGValidateBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomDocumentValidateRuntime::ABI_RELAXNG_VALIDATE,
+            'dom_document_relaxng_validate_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomDocumentValidateJitHelper::relaxNGValidateArgv',
+            '/ext/dom/DomDocumentValidateJitHelper.php'
+        );
+    }
+
+    public static function ensureDocumentRelaxNGValidateSourceBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomDocumentValidateRuntime::ABI_RELAXNG_VALIDATE_SOURCE,
+            'dom_document_relaxng_validate_source_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomDocumentValidateJitHelper::relaxNGValidateSourceArgv',
+            '/ext/dom/DomDocumentValidateJitHelper.php'
+        );
+    }
+
+    public static function ensureDocumentXIncludeBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomDocumentValidateRuntime::ABI_XINCLUDE,
+            'dom_document_xinclude_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('int64'),
+            'PHPCompiler\\ext\\dom\\DomDocumentValidateJitHelper::xincludeArgv',
+            '/ext/dom/DomDocumentValidateJitHelper.php'
+        );
+    }
+
+    public static function ensureDocumentRegisterNodeClassBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomDocumentValidateRuntime::ABI_REGISTER_NODE_CLASS,
+            'dom_document_register_node_class_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomDocumentValidateJitHelper::registerNodeClassArgv',
+            '/ext/dom/DomDocumentValidateJitHelper.php'
         );
     }
 

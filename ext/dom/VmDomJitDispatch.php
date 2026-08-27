@@ -275,6 +275,177 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMDocument::validate() — DTD validation (#35540, php-src document.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function validate(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMDocument::validate', $extra, 0);
+        $var = new Variable();
+        $var->bool(VmDom::validate($ctx, $document, null));
+
+        return $var;
+    }
+
+    /**
+     * DOMDocument::schemaValidate() — XSD file (#35540, php-src document.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function schemaValidate(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        self::requireExtraArgCountRange('DOMDocument::schemaValidate', $extra, 1, 2);
+        $filename = self::stringArg(
+            $extra[0] ?? self::missingArg('schemaValidate', 0),
+            'DOMDocument::schemaValidate',
+            0,
+            'filename'
+        );
+        $flags = 0;
+        if (isset($extra[1])) {
+            $flags = VmMath::parseZParamLongBuiltinArg(
+                $extra[1],
+                'DOMDocument::schemaValidate',
+                2,
+                'flags'
+            );
+        }
+        $var = new Variable();
+        $var->bool(VmDom::schemaValidate($ctx, $document, $filename, $flags, null));
+
+        return $var;
+    }
+
+    /**
+     * DOMDocument::schemaValidateSource() — in-memory XSD (#35540).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function schemaValidateSource(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        self::requireExtraArgCountRange('DOMDocument::schemaValidateSource', $extra, 1, 2);
+        $source = self::stringArg(
+            $extra[0] ?? self::missingArg('schemaValidateSource', 0),
+            'DOMDocument::schemaValidateSource',
+            0,
+            'source'
+        );
+        $flags = 0;
+        if (isset($extra[1])) {
+            $flags = VmMath::parseZParamLongBuiltinArg(
+                $extra[1],
+                'DOMDocument::schemaValidateSource',
+                2,
+                'flags'
+            );
+        }
+        $var = new Variable();
+        $var->bool(VmDom::schemaValidateSource($ctx, $document, $source, $flags, null));
+
+        return $var;
+    }
+
+    /**
+     * DOMDocument::relaxNGValidate() (#35540, php-src document.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function relaxNGValidate(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMDocument::relaxNGValidate', $extra, 1);
+        $filename = self::stringArg(
+            $extra[0] ?? self::missingArg('relaxNGValidate', 0),
+            'DOMDocument::relaxNGValidate',
+            0,
+            'filename'
+        );
+        $var = new Variable();
+        $var->bool(VmDom::relaxNGValidate($ctx, $document, $filename, null));
+
+        return $var;
+    }
+
+    /**
+     * DOMDocument::relaxNGValidateSource() (#35540).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function relaxNGValidateSource(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMDocument::relaxNGValidateSource', $extra, 1);
+        $source = self::stringArg(
+            $extra[0] ?? self::missingArg('relaxNGValidateSource', 0),
+            'DOMDocument::relaxNGValidateSource',
+            0,
+            'source'
+        );
+        $var = new Variable();
+        $var->bool(VmDom::relaxNGValidateSource($ctx, $document, $source, null));
+
+        return $var;
+    }
+
+    /**
+     * DOMDocument::xinclude() — int substitutions or false (#35540).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function xinclude(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        self::requireAtMostExtraArgCount('DOMDocument::xinclude', $extra, 1);
+        $options = 0;
+        if (isset($extra[0])) {
+            $options = VmMath::parseZParamLongBuiltinArg(
+                $extra[0],
+                'DOMDocument::xinclude',
+                1,
+                'options'
+            );
+        }
+        $count = VmDom::xinclude($ctx, $document, $options, null);
+        $var = new Variable();
+        if (false === $count) {
+            $var->bool(false);
+        } else {
+            $var->int($count);
+        }
+
+        return $var;
+    }
+
+    /**
+     * DOMDocument::registerNodeClass() — always true on success (#35540).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function registerNodeClass(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMDocument::registerNodeClass', $extra, 2);
+        $baseName = self::stringArg(
+            $extra[0] ?? self::missingArg('registerNodeClass', 0),
+            'DOMDocument::registerNodeClass',
+            0,
+            'baseClass'
+        );
+        $extendedArg = ($extra[1] ?? self::missingArg('registerNodeClass', 1))->resolveIndirect();
+        $extendedName = null;
+        if (Variable::TYPE_NULL !== $extendedArg->type) {
+            $extendedName = self::stringArg(
+                $extendedArg,
+                'DOMDocument::registerNodeClass',
+                1,
+                'extendedClass'
+            );
+        }
+        VmDom::registerNodeClass($ctx, $document, $baseName, $extendedName);
+        $var = new Variable();
+        $var->bool(true);
+
+        return $var;
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function createElement(VmContext $ctx, ObjectEntry $document, array $extra): Variable

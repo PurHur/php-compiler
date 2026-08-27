@@ -82,6 +82,14 @@ final class DomInstanceMethodJit
         'domdocument::savexml' => true,
         'domdocument::savehtml' => true,
         'domdocument::savehtmlfile' => true,
+        // Validation / xinclude / registerNodeClass — must not ExternalMethod-null (#35540).
+        'domdocument::validate' => true,
+        'domdocument::schemavalidate' => true,
+        'domdocument::schemavalidatesource' => true,
+        'domdocument::relaxngvalidate' => true,
+        'domdocument::relaxngvalidatesource' => true,
+        'domdocument::xinclude' => true,
+        'domdocument::registernodeclass' => true,
         'domdocument::getelementsbytagname' => true,
         'domelement::getelementsbytagname' => true,
         // appendChild() returns DOMNode — getElementsByTagName* must not ExternalMethod-null (#35277).
@@ -657,6 +665,22 @@ final class DomInstanceMethodJit
             }
             if ('domdocument::savexml' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentSaveXML();
+
+                return;
+            }
+            if ('domdocument::validate' === $lc
+                || 'domdocument::schemavalidate' === $lc
+                || 'domdocument::schemavalidatesource' === $lc
+                || 'domdocument::relaxngvalidate' === $lc
+                || 'domdocument::relaxngvalidatesource' === $lc
+                || 'domdocument::xinclude' === $lc
+                || 'domdocument::registernodeclass' === $lc
+            ) {
+                // Dedicated NestedJIT — VmDomInstanceInvoke aborts under thin AOT (#35540).
+                if (!preg_match('/^domdocument::([a-z0-9_]+)$/', $lc, $validateMatches)) {
+                    return;
+                }
+                $context->functionProxies[$lc] = new Call\DomDocumentValidateMethod($validateMatches[1]);
 
                 return;
             }
@@ -1243,6 +1267,13 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::savexml');
             self::ensureProxy($context, 'domdocument::savehtml');
             self::ensureProxy($context, 'domdocument::savehtmlfile');
+            self::ensureProxy($context, 'domdocument::validate');
+            self::ensureProxy($context, 'domdocument::schemavalidate');
+            self::ensureProxy($context, 'domdocument::schemavalidatesource');
+            self::ensureProxy($context, 'domdocument::relaxngvalidate');
+            self::ensureProxy($context, 'domdocument::relaxngvalidatesource');
+            self::ensureProxy($context, 'domdocument::xinclude');
+            self::ensureProxy($context, 'domdocument::registernodeclass');
             self::ensureProxy($context, 'domdocument::getelementsbytagname');
             self::ensureProxy($context, 'domelement::getelementsbytagname');
             self::ensureProxy($context, 'domnode::getelementsbytagname');
