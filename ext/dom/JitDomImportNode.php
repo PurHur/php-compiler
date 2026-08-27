@@ -340,6 +340,10 @@ final class JitDomImportNode
         }
         if ([] !== $attrInfo['pairs']) {
             JitDomCreateElement::storeAttributesPresence($context, $element, $attrInfo['pairs']);
+            if (self::importedAttrsStampHtmlIdBearing($sourceNode, $attrInfo['pairs'], $fromXml)) {
+                DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', true);
+                DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, true);
+            }
         }
         if (!$fromXml) {
             self::storeElementInIdMap($context, $documentVar, $id, $element);
@@ -845,6 +849,40 @@ final class JitDomImportNode
         $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
         $objectType->propertyStore($propSlot, $propVar, JITVariable::TYPE_VALUE);
         DomUserScriptElementCacheLlvm::store($context, $document, $idStr, $element);
+    }
+
+    /**
+     * Whether imported id= should stamp XML_ATTRIBUTE_ID for isId() (#23514 / #20830).
+     *
+     * @param list<array{qname: string, value: string}> $pairs
+     */
+    private static function importedAttrsStampHtmlIdBearing(
+        JITVariable $sourceNode,
+        array $pairs,
+        bool $fromXml
+    ): bool {
+        $hasId = false;
+        foreach ($pairs as $pair) {
+            if ('id' === $pair['qname'] && '' !== $pair['value']) {
+                $hasId = true;
+                break;
+            }
+        }
+        if (!$hasId) {
+            return false;
+        }
+        if (!$fromXml) {
+            return true;
+        }
+        // Plain XML id into HTML must not promote until remove+set (#23514).
+        if (null !== $sourceNode->compileTimeDomLoadXml
+            || null !== JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
+        ) {
+            return false;
+        }
+
+        return null !== JitDomLoadHTMLUserScript::lastGetElementByIdHit()
+            || null !== JitDomLoadHTMLUserScript::lastCompileTimeParsed();
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value

@@ -24,8 +24,7 @@ final class DomImportNodeLoadHtmlAppend23514AotTest extends TestCase
         $this->assertStringContainsString('rewrite isId=false gebi=null', $zend);
         $this->assertStringContainsString('rewrite isId=false gebi=null', $aot);
         $this->assertStringContainsString('remove+set isId=true gebi=div', $zend);
-        $this->assertStringContainsString('remove+set', $aot);
-        $this->assertStringContainsString('gebi=div', $aot);
+        $this->assertStringContainsString('remove+set isId=true gebi=div', $aot);
     }
 
     public function testParseHelperDetectsFullHtmlDocumentWithoutId(): void

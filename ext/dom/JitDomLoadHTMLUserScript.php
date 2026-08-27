@@ -247,6 +247,10 @@ final class JitDomLoadHTMLUserScript
             $parsed['text']
         );
         self::storeElementInIdMap($context, $document, $parsed['id'], $element);
+        if ('' !== $parsed['id']) {
+            DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', true);
+            DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, true);
+        }
         $idStr = $context->builder->load($context->constantStringFromString($parsed['id']));
         DomUserScriptElementCacheLlvm::store($context, $document, $idStr, $element);
         // Pin html documentElement so DOMDocument::appendChild linkNext sees a real root
