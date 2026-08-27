@@ -2865,7 +2865,7 @@ final class BuiltinParamNames
             'min' => ['index' => 1, 'required' => 1, 'total' => 2],
             'array_map' => ['index' => 2, 'required' => 2, 'total' => 3],
             'setlocale' => ['index' => 2, 'required' => 2, 'total' => 3],
-            'mb_convert_variables' => ['index' => 3, 'required' => 3, 'total' => 4],
+            'mb_convert_variables' => ['index' => 2, 'required' => 3, 'total' => 3],
             default => null,
         };
     }
