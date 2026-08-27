@@ -4122,8 +4122,9 @@ class Object_ extends Type {
             // Invoke metadata for indirect holders (array elements, properties; issue #72).
             $this->defineProperty($id, '__closure_target', Variable::TYPE_STRING);
             $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_THIS_PROPERTY, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_THIS_PROPERTY, Variable::TYPE_OBJECT);
             $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_SCOPE_PROPERTY, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::IS_STATIC_PROPERTY, Variable::TYPE_NATIVE_BOOL);
             $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::IS_METHOD_PROPERTY, Variable::TYPE_NATIVE_BOOL);
             if (\PHPCompiler\CompilerVersion::supportsClosureGetCurrent()) {
                 $this->defineMethodVisibility(

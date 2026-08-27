@@ -40,7 +40,20 @@ final class VmClosure
             return new \PHPCompiler\JIT\Call\ForeachIndexedClosureCall($receiver, $table, $slotKey);
         }
         if (null !== $receiver->closureCall) {
-            return $receiver->closureCall;
+            $call = $receiver->closureCall;
+            // Create-time ClosureWithBinding may hold a method-local $this snapshot / SSA
+            // value. Prefer RuntimeIndirect → wrapCallWithBindingFromObject so invoke
+            // reloads __closure_bound_this from the Closure heap (#35456, peer #28612).
+            if ($call instanceof \PHPCompiler\JIT\Call\ClosureWithBinding
+                && null === $call->closureObject()
+            ) {
+                $indirect = self::resolveIndirectCall($context, $receiver);
+                if (null !== $indirect) {
+                    return $indirect;
+                }
+            }
+
+            return $call;
         }
 
         return self::resolveIndirectCall($context, $receiver);

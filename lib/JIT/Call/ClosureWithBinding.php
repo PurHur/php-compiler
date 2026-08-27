@@ -12,6 +12,10 @@ use PHPLLVM\Value;
 
 /**
  * Closure invoke with bindTo/bind scope and $this (issue #4192, Zend zend_closures.c).
+ *
+ * When {@see $closureObject} is set (cross-function `$f = $obj->m(); $f()`), reload
+ * bound `$this` from the Closure heap slots — the create-time snapshot Variable may
+ * point at a method-local alloca that is dead after return (#35456, peer #28612).
  */
 final class ClosureWithBinding implements Call
 {
@@ -19,6 +23,7 @@ final class ClosureWithBinding implements Call
         private readonly Call $inner,
         private readonly Variable $boundThis,
         private readonly Variable $boundScope,
+        private readonly ?Variable $closureObject = null,
     ) {
     }
 
@@ -39,8 +44,41 @@ final class ClosureWithBinding implements Call
         return $this->boundScope;
     }
 
+    /** Closure object whose `__closure_bound_this` should be read at invoke (#35456). */
+    public function closureObject(): ?Variable
+    {
+        return $this->closureObject;
+    }
+
+    /** Prefer heap-bound `$this` from a Closure object Variable (#35456). */
+    public function withClosureObject(Variable $closureObject): self
+    {
+        $inner = $this->inner;
+        while ($inner instanceof self) {
+            $inner = $inner->inner();
+        }
+
+        return new self(
+            $inner,
+            $this->boundThis,
+            $this->boundScope,
+            $closureObject
+        );
+    }
+
     public function call(Context $context, Variable ...$args): Value
     {
+        if (null !== $this->closureObject) {
+            $obj = $context->helper->loadValue($this->closureObject);
+
+            return ClosureBindHelper::wrapCallWithBindingFromObject(
+                $context,
+                $obj,
+                $this->inner,
+                ...$args
+            );
+        }
+
         $savedCalled = $context->scope->calledClassName;
         $scopeName = ClosureBindHelper::compileTimeScopeName($this->boundScope);
         if ('' !== $scopeName) {

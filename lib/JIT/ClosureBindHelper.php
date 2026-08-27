@@ -170,7 +170,7 @@ final class ClosureBindHelper
         $classId = $context->type->object->lookup('Closure');
         $objectType = $context->type->object;
         if (!$objectType->hasProperty($classId, self::BOUND_THIS_PROPERTY)) {
-            $objectType->defineProperty($classId, self::BOUND_THIS_PROPERTY, Variable::TYPE_VALUE);
+            $objectType->defineProperty($classId, self::BOUND_THIS_PROPERTY, Variable::TYPE_OBJECT);
         }
         if (!$objectType->hasProperty($classId, self::BOUND_SCOPE_PROPERTY)) {
             $objectType->defineProperty($classId, self::BOUND_SCOPE_PROPERTY, Variable::TYPE_STRING);
