@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7945 |
-| Phase A inventory files (M2 ratio SSOT) | 7945 |
+| PHP files on vm.php path | 7947 |
+| Phase A inventory files (M2 ratio SSOT) | 7947 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25292 |
+| Source constructs flagged (warnings) | 25297 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2438,6 +2438,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/SodiumExtensionPolicy.php` | 0 | 1 |
 | `ext/sodium/SodiumFunction.php` | 0 | 4 |
 | `ext/sodium/SodiumGenerichashFunction.php` | 0 | 2 |
+| `ext/sodium/SodiumHex2binJitHelper.php` | 0 | 3 |
 | `ext/sodium/SodiumJitHelper.php` | 0 | 3 |
 | `ext/sodium/SodiumKdfDeriveFromKeyFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumKeygenFunction.php` | 0 | 3 |
@@ -6993,6 +6994,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/MagicMethodDispatch.php` | 0 | 1 |
 | `lib/JIT/MagicMethodLlvm.php` | 0 | 17 |
 | `lib/JIT/MatchUnhandledJitHelper.php` | 0 | 1 |
+| `lib/JIT/MbConvertVariablesLlvm.php` | 0 | 2 |
 | `lib/JIT/McjitEmbedHostEcho.php` | 0 | 2 |
 | `lib/JIT/McjitEmbedRuntime.php` | 0 | 1 |
 | `lib/JIT/MultipleIteratorZipLlvm.php` | 0 | 4 |
@@ -10219,7 +10221,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomParseSimpleXmlJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 50 class method(s)
+- 52 class method(s)
 
 ### `ext/dom/DomRegistry.php`
 
@@ -10713,7 +10715,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomCloneNode.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/dom/JitDomCreateCDATASection.php`
 
@@ -11181,10 +11183,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 164)
 - new JITVariable (line 165)
 - new JITVariable (line 273)
-- new JITVariable (line 360)
-- new JITVariable (line 379)
-- new JITVariable (line 398)
-- new JITVariable (line 558)
+- new JITVariable (line 362)
+- new JITVariable (line 381)
+- new JITVariable (line 400)
+- new JITVariable (line 560)
 - 11 class method(s)
 
 ### `ext/dom/JitDomReplaceChildLiveSlots.php`
@@ -19999,7 +20001,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/JitMbConvertVariables.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 10 class method(s)
 
 ### `ext/mbstring/JitMbDetectEncoding.php`
 
@@ -27449,7 +27451,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/JitSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 16 class method(s)
 
 ### `ext/sodium/Module.php`
 
@@ -27662,6 +27664,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 - 1 closure(s)
+
+### `ext/sodium/SodiumHex2binJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new SodiumException (line 87)
+- new SodiumException (line 96)
+- 8 class method(s)
 
 ### `ext/sodium/SodiumJitHelper.php`
 
@@ -28407,8 +28416,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/sodium_hex2bin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
 - new ArgumentCountError (line 35)
+- new ArgumentCountError (line 42)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -49422,15 +49431,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\RuntimeIndirectStaticMethodCall (line 27658)
 - new JIT\Call\RuntimeIndirectStaticMethodCall (line 27821)
 - new Operand\Literal (line 28593)
-- new VM (line 29508)
-- new VM\Variable (line 29517)
-- new VM\ClassEntry (line 29620)
-- new Func\PHP (line 29639)
-- new VM\ClassEntry (line 29685)
-- new Variable (line 29702)
-- new Variable (line 29795)
-- new Variable (line 29949)
-- new Variable (line 31305)
+- new VM (line 29525)
+- new VM\Variable (line 29534)
+- new VM\ClassEntry (line 29637)
+- new Func\PHP (line 29656)
+- new VM\ClassEntry (line 29702)
+- new Variable (line 29719)
+- new Variable (line 29812)
+- new Variable (line 29966)
+- new Variable (line 31322)
 - 554 class method(s)
 - 26 closure(s)
 
@@ -50299,7 +50308,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 836)
 - new Variable (line 978)
 - new Variable (line 1017)
-- new Variable (line 1248)
+- new Variable (line 1254)
 - 50 class method(s)
 
 ### `lib/JIT/Builtin/DomNodeTreeMutationRuntime.php`
@@ -53522,7 +53531,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 25 class method(s)
 
 ### `lib/JIT/Builtin/StringSodiumAead.php`
 
@@ -54055,26 +54064,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2867)
 - new Variable (line 2880)
 - new Variable (line 3090)
-- new VMVariable (line 5129)
-- new VMVariable (line 5149)
-- new VMVariable (line 5159)
-- new VMVariable (line 5179)
-- new VMVariable (line 6615)
-- new ReflectionClassConstant (line 7348)
-- new Variable (line 7782)
-- new Variable (line 7808)
-- new Variable (line 7816)
-- new Variable (line 7839)
-- new Variable (line 7865)
-- new Variable (line 7873)
-- new Variable (line 7947)
-- new Literal (line 7964)
-- new Literal (line 7969)
-- new Literal (line 7974)
-- new Variable (line 7985)
-- new Variable (line 8018)
-- new Variable (line 8041)
-- new Variable (line 8579)
+- new VMVariable (line 5141)
+- new VMVariable (line 5161)
+- new VMVariable (line 5171)
+- new VMVariable (line 5191)
+- new VMVariable (line 6627)
+- new ReflectionClassConstant (line 7360)
+- new Variable (line 7794)
+- new Variable (line 7820)
+- new Variable (line 7828)
+- new Variable (line 7851)
+- new Variable (line 7877)
+- new Variable (line 7885)
+- new Variable (line 7959)
+- new Literal (line 7976)
+- new Literal (line 7981)
+- new Literal (line 7986)
+- new Variable (line 7997)
+- new Variable (line 8030)
+- new Variable (line 8053)
+- new Variable (line 8591)
 - 327 class method(s)
 - 8 closure(s)
 
@@ -57387,17 +57396,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 252)
 - new Variable (line 256)
 - new Variable (line 258)
-- new Variable (line 2465)
-- new Variable (line 2469)
-- new Variable (line 2680)
-- new Variable (line 2692)
-- new Variable (line 2842)
-- new Variable (line 2933)
-- new Variable (line 2987)
-- new Variable (line 3207)
+- new Variable (line 2481)
+- new Variable (line 2485)
+- new Variable (line 2696)
+- new Variable (line 2708)
+- new Variable (line 2858)
+- new Variable (line 2949)
+- new Variable (line 3003)
 - new Variable (line 3223)
-- new Variable (line 3245)
-- new Variable (line 3256)
+- new Variable (line 3239)
+- new Variable (line 3261)
+- new Variable (line 3272)
 - 24 class method(s)
 - 8 closure(s)
 
@@ -57855,6 +57864,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/JIT/MbConvertVariablesLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 14 class method(s)
+- 4 closure(s)
 
 ### `lib/JIT/McjitEmbedHostEcho.php`
 
