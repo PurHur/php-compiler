@@ -24,8 +24,9 @@ use PHPLLVM\Value;
 
 /**
  * LLVM lowering for ZipArchive open/add/close/get/locate/index/rename/extract/comment
- * /isCompressionMethodSupported/isEncryptionMethodSupported
- * (#35424 / #35437 / #35440 / #35449 / #35450 / #35465 / #35467 / #35472 / #35476 / #35486 / #35498).
+ * /isCompressionMethodSupported/isEncryptionMethodSupported/setPassword/statName/statIndex
+ * (#35424 / #35437 / #35440 / #35449 / #35450 / #35465 / #35467 / #35472 / #35476 / #35486 /
+ * #35498 / #35500 / #35504).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -1404,6 +1405,200 @@ final class JitZipArchive
     }
 
     /**
+     * ZipArchive::statName — NestedJIT stn → RETURN_SB hashtable (#35504 leftover of #35500).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_statName
+     */
+    public static function statName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::statName', 1, 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::statName',
+            0,
+            'name'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($name, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_stn_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_stn_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::statName(): Argument #1 ($name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        [$found, $payload] = self::execLongAndPayload(
+            $context,
+            'stn',
+            $handle,
+            $zero,
+            $name,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxStatOrFalse($context, $found, $payload);
+    }
+
+    /**
+     * ZipArchive::statIndex — NestedJIT sti → RETURN_SB hashtable (#35504 leftover of #35500).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_statIndex
+     */
+    public static function statIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::statIndex', 1, 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower($context, $args[1], 'ZipArchive::statIndex(): Argument #1 ($index)');
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $zero = $i64->constInt(0, false);
+        [$found, $payload] = self::execLongAndPayload(
+            $context,
+            'sti',
+            $index,
+            $zero,
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxStatOrFalse($context, $found, $payload);
+    }
+
+    /**
+     * ZipArchive::setCompressionName — NestedJIT cpm (#35506 leftover of #35500 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setCompressionName
+     * Optional $compflags accepted and ignored (VmZipArchive).
+     */
+    public static function setCompressionName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::setCompressionName', 2, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::setCompressionName',
+            0,
+            'name'
+        );
+        $method = JitLongArg::lower(
+            $context,
+            $args[2],
+            'ZipArchive::setCompressionName(): Argument #2 ($method)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        if ($method->typeOf() !== $i64) {
+            $method = $context->builder->sext($method, $i64);
+        }
+        // Empty name → ValueError in IR (#35481 peer; NestedJIT throw SIGSEGVs).
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($name, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_cpm_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_cpm_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::setCompressionName(): Argument #1 ($name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'cpm',
+            $method,
+            $zero,
+            $name,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::setCompressionIndex — NestedJIT cpi (#35506 leftover of #35500 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setCompressionIndex
+     * Optional $compflags accepted and ignored (VmZipArchive).
+     */
+    public static function setCompressionIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::setCompressionIndex', 2, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower(
+            $context,
+            $args[1],
+            'ZipArchive::setCompressionIndex(): Argument #1 ($index)'
+        );
+        $method = JitLongArg::lower(
+            $context,
+            $args[2],
+            'ZipArchive::setCompressionIndex(): Argument #2 ($method)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        if ($method->typeOf() !== $i64) {
+            $method = $context->builder->sext($method, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'cpi',
+            $index,
+            $method,
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
      * ZipArchive::setMtimeName — NestedJIT smn (#35508 leftover of #35500 / #20363).
      *
      * php-src: ext/zip/php_zip.c — zim_ZipArchive_setMtimeName
@@ -2095,6 +2290,154 @@ final class JitZipArchive
         JitValueBox::writeBool($context, $slot, $isTrue);
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * Materialize RETURN_SB hashtable from NestedJIT packed payload, or false on miss (#35504).
+     *
+     * Payload layout: index,crc,size,mtime,comp_size,comp_method,encryption_method (7×int32) + name.
+     */
+    private static function boxStatOrFalse(Context $context, Value $foundI64, Value $payload): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $isFound = $context->builder->icmp(Builder::INT_NE, $foundI64, $i64->constInt(0, false));
+        $id = (string) (++self::$serial);
+        $okBlock = BasicBlockHelper::append($context, 'zip_stat_ok_'.$id);
+        $missBlock = BasicBlockHelper::append($context, 'zip_stat_miss_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_stat_done_'.$id);
+        $context->builder->branchIf($isFound, $okBlock, $missBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $index = self::int32LeAtStringOffset($context, $payload, 0);
+        $crc = self::int32LeAtStringOffset($context, $payload, 4);
+        $size = self::int32LeAtStringOffset($context, $payload, 8);
+        $mtime = self::int32LeAtStringOffset($context, $payload, 12);
+        $compSize = self::int32LeAtStringOffset($context, $payload, 16);
+        $compMethod = self::int32LeAtStringOffset($context, $payload, 20);
+        $encMethod = self::int32LeAtStringOffset($context, $payload, 24);
+        $name = self::stringFromPayloadOffset($context, $payload, ZipArchiveJitHelper::STAT_FIELD_BYTES);
+        $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
+        $setString = $context->lookupFunction('__hashtable__setStringKeyString');
+        $context->builder->call(
+            $setString,
+            $ht,
+            $context->builder->load($context->constantStringFromString('name')),
+            $name
+        );
+        foreach (
+            [
+                ['index', $index],
+                ['crc', $crc],
+                ['size', $size],
+                ['mtime', $mtime],
+                ['comp_size', $compSize],
+                ['comp_method', $compMethod],
+                ['encryption_method', $encMethod],
+            ] as [$key, $val]
+        ) {
+            $context->builder->call(
+                $setLong,
+                $ht,
+                $context->builder->load($context->constantStringFromString($key)),
+                $val
+            );
+        }
+        $okSlot = JitValueBox::alloc($context);
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $okPtr,
+            $ht
+        );
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $missSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $missSlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $missPtr = JitValueBox::pointer($context, $missSlot);
+        $missTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($valuePtrTy);
+        $phi->addIncoming($okPtr, $okTail);
+        $phi->addIncoming($missPtr, $missTail);
+
+        return $phi;
+    }
+
+    /** Decode LE int32 at byte offset inside a __string__ payload into sext i64. */
+    private static function int32LeAtStringOffset(Context $context, Value $strPtr, int $byteOffset): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $raw = $context->builder->pointerCast($strPtr, $i8p);
+        $data = $context->builder->gep($raw, $context->constantFromInteger(16, 'size_t'));
+        $at = $context->builder->gep($data, $context->constantFromInteger($byteOffset, 'size_t'));
+        $b0 = $context->builder->load($context->builder->gep($at, $context->constantFromInteger(0, 'size_t')));
+        $b1 = $context->builder->load($context->builder->gep($at, $context->constantFromInteger(1, 'size_t')));
+        $b2 = $context->builder->load($context->builder->gep($at, $context->constantFromInteger(2, 'size_t')));
+        $b3 = $context->builder->load($context->builder->gep($at, $context->constantFromInteger(3, 'size_t')));
+        $u0 = $context->builder->zext($b0, $i32);
+        $u1 = $context->builder->shl($context->builder->zext($b1, $i32), $i32->constInt(8, false));
+        $u2 = $context->builder->shl($context->builder->zext($b2, $i32), $i32->constInt(16, false));
+        $u3 = $context->builder->shl($context->builder->zext($b3, $i32), $i32->constInt(24, false));
+        $packed = $context->builder->or($context->builder->or($u0, $u1), $context->builder->or($u2, $u3));
+
+        return $context->builder->zext($packed, $i64);
+    }
+
+    /** Slice __string__ from byte offset to end (entry name after RETURN_SB ints). */
+    private static function stringFromPayloadOffset(Context $context, Value $strPtr, int $byteOffset): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $raw = $context->builder->pointerCast($strPtr, $i8p);
+        $lenPtr = $context->builder->pointerCast(
+            $context->builder->gep($raw, $context->constantFromInteger(8, 'size_t')),
+            $context->getTypeFromString('int64*')
+        );
+        $len = $context->builder->load($lenPtr);
+        $off = $i64->constInt($byteOffset, false);
+        $payLen = $context->builder->sub($len, $off);
+        $isEmpty = $context->builder->icmp(Builder::INT_SLE, $payLen, $i64->constInt(0, false));
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_stat_name_empty_'.$id);
+        $sliceBlock = BasicBlockHelper::append($context, 'zip_stat_name_slice_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_stat_name_done_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $sliceBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $emptyTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($sliceBlock);
+        $data = $context->builder->gep($raw, $context->constantFromInteger(16, 'size_t'));
+        $nameCstr = $context->builder->gep($data, $context->constantFromInteger($byteOffset, 'size_t'));
+        $sliced = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $payLen,
+            $context->builder->pointerCast($nameCstr, $context->getTypeFromString('char*'))
+        );
+        $sliceTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $strTy = $context->getTypeFromString('__string__*');
+        $phi = $context->builder->phi($strTy);
+        $phi->addIncoming($empty, $emptyTail);
+        $phi->addIncoming($sliced, $sliceTail);
+
+        return $phi;
     }
 
     /** locateName: index >= 0 → long; -1 miss → false (#35437). */
