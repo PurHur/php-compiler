@@ -2185,10 +2185,11 @@ class Context {
         $this->functionProxies['domdocument::__construct'] = new Call\DomDocumentConstruct();
         // ZipArchive::__construct — seed stub props for thin AOT (#35002 leftover of #20584).
         $this->functionProxies['ziparchive::__construct'] = new Call\ZipArchiveConstruct();
-        // ZipArchive methods — NestedJIT helper (peer HashContext #3357; #35424 / #35437 / #35440 / #35449 / #35450 / #35455 leftover of #6414).
+        // ZipArchive methods — NestedJIT helper (peer HashContext #3357; #35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35465 leftover of #6414).
         foreach ([
             'open',
             'addFromString',
+            'addEmptyDir',
             'addFile',
             'close',
             'getFromName',

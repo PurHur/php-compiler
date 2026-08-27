@@ -12,7 +12,7 @@ use PHPLLVM\Value;
 
 /**
  * ZipArchive thin-AOT methods — open / add / close / get / locate / index / rename / delete / status
- * (#35424 / #35437 / #35440 / #35449 / #35450 / #35455).
+ * (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35465).
  *
  * php-src: ext/zip/php_zip.c
  */
@@ -33,6 +33,7 @@ final class ZipArchiveMethod implements Call
         return match (strtolower($this->method)) {
             'open' => JitZipArchive::open($context, ...$args),
             'addfromstring' => JitZipArchive::addFromString($context, ...$args),
+            'addemptydir' => JitZipArchive::addEmptyDir($context, ...$args),
             'addfile' => JitZipArchive::addFile($context, ...$args),
             'getfromname' => JitZipArchive::getFromName($context, ...$args),
             'getfromindex' => JitZipArchive::getFromIndex($context, ...$args),
@@ -44,7 +45,7 @@ final class ZipArchiveMethod implements Call
             'getstatusstring' => JitZipArchive::getStatusString($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35437/#35440/#35449/#35450/#35455)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35437/#35440/#35449/#35450/#35455/#35465)'
             ),
         };
     }

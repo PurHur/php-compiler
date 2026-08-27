@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 use PHPCompiler\ext\standard\JitFileGetContents;
+use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Builtin\StringFilePutContents;
@@ -20,7 +21,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for ZipArchive open/add/close/get/locate/index (#35424 / #35437 / #35440 / #35449).
+ * LLVM lowering for ZipArchive open/add/close/get/locate/index (#35424 / #35437 / #35440 / #35449 / #35465).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -237,6 +238,66 @@ final class JitZipArchive
         self::syncProps($context, $obj, $handle);
 
         return self::boxBoolFromI64($context, $ok);
+    }
+
+    /** ZipArchive::addEmptyDir — IR append "/" + NestedJIT addir (#35465 leftover of #35424 / #19880). */
+    public static function addEmptyDir(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::addEmptyDir', 1, 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $dirname = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::addEmptyDir',
+            0,
+            'dirname'
+        );
+        // Optional $flags ignored (php-src zim_ZipArchive_addEmptyDir).
+        // Empty dirname → false (do not concat to "/" — that would add a root entry).
+        $strMap = $context->structFieldMap['__string__'];
+        $dirLen = $context->builder->load(
+            $context->builder->structGep($dirname, $strMap['length'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $dirLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_aed_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_aed_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_aed_done_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $rcEmpty = $zero;
+        $emptyTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $slash = ZipArchiveEmbedBridge::opString($context, '/');
+        $dirnameSlash = JitStringConcat::concat($context, $dirname, $slash, false);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $rcOk = self::execLong(
+            $context,
+            'addir',
+            $handle,
+            $zero,
+            $dirnameSlash,
+            $empty
+        );
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $rcPhi = $context->builder->phi($i64);
+        $rcPhi->addIncoming($rcOk, $okTail);
+        $rcPhi->addIncoming($rcEmpty, $emptyTail);
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $rcPhi);
     }
 
     /** ZipArchive::addFile — file_get_contents in IR + NestedJIT add (#35449 leftover of #35424). */
