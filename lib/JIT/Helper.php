@@ -565,18 +565,14 @@ restart:
                             $__right
                         );
                     case OpCode::TYPE_DIV:
-                        // PHP `/` is always float (zend_div). Integer sdiv made `7/2` int(3) (#31968).
+                        // php-src div_function: exact long/long → int, else double (#35337).
+                        $folded = JitLongDiv::tryFoldBinary($this->context, $left, $right);
+                        if (null !== $folded) {
+                            return $folded;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                        $f64 = $this->context->getTypeFromString('double');
-                        $leftDouble = $this->context->builder->siToFp($leftValue, $f64);
-                        $rightDouble = $this->context->builder->siToFp($__right, $f64);
-                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
-                            $this->context,
-                            $rightDouble,
-                            'Division by zero'
-                        );
-                        $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
-                        goto return_double;
+
+                        return JitLongDiv::binaryNativeLong($this->context, $leftValue, $__right);
                     case OpCode::TYPE_MODULO:
                         $result = JitNumericDivisionGuard::signedModulo($this->context, $leftValue, $rightValue);
                         goto return_long;
@@ -998,16 +994,7 @@ restart:
                     $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
                     $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
                     if (OpCode::TYPE_DIV === $opcode->type) {
-                        $f64 = $this->context->getTypeFromString('double');
-                        $leftDouble = $this->context->builder->siToFp($leftLong, $f64);
-                        $rightDouble = $this->context->builder->siToFp($rightLong, $f64);
-                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
-                            $this->context,
-                            $rightDouble,
-                            'Division by zero'
-                        );
-                        $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
-                        goto return_double;
+                        return JitLongDiv::binaryNativeLong($this->context, $leftLong, $rightLong);
                     }
                     // convert_to_long then ZEND_SIGNED_*_OVERFLOW (#32426 leftover of #31964).
                     return JitLongArithOverflow::binaryNativeLong(
@@ -2163,19 +2150,10 @@ restart:
                 );
             }
             if (OpCode::TYPE_DIV === $opcode->type) {
-                $f64 = $this->context->getTypeFromString('double');
-                $leftDouble = $this->context->builder->siToFp(
-                    JitLongArg::lowerStringValue($this->context, $leftValue),
-                    $f64
-                );
-                $rightDouble = $this->context->builder->siToFp($rightValue, $f64);
-                JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
-                    $this->context,
-                    $rightDouble,
-                    'Division by zero'
-                );
-                $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
-                goto return_double;
+                $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+
+                return JitLongDiv::binaryNativeLong($this->context, $leftLong, $__right);
             }
             if (OpCode::TYPE_SPACESHIP === $opcode->type || self::isOrderedCompareOpcode($opcode->type)) {
                 $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
@@ -2271,19 +2249,10 @@ restart:
                 );
             }
             if (OpCode::TYPE_DIV === $opcode->type) {
-                $f64 = $this->context->getTypeFromString('double');
-                $leftDouble = $this->context->builder->siToFp($leftValue, $f64);
-                $rightDouble = $this->context->builder->siToFp(
-                    JitLongArg::lowerStringValue($this->context, $rightValue),
-                    $f64
-                );
-                JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
-                    $this->context,
-                    $rightDouble,
-                    'Division by zero'
-                );
-                $result = $this->context->builder->fdiv($leftDouble, $rightDouble);
-                goto return_double;
+                $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
+
+                return JitLongDiv::binaryNativeLong($this->context, $__left, $rightLong);
             }
             if (OpCode::TYPE_SPACESHIP === $opcode->type || self::isOrderedCompareOpcode($opcode->type)) {
                 $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
