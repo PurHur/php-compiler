@@ -725,6 +725,41 @@ final class JitZipArchive
         return $ptr;
     }
 
+    /**
+     * ZipArchive::count — Countable entry count via NestedJIT num_files (#35466 leftover of #35424).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_count
+     */
+    public static function count(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::count', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        $n = self::execLong(
+            $context,
+            'num_files',
+            $handle,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $ptr,
+            $n
+        );
+
+        return $ptr;
+    }
+
     public static function ensureHandle(Context $context, Value $obj): Value
     {
         ZipArchiveEmbedBridge::ensureLinked($context);
