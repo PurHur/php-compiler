@@ -11,14 +11,17 @@ use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT for mb_preferred_mime_name() (php-src ext/mbstring/mbstring.c; #13100, #34298).
+ * LLVM JIT/AOT for mb_preferred_mime_name() (php-src ext/mbstring/mbstring.c; #13100, #34298, #35275).
  *
- * Compile-time fold for string literals; runtime via NestedJIT {@see MbPreferredMimeNameJitHelper}.
- * Peer {@see JitMbEncodingRegistry} / {@see JitMbChrOrd}.
+ * Compile-time fold for string literals; runtime via leaf NestedJIT
+ * {@see MbPreferredMimeNameJitHelper} (peer {@see JitMbEncodingRegistry} / #35216).
+ * `ensureLinked` runs **before** arg lowering (peer #34270).
  */
 final class JitMbPreferredMimeName
 {
@@ -37,6 +40,13 @@ final class JitMbPreferredMimeName
             return $folded;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbPreferredMimeNameRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_preferred_mime_runtime');
+
         $encoding = JitStringBuiltinArg::lower(
             $context,
             $args[0],
@@ -44,12 +54,8 @@ final class JitMbPreferredMimeName
             0,
             'encoding'
         );
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbPreferredMimeNameRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
+        $context->builder->call(MbPreferredMimeNameRuntime::assertEncodingHelper($context), $encoding);
+        TryCatchHelper::emitCheckPendingThrowAfterCall($context);
 
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
@@ -57,7 +63,7 @@ final class JitMbPreferredMimeName
             [$encoding]
         );
 
-        return self::boxStringOrFalse($context, $raw);
+        return self::boxStringOrEmptyFalse($context, $raw);
     }
 
     private static function tryCompileTimeFold(Context $context, JITVariable $arg): ?Value
@@ -89,19 +95,23 @@ final class JitMbPreferredMimeName
     }
 
     /**
-     * NestedJIT string|false → `__value__*` (peer JitMbChrOrd / #34250).
+     * NestedJIT string (empty = no mime) → `__value__*` string|false.
      */
-    private static function boxStringOrFalse(Context $context, Value $raw): Value
+    private static function boxStringOrEmptyFalse(Context $context, Value $raw): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_preferred_mime_box');
+        $strPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+        $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
+        $slen = $context->builder->call($context->lookupFunction('__string__strlen'), $strPtr);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $slen, $i64->constInt(0, false));
+
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
-        $isMiss = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
         $missBb = BasicBlockHelper::append($context, 'mb_preferred_mime_miss');
         $hitBb = BasicBlockHelper::append($context, 'mb_preferred_mime_hit');
         $doneBb = BasicBlockHelper::append($context, 'mb_preferred_mime_done');
-        $context->builder->branchIf($isMiss, $missBb, $hitBb);
+        $context->builder->branchIf($isEmpty, $missBb, $hitBb);
 
         $context->builder->positionAtEnd($missBb);
         $context->builder->call(
@@ -112,7 +122,6 @@ final class JitMbPreferredMimeName
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($hitBb);
-        $strPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $strPtr);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),

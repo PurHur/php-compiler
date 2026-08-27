@@ -28,11 +28,19 @@ final class MbPreferredMimeNameRuntimeAotTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $helper = (string) file_get_contents($root.'/ext/mbstring/MbPreferredMimeNameJitHelper.php');
-        $this->assertStringContainsString('function preferredArgv', $helper);
-        $this->assertStringContainsString('MbstringEncodingRegistry::preferredMimeName', $helper);
+        $this->assertStringContainsString('function assertEncodingArgv', $helper);
+        $this->assertStringContainsString('function preferredMimeArgv', $helper);
+        $this->assertStringNotContainsString('MbstringEncodingRegistry::', $helper);
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbPreferredMimeNameRuntime.php');
+        $this->assertStringContainsString('assertEncodingHelper', $runtime);
         $this->assertStringContainsString('preferredHelper', $runtime);
-        $this->assertStringContainsString('MbPreferredMimeNameJitHelper::preferredArgv', $runtime);
+        $this->assertStringContainsString('MbPreferredMimeNameJitHelper::preferredMimeArgv', $runtime);
+        $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbPreferredMimeName.php');
+        $this->assertStringContainsString('ensureLinked($context)', $jit);
+        $this->assertLessThan(
+            strpos($jit, 'JitStringBuiltinArg::lower'),
+            strpos($jit, 'MbPreferredMimeNameRuntime::ensureLinked')
+        );
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_preferred_mime_name.php');
         $this->assertStringContainsString('JitMbPreferredMimeName::invoke', $src);
         $this->assertStringNotContainsString(
