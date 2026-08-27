@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Builtin\StringFilePutContents;
 use PHPCompiler\JIT\Builtin\ZipArchiveEmbedBridge;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -21,7 +22,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for ZipArchive open/add/close/get/locate/index/extract (#35424 / #35437 / #35440 / #35449 / #35465 / #35467).
+ * LLVM lowering for ZipArchive open/add/close/get/locate/index/extract/rename (#35424 / #35437 / #35440 / #35449 / #35450 / #35465 / #35467 / #35474).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -641,6 +642,60 @@ final class JitZipArchive
             $handle,
             $context->getTypeFromString('int64')->constInt(0, false),
             $name,
+            $newName
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /** ZipArchive::renameIndex — NestedJIT rename_index for slots 0/1 (#35474 leftover of #35450). */
+    public static function renameIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::renameIndex', 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower($context, $args[1], 'ZipArchive::renameIndex(): Argument #1 ($index)');
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        $newName = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[2],
+            'ZipArchive::renameIndex',
+            1,
+            'new_name'
+        );
+        // Empty new_name → ValueError in IR (NestedJIT throw SIGSEGVs under thin AOT).
+        $strMap = $context->structFieldMap['__string__'];
+        $newLen = $context->builder->load(
+            $context->builder->structGep($newName, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $newLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_ri_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_ri_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::renameIndex(): Argument #2 ($new_name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'rename_index',
+            $index,
+            $zero,
+            $empty,
             $newName
         );
         self::syncProps($context, $obj, $handle);
