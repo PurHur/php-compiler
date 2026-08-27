@@ -97,17 +97,25 @@ final class DomUserScriptElementCacheLlvm
     }
 
     /**
-     * Rekey single-slot id cache only when it currently holds $element (#35321).
+     * Rekey single-slot id cache after setAttribute('id', …) (#19870 / #35321 / #35329).
      *
-     * Unconditional rebindId retargets the id string while keeping a stale element pointer,
-     * so getElementById(old) can still resolve via PROP_ELEMENT_ID_MAP and getElementById(new)
-     * can point at the wrong node after a sibling also carried id=.
+     * Retarget when the cache holds $element, or when {@see $oldIdLit} matches the cached
+     * id string (loadHTML getElementById temps may not share the setAttribute receiver
+     * pointer — #35326 pointer-only check regressed #19870). A different element's id
+     * write must not steal GLOBAL_ID.
+     *
+     * @param string|null $oldIdLit Prior id being replaced; null skips the id-string match
      */
-    public static function rebindIdIfElement(Context $context, ?Value $element, string $newIdLit): void
-    {
+    public static function rebindIdIfElement(
+        Context $context,
+        ?Value $element,
+        string $newIdLit,
+        ?string $oldIdLit = null
+    ): void {
         self::ensureGlobals($context);
         $i1 = $context->getTypeFromString('int1');
         $objPtr = $context->getTypeFromString('__object__*');
+        $i64 = $context->getTypeFromString('int64');
 
         $storedOk = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_OK));
         $hasStore = $context->builder->icmp(Builder::INT_EQ, $storedOk, $i1->constInt(1, false));
@@ -121,12 +129,43 @@ final class DomUserScriptElementCacheLlvm
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($checkBlock);
-        if (null !== $element) {
+        if (null === $element) {
+            $context->builder->branch($doBlock);
+        } else {
             $cachedElem = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ELEM));
             $isReceiver = $context->builder->icmp(Builder::INT_EQ, $cachedElem, $element);
-            $context->builder->branchIf($isReceiver, $doBlock, $skipBlock);
-        } else {
-            $context->builder->branch($doBlock);
+            if (null === $oldIdLit || '' === $oldIdLit) {
+                $context->builder->branchIf($isReceiver, $doBlock, $skipBlock);
+            } else {
+                $shouldSlot = BasicBlockHelper::entryAlloca($context, $i1);
+                $context->builder->store($isReceiver, $shouldSlot);
+                $cachedId = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ID));
+                $hasCachedId = $context->builder->icmp(
+                    Builder::INT_NE,
+                    $cachedId,
+                    $cachedId->typeOf()->constNull()
+                );
+                $idCmpBlock = BasicBlockHelper::append($context, 'dom_us_rebind_idcmp');
+                $afterIdBlock = BasicBlockHelper::append($context, 'dom_us_rebind_afterid');
+                $context->builder->branchIf($hasCachedId, $idCmpBlock, $afterIdBlock);
+
+                $context->builder->positionAtEnd($idCmpBlock);
+                $oldIdStr = $context->builder->load($context->constantStringFromString($oldIdLit));
+                $cmp = JitStringCompare::strcmp($context, $cachedId, $oldIdStr);
+                $idMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+                $context->builder->store(
+                    $context->builder->or($context->builder->load($shouldSlot), $idMatch),
+                    $shouldSlot
+                );
+                $context->builder->branch($afterIdBlock);
+
+                $context->builder->positionAtEnd($afterIdBlock);
+                $context->builder->branchIf(
+                    $context->builder->load($shouldSlot),
+                    $doBlock,
+                    $skipBlock
+                );
+            }
         }
 
         $context->builder->positionAtEnd($doBlock);
@@ -138,6 +177,9 @@ final class DomUserScriptElementCacheLlvm
         $context->builder->store($ownedId, $context->module->getNamedGlobal(self::GLOBAL_ID));
         if ('' === $newIdLit) {
             $context->builder->store($objPtr->constNull(), $context->module->getNamedGlobal(self::GLOBAL_ELEM));
+        } elseif (null !== $element) {
+            // Align cache element with the setAttribute receiver (loadHTML pointer mismatch; #35329).
+            $context->builder->store($element, $context->module->getNamedGlobal(self::GLOBAL_ELEM));
         }
         $context->builder->branch($doneBlock);
 
