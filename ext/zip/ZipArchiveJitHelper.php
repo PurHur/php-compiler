@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\zip;
 
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
- * #35465 / #35466 / #35467 / #35472 / #35476 / #35486) — CREATE/add/close/get/locate/index/
- * rename/delete/extract/status/count/archive-comment/entry-comment path.
+ * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489) — CREATE/add/close/get/locate/
+ * index/rename/delete/extract/status/count/archive-comment/entry-comment/unchange path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -19,7 +19,7 @@ namespace PHPCompiler\ext\zip;
  * close / getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
  * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
- * setCommentIndex / getCommentIndex)
+ * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive)
  */
 final class ZipArchiveJitHelper
 {
@@ -42,6 +42,21 @@ final class ZipArchiveJitHelper
     private static string $h1ecomment = '';
 
     private static string $h1ecomment2 = '';
+
+    /** Open-time snapshot for unchangeAll / unchangeArchive (#35489 / #20387). */
+    private static string $h1snap_name = '';
+
+    private static string $h1snap_data = '';
+
+    private static string $h1snap_name2 = '';
+
+    private static string $h1snap_data2 = '';
+
+    private static string $h1snap_comment = '';
+
+    private static string $h1snap_ecomment = '';
+
+    private static string $h1snap_ecomment2 = '';
 
     private static int $h1status = 0;
 
@@ -72,6 +87,7 @@ final class ZipArchiveJitHelper
             self::$h1ecomment2 = '';
             self::$h1status = 0;
             self::$h1readonly = 0;
+            self::snapSave();
 
             return self::pack($h);
         }
@@ -139,6 +155,7 @@ final class ZipArchiveJitHelper
                             break;
                         }
                     }
+                    self::snapSave();
 
                     return self::pack($h);
                 }
@@ -680,8 +697,45 @@ final class ZipArchiveJitHelper
 
             return self::pack(1);
         }
+        // unchangeAll — restore open snapshot (#35489 leftover of #35486 / #20387).
+        if ('ua' === $op) {
+            if (1 !== self::$h1open) {
+                throw new \ValueError('Invalid or uninitialized Zip object');
+            }
+            self::$h1name = self::$h1snap_name;
+            self::$h1data = self::$h1snap_data;
+            self::$h1name2 = self::$h1snap_name2;
+            self::$h1data2 = self::$h1snap_data2;
+            self::$h1comment = self::$h1snap_comment;
+            self::$h1ecomment = self::$h1snap_ecomment;
+            self::$h1ecomment2 = self::$h1snap_ecomment2;
+            self::$h1status = 0;
+
+            return self::packPayload(1, self::$h1comment);
+        }
+        // unchangeArchive — restore archive comment only (#35489 / #20387).
+        if ('uar' === $op) {
+            if (1 !== self::$h1open) {
+                throw new \ValueError('Invalid or uninitialized Zip object');
+            }
+            self::$h1comment = self::$h1snap_comment;
+            self::$h1status = 0;
+
+            return self::packPayload(1, self::$h1comment);
+        }
 
         return self::pack(0);
+    }
+
+    private static function snapSave(): void
+    {
+        self::$h1snap_name = self::$h1name;
+        self::$h1snap_data = self::$h1data;
+        self::$h1snap_name2 = self::$h1name2;
+        self::$h1snap_data2 = self::$h1data2;
+        self::$h1snap_comment = self::$h1comment;
+        self::$h1snap_ecomment = self::$h1ecomment;
+        self::$h1snap_ecomment2 = self::$h1ecomment2;
     }
 
     private static function pack(int $rc): string

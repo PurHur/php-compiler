@@ -1,0 +1,33 @@
+<?php
+// ZipArchive unchangeAll / unchangeArchive — AOT must match VM (#35489 leftover of #35486).
+$path = sys_get_temp_dir() . '/phpc_zip_35489_' . getmypid() . '.zip';
+@unlink($path);
+$z = new ZipArchive();
+$z->open($path, ZipArchive::CREATE);
+$z->addFromString('a.txt', 'AAA');
+echo 'setArch=';
+var_export($z->setArchiveComment('note'));
+echo "\n";
+echo 'getArch=';
+var_export($z->getArchiveComment());
+echo "\n";
+echo 'unchangeArch=';
+var_export($z->unchangeArchive());
+echo "\n";
+echo 'afterUar=';
+var_export($z->getArchiveComment());
+echo "\n";
+echo 'setArch2=';
+var_export($z->setArchiveComment('again'));
+echo "\n";
+echo 'unchangeAll=';
+var_export($z->unchangeAll());
+echo "\n";
+echo 'afterUa=';
+var_export($z->getArchiveComment());
+echo "\n";
+echo 'still=';
+var_export($z->getFromName('a.txt'));
+echo "\n";
+$z->close();
+@unlink($path);
