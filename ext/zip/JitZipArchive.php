@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Builtin\StringFilePutContents;
 use PHPCompiler\JIT\Builtin\ZipArchiveEmbedBridge;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -637,11 +638,31 @@ final class JitZipArchive
             1,
             'new_name'
         );
+        // Empty new_name → ValueError in IR (#35481; NestedJIT throw SIGSEGVs under thin AOT).
+        $strMap = $context->structFieldMap['__string__'];
+        $newLen = $context->builder->load(
+            $context->builder->structGep($newName, $strMap['length'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $newLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_rn_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_rn_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::renameName(): Argument #2 ($new_name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
         $ok = self::execLong(
             $context,
             'rename',
             $handle,
-            $context->getTypeFromString('int64')->constInt(0, false),
+            $zero,
             $name,
             $newName
         );
@@ -671,12 +692,31 @@ final class JitZipArchive
             1,
             'new_name'
         );
+        // Empty new_name → ValueError in IR (#35481; NestedJIT throw SIGSEGVs under thin AOT).
+        $strMap = $context->structFieldMap['__string__'];
+        $newLen = $context->builder->load(
+            $context->builder->structGep($newName, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $newLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_ri_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_ri_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::renameIndex(): Argument #2 ($new_name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
         $empty = ZipArchiveEmbedBridge::emptyString($context);
         $ok = self::execLong(
             $context,
             'rename_index',
             $index,
-            $i64->constInt(0, false),
+            $zero,
             $empty,
             $newName
         );
