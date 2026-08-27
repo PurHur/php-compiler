@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -25,10 +26,13 @@ use PHPLLVM\Value;
  *
  * Compile-time bake in {@see JitOpensslPbkdf2} (#32429) only handles literals; this path
  * lowers runtime password/salt/key_length/iterations/digest_algo as well.
+ * Unknown digest softfail E_WARNING via {@see JitBuiltinWarning} (#35399 peer #35382).
  */
 final class openssl_pbkdf2 extends Internal
 {
     private const KEY_LENGTH_ERROR = 'openssl_pbkdf2(): Argument #3 ($key_length) must be greater than 0';
+
+    private const UNKNOWN_DIGEST_WARNING = 'openssl_pbkdf2(): Unknown digest algorithm';
 
     private static int $blockSerial = 0;
 
@@ -79,6 +83,15 @@ final class openssl_pbkdf2 extends Internal
             throw new \ArgumentCountError(
                 'openssl_pbkdf2() expects 4 or 5 arguments, '.$argc.' given'
             );
+        }
+
+        // Compile-time unknown digest_algo: bake Zend-shaped E_WARNING + false (#35399).
+        // NestedJIT trigger_error is silent on thin AOT (peer #35382).
+        if (isset($args[4]) && null !== $args[4]->compileTimeString
+            && !OpensslCipherRegistry::digestImplemented($args[4]->compileTimeString)) {
+            JitBuiltinWarning::emit($context, self::UNKNOWN_DIGEST_WARNING);
+
+            return self::boxedFalse($context);
         }
 
         $passwordVal = JitStringBuiltinArg::lower($context, $args[0], 'openssl_pbkdf2', 0, 'password');

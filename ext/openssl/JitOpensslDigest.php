@@ -11,6 +11,7 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\ext\standard\JitHash;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -20,9 +21,13 @@ use PHPLLVM\Value;
  *
  * Known compile-time method names lower via {@see JitHash} / `__compiler_hash` (AOT-green).
  * Unknown / dynamic method names use NestedJIT {@see OpensslDigestJitHelper} (VM SSOT).
+ * Softfail E_WARNING via {@see JitBuiltinWarning} (#35399 peer #35382) — NestedJIT
+ * `trigger_error` is silent on thin AOT.
  */
 final class JitOpensslDigest
 {
+    private const UNKNOWN_DIGEST_WARNING = 'openssl_digest(): Unknown digest algorithm';
+
     private static int $blockSerial = 0;
 
     public static function digest(
@@ -45,11 +50,21 @@ final class JitOpensslDigest
 
                 return JitHash::hash($context, $methodVal, $dataVal, $rawI1);
             }
-            // Unknown compile-time algo: NestedJIT helper emits warning + false (#21081).
-            return self::digestViaNestedJit($context, $dataVal, $method, $rawI1);
+            // Unknown compile-time algo: bake Zend-shaped E_WARNING + false (#35399).
+            return self::unknownDigestSoftfail($context);
         }
 
         return self::digestViaNestedJit($context, $dataVal, $method, $rawI1);
+    }
+
+    /** Compile-time unknown digest_algo — peer asymmetric softfail bake (#35382). */
+    private static function unknownDigestSoftfail(Context $context): Value
+    {
+        JitBuiltinWarning::emit($context, self::UNKNOWN_DIGEST_WARNING);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+        return JitValueBox::pointer($context, $slot);
     }
 
     private static function digestViaNestedJit(
@@ -91,6 +106,8 @@ final class JitOpensslDigest
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        // Runtime unknown algo: NestedJIT helper returns null after silent trigger_error (#35399).
+        JitBuiltinWarning::emit($context, self::UNKNOWN_DIGEST_WARNING);
         JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
         $context->builder->branch($doneBlock);
 
