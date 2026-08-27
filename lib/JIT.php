@@ -16871,19 +16871,30 @@ class JIT {
      * tag/inner/attrs (php-src returns the same node; #35373 leftover of #35361; insertBefore
      * peer #35377 — null-ref ≡ append still keeps toCall as DomNodeInsertBefore).
      *
+     * replaceChild() returns the **old** child (php-src `dom_node_replace_child`); removeChild()
+     * returns the removed node — sync from `$callArgs[2]` / `$callArgs[1]` respectively (#35386).
+     *
      * @param array<int, Variable> $callArgs
      */
     private function propagateDomAppendChildCompileTimeTag(Operand $result, array $callArgs): void
     {
         $toCall = $this->context->scope->toCall;
-        if (!(
+        $childIndex = null;
+        if (
             $toCall instanceof JIT\Call\DomNodeAppendChild
             || $toCall instanceof JIT\Call\DomDocumentAppendChild
             || $toCall instanceof JIT\Call\DomNodeInsertBefore
-        )) {
+            || $toCall instanceof JIT\Call\DomNodeRemoveChild
+        ) {
+            // receiver, child — return is the child
+            $childIndex = 1;
+        } elseif ($toCall instanceof JIT\Call\DomNodeReplaceChild) {
+            // receiver, newChild, oldChild — return is oldChild (ext/dom/node.c)
+            $childIndex = 2;
+        } else {
             return;
         }
-        $child = $callArgs[1] ?? null;
+        $child = $callArgs[$childIndex] ?? null;
         if (!$child instanceof Variable) {
             return;
         }
