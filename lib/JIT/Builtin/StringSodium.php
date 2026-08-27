@@ -22,6 +22,17 @@ final class StringSodium
     private const HELPER_PATH = '/ext/sodium/SodiumJitHelper.php';
     private const PAD_HELPER_PATH = '/ext/sodium/SodiumPadJitHelper.php';
     private const HEX2BIN_HELPER_PATH = '/ext/sodium/SodiumHex2binJitHelper.php';
+    private const BASE64_HELPER_PATH = '/ext/sodium/SodiumBase64JitHelper.php';
+
+    /**
+     * NestedJIT bundle so Base64JitHelper::encodeArgv is in-scope (#35378 / peer utf8 #32879).
+     *
+     * @var list<string>
+     */
+    private const BASE64_HELPER_BUNDLE = [
+        '/ext/standard/Base64JitHelper.php',
+        '/ext/sodium/SodiumBase64JitHelper.php',
+    ];
 
     private const SECRETBOX_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::secretbox';
 
@@ -50,6 +61,8 @@ final class StringSodium
     private const HEX2BIN_IGNORE_BYTE = 'PHPCompiler\\ext\\sodium\\SodiumHex2binJitHelper::ignoreByte';
     private const HEX2BIN_IGNORE_REST = 'PHPCompiler\\ext\\sodium\\SodiumHex2binJitHelper::ignoreRest';
 
+    private const BIN2BASE64_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumBase64JitHelper::bin2base64Argv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SECRETBOX_HELPER,
@@ -60,6 +73,11 @@ final class StringSodium
         self::STREAM_XCHACHA20_XOR_HELPER,
         self::MEMCMP_HELPER,
         self::COMPARE_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const BASE64_COMPILED_HELPERS = [
+        self::BIN2BASE64_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -150,6 +168,29 @@ final class StringSodium
         return $context->builder->call(
             $context->lookupFunction('__compiler_sodium_hex2bin_decode'),
             $string
+        );
+    }
+
+    /** #35378 — sodium_bin2base64 NestedJIT (user-binary bundle with Base64JitHelper). */
+    public static function invokeBin2base64Helper(Context $context, Value $string, Value $id): Value
+    {
+        self::ensureBin2base64HelperCompiled($context);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            JitVmHelperLink::lookupCompiled($context, self::BIN2BASE64_HELPER, '#35378'),
+            [$string, $id]
+        );
+
+        return JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+    }
+
+    private static function ensureBin2base64HelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::BASE64_HELPER_BUNDLE,
+            self::BASE64_COMPILED_HELPERS,
+            '#35378'
         );
     }
 

@@ -9,12 +9,17 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** sodium_bin2base64() — binary to base64 variant (php-src ext/sodium/libsodium.c; #20675). */
+/**
+ * sodium_bin2base64() — binary to base64 variant (php-src ext/sodium/libsodium.c; #20675, #35378).
+ *
+ * JIT/AOT: NestedJIT {@see SodiumBase64JitHelper} via {@see JitSodium::invokeBin2base64}.
+ */
 final class sodium_bin2base64 extends Internal
 {
     public function __construct()
@@ -36,6 +41,18 @@ final class sodium_bin2base64 extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() JIT is not supported in this compiler build');
+        if (!$this->requireExactJitArgCount($context, $args, $this->getName(), 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+        $string = JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $args[0],
+            $this->getName(),
+            0,
+            'string'
+        );
+        $id = $this->jitLong($context, $args[1], $this->getName().' id');
+
+        return JitSodium::invokeBin2base64($context, $string, $id);
     }
 }

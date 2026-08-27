@@ -3712,6 +3712,12 @@ class Object_ extends Type {
         if ('numberformatter' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmNumberFormatter::classConstants());
         }
+        // Collator Call proxies are linked (#28649); seed PRIMARY/SORT_*/… so ClassConstFetch
+        // folds to compile-time long (#35379 peer of #35366). Without this, thin AOT raises
+        // Undefined constant Collator::PRIMARY at runtime.
+        if ('collator' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmCollator::classConstants());
+        }
         // Transliterator::create Call proxy is linked even when host lacks ext-intl; seed
         // FORWARD/REVERSE so ClassConstFetch folds to compile-time long (#35383 peer of #35366).
         if ('transliterator' === $lcname) {
