@@ -1368,6 +1368,41 @@ final class JitZipArchive
         return self::boxBoolFromI64($context, $rcPhi);
     }
 
+    /**
+     * ZipArchive::setPassword — NestedJIT spw (#35500 leftover of #35496 / #19873).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setPassword
+     */
+    public static function setPassword(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::setPassword', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $password = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::setPassword',
+            0,
+            'password'
+        );
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        $ok = self::execLong(
+            $context,
+            'spw',
+            $handle,
+            $i64->constInt(0, false),
+            $password,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
     public static function close(Context $context, JITVariable ...$args): Value
     {
         if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::close', 0)) {
