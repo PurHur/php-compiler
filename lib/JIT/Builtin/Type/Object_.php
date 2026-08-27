@@ -3689,6 +3689,12 @@ class Object_ extends Type {
                 'include_end_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_INCLUDE_END_DATE,
             ]);
         }
+        // Normalizer::normalize Call proxy is always registered (#28654); seed FORM_* so
+        // ClassConstFetch folds to compile-time long. Without this, pending ErrorRaise leaves
+        // a null form arg and thin AOT segfaults (re-#28654 / AotTest normalizer_normalize_28654).
+        if ('normalizer' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmNormalizer::classConstants());
+        }
         // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
         // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
         // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
