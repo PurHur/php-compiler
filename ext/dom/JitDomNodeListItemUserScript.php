@@ -116,6 +116,47 @@ final class JitDomNodeListItemUserScript
                 }
             }
             if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
+                if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+                    $indexVal = $context->helper->loadValue($arg);
+                } elseif (JITVariable::TYPE_VALUE === $arg->type) {
+                    $indexVal = $context->builder->call(
+                        $context->lookupFunction('__value__readLong'),
+                        JitValueBox::valuePtrFromVariable($context, $arg)
+                    );
+                } else {
+                    $indexVal = null;
+                }
+                if (null !== $indexVal) {
+                    $pinned = DomUserScriptPinnedRootLlvm::load($context);
+                    $live = JitDomLiveElementsByTagWalk::itemAt(
+                        $context,
+                        $pinned,
+                        $queryTag,
+                        $indexVal,
+                        false
+                    );
+                    $compileTime = self::materializeDynamicIndexQueryMatch(
+                        $context,
+                        $xml,
+                        $queryTag,
+                        $arg
+                    );
+                    $objPtrTy = $context->getTypeFromString('__object__*');
+                    $pinNull = $context->builder->icmp(
+                        Builder::INT_EQ,
+                        $pinned,
+                        $objPtrTy->constNull()
+                    );
+                    $liveObj = $context->builder->call(
+                        $context->lookupFunction('__value__readObject'),
+                        $live
+                    );
+                    $liveNull = $context->builder->icmp(Builder::INT_EQ, $liveObj, $objPtrTy->constNull());
+                    $preferRemat = $context->builder->or($pinNull, $liveNull);
+
+                    return $context->builder->select($preferRemat, $compileTime, $live);
+                }
+
                 return self::materializeDynamicIndexQueryMatch($context, $xml, $queryTag, $arg);
             }
             if (null !== $tagQuery && null !== $itemMarkup) {
@@ -137,9 +178,35 @@ final class JitDomNodeListItemUserScript
             return null;
         }
 
-        // XPath //tag (and predicate) lists: materialize Nth match with attrs (#27275).
+        // XPath //tag lists: prefer live pinned-root walk so item() keeps
+        // ownerDocument for setIdAttribute (#35447). Always rematerializing
+        // (#27275) returned a detached clone — getAttribute worked via Attr
+        // presence, but NestedJIT setIdAttribute SIGSEGV'd.
         if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
-            return self::materializeNthQueryMatch($context, $xml, $queryTag, $index);
+            $pinned = DomUserScriptPinnedRootLlvm::load($context);
+            $i64 = $context->getTypeFromString('int64');
+            $live = JitDomLiveElementsByTagWalk::itemAt(
+                $context,
+                $pinned,
+                $queryTag,
+                $i64->constInt($index, false),
+                false
+            );
+            $compileTime = self::materializeNthQueryMatch($context, $xml, $queryTag, $index);
+            $objPtrTy = $context->getTypeFromString('__object__*');
+            $pinNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $pinned,
+                $objPtrTy->constNull()
+            );
+            $liveObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $live
+            );
+            $liveNull = $context->builder->icmp(Builder::INT_EQ, $liveObj, $objPtrTy->constNull());
+            $preferRemat = $context->builder->or($pinNull, $liveNull);
+
+            return $context->builder->select($preferRemat, $compileTime, $live);
         }
 
         // getElementsByTagNameNS live list — prefer pinned-root walk (#34995 / re-#34983).

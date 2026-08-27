@@ -16963,9 +16963,11 @@ class JIT {
      * Without this index, {@see \PHPCompiler\ext\dom\JitDomReplaceChild} leaves seeded InnerXml
      * unchanged so serialization keeps the replaced sibling.
      *
-     * getElementsByTagName()->item($N) is the Nth **tag match**, not childNodes[$N]. Using the
-     * raw NodeList index as {@see JIT\Variable::$compileTimeDomChildIndex} stamped tag `a` for
-     * `getElementsByTagName('b')->item(0)` and setIdAttribute registered id `x` on `<b>` (#35433
+     * getElementsByTagName()/XPath //tag ->item($N) is the Nth **tag match**, not
+     * childNodes[$N]. Using the raw NodeList index as
+     * {@see JIT\Variable::$compileTimeDomChildIndex} stamped tag `a` for
+     * `getElementsByTagName('b')->item(0)` / `query('//b')->item(0)` and
+     * setIdAttribute registered id `x` on `<b>` (or SIGSEGV; #35433 / #35447
      * re-#33957). Prefer {@see \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedChildIndex}
      * (mapped in {@see \PHPCompiler\ext\dom\JitDomNodeListItem::rememberTagListItemChildIndex},
      * #34780).
