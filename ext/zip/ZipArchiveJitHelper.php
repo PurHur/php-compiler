@@ -6,8 +6,9 @@ namespace PHPCompiler\ext\zip;
 
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
- * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491) — CREATE/add/close/get/
- * locate/index/rename/delete/extract/status/count/archive-comment/entry-comment/unchange path.
+ * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496) — CREATE/add/
+ * close/get/locate/index/rename/delete/extract/status/count/archive-comment/entry-comment/
+ * unchange/replaceFile path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -20,7 +21,7 @@ namespace PHPCompiler\ext\zip;
  * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
- * unchangeName)
+ * unchangeName / replaceFile)
  */
 final class ZipArchiveJitHelper
 {
@@ -151,6 +152,51 @@ final class ZipArchiveJitHelper
                             if ($cmtLen === $bi && $eoff + 22 + $cmtLen === $len) {
                                 if ($cmtLen > 0) {
                                     self::$h1comment = substr($data, $eoff + 22, $cmtLen);
+                                }
+                                // Entry comments in central directory — unrolled (NestedJIT) (#35493).
+                                $cdPos = ord($data[$eoff + 16]) | (ord($data[$eoff + 17]) << 8)
+                                    | (ord($data[$eoff + 18]) << 16) | (ord($data[$eoff + 19]) << 24);
+                                if ($cdPos + 46 <= $len) {
+                                    $sigC = ord($data[$cdPos]) | (ord($data[$cdPos + 1]) << 8)
+                                        | (ord($data[$cdPos + 2]) << 16) | (ord($data[$cdPos + 3]) << 24);
+                                    if (0x02014b50 === $sigC) {
+                                        $nlenC = ord($data[$cdPos + 28]) | (ord($data[$cdPos + 29]) << 8);
+                                        $xlenC = ord($data[$cdPos + 30]) | (ord($data[$cdPos + 31]) << 8);
+                                        $clenC = ord($data[$cdPos + 32]) | (ord($data[$cdPos + 33]) << 8);
+                                        $nameOff = $cdPos + 46;
+                                        if ($nameOff + $nlenC + $xlenC + $clenC <= $len) {
+                                            if ($clenC > 0) {
+                                                self::$h1ecomment = substr(
+                                                    $data,
+                                                    $nameOff + $nlenC + $xlenC,
+                                                    $clenC
+                                                );
+                                            }
+                                            $cdPos2 = $nameOff + $nlenC + $xlenC + $clenC;
+                                            if ($cdPos2 + 46 <= $len) {
+                                                $sigC2 = ord($data[$cdPos2]) | (ord($data[$cdPos2 + 1]) << 8)
+                                                    | (ord($data[$cdPos2 + 2]) << 16)
+                                                    | (ord($data[$cdPos2 + 3]) << 24);
+                                                if (0x02014b50 === $sigC2) {
+                                                    $nlenC2 = ord($data[$cdPos2 + 28])
+                                                        | (ord($data[$cdPos2 + 29]) << 8);
+                                                    $xlenC2 = ord($data[$cdPos2 + 30])
+                                                        | (ord($data[$cdPos2 + 31]) << 8);
+                                                    $clenC2 = ord($data[$cdPos2 + 32])
+                                                        | (ord($data[$cdPos2 + 33]) << 8);
+                                                    $nameOff2 = $cdPos2 + 46;
+                                                    if ($nameOff2 + $nlenC2 + $xlenC2 + $clenC2 <= $len
+                                                        && $clenC2 > 0) {
+                                                        self::$h1ecomment2 = substr(
+                                                            $data,
+                                                            $nameOff2 + $nlenC2 + $xlenC2,
+                                                            $clenC2
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             break;
@@ -458,22 +504,27 @@ final class ZipArchiveJitHelper
                 .chr($nl & 255).chr(($nl >> 8) & 255).chr(0).chr(0)
                 .$name.$content;
             $loff = 0;
+            $ecmt = self::$h1ecomment;
+            $ecl = strlen($ecmt);
             $central = chr(0x50).chr(0x4b).chr(0x01).chr(0x02)
                 .chr(20).chr(0).chr(20).chr(0).chr(0).chr(0).chr(0).chr(0)
                 .chr(0).chr(0).chr(0).chr(0)
                 .chr(0).chr(0).chr(0).chr(0)
                 .chr($size & 255).chr(($size >> 8) & 255).chr(($size >> 16) & 255).chr(($size >> 24) & 255)
                 .chr($size & 255).chr(($size >> 8) & 255).chr(($size >> 16) & 255).chr(($size >> 24) & 255)
-                .chr($nl & 255).chr(($nl >> 8) & 255).chr(0).chr(0).chr(0).chr(0)
+                .chr($nl & 255).chr(($nl >> 8) & 255).chr(0).chr(0)
+                .chr($ecl & 255).chr(($ecl >> 8) & 255)
                 .chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0)
                 .chr($loff & 255).chr(($loff >> 8) & 255).chr(($loff >> 16) & 255).chr(($loff >> 24) & 255)
-                .$name;
+                .$name.$ecmt;
             $countLow = 1;
             if ('' !== self::$h1name2) {
                 $name2 = self::$h1name2;
                 $content2 = self::$h1data2;
                 $size2 = strlen($content2);
                 $nl2 = strlen($name2);
+                $ecmt2 = self::$h1ecomment2;
+                $ecl2 = strlen($ecmt2);
                 $loff2 = strlen($local);
                 $local .= chr(0x50).chr(0x4b).chr(0x03).chr(0x04)
                     .chr(20).chr(0).chr(0).chr(0).chr(0).chr(0)
@@ -489,10 +540,11 @@ final class ZipArchiveJitHelper
                     .chr(0).chr(0).chr(0).chr(0)
                     .chr($size2 & 255).chr(($size2 >> 8) & 255).chr(($size2 >> 16) & 255).chr(($size2 >> 24) & 255)
                     .chr($size2 & 255).chr(($size2 >> 8) & 255).chr(($size2 >> 16) & 255).chr(($size2 >> 24) & 255)
-                    .chr($nl2 & 255).chr(($nl2 >> 8) & 255).chr(0).chr(0).chr(0).chr(0)
+                    .chr($nl2 & 255).chr(($nl2 >> 8) & 255).chr(0).chr(0)
+                    .chr($ecl2 & 255).chr(($ecl2 >> 8) & 255)
                     .chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0)
                     .chr($loff2 & 255).chr(($loff2 >> 8) & 255).chr(($loff2 >> 16) & 255).chr(($loff2 >> 24) & 255)
-                    .$name2;
+                    .$name2.$ecmt2;
                 $countLow = 2;
             }
             $clen = strlen($central);
@@ -753,6 +805,30 @@ final class ZipArchiveJitHelper
             }
             if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
                 return self::pack(self::unchangeSlot1() ? 1 : 0);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        // replaceFile — replace slot data, keep name (#35496 / php-src zim_ZipArchive_replaceFile).
+        // Content is read in IR via file_get_contents; $s2 is the new bytes. $a = index.
+        if ('rpl' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if (0 === $a && '' !== self::$h1name) {
+                self::$h1data = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1data2 = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
             }
             self::$h1status = 9;
 

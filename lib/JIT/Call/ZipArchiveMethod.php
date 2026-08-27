@@ -12,10 +12,10 @@ use PHPLLVM\Value;
 
 /**
  * ZipArchive thin-AOT methods — open / add / close / get / locate / index / rename / delete /
- * extract / status / count / writable / archive comment / entry comment / unchange /
+ * extract / status / count / writable / archive comment / entry comment / unchange / replaceFile /
  * isCompressionMethodSupported / isEncryptionMethodSupported
  * (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35465 / #35466 / #35467 / #35472 /
- * #35476 / #35478 / #35486 / #35489 / #35491 / #35498).
+ * #35476 / #35478 / #35486 / #35489 / #35491 / #35496 / #35498).
  *
  * php-src: ext/zip/php_zip.c
  */
@@ -76,6 +76,7 @@ final class ZipArchiveMethod implements Call
             'unchangearchive' => JitZipArchive::unchangeArchive($context, ...$args),
             'unchangeindex' => JitZipArchive::unchangeIndex($context, ...$args),
             'unchangename' => JitZipArchive::unchangeName($context, ...$args),
+            'replacefile' => JitZipArchive::replaceFile($context, ...$args),
             'iscompressionmethodsupported' => JitZipArchive::isCompressionMethodSupported($context, ...$args),
             'isencryptionmethodsupported' => JitZipArchive::isEncryptionMethodSupported($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
