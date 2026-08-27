@@ -641,6 +641,62 @@ final class PregAotFastPath
     }
 
     /**
+     * Delimited `/X+/` / `#X+#` body — NestedJIT-safe (#35335 / preg mb callback find-next).
+     *
+     * @return string|null single literal byte when body is one char + `+`
+     */
+    private static function literalCharPlusChar(string $pattern): ?string
+    {
+        $close = self::delimitedBodyCloseAllowUtf($pattern);
+        if ($close < 1) {
+            return null;
+        }
+        $rawBody = \substr($pattern, 1, $close - 1);
+        if (2 !== \strlen($rawBody)) {
+            return null;
+        }
+        if ('+' !== \substr($rawBody, 1, 1)) {
+            return null;
+        }
+        $ch = \substr($rawBody, 0, 1);
+        if ('[' === $ch || '(' === $ch || ')' === $ch || '|' === $ch
+            || '*' === $ch || '+' === $ch || '?' === $ch || '{' === $ch || '}' === $ch
+            || '^' === $ch || '$' === $ch || '.' === $ch || '\\' === $ch) {
+            return null;
+        }
+
+        return $ch;
+    }
+
+    /**
+     * @return int 1 matched, 0 no match
+     */
+    private static function findLiteralCharPlus(string $ch, string $subject, int $offset): int
+    {
+        $subLen = \strlen($subject);
+        $i = $offset;
+        if ($i < 0) {
+            $i = 0;
+        }
+        while ($i < $subLen) {
+            if ($ch !== \substr($subject, $i, 1)) {
+                ++$i;
+                continue;
+            }
+            $j = $i + 1;
+            while ($j < $subLen && $ch === \substr($subject, $j, 1)) {
+                ++$j;
+            }
+            self::$lastReplacePos = $i;
+            self::$lastReplaceBodyLen = $j - $i;
+
+            return 1;
+        }
+
+        return 0;
+    }
+
+    /**
      * Parse `\x…` starting at $i (after the `x`). Sets {@see $hexEscapeNext}.
      *
      * @return string|null encoded bytes
@@ -804,6 +860,10 @@ final class PregAotFastPath
     {
         self::$lastReplacePos = -1;
         self::$lastReplaceBodyLen = 0;
+        $litPlus = self::literalCharPlusChar($pattern);
+        if (null !== $litPlus) {
+            return self::findLiteralCharPlus($litPlus, $subject, $offset);
+        }
         $hexLit = self::exactHexEscapeLiteral($pattern);
         if (null !== $hexLit) {
             $bodyLen = \strlen($hexLit);

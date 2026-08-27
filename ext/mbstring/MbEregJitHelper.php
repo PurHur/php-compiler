@@ -90,6 +90,22 @@ final class MbEregJitHelper
         return VmMbstring::eregReplace($pattern, $replacement, $string, true, $opt);
     }
 
+    /**
+     * mb_ereg ERE pattern → PCRE delimiter form for preg thin callback bridge (#35335).
+     */
+    public static function eregToPcrePatternArgv(
+        string $pattern,
+        string $options,
+        int $hasOptions,
+        int $caseInsensitive
+    ): string {
+        $opt = 0 !== $hasOptions ? $options : null;
+        $ci = (0 !== $caseInsensitive) || VmMbstring::optionsImplyIgnoreCase($opt);
+        $regex = VmMbstring::mbEregRegex($pattern, $ci, $opt);
+
+        return $regex ?? '';
+    }
+
     private static function matchArgv(
         string $pattern,
         string $string,

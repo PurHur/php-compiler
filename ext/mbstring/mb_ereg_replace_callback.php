@@ -7,14 +7,21 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_ereg_replace_callback() — multibyte regex replace via callable (php-src php_mbregex.c; #20024).
+ * mb_ereg_replace_callback() — multibyte regex replace via callable (php-src php_mbregex.c; #20024, #35335).
+ *
+ * JIT/AOT: catchable argc/TypeError; runtime via {@see JitMbEreg::invokeReplaceCallback}
+ * (ERE→PCRE + thin preg_replace_callback bridge; string user-function names only).
  */
 final class mb_ereg_replace_callback extends Internal
 {
@@ -100,8 +107,38 @@ final class mb_ereg_replace_callback extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_ereg_replace_callback() is not lowered for JIT/AOT in this compiler build'
-        );
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 4) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                sprintf('mb_ereg_replace_callback() expects at least 3 arguments, %d given', $argc)
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_ereg_replace_cb_argc_cont');
+
+            return self::foldFalse($context);
+        }
+
+        foreach ([
+            [0, 'pattern'],
+            [2, 'string'],
+        ] as [$idx, $name]) {
+            $isNull = JITVariable::TYPE_NULL === $args[$idx]->type || $args[$idx]->isNullConstant;
+            if ($isNull && $context->callerStrictTypes) {
+                JitInternalStrictArg::rejectNullString($context, $args[$idx], 'mb_ereg_replace_callback', $name, $idx + 1);
+
+                return self::foldFalse($context);
+            }
+        }
+
+        return JitMbEreg::invokeReplaceCallback($context, $args);
+    }
+
+    private static function foldFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+        return JitValueBox::pointer($context, $slot);
     }
 }
