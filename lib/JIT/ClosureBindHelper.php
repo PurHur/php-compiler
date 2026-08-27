@@ -170,7 +170,9 @@ final class ClosureBindHelper
         $classId = $context->type->object->lookup('Closure');
         $objectType = $context->type->object;
         if (!$objectType->hasProperty($classId, self::BOUND_THIS_PROPERTY)) {
-            $objectType->defineProperty($classId, self::BOUND_THIS_PROPERTY, Variable::TYPE_VALUE);
+            // Must match Object_:: Closure seed (TYPE_OBJECT). A TYPE_VALUE box written into
+            // an object pointer slot makes heap reload read null/garbage (#35456 / #28613).
+            $objectType->defineProperty($classId, self::BOUND_THIS_PROPERTY, Variable::TYPE_OBJECT);
         }
         if (!$objectType->hasProperty($classId, self::BOUND_SCOPE_PROPERTY)) {
             $objectType->defineProperty($classId, self::BOUND_SCOPE_PROPERTY, Variable::TYPE_STRING);
@@ -413,18 +415,8 @@ final class ClosureBindHelper
                 $targetVar
             );
         }
-        $context->type->object->storeInstanceProperty(
-            $dest,
-            'Closure',
-            self::BOUND_THIS_PROPERTY,
-            $boundThis
-        );
-        $context->type->object->storeInstanceProperty(
-            $dest,
-            'Closure',
-            self::BOUND_SCOPE_PROPERTY,
-            $boundScope
-        );
+        // TYPE_OBJECT slot — coerce VALUE snapshots from materializeBoundThis (#35456).
+        self::storeFccBoundThisAndScope($context, $dest, $boundThis, $boundScope);
         // Do not propertyFetch/copy IS_STATIC / IS_METHOD from the source: free closures
         // leave those slots uninitialized and the copy segfaults under thin AOT (#27219).
         // Set flags from Variable metadata when present (method FCC / static closures).
@@ -471,11 +463,11 @@ final class ClosureBindHelper
     }
 
     /**
-     * Persist FCC / fromCallable bound $this + scope on the Closure object.
+     * Persist FCC / fromCallable / method-closure bound $this + scope on the Closure object.
      *
-     * AOT invoke goes through {@see Call\RuntimeIndirectClosureCall} →
-     * {@see wrapCallWithBindingFromObject}; without these slots, instance-method
-     * FCC aborts (empty output / SIGABRT) while JIT still works via Variable::closureCall (#28613).
+     * {@see Object_} seeds `__closure_bound_this` as TYPE_OBJECT. Storing a TYPE_VALUE
+     * snapshot box into that slot makes {@see wrapCallWithBindingFromObject} reload
+     * null/garbage (#35456). Always materialize a TYPE_OBJECT pointer for the store.
      */
     public static function storeFccBoundThisAndScope(
         Context $context,
@@ -488,7 +480,7 @@ final class ClosureBindHelper
             $closureObj,
             'Closure',
             self::BOUND_THIS_PROPERTY,
-            $boundThis
+            self::boundThisForObjectSlot($context, $boundThis)
         );
         $context->type->object->storeInstanceProperty(
             $closureObj,
@@ -496,6 +488,42 @@ final class ClosureBindHelper
             self::BOUND_SCOPE_PROPERTY,
             $boundScope
         );
+    }
+
+    /** Coerce bound-$this to TYPE_OBJECT for the Closure object property slot (#35456). */
+    private static function boundThisForObjectSlot(Context $context, Variable $boundThis): Variable
+    {
+        if ($boundThis->isNullConstant ?? false) {
+            $nullObj = $context->getTypeFromString('__object__*')->constNull();
+            $var = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $nullObj);
+            $var->isNullConstant = true;
+            $var->addref();
+
+            return $var;
+        }
+        if (Variable::TYPE_OBJECT === $boundThis->type) {
+            return $boundThis;
+        }
+        if (Variable::TYPE_VALUE === $boundThis->type) {
+            $obj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $boundThis)
+            );
+            $var = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+            $var->addref();
+
+            return $var;
+        }
+        if (Variable::TYPE_NULL === $boundThis->type) {
+            $nullObj = $context->getTypeFromString('__object__*')->constNull();
+            $var = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $nullObj);
+            $var->isNullConstant = true;
+            $var->addref();
+
+            return $var;
+        }
+
+        throw new \LogicException('Closure bound $this must be object|value|null for heap store (#35456)');
     }
 
     /** Mark FCC / fromCallable method wrappers for unbind diagnostics (#23421). */
