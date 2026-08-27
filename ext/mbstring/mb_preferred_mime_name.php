@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * mb_preferred_mime_name() — MIME charset label (php-src ext/mbstring/mbstring.c; #13100).
  *
- * JIT/AOT: compile-time fold + NestedJIT via {@see JitMbPreferredMimeName} (#34298).
+ * JIT/AOT: compile-time fold + NestedJIT leaf via {@see JitMbPreferredMimeName} (#34298 / #35275).
  */
 final class mb_preferred_mime_name extends Internal
 {

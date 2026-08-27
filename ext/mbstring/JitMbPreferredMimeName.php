@@ -12,13 +12,14 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT for mb_preferred_mime_name() (php-src ext/mbstring/mbstring.c; #13100, #34298).
+ * LLVM JIT/AOT for mb_preferred_mime_name() (php-src ext/mbstring/mbstring.c; #13100, #34298, #35275).
  *
- * Compile-time fold for string literals; runtime via NestedJIT {@see MbPreferredMimeNameJitHelper}.
- * Peer {@see JitMbEncodingRegistry} / {@see JitMbChrOrd}.
+ * Compile-time fold for string literals; runtime via NestedJIT leaf
+ * {@see MbPreferredMimeNameJitHelper} (peer {@see JitMbEncodingRegistry}).
  */
 final class JitMbPreferredMimeName
 {
@@ -37,6 +38,14 @@ final class JitMbPreferredMimeName
             return $folded;
         }
 
+        // Link NestedJIT before lowering args — NestedJIT invalidates prior IR (#34270 / #35275).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbPreferredMimeNameRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_preferred_mime_runtime');
+
         $encoding = JitStringBuiltinArg::lower(
             $context,
             $args[0],
@@ -44,20 +53,17 @@ final class JitMbPreferredMimeName
             0,
             'encoding'
         );
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbPreferredMimeNameRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-
+        $context->builder->call(
+            MbPreferredMimeNameRuntime::assertEncodingHelper($context),
+            $encoding
+        );
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             MbPreferredMimeNameRuntime::preferredHelper($context),
             [$encoding]
         );
 
-        return self::boxStringOrFalse($context, $raw);
+        return self::boxStringOrEmptyFalse($context, $raw);
     }
 
     private static function tryCompileTimeFold(Context $context, JITVariable $arg): ?Value
@@ -89,19 +95,22 @@ final class JitMbPreferredMimeName
     }
 
     /**
-     * NestedJIT string|false → `__value__*` (peer JitMbChrOrd / #34250).
+     * NestedJIT string (empty = no MIME) → `__value__*` string|false (peer #34250 / #35275).
      */
-    private static function boxStringOrFalse(Context $context, Value $raw): Value
+    private static function boxStringOrEmptyFalse(Context $context, Value $raw): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_preferred_mime_box');
         $i32 = $context->getTypeFromString('int32');
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
+
         $isMiss = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
         $missBb = BasicBlockHelper::append($context, 'mb_preferred_mime_miss');
+        $checkEmptyBb = BasicBlockHelper::append($context, 'mb_preferred_mime_check_empty');
+        $emptyBb = BasicBlockHelper::append($context, 'mb_preferred_mime_empty');
         $hitBb = BasicBlockHelper::append($context, 'mb_preferred_mime_hit');
         $doneBb = BasicBlockHelper::append($context, 'mb_preferred_mime_done');
-        $context->builder->branchIf($isMiss, $missBb, $hitBb);
+        $context->builder->branchIf($isMiss, $missBb, $checkEmptyBb);
 
         $context->builder->positionAtEnd($missBb);
         $context->builder->call(
@@ -111,8 +120,26 @@ final class JitMbPreferredMimeName
         );
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($hitBb);
+        $context->builder->positionAtEnd($checkEmptyBb);
         $strPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $strPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $isEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $len,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($isEmpty, $emptyBb, $hitBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $ptr,
+            $i32->constInt(0, false)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($hitBb);
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $strPtr);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),

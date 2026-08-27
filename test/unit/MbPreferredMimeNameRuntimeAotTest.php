@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: mb_preferred_mime_name() via MbPreferredMimeNameJitHelper (#34298 leftover of #13100).
+ * AOT: mb_preferred_mime_name() via MbPreferredMimeNameJitHelper (#34298 / #35275 leftover of #13100).
  *
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_preferred_mime_name)
  *
@@ -24,15 +24,35 @@ final class MbPreferredMimeNameRuntimeAotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/mb_preferred_mime_name_runtime_aot.php');
     }
 
+    public function testAotOpaqueFunctionEncodingMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(__DIR__.'/../repro/aot_mb_preferred_mime_name_runtime_fn.php');
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
         $helper = (string) file_get_contents($root.'/ext/mbstring/MbPreferredMimeNameJitHelper.php');
         $this->assertStringContainsString('function preferredArgv', $helper);
-        $this->assertStringContainsString('MbstringEncodingRegistry::preferredMimeName', $helper);
+        $this->assertStringContainsString('function assertEncodingArgv', $helper);
+        // Leaf NestedJIT — must not call the registry static table (#35275).
+        $this->assertStringNotContainsString('MbstringEncodingRegistry::preferredMimeName', $helper);
+        $this->assertStringNotContainsString('MbstringEncodingRegistry::assertValid', $helper);
+        $this->assertStringNotContainsString('MbstringEncodingRegistry::resolve', $helper);
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbPreferredMimeNameRuntime.php');
         $this->assertStringContainsString('preferredHelper', $runtime);
+        $this->assertStringContainsString('assertEncodingHelper', $runtime);
         $this->assertStringContainsString('MbPreferredMimeNameJitHelper::preferredArgv', $runtime);
+        $this->assertStringContainsString('MbPreferredMimeNameJitHelper::assertEncodingArgv', $runtime);
+        $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbPreferredMimeName.php');
+        $this->assertStringContainsString('ensureLinked($context)', $jit);
+        $this->assertMatchesRegularExpression(
+            '/ensureLinked\(\$context\).*JitStringBuiltinArg::lower/s',
+            $jit
+        );
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_preferred_mime_name.php');
         $this->assertStringContainsString('JitMbPreferredMimeName::invoke', $src);
         $this->assertStringNotContainsString(
