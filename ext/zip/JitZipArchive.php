@@ -24,9 +24,10 @@ use PHPLLVM\Value;
 
 /**
  * LLVM lowering for ZipArchive open/add/close/get/locate/index/rename/extract/comment
- * /isCompressionMethodSupported/isEncryptionMethodSupported/setPassword/statName/statIndex
+ * /isCompressionMethodSupported/isEncryptionMethodSupported/setPassword/setCompression*
+ * /statName/statIndex
  * (#35424 / #35437 / #35440 / #35449 / #35450 / #35465 / #35467 / #35472 / #35476 / #35486 /
- * #35498 / #35500 / #35504).
+ * #35498 / #35500 / #35504 / #35507).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -1397,6 +1398,113 @@ final class JitZipArchive
             $handle,
             $i64->constInt(0, false),
             $password,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::setCompressionName — NestedJIT cmn (#35507 leftover of #35500 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setCompressionName
+     * Pure-PHP ZipEngine: CM_STORE / CM_DEFAULT only; method retained for API/stat parity.
+     */
+    public static function setCompressionName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::setCompressionName', 2, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::setCompressionName',
+            0,
+            'name'
+        );
+        $method = JitLongArg::lower(
+            $context,
+            $args[2],
+            'ZipArchive::setCompressionName(): Argument #2 ($method)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        if ($method->typeOf() !== $i64) {
+            $method = $context->builder->sext($method, $i64);
+        }
+        // Optional $compflags accepted and ignored (php-src / VmZipArchive).
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($name, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_cmn_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_cmn_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::setCompressionName(): Argument #1 ($name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        $ok = self::execLong(
+            $context,
+            'cmn',
+            $method,
+            $zero,
+            $name,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::setCompressionIndex — NestedJIT cmi (#35507 leftover of #35500 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setCompressionIndex
+     */
+    public static function setCompressionIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::setCompressionIndex', 2, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower(
+            $context,
+            $args[1],
+            'ZipArchive::setCompressionIndex(): Argument #1 ($index)'
+        );
+        $method = JitLongArg::lower(
+            $context,
+            $args[2],
+            'ZipArchive::setCompressionIndex(): Argument #2 ($method)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        if ($method->typeOf() !== $i64) {
+            $method = $context->builder->sext($method, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'cmi',
+            $index,
+            $method,
+            $empty,
             $empty
         );
         self::syncProps($context, $obj, $handle);

@@ -8,7 +8,7 @@ namespace PHPCompiler\ext\zip;
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
  * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500 /
  * #35504) — CREATE/add/close/get/locate/index/rename/delete/extract/status/count/
- * archive-comment/entry-comment/unchange/replaceFile/setPassword/statName/statIndex path.
+ * archive-comment/entry-comment/unchange/replaceFile/setPassword/statName/statIndex/setCompression path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -21,7 +21,7 @@ namespace PHPCompiler\ext\zip;
  * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
- * unchangeName / replaceFile / setPassword / statName / statIndex)
+ * unchangeName / replaceFile / setPassword / statName / statIndex / setCompressionName / setCompressionIndex)
  */
 final class ZipArchiveJitHelper
 {
@@ -70,6 +70,11 @@ final class ZipArchiveJitHelper
     /** Session password for setEncryption* (#35500 / #19873). */
     private static string $h1password = '';
 
+    /** Per-entry compression method (CM_STORE=0) for slots 0/1 (#35507 / #20363). */
+    private static int $h1comp = 0;
+
+    private static int $h1comp2 = 0;
+
     public static function exec(string $op, int $a, int $b, string $s1, string $s2): string
     {
         if ('alloc' === $op) {
@@ -95,6 +100,8 @@ final class ZipArchiveJitHelper
             self::$h1status = 0;
             self::$h1readonly = 0;
             self::$h1password = '';
+            self::$h1comp = 0;
+            self::$h1comp2 = 0;
             self::snapSave();
 
             return self::pack($h);
@@ -118,6 +125,8 @@ final class ZipArchiveJitHelper
             self::$h1open = 0;
             self::$h1readonly = 0;
             self::$h1password = '';
+            self::$h1comp = 0;
+            self::$h1comp2 = 0;
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
                 $nlen = ord($data[26]) | (ord($data[27]) << 8);
                 $xlen = ord($data[28]) | (ord($data[29]) << 8);
@@ -229,12 +238,14 @@ final class ZipArchiveJitHelper
                 self::$h1name = $s1;
                 self::$h1data = $s2;
                 self::$h1ecomment = '';
+                self::$h1comp = 0;
             } elseif ($s1 === self::$h1name) {
                 self::$h1data = $s2;
             } elseif ('' === self::$h1name2) {
                 self::$h1name2 = $s1;
                 self::$h1data2 = $s2;
                 self::$h1ecomment2 = '';
+                self::$h1comp2 = 0;
             } elseif ($s1 === self::$h1name2) {
                 self::$h1data2 = $s2;
             } else {
@@ -260,6 +271,7 @@ final class ZipArchiveJitHelper
                 self::$h1name = $s1;
                 self::$h1data = '';
                 self::$h1ecomment = '';
+                self::$h1comp = 0;
             } elseif ($s1 === self::$h1name) {
                 self::$h1status = 10;
 
@@ -268,6 +280,7 @@ final class ZipArchiveJitHelper
                 self::$h1name2 = $s1;
                 self::$h1data2 = '';
                 self::$h1ecomment2 = '';
+                self::$h1comp2 = 0;
             } elseif ($s1 === self::$h1name2) {
                 self::$h1status = 10;
 
@@ -574,6 +587,8 @@ final class ZipArchiveJitHelper
             self::$h1ecomment = '';
             self::$h1ecomment2 = '';
             self::$h1password = '';
+            self::$h1comp = 0;
+            self::$h1comp2 = 0;
             self::$h1status = 0;
 
             return self::packPayload(1, $local.$central.$eocd);
@@ -907,6 +922,73 @@ final class ZipArchiveJitHelper
                 self::$h1status = 0;
 
                 return self::packStat(1, self::$h1name2, self::$h1data2);
+            }
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+
+        // setCompressionName — $s1=name, $a=method (#35507 / zim_ZipArchive_setCompressionName).
+        // Empty name rejected in IR. Pure-PHP engine: CM_STORE(0)/CM_DEFAULT(-1) only.
+        if ('cmn' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if ('' === $s1) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            $method = $a;
+            if (0 !== $method && -1 !== $method) {
+                self::$h1status = 16;
+
+                return self::pack(0);
+            }
+            $normalized = -1 === $method ? 0 : $method;
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1comp = $normalized;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1comp2 = $normalized;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        // setCompressionIndex — $a=index, $b=method (#35507 / zim_ZipArchive_setCompressionIndex).
+        if ('cmi' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            $method = $b;
+            if (0 !== $method && -1 !== $method) {
+                self::$h1status = 16;
+
+                return self::pack(0);
+            }
+            $normalized = -1 === $method ? 0 : $method;
+            if (0 === $a && '' !== self::$h1name) {
+                self::$h1comp = $normalized;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1comp2 = $normalized;
+                self::$h1status = 0;
+
+                return self::pack(1);
             }
             self::$h1status = 18;
 
