@@ -7,9 +7,9 @@ namespace PHPCompiler\ext\zip;
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
  * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500 /
- * #35504 / #35506 / #35503 / #35508 / #35515 / #35522) — CREATE/add/close/get/locate/index/rename/delete/
+ * #35504 / #35506 / #35503 / #35508 / #35515 / #35522 / #35537) — CREATE/add/close/get/locate/index/rename/delete/
  * extract/status/count/archive-comment/entry-comment/unchange/replaceFile/setPassword/stat/
- * setCompression/setEncryption/setMtime/setExternalAttributes/setArchiveFlag path.
+ * setCompression/setEncryption/setMtime/setExternalAttributes/setArchiveFlag/addGlob/addPattern path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -24,12 +24,16 @@ namespace PHPCompiler\ext\zip;
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
  * unchangeName / replaceFile / setPassword / setCompressionName / setCompressionIndex /
  * setEncryptionName / setEncryptionIndex / setExternalAttributesName / setExternalAttributesIndex /
- * statName / statIndex / setMtimeName / setMtimeIndex / setArchiveFlag / getArchiveFlag)
+ * statName / statIndex / setMtimeName / setMtimeIndex / setArchiveFlag / getArchiveFlag /
+ * addGlob / addPattern)
  */
 final class ZipArchiveJitHelper
 {
     /** Packed RETURN_SB after rc: 7×int32 LE + name (#35504 / zim_ZipArchive_stat*). */
     public const STAT_FIELD_BYTES = 28;
+
+    /** addGlob/addPattern false sentinel (sext i64 == -1) (#35537). */
+    public const ADDPATHS_FALSE_RC = -1;
     private static int $nextId = 1;
 
     private static int $h1open = 0;
@@ -107,6 +111,13 @@ final class ZipArchiveJitHelper
     private static int $h1attr = 0;
 
     private static int $h1attr2 = 0;
+
+    /** Scratch for addGlob/addPattern path-list packing (#35537) — NestedJIT avoids by-ref. */
+    private static string $agP0 = '';
+
+    private static string $agP1 = '';
+
+    private static int $agN = 0;
 
     public static function exec(string $op, int $a, int $b, string $s1, string $s2): string
     {
@@ -1391,7 +1402,247 @@ final class ZipArchiveJitHelper
             return self::pack(0);
         }
 
+        // addGlob — $s1=pattern, $a=flags; payload = packed path list (#35537 / #20387).
+        // NestedJIT: no open-ended foreach — unroll first 8 glob hits into ≤2 slots.
+        if ('ag' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(self::ADDPATHS_FALSE_RC);
+            }
+            if ('' === $s1) {
+                self::$h1status = 18;
+
+                return self::pack(self::ADDPATHS_FALSE_RC);
+            }
+            $found = @\glob($s1, $a);
+            if (false === $found) {
+                self::$h1status = 18;
+
+                return self::pack(self::ADDPATHS_FALSE_RC);
+            }
+            self::$agP0 = '';
+            self::$agP1 = '';
+            self::$agN = 0;
+            if (self::agAbsorb($found, 0) < 0
+                || self::agAbsorb($found, 1) < 0
+                || self::agAbsorb($found, 2) < 0
+                || self::agAbsorb($found, 3) < 0
+                || self::agAbsorb($found, 4) < 0
+                || self::agAbsorb($found, 5) < 0
+                || self::agAbsorb($found, 6) < 0
+                || self::agAbsorb($found, 7) < 0
+            ) {
+                return self::pack(self::ADDPATHS_FALSE_RC);
+            }
+            self::$h1status = 0;
+
+            return self::packPathList(self::$agN, self::$agP0, self::$agP1);
+        }
+
+        // addPattern — $s1=PCRE, $s2=dir; payload = packed path list (#35537 / #20387).
+        if ('ap' === $op) {
+            return self::addPatternScan($s1, $s2, false);
+        }
+
+        // addPattern suffix — $s1=literal suffix (IR-stripped from /^…$/); no preg (#35537).
+        // NestedJIT __compiler_preg_match returns false on some escaped delimiter forms.
+        if ('aps' === $op) {
+            return self::addPatternScan($s1, $s2, true);
+        }
+
         return self::pack(0);
+    }
+
+    /**
+     * Shared addPattern scandir walk (#35537).
+     *
+     * @param bool $suffixMode when true, $pattern is a literal suffix (not PCRE)
+     */
+    private static function addPatternScan(string $pattern, string $path, bool $suffixMode): string
+    {
+        if (1 !== self::$h1open) {
+            self::$h1status = 8;
+
+            return self::pack(self::ADDPATHS_FALSE_RC);
+        }
+        if ('' === $pattern) {
+            self::$h1status = 18;
+
+            return self::pack(self::ADDPATHS_FALSE_RC);
+        }
+        $list = @\scandir($path);
+        if (false === $list) {
+            self::$h1status = 9;
+
+            return self::pack(self::ADDPATHS_FALSE_RC);
+        }
+        self::$agP0 = '';
+        self::$agP1 = '';
+        self::$agN = 0;
+        if (self::apAbsorb($list, $pattern, $path, 0, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 1, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 2, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 3, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 4, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 5, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 6, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 7, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 8, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 9, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 10, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 11, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 12, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 13, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 14, $suffixMode) < 0
+            || self::apAbsorb($list, $pattern, $path, 15, $suffixMode) < 0
+        ) {
+            return self::pack(self::ADDPATHS_FALSE_RC);
+        }
+        self::$h1status = 0;
+
+        return self::packPathList(self::$agN, self::$agP0, self::$agP1);
+    }
+
+    /**
+     * Absorb one glob hit into slots (#35537). Returns 0 ok, or -1 on hard fail.
+     *
+     * @param list<string>|array<int|string, mixed> $found
+     */
+    private static function agAbsorb(array $found, int $i): int
+    {
+        if (self::$agN >= 2 || !isset($found[$i]) || !\is_string($found[$i]) || '' === $found[$i]) {
+            return 0;
+        }
+
+        return self::agAddOne($found[$i]);
+    }
+
+    /**
+     * Absorb one scandir entry for addPattern (#35537). Returns 0 ok, or -1 on hard fail.
+     *
+     * @param list<string>|array<int|string, mixed> $list
+     */
+    private static function apAbsorb(
+        array $list,
+        string $pattern,
+        string $path,
+        int $i,
+        bool $suffixMode
+    ): int {
+        if (self::$agN >= 2 || !isset($list[$i]) || !\is_string($list[$i])) {
+            return 0;
+        }
+        $file = $list[$i];
+        if ('.' === $file || '..' === $file) {
+            return 0;
+        }
+        if ($suffixMode) {
+            $fl = \strlen($file);
+            $sl = \strlen($pattern);
+            if ($fl < $sl) {
+                return 0;
+            }
+            // Positive-offset substr — NestedJIT rejects substr($s, -1) (#35476 peer).
+            if (\substr($file, $fl - $sl) !== $pattern) {
+                return 0;
+            }
+        } else {
+            $m = @\preg_match($pattern, $file);
+            if (false === $m) {
+                self::$h1status = 18;
+
+                return -1;
+            }
+            if (1 !== $m) {
+                return 0;
+            }
+        }
+        $base = $path;
+        $blen = \strlen($base);
+        if ($blen > 0) {
+            // Avoid substr($s, -1) — NestedJIT dislikes it (#35476 peer).
+            $last = \ord($base[$blen - 1]);
+            if (47 !== $last && 92 !== $last) {
+                $base = $base.'/';
+            }
+        }
+
+        return self::agAddOne($base.$file);
+    }
+
+    /**
+     * Add one filesystem path into a free slot (#35537). Returns 0 ok/skip, or -1 on hard fail.
+     */
+    private static function agAddOne(string $filepath): int
+    {
+        if (1 === self::$h1readonly) {
+            self::$h1status = 25;
+
+            return -1;
+        }
+        $data = @\file_get_contents($filepath);
+        if (false === $data) {
+            return 0;
+        }
+        // Entry name = full path (VM entryNameFromOptions with empty options, #20387).
+        if ('' === self::$h1name) {
+            self::$h1name = $filepath;
+            self::$h1data = $data;
+            self::$h1ecomment = '';
+            self::$h1comp = 0;
+            self::$h1mtime = 0;
+            self::$h1opsys = 3;
+            self::$h1attr = 0;
+            self::$agP0 = $filepath;
+            self::$agN = 1;
+
+            return 0;
+        }
+        if ($filepath === self::$h1name) {
+            self::$h1data = $data;
+            self::$agP0 = $filepath;
+            if (self::$agN < 1) {
+                self::$agN = 1;
+            }
+
+            return 0;
+        }
+        if ('' === self::$h1name2) {
+            self::$h1name2 = $filepath;
+            self::$h1data2 = $data;
+            self::$h1ecomment2 = '';
+            self::$h1comp2 = 0;
+            self::$h1mtime2 = 0;
+            self::$h1opsys2 = 3;
+            self::$h1attr2 = 0;
+            self::$agP1 = $filepath;
+            self::$agN = self::$agN + 1;
+
+            return 0;
+        }
+        if ($filepath === self::$h1name2) {
+            self::$h1data2 = $data;
+            self::$agP1 = $filepath;
+
+            return 0;
+        }
+        self::$h1status = 18;
+
+        return -1;
+    }
+
+    /** Pack rc=count + len-prefixed paths for IR array materialization (#35537). */
+    private static function packPathList(int $n, string $p0, string $p1): string
+    {
+        if ($n <= 0) {
+            return self::packPayload(0, '');
+        }
+        if (1 === $n) {
+            return self::packPayload(1, self::pack(\strlen($p0)).$p0);
+        }
+
+        return self::packPayload(2, self::pack(\strlen($p0)).$p0.self::pack(\strlen($p1)).$p1);
     }
 
     /**

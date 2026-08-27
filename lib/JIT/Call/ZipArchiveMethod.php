@@ -130,11 +130,13 @@ final class ZipArchiveMethod implements Call
             'getstream' => JitZipArchive::getStream($context, ...$args),
             'getstreamindex' => JitZipArchive::getStreamIndex($context, ...$args),
             'getstreamname' => JitZipArchive::getStreamName($context, ...$args),
+            'addglob' => JitZipArchive::addGlob($context, ...$args),
+            'addpattern' => JitZipArchive::addPattern($context, ...$args),
             'registerprogresscallback' => JitZipArchive::registerProgressCallback($context, ...$args),
             'registercancelcallback' => JitZipArchive::registerCancelCallback($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35531/#35534/#35539)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35531/#35534/#35537/#35539)'
             ),
         };
     }
