@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: mb_encode/decode_numericentity() runtime encoding via NestedJIT (#35210 leftover of #7237).
+ * AOT: mb_encode/decode_numericentity() runtime encoding via NestedJIT (#35210 / #35254).
  *
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_encode_numericentity)
  *
@@ -47,9 +47,15 @@ final class MbNumericEntityRuntimeEncodingAotTest extends TestCase
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbNumericEntity.php');
         $this->assertStringContainsString('encode4Helper', $runtime);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertMatchesRegularExpression(
+            "/'mb_numericentity'\\s*,\\s*true/",
+            $runtime
+        );
         $this->assertStringNotContainsString('ensureBridge', $runtime);
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbNumericEntity.php');
         $this->assertStringContainsString('MbNumericEntity::encode4Helper', $jit);
+        $this->assertStringContainsString('JitNestedHelperCoerce::callHelper', $jit);
+        $this->assertStringContainsString('extractStringPtrFromHelperResult', $jit);
         $this->assertStringNotContainsString(
             'JIT requires compile-time encoding literal in this compiler build',
             $jit
