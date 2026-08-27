@@ -308,11 +308,14 @@ final class LibcExtern
     }
 
     /**
-     * Module-local exit(3)/abort(3) after Type always-on drop (#33267).
+     * Module-local exit(3)/abort(3) after Type always-on drop (#33267 / #35428).
      *
      * User-script exit()/die() stay on ScriptExit / zend_builtin_functions.c; NestedJIT
-     * fatal/raise paths and ScriptExit call this before lookupFunction('exit'|'abort').
-     * Peer: ensurePrintf (#31706). Leftover Type empty decls mint exit.1 (#31894 / #32122).
+     * fatal/raise paths and ScriptExit may call this before lookupFunction('exit'|'abort').
+     * {@see Context::lookupFunction} also lazy-calls this for exit/abort so Type::register
+     * need not always-on declare (#35428 / peer #35392). Must not call lookupFunction here
+     * (re-entrancy). Peer: ensurePrintf (#31706). Leftover Type empty decls mint exit.1
+     * (#31894 / #32122).
      */
     public static function ensureExitAbort(Context $context): void
     {
@@ -322,11 +325,8 @@ final class LibcExtern
             ['exit', $void, [$i32]],
             ['abort', $void, []],
         ] as [$name, $ret, $params]) {
-            try {
-                $context->lookupFunction($name);
-
+            if (null !== $context->tryGetRegisteredFunction($name)) {
                 continue;
-            } catch (\LogicException $e) {
             }
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
