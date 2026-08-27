@@ -13,6 +13,8 @@ namespace PHPCompiler\ext\mbstring;
  *
  * NestedJIT-safe UTF-8 peel mirrors {@see MbStrwidthJitHelper} (#34270):
  * isset-index length, no VmMbstring, char-index walk via utf8Substr.
+ * Runtime `$length` must use `$chunkLen = $length + 0` — assigning the param to a
+ * plain local copies zero under NestedJIT and breaks multibyte splits (#34881).
  *
  * Runtime encoding via assertEncodingArgv (#34880 leftover of #34278 / peer #34875).
  *
@@ -62,7 +64,7 @@ final class MbStrSplitJitHelper
     public static function strSplitArgv(string $string, int $length, string $encoding): string
     {
         // Encoding must already be validated via {@see assertEncodingArgv} (#34880).
-        if ($length <= 0) {
+        if (($length + 0) <= 0) {
             return '';
         }
 
@@ -88,6 +90,8 @@ final class MbStrSplitJitHelper
             return '';
         }
 
+        // NestedJIT zeros plain `$chunkLen = $length` — use `$length + 0` at each use (#34881).
+        $chunkLen = $length + 0;
         $joined = '';
         $pos = 0;
         $first = 1;
@@ -95,18 +99,14 @@ final class MbStrSplitJitHelper
         $guard = $byteLen + 1;
         while ($pos < $byteLen && $guard > 0) {
             $guard = $guard - 1;
-            $take = $length;
-            if ($pos + $take > $byteLen) {
-                $take = $byteLen - $pos;
-            }
-            $part = \substr($string, $pos, $take);
+            $part = \substr($string, $pos, $chunkLen);
             if (1 === $first) {
                 $joined = $part;
                 $first = 0;
             } else {
                 $joined = $joined.$delim.$part;
             }
-            $pos = $pos + $length;
+            $pos = $pos + $chunkLen;
         }
 
         return $joined;
@@ -119,6 +119,9 @@ final class MbStrSplitJitHelper
             return '';
         }
 
+        // Never reassign $length — one `$chunkLen = $length + 0` for the whole peel (#34881).
+        $chunkLen = $length + 0;
+        $byteLen = self::byteLength($string);
         $joined = '';
         $pos = 0;
         $first = 1;
@@ -126,18 +129,67 @@ final class MbStrSplitJitHelper
         $guard = $charLen + 1;
         while ($pos < $charLen && $guard > 0) {
             $guard = $guard - 1;
-            $take = $length;
-            if ($pos + $take > $charLen) {
-                $take = $charLen - $pos;
+            $charIndex = 0;
+            $bytePos = 0;
+            $sliceStart = $byteLen;
+            $sliceEnd = $byteLen;
+            $foundStart = 0;
+            $foundEnd = 0;
+            $g = $byteLen + 1;
+            while ($bytePos < $byteLen && $g > 0) {
+                $g = $g - 1;
+                if (0 === $foundStart) {
+                    if ($charIndex == $pos) {
+                        $sliceStart = $bytePos;
+                        $foundStart = 1;
+                    }
+                }
+                if (0 === $foundEnd) {
+                    if ($charIndex == ($pos + $chunkLen)) {
+                        $sliceEnd = $bytePos;
+                        $foundEnd = 1;
+                    }
+                }
+                $b = \ord(\substr($string, $bytePos, 1));
+                $w = 1;
+                if ($b >= 192) {
+                    if ($b < 224) {
+                        if ($bytePos + 1 < $byteLen) {
+                            $w = 2;
+                        }
+                    }
+                }
+                if ($b >= 224) {
+                    if ($b < 240) {
+                        if ($bytePos + 2 < $byteLen) {
+                            $w = 3;
+                        }
+                    }
+                }
+                if ($b >= 240) {
+                    if ($b < 248) {
+                        if ($bytePos + 3 < $byteLen) {
+                            $w = 4;
+                        }
+                    }
+                }
+                $bytePos = $bytePos + $w;
+                $charIndex = $charIndex + 1;
             }
-            $part = self::utf8Substr($string, $pos, $take);
+            if (0 === $foundStart) {
+                break;
+            }
+            if (0 === $foundEnd) {
+                $sliceEnd = $byteLen;
+            }
+            $part = \substr($string, $sliceStart, $sliceEnd - $sliceStart);
             if (1 === $first) {
                 $joined = $part;
                 $first = 0;
             } else {
                 $joined = $joined.$delim.$part;
             }
-            $pos = $pos + $length;
+            $pos = $pos + $chunkLen;
         }
 
         return $joined;
@@ -160,71 +212,38 @@ final class MbStrSplitJitHelper
     private static function utf8CharLength(string $string): int
     {
         $n = 0;
-        $i = 0;
-        $len = self::byteLength($string);
-        while ($i < $len) {
-            $b = \ord($string[$i]);
-            if ($b < 0x80) {
-                $step = 1;
-            } elseif ($b < 0xE0) {
-                $step = 2;
-            } elseif ($b < 0xF0) {
-                $step = 3;
-            } else {
-                $step = 4;
+        $bytePos = 0;
+        $byteLen = self::byteLength($string);
+        $guard = $byteLen + 1;
+        while ($bytePos < $byteLen && $guard > 0) {
+            $guard = $guard - 1;
+            $b = \ord(\substr($string, $bytePos, 1));
+            $w = 1;
+            if ($b >= 192) {
+                if ($b < 224) {
+                    if ($bytePos + 1 < $byteLen) {
+                        $w = 2;
+                    }
+                }
             }
-            $i += $step;
-            ++$n;
-            if ($n > $len) {
-                break;
+            if ($b >= 224) {
+                if ($b < 240) {
+                    if ($bytePos + 2 < $byteLen) {
+                        $w = 3;
+                    }
+                }
             }
+            if ($b >= 240) {
+                if ($b < 248) {
+                    if ($bytePos + 3 < $byteLen) {
+                        $w = 4;
+                    }
+                }
+            }
+            $bytePos = $bytePos + $w;
+            $n = $n + 1;
         }
 
         return $n;
-    }
-
-    private static function utf8Substr(string $string, int $charFrom, int $charCount): string
-    {
-        if ($charCount <= 0) {
-            return '';
-        }
-        $i = 0;
-        $len = self::byteLength($string);
-        $seen = 0;
-        while ($i < $len && $seen < $charFrom) {
-            $b = \ord($string[$i]);
-            if ($b < 0x80) {
-                $step = 1;
-            } elseif ($b < 0xE0) {
-                $step = 2;
-            } elseif ($b < 0xF0) {
-                $step = 3;
-            } else {
-                $step = 4;
-            }
-            $i += $step;
-            ++$seen;
-        }
-        if ($i >= $len) {
-            return '';
-        }
-        $start = $i;
-        $taken = 0;
-        while ($i < $len && $taken < $charCount) {
-            $b = \ord($string[$i]);
-            if ($b < 0x80) {
-                $step = 1;
-            } elseif ($b < 0xE0) {
-                $step = 2;
-            } elseif ($b < 0xF0) {
-                $step = 3;
-            } else {
-                $step = 4;
-            }
-            $i += $step;
-            ++$taken;
-        }
-
-        return \substr($string, $start, $i - $start);
     }
 }

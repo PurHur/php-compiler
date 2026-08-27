@@ -40,7 +40,8 @@ final class MbStrSplitRuntimeIntsAotTest extends TestCase
         $this->assertStringNotContainsString('new HashTable', $helper);
         $this->assertStringNotContainsString('use PHPCompiler\\VM\\HashTable', $helper);
         $this->assertStringContainsString('JOIN_DELIM', $helper);
-        $this->assertStringContainsString('utf8Substr', $helper);
+        $this->assertStringContainsString('$chunkLen = $length + 0', $helper);
+        $this->assertStringContainsString('substr($string, $bytePos, 1)', $helper);
         $cache = (string) file_get_contents($root.'/lib/AOT/HelperRuntimeCache.php');
         $this->assertStringContainsString(
             "mbstrsplitjithelper::strsplitargv",
