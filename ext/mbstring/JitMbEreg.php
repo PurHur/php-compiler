@@ -39,12 +39,19 @@ final class JitMbEreg
      */
     public static function invokeMatch(Context $context, array $args, bool $caseInsensitive): Value
     {
+        $fn = $caseInsensitive ? 'mb_eregi' : 'mb_ereg';
         $pattern = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $args[0],
-            $caseInsensitive ? 'mb_eregi' : 'mb_ereg',
+            $fn,
             0,
             'pattern'
+        );
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[0],
+            $pattern,
+            sprintf('%s(): Argument #1 ($pattern) must not be empty', $fn)
         );
         $string = JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,

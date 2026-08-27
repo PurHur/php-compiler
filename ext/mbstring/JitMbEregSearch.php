@@ -40,7 +40,7 @@ final class JitMbEregSearch
         }
         $pattern = JitStringArg::compileTimeLiteral($args[0]);
         $string = JitStringArg::compileTimeLiteral($args[1]);
-        if (null === $pattern || null === $string) {
+        if (null === $pattern || null === $string || '' === $pattern) {
             return null;
         }
 

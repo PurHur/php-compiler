@@ -1075,16 +1075,12 @@ final class JitStringBuiltinArg
     /**
      * Reject empty string operands after lowering (php-src dir.c / ini.c empty-path guards; #11031).
      *
-     * @throws \ValueError when the compile-time operand is empty (JIT hybrid try/catch).
-     * AOT: prefer a non-literal empty path so lowering emits the runtime length check (#29268).
+     * Always emits a runtime length branch so user try/catch can catch ValueError (#29268).
+     * Compile-time non-empty literals skip the guard; compile-time '' still emits the branch.
      */
     public static function rejectEmpty(Context $context, Variable $arg, Value $loweredStr, string $errorMessage): void
     {
-        if (null !== ($arg->compileTimeString ?? null)) {
-            if ('' === $arg->compileTimeString) {
-                throw new \ValueError($errorMessage);
-            }
-
+        if (null !== ($arg->compileTimeString ?? null) && '' !== $arg->compileTimeString) {
             return;
         }
 
