@@ -1183,7 +1183,15 @@ final class JitDomAttributeNodeNS
                 if ('' !== $valueLit) {
                     JitDomLoadXMLUserScript::storeElementInIdMap($context, $document, $valueLit, $element);
                 }
-                DomUserScriptElementCacheLlvm::rebindId($context, $valueLit);
+                // Only retarget the single-slot cache when this write owns the cached id
+                // (same element, or oldId matches cached id). Sibling/new-element writes
+                // must not steal GLOBAL_ID (#35321).
+                DomUserScriptElementCacheLlvm::rebindIdForElement(
+                    $context,
+                    $element,
+                    $valueLit,
+                    $oldIdLit
+                );
                 JitDomSetIdAttribute::rememberSetAttributeIdValue($valueLit);
                 // Keep setIdAttribute cache in sync when setAttribute runs after a prior
                 // setIdAttribute in the same script (multi-document #29257).
@@ -1502,15 +1510,15 @@ final class JitDomAttributeNodeNS
 
     /**
      * Prior id= literal before setAttribute/removeAttribute mutates the live Attr cache (#19870).
+     *
+     * Prefer per-element open-tag stamps. Do not use the global Attr cache — it is keyed
+     * only by name and returns the last id= / last setAttribute in the document (#34050 /
+     * #35321), which would drop a sibling's registered id from PROP_ELEMENT_ID_MAP.
      */
     private static function compileTimePriorIdLiteral(JITVariable $receiver, string $nameLit): ?string
     {
         if ('id' !== $nameLit) {
             return null;
-        }
-        $cached = DomUserScriptAttributeCacheLlvm::literalValue('', 'id');
-        if (null !== $cached && '' !== $cached) {
-            return $cached;
         }
         $attrs = $receiver->compileTimeDomAttributes;
         if (null !== $attrs && isset($attrs['id']) && '' !== $attrs['id']) {

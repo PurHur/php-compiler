@@ -90,7 +90,7 @@ final class DomUserScriptElementCacheLlvm
         $context->builder->positionAtEnd($doneBlock);
     }
 
-    /** Rekey cache after setAttribute('id', …) (#19870). */
+    /** Rekey cache after setAttribute('id', …) on the cached element (#19870). */
     public static function rebindId(Context $context, string $newIdLit): void
     {
         self::ensureGlobals($context);
@@ -113,6 +113,81 @@ final class DomUserScriptElementCacheLlvm
             $newIdStr
         );
         $context->builder->store($ownedId, $context->module->getNamedGlobal(self::GLOBAL_ID));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /**
+     * Rekey the single-slot cache after setAttribute('id', …) (#19870 / #35321).
+     *
+     * Updates when the receiver is the cached element, or when {@see $oldIdLit} matches
+     * the cached id (loadHTML getElementById temps may not share the same object
+     * pointer as the setAttribute receiver). A different element's id write must not
+     * retarget GLOBAL_ID / GLOBAL_ELEM.
+     */
+    public static function rebindIdForElement(
+        Context $context,
+        Value $element,
+        string $newIdLit,
+        ?string $oldIdLit = null
+    ): void {
+        self::ensureGlobals($context);
+        $i1 = $context->getTypeFromString('int1');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $i64 = $context->getTypeFromString('int64');
+
+        $storedOk = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_OK));
+        $hasStore = $context->builder->icmp(Builder::INT_EQ, $storedOk, $i1->constInt(1, false));
+        $skipBlock = BasicBlockHelper::append($context, 'dom_us_rebind_el_skip');
+        $cmpBlock = BasicBlockHelper::append($context, 'dom_us_rebind_el_cmp');
+        $doBlock = BasicBlockHelper::append($context, 'dom_us_rebind_el_do');
+        $doneBlock = BasicBlockHelper::append($context, 'dom_us_rebind_el_done');
+        $context->builder->branchIf($hasStore, $cmpBlock, $skipBlock);
+
+        $context->builder->positionAtEnd($skipBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($cmpBlock);
+        $cachedElem = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ELEM));
+        $sameElem = $context->builder->icmp(Builder::INT_EQ, $cachedElem, $element);
+        $should = $sameElem;
+        if (null !== $oldIdLit && '' !== $oldIdLit) {
+            $cachedId = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ID));
+            $hasCachedId = $context->builder->icmp(
+                Builder::INT_NE,
+                $cachedId,
+                $cachedId->typeOf()->constNull()
+            );
+            $idCmpBlock = BasicBlockHelper::append($context, 'dom_us_rebind_el_idcmp');
+            $afterIdBlock = BasicBlockHelper::append($context, 'dom_us_rebind_el_afterid');
+            $shouldSlot = BasicBlockHelper::entryAlloca($context, $i1);
+            $context->builder->store($sameElem, $shouldSlot);
+            $context->builder->branchIf($hasCachedId, $idCmpBlock, $afterIdBlock);
+
+            $context->builder->positionAtEnd($idCmpBlock);
+            $oldIdStr = $context->builder->load($context->constantStringFromString($oldIdLit));
+            $cmp = JitStringCompare::strcmp($context, $cachedId, $oldIdStr);
+            $idMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
+            $context->builder->store(
+                $context->builder->or($context->builder->load($shouldSlot), $idMatch),
+                $shouldSlot
+            );
+            $context->builder->branch($afterIdBlock);
+
+            $context->builder->positionAtEnd($afterIdBlock);
+            $should = $context->builder->load($shouldSlot);
+        }
+        $context->builder->branchIf($should, $doBlock, $skipBlock);
+
+        $context->builder->positionAtEnd($doBlock);
+        $newIdStr = $context->builder->load($context->constantStringFromString($newIdLit));
+        $ownedId = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $newIdStr
+        );
+        $context->builder->store($ownedId, $context->module->getNamedGlobal(self::GLOBAL_ID));
+        $context->builder->store($element, $context->module->getNamedGlobal(self::GLOBAL_ELEM));
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
