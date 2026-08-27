@@ -2225,6 +2225,8 @@ class Context {
             'setEncryptionIndex',
             'setExternalAttributesName',
             'setExternalAttributesIndex',
+            'getExternalAttributesName',
+            'getExternalAttributesIndex',
             'statName',
             'statIndex',
             'setMtimeName',

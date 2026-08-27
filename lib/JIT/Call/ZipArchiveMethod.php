@@ -53,6 +53,10 @@ final class ZipArchiveMethod implements Call
             $this->paramNames = ['name', 'opsys', 'attr', 'flags='];
         } elseif ('setexternalattributesindex' === $lc) {
             $this->paramNames = ['index', 'opsys', 'attr', 'flags='];
+        } elseif ('getexternalattributesname' === $lc) {
+            $this->paramNames = ['name', 'opsys', 'attr', 'flags='];
+        } elseif ('getexternalattributesindex' === $lc) {
+            $this->paramNames = ['index', 'opsys', 'attr', 'flags='];
         } elseif ('setmtimename' === $lc) {
             $this->paramNames = ['name', 'timestamp', 'flags='];
         } elseif ('setmtimeindex' === $lc) {
@@ -113,11 +117,13 @@ final class ZipArchiveMethod implements Call
             'setmtimeindex' => JitZipArchive::setMtimeIndex($context, ...$args),
             'setexternalattributesname' => JitZipArchive::setExternalAttributesName($context, ...$args),
             'setexternalattributesindex' => JitZipArchive::setExternalAttributesIndex($context, ...$args),
+            'getexternalattributesname' => JitZipArchive::getExternalAttributesName($context, ...$args),
+            'getexternalattributesindex' => JitZipArchive::getExternalAttributesIndex($context, ...$args),
             'setarchiveflag' => JitZipArchive::setArchiveFlag($context, ...$args),
             'getarchiveflag' => JitZipArchive::getArchiveFlag($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35515/#35522)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35515/#35522/#35527)'
             ),
         };
     }
