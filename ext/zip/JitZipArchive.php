@@ -2007,6 +2007,96 @@ final class JitZipArchive
         return self::boxBoolFromI64($context, $rcPhi);
     }
 
+    /**
+     * ZipArchive::getExternalAttributesName — NestedJIT gea + by-ref opsys/attr (#35529 leftover of #35515).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getExternalAttributesName
+     */
+    public static function getExternalAttributesName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::getExternalAttributesName', 3, 4)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::getExternalAttributesName',
+            0,
+            'name'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($name, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_gea_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_gea_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::getExternalAttributesName(): Argument #1 ($name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        [$found, $payload] = self::execLongAndPayload(
+            $context,
+            'gea',
+            $zero,
+            $zero,
+            $name,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxGetExtAttr($context, $found, $payload, $args[2], $args[3]);
+    }
+
+    /**
+     * ZipArchive::getExternalAttributesIndex — NestedJIT gei + by-ref opsys/attr (#35529 leftover of #35515).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getExternalAttributesIndex
+     */
+    public static function getExternalAttributesIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::getExternalAttributesIndex', 3, 4)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower(
+            $context,
+            $args[1],
+            'ZipArchive::getExternalAttributesIndex(): Argument #1 ($index)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $zero = $i64->constInt(0, false);
+        [$found, $payload] = self::execLongAndPayload(
+            $context,
+            'gei',
+            $index,
+            $zero,
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxGetExtAttr($context, $found, $payload, $args[2], $args[3]);
+    }
+
     public static function close(Context $context, JITVariable ...$args): Value
     {
         if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::close', 0)) {
@@ -2687,6 +2777,69 @@ final class JitZipArchive
         JitValueBox::writeBool($context, $slot, $isTrue);
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * Write by-ref opsys/attr from NestedJIT payload (2×int32 LE) and return bool (#35529).
+     */
+    private static function boxGetExtAttr(
+        Context $context,
+        Value $foundI64,
+        Value $payload,
+        JITVariable $opsysArg,
+        JITVariable $attrArg
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $isFound = $context->builder->icmp(Builder::INT_NE, $foundI64, $i64->constInt(0, false));
+        $id = (string) (++self::$serial);
+        $okBlock = BasicBlockHelper::append($context, 'zip_gea_box_ok_'.$id);
+        $missBlock = BasicBlockHelper::append($context, 'zip_gea_box_miss_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_gea_box_done_'.$id);
+        $context->builder->branchIf($isFound, $okBlock, $missBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $opsys = self::int32LeAtStringOffset($context, $payload, 0);
+        $attr = self::int32LeAtStringOffset($context, $payload, 4);
+        $opsysPtr = JitValueBox::valuePtrFromVariable($context, $opsysArg);
+        $attrPtr = JitValueBox::valuePtrFromVariable($context, $attrArg);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $opsysPtr,
+            $opsys
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $attrPtr,
+            $attr
+        );
+        $okSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $okSlot,
+            $context->getTypeFromString('int1')->constInt(1, false)
+        );
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $missSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $missSlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $missPtr = JitValueBox::pointer($context, $missSlot);
+        $missTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $ptrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($ptrTy);
+        $phi->addIncoming($okPtr, $okTail);
+        $phi->addIncoming($missPtr, $missTail);
+
+        return $phi;
     }
 
     /**

@@ -7,9 +7,9 @@ namespace PHPCompiler\ext\zip;
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
  * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500 /
- * #35504 / #35506 / #35503 / #35508 / #35515 / #35522) — CREATE/add/close/get/locate/index/rename/delete/
+ * #35504 / #35506 / #35503 / #35508 / #35515 / #35522 / #35529) — CREATE/add/close/get/locate/index/rename/delete/
  * extract/status/count/archive-comment/entry-comment/unchange/replaceFile/setPassword/stat/
- * setCompression/setEncryption/setMtime/setExternalAttributes/setArchiveFlag path.
+ * setCompression/setEncryption/setMtime/setExternalAttributes/getExternalAttributes/setArchiveFlag path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -24,6 +24,7 @@ namespace PHPCompiler\ext\zip;
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
  * unchangeName / replaceFile / setPassword / setCompressionName / setCompressionIndex /
  * setEncryptionName / setEncryptionIndex / setExternalAttributesName / setExternalAttributesIndex /
+ * getExternalAttributesName / getExternalAttributesIndex /
  * statName / statIndex / setMtimeName / setMtimeIndex / setArchiveFlag / getArchiveFlag)
  */
 final class ZipArchiveJitHelper
@@ -1266,6 +1267,65 @@ final class ZipArchiveJitHelper
                 return self::pack(1);
             }
             self::$h1status = 9;
+
+            return self::pack(0);
+        }
+
+        // getExternalAttributesName — $s1=name; payload opsys+attr (#35529 leftover of #35515 / #20363).
+        if ('gea' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if ('' === $s1) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::pack(self::$h1opsys).self::pack(self::$h1attr));
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::pack(self::$h1opsys2).self::pack(self::$h1attr2));
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+
+        // getExternalAttributesIndex — $a=index; payload opsys+attr (#35529 leftover of #35515 / #20363).
+        if ('gei' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if (0 === $a) {
+                if ('' === self::$h1name) {
+                    self::$h1status = 18;
+
+                    return self::pack(0);
+                }
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::pack(self::$h1opsys).self::pack(self::$h1attr));
+            }
+            if (1 === $a) {
+                if ('' === self::$h1name2) {
+                    self::$h1status = 18;
+
+                    return self::pack(0);
+                }
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::pack(self::$h1opsys2).self::pack(self::$h1attr2));
+            }
+            self::$h1status = 18;
 
             return self::pack(0);
         }

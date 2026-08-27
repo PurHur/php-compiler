@@ -113,11 +113,13 @@ final class ZipArchiveMethod implements Call
             'setmtimeindex' => JitZipArchive::setMtimeIndex($context, ...$args),
             'setexternalattributesname' => JitZipArchive::setExternalAttributesName($context, ...$args),
             'setexternalattributesindex' => JitZipArchive::setExternalAttributesIndex($context, ...$args),
+            'getexternalattributesname' => JitZipArchive::getExternalAttributesName($context, ...$args),
+            'getexternalattributesindex' => JitZipArchive::getExternalAttributesIndex($context, ...$args),
             'setarchiveflag' => JitZipArchive::setArchiveFlag($context, ...$args),
             'getarchiveflag' => JitZipArchive::getArchiveFlag($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35515/#35522)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35515/#35529)'
             ),
         };
     }
