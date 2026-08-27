@@ -3123,6 +3123,7 @@ require_once __DIR__.'/../../../ext/standard/JitSessionStatus.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionStorageKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionUnset.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionWriteClose.php';
+require_once __DIR__.'/../../../ext/standard/JitSessionRegisterShutdown.php';
 require_once __DIR__.'/../../../ext/standard/JitSetcookie.php';
 require_once __DIR__.'/../../../ext/standard/JitSetcookieOptions.php';
 require_once __DIR__.'/../../../ext/standard/JitSettype.php';

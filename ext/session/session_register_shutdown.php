@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\session;
 
+use PHPCompiler\ext\standard\JitSessionRegisterShutdown;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
@@ -12,6 +13,8 @@ use PHPLLVM\Value;
 
 /**
  * session_register_shutdown() — register session_write_close on script shutdown (php-src ext/session/session.c; #4873).
+ *
+ * JIT/AOT via {@see JitSessionRegisterShutdown} (#35330 leftover of #4873).
  */
 final class session_register_shutdown extends Internal
 {
@@ -30,8 +33,10 @@ final class session_register_shutdown extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'session_register_shutdown() is not lowered for JIT/AOT in this compiler build'
-        );
+        if ([] !== $args) {
+            throw new \LogicException('session_register_shutdown() takes no arguments in this compiler build');
+        }
+
+        return JitSessionRegisterShutdown::invoke($context);
     }
 }
