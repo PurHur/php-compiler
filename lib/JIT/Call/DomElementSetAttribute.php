@@ -25,17 +25,21 @@ final class DomElementSetAttribute implements Call
             $name = $args[1]->compileTimeString;
             $value = $args[2]->compileTimeString;
             $id = $args[0]->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
-            if (null !== $name && null !== $value && 'xmlns' !== $name && null !== $id) {
-                JitDomCreateElementAttrs::set($id, $name, $value);
-                // Merge side-table first — local stamp alone would wipe NS attrs from
-                // a prior setAttributeNS on the same element (#34257 / peer #33526).
+            if (null !== $name && null !== $value && 'xmlns' !== $name) {
+                // Always merge onto the Variable bag — replaceChild/removeChild returns can
+                // lose ElementId on the receiver temp while lastId() points at a newer
+                // createElement (the replacement / a later sibling), so gating on $id alone
+                // left compileTimeDomAttributes stale for cloneNode (#35386 / peer #35377).
+                if (null !== $id) {
+                    JitDomCreateElementAttrs::set($id, $name, $value);
+                }
                 $attrs = $args[0]->compileTimeDomAttributes ?? [];
-                if ([] === $attrs) {
+                if ([] === $attrs && null !== $id) {
                     $attrs = JitDomCreateElementAttrs::get($id);
                 }
                 $attrs[$name] = $value;
                 $args[0]->compileTimeDomAttributes = $attrs;
-                if (null === $args[0]->compileTimeDomElementId) {
+                if (null === $args[0]->compileTimeDomElementId && null !== $id) {
                     $args[0]->compileTimeDomElementId = $id;
                 }
             }

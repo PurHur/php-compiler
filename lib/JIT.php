@@ -16865,25 +16865,36 @@ class JIT {
     }
 
     /**
-     * appendChild() / insertBefore() return the (new) child node — copy compile-time DOM
-     * metadata onto the result Variable so later cloneNode/saveXML on
-     * `$n = $p->appendChild(...)` / `$n = $p->insertBefore(...)` still see createElement
-     * tag/inner/attrs (php-src returns the same node; #35373 leftover of #35361; insertBefore
-     * peer #35377 — null-ref ≡ append still keeps toCall as DomNodeInsertBefore).
+     * Mutation helpers that return a child node — copy compile-time DOM metadata onto the
+     * result Variable so later cloneNode/saveXML on `$n = $p->appendChild(...)` etc. still
+     * see createElement tag/inner/attrs (php-src returns the same node object; #35373 leftover
+     * of #35361; insertBefore peer #35377 — null-ref ≡ append still keeps toCall as
+     * DomNodeInsertBefore; replaceChild/removeChild peer #35386).
+     *
+     * Call-arg index of the returned node (php-src ext/dom/node.c):
+     * - appendChild / insertBefore / removeChild → `$callArgs[1]` (new/removed child)
+     * - replaceChild → `$callArgs[2]` (oldChild — NOT the new child)
      *
      * @param array<int, Variable> $callArgs
      */
     private function propagateDomAppendChildCompileTimeTag(Operand $result, array $callArgs): void
     {
         $toCall = $this->context->scope->toCall;
-        if (!(
+        $sourceIndex = null;
+        if (
             $toCall instanceof JIT\Call\DomNodeAppendChild
             || $toCall instanceof JIT\Call\DomDocumentAppendChild
             || $toCall instanceof JIT\Call\DomNodeInsertBefore
-        )) {
+            || $toCall instanceof JIT\Call\DomNodeRemoveChild
+        ) {
+            $sourceIndex = 1;
+        } elseif ($toCall instanceof JIT\Call\DomNodeReplaceChild) {
+            // dom_node_replace_child returns the replaced (old) child.
+            $sourceIndex = 2;
+        } else {
             return;
         }
-        $child = $callArgs[1] ?? null;
+        $child = $callArgs[$sourceIndex] ?? null;
         if (!$child instanceof Variable) {
             return;
         }
@@ -16895,6 +16906,13 @@ class JIT {
         $this->syncCompileTimeDomTagName($resultVar, $child, true);
         if (null !== $child->classUserType) {
             $resultVar->classUserType = $child->classUserType;
+        }
+        // replaceChild returns oldChild: a non-empty compileTimeDomAttributes snapshot
+        // shadows later setAttribute updates that only refresh CreateElementAttrs /
+        // NamedNodeMap pins on the receiver temp, so cloneNode would omit new attrs
+        // (#35386). Clear the bag and keep ElementId — clone reads the side-table.
+        if ($toCall instanceof JIT\Call\DomNodeReplaceChild) {
+            $resultVar->compileTimeDomAttributes = null;
         }
     }
 
@@ -22192,7 +22210,17 @@ class JIT {
             $dest->compileTimeDomTextData = $src->compileTimeDomTextData;
         }
         if ($force || null !== $src->compileTimeDomAttributes) {
-            $dest->compileTimeDomAttributes = $src->compileTimeDomAttributes;
+            // Copy the bag — a shared array ref lets later setAttribute / mutation see the
+            // wrong identity after replaceChild synced oldChild onto the result (#35386).
+            if (null === $src->compileTimeDomAttributes) {
+                $dest->compileTimeDomAttributes = null;
+            } else {
+                $copied = [];
+                foreach ($src->compileTimeDomAttributes as $attrName => $attrVal) {
+                    $copied[$attrName] = $attrVal;
+                }
+                $dest->compileTimeDomAttributes = $copied;
+            }
         }
         if ($force || null !== $src->compileTimeDomElementId) {
             $dest->compileTimeDomElementId = $src->compileTimeDomElementId;
@@ -30200,7 +30228,14 @@ class JIT {
             if (!$bound instanceof Variable || $bound === $arg) {
                 continue;
             }
-            if (null === $bound->compileTimeDomAttributes || [] === $bound->compileTimeDomAttributes) {
+            // Promote on ElementId / tagName too — replaceChild clears the attrs bag so
+            // later setAttribute does not shadow CreateElementAttrs, but the ARG_SEND temp
+            // still needs ElementId or lastId() points at a newer createElement (#35386).
+            if (
+                (null === $bound->compileTimeDomAttributes || [] === $bound->compileTimeDomAttributes)
+                && null === $bound->compileTimeDomElementId
+                && (null === $bound->compileTimeDomTagName || '' === $bound->compileTimeDomTagName)
+            ) {
                 continue;
             }
             $this->syncCompileTimeDomTagName($arg, $bound, true);
