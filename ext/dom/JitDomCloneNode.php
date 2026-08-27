@@ -15,14 +15,16 @@ use PHPLLVM\Value;
  *
  * Thin standalone AOT does not register {@see NodeCloneNode} on :object receivers
  * (firstChild temps lose DOMElement userType). Compile-time loadXML markup is the
- * SSOT — NestedJIT DomRegistry clone would SIGSEGV on the returned object like
- * importNode before the user-script materialize path (#19212).
+ * preferred SSOT; createElement + appendChild trees use {@see compileTimeDomTagName}
+ * / {@see compileTimeDomInnerXml} instead (#35361). NestedJIT DomRegistry clone would
+ * SIGSEGV on the returned object like importNode before the user-script materialize
+ * path (#19212).
  *
  * Materialize stores InnerXml for saveXML (#32355) and seeds LiveSlots via
  * {@see JitDomDocumentElement::syncChildrenFromXmlPublic} so firstChild walks
  * on the clone do not SIGSEGV (#32949).
  *
- * php-src: ext/dom/node.c php_dom_clone_node → xmlDocCopyNode (#32355, #32949)
+ * php-src: ext/dom/node.c php_dom_clone_node → xmlDocCopyNode (#32355, #32949, #35361)
  */
 final class JitDomCloneNode
 {
@@ -68,7 +70,8 @@ final class JitDomCloneNode
     {
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
-            return null;
+            // createElement / appendChild trees have no loadXML SSOT (#35361).
+            return self::specFromCreateElementReceiver($receiver, $deep);
         }
 
         $index = $receiver->compileTimeDomChildIndex;
@@ -114,6 +117,77 @@ final class JitDomCloneNode
             'tag' => $tag,
             'attrs' => $attrs,
             'inner' => $childInner,
+            'text' => $text,
+        ];
+    }
+
+    /**
+     * Deep/shallow clone when the node was built with createElement (+ appendChild),
+     * not loadXML — php-src xmlDocCopyNode still applies (#35361).
+     *
+     * @return null|array{kind: string, tag: string, attrs: string, inner: string, text: string}
+     */
+    private static function specFromCreateElementReceiver(JITVariable $receiver, bool $deep): ?array
+    {
+        $tag = $receiver->compileTimeDomTagName
+            ?? JitDomNodeChildProperty::$lastFetchedTagName
+            ?? null;
+        if (null === $tag || '' === $tag) {
+            $textData = $receiver->compileTimeDomTextData
+                ?? JitDomCreateTextNode::$lastMaterializedData
+                ?? null;
+            if (null !== $textData) {
+                return [
+                    'kind' => 'text',
+                    'tag' => '#text',
+                    'attrs' => '',
+                    'inner' => '',
+                    'text' => $textData,
+                ];
+            }
+
+            return null;
+        }
+        if ('#comment' === $tag) {
+            return [
+                'kind' => 'comment',
+                'tag' => '#comment',
+                'attrs' => '',
+                'inner' => '',
+                'text' => $receiver->compileTimeDomTextData ?? '',
+            ];
+        }
+        if ('#text' === $tag || '#cdata-section' === $tag) {
+            return [
+                'kind' => 'text',
+                'tag' => '#text',
+                'attrs' => '',
+                'inner' => '',
+                'text' => $receiver->compileTimeDomTextData ?? '',
+            ];
+        }
+
+        $attrs = '';
+        $attrMap = $receiver->compileTimeDomAttributes;
+        if (null === $attrMap || [] === $attrMap) {
+            $id = $receiver->compileTimeDomElementId ?? JitDomCreateElementAttrs::lastId();
+            if (null !== $id) {
+                $attrMap = JitDomCreateElementAttrs::get($id);
+            }
+        }
+        if (null !== $attrMap && [] !== $attrMap) {
+            $attrs = JitDomCreateElementAttrs::formatSuffix($attrMap);
+        }
+        $inner = $deep ? ($receiver->compileTimeDomInnerXml ?? '') : '';
+        $openAttrs = '' === $attrs ? '' : (str_starts_with($attrs, ' ') ? $attrs : ' '.$attrs);
+        $outer = '<'.$tag.$openAttrs.'>'.$inner.'</'.$tag.'>';
+        $text = $deep ? DomParseSimpleXmlJitHelper::rootTextContentArgv($outer) : '';
+
+        return [
+            'kind' => 'element',
+            'tag' => $tag,
+            'attrs' => $attrs,
+            'inner' => $inner,
             'text' => $text,
         ];
     }

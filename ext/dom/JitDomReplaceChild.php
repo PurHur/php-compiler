@@ -332,6 +332,8 @@ final class JitDomReplaceChild
         );
 
         $childCount = null;
+        // Always defined for syncUserScriptInnerXml — createElement trees never set $xml (#35361).
+        $xml = null;
         if (JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             $inner = $parentVar->compileTimeDomInnerXml;
             if (null !== $inner && '' !== $inner) {
