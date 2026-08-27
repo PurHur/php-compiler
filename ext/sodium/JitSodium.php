@@ -124,6 +124,38 @@ final class JitSodium
         return StringSodium::invokePadHelper($context, $name, $string, $blockSize);
     }
 
+    /** sodium_hex2bin NestedJIT — decode after optional ignore strip (#35357). */
+    public static function invokeHex2bin(Context $context, Value $string, Value $ignore): Value
+    {
+        return StringSodium::invokeHex2binHelper($context, $string, $ignore);
+    }
+
+    /** Peel one ignore character from hex input (#35357 NestedJIT two-string workaround). */
+    public static function invokeStripChar(Context $context, Value $string, Value $char): Value
+    {
+        return StringSodium::invokeStripCharHelper($context, $string, $char);
+    }
+
+    public static function invokeStripByte(Context $context, Value $string, Value $byte): Value
+    {
+        return StringSodium::invokeStripByteHelper($context, $string, $byte);
+    }
+
+    public static function invokeIgnoreByte(Context $context, Value $ignore): Value
+    {
+        return StringSodium::invokeIgnoreByteHelper($context, $ignore);
+    }
+
+    public static function invokeIgnoreRest(Context $context, Value $ignore): Value
+    {
+        return StringSodium::invokeIgnoreRestHelper($context, $ignore);
+    }
+
+    public static function invokeDecode(Context $context, Value $string): Value
+    {
+        return StringSodium::invokeDecodeHelper($context, $string);
+    }
+
     public static function invokeStreamXor(
         Context $context,
         string $name,

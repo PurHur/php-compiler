@@ -21,6 +21,7 @@ final class StringSodium
 {
     private const HELPER_PATH = '/ext/sodium/SodiumJitHelper.php';
     private const PAD_HELPER_PATH = '/ext/sodium/SodiumPadJitHelper.php';
+    private const HEX2BIN_HELPER_PATH = '/ext/sodium/SodiumHex2binJitHelper.php';
 
     private const SECRETBOX_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::secretbox';
 
@@ -41,6 +42,13 @@ final class StringSodium
     private const PAD_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumPadJitHelper::pad';
 
     private const UNPAD_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumPadJitHelper::unpad';
+
+    private const HEX2BIN_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumHex2binJitHelper::hex2binArgv';
+    private const HEX2BIN_STRIP_CHAR = 'PHPCompiler\\ext\\sodium\\SodiumHex2binJitHelper::stripChar';
+    private const HEX2BIN_STRIP_BYTE = 'PHPCompiler\\ext\\sodium\\SodiumHex2binJitHelper::stripByte';
+    private const HEX2BIN_DECODE = 'PHPCompiler\\ext\\sodium\\SodiumHex2binJitHelper::decode';
+    private const HEX2BIN_IGNORE_BYTE = 'PHPCompiler\\ext\\sodium\\SodiumHex2binJitHelper::ignoreByte';
+    private const HEX2BIN_IGNORE_REST = 'PHPCompiler\\ext\\sodium\\SodiumHex2binJitHelper::ignoreRest';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -79,6 +87,247 @@ final class StringSodium
         );
 
         return JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+    }
+
+    /** sodium_hex2bin() NestedJIT bridge (#35357). */
+    public static function invokeHex2binHelper(Context $context, Value $string, Value $ignore): Value
+    {
+        self::ensureHex2binHelpers($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_sodium_hex2bin'),
+            $string,
+            $ignore
+        );
+    }
+
+    public static function invokeStripCharHelper(Context $context, Value $string, Value $char): Value
+    {
+        self::ensureHex2binHelpers($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_sodium_hex2bin_strip_char'),
+            $string,
+            $char
+        );
+    }
+
+    public static function invokeStripByteHelper(Context $context, Value $string, Value $byte): Value
+    {
+        self::ensureHex2binHelpers($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_sodium_hex2bin_strip_byte'),
+            $string,
+            $byte
+        );
+    }
+
+    public static function invokeIgnoreByteHelper(Context $context, Value $ignore): Value
+    {
+        self::ensureHex2binHelpers($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_sodium_hex2bin_ignore_byte'),
+            $ignore
+        );
+    }
+
+    public static function invokeIgnoreRestHelper(Context $context, Value $ignore): Value
+    {
+        self::ensureHex2binHelpers($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_sodium_hex2bin_ignore_rest'),
+            $ignore
+        );
+    }
+
+    public static function invokeDecodeHelper(Context $context, Value $string): Value
+    {
+        self::ensureHex2binHelpers($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_sodium_hex2bin_decode'),
+            $string
+        );
+    }
+
+    private static function ensureHex2binHelpers(Context $context): void
+    {
+        $helpers = [
+            self::HEX2BIN_HELPER,
+            self::HEX2BIN_STRIP_CHAR,
+            self::HEX2BIN_STRIP_BYTE,
+            self::HEX2BIN_DECODE,
+            self::HEX2BIN_IGNORE_BYTE,
+            self::HEX2BIN_IGNORE_REST,
+        ];
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HEX2BIN_HELPER_PATH,
+            $helpers,
+            '#35357'
+        );
+
+        self::ensureHex2binStringStringBridge(
+            $context,
+            '__compiler_sodium_hex2bin',
+            self::HEX2BIN_HELPER
+        );
+        self::ensureHex2binStringStringBridge(
+            $context,
+            '__compiler_sodium_hex2bin_strip_char',
+            self::HEX2BIN_STRIP_CHAR
+        );
+        self::ensureHex2binStringIntBridge(
+            $context,
+            '__compiler_sodium_hex2bin_strip_byte',
+            self::HEX2BIN_STRIP_BYTE
+        );
+        self::ensureHex2binStringBridge(
+            $context,
+            '__compiler_sodium_hex2bin_decode',
+            self::HEX2BIN_DECODE
+        );
+        self::ensureHex2binIgnoreByteBridge($context);
+        self::ensureHex2binStringBridge(
+            $context,
+            '__compiler_sodium_hex2bin_ignore_rest',
+            self::HEX2BIN_IGNORE_REST
+        );
+    }
+
+    private static function ensureHex2binStringStringBridge(
+        Context $context,
+        string $abiName,
+        string $helper
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $restore = self::captureInsertBlock($context);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false, $strPtr, $strPtr)
+            );
+        $entry = $fn->appendBasicBlock('sodium_hex2bin_ss_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            JitVmHelperLink::lookupCompiled($context, $helper, '#35357'),
+            [$fn->getParam(0), $fn->getParam(1)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
+        );
+        $context->registerFunction($abiName, $fn);
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    private static function ensureHex2binStringIntBridge(
+        Context $context,
+        string $abiName,
+        string $helper
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $restore = self::captureInsertBlock($context);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false, $strPtr, $i64)
+            );
+        $entry = $fn->appendBasicBlock('sodium_hex2bin_si_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            JitVmHelperLink::lookupCompiled($context, $helper, '#35357'),
+            [$fn->getParam(0), $fn->getParam(1)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
+        );
+        $context->registerFunction($abiName, $fn);
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    private static function ensureHex2binStringBridge(
+        Context $context,
+        string $abiName,
+        string $helper
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $restore = self::captureInsertBlock($context);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false, $strPtr)
+            );
+        $entry = $fn->appendBasicBlock('sodium_hex2bin_s_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            JitVmHelperLink::lookupCompiled($context, $helper, '#35357'),
+            [$fn->getParam(0)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
+        );
+        $context->registerFunction($abiName, $fn);
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    private static function ensureHex2binIgnoreByteBridge(Context $context): void
+    {
+        $abiName = '__compiler_sodium_hex2bin_ignore_byte';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+        $restore = self::captureInsertBlock($context);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i64, false, $strPtr)
+            );
+        $entry = $fn->appendBasicBlock('sodium_hex2bin_ib_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            JitVmHelperLink::lookupCompiled($context, self::HEX2BIN_IGNORE_BYTE, '#35357'),
+            [$fn->getParam(0)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::extractLongFromHelperResult($context, $raw, $i64)
+        );
+        $context->registerFunction($abiName, $fn);
+        self::restoreInsertBlock($context, $restore);
     }
 
     private static function implementPadBridge(Context $context, string $abiName, string $helper): void
