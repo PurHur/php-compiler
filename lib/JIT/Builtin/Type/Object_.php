@@ -3760,6 +3760,12 @@ class Object_ extends Type {
         if ('intllistformatter' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlListFormatter::classConstants());
         }
+        // IntlChar Call proxies are linked (#6171/#20730); seed PROPERTY_*, FOLD_CASE_* so
+        // ClassConstFetch folds to compile-time long (#35412 peer of #35408). Without this,
+        // thin AOT raises Undefined constant IntlChar::PROPERTY_ALPHABETIC at runtime.
+        if ('intlchar' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlChar::classConstants());
+        }
         // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
         // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
         // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
