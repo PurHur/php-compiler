@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\ext\standard\VmPregMatches;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
 use PHPLLVM\Value;
 
 /**
@@ -21,7 +24,8 @@ use PHPLLVM\Value;
 final class JitMbEregSearch
 {
     /**
-     * mb_ereg() / mb_eregi() — 2-arg literal fold (no &$regs). php-src php_mbregex.c (#33648).
+     * mb_ereg() / mb_eregi() — 2–3 arg literal fold (&$regs when present; #35297 / #33811).
+     * php-src php_mbregex.c — always assign $regs, empty array on no-match (#26408).
      *
      * @param JITVariable[] $args
      */
@@ -30,7 +34,8 @@ final class JitMbEregSearch
         array $args,
         bool $caseInsensitive
     ): ?Value {
-        if (2 !== \count($args)) {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
             return null;
         }
         $pattern = JitStringArg::compileTimeLiteral($args[0]);
@@ -42,6 +47,10 @@ final class JitMbEregSearch
         MbstringAotFoldState::syncRegexEncodingIntoState($context);
         $out = VmMbstring::eregMatch($pattern, $string, $caseInsensitive);
 
+        if (3 === $argc) {
+            self::writeEregRegistersFold($context, $args[2], $out);
+        }
+
         // Boxed bool — same convention as mb_ord foldFalse / ExceptionBridge catchables (#33648).
         $slot = JitValueBox::alloc($context);
         $i1 = $context->getTypeFromString('int1');
@@ -52,6 +61,29 @@ final class JitMbEregSearch
         );
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * Bake mb_ereg &$regs at fold time (peer openssl_pkcs12_read / #35297).
+     *
+     * @param array{matched: bool, registers: array<int, string>} $out
+     */
+    private static function writeEregRegistersFold(
+        Context $context,
+        JITVariable $regsArg,
+        array $out
+    ): void {
+        $ht = $out['matched']
+            ? VmPregMatches::hostMatchesToHashTable($out['registers'], 0)
+            : new HashTable();
+        $htJit = HashTableHelper::variableFromVmHashTable($context, $ht);
+        $outPtr = JitValueBox::valuePtrFromVariable($context, $regsArg);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $outPtr,
+            $context->helper->loadValue($htJit)
+        );
+        JitValueBox::publishAfterWrite($context, $outPtr);
     }
 
     /**
