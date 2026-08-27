@@ -1144,6 +1144,64 @@ final class JitZipArchive
         return $phi;
     }
 
+    /**
+     * ZipArchive::unchangeAll — NestedJIT ua (#35489 leftover of #35486 / #20387).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_unchangeAll
+     */
+    public static function unchangeAll(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::unchangeAll', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        [$ok, $comment] = self::execLongAndPayload(
+            $context,
+            'ua',
+            $handle,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+        self::storeValueStringProperty($context, $obj, VmZipArchive::PROP_COMMENT, $comment);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::unchangeArchive — NestedJIT uar (#35489 leftover of #35486 / #20387).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_unchangeArchive
+     */
+    public static function unchangeArchive(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::unchangeArchive', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        [$ok, $comment] = self::execLongAndPayload(
+            $context,
+            'uar',
+            $handle,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+        self::storeValueStringProperty($context, $obj, VmZipArchive::PROP_COMMENT, $comment);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
     public static function close(Context $context, JITVariable ...$args): Value
     {
         if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::close', 0)) {
