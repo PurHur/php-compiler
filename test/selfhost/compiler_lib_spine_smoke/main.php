@@ -6633,6 +6633,7 @@ require_once __DIR__.'/../../../lib/JIT/JitFloatCompare.php';
 require_once __DIR__.'/../../../lib/JIT/JitHttpResponseCodeArg.php';
 require_once __DIR__.'/../../../lib/JIT/JitIterableArg.php';
 require_once __DIR__.'/../../../lib/JIT/JitLongArg.php';
+require_once __DIR__.'/../../../lib/JIT/JitLongDiv.php';
 require_once __DIR__.'/../../../lib/JIT/JitMemoryUsageArg.php';
 require_once __DIR__.'/../../../lib/JIT/JitNativeString.php';
 require_once __DIR__.'/../../../lib/JIT/JitNestedHelperCoerce.php';
