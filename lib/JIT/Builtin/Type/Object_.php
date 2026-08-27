@@ -3730,6 +3730,12 @@ class Object_ extends Type {
         if ('intlcalendar' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlCalendar::classConstants());
         }
+        // Spoofchecker Call proxies are linked (#20035); seed SINGLE_SCRIPT/INVISIBLE/… so
+        // ClassConstFetch folds to compile-time long (#35396 peer of #35389). Without this,
+        // thin AOT raises Undefined constant Spoofchecker::INVISIBLE at runtime.
+        if ('spoofchecker' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmSpoofchecker::classConstants());
+        }
         // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
         // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
         // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
