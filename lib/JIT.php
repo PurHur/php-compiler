@@ -24552,49 +24552,10 @@ class JIT {
 
     private function compileBinaryOp(OpCode $op, Variable $left, Variable $right): Variable
     {
-        if (Variable::TYPE_VALUE === $left->type && Variable::TYPE_VALUE === $right->type) {
-            switch ($op->type) {
-                case OpCode::TYPE_BITWISE_AND:
-                case OpCode::TYPE_BITWISE_OR:
-                case OpCode::TYPE_BITWISE_XOR:
-                    return $this->compileValueBoxedBitwiseOp($op->type, $left, $right);
-            }
-        }
-
+        // VALUE×VALUE &|^ must go through Helper::binaryOp so string tags use
+        // StringBitwiseNot::emitBinary (Zend bitwise_*_function). A prior
+        // readLong-only short-circuit coerced "$a & $b" to int (#35312).
         return $this->context->helper->binaryOp($op, $left, $right);
-    }
-
-    private function compileValueBoxedBitwiseOp(int $opcodeType, Variable $left, Variable $right): Variable
-    {
-        $folded = $this->context->helper->tryFoldCoreIntBitwise($opcodeType, $left, $right);
-        if (null !== $folded) {
-            return Variable::fromConstantInt($this->context, $folded);
-        }
-
-        $leftPtr = Variable::KIND_VARIABLE === $left->kind
-            ? $left->value
-            : $this->context->helper->loadValue($left);
-        $rightPtr = Variable::KIND_VARIABLE === $right->kind
-            ? $right->value
-            : $this->context->helper->loadValue($right);
-        $readLong = $this->context->lookupFunction('__value__readLong');
-        $leftLong = $this->context->builder->call($readLong, $leftPtr);
-        $rightLong = $this->context->builder->call($readLong, $rightPtr);
-        switch ($opcodeType) {
-            case OpCode::TYPE_BITWISE_AND:
-                $result = $this->context->builder->bitwiseAnd($leftLong, $rightLong);
-                break;
-            case OpCode::TYPE_BITWISE_OR:
-                $result = $this->context->builder->bitwiseOr($leftLong, $rightLong);
-                break;
-            case OpCode::TYPE_BITWISE_XOR:
-                $result = $this->context->builder->bitwiseXor($leftLong, $rightLong);
-                break;
-            default:
-                throw new \LogicException('Unsupported boxed bitwise opcode: '.opcode_type_name($opcodeType));
-        }
-
-        return new Variable($this->context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $result);
     }
 
     private function jitVariableArrayClassConstant(string $constName): ?Variable

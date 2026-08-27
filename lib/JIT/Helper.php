@@ -304,9 +304,17 @@ return_string:
             || OpCode::TYPE_SHIFT_RIGHT === $opcode->type
         ) {
             // string⊙string is byte-wise; do not convert_to_long-fold (#32431).
+            // VALUE boxes may carry compileTimeString — int-folding those pairs yields
+            // "12"&"3"→0 instead of Zend string "1" (#35312 leftover of #32431).
             $foldLeft = $this->operandJitType($left);
             $foldRight = $this->operandJitType($right);
-            if (!(Variable::TYPE_STRING === $foldLeft && Variable::TYPE_STRING === $foldRight)) {
+            $skipFold = Variable::TYPE_STRING === $foldLeft && Variable::TYPE_STRING === $foldRight;
+            if ($this->isBitwiseLogicOpcode($opcode->type)
+                && (null !== $left->compileTimeString || null !== $right->compileTimeString)
+            ) {
+                $skipFold = true;
+            }
+            if (!$skipFold) {
                 $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
                 if (null !== $folded) {
                     $result = $this->context->getTypeFromString('int64')->constInt($folded, false);
@@ -1081,11 +1089,19 @@ restart:
                 );
                 goto return_bool;
             }
+            // STRING × VALUE bitwise: boxed string → byte-wise; else convert_to_long (#35312).
+            if ($this->isBitwiseLogicOpcode($opcode->type)) {
+                return $this->emitBitwiseNativeStringAndBoxedValue(
+                    $opcode,
+                    $leftValue,
+                    $right,
+                    true
+                );
+            }
             // convert_scalar_to_number on the value box (IS_NULL→0) then numeric-string ⊙ long
             // (#32406 arith; #32417 bitwise/shift via #32407 native-long ⊙ string).
             if (JitValueNumeric::isArithOpcode($opcode->type)
                 || OpCode::TYPE_MODULO === $opcode->type
-                || $this->isBitwiseLogicOpcode($opcode->type)
                 || OpCode::TYPE_SHIFT_LEFT === $opcode->type
                 || OpCode::TYPE_SHIFT_RIGHT === $opcode->type
             ) {
@@ -1153,11 +1169,19 @@ restart:
                 );
                 goto return_bool;
             }
+            // VALUE × STRING bitwise: boxed string → byte-wise; else convert_to_long (#35312).
+            if ($this->isBitwiseLogicOpcode($opcode->type)) {
+                return $this->emitBitwiseNativeStringAndBoxedValue(
+                    $opcode,
+                    $rightValue,
+                    $left,
+                    false
+                );
+            }
             // convert_scalar_to_number on the value box (IS_NULL→0) then long ⊙ numeric-string
             // (#32406 arith; #32417 bitwise/shift via #32407 native-long ⊙ string).
             if (JitValueNumeric::isArithOpcode($opcode->type)
                 || OpCode::TYPE_MODULO === $opcode->type
-                || $this->isBitwiseLogicOpcode($opcode->type)
                 || OpCode::TYPE_SHIFT_LEFT === $opcode->type
                 || OpCode::TYPE_SHIFT_RIGHT === $opcode->type
             ) {
@@ -1186,6 +1210,10 @@ restart:
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
                 case OpCode::TYPE_BITWISE_XOR:
+                    // VALUE×VALUE &|^: both string tags → byte-wise emitBinary; else
+                    // convert_to_long (Zend bitwise_*_function). Do not int-fold when
+                    // either side carries compileTimeString (#35312 leftover of #32431/#35305).
+                    return $this->emitBitwiseValueValue($opcode, $left, $right);
                 case OpCode::TYPE_SHIFT_LEFT:
                 case OpCode::TYPE_SHIFT_RIGHT:
                     $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
@@ -1195,15 +1223,7 @@ restart:
                     }
                     $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                     $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
-                    if (OpCode::TYPE_BITWISE_AND === $opcode->type) {
-                        $result = $this->context->builder->bitwiseAnd($leftLong, $rightLong);
-                    } elseif (OpCode::TYPE_BITWISE_OR === $opcode->type) {
-                        $result = $this->context->builder->bitwiseOr($leftLong, $rightLong);
-                    } elseif (OpCode::TYPE_BITWISE_XOR === $opcode->type) {
-                        $result = $this->context->builder->bitwiseXor($leftLong, $rightLong);
-                    } else {
-                        $result = $this->emitGuardedIntShift($opcode->type, $leftLong, $rightLong);
-                    }
+                    $result = $this->emitGuardedIntShift($opcode->type, $leftLong, $rightLong);
                     goto return_long;
             }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
@@ -2881,6 +2901,124 @@ return_bool:
         return OpCode::TYPE_BITWISE_AND === $type
             || OpCode::TYPE_BITWISE_OR === $type
             || OpCode::TYPE_BITWISE_XOR === $type;
+    }
+
+    /**
+     * VALUE×VALUE &|^ — both string tags → byte-wise; else convert_to_long (#35312).
+     *
+     * php-src: Zend/zend_operators.c bitwise_and/or/xor_function
+     */
+    private function emitBitwiseValueValue(OpCode $opcode, Variable $left, Variable $right): Variable
+    {
+        if (null === $left->compileTimeString && null === $right->compileTimeString) {
+            $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
+            if (null !== $folded) {
+                return $this->nativeLongResultVariable(
+                    $this->context->getTypeFromString('int64')->constInt($folded, false)
+                );
+            }
+        }
+
+        BasicBlockHelper::ensureOpenInsertBlock($this->context, 'bitwise_vv_cont');
+        $resultSlot = JitValueBox::alloc($this->context);
+        $bothString = $this->context->builder->and(
+            JitValueNumeric::valueIsString($this->context, $left),
+            JitValueNumeric::valueIsString($this->context, $right)
+        );
+        $stringBlock = BasicBlockHelper::append($this->context, 'bitwise_vv_string');
+        $intBlock = BasicBlockHelper::append($this->context, 'bitwise_vv_int');
+        $mergeBlock = BasicBlockHelper::append($this->context, 'bitwise_vv_merge');
+        $this->context->builder->branchIf($bothString, $stringBlock, $intBlock);
+
+        $this->context->builder->positionAtEnd($stringBlock);
+        $leftPtr = JitValueBox::valuePtrFromVariable($this->context, $left);
+        $rightPtr = JitValueBox::valuePtrFromVariable($this->context, $right);
+        $leftStr = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readString'),
+            $leftPtr
+        );
+        $rightStr = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readString'),
+            $rightPtr
+        );
+        $strOut = Builtin\StringBitwiseNot::emitBinary(
+            $this->context,
+            $opcode->type,
+            $leftStr,
+            $rightStr
+        );
+        JitValueBox::assignToPointer($this->context, $resultSlot, $strOut);
+        $this->context->builder->branch($mergeBlock);
+
+        $this->context->builder->positionAtEnd($intBlock);
+        $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
+        $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
+        $intResult = $this->emitBitwiseLongOp($opcode->type, $leftLong, $rightLong);
+        JitValueBox::writeLong($this->context, $resultSlot, $intResult);
+        $this->context->builder->branch($mergeBlock);
+
+        $this->context->builder->positionAtEnd($mergeBlock);
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VALUE,
+            $resultSlot
+        );
+    }
+
+    /**
+     * Native `__string__*` ⊙ VALUE &|^ — boxed string → byte-wise; else long (#35312).
+     *
+     * @param \PHPLLVM\Value $nativeStr
+     */
+    private function emitBitwiseNativeStringAndBoxedValue(
+        OpCode $opcode,
+        $nativeStr,
+        Variable $boxed,
+        bool $nativeIsLeft
+    ): Variable {
+        BasicBlockHelper::ensureOpenInsertBlock($this->context, 'bitwise_sv_cont');
+        $resultSlot = JitValueBox::alloc($this->context);
+        $isString = JitValueNumeric::valueIsString($this->context, $boxed);
+        $stringBlock = BasicBlockHelper::append($this->context, 'bitwise_sv_string');
+        $intBlock = BasicBlockHelper::append($this->context, 'bitwise_sv_int');
+        $mergeBlock = BasicBlockHelper::append($this->context, 'bitwise_sv_merge');
+        $this->context->builder->branchIf($isString, $stringBlock, $intBlock);
+
+        $this->context->builder->positionAtEnd($stringBlock);
+        $boxedStr = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readString'),
+            JitValueBox::valuePtrFromVariable($this->context, $boxed)
+        );
+        $leftStr = $nativeIsLeft ? $nativeStr : $boxedStr;
+        $rightStr = $nativeIsLeft ? $boxedStr : $nativeStr;
+        $strOut = Builtin\StringBitwiseNot::emitBinary(
+            $this->context,
+            $opcode->type,
+            $leftStr,
+            $rightStr
+        );
+        JitValueBox::assignToPointer($this->context, $resultSlot, $strOut);
+        $this->context->builder->branch($mergeBlock);
+
+        $this->context->builder->positionAtEnd($intBlock);
+        $boxedLong = JitLongArg::lower($this->context, $boxed, 'binary op boxed operand');
+        $nativeLong = JitLongArg::lowerStringValue($this->context, $nativeStr);
+        $leftLong = $nativeIsLeft ? $nativeLong : $boxedLong;
+        $rightLong = $nativeIsLeft ? $boxedLong : $nativeLong;
+        $intResult = $this->emitBitwiseLongOp($opcode->type, $leftLong, $rightLong);
+        JitValueBox::writeLong($this->context, $resultSlot, $intResult);
+        $this->context->builder->branch($mergeBlock);
+
+        $this->context->builder->positionAtEnd($mergeBlock);
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VALUE,
+            $resultSlot
+        );
     }
 
     /** Operands bitwise_*_function can convert_to_long (#32414). */
