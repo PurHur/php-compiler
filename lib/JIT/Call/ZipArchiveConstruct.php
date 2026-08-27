@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\ext\zip\VmZipArchive;
 use PHPCompiler\ext\zip\ZipArchiveConstants;
+use PHPCompiler\ext\zip\ZipArchiveJitSupport;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -59,6 +60,13 @@ final class ZipArchiveConstruct implements Call
         );
         self::seedEmptyString($context, $obj, VmZipArchive::PROP_FILENAME);
         self::seedEmptyString($context, $obj, VmZipArchive::PROP_COMMENT);
+        ReflectionSetup::emitSetIntegerProperty(
+            $context,
+            $obj,
+            $class,
+            ZipArchiveJitSupport::PROP_ID,
+            0
+        );
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(

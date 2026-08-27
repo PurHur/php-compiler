@@ -2185,6 +2185,11 @@ class Context {
         $this->functionProxies['domdocument::__construct'] = new Call\DomDocumentConstruct();
         // ZipArchive::__construct — seed stub props for thin AOT (#35002 leftover of #20584).
         $this->functionProxies['ziparchive::__construct'] = new Call\ZipArchiveConstruct();
+        // ZipArchive mutating methods — NestedJIT ZipArchiveJitHelper (#35424 leftover of #6414).
+        $this->functionProxies['ziparchive::open'] = new Call\ZipArchiveMethod('open');
+        $this->functionProxies['ziparchive::addfromstring'] = new Call\ZipArchiveMethod('addFromString');
+        $this->functionProxies['ziparchive::close'] = new Call\ZipArchiveMethod('close');
+        $this->functionProxies['ziparchive::getfromname'] = new Call\ZipArchiveMethod('getFromName');
         $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
         $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();
         $this->functionProxies['dateinterval::format'] = new Call\DateIntervalFormat();

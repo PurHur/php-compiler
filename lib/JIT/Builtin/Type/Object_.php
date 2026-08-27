@@ -4039,6 +4039,7 @@ class Object_ extends Type {
         }
         // ZipArchive stub props — late defineProperty after new SIGSEGVs (#35002 leftover of #20584).
         // TYPE_VALUE for filename/comment: emitSetStringPropertyFromCstr stores heap __value__* boxes.
+        // __zipId: NestedJIT session handle (peer HashContext __hcId; #35424).
         if ('ziparchive' === $lcname) {
             $this->defineProperty($id, VmZipArchive::PROP_STATUS, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, VmZipArchive::PROP_STATUS_SYS, Variable::TYPE_NATIVE_LONG);
@@ -4046,6 +4047,8 @@ class Object_ extends Type {
             $this->defineProperty($id, VmZipArchive::PROP_NUM_FILES, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, VmZipArchive::PROP_FILENAME, Variable::TYPE_VALUE);
             $this->defineProperty($id, VmZipArchive::PROP_COMMENT, Variable::TYPE_VALUE);
+            // Session handle for NestedJIT ZipArchive methods (#35424).
+            $this->defineProperty($id, \PHPCompiler\ext\zip\ZipArchiveJitSupport::PROP_ID, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
         }
         // OpenSSLAsymmetricKey PEM for thin AOT openssl_pkey_new (#34015).
@@ -5529,6 +5532,10 @@ class Object_ extends Type {
 
         // HashContext JIT handle (ext/hash/JitHashContext.php, #3357 / #27264).
         if ('hashcontext' === $lcClass && ('__hcid' === $lcName || '__hchmac' === $lcName)) {
+            return Variable::TYPE_NATIVE_LONG;
+        }
+        // ZipArchive NestedJIT session handle (#35424).
+        if ('ziparchive' === $lcClass && '__zipid' === $lcName) {
             return Variable::TYPE_NATIVE_LONG;
         }
         if (
