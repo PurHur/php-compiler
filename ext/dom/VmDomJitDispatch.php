@@ -197,6 +197,26 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMDocument::saveHTMLFile() — write saveHTML() bytes (#35549 / #18268, php-src php_dom.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function saveHTMLFile(ObjectEntry $document, array $extra): Variable
+    {
+        self::requireExactExtraArgCount('DOMDocument::saveHTMLFile', $extra, 1);
+        $filename = self::stringArg(
+            $extra[0] ?? self::missingArg('saveHTMLFile', 0),
+            'DOMDocument::saveHTMLFile',
+            0,
+            'filename'
+        );
+        $var = new Variable();
+        $var->int(VmDom::saveHTMLFile($document, $filename));
+
+        return $var;
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function getElementById(ObjectEntry $document, array $extra): Variable
