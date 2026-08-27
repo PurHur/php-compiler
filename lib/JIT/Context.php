@@ -2185,6 +2185,12 @@ class Context {
         $this->functionProxies['domdocument::__construct'] = new Call\DomDocumentConstruct();
         // ZipArchive::__construct — seed stub props for thin AOT (#35002 leftover of #20584).
         $this->functionProxies['ziparchive::__construct'] = new Call\ZipArchiveConstruct();
+        // ZipArchive methods — NestedJIT helper (peer HashContext #3357; #35424 leftover of #6414).
+        foreach (['open', 'addFromString', 'close', 'getFromName'] as $zipMethod) {
+            $this->functionProxies['ziparchive::'.strtolower($zipMethod)] = new Call\ZipArchiveMethod(
+                $zipMethod
+            );
+        }
         $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
         $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();
         $this->functionProxies['dateinterval::format'] = new Call\DateIntervalFormat();
@@ -3311,17 +3317,29 @@ class Context {
             case 'const char':
                 return $this->context->int8Type();
             case 'char':
+            case 'unsigned char':
             case 'int8':
+            case 'uint8_t':
+            case 'int8_t':
                 return $this->context->int8Type();
             case 'int16':
             case 'short':
             case 'unsigned short':
+            case 'uint16_t':
+            case 'int16_t':
                 return $this->context->int16Type();
             case 'int32':
             case 'int':
+            case 'unsigned':
             case 'unsigned int':
+            case 'uint32_t':
+            case 'int32_t':
+            case 'uint':
                 return $this->context->int32Type();
             case 'int64':
+            // NestedJIT / FFI may emit plain "long"; LP64 maps to i64 (#35424).
+            case 'long':
+            case 'unsigned long':
             case 'long long':
             case 'unsigned long long':
             case 'size_t':
