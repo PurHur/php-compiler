@@ -10,7 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** mb_http_input() — HTTP input encoding probe (php-src ext/mbstring/mbstring.c; #4636). */
+/**
+ * mb_http_input() — HTTP input encoding probe (php-src ext/mbstring/mbstring.c; #4636, #35271).
+ *
+ * JIT/AOT: compile-time fold + NestedJIT via {@see JitMbHttpInput}.
+ */
 final class mb_http_input extends Internal
 {
     public function __construct()
@@ -49,8 +53,6 @@ final class mb_http_input extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_http_input() JIT is not supported in this compiler build'
-        );
+        return JitMbHttpInput::invoke($context, $args);
     }
 }
