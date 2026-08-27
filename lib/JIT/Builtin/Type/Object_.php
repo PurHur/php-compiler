@@ -3712,6 +3712,12 @@ class Object_ extends Type {
         if ('numberformatter' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmNumberFormatter::classConstants());
         }
+        // Collator Call proxies are linked (#28649); seed PRIMARY/SORT_*/… so ClassConstFetch
+        // folds to compile-time long (#35379 peer of #35366). Without this, thin AOT raises
+        // Undefined constant Collator::PRIMARY at runtime.
+        if ('collator' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmCollator::classConstants());
+        }
         // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
         // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
         // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
