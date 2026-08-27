@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 /**
- * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 / #35466 / #35467) —
+ * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 / #35465 / #35466 / #35467) —
  * CREATE/add/close/get/locate/index/rename/delete/extract/status/count path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
@@ -14,8 +14,8 @@ namespace PHPCompiler\ext\zip;
  * Result encoding: 4-byte LE int32 + optional payload (get/close). Int returns via
  * NestedJIT arrive as ptrtoint of __value__ boxes, so the ABI is string-packed.
  *
- * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / addFile / close /
- * getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
+ * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / addFile / addEmptyDir /
+ * close / getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
  * renameName / deleteName / deleteIndex / extractTo / count)
  */
 final class ZipArchiveJitHelper
@@ -122,6 +122,39 @@ final class ZipArchiveJitHelper
                 self::$h1data2 = $s2;
             } elseif ($s1 === self::$h1name2) {
                 self::$h1data2 = $s2;
+            } else {
+                self::$h1status = 18;
+
+                return self::pack(0);
+            }
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        // addir — addEmptyDir after IR appends "/" (#35465). Same slots as add; ER_EXISTS on dup.
+        if ('addir' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if ('' === $s1) {
+                return self::pack(0);
+            }
+            if ('' === self::$h1name) {
+                self::$h1name = $s1;
+                self::$h1data = '';
+            } elseif ($s1 === self::$h1name) {
+                self::$h1status = 10;
+
+                return self::pack(0);
+            } elseif ('' === self::$h1name2) {
+                self::$h1name2 = $s1;
+                self::$h1data2 = '';
+            } elseif ($s1 === self::$h1name2) {
+                self::$h1status = 10;
+
+                return self::pack(0);
             } else {
                 self::$h1status = 18;
 
@@ -397,6 +430,8 @@ final class ZipArchiveJitHelper
                     $msg = 'Containing zip archive was closed';
                 } elseif (5 === $code) {
                     $msg = 'Read error';
+                } elseif (10 === $code) {
+                    $msg = 'File already exists';
                 } elseif (18 === $code) {
                     $msg = 'Invalid argument';
                 } else {
