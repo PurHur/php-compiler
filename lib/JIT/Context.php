@@ -2223,6 +2223,8 @@ class Context {
             'setCompressionIndex',
             'setEncryptionName',
             'setEncryptionIndex',
+            'setExternalAttributesName',
+            'setExternalAttributesIndex',
             'statName',
             'statIndex',
         ] as $zipMethod) {
