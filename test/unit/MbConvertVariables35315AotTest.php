@@ -36,7 +36,8 @@ final class MbConvertVariables35315AotTest extends TestCase
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbConvertVariablesRuntime.php');
         $this->assertStringContainsString('convertStringHelper', $runtime);
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbConvertVariables.php');
-        $this->assertStringContainsString('MbConvertVariablesRuntime::convertStringHelper', $jit);
+        $this->assertStringContainsString('MbConvertEncodingRuntime::convertHelper', $jit);
+        $this->assertStringContainsString('MbConvertVariablesRuntime::detectHelper', $jit);
         $this->assertStringContainsString('array $var is not lowered', $jit);
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_convert_variables.php');
         $this->assertStringContainsString('JitMbConvertVariables::invoke', $src);

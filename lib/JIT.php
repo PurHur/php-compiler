@@ -29351,7 +29351,24 @@ class JIT {
                 }
                 $operand = $operands[$idx] ?? null;
                 if (null === $operand) {
+                    // Sparse operand maps (optional middle params) still send by-ref
+                    // variadic tails — promote the live Variable (#35315 mb_convert_variables).
+                    if (
+                        Variable::KIND_VARIABLE === $args[$idx]->kind
+                        || Variable::TYPE_VALUE === $args[$idx]->type
+                    ) {
+                        $args[$idx] = JIT\ClosureHelper::referenceCapture($this->context, $args[$idx]);
+                    }
                     continue;
+                }
+                $scopeName = JIT\OperandName::resolve($operand);
+                if (
+                    null !== $scopeName
+                    && '' !== $scopeName
+                    && $block->isMainScript()
+                    && !\PHPCompiler\Web\Superglobals::isSuperglobalName($scopeName)
+                ) {
+                    $args[$idx] = $this->context->ensureScriptGlobal($scopeName);
                 }
                 if (
                     'array_multisort' === strtolower($name)

@@ -6,10 +6,11 @@ namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MbConvertEncodingRuntime;
 use PHPCompiler\JIT\Builtin\MbConvertVariablesRuntime;
+use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -65,6 +66,7 @@ final class JitMbConvertVariables
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbConvertVariablesRuntime::ensureLinked($context);
+        MbConvertEncodingRuntime::ensureLinked($context);
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         }
@@ -184,6 +186,23 @@ final class JitMbConvertVariables
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
 
+        // Resolve by-ref lvalue before NestedJIT helper calls (#35315 / peer #34270).
+        if (null === $arg->valueBoxAliasPtr) {
+            ClosureHelper::referenceCapture($context, $arg);
+        }
+        $outPtr = null !== $arg->valueBoxAliasPtr
+            ? JitValueBox::normalizeValuePtr($context, $arg->valueBoxAliasPtr)
+            : JitValueBox::valuePtrFromVariable($context, $arg);
+        if (
+            \PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType
+            && !$arg->functionStaticGlobal
+            && null === $arg->valueBoxAliasPtr
+        ) {
+            throw new \LogicException(
+                'mb_convert_variables(): by-ref $var is not a script-global lvalue (#35315)'
+            );
+        }
+
         $str = JitStringBuiltinArg::lower(
             $context,
             $arg,
@@ -191,20 +210,21 @@ final class JitMbConvertVariables
             $argIndex,
             'var'
         );
-        $convertedRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            MbConvertVariablesRuntime::convertStringHelper($context),
-            [$str, $toPtr, $fromPtr]
+        // Peer JitMbConvertEncoding::convertHelper — MbConvertVariablesJitHelper::convertStringArgv
+        // duplicates convertArgv but NestedJIT link for convertStringHelper mis-returns (#35315).
+        $converted = $context->builder->call(
+            MbConvertEncodingRuntime::convertHelper($context),
+            $str,
+            $toPtr,
+            $fromPtr
         );
-        $converted = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $convertedRaw);
-        $detectedRaw = JitNestedHelperCoerce::callHelper(
-            $context,
+        $detected = $context->builder->call(
             MbConvertVariablesRuntime::detectHelper($context),
-            [$str, $toPtr, $fromPtr]
+            $str,
+            $toPtr,
+            $fromPtr
         );
-        $detected = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $detectedRaw);
 
-        $outPtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $converted);
         $context->builder->call($context->lookupFunction('__value__writeString'), $outPtr, $owned);
         JitValueBox::publishAfterWrite($context, $outPtr);
