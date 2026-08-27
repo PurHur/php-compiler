@@ -13,7 +13,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** mb_detect_order() — encoding detection order (php-src ext/mbstring/mbstring.c; #13100, #29920). */
+/**
+ * mb_detect_order() — encoding detection order (php-src ext/mbstring/mbstring.c; #13100, #29920, #35278).
+ *
+ * JIT/AOT setter accepts compile-time string **or** array of encoding names
+ * (php-src `Z_PARAM_ARRAY_OR_STRING_OR_NULL`); peer
+ * {@see JitMbDetectEncoding::compileTimeOrderFromNativeArray}.
+ */
 final class mb_detect_order extends Internal
 {
     public function __construct()
@@ -71,15 +77,96 @@ final class mb_detect_order extends Internal
             return $slot;
         }
 
-        $encodingLit = JitStringArg::compileTimeLiteral($args[0]);
-        if (null === $encodingLit) {
+        $parsed = self::compileTimeOrderList($context, $args[0]);
+        if (null === $parsed) {
             throw new \LogicException(
-                'mb_detect_order() JIT setter requires a compile-time string in this compiler build'
+                'mb_detect_order() JIT setter requires a compile-time string or array in this compiler build'
             );
         }
-        $parsed = MbstringEncodingRegistry::parseOrderList('mb_detect_order', 0, $encodingLit);
         MbstringAotFoldState::setDetectOrder($context, $parsed);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    /**
+     * Compile-time string (`'UTF-8,ASCII'`) or array (`['UTF-8','ASCII']`) order list (#35278).
+     *
+     * @return list<string>|null
+     */
+    private static function compileTimeOrderList(Context $context, JITVariable $arg): ?array
+    {
+        $encodingLit = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $encodingLit) {
+            return MbstringEncodingRegistry::parseOrderList('mb_detect_order', 0, $encodingLit);
+        }
+
+        $fromNative = self::compileTimeOrderFromNativeArray($context, $arg);
+        if (null !== $fromNative) {
+            return $fromNative;
+        }
+
+        $arr = $arg->compileTimeArray ?? null;
+        if (null === $arr) {
+            return null;
+        }
+        $order = [];
+        foreach ($arr as $elem) {
+            if (\is_string($elem)) {
+                $s = $elem;
+            } elseif ($elem instanceof JITVariable) {
+                $s = JitStringArg::compileTimeLiteral($elem);
+                if (null === $s) {
+                    return null;
+                }
+            } else {
+                return null;
+            }
+            $canonical = MbstringEncodingRegistry::resolve($s);
+            if (null === $canonical) {
+                throw new \ValueError(sprintf(
+                    'mb_detect_order(): Argument #1 ($encoding) contains invalid encoding "%s"',
+                    $s
+                ));
+            }
+            $order[] = $canonical;
+        }
+        MbstringEncodingRegistry::assertNonEmptyOrder('mb_detect_order', 0, $order);
+
+        return $order;
+    }
+
+    /**
+     * Packed native-array encoding list (`['UTF-8','ASCII']`) via dimFetch (peer #34358 / #35278).
+     *
+     * @return list<string>|null
+     */
+    private static function compileTimeOrderFromNativeArray(Context $context, JITVariable $arg): ?array
+    {
+        if (0 === ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return null;
+        }
+        $n = $arg->nextFreeElement;
+        if ($n <= 0) {
+            return null;
+        }
+        $order = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $elem = $arg->dimFetch(JITVariable::fromConstantInt($context, $i));
+            $s = JitStringArg::compileTimeLiteral($elem);
+            if (null === $s) {
+                return null;
+            }
+            $canonical = MbstringEncodingRegistry::resolve($s);
+            if (null === $canonical) {
+                throw new \ValueError(sprintf(
+                    'mb_detect_order(): Argument #1 ($encoding) contains invalid encoding "%s"',
+                    $s
+                ));
+            }
+            $order[] = $canonical;
+        }
+        MbstringEncodingRegistry::assertNonEmptyOrder('mb_detect_order', 0, $order);
+
+        return $order;
     }
 }
