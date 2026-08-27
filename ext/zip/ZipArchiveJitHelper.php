@@ -1270,6 +1270,64 @@ final class ZipArchiveJitHelper
             return self::pack(0);
         }
 
+        // getExternalAttributesName — $s1=name; payload opsys+attr int32s (#35527 / #20363).
+        if ('gan' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if ('' === $s1) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::pack(self::$h1opsys).self::pack(self::$h1attr));
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::pack(self::$h1opsys2).self::pack(self::$h1attr2));
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        // getExternalAttributesIndex — $a=index; payload opsys+attr (#35527 / #20363).
+        if ('gai' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if (0 === $a) {
+                if ('' === self::$h1name) {
+                    self::$h1status = 18;
+
+                    return self::pack(0);
+                }
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::pack(self::$h1opsys).self::pack(self::$h1attr));
+            }
+            if (1 === $a) {
+                if ('' === self::$h1name2) {
+                    self::$h1status = 18;
+
+                    return self::pack(0);
+                }
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::pack(self::$h1opsys2).self::pack(self::$h1attr2));
+            }
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+
         return self::pack(0);
     }
 

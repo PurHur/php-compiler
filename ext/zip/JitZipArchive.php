@@ -2007,6 +2007,135 @@ final class JitZipArchive
         return self::boxBoolFromI64($context, $rcPhi);
     }
 
+    /**
+     * ZipArchive::getExternalAttributesName — NestedJIT gan + by-ref outs (#35527 leftover of #35522 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getExternalAttributesName
+     */
+    public static function getExternalAttributesName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::getExternalAttributesName', 3, 4)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::getExternalAttributesName',
+            0,
+            'name'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($name, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_gan_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_gan_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::getExternalAttributesName(): Argument #1 ($name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        [$found, $payload] = self::execLongAndPayload(
+            $context,
+            'gan',
+            $zero,
+            $zero,
+            $name,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+        self::writeExtAttrByRefs($context, $args[2], $args[3], $found, $payload);
+
+        return self::boxBoolFromI64($context, $found);
+    }
+
+    /**
+     * ZipArchive::getExternalAttributesIndex — NestedJIT gai + by-ref outs (#35527 leftover of #35522 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getExternalAttributesIndex
+     */
+    public static function getExternalAttributesIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::getExternalAttributesIndex', 3, 4)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower(
+            $context,
+            $args[1],
+            'ZipArchive::getExternalAttributesIndex(): Argument #1 ($index)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $zero = $i64->constInt(0, false);
+        [$found, $payload] = self::execLongAndPayload(
+            $context,
+            'gai',
+            $index,
+            $zero,
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+        self::writeExtAttrByRefs($context, $args[2], $args[3], $found, $payload);
+
+        return self::boxBoolFromI64($context, $found);
+    }
+
+    /**
+     * On hit, write packed opsys/attr (2×int32 LE) into by-ref &$opsys / &$attr (#35527).
+     */
+    private static function writeExtAttrByRefs(
+        Context $context,
+        JITVariable $opsysArg,
+        JITVariable $attrArg,
+        Value $foundI64,
+        Value $payload
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $isFound = $context->builder->icmp(Builder::INT_NE, $foundI64, $i64->constInt(0, false));
+        $id = (string) (++self::$serial);
+        $writeBlock = BasicBlockHelper::append($context, 'zip_gea_write_'.$id);
+        $skipBlock = BasicBlockHelper::append($context, 'zip_gea_skip_'.$id);
+        $context->builder->branchIf($isFound, $writeBlock, $skipBlock);
+
+        $context->builder->positionAtEnd($writeBlock);
+        $opsys = self::int32LeAtStringOffset($context, $payload, 0);
+        $attr = self::int32LeAtStringOffset($context, $payload, 4);
+        $opsysPtr = JitValueBox::valuePtrFromVariable($context, $opsysArg);
+        $attrPtr = JitValueBox::valuePtrFromVariable($context, $attrArg);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $opsysPtr,
+            $opsys
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $attrPtr,
+            $attr
+        );
+        $context->builder->branch($skipBlock);
+
+        $context->builder->positionAtEnd($skipBlock);
+    }
+
     public static function close(Context $context, JITVariable ...$args): Value
     {
         if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::close', 0)) {
