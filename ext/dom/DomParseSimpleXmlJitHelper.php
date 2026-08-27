@@ -169,6 +169,9 @@ final class DomParseSimpleXmlJitHelper
     ): ?array {
         $tag = strtolower($tag);
         $attr = strtolower($attr);
+        if ('*' === $tag) {
+            return self::matchDescendantWildcardAttributeArgv($xml, $attr, $value, $numericCompare);
+        }
         $needle = '<'.$tag;
         $count = 0;
         $firstText = null;
@@ -207,7 +210,101 @@ final class DomParseSimpleXmlJitHelper
             return null;
         }
 
-        return [$count, (string) $firstText];
+        return [$count, (string) $firstText, $tag];
+    }
+
+    /**
+     * //*[@attr='v'] — any element name-test with attribute predicate (#35349).
+     *
+     * php-src ext/dom/xpath.c matches all element nodes; {@see matchDescendantAttributeArgv}
+     * must not search for a literal {@code <*} open tag.
+     *
+     * @return array{0: int, 1: string, 2: string}|null
+     */
+    private static function matchDescendantWildcardAttributeArgv(
+        string $xml,
+        string $attr,
+        string $value,
+        bool $numericCompare
+    ): ?array {
+        $count = 0;
+        $firstText = null;
+        $firstLocalTag = null;
+        $offset = 0;
+        $len = \strlen($xml);
+        while ($offset < $len && false !== ($pos = strpos($xml, '<', $offset))) {
+            $next = $xml[$pos + 1] ?? '';
+            if ('/' === $next || '!' === $next || '?' === $next || '' === $next) {
+                $offset = $pos + 1;
+                continue;
+            }
+            $gt = strpos($xml, '>', $pos);
+            if (false === $gt) {
+                break;
+            }
+            $openTag = substr($xml, $pos, $gt - $pos + 1);
+            $localTag = self::openTagLocalNameArgv($openTag);
+            if (null === $localTag) {
+                $offset = $pos + 1;
+                continue;
+            }
+            $matched = $numericCompare
+                ? self::openTagAttrMatches($openTag, $attr, $value, true)
+                : (false !== stripos($openTag, $attr.'="'.str_replace('"', '', $value).'"')
+                    || false !== stripos($openTag, $attr."='".str_replace("'", '', $value)."'"));
+            if ($matched) {
+                if ($gt > $pos && '/' === $xml[$gt - 1]) {
+                    $text = '';
+                } else {
+                    $close = stripos($xml, '</'.$localTag.'>', $gt + 1);
+                    $text = false === $close ? '' : substr($xml, $gt + 1, $close - $gt - 1);
+                }
+                if (0 === $count) {
+                    $firstText = $text;
+                    $firstLocalTag = $localTag;
+                }
+                ++$count;
+            }
+            $offset = $pos + 1;
+        }
+        if (0 === $count || null === $firstLocalTag) {
+            return null;
+        }
+
+        return [$count, (string) $firstText, $firstLocalTag];
+    }
+
+    /** Local name from {@code <tag ...>} or {@code <ns:tag ...>} (no leading {@code <}). */
+    private static function openTagLocalNameArgv(string $openTag): ?string
+    {
+        if (!str_starts_with($openTag, '<') || str_starts_with($openTag, '</')) {
+            return null;
+        }
+        $body = substr($openTag, 1);
+        $gt = strpos($body, '>');
+        if (false !== $gt) {
+            $body = substr($body, 0, $gt);
+        }
+        $body = rtrim($body, '/');
+        if ('' === $body) {
+            return null;
+        }
+        $nameEnd = 0;
+        $bodyLen = \strlen($body);
+        while ($nameEnd < $bodyLen) {
+            $ch = $body[$nameEnd];
+            if ('/' === $ch || ' ' === $ch || "\t" === $ch || "\n" === $ch || "\r" === $ch) {
+                break;
+            }
+            ++$nameEnd;
+        }
+        if (0 === $nameEnd) {
+            return null;
+        }
+        $qname = strtolower(substr($body, 0, $nameEnd));
+        $colon = strrpos($qname, ':');
+
+        return false === $colon ? $qname : substr($qname, $colon + 1);
     }
 
     /** Attribute value from an open tag, or null if absent. */
