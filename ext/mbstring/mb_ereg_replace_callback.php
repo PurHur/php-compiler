@@ -100,8 +100,6 @@ final class mb_ereg_replace_callback extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_ereg_replace_callback() is not lowered for JIT/AOT in this compiler build'
-        );
+        return JitMbEregReplaceCallback::invoke($context, $args);
     }
 }

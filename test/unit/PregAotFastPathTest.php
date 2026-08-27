@@ -173,6 +173,18 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(0, PregAotFastPath::replaceFindNext('/a/', 'xyz', 0));
     }
 
+    /** Issue #35335 — `/a+/` quantifier for thin preg_replace_callback AOT. */
+    public function testLiteralAPlusReplaceFindNext(): void
+    {
+        $this->assertSame(16, PregAotFastPath::patternKind('/a+/'));
+        $this->assertSame(16, PregAotFastPath::patternKind('#a+#u'));
+        $this->assertSame(1, PregAotFastPath::replaceFindNext('/a+/', 'xaaay', 0));
+        $this->assertSame(1, PregAotFastPath::takeLastReplacePos());
+        $this->assertSame(3, PregAotFastPath::takeLastReplaceBodyLen());
+        $this->assertSame(1, PregAotFastPath::matchCount('/a+/', 'xaaay', 0));
+        $this->assertSame('aaa', PregAotFastPath::lastCap(0));
+    }
+
     public function testLiteralCaptureGroups(): void
     {
         $this->assertSame(8, PregAotFastPath::patternKind('/(a)(b)/'));

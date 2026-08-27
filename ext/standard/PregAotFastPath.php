@@ -172,6 +172,13 @@ final class PregAotFastPath
             return $rc;
         }
 
+        if (16 === $kind) {
+            $rc = self::matchLiteralAPlus($subject, $offset);
+            self::rememberNamedCapAfterMatch($pattern, $rc);
+
+            return $rc;
+        }
+
         $rc = self::matchClassPlus($kind, $subject, $offset);
         self::rememberNamedCapAfterMatch($pattern, $rc);
 
@@ -360,6 +367,10 @@ final class PregAotFastPath
         }
         if ('/(\\w+)/' === $pattern || '#(\\w+)#' === $pattern) {
             return 7;
+        }
+        // Literal char + quantifier — NestedJIT exact compares (#35335 /a+/ thin preg callback).
+        if ('/a+/' === $pattern || '#a+#' === $pattern || '#a+#u' === $pattern) {
+            return 16;
         }
         if (self::isLiteralGroupsPattern($pattern)) {
             return 8;
@@ -790,6 +801,9 @@ final class PregAotFastPath
         if ($kind >= 10 && $kind <= 15) {
             return self::replaceClassOnce($kind, $replacement, $subject, $limit);
         }
+        if (16 === $kind) {
+            return self::replaceLiteralAPlus($replacement, $subject, $limit);
+        }
 
         return self::replaceClassPlus($kind, $replacement, $subject, $limit);
     }
@@ -851,6 +865,9 @@ final class PregAotFastPath
             if ($kind >= 10 && $kind <= 15) {
                 return self::findClassOnce($kind, $subject, $offset);
             }
+            if (16 === $kind) {
+                return self::findLiteralAPlus($subject, $offset);
+            }
 
             return self::findClassPlus($kind, $subject, $offset);
         }
@@ -893,6 +910,88 @@ final class PregAotFastPath
     public static function takeLastReplaceBodyLen(): int
     {
         return self::$lastReplaceBodyLen;
+    }
+
+    /** `/a+/`, `#a+#`, `#a+#u` — one-or-more literal `a` (#35335). */
+    private static function findLiteralAPlus(string $subject, int $offset): int
+    {
+        self::$lastReplacePos = -1;
+        self::$lastReplaceBodyLen = 0;
+        $subLen = \strlen($subject);
+        $i = $offset;
+        if ($i < 0) {
+            $i = 0;
+        }
+        while ($i < $subLen) {
+            if ('a' === \substr($subject, $i, 1)) {
+                $j = $i + 1;
+                while ($j < $subLen && 'a' === \substr($subject, $j, 1)) {
+                    ++$j;
+                }
+                self::$lastReplacePos = $i;
+                self::$lastReplaceBodyLen = $j - $i;
+
+                return 1;
+            }
+            ++$i;
+        }
+
+        return 0;
+    }
+
+    private static function matchLiteralAPlus(string $subject, int $offset): int
+    {
+        $subLen = \strlen($subject);
+        $i = $offset;
+        if ($i < 0) {
+            $i = 0;
+        }
+        while ($i < $subLen) {
+            if ('a' === \substr($subject, $i, 1)) {
+                $j = $i + 1;
+                while ($j < $subLen && 'a' === \substr($subject, $j, 1)) {
+                    ++$j;
+                }
+                self::storeCaps(\substr($subject, $i, $j - $i), false);
+
+                return 1;
+            }
+            ++$i;
+        }
+
+        return 0;
+    }
+
+    private static function replaceLiteralAPlus(string $replacement, string $subject, int $limit): string
+    {
+        if (0 === $limit) {
+            return $subject;
+        }
+        $out = '';
+        $subLen = \strlen($subject);
+        $cursor = 0;
+        $n = 0;
+        while ($cursor < $subLen) {
+            if ($limit >= 0 && $n >= $limit) {
+                $out .= \substr($subject, $cursor);
+
+                return $out;
+            }
+            if ('a' !== \substr($subject, $cursor, 1)) {
+                $out .= \substr($subject, $cursor, 1);
+                ++$cursor;
+                continue;
+            }
+            $j = $cursor + 1;
+            while ($j < $subLen && 'a' === \substr($subject, $j, 1)) {
+                ++$j;
+            }
+            $out .= $replacement;
+            $cursor = $j;
+            ++$n;
+        }
+
+        return $out;
     }
 
     private static function findClassPlus(int $kind, string $subject, int $offset): int
