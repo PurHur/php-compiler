@@ -79,14 +79,35 @@ final class ContextFullStandaloneLazyExceptionErrorBridgeRuntimeShrinkTest exten
     public function testStandaloneMainStillEnsuresBeforeClearAbort(): void
     {
         $context = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('ErrorBridge::ensureLinked($this)', $context);
+        $this->assertStringContainsString('#35443', $context);
+        // compileToFile must not eagerly NestedJIT ErrorBridge around clear/abort (#35443).
+        $compilePos = strpos($context, 'public function compileToFile');
+        $this->assertNotFalse($compilePos);
+        $compileEnd = strpos($context, 'public function compileCommon', $compilePos);
+        if (false === $compileEnd) {
+            $compileEnd = strpos($context, 'Progress::noteFunction(\'jit_context_compile_common_begin\')', $compilePos);
+        }
+        $this->assertNotFalse($compileEnd);
+        $compileBody = substr($context, $compilePos, $compileEnd - $compilePos);
+        $this->assertStringNotContainsString(
+            'ErrorBridge::ensureLinked($this)',
+            $compileBody,
+            'compileToFile must not eagerly ErrorBridge::ensureLinked (#35443)'
+        );
+        $this->assertStringNotContainsString(
+            'ErrorBridge::registerDeclarations($this)',
+            $compileBody,
+            'compileToFile must not eagerly ErrorBridge::registerDeclarations (#35443)'
+        );
         $this->assertStringContainsString('ErrorBridge::emitClearForStandaloneMain($this)', $context);
+        $this->assertStringContainsString('ErrorBridge::emitAbortIfPendingForStandaloneMain($this)', $context);
         $this->assertStringContainsString('ExceptionBridge::emitClearForStandaloneMain($this)', $context);
         $this->assertStringContainsString('ExceptionBridge::emitAbortIfPendingForStandaloneMain($this)', $context);
 
         foreach ([
             'lib/JIT/Builtin/TypeErrorRaise.php',
             'lib/JIT/Builtin/ErrorRaise.php',
+            'lib/JIT/Builtin/ReadonlyRaise.php',
         ] as $rel) {
             $source = (string) file_get_contents(__DIR__.'/../../'.$rel);
             foreach (['emitClearForStandaloneMain', 'emitAbortIfPendingForStandaloneMain'] as $method) {
@@ -99,7 +120,7 @@ final class ContextFullStandaloneLazyExceptionErrorBridgeRuntimeShrinkTest exten
                 $this->assertStringContainsString(
                     'self::ensureLinked($context)',
                     $body,
-                    $rel.'::'.$method.' must ensureLinked before lookup (#35099)'
+                    $rel.'::'.$method.' must ensureLinked before lookup (#35099 / #35443)'
                 );
             }
         }

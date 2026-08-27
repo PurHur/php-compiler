@@ -2494,8 +2494,8 @@ class Context {
             // ExceptionBridge / ErrorBridge always-on removed (#35099): TypeErrorRaise /
             // JitThrow / ErrorRaise / AssertionErrorRaise / ReadonlyRaise ensureLinked +
             // emitClear/emitAbort/emitRaise already implement standalone bodies before lookup
-            // (peer ensureMinimal #34732 / #34769). Full {main} still ErrorBridge::ensureLinked
-            // / ExceptionBridge::emitClear|emitAbort → ensureLinked before lookup. Full
+            // (peer ensureMinimal #34732 / #34769). compileToFile clear/abort also drop
+            // eager ErrorBridge::ensureLinked (#35443) — emit* self-ensure. Full
             // standalone must not NestedJIT type_error_* / error_* during init — leftover
             // Context NestedJIT vs Runtime ABI drift mints *.1 (#31894 / #32122).
             // StreamLifecycle / StreamRead always-on removed (#35086): JitFclose / JitFeof /
@@ -2703,11 +2703,13 @@ class Context {
                     // ensureLinked fills return-pending bodies after ensureFull drop (#35073).
                     $emitInStandaloneMain(fn () => Builtin\JitReturnPending::ensureLinked($this));
                     $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending')));
-                } else {
-                    // Thin path: still clear Error/Readonly pending buffers (#23665).
-                    $emitInStandaloneMain(fn () => ErrorBridge::registerDeclarations($this));
-                    $emitInStandaloneMain(fn () => ErrorBridge::ensureLinked($this));
                 }
+                // ErrorBridge always-on ensure removed (#35443 / peer #35099): emitClear /
+                // emitAbort already ErrorRaise / ReadonlyRaise::ensureLinked (insert restore)
+                // before lookup. Thin hello-world must not NestedJIT AssertionErrorRaise during
+                // {main} prologue — leftover Context NestedJIT vs Runtime ABI drift mints *.1
+                // (#31894 / #32122). Thin still clears/aborts pending Error for final/readonly
+                // writes (#23665, #3149).
                 $emitInStandaloneMain(fn () => ErrorBridge::emitClearForStandaloneMain($this));
                 if (!$this->isThinStandaloneAotMain()) {
                     $emitInStandaloneMain(fn () => ExceptionBridge::emitClearForStandaloneMain($this));
@@ -2727,8 +2729,7 @@ class Context {
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 // Always abort pending Errors after user script — thin AOT previously skipped this
                 // and silently no-op'd final/readonly writes (#23665, readonly_property_write AOT).
-                $emitInStandaloneMain(fn () => ErrorBridge::registerDeclarations($this));
-                $emitInStandaloneMain(fn () => ErrorBridge::ensureLinked($this));
+                // emitAbort self-ensures (#35443); do not NestedJIT ErrorBridge here.
                 $emitInStandaloneMain(fn () => ErrorBridge::emitAbortIfPendingForStandaloneMain($this));
                 // Thin AOT: still flush OB when stack was linked (URL-Rewriter endAll, #27566).
                 // emitEndAllForStandalone no-ops unless __phpc_ob_end_all has a body (#13571).
