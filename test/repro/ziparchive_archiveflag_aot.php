@@ -1,0 +1,33 @@
+<?php
+// ZipArchive::setArchiveFlag/getArchiveFlag — AOT must match VM (#35522 leftover of #35515 / #21831).
+$path = sys_get_temp_dir() . '/phpc_zip_35522_' . getmypid() . '.zip';
+@unlink($path);
+$z = new ZipArchive();
+$z->open($path, ZipArchive::CREATE);
+$z->addFromString('a.txt', 'AAAA');
+echo 'set=';
+var_export($z->setArchiveFlag(ZipArchive::AFL_RDONLY, 1));
+echo "\n";
+echo 'get=';
+var_export($z->getArchiveFlag(ZipArchive::AFL_RDONLY));
+echo "\n";
+echo 'clear=';
+var_export($z->setArchiveFlag(ZipArchive::AFL_RDONLY, 0));
+echo "\n";
+echo 'get2=';
+var_export($z->getArchiveFlag(ZipArchive::AFL_RDONLY));
+echo "\n";
+echo 'unchanged=';
+var_export($z->getArchiveFlag(ZipArchive::AFL_RDONLY, ZipArchive::FL_UNCHANGED));
+echo "\n";
+echo 'torrent=';
+var_export($z->setArchiveFlag(ZipArchive::AFL_WANT_TORRENTZIP, 1));
+echo "\n";
+echo 'get_t=';
+var_export($z->getArchiveFlag(ZipArchive::AFL_WANT_TORRENTZIP));
+echo "\n";
+echo 'bad=';
+var_export($z->setArchiveFlag(1, 1));
+echo "\n";
+$z->close();
+@unlink($path);
