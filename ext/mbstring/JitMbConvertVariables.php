@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\iconv\CharsetEngine;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbConvertEncodingRuntime;
 use PHPCompiler\JIT\Builtin\MbConvertVariablesRuntime;
@@ -14,6 +15,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\MbConvertVariablesLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -21,8 +23,7 @@ use PHPLLVM\Value;
 /**
  * LLVM JIT/AOT for mb_convert_variables() (php-src ext/mbstring/mbstring.c; #35315 leftover #4572).
  *
- * String by-ref via NestedJIT {@see MbConvertVariablesJitHelper}; array/object by-ref remain
- * honest LogicException until a NestedJIT-safe walk lands.
+ * String/array/object by-ref via NestedJIT {@see MbConvertVariablesJitHelper}.
  */
 final class JitMbConvertVariables
 {
@@ -42,19 +43,6 @@ final class JitMbConvertVariables
             BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_convert_variables_argc');
 
             return self::foldFalse($context);
-        }
-
-        for ($i = 2; $i < $argc; ++$i) {
-            if (self::isObjectArg($args[$i])) {
-                throw new \LogicException(
-                    'mb_convert_variables() object $var is not lowered for JIT/AOT in this compiler build'
-                );
-            }
-            if (self::isArrayArg($args[$i])) {
-                throw new \LogicException(
-                    'mb_convert_variables() array $var is not lowered for JIT/AOT in this compiler build'
-                );
-            }
         }
 
         $fromCsv = self::compileTimeFromCsv($args[1]);
@@ -137,7 +125,13 @@ final class JitMbConvertVariables
 
         for ($i = 2; $i < $argc; ++$i) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_convert_variables_var_'.$i);
-            self::lowerStringVar($context, $args[$i], $toPtr, $fromPtr, $lastDetectedSlot, $anyFailSlot, $i);
+            if (self::isArrayArg($args[$i])) {
+                self::lowerArrayVar($context, $args[$i], $toPtr, $fromPtr, $lastDetectedSlot, $anyFailSlot);
+            } elseif (self::isObjectArg($args[$i])) {
+                self::lowerObjectVar($context, $args[$i], $toPtr, $fromPtr, $lastDetectedSlot, $anyFailSlot);
+            } else {
+                self::lowerStringVar($context, $args[$i], $toPtr, $fromPtr, $lastDetectedSlot, $anyFailSlot, $i);
+            }
         }
 
         $failed = $context->builder->load($anyFailSlot);
@@ -155,11 +149,27 @@ final class JitMbConvertVariables
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
+        $okHead = $context->builder->getInsertBlock();
         $outStr = $context->builder->load($lastDetectedSlot);
-        // If never updated, use first from encoding when fromCsv known.
+        $outLen = $context->builder->call($context->lookupFunction('__string__strlen'), $outStr);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $useFrom = $context->builder->icmp(Builder::INT_EQ, $outLen, $zero);
+        $fromFallbackBlock = BasicBlockHelper::append($context, $tag.'_from_fb');
+        $packBlock = BasicBlockHelper::append($context, $tag.'_pack');
+        $context->builder->branchIf($useFrom, $fromFallbackBlock, $packBlock);
+        $context->builder->positionAtEnd($fromFallbackBlock);
+        $context->builder->branch($packBlock);
+        $context->builder->positionAtEnd($packBlock);
+        $outPhi = $context->builder->phi($strPtrTy, 'mcv_out_str');
+        $outPhi->addIncoming($fromPtr, $fromFallbackBlock);
+        $outPhi->addIncoming($outStr, $okHead);
         $okSlot = JitValueBox::alloc($context);
         $okPtr = JitValueBox::pointer($context, $okSlot);
-        $ownedOut = $context->builder->call($context->lookupFunction('__string__separate'), $outStr);
+        $ownedOut = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $outPhi
+        );
         $context->builder->call($context->lookupFunction('__value__writeString'), $okPtr, $ownedOut);
         $okTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
@@ -249,6 +259,48 @@ final class JitMbConvertVariables
         $context->builder->positionAtEnd($contBlock);
     }
 
+    private static function lowerArrayVar(
+        Context $context,
+        JITVariable $arg,
+        Value $toPtr,
+        Value $fromPtr,
+        Value $lastDetectedSlot,
+        Value $anyFailSlot
+    ): void {
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $arg);
+        MbConvertVariablesLlvm::convertArrayInPlace(
+            $context,
+            $ht,
+            $toPtr,
+            $fromPtr,
+            $lastDetectedSlot,
+            $anyFailSlot
+        );
+    }
+
+    private static function lowerObjectVar(
+        Context $context,
+        JITVariable $arg,
+        Value $toPtr,
+        Value $fromPtr,
+        Value $lastDetectedSlot,
+        Value $anyFailSlot
+    ): void {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        MbConvertVariablesLlvm::convertObjectInPlace(
+            $context,
+            $obj,
+            $toPtr,
+            $fromPtr,
+            $lastDetectedSlot,
+            $anyFailSlot
+        );
+    }
+
     /**
      * @return array{0: Value, 1: ?string}
      */
@@ -308,17 +360,25 @@ final class JitMbConvertVariables
         return implode(',', $parts);
     }
 
+    private static function isObjectArg(JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            return true;
+        }
+        $classHint = ltrim((string) ($arg->classUserType ?? ''), '\\');
+        if ('' !== $classHint && 'mixed' !== strtolower($classHint)) {
+            return true;
+        }
+
+        return false;
+    }
+
     private static function isArrayArg(JITVariable $arg): bool
     {
         return JITVariable::TYPE_HASHTABLE === $arg->type
             || (($arg->type & JITVariable::IS_NATIVE_ARRAY) !== 0)
             || ($arg->compileTimeEmptyArrayLiteral ?? false)
             || null !== ($arg->compileTimeArray ?? null);
-    }
-
-    private static function isObjectArg(JITVariable $arg): bool
-    {
-        return JITVariable::TYPE_OBJECT === $arg->type;
     }
 
     private static function foldFalse(Context $context): Value
