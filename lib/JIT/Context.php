@@ -2239,6 +2239,8 @@ class Context {
             'getStreamName',
             'addGlob',
             'addPattern',
+            'registerProgressCallback',
+            'registerCancelCallback',
         ] as $zipMethod) {
             $this->functionProxies['ziparchive::'.strtolower($zipMethod)] = new Call\ZipArchiveMethod(
                 $zipMethod
