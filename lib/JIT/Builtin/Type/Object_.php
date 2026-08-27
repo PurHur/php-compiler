@@ -3695,6 +3695,12 @@ class Object_ extends Type {
         if ('normalizer' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmNormalizer::classConstants());
         }
+        // IntlDateFormatter::create Call proxy is linked (#27361) even when host lacks ext-intl;
+        // seed SHORT/NONE/GREGORIAN/… so ClassConstFetch folds to compile-time long. Without this,
+        // null style args reach create/format and thin AOT aborts (#35360 peer of #35358).
+        if ('intldateformatter' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlDateFormatter::classConstants());
+        }
         // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
         // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
         // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
