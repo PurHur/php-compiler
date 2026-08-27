@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 /**
- * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 / #35465 / #35466 / #35467) —
- * CREATE/add/close/get/locate/index/rename/delete/extract/status/count path.
+ * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
+ * #35465 / #35466 / #35467 / #35472) — CREATE/add/close/get/locate/index/rename/delete/extract/
+ * status/count path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -16,7 +17,7 @@ namespace PHPCompiler\ext\zip;
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / addFile / addEmptyDir /
  * close / getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
- * renameName / deleteName / deleteIndex / extractTo / count)
+ * renameName / renameIndex / deleteName / deleteIndex / extractTo / count)
  */
 final class ZipArchiveJitHelper
 {
@@ -256,7 +257,7 @@ final class ZipArchiveJitHelper
 
             return self::pack(0);
         }
-        // renameName — single-entry name swap (#35450 leftover of #35424).
+        // renameName — name swap on either slot (#35450 leftover of #35424 / #35454).
         if ('rename' === $op) {
             if ('' === $s2) {
                 // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
@@ -264,15 +265,54 @@ final class ZipArchiveJitHelper
                     'ZipArchive::renameName(): Argument #2 ($new_name) must not be empty'
                 );
             }
-            if (1 !== self::$h1open || '' === self::$h1name || $s1 !== self::$h1name) {
+            if (1 !== self::$h1open) {
                 self::$h1status = 9;
 
                 return self::pack(0);
             }
-            self::$h1name = $s2;
-            self::$h1status = 0;
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1name = $s2;
+                self::$h1status = 0;
 
-            return self::pack(1);
+                return self::pack(1);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1name2 = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        // renameIndex — rename by slot index 0/1 (#35472 leftover of #35450 / #35454).
+        if ('rename_index' === $op) {
+            if ('' === $s2) {
+                throw new \ValueError(
+                    'ZipArchive::renameIndex(): Argument #2 ($new_name) must not be empty'
+                );
+            }
+            if (1 !== self::$h1open) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            if (0 === $a && '' !== self::$h1name) {
+                self::$h1name = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1name2 = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
         }
         // deleteName — clear the single-entry slot (#35450 leftover of #35424).
         if ('delete' === $op) {
