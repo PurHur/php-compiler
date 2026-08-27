@@ -40,9 +40,12 @@ final class TypeDeadUndefinedArrayKeyAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register undef-key long ABI (#33249)'
         );
-        // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('StringTriggerError::ensureLinked', $type);
-        $this->assertStringContainsString('StringTriggerError::declareUndefinedArrayKeyAbis', $type);
+        // No further Type always-on leftover after #33267 exit/abort drop;
+        // StringTriggerError register ensure moved to HashTable::implement (#35392).
+        $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
+        $ht = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
+        $this->assertStringContainsString('StringTriggerError::ensureLinked', $ht);
+        $this->assertStringContainsString('StringTriggerError::declareUndefinedArrayKeyAbis', $ht);
     }
 
     public function testRuntimeOwnerDeclaresUndefinedArrayKeyAbiModuleLocally(): void
@@ -61,10 +64,20 @@ final class TypeDeadUndefinedArrayKeyAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_undefined_array_key_warning_long', $kernel);
     }
 
-    public function testTypeInitializeStillEnsureLinksStringTriggerError(): void
+    public function testTypeRegisterNoLongerEagerLinksStringTriggerError(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('StringTriggerError::ensureLinked($this->context)', $type);
+        $regPos = strpos($type, 'public function register(): void');
+        $this->assertNotFalse($regPos);
+        $initPos = strpos($type, 'public function initialize(): void');
+        $this->assertNotFalse($initPos);
+        $regBody = substr($type, $regPos, $initPos - $regPos);
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureLinked($this->context)',
+            $regBody,
+            'Type::register must not eagerly StringTriggerError::ensureLinked (#35392)'
+        );
+        $this->assertStringContainsString('#35392', $type);
     }
 
     public function testNoNewRuntimeCForUndefinedArrayKeyAbi(): void

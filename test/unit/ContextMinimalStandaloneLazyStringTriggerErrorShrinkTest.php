@@ -70,6 +70,9 @@ final class ContextMinimalStandaloneLazyStringTriggerErrorShrinkTest extends Tes
         );
         $assert = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/AssertFail.php');
         $this->assertStringContainsString('StringTriggerError::ensureLinked($context)', $assert);
+        $coerce = (string) file_get_contents(__DIR__.'/../../ext/standard/JitScalarEnumCoerce.php');
+        $this->assertStringContainsString('#35392', $coerce);
+        $this->assertStringContainsString('StringTriggerError::ensureLinked($context)', $coerce);
     }
 
     public function testCallSitesEnsureBeforeLookup(): void

@@ -30,7 +30,7 @@ final class TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest ext
                 "Builtin\\Type::initialize must not eagerly {$class}::ensureLinked (#34513)"
             );
         }
-        // initialize() must not call StringTriggerError::ensureLinked — register() still does.
+        // initialize() must not call StringTriggerError::ensureLinked — register() neither (#35392).
         $initPos = strpos($type, 'public function initialize(): void');
         $this->assertNotFalse($initPos);
         $initBody = substr($type, $initPos);
@@ -39,10 +39,19 @@ final class TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest ext
             $initBody,
             'Type::initialize must not eagerly StringTriggerError::ensureLinked (#34513)'
         );
+        $regPos = strpos($type, 'public function register(): void');
+        $this->assertNotFalse($regPos);
+        $regBody = substr($type, $regPos, $initPos - $regPos);
+        $this->assertStringNotContainsString(
+            'StringTriggerError::ensureLinked($this->context)',
+            $regBody,
+            'Type::register must not eagerly StringTriggerError::ensureLinked (#35392)'
+        );
+        $ht = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
         $this->assertStringContainsString(
             'StringTriggerError::ensureLinked($this->context)',
-            $type,
-            'Type::register still ensureLinked StringTriggerError for HELPER_RUNTIME_O=0 (#33248)'
+            $ht,
+            'HashTable::implement ensureLinked StringTriggerError for HELPER_RUNTIME_O=0 (#35392 / #33248)'
         );
         // SessionStorageGlobals::ensureGlobals also lazy as of #34566 (peer).
     }
