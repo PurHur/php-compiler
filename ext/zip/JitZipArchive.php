@@ -23,8 +23,8 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for ZipArchive open/add/close/get/locate/index/rename/extract
- * (#35424 / #35437 / #35440 / #35449 / #35450 / #35465 / #35467 / #35472).
+ * LLVM lowering for ZipArchive open/add/close/get/locate/index/rename/extract/comment
+ * (#35424 / #35437 / #35440 / #35449 / #35450 / #35465 / #35467 / #35472 / #35476 / #35486).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -876,6 +876,270 @@ final class JitZipArchive
         );
         $missPtr = JitValueBox::pointer($context, $missSlot);
         self::storeValueStringProperty($context, $obj, VmZipArchive::PROP_COMMENT, $empty);
+        $missTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($valuePtrTy);
+        $phi->addIncoming($okPtr, $okTail);
+        $phi->addIncoming($missPtr, $missTail);
+
+        return $phi;
+    }
+
+    /**
+     * ZipArchive::setCommentName — NestedJIT scn (#35486 leftover of #35476 / #20386).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setCommentName
+     */
+    public static function setCommentName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::setCommentName', 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::setCommentName',
+            0,
+            'name'
+        );
+        $comment = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[2],
+            'ZipArchive::setCommentName',
+            1,
+            'comment'
+        );
+        // Empty name → ValueError in IR (#35486; NestedJIT throw SIGSEGVs under thin AOT).
+        $i64 = $context->getTypeFromString('int64');
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($name, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_scn_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_scn_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::setCommentName(): Argument #1 ($name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        $ok = self::execLong(
+            $context,
+            'scn',
+            $handle,
+            $zero,
+            $name,
+            $comment
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::getCommentName — NestedJIT gcn (#35486 leftover of #35476 / #20386).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getCommentName
+     * Missing entry → false; unset comment → '' (unlike getArchiveComment).
+     */
+    public static function getCommentName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::getCommentName', 1, 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::getCommentName',
+            0,
+            'name'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($name, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_gcn_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_gcn_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::getCommentName(): Argument #1 ($name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        [$found, $data] = self::execLongAndPayload(
+            $context,
+            'gcn',
+            $handle,
+            $zero,
+            $name,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        $isFound = $context->builder->icmp(
+            Builder::INT_NE,
+            $found,
+            $zero
+        );
+        $id2 = (string) (++self::$serial);
+        $hitBlock = BasicBlockHelper::append($context, 'zip_gcn_hit_'.$id2);
+        $missBlock = BasicBlockHelper::append($context, 'zip_gcn_miss_'.$id2);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_gcn_done_'.$id2);
+        $context->builder->branchIf($isFound, $hitBlock, $missBlock);
+
+        $context->builder->positionAtEnd($hitBlock);
+        $okSlot = JitValueBox::alloc($context);
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $okPtr,
+            $data
+        );
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $missSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $missSlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $missPtr = JitValueBox::pointer($context, $missSlot);
+        $missTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($valuePtrTy);
+        $phi->addIncoming($okPtr, $okTail);
+        $phi->addIncoming($missPtr, $missTail);
+
+        return $phi;
+    }
+
+    /**
+     * ZipArchive::setCommentIndex — NestedJIT sci (#35486 leftover of #35476 / #20386).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setCommentIndex
+     */
+    public static function setCommentIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::setCommentIndex', 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower($context, $args[1], 'ZipArchive::setCommentIndex(): Argument #1 ($index)');
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        $comment = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[2],
+            'ZipArchive::setCommentIndex',
+            1,
+            'comment'
+        );
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'sci',
+            $index,
+            $i64->constInt(0, false),
+            $comment,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::getCommentIndex — NestedJIT gci (#35486 leftover of #35476 / #20386).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getCommentIndex
+     * Invalid index → false; unset comment → ''.
+     */
+    public static function getCommentIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::getCommentIndex', 1, 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower($context, $args[1], 'ZipArchive::getCommentIndex(): Argument #1 ($index)');
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        [$found, $data] = self::execLongAndPayload(
+            $context,
+            'gci',
+            $index,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        $isFound = $context->builder->icmp(
+            Builder::INT_NE,
+            $found,
+            $i64->constInt(0, false)
+        );
+        $id = (string) (++self::$serial);
+        $okBlock = BasicBlockHelper::append($context, 'zip_gci_ok_'.$id);
+        $missBlock = BasicBlockHelper::append($context, 'zip_gci_miss_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_gci_done_'.$id);
+        $context->builder->branchIf($isFound, $okBlock, $missBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $okSlot = JitValueBox::alloc($context);
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $okPtr,
+            $data
+        );
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $missSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $missSlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $missPtr = JitValueBox::pointer($context, $missSlot);
         $missTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 

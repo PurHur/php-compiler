@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\zip;
 
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
- * #35465 / #35466 / #35467 / #35472 / #35476) — CREATE/add/close/get/locate/index/rename/delete/
- * extract/status/count/archive-comment path.
+ * #35465 / #35466 / #35467 / #35472 / #35476 / #35486) — CREATE/add/close/get/locate/index/
+ * rename/delete/extract/status/count/archive-comment/entry-comment path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -18,7 +18,8 @@ namespace PHPCompiler\ext\zip;
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / addFile / addEmptyDir /
  * close / getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
  * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
- * setArchiveComment / getArchiveComment)
+ * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
+ * setCommentIndex / getCommentIndex)
  */
 final class ZipArchiveJitHelper
 {
@@ -36,6 +37,11 @@ final class ZipArchiveJitHelper
 
     /** EOCD archive comment — php-src zip_set_archive_comment (#35476 / #20386). */
     private static string $h1comment = '';
+
+    /** Per-entry file comments — php-src zip_file_set_comment (#35486 / #20386). */
+    private static string $h1ecomment = '';
+
+    private static string $h1ecomment2 = '';
 
     private static int $h1status = 0;
 
@@ -62,6 +68,8 @@ final class ZipArchiveJitHelper
             self::$h1name2 = '';
             self::$h1data2 = '';
             self::$h1comment = '';
+            self::$h1ecomment = '';
+            self::$h1ecomment2 = '';
             self::$h1status = 0;
             self::$h1readonly = 0;
 
@@ -81,6 +89,8 @@ final class ZipArchiveJitHelper
             self::$h1name2 = '';
             self::$h1data2 = '';
             self::$h1comment = '';
+            self::$h1ecomment = '';
+            self::$h1ecomment2 = '';
             self::$h1open = 0;
             self::$h1readonly = 0;
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
@@ -147,11 +157,13 @@ final class ZipArchiveJitHelper
             if ('' === self::$h1name) {
                 self::$h1name = $s1;
                 self::$h1data = $s2;
+                self::$h1ecomment = '';
             } elseif ($s1 === self::$h1name) {
                 self::$h1data = $s2;
             } elseif ('' === self::$h1name2) {
                 self::$h1name2 = $s1;
                 self::$h1data2 = $s2;
+                self::$h1ecomment2 = '';
             } elseif ($s1 === self::$h1name2) {
                 self::$h1data2 = $s2;
             } else {
@@ -176,6 +188,7 @@ final class ZipArchiveJitHelper
             if ('' === self::$h1name) {
                 self::$h1name = $s1;
                 self::$h1data = '';
+                self::$h1ecomment = '';
             } elseif ($s1 === self::$h1name) {
                 self::$h1status = 10;
 
@@ -183,6 +196,7 @@ final class ZipArchiveJitHelper
             } elseif ('' === self::$h1name2) {
                 self::$h1name2 = $s1;
                 self::$h1data2 = '';
+                self::$h1ecomment2 = '';
             } elseif ($s1 === self::$h1name2) {
                 self::$h1status = 10;
 
@@ -345,6 +359,7 @@ final class ZipArchiveJitHelper
             }
             self::$h1name = '';
             self::$h1data = '';
+            self::$h1ecomment = '';
             self::$h1status = 0;
 
             return self::pack(1);
@@ -358,6 +373,7 @@ final class ZipArchiveJitHelper
             }
             self::$h1name = '';
             self::$h1data = '';
+            self::$h1ecomment = '';
             self::$h1status = 0;
 
             return self::pack(1);
@@ -415,6 +431,8 @@ final class ZipArchiveJitHelper
             $content = self::$h1data;
             $size = strlen($content);
             $nl = strlen($name);
+            $ec1 = self::$h1ecomment;
+            $ecl1 = strlen($ec1);
             $local = chr(0x50).chr(0x4b).chr(0x03).chr(0x04)
                 .chr(20).chr(0).chr(0).chr(0).chr(0).chr(0)
                 .chr(0).chr(0).chr(0).chr(0)
@@ -430,16 +448,18 @@ final class ZipArchiveJitHelper
                 .chr(0).chr(0).chr(0).chr(0)
                 .chr($size & 255).chr(($size >> 8) & 255).chr(($size >> 16) & 255).chr(($size >> 24) & 255)
                 .chr($size & 255).chr(($size >> 8) & 255).chr(($size >> 16) & 255).chr(($size >> 24) & 255)
-                .chr($nl & 255).chr(($nl >> 8) & 255).chr(0).chr(0).chr(0).chr(0)
+                .chr($nl & 255).chr(($nl >> 8) & 255).chr(0).chr(0).chr($ecl1 & 255).chr(($ecl1 >> 8) & 255)
                 .chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0)
                 .chr($loff & 255).chr(($loff >> 8) & 255).chr(($loff >> 16) & 255).chr(($loff >> 24) & 255)
-                .$name;
+                .$name.$ec1;
             $countLow = 1;
             if ('' !== self::$h1name2) {
                 $name2 = self::$h1name2;
                 $content2 = self::$h1data2;
                 $size2 = strlen($content2);
                 $nl2 = strlen($name2);
+                $ec2 = self::$h1ecomment2;
+                $ecl2 = strlen($ec2);
                 $loff2 = strlen($local);
                 $local .= chr(0x50).chr(0x4b).chr(0x03).chr(0x04)
                     .chr(20).chr(0).chr(0).chr(0).chr(0).chr(0)
@@ -455,10 +475,10 @@ final class ZipArchiveJitHelper
                     .chr(0).chr(0).chr(0).chr(0)
                     .chr($size2 & 255).chr(($size2 >> 8) & 255).chr(($size2 >> 16) & 255).chr(($size2 >> 24) & 255)
                     .chr($size2 & 255).chr(($size2 >> 8) & 255).chr(($size2 >> 16) & 255).chr(($size2 >> 24) & 255)
-                    .chr($nl2 & 255).chr(($nl2 >> 8) & 255).chr(0).chr(0).chr(0).chr(0)
+                    .chr($nl2 & 255).chr(($nl2 >> 8) & 255).chr(0).chr(0).chr($ecl2 & 255).chr(($ecl2 >> 8) & 255)
                     .chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0)
                     .chr($loff2 & 255).chr(($loff2 >> 8) & 255).chr(($loff2 >> 16) & 255).chr(($loff2 >> 24) & 255)
-                    .$name2;
+                    .$name2.$ec2;
                 $countLow = 2;
             }
             $clen = strlen($central);
@@ -478,6 +498,8 @@ final class ZipArchiveJitHelper
             self::$h1name2 = '';
             self::$h1data2 = '';
             self::$h1comment = '';
+            self::$h1ecomment = '';
+            self::$h1ecomment2 = '';
             self::$h1status = 0;
 
             return self::packPayload(1, $local.$central.$eocd);
@@ -504,6 +526,84 @@ final class ZipArchiveJitHelper
             }
 
             return self::packPayload(1, self::$h1comment);
+        }
+        // setCommentIndex / getCommentIndex / setCommentName / getCommentName (#35486 / #20386).
+        if ('sci' === $op) {
+            if (1 !== self::$h1open) {
+                throw new \ValueError('Invalid or uninitialized Zip object');
+            }
+            if (0 === $a && '' !== self::$h1name) {
+                self::$h1ecomment = $s1;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1ecomment2 = $s1;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+        if ('gci' === $op) {
+            if (1 !== self::$h1open) {
+                throw new \ValueError('Invalid or uninitialized Zip object');
+            }
+            if (0 === $a && '' !== self::$h1name) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1ecomment);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1ecomment2);
+            }
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+        if ('scn' === $op) {
+            if (1 !== self::$h1open) {
+                throw new \ValueError('Invalid or uninitialized Zip object');
+            }
+            // Empty name rejected in IR (#35486) — NestedJIT throw SIGSEGVs under thin AOT.
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1ecomment = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1ecomment2 = $s2;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        if ('gcn' === $op) {
+            if (1 !== self::$h1open) {
+                throw new \ValueError('Invalid or uninitialized Zip object');
+            }
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1ecomment);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1ecomment2);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
         }
         if ('status' === $op) {
             return self::pack(self::$h1status);

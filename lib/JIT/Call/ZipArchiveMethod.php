@@ -12,9 +12,9 @@ use PHPLLVM\Value;
 
 /**
  * ZipArchive thin-AOT methods — open / add / close / get / locate / index / rename / delete /
- * extract / status / count / writable / archive comment
+ * extract / status / count / writable / archive comment / entry comment
  * (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35465 / #35466 / #35467 / #35472 /
- * #35476 / #35478).
+ * #35476 / #35478 / #35486).
  *
  * php-src: ext/zip/php_zip.c
  */
@@ -52,9 +52,13 @@ final class ZipArchiveMethod implements Call
             'setreadonly' => JitZipArchive::setReadOnly($context, ...$args),
             'setarchivecomment' => JitZipArchive::setArchiveComment($context, ...$args),
             'getarchivecomment' => JitZipArchive::getArchiveComment($context, ...$args),
+            'setcommentname' => JitZipArchive::setCommentName($context, ...$args),
+            'getcommentname' => JitZipArchive::getCommentName($context, ...$args),
+            'setcommentindex' => JitZipArchive::setCommentIndex($context, ...$args),
+            'getcommentindex' => JitZipArchive::getCommentIndex($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35478/#35476)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35478/#35476/#35486)'
             ),
         };
     }
