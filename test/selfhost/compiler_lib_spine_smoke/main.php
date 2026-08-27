@@ -3172,6 +3172,7 @@ require_once __DIR__.'/../../../ext/standard/JitStreamContextSetParams.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamCopyToStream.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamEnableCrypto.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamFilter.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamFilterApplyKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamFilterKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamGetContents.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamGetFilters.php';

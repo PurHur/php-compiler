@@ -41,6 +41,7 @@ final class StreamFilterKernelShrinkTest extends TestCase
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('JitStreamFilterKernel.php', $spine);
+        $this->assertStringContainsString('JitStreamFilterApplyKernel.php', $spine);
         $this->assertStringNotContainsString('StreamFilterJit.php', $spine);
         $this->assertStringContainsString('StreamFilter.php', $spine);
     }
