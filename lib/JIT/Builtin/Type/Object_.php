@@ -4046,6 +4046,8 @@ class Object_ extends Type {
             $this->defineProperty($id, VmZipArchive::PROP_NUM_FILES, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, VmZipArchive::PROP_FILENAME, Variable::TYPE_VALUE);
             $this->defineProperty($id, VmZipArchive::PROP_COMMENT, Variable::TYPE_VALUE);
+            // NestedJIT handle into ZipArchiveJitHelper (#35424).
+            $this->defineProperty($id, \PHPCompiler\ext\zip\ZipArchiveJitSupport::PROP_ID, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
         }
         // OpenSSLAsymmetricKey PEM for thin AOT openssl_pkey_new (#34015).

@@ -57,6 +57,14 @@ final class ZipArchiveConstruct implements Call
             VmZipArchive::PROP_NUM_FILES,
             0
         );
+        // NestedJIT handle slot — 0 means alloc-on-first-use (#35424).
+        ReflectionSetup::emitSetIntegerProperty(
+            $context,
+            $obj,
+            $class,
+            \PHPCompiler\ext\zip\ZipArchiveJitSupport::PROP_ID,
+            0
+        );
         self::seedEmptyString($context, $obj, VmZipArchive::PROP_FILENAME);
         self::seedEmptyString($context, $obj, VmZipArchive::PROP_COMMENT);
 
