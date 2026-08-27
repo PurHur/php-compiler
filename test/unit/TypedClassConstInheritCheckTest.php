@@ -4,12 +4,36 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #5953 */
 final class TypedClassConstInheritCheckTest extends TestCase
 {
+    /** @var string|false|null */
+    private $savedCompilerProfile = null;
+
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsTypedClassConstants()) {
+            $this->savedCompilerProfile = getenv('PHP_COMPILER_PROFILE');
+            putenv('PHP_COMPILER_PROFILE=8.3');
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        if (null !== $this->savedCompilerProfile) {
+            if (false === $this->savedCompilerProfile) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$this->savedCompilerProfile);
+            }
+            $this->savedCompilerProfile = null;
+        }
+    }
+
     public function testIncompatibleInheritedTypedConstantFailsCompile(): void
     {
         $runtime = new Runtime();
@@ -94,93 +118,65 @@ class C {
 }
 PHP;
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Type of C::FOO must be compatible with T::FOO of type string');
+        $this->expectExceptionMessage(
+            'C and T define the same constant (FOO) in the composition of C. However, the definition differs and is considered incompatible. Class was composed'
+        );
         $runtime->parseAndCompile($code, 'typed_trait_const_inherit_bad.php');
     }
 
     /** @covers issue #5982 */
     public function testIncompatibleInterfaceTypedConstantOverrideFailsCompile(): void
     {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            if (!\PHPCompiler\CompilerVersion::supportsInterfaceTypedConstants()) {
-                $this->markTestSkipped('typed interface constants require forward profile 8.3+ (#24917)');
-            }
-            $runtime = new Runtime();
-            $code = <<<'PHP'
+        if (!CompilerVersion::supportsInterfaceTypedConstants()) {
+            $this->markTestSkipped('typed interface constants require forward profile 8.3+ (#24917)');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
 <?php
 interface I { public const array X = [1]; }
 class C implements I { public const string X = 'not-array'; }
 PHP;
-            $this->expectException(\CompileError::class);
-            $this->expectExceptionMessage('Type of C::X must be compatible with I::X of type array');
-            $runtime->parseAndCompile($code, 'interface_typed_const_inherit_bad.php');
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Type of C::X must be compatible with I::X of type array');
+        $runtime->parseAndCompile($code, 'interface_typed_const_inherit_bad.php');
     }
 
     /** @covers issue #5982 */
     public function testCompatibleInterfaceTypedConstantOverrideCompilesAndRuns(): void
     {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            if (!\PHPCompiler\CompilerVersion::supportsInterfaceTypedConstants()) {
-                $this->markTestSkipped('typed interface constants require forward profile 8.3+ (#24917)');
-            }
-            $runtime = new Runtime();
-            $code = <<<'PHP'
+        if (!CompilerVersion::supportsInterfaceTypedConstants()) {
+            $this->markTestSkipped('typed interface constants require forward profile 8.3+ (#24917)');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
 <?php
 interface I { public const array X = [1]; }
 class C implements I { public const array X = [2, 3]; }
 echo C::X[0], "\n";
 PHP;
-            $block = $runtime->parseAndCompile($code, 'interface_typed_const_inherit_ok.php');
-            $this->assertNotNull($block);
-            ob_start();
-            $runtime->run($block);
-            $this->assertSame("2\n", ob_get_clean());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
+        $block = $runtime->parseAndCompile($code, 'interface_typed_const_inherit_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("2\n", ob_get_clean());
     }
 
     /** @covers issue #7042 */
     public function testConflictingInterfaceTypedConstantsWithoutOverrideFailsCompile(): void
     {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            if (!\PHPCompiler\CompilerVersion::supportsInterfaceTypedConstants()) {
-                $this->markTestSkipped('typed interface constants require forward profile 8.3+ (#24917)');
-            }
-            $runtime = new Runtime();
-            $code = <<<'PHP'
+        if (!CompilerVersion::supportsInterfaceTypedConstants()) {
+            $this->markTestSkipped('typed interface constants require forward profile 8.3+ (#24917)');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
 <?php
 interface I { public const string X = 'a'; }
 interface J { public const int X = 1; }
 class C implements I, J {}
 echo C::X, "\n";
 PHP;
-            $this->expectException(\CompileError::class);
-            $this->expectExceptionMessage('Cannot inherit previously-inherited or override constant X from interface J');
-            $runtime->parseAndCompile($code, 'interface_typed_const_multi_conflict.php');
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot inherit previously-inherited or override constant X from interface J');
+        $runtime->parseAndCompile($code, 'interface_typed_const_multi_conflict.php');
     }
 }

@@ -17,9 +17,16 @@ final class JitTypedClassConstExecuteTest extends TestCase
 {
     private string $repoRoot;
 
+    /** @var string|false|null */
+    private $savedCompilerProfile = null;
+
     protected function setUp(): void
     {
         $this->repoRoot = dirname(__DIR__, 2);
+        if (!CompilerVersion::supportsTypedClassConstants()) {
+            $this->savedCompilerProfile = getenv('PHP_COMPILER_PROFILE');
+            putenv('PHP_COMPILER_PROFILE=8.3');
+        }
         LlvmToolchain::applyCurrentProcessEnv($this->repoRoot);
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
@@ -30,16 +37,25 @@ final class JitTypedClassConstExecuteTest extends TestCase
         }
     }
 
+    protected function tearDown(): void
+    {
+        if (null !== $this->savedCompilerProfile) {
+            if (false === $this->savedCompilerProfile) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$this->savedCompilerProfile);
+            }
+            $this->savedCompilerProfile = null;
+        }
+    }
+
     /**
      * @dataProvider typedClassConstPhptProvider
      */
     public function testTypedClassConstMatchesVm(string $fixture): void
     {
         if (!CompilerVersion::supportsTypedClassConstants()) {
-            putenv('PHP_COMPILER_PROFILE=8.3');
-            if (!CompilerVersion::supportsTypedClassConstants()) {
-                $this->markTestSkipped('typed class constants require forward profile 8.3+');
-            }
+            $this->markTestSkipped('typed class constants require forward profile 8.3+');
         }
         $jit = realpath($this->repoRoot.'/bin/jit.php');
         $this->assertNotFalse($jit);
@@ -47,8 +63,9 @@ final class JitTypedClassConstExecuteTest extends TestCase
         $this->assertNotFalse($vm);
         $code = $this->phptFixtureCode($fixture);
         $env = $this->llvmProcessEnv();
-        if (!CompilerVersion::supportsTypedClassConstants()) {
-            $env['PHP_COMPILER_PROFILE'] = '8.3';
+        $profile = getenv('PHP_COMPILER_PROFILE');
+        if (false !== $profile && '' !== $profile) {
+            $env['PHP_COMPILER_PROFILE'] = $profile;
         }
         $vmOut = $this->runScript([PHP_BINARY, $vm], $env, $code);
         $this->assertSame(0, $vmOut['exit'], 'VM: '.$vmOut['combined']);
