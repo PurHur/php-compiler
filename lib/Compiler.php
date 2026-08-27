@@ -13500,6 +13500,7 @@ class Compiler {
                 $finallyOp->block2 = $merge;
                 $block->addOpCode($finallyOp);
                 $this->rewriteMergeJumpsToFinally($try, $merge, $compiledFinally);
+                $this->rewriteLeaveJumpsToFinally($try, $merge, $compiledFinally);
                 if (property_exists($stmt, 'else')
                     && null !== $stmt->else
                     && isset($this->seen[$stmt->else])) {
@@ -18787,6 +18788,139 @@ class Compiler {
                 $this->rewriteMergeJumpsToFinallyRecursive($op->block2, $merge, $finally, $seen);
             }
         }
+    }
+
+    /**
+     * Break/continue leave edges target loop exit, not merge — stub through finally (#35547).
+     */
+    private function rewriteLeaveJumpsToFinally(Block $try, Block $merge, Block $finally): void
+    {
+        $seen = [];
+        $this->rewriteLeaveJumpsToFinallyRecursive($try, $try, $merge, $finally, $seen);
+    }
+
+    /**
+     * @param array<int, true> $seen
+     */
+    private function rewriteLeaveJumpsToFinallyRecursive(
+        Block $tryEntry,
+        Block $source,
+        Block $merge,
+        Block $finally,
+        array &$seen
+    ): void {
+        $id = spl_object_id($source);
+        if (isset($seen[$id]) || $source === $merge || $source === $finally) {
+            return;
+        }
+        $seen[$id] = true;
+        for ($i = 0; $i < $source->nOpCodes; ++$i) {
+            $op = $source->opCodes[$i];
+            if (OpCode::TYPE_JUMP === $op->type) {
+                $this->maybeRetargetLeaveJumpToFinallyStub($op, 'block1', $tryEntry, $merge, $finally);
+            } elseif (OpCode::TYPE_JUMPIF === $op->type) {
+                $this->maybeRetargetLeaveJumpToFinallyStub($op, 'block1', $tryEntry, $merge, $finally);
+                $this->maybeRetargetLeaveJumpToFinallyStub($op, 'block2', $tryEntry, $merge, $finally);
+            }
+            if (null !== $op->block1 && $op->block1 !== $merge && $op->block1 !== $finally) {
+                $this->rewriteLeaveJumpsToFinallyRecursive($tryEntry, $op->block1, $merge, $finally, $seen);
+            }
+            if (null !== $op->block2 && $op->block2 !== $merge && $op->block2 !== $finally) {
+                $this->rewriteLeaveJumpsToFinallyRecursive($tryEntry, $op->block2, $merge, $finally, $seen);
+            }
+        }
+    }
+
+    private function maybeRetargetLeaveJumpToFinallyStub(
+        OpCode $op,
+        string $edge,
+        Block $tryEntry,
+        Block $merge,
+        Block $finally
+    ): void {
+        $target = $op->$edge;
+        if (!$target instanceof Block || $target === $merge || $target === $finally) {
+            return;
+        }
+        if ($this->blockIsInsideActiveTryRegion($tryEntry, $merge, $finally, $target)) {
+            return;
+        }
+        $stub = new Block($tryEntry->orig);
+        $stub->aotGotoResumeTarget = $target;
+        $stub->func = $tryEntry->func;
+        $jump = new OpCode(OpCode::TYPE_JUMP);
+        $jump->block1 = $finally;
+        $stub->addOpCode($jump);
+        $op->$edge = $stub;
+    }
+
+    private function blockIsInsideActiveTryRegion(
+        Block $tryEntry,
+        Block $merge,
+        Block $finally,
+        Block $target
+    ): bool {
+        if ($target === $tryEntry) {
+            return true;
+        }
+        $leaveBlocked = [spl_object_id($merge) => true, spl_object_id($finally) => true];
+        if (!$this->cfgBlockCanReach($tryEntry, $target, $leaveBlocked)) {
+            return false;
+        }
+        if ($this->cfgBlockCanReach($target, $merge, [])) {
+            return true;
+        }
+        if ($this->cfgBlockCanReach($target, $finally, [])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, true> $blocked
+     */
+    private function cfgBlockCanReach(Block $from, Block $to, array $blocked): bool
+    {
+        if ($from === $to) {
+            return true;
+        }
+        $seen = [];
+        $queue = [$from];
+        while ([] !== $queue) {
+            $block = \array_pop($queue);
+            $id = spl_object_id($block);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach ($this->cfgBlockBranchTargets($block) as $succ) {
+                if ($succ === $to) {
+                    return true;
+                }
+                if (isset($blocked[spl_object_id($succ)])) {
+                    continue;
+                }
+                $queue[] = $succ;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<Block> */
+    private function cfgBlockBranchTargets(Block $block): array
+    {
+        $targets = [];
+        foreach ($block->opCodes as $op) {
+            foreach ([$op->block1, $op->block2, $op->block3] as $t) {
+                if ($t instanceof Block) {
+                    $targets[] = $t;
+                }
+            }
+        }
+
+        return $targets;
     }
 
     /**

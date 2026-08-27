@@ -35,5 +35,9 @@ final class TryCatchState
         $this->handlerStack = [];
         $this->mergeHandlers = [];
         $this->returnFinallyStack = [];
+        $this->pendingGotoResumeWires = [];
     }
+
+    /** @var list<TryCatchHandler> */
+    public array $pendingGotoResumeWires = [];
 }

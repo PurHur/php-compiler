@@ -215,7 +215,6 @@ class JIT {
         JIT\Progress::noteFunction('jit_compile_compile_block_begin');
         $this->context->jitUndeclaredInstancePropertyWrites = Block::collectJitUndeclaredInstancePropertyWrites($block);
         $return = $this->compileBlock($block);
-        JIT\Progress::noteFunction('jit_compile_compile_block_done');
         JIT\Progress::noteFunction('jit_compile_run_queue_begin');
         if (
             $this->isM4BinCompileScriptMain($block)
@@ -232,6 +231,10 @@ class JIT {
             $this->runQueue();
         }
         JIT\Progress::noteFunction('jit_compile_run_queue_done');
+        if ($return instanceof PHPLLVM\Value\Function_) {
+            JIT\TryCatchHelper::wirePendingGotoResumes($this, $return, $this->context, []);
+        }
+        JIT\Progress::noteFunction('jit_compile_compile_block_done');
         JIT\Progress::noteFunction('jit_compile_finalize_m3_emit_tu_spine_begin');
         $this->finalizeM3EmitTuRuntimeSpineAfterQueue();
         JIT\Progress::noteFunction('jit_compile_finalize_m3_emit_tu_spine_done');
@@ -298,6 +301,15 @@ class JIT {
             }
             $this->compileBlock($func->block, $name);
             $this->runQueue();
+            if ($this->context->activeFunction instanceof PHPLLVM\Value\Function_) {
+                JIT\TryCatchHelper::wirePendingGotoResumes(
+                    $this,
+                    $this->context->activeFunction,
+                    $this->context,
+                    []
+                );
+            }
+
             return;
         } elseif ($func instanceof CoreFunc\JIT) {
             // No need to do anything, already compiled
@@ -8131,6 +8143,12 @@ class JIT {
         return $this->compileBlockInternal($func, $block, $limit, null, 0, false, ...$args);
     }
 
+    /** Public wrapper for try/finally goto resume (#35547). */
+    public function jitBranchEntryForCfg(Block $target, PHPLLVM\Value\Function_ $func): PHPLLVM\BasicBlock
+    {
+        return $this->jitBranchEntryBlock($target, $func);
+    }
+
     /**
      * Lower a ?? / ??= arm at a pre-built entry BB after the test BB is sealed (#32880).
      *
@@ -12131,6 +12149,19 @@ class JIT {
                     JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'jump_cont');
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
+                    if (
+                        0 === $this->context->inlineIncludeDepth
+                        && null !== $block->aotGotoResumeTarget
+                        && JIT\TryCatchHelper::deferGotoLeaveFromStub(
+                            $this,
+                            $func,
+                            $this->context,
+                            $block->aotGotoResumeTarget,
+                            $args
+                        )
+                    ) {
+                        return $origBasicBlock;
+                    }
                     $skippedListUnpackAssign = $this->context->listUnpackSkipAssignPath;
                     $this->context->listUnpackSkipAssignPath = false;
                     $mergeLlvm = null;

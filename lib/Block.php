@@ -60,6 +60,9 @@ class Block {
     /** Synthetic ?? branch block: shares php-cfg orig but is not the function CFG entry (#99). */
     public bool $syntheticCfgBranch = false;
 
+    /** AOT leave stub: run finally then resume this CFG block (#35547). */
+    public ?Block $aotGotoResumeTarget = null;
+
     /** File-level declare(strict_types=1) for this function body (issue #156). */
     public bool $strictTypes = false;
 

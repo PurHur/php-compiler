@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPCompiler\JIT\Builtin\ExceptionHandlerJitRuntime;
+use PHPCompiler\JIT\Builtin\JitGotoPending;
 use PHPCompiler\JIT\Builtin\JitReturnPending;
 use PHPCompiler\JIT\Builtin\ExceptionThrowToStringSeed;
 use PHPCompiler\JIT\Builtin\JitThrow;
@@ -141,6 +142,46 @@ final class TryCatchHelper
         return true;
     }
 
+    /**
+     * Leave stub ({@see Block::$aotGotoResumeTarget}) runs finally then resumes (#35547).
+     *
+     * @param list<Variable> $args
+     */
+    public static function deferGotoLeaveFromStub(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        Block $resumeTarget,
+        array $args
+    ): bool {
+        if ([] === $context->tryCatch->handlerStack) {
+            return false;
+        }
+        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)];
+        if (null === $handler->finallyOp) {
+            return false;
+        }
+        JitGotoPending::registerDeclarations($context);
+        JitGotoPending::ensureLinked($context);
+        $handler->pendingGotoResumeBlock = $resumeTarget;
+        JitGotoPending::setPending($context);
+        if (null === $handler->gotoResumeBb) {
+            self::gotoResumeBbFor($jit, $func, $context, $handler, $args);
+        }
+        if (!\in_array($handler, $context->tryCatch->pendingGotoResumeWires, true)) {
+            $context->tryCatch->pendingGotoResumeWires[] = $handler;
+        }
+        $builder = $context->builder;
+        $branchBlock = $builder->getInsertBlock();
+        if (null === $branchBlock || null !== $branchBlock->getTerminator()) {
+            $branchBlock = self::appendBlock($func, 'goto_leave_stub_'.self::blockSuffix($handler));
+            $builder->positionAtEnd($branchBlock);
+        }
+        $builder->branch(self::finallyBbFor($jit, $func, $context, $handler, $args, false));
+
+        return true;
+    }
+
     public static function beginTry(
         \PHPCompiler\JIT $jit,
         Function_ $func,
@@ -154,6 +195,8 @@ final class TryCatchHelper
         JitThrow::ensureLinked($context);
         JitReturnPending::registerDeclarations($context);
         JitReturnPending::ensureLinked($context);
+        JitGotoPending::registerDeclarations($context);
+        JitGotoPending::ensureLinked($context);
         $mergeBlock = $tryOp->block2;
         if (null === $mergeBlock) {
             throw new \LogicException('TYPE_TRY requires merge block (block2)');
@@ -186,6 +229,7 @@ final class TryCatchHelper
         $builder->positionAtEnd($branchBlock);
         $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
         $builder->call($context->lookupFunction('phpc_jit_clear_return_pending'));
+        $builder->call($context->lookupFunction('phpc_jit_clear_goto_pending'));
         $mergeHeaderBb = $context->scope->blockStorage[$mergeBlock] ?? null;
         if (!$handler->mergeBodyCompiled) {
             if (null === $mergeHeaderBb) {
@@ -241,6 +285,7 @@ final class TryCatchHelper
         // continuation unterminated and sealFunction later emits `ret void` — AOT
         // then exits after a successful `$obj->prop = …` inside try (#28078).
         $tryTail = $jit->compileSubBlock($func, $tryOp->block1, ...$args);
+        // self::wireGotoResumeBb($jit, $func, $context, $handler, $args);
         $tryOp->block1->syntheticCfgBranch = $savedTrySynthetic;
         $elseExit = self::tryBodyTrailingJumpTarget($tryOp->block1);
         $elseEntryBb = null;
@@ -1535,6 +1580,12 @@ final class TryCatchHelper
         $afterReturnCheck = self::appendBlock($func, 'try_finally_after_return_'.self::blockSuffix($handler));
         $builder->branchIf($hasReturnBool, $returnResume, $afterReturnCheck);
         $builder->positionAtEnd($afterReturnCheck);
+        $hasGoto = $builder->call($context->lookupFunction('phpc_jit_has_goto_pending'));
+        $hasGotoBool = $builder->icmp(Builder::INT_NE, $hasGoto, $i32->constInt(0, false));
+        $gotoResume = self::gotoResumeBbFor($jit, $func, $context, $handler, $args);
+        $afterGotoCheck = self::appendBlock($func, 'try_finally_after_goto_'.self::blockSuffix($handler));
+        $builder->branchIf($hasGotoBool, $gotoResume, $afterGotoCheck);
+        $builder->positionAtEnd($afterGotoCheck);
         $hasThrow = $builder->call($context->lookupFunction('phpc_jit_has_throw_pending'));
         $hasThrowBool = $builder->icmp(Builder::INT_NE, $hasThrow, $i32->constInt(0, false));
         $propagate = self::appendBlock($func, 'try_finally_propagate_'.self::blockSuffix($handler));
@@ -1596,6 +1647,134 @@ final class TryCatchHelper
         }
 
         return $resume;
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    private static function gotoResumeBbFor(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler,
+        array $args
+    ): BasicBlock {
+        if (null !== $handler->gotoResumeBb) {
+            return $handler->gotoResumeBb;
+        }
+        $resume = self::appendBlock($func, 'try_goto_resume_'.self::blockSuffix($handler));
+        $handler->gotoResumeBb = $resume;
+
+        return $resume;
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    public static function wirePendingGotoResumes(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        array $args
+    ): void {
+        foreach ($context->tryCatch->pendingGotoResumeWires as $handler) {
+            if (null !== $handler->pendingGotoResumeBlock) {
+                $jit->jitBranchEntryForCfg($handler->pendingGotoResumeBlock, $func);
+            }
+            $jit->jitBranchEntryForCfg($handler->mergeBlock, $func);
+            self::wireGotoResumeBb($jit, $func, $context, $handler, $args);
+            self::wireGotoResumeBbToMerge($func, $context, $handler);
+        }
+        $context->tryCatch->pendingGotoResumeWires = [];
+    }
+
+    private static function gotoResumeBbIsOpen(Context $context, TryCatchHandler $handler): bool
+    {
+        if (null === $handler->gotoResumeBb) {
+            return false;
+        }
+        $term = $handler->gotoResumeBb->getTerminator();
+        if (null === $term) {
+            return true;
+        }
+
+        return BasicBlockHelper::isPrematureVoidReturn($context, $term);
+    }
+
+    private static function clearGotoResumeBbTerminator(Context $context, TryCatchHandler $handler): void
+    {
+        if (null === $handler->gotoResumeBb) {
+            return;
+        }
+        $term = $handler->gotoResumeBb->getTerminator();
+        if (null === $term || !BasicBlockHelper::isPrematureVoidReturn($context, $term)) {
+            return;
+        }
+        try {
+            $term->eraseFromParent();
+        } catch (\Throwable) {
+        }
+    }
+
+    private static function wireGotoResumeBbToMerge(
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler
+    ): void {
+        if (!self::gotoResumeBbIsOpen($context, $handler)) {
+            return;
+        }
+        $mergeBb = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
+        if (null === $mergeBb) {
+            return;
+        }
+        self::clearGotoResumeBbTerminator($context, $handler);
+        $builder = $context->builder;
+        $saved = $builder->getInsertBlock();
+        $builder->positionAtEnd($handler->gotoResumeBb);
+        $builder->call($context->lookupFunction('phpc_jit_clear_goto_pending'));
+        $builder->branch($mergeBb);
+        if (null !== $saved) {
+            BasicBlockHelper::restoreInsertBlock($context, $saved);
+        }
+    }
+
+    /**
+     * @param list<Variable> $args
+     *
+     * @return bool true when wired
+     */
+    private static function wireGotoResumeBb(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler,
+        array $args
+    ): bool {
+        if (null === $handler->gotoResumeBb || null === $handler->pendingGotoResumeBlock) {
+            return false;
+        }
+        if (!self::gotoResumeBbIsOpen($context, $handler)) {
+            return null !== $handler->gotoResumeBb->getTerminator();
+        }
+        $target = $handler->pendingGotoResumeBlock;
+        $resumeEntry = $context->scope->blockStorage[$target]
+            ?? $context->scope->blockEntryStorage[$target]
+            ?? null;
+        if (null === $resumeEntry) {
+            $resumeEntry = $jit->jitBranchEntryForCfg($target, $func);
+        }
+        self::clearGotoResumeBbTerminator($context, $handler);
+        $builder = $context->builder;
+        $saved = $builder->getInsertBlock();
+        $builder->positionAtEnd($handler->gotoResumeBb);
+        $builder->call($context->lookupFunction('phpc_jit_clear_goto_pending'));
+        $builder->branch($resumeEntry);
+        if (null !== $saved) {
+            BasicBlockHelper::restoreInsertBlock($context, $saved);
+        }
+
+        return true;
     }
 
     private static function blockSuffix(TryCatchHandler $handler): string
@@ -1701,6 +1880,10 @@ final class TryCatchHandler
     public ?BasicBlock $finallyEpilogueBb = null;
 
     public ?BasicBlock $returnResumeBb = null;
+
+    public ?BasicBlock $gotoResumeBb = null;
+
+    public ?Block $pendingGotoResumeBlock = null;
 
     /**
      * @param list<array{op: OpCode, catchTypes: list<string>}> $catchArms

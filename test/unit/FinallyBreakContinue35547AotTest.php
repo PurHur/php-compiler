@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * AOT: continue in try must still run finally (#35547 / re-#25240).
+ * AOT: break/continue in try must still run finally (#35547 / re-#25240).
  *
  * @group llvm
  */
@@ -51,6 +51,33 @@ PHP;
         $repro = $this->repoRoot.'/test/repro/issue_35547_aot_finally_continue.php';
         $this->assertFileExists($repro);
         $this->assertAotFileOutput($repro, "B0F0F1B2F2\n");
+    }
+
+    public function testBreakInTryFinallyMatchesZend(): void
+    {
+        $src = <<<'PHP'
+<?php
+$out = '';
+for ($i = 0; $i < 3; $i++) {
+    try {
+        $out .= 'B'.$i;
+        if ($i === 1) {
+            break;
+        }
+    } finally {
+        $out .= 'F'.$i;
+    }
+}
+echo $out, "\n";
+PHP;
+        $this->assertAotSourceOutput($src, "B0F0B1F1\n");
+    }
+
+    public function testBreakReproFileMatchesZend(): void
+    {
+        $repro = $this->repoRoot.'/test/repro/issue_35547_aot_finally_break.php';
+        $this->assertFileExists($repro);
+        $this->assertAotFileOutput($repro, "B0F0B1F1\n");
     }
 
     private function assertAotSourceOutput(string $source, string $expected): void
