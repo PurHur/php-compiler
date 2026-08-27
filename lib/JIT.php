@@ -13917,6 +13917,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $callArgs
                     );
+                    $this->propagateDomAppendChildCompileTimeTag(
+                        $block->getOperand($op->arg1),
+                        $callArgs
+                    );
                     $this->propagateDomCreateDocumentTypeCompileTimeTag(
                         $block->getOperand($op->arg1)
                     );
@@ -16858,6 +16862,63 @@ class JIT {
             $inner = htmlspecialchars($valueArg->compileTimeString, ENT_QUOTES | ENT_XML1, 'UTF-8');
         }
         $resultVar->compileTimeDomInnerXml = $inner;
+    }
+
+    /**
+     * appendChild() returns the child — copy compile-time DOM metadata onto the result CV
+     * so cloneNode (and peers) see createElement tags after `$e = $d->appendChild(...)` (#35373).
+     *
+     * DomNodeAppendChild / DomDocumentAppendChild re-box the child object without preserving
+     * Variable metadata; without this stamp, thin-AOT cloneNode aborts requiring loadXML.
+     *
+     * php-src: ext/dom/node.c — dom_node_append_child returns the appended node.
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private function propagateDomAppendChildCompileTimeTag(Operand $result, array $callArgs): void
+    {
+        $toCall = $this->context->scope->toCall;
+        if (!(
+            $toCall instanceof JIT\Call\DomNodeAppendChild
+            || $toCall instanceof JIT\Call\DomDocumentAppendChild
+        )) {
+            return;
+        }
+        $child = $callArgs[1] ?? null;
+        if (!$child instanceof Variable) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $this->syncCompileTimeDomTagName($resultVar, $child, false);
+        if (null !== $child->classUserType) {
+            $resultVar->classUserType = $child->classUserType;
+        } elseif (
+            null !== $child->compileTimeDomTagName
+            && '' !== $child->compileTimeDomTagName
+            && !str_starts_with((string) $child->compileTimeDomTagName, '#')
+        ) {
+            $resultVar->classUserType = 'DOMElement';
+        }
+        $name = JIT\OperandName::resolve($result);
+        if (null === $name || '' === $name) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (isset($this->context->namedVariableBindings[$resolved])) {
+            $this->syncCompileTimeDomTagName(
+                $this->context->namedVariableBindings[$resolved],
+                $child,
+                false
+            );
+            if (null !== $resultVar->classUserType) {
+                $this->context->namedVariableBindings[$resolved]->classUserType =
+                    $resultVar->classUserType;
+            }
+        }
+        $this->context->bindVariableByName($resolved, $resultVar);
     }
 
     /** Stamp createDocumentType stand-in tag for Document append/insertBefore (#33584). */
