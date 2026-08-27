@@ -11,7 +11,8 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * ZipArchive thin-AOT methods — open / addFromString / close / getFromName (#35424).
+ * ZipArchive thin-AOT methods — open / addFromString / close / getFromName / locateName /
+ * getFromIndex (#35424 / #35437).
  *
  * php-src: ext/zip/php_zip.c
  */
@@ -33,9 +34,11 @@ final class ZipArchiveMethod implements Call
             'open' => JitZipArchive::open($context, ...$args),
             'addfromstring' => JitZipArchive::addFromString($context, ...$args),
             'getfromname' => JitZipArchive::getFromName($context, ...$args),
+            'locatename' => JitZipArchive::locateName($context, ...$args),
+            'getfromindex' => JitZipArchive::getFromIndex($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35437)'
             ),
         };
     }

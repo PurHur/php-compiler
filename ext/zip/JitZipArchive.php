@@ -20,7 +20,8 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for ZipArchive open/addFromString/close/getFromName (#35424).
+ * LLVM lowering for ZipArchive open/addFromString/close/getFromName/locateName/getFromIndex
+ * (#35424 / #35437).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -275,6 +276,133 @@ final class JitZipArchive
         $okBlock = BasicBlockHelper::append($context, 'zip_gfn_ok_'.$id);
         $missBlock = BasicBlockHelper::append($context, 'zip_gfn_miss_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'zip_gfn_done_'.$id);
+        $context->builder->branchIf($isFound, $okBlock, $missBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $okSlot = JitValueBox::alloc($context);
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $okPtr,
+            $data
+        );
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $missSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $missSlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $missPtr = JitValueBox::pointer($context, $missSlot);
+        $missTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($valuePtrTy);
+        $phi->addIncoming($okPtr, $okTail);
+        $phi->addIncoming($missPtr, $missTail);
+
+        return $phi;
+    }
+
+    public static function locateName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::locateName', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::locateName',
+            0,
+            'name'
+        );
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        $idx = self::execLong(
+            $context,
+            'locate',
+            $handle,
+            $i64->constInt(0, false),
+            $name,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        $found = $context->builder->icmp(Builder::INT_SGE, $idx, $i64->constInt(0, false));
+        $id = (string) (++self::$serial);
+        $okBlock = BasicBlockHelper::append($context, 'zip_loc_ok_'.$id);
+        $missBlock = BasicBlockHelper::append($context, 'zip_loc_miss_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_loc_done_'.$id);
+        $context->builder->branchIf($found, $okBlock, $missBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $okSlot = JitValueBox::alloc($context);
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        JitValueBox::writeLong($context, $okSlot, $idx);
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $missSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $missSlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $missPtr = JitValueBox::pointer($context, $missSlot);
+        $missTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($valuePtrTy);
+        $phi->addIncoming($okPtr, $okTail);
+        $phi->addIncoming($missPtr, $missTail);
+
+        return $phi;
+    }
+
+    public static function getFromIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::getFromIndex', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = $context->builder->truncOrBitCast(
+            JitLongArg::lower($context, $args[1], 'ZipArchive::getFromIndex() index'),
+            $context->getTypeFromString('int64')
+        );
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        [$found, $data] = self::execLongAndPayload(
+            $context,
+            'get_index',
+            $handle,
+            $index,
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        $i64 = $context->getTypeFromString('int64');
+        $isFound = $context->builder->icmp(
+            Builder::INT_NE,
+            $found,
+            $i64->constInt(0, false)
+        );
+        $id = (string) (++self::$serial);
+        $okBlock = BasicBlockHelper::append($context, 'zip_gfi_ok_'.$id);
+        $missBlock = BasicBlockHelper::append($context, 'zip_gfi_miss_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_gfi_done_'.$id);
         $context->builder->branchIf($isFound, $okBlock, $missBlock);
 
         $context->builder->positionAtEnd($okBlock);

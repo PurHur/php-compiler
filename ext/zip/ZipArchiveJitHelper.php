@@ -13,7 +13,8 @@ namespace PHPCompiler\ext\zip;
  * Result encoding: 4-byte LE int32 + optional payload (get/close). Int returns via
  * NestedJIT arrive as ptrtoint of __value__ boxes, so the ABI is string-packed.
  *
- * php-src: ext/zip/php_zip.c — zim_ZipArchive_open / addFromString / close / getFromName
+ * php-src: ext/zip/php_zip.c — zim_ZipArchive_open / addFromString / close / getFromName /
+ * locateName / getFromIndex
  */
 final class ZipArchiveJitHelper
 {
@@ -99,6 +100,28 @@ final class ZipArchiveJitHelper
 
                 return self::pack(0);
             }
+
+            return self::packPayload(1, self::$h1data);
+        }
+        if ('locate' === $op) {
+            // Index of single-entry archive when name matches (#35437).
+            if (1 !== self::$h1open || '' === $s1 || $s1 !== self::$h1name) {
+                self::$h1status = 9;
+
+                return self::pack(-1);
+            }
+            self::$h1status = 0;
+
+            return self::pack(0);
+        }
+        if ('get_index' === $op) {
+            // Only index 0 is populated in the single-entry slot (#35437). $b = index.
+            if (1 !== self::$h1open || 0 !== $b || '' === self::$h1name) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            self::$h1status = 0;
 
             return self::packPayload(1, self::$h1data);
         }
