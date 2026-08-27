@@ -16898,9 +16898,6 @@ class JIT {
         if (!$child instanceof Variable) {
             return;
         }
-        if (!$this->context->hasVariableOp($result)) {
-            return;
-        }
         // ARG_SEND temps for firstChild/item() often drop compileTimeDom* (#32903).
         // Recover lastFetched* before syncing mutation returns so later cloneNode does
         // not fall through to documentElement (#35421 / #35425).
@@ -16924,6 +16921,22 @@ class JIT {
                     ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeChildIndex;
             }
         }
+        // createElement trees (no loadXML): keep parent compileTimeDomInnerXml in sync so
+        // firstChild/lastChild annotate can stamp tags for cloneNode (#35461).
+        // Must run even when the call result Operand is unused / untracked.
+        if (
+            $toCall instanceof JIT\Call\DomNodeAppendChild
+            || $toCall instanceof JIT\Call\DomDocumentAppendChild
+            || $toCall instanceof JIT\Call\DomNodeInsertBefore
+        ) {
+            $parent = $callArgs[0] ?? null;
+            if ($parent instanceof Variable) {
+                $this->appendCompileTimeDomInnerXmlChild($parent, $child);
+            }
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
         $resultVar = $this->context->getVariableFromOp($result);
         // Force-sync present child metadata (result is a fresh box of the same node).
         $this->syncCompileTimeDomTagName($resultVar, $child, true);
@@ -16941,6 +16954,51 @@ class JIT {
         if ($toCall instanceof JIT\Call\DomNodeReplaceChild) {
             $resultVar->compileTimeDomAttributes = null;
         }
+    }
+
+    /**
+     * Append one child's outer markup onto the parent's compile-time InnerXml (#35461).
+     *
+     * Used when there is no loadXML SSOT (createElement + appendChild/insertBefore trees)
+     * so {@see \PHPCompiler\ext\dom\JitDomNodeChildProperty} can stamp firstChild tags.
+     */
+    private function appendCompileTimeDomInnerXmlChild(Variable $parent, Variable $child): void
+    {
+        $tag = $child->compileTimeDomTagName;
+        if (null === $tag || '' === $tag) {
+            return;
+        }
+        if ('#text' === $tag || '#cdata-section' === $tag) {
+            $parent->compileTimeDomInnerXml = ($parent->compileTimeDomInnerXml ?? '')
+                .($child->compileTimeDomTextData ?? '');
+
+            return;
+        }
+        if ('#comment' === $tag) {
+            $parent->compileTimeDomInnerXml = ($parent->compileTimeDomInnerXml ?? '')
+                .'<!--'.($child->compileTimeDomTextData ?? '').'-->';
+
+            return;
+        }
+        if (str_starts_with($tag, '#')) {
+            return;
+        }
+        $attrs = '';
+        $attrMap = $child->compileTimeDomAttributes;
+        if (null === $attrMap || [] === $attrMap) {
+            $id = $child->compileTimeDomElementId
+                ?? \PHPCompiler\ext\dom\JitDomCreateElementAttrs::lastId();
+            if (null !== $id) {
+                $attrMap = \PHPCompiler\ext\dom\JitDomCreateElementAttrs::get($id);
+            }
+        }
+        if (null !== $attrMap && [] !== $attrMap) {
+            $attrs = \PHPCompiler\ext\dom\JitDomCreateElementAttrs::formatSuffix($attrMap);
+        }
+        $inner = $child->compileTimeDomInnerXml ?? '';
+        $openAttrs = '' === $attrs ? '' : (str_starts_with($attrs, ' ') ? $attrs : ' '.$attrs);
+        $markup = '<'.$tag.$openAttrs.'>'.$inner.'</'.$tag.'>';
+        $parent->compileTimeDomInnerXml = ($parent->compileTimeDomInnerXml ?? '').$markup;
     }
 
     /** Stamp createDocumentType stand-in tag for Document append/insertBefore (#33584). */
