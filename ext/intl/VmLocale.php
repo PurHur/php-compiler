@@ -18,6 +18,25 @@ final class VmLocale
     /** php-src INTL_MAX_LOCALE_LEN = ULOC_FULLNAME_CAPACITY - 1 */
     private const MAX_LOCALE_LEN = 156;
 
+    /** ULOC_ACTUAL_LOCALE — php-src Locale::ACTUAL_LOCALE (unicode/uloc.h). */
+    public const ACTUAL_LOCALE = 0;
+
+    /** ULOC_VALID_LOCALE — php-src Locale::VALID_LOCALE (unicode/uloc.h). */
+    public const VALID_LOCALE = 1;
+
+    /**
+     * Locale::* class constants for VM ClassEntry + thin AOT ClassConstFetch (#35416).
+     *
+     * @return array<string, int>
+     */
+    public static function classConstants(): array
+    {
+        return [
+            'ACTUAL_LOCALE' => self::ACTUAL_LOCALE,
+            'VALID_LOCALE' => self::VALID_LOCALE,
+        ];
+    }
+
     /** @var array<string, true> ICU RTL scripts used by uloc_isRightToLeft fallback (#20927) */
     private const RTL_SCRIPTS = [
         'Arab' => true,
