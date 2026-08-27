@@ -1183,8 +1183,14 @@ final class JitDomAttributeNodeNS
                 if ('' !== $valueLit) {
                     JitDomLoadXMLUserScript::storeElementInIdMap($context, $document, $valueLit, $element);
                 }
-                // Only retarget the single-slot cache when it holds this receiver (#35321).
-                DomUserScriptElementCacheLlvm::rebindIdIfElement($context, $element, $valueLit);
+                // Retarget single-slot cache when receiver matches, or oldId matches cached
+                // id (loadHTML getElementById pointer mismatch; #35329 / re-#19870).
+                DomUserScriptElementCacheLlvm::rebindIdIfElement(
+                    $context,
+                    $element,
+                    $valueLit,
+                    $oldIdLit
+                );
                 JitDomSetIdAttribute::rememberSetAttributeIdValue($valueLit);
                 if (null !== $args[0]->compileTimeDomAttributes) {
                     $args[0]->compileTimeDomAttributes['id'] = $valueLit;
