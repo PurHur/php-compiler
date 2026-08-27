@@ -2233,6 +2233,7 @@ class Context {
             'setMtimeIndex',
             'setArchiveFlag',
             'getArchiveFlag',
+            'clearError',
         ] as $zipMethod) {
             $this->functionProxies['ziparchive::'.strtolower($zipMethod)] = new Call\ZipArchiveMethod(
                 $zipMethod
