@@ -2659,6 +2659,144 @@ final class JitZipArchive
     }
 
     /**
+     * ZipArchive::addGlob — NestedJIT ag + agp path list (#35537 leftover of #35531 / #20387).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_addGlob
+     * Options array ignored in NestedJIT honest subset (empty options).
+     */
+    public static function addGlob(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::addGlob', 1, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $pattern = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::addGlob',
+            0,
+            'pattern'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $flags = $i64->constInt(0, false);
+        if (isset($args[2])) {
+            $flags = JitLongArg::lower($context, $args[2], 'ZipArchive::addGlob(): Argument #2 ($flags)');
+            if ($flags->typeOf() !== $i64) {
+                $flags = $context->builder->sext($flags, $i64);
+            }
+        }
+        $strMap = $context->structFieldMap['__string__'];
+        $patLen = $context->builder->load(
+            $context->builder->structGep($pattern, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $patLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_ag_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_ag_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::addGlob(): Argument #1 ($pattern) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $n = self::execLong(
+            $context,
+            'ag',
+            $flags,
+            $zero,
+            $pattern,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxPathListOrFalse($context, $n);
+    }
+
+    /**
+     * ZipArchive::addPattern — NestedJIT ap/aps + agp path list (#35537 leftover of #35531 / #20387).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_addPattern
+     * Options array ignored in NestedJIT honest subset (empty options).
+     */
+    public static function addPattern(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::addPattern', 1, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $pattern = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::addPattern',
+            0,
+            'pattern'
+        );
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $path = $empty;
+        if (isset($args[2])) {
+            $path = JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[2],
+                'ZipArchive::addPattern',
+                1,
+                'path'
+            );
+        } else {
+            // Default "." — php-src / VmZipArchive.
+            $path = $context->builder->load($context->constantStringFromString('.'));
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $strMap = $context->structFieldMap['__string__'];
+        $patLen = $context->builder->load(
+            $context->builder->structGep($pattern, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $patLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_ap_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_ap_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::addPattern(): Argument #1 ($pattern) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        $matchArg = $pattern;
+        $op = 'ap';
+        // NestedJIT preg_match returns false on some escaped /…$/ forms; peel compile-time
+        // anchored suffix literals to NestedJIT `aps` (str_ends_with) (#35537).
+        $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
+        if (\is_string($lit) && 1 === \preg_match('~^/((?:\\\\.|[^/$\\\\])+)\\$/[a-zA-Z]*$~', $lit, $mm)) {
+            $op = 'aps';
+            $suffix = \stripcslashes($mm[1]);
+            $matchArg = $context->builder->load($context->constantStringFromString($suffix));
+        }
+        $n = self::execLong(
+            $context,
+            $op,
+            $zero,
+            $zero,
+            $matchArg,
+            $path
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxPathListOrFalse($context, $n);
+    }
+
+    /**
      * ZipArchive::isCompressionMethodSupported — static pure IR (#35498 leftover of #35478 / #20363).
      *
      * php-src: ext/zip/php_zip.c — zim_ZipArchive_isCompressionMethodSupported
@@ -3207,6 +3345,108 @@ final class JitZipArchive
         $phi = $context->builder->phi($valuePtrTy);
         $phi->addIncoming($okPtr, $okTail);
         $phi->addIncoming($missPtr, $missTail);
+
+        return $phi;
+    }
+
+    /**
+     * Materialize addGlob/addPattern path list via NestedJIT agp fetches, or false (#35537).
+     *
+     * rc == -1 → false; else rc is count (0..2) and each path is fetched with agp.
+     */
+    private static function boxPathListOrFalse(Context $context, Value $rcI64): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $isFalse = $context->builder->icmp(
+            Builder::INT_EQ,
+            $rcI64,
+            $i64->constInt(ZipArchiveJitHelper::ADDPATHS_FALSE_RC, true)
+        );
+        $id = (string) (++self::$serial);
+        $falseBlock = BasicBlockHelper::append($context, 'zip_paths_false_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_paths_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_paths_done_'.$id);
+        $context->builder->branchIf($isFalse, $falseBlock, $okBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $falseSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $falseSlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $falsePtr = JitValueBox::pointer($context, $falseSlot);
+        $falseTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $setStringAt = $context->lookupFunction('__hashtable__setStringAt');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $is1 = $context->builder->icmp(Builder::INT_SGE, $rcI64, $i64->constInt(1, false));
+        $has1 = BasicBlockHelper::append($context, 'zip_paths_has1_'.$id);
+        $after1 = BasicBlockHelper::append($context, 'zip_paths_after1_'.$id);
+        $context->builder->branchIf($is1, $has1, $after1);
+
+        $context->builder->positionAtEnd($has1);
+        [, $str0] = self::execLongAndPayload(
+            $context,
+            'agp',
+            $i64->constInt(0, false),
+            $zero,
+            $empty,
+            $empty
+        );
+        $context->builder->call(
+            $setStringAt,
+            $ht,
+            $context->builder->pointerCast($i64->constInt(0, false), $sizeT),
+            $str0
+        );
+        $context->builder->branch($after1);
+
+        $context->builder->positionAtEnd($after1);
+        $is2 = $context->builder->icmp(Builder::INT_SGE, $rcI64, $i64->constInt(2, false));
+        $has2 = BasicBlockHelper::append($context, 'zip_paths_has2_'.$id);
+        $after2 = BasicBlockHelper::append($context, 'zip_paths_after2_'.$id);
+        $context->builder->branchIf($is2, $has2, $after2);
+
+        $context->builder->positionAtEnd($has2);
+        [, $str1] = self::execLongAndPayload(
+            $context,
+            'agp',
+            $i64->constInt(1, false),
+            $zero,
+            $empty,
+            $empty
+        );
+        $context->builder->call(
+            $setStringAt,
+            $ht,
+            $context->builder->pointerCast($i64->constInt(1, false), $sizeT),
+            $str1
+        );
+        $context->builder->branch($after2);
+
+        $context->builder->positionAtEnd($after2);
+        $okSlot = JitValueBox::alloc($context);
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $okPtr,
+            $ht
+        );
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($valuePtrTy);
+        $phi->addIncoming($falsePtr, $falseTail);
+        $phi->addIncoming($okPtr, $okTail);
 
         return $phi;
     }

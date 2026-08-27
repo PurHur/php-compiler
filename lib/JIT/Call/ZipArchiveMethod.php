@@ -15,11 +15,11 @@ use PHPLLVM\Value;
  * extract / status / count / writable / archive comment / entry comment / unchange / replaceFile /
  * isCompressionMethodSupported / isEncryptionMethodSupported / setPassword / setCompression* /
  * setEncryption* / setExternalAttributes* / statName / statIndex / setMtimeName / setMtimeIndex /
- * setArchiveFlag / getArchiveFlag / clearError / getStream* / registerProgressCallback /
- * registerCancelCallback
+ * setArchiveFlag / getArchiveFlag / clearError / getStream* / addGlob / addPattern /
+ * registerProgressCallback / registerCancelCallback
  * (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35465 / #35466 / #35467 / #35472 /
  * #35476 / #35478 / #35486 / #35489 / #35491 / #35496 / #35498 / #35500 / #35503 / #35504 /
- * #35506 / #35508 / #35515 / #35522 / #35531 / #35534 / #35539).
+ * #35506 / #35508 / #35515 / #35522 / #35531 / #35534 / #35537 / #35539).
  *
  * php-src: ext/zip/php_zip.c
  */
@@ -66,6 +66,10 @@ final class ZipArchiveMethod implements Call
             $this->paramNames = ['flag', 'value'];
         } elseif ('getarchiveflag' === $lc) {
             $this->paramNames = ['flag', 'flags='];
+        } elseif ('addglob' === $lc) {
+            $this->paramNames = ['pattern', 'flags=', 'options='];
+        } elseif ('addpattern' === $lc) {
+            $this->paramNames = ['pattern', 'path=', 'options='];
         } elseif ('registerprogresscallback' === $lc) {
             $this->paramNames = ['rate', 'callback'];
         } elseif ('registercancelcallback' === $lc) {
@@ -130,11 +134,13 @@ final class ZipArchiveMethod implements Call
             'getstream' => JitZipArchive::getStream($context, ...$args),
             'getstreamindex' => JitZipArchive::getStreamIndex($context, ...$args),
             'getstreamname' => JitZipArchive::getStreamName($context, ...$args),
+            'addglob' => JitZipArchive::addGlob($context, ...$args),
+            'addpattern' => JitZipArchive::addPattern($context, ...$args),
             'registerprogresscallback' => JitZipArchive::registerProgressCallback($context, ...$args),
             'registercancelcallback' => JitZipArchive::registerCancelCallback($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35531/#35534/#35539)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35531/#35534/#35537/#35539)'
             ),
         };
     }

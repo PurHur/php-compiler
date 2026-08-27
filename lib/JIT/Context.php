@@ -2237,6 +2237,8 @@ class Context {
             'getStream',
             'getStreamIndex',
             'getStreamName',
+            'addGlob',
+            'addPattern',
             'registerProgressCallback',
             'registerCancelCallback',
         ] as $zipMethod) {
