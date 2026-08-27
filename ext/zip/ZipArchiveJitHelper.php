@@ -7,8 +7,9 @@ namespace PHPCompiler\ext\zip;
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
  * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500 /
- * #35504 / #35506 / #35503 / #35508) — CREATE/add/close/get/locate/index/rename/delete/extract/status/count/
- * archive-comment/entry-comment/unchange/replaceFile/setPassword/stat/setCompression/setEncryption/setMtime path.
+ * #35504 / #35506 / #35503 / #35508 / #35515 / #35522) — CREATE/add/close/get/locate/index/rename/delete/
+ * extract/status/count/archive-comment/entry-comment/unchange/replaceFile/setPassword/stat/
+ * setCompression/setEncryption/setMtime/setExternalAttributes/setArchiveFlag path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -22,7 +23,8 @@ namespace PHPCompiler\ext\zip;
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
  * unchangeName / replaceFile / setPassword / setCompressionName / setCompressionIndex /
- * setEncryptionName / setEncryptionIndex / statName / statIndex / setMtimeName / setMtimeIndex)
+ * setEncryptionName / setEncryptionIndex / setExternalAttributesName / setExternalAttributesIndex /
+ * statName / statIndex / setMtimeName / setMtimeIndex / setArchiveFlag / getArchiveFlag)
  */
 final class ZipArchiveJitHelper
 {
@@ -67,6 +69,12 @@ final class ZipArchiveJitHelper
 
     /** AFL_RDONLY-style session flag (#35478). */
     private static int $h1readonly = 0;
+
+    /** Archive AFL_* bitmask (#35522 / zim_ZipArchive_setArchiveFlag). */
+    private static int $h1aflags = 0;
+
+    /** Open-time archive flags for getArchiveFlag(..., FL_UNCHANGED) (#35522). */
+    private static int $h1snap_aflags = 0;
 
     /** Session password for setEncryption* (#35500 / #19873). */
     private static string $h1password = '';
@@ -124,6 +132,8 @@ final class ZipArchiveJitHelper
             self::$h1ecomment2 = '';
             self::$h1status = 0;
             self::$h1readonly = 0;
+            self::$h1aflags = 0;
+            self::$h1snap_aflags = 0;
             self::$h1password = '';
             self::$h1comp = 0;
             self::$h1comp2 = 0;
@@ -159,6 +169,8 @@ final class ZipArchiveJitHelper
             self::$h1ecomment2 = '';
             self::$h1open = 0;
             self::$h1readonly = 0;
+            self::$h1aflags = 0;
+            self::$h1snap_aflags = 0;
             self::$h1password = '';
             self::$h1comp = 0;
             self::$h1comp2 = 0;
@@ -837,17 +849,89 @@ final class ZipArchiveJitHelper
 
             return self::pack(0 === self::$h1readonly ? 1 : 0);
         }
-        // setReadOnly — $a != 0 ⇒ readonly (#35478).
+        // setReadOnly — $a != 0 ⇒ readonly (#35478); keep AFL_RDONLY bit in sync (#35522).
         if ('set_readonly' === $op) {
             if (1 !== self::$h1open) {
                 self::$h1status = 8;
 
                 return self::pack(0);
             }
-            self::$h1readonly = 0 !== $a ? 1 : 0;
+            if (0 !== $a) {
+                self::$h1readonly = 1;
+                self::$h1aflags = self::$h1aflags | 2;
+            } else {
+                self::$h1readonly = 0;
+                self::$h1aflags = self::$h1aflags & ~2;
+            }
             self::$h1status = 0;
 
             return self::pack(1);
+        }
+        // setArchiveFlag / getArchiveFlag — AFL_* bits (#35522 / #21831).
+        // $a = flag; $b = value (saf) or FL_* (gaf). Known flags: 2/4/8/16.
+        if ('saf' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            $known = false;
+            if (2 === $a) {
+                $known = true;
+            } elseif (4 === $a) {
+                $known = true;
+            } elseif (8 === $a) {
+                $known = true;
+            } elseif (16 === $a) {
+                $known = true;
+            }
+            if (!$known) {
+                self::$h1status = 18;
+
+                return self::pack(0);
+            }
+            if (0 === $b) {
+                if (2 === $a) {
+                    $has = self::$h1aflags & 2;
+                    if (0 !== $has) {
+                        self::$h1status = 18;
+
+                        return self::pack(0);
+                    }
+                }
+                self::$h1aflags = self::$h1aflags & ~$a;
+                if (2 === $a) {
+                    self::$h1readonly = 0;
+                }
+            } else {
+                self::$h1aflags = self::$h1aflags | $a;
+                if (2 === $a) {
+                    self::$h1readonly = 1;
+                }
+            }
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        if ('gaf' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            $unchanged = $b & 8;
+            if (0 !== $unchanged) {
+                $bits = self::$h1snap_aflags;
+            } else {
+                $bits = self::$h1aflags;
+            }
+            self::$h1status = 0;
+            $masked = $bits & $a;
+            if (0 !== $masked) {
+                return self::pack(1);
+            }
+
+            return self::pack(0);
         }
         // unchangeAll — restore open snapshot (#35489 leftover of #35486 / #20387).
         if ('ua' === $op) {
@@ -1228,6 +1312,7 @@ final class ZipArchiveJitHelper
         self::$h1snap_comment = self::$h1comment;
         self::$h1snap_ecomment = self::$h1ecomment;
         self::$h1snap_ecomment2 = self::$h1ecomment2;
+        self::$h1snap_aflags = self::$h1aflags;
     }
 
     /**
