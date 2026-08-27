@@ -163,6 +163,40 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMDocument::save() — write saveXML() bytes to $filename (#35546 / #18435, php-src php_dom.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function save(ObjectEntry $document, array $extra): Variable
+    {
+        self::requireExtraArgCountRange('DOMDocument::save', $extra, 1, 2);
+        $filename = self::stringArg(
+            $extra[0] ?? self::missingArg('save', 0),
+            'DOMDocument::save',
+            0,
+            'filename'
+        );
+        $options = 0;
+        if (isset($extra[1])) {
+            $options = VmMath::parseZParamLongBuiltinArg(
+                $extra[1],
+                'DOMDocument::save',
+                2,
+                'options'
+            );
+        }
+        $result = VmDom::save($document, $filename, $options, null);
+        $var = new Variable();
+        if (false === $result) {
+            $var->bool(false);
+        } else {
+            $var->int($result);
+        }
+
+        return $var;
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function getElementById(ObjectEntry $document, array $extra): Variable

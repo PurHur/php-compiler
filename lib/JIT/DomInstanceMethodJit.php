@@ -82,6 +82,8 @@ final class DomInstanceMethodJit
         'domdocument::savexml' => true,
         'domdocument::savehtml' => true,
         'domdocument::savehtmlfile' => true,
+        // DOMDocument::save — must not ExternalMethod-null (#35546 leftover of #18435 / #35540).
+        'domdocument::save' => true,
         // Validation / xinclude / registerNodeClass — must not ExternalMethod-null (#35540).
         'domdocument::validate' => true,
         'domdocument::schemavalidate' => true,
@@ -699,6 +701,12 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domdocument::save' === $lc) {
+                // Dedicated NestedJIT — VmDomInstanceInvoke aborts under thin AOT (#35546).
+                $context->functionProxies[$lc] = new Call\DomDocumentSave();
+
+                return;
+            }
             if ('domdocument::getelementsbytagname' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentGetElementsByTagName();
 
@@ -1267,6 +1275,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::savexml');
             self::ensureProxy($context, 'domdocument::savehtml');
             self::ensureProxy($context, 'domdocument::savehtmlfile');
+            self::ensureProxy($context, 'domdocument::save');
             self::ensureProxy($context, 'domdocument::validate');
             self::ensureProxy($context, 'domdocument::schemavalidate');
             self::ensureProxy($context, 'domdocument::schemavalidatesource');

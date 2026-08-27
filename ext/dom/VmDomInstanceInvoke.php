@@ -70,6 +70,8 @@ final class VmDomInstanceInvoke
             'loadxml' => VmDomJitDispatch::loadXML($ctx, $self, $extra),
             'load' => VmDomJitDispatch::load($ctx, $self, $extra),
             'savexml' => VmDomJitDispatch::saveXML($self, $extra),
+            // DOMDocument::save — must not ExternalMethod-null under thin AOT (#35546 / #18435).
+            'save' => VmDomJitDispatch::save($self, $extra),
             'getelementbyid' => VmDomJitDispatch::getElementById($self, $extra),
             'appendchild' => VmDomJitDispatch::appendChild($ctx, $self, $extra),
             'append' => VmDomJitDispatch::append($ctx, $self, $extra),
