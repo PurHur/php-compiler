@@ -167,12 +167,12 @@ final class JitDomXPathQueryUserScript
 
             return self::boxNodeList($context, 0);
         }
-        [$count, $text] = $matched;
+        [$count, $text, $materializeTag] = $matched + [2 => $tag];
         self::$lastCacheKey = strtolower($tag.'@'.$matches[2].'='.$attrValue.($numeric ? '#n' : ''));
         // Predicate lists keep the first-match element cache; do not use unfiltered nth-tag (#27275).
         self::$lastQueryTag = null;
         DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count, true);
-        $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        $element = JitDomCreateElement::materializeElementWithTextContent($context, $materializeTag, $text);
         $cacheKey = $context->builder->load(
             $context->constantStringFromString(self::$lastCacheKey)
         );
