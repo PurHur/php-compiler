@@ -121,9 +121,10 @@ final class ZipArchiveMethod implements Call
             'getexternalattributesindex' => JitZipArchive::getExternalAttributesIndex($context, ...$args),
             'setarchiveflag' => JitZipArchive::setArchiveFlag($context, ...$args),
             'getarchiveflag' => JitZipArchive::getArchiveFlag($context, ...$args),
+            'clearerror' => JitZipArchive::clearError($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35515/#35522/#35527)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35522/#35527/#35531)'
             ),
         };
     }

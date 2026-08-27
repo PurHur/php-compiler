@@ -790,6 +790,12 @@ final class ZipArchiveJitHelper
 
             return self::pack(0);
         }
+        // clearError — reset h1status to ER_OK (#35531 leftover of #35527 / #20378).
+        if ('ce' === $op) {
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
         if ('status' === $op) {
             return self::pack(self::$h1status);
         }

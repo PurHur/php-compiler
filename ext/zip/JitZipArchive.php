@@ -2440,6 +2440,40 @@ final class JitZipArchive
     }
 
     /**
+     * ZipArchive::clearError — NestedJIT ce (#35531 leftover of #35527 / #20378).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_clearError (void; resets status to ER_OK).
+     */
+    public static function clearError(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::clearError', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        self::execLong(
+            $context,
+            'ce',
+            $handle,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $ptr
+        );
+
+        return $ptr;
+    }
+
+    /**
      * ZipArchive::isCompressionMethodSupported — static pure IR (#35498 leftover of #35478 / #20363).
      *
      * php-src: ext/zip/php_zip.c — zim_ZipArchive_isCompressionMethodSupported
