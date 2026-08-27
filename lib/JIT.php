@@ -16901,11 +16901,38 @@ class JIT {
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
+        // ARG_SEND temps for firstChild/item() often drop compileTimeDom* (#32903).
+        // Recover lastFetched* before syncing mutation returns so later cloneNode does
+        // not fall through to documentElement (#35421 / #35425).
+        if (
+            $toCall instanceof JIT\Call\DomNodeReplaceChild
+            || $toCall instanceof JIT\Call\DomNodeRemoveChild
+            || $toCall instanceof JIT\Call\DomNodeAppendChild
+            || $toCall instanceof JIT\Call\DomNodeInsertBefore
+            || $toCall instanceof JIT\Call\DomDocumentAppendChild
+        ) {
+            if (null === $child->compileTimeDomTagName || '' === $child->compileTimeDomTagName) {
+                $child->compileTimeDomTagName =
+                    \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName
+                    ?? \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedTagName
+                    ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeTagName;
+            }
+            if (null === $child->compileTimeDomChildIndex) {
+                $child->compileTimeDomChildIndex =
+                    \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedChildIndex
+                    ?? \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedChildIndex
+                    ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeChildIndex;
+            }
+        }
         $resultVar = $this->context->getVariableFromOp($result);
         // Force-sync present child metadata (result is a fresh box of the same node).
         $this->syncCompileTimeDomTagName($resultVar, $child, true);
         if (null !== $child->classUserType) {
             $resultVar->classUserType = $child->classUserType;
+        } elseif (null !== $resultVar->compileTimeDomTagName && '' !== $resultVar->compileTimeDomTagName) {
+            // loadXML edge temps may lack classUserType; stamp DOMElement so later
+            // cloneNode stays on the direct DomNodeCloneNode path (#35425).
+            $resultVar->classUserType = 'DOMElement';
         }
         // replaceChild returns oldChild: a non-empty compileTimeDomAttributes snapshot
         // shadows later setAttribute updates that only refresh CreateElementAttrs /
@@ -25366,6 +25393,22 @@ class JIT {
                     return;
                 }
             }
+            // insertBefore on documentElement temps — peer appendChild (#27044 / #35425).
+            // RuntimeIndirect skips propagateDomAppendChildCompileTimeTag so cloneNode on
+            // the return falls through to documentElement after loadXML SSOT refresh.
+            if (
+                'insertbefore' === $methodLcEarly
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::insertbefore');
+                if ($this->context->functionIsRegistered('domnode::insertbefore')) {
+                    $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::insertbefore');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
             // documentElement temps (:object) — Element getElementsByTagName SIGABRT via RuntimeIndirect (#32454).
             if (
                 'getelementsbytagname' === $methodLcEarly
@@ -26237,6 +26280,16 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\document::'.$methodLc);
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::'.$methodLc);
                 }
+                // insertBefore on :object documentElement temps — peer appendChild force-direct
+                // (#28509 / #35425). RuntimeIndirect drops compileTimeDom* on the return so
+                // cloneNode after loadXML move uses stale index / documentElement.
+                if ('insertbefore' === $methodLc && $this->context->functionIsRegistered('domnode::insertbefore')) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::insertbefore');
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::insertbefore');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
                 // `__construct` on typed object: use safe new-construct candidates only —
                 // LimitIteratorConstruct et al. throw while emitting every switch arm (#27302 / #27156).
                 $runtimeCandidates = ('__construct' === $methodLc)
@@ -26608,6 +26661,21 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::appendchild');
             if ($this->context->functionIsRegistered('domnode::appendchild')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::appendchild');
+            } else {
+                $this->context->scope->toCall = $staticProxy;
+            }
+            $this->context->scope->args = [$receiverVar];
+
+            return;
+        }
+        // insertBefore peer of appendChild force-direct (#35425 / #28509).
+        if (
+            'insertbefore' === $methodLc
+            && 'domnode::insertbefore' === strtolower($proxyName)
+        ) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::insertbefore');
+            if ($this->context->functionIsRegistered('domnode::insertbefore')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::insertbefore');
             } else {
                 $this->context->scope->toCall = $staticProxy;
             }

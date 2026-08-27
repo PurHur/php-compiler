@@ -3111,7 +3111,20 @@ class Context {
         if (isset($this->functionScope[$name])) {
             return $this->functionScope[$name];
         }
+        // Lazy libc exit(3)/abort(3) — Type::register no longer always-on ensures (#35428 /
+        // leftover #33267 / peer #35392). ~292 call sites lookup without a nearby ensure.
+        if ('exit' === $name || 'abort' === $name) {
+            LibcExtern::ensureExitAbort($this);
+            if (isset($this->functionScope[$name])) {
+                return $this->functionScope[$name];
+            }
+        }
         throw new \LogicException('Unable to lookup non-existing function ' . $name);
+    }
+
+    /** Scope probe for LibcExtern ensure* without re-entering lookupFunction (#35428). */
+    public function tryGetRegisteredFunction(string $name): ?PHPLLVM\Value\Function_ {
+        return $this->functionScope[$name] ?? null;
     }
 
     public function registerFunction(string $name, PHPLLVM\Value\Function_ $func): void {
