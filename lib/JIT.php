@@ -13110,7 +13110,15 @@ class JIT {
                             $boundThis,
                             $boundScope
                         );
-                        $closureObj->closureCall = new JIT\Call\ClosureWithBinding($callProxy, $boundThis, $boundScope);
+                        // Always tie invoke to this Closure object so $this is reloaded from
+                        // heap slots — never reuse create-time SSA/alloca across returns (#35456).
+                        $closureObj->closureCall = new JIT\Call\ClosureWithBinding(
+                            $callProxy,
+                            $boundThis,
+                            $boundScope,
+                            $closureObj
+                        );
+                        $this->context->lastClosureCallProxy = $closureObj->closureCall;
                     }
                     // Refresh returned-closure map with the final proxy (captures / binding) (#34868).
                     if (null !== $closureObj->closureCall) {

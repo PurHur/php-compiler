@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\ClosureBindHelper;
+use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
@@ -69,7 +70,8 @@ final class ClosureWithBinding implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         if (null !== $this->closureObject) {
-            $obj = $context->helper->loadValue($this->closureObject);
+            // Returned closures are often TYPE_VALUE boxes — loadValue() is wrong for those.
+            $obj = ClosureHelper::loadObjectFromCallable($context, $this->closureObject);
 
             return ClosureBindHelper::wrapCallWithBindingFromObject(
                 $context,
