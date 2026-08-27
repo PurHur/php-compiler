@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\zip;
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
  * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500 /
- * #35504 / #35506 / #35508) — CREATE/add/close/get/locate/index/rename/delete/extract/status/count/
- * archive-comment/entry-comment/unchange/replaceFile/setPassword/stat/setCompression/setMtime path.
+ * #35504 / #35506 / #35503 / #35508) — CREATE/add/close/get/locate/index/rename/delete/extract/status/count/
+ * archive-comment/entry-comment/unchange/replaceFile/setPassword/stat/setCompression/setEncryption/setMtime path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -22,7 +22,7 @@ namespace PHPCompiler\ext\zip;
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
  * unchangeName / replaceFile / setPassword / setCompressionName / setCompressionIndex /
- * statName / statIndex / setMtimeName / setMtimeIndex)
+ * setEncryptionName / setEncryptionIndex / statName / statIndex / setMtimeName / setMtimeIndex)
  */
 final class ZipArchiveJitHelper
 {
@@ -76,6 +76,16 @@ final class ZipArchiveJitHelper
 
     private static int $h1comp2 = 0;
 
+    /** Per-entry encryption_method for slots 0/1 (#35503 / #19873). EM_NONE = 0. */
+    private static int $h1enc = 0;
+
+    private static int $h1enc2 = 0;
+
+    /** Per-entry encryption_password for slots 0/1 (#35503). */
+    private static string $h1encpw = '';
+
+    private static string $h1encpw2 = '';
+
     /** Per-entry unix mtime for slots 0/1 (#35508 / zim_ZipArchive_setMtime*). 0 → time() in packStat. */
     private static int $h1mtime = 0;
 
@@ -108,6 +118,10 @@ final class ZipArchiveJitHelper
             self::$h1password = '';
             self::$h1comp = 0;
             self::$h1comp2 = 0;
+            self::$h1enc = 0;
+            self::$h1enc2 = 0;
+            self::$h1encpw = '';
+            self::$h1encpw2 = '';
             self::$h1mtime = 0;
             self::$h1mtime2 = 0;
             self::snapSave();
@@ -135,6 +149,10 @@ final class ZipArchiveJitHelper
             self::$h1password = '';
             self::$h1comp = 0;
             self::$h1comp2 = 0;
+            self::$h1enc = 0;
+            self::$h1enc2 = 0;
+            self::$h1encpw = '';
+            self::$h1encpw2 = '';
             self::$h1mtime = 0;
             self::$h1mtime2 = 0;
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
@@ -605,6 +623,10 @@ final class ZipArchiveJitHelper
             self::$h1ecomment = '';
             self::$h1ecomment2 = '';
             self::$h1password = '';
+            self::$h1enc = 0;
+            self::$h1enc2 = 0;
+            self::$h1encpw = '';
+            self::$h1encpw2 = '';
             self::$h1comp = 0;
             self::$h1comp2 = 0;
             self::$h1mtime = 0;
@@ -1011,6 +1033,44 @@ final class ZipArchiveJitHelper
 
             return self::pack(0);
         }
+        // setEncryptionIndex — $a=index, $b=method; sei=omit pw, seip=password in $s1 (#35503).
+        // setEncryptionName lowers via locate + sei/seip. Keep branches NestedJIT-safe (peer sci/uci).
+        if ('sei' === $op || 'seip' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            $hasPw = 'seip' === $op;
+            $use = $hasPw ? $s1 : self::$h1password;
+            if (0 === $a && '' !== self::$h1name) {
+                if (0 === $b) {
+                    self::$h1enc = 0;
+                    self::$h1encpw = '';
+                } else {
+                    self::$h1enc = $b;
+                    self::$h1encpw = '' !== $use ? $use : '';
+                }
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                if (0 === $b) {
+                    self::$h1enc2 = 0;
+                    self::$h1encpw2 = '';
+                } else {
+                    self::$h1enc2 = $b;
+                    self::$h1encpw2 = '' !== $use ? $use : '';
+                }
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 4;
+
+            return self::pack(0);
+        }
         // setMtimeName / setMtimeIndex — per-slot unix mtime (#35508 / zim_ZipArchive_setMtime*).
         // Empty name rejected in IR. $b = timestamp; smn uses $s1 name; smi uses $a index.
         if ('smn' === $op) {
@@ -1074,6 +1134,7 @@ final class ZipArchiveJitHelper
             $crc += 0x100000000;
         }
         $comp = 0 === $index ? self::$h1comp : self::$h1comp2;
+        $enc = 0 === $index ? self::$h1enc : self::$h1enc2;
         $mtime = 0 === $index ? self::$h1mtime : self::$h1mtime2;
         if (0 === $mtime) {
             $mtime = time();
@@ -1084,7 +1145,7 @@ final class ZipArchiveJitHelper
             .self::pack($mtime)
             .self::pack($size)
             .self::pack($comp)
-            .self::pack(0)
+            .self::pack($enc)
             .$name;
 
         return self::packPayload(1, $payload);

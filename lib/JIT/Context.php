@@ -2221,6 +2221,8 @@ class Context {
             'setPassword',
             'setCompressionName',
             'setCompressionIndex',
+            'setEncryptionName',
+            'setEncryptionIndex',
             'statName',
             'statIndex',
             'setMtimeName',
