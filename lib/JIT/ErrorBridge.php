@@ -14,6 +14,7 @@ use PHPCompiler\JIT\Builtin\ErrorRaise;
  * readonly property guards use {@see ReadonlyBridge} (#5374).
  * Standalone bodies are lazy via ensureLinked at call sites (#34769 / #35099); Context
  * ensureMinimal and ensureFull no longer eagerly NestedJIT this ABI.
+ * compileToFile clear/abort also rely on emit* self-ensure — no Context ensureLinked (#35443).
  */
 final class ErrorBridge
 {
