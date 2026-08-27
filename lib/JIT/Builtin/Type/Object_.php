@@ -3718,6 +3718,12 @@ class Object_ extends Type {
         if ('collator' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmCollator::classConstants());
         }
+        // Transliterator::create / transliterate Call proxies are linked (#28657); seed
+        // FORWARD/REVERSE so ClassConstFetch folds to compile-time long (#35384 peer of #35379).
+        // Without this, thin AOT raises Undefined constant Transliterator::FORWARD at runtime.
+        if ('transliterator' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmTransliterator::classConstants());
+        }
         // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
         // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
         // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
