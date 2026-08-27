@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 /**
- * ZipArchive NestedJIT helper (#35424 / #35437 / #35440) — CREATE/add/close/get/locate/index path.
+ * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35450) — CREATE/add/close/get/locate/index/rename/delete path.
  *
  * Single concurrent archive slot (scalars, not array tables): NestedJIT aborts on
  * nested-array state / refs. Sequential open→close→reopen matches php-src repros.
@@ -14,7 +14,7 @@ namespace PHPCompiler\ext\zip;
  * NestedJIT arrive as ptrtoint of __value__ boxes, so the ABI is string-packed.
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / close /
- * getFromName / locateName / getFromIndex / getNameIndex)
+ * getFromName / locateName / getFromIndex / getNameIndex / renameName / deleteName)
  */
 final class ZipArchiveJitHelper
 {
@@ -135,6 +135,37 @@ final class ZipArchiveJitHelper
             self::$h1status = 0;
 
             return self::packPayload(1, self::$h1name);
+        }
+        // renameName — single-entry name swap (#35450 leftover of #35424).
+        if ('rename' === $op) {
+            if ('' === $s2) {
+                // Concat (not sprintf) — NestedJIT sprintf+throw breaks module verify (#34625).
+                throw new \ValueError(
+                    'ZipArchive::renameName(): Argument #2 ($new_name) must not be empty'
+                );
+            }
+            if (1 !== self::$h1open || '' === self::$h1name || $s1 !== self::$h1name) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            self::$h1name = $s2;
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        // deleteName — clear the single-entry slot (#35450 leftover of #35424).
+        if ('delete' === $op) {
+            if (1 !== self::$h1open || '' === self::$h1name || '' === $s1 || $s1 !== self::$h1name) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            self::$h1name = '';
+            self::$h1data = '';
+            self::$h1status = 0;
+
+            return self::pack(1);
         }
         if ('close' === $op) {
             if (1 !== self::$h1open) {
