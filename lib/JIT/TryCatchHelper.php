@@ -1418,13 +1418,27 @@ final class TryCatchHelper
         JitReturnPending::registerDeclarations($context);
         JitReturnPending::ensureLinked($context);
         $finallyCfg = $handler->finallyOp->block1;
+        $mergeHeaderBb = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
         $finallyBb = $context->scope->blockStorage[$finallyCfg] ?? null;
-        if (null !== $finallyBb && null !== $handler->mergeBodyLlvmBb && $finallyBb === $handler->mergeBodyLlvmBb) {
+        // Empty `finally {}` often shares the merge CFG block. Reusing try_merge as
+        // finallyBb appends set_return_pending + br after the merge header's
+        // `br try_merge_body` → "Terminator found in the middle of a basic block"
+        // (#35535 / re-#32371). Also reject mergeBody collision (#24105).
+        if (
+            null !== $finallyBb
+            && (
+                $finallyBb === $handler->mergeBodyLlvmBb
+                || $finallyBb === $mergeHeaderBb
+            )
+        ) {
             $finallyBb = null;
         }
         if (null === $finallyBb) {
             $finallyBb = self::appendBlock($func, 'try_finally_body_'.self::blockSuffix($handler));
-            $context->scope->blockStorage[$finallyCfg] = $finallyBb;
+            // Do not overwrite blockStorage[mergeBlock] when finally CFG === merge.
+            if ($finallyCfg !== $handler->mergeBlock) {
+                $context->scope->blockStorage[$finallyCfg] = $finallyBb;
+            }
         }
         $handler->finallyBb = $finallyBb;
         if ($compileBody && !$handler->finallyBodyCompiled) {
@@ -1448,8 +1462,21 @@ final class TryCatchHelper
             return;
         }
         $handler->finallyBodyCompiled = true;
-        $compiledTail = $jit->compileFinallyAtEntry($func, $handler->finallyOp->block1, $handler->finallyBb, ...$args);
         $builder = $context->builder;
+        $finallyCfg = $handler->finallyOp->block1;
+        // Empty `finally {}` shares the try merge CFG block. Compiling that block as the
+        // finally body re-lowers the post-try fallthrough (typed missing-return TypeError
+        // path) under an active finally — deferReturn branches back to finallyBb forever
+        // (#35535). Fall through to the epilogue only.
+        if ($finallyCfg === $handler->mergeBlock) {
+            $builder->positionAtEnd($handler->finallyBb);
+            if (null === $handler->finallyBb->getTerminator()) {
+                $builder->branch(self::finallyEpilogueBbFor($jit, $func, $context, $handler, $args));
+            }
+
+            return;
+        }
+        $compiledTail = $jit->compileFinallyAtEntry($func, $finallyCfg, $handler->finallyBb, ...$args);
         // Prefer the live tail — boxed stores / extra BBs terminate finallyBb itself
         // (`$x+=`, echo helpers). Repositioning at the start then skipped the epilogue
         // branch whenever that entry already had a terminator; sealFunction emitted
