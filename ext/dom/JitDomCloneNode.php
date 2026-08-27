@@ -16,15 +16,16 @@ use PHPLLVM\Value;
  * Thin standalone AOT does not register {@see NodeCloneNode} on :object receivers
  * (firstChild temps lose DOMElement userType). Compile-time loadXML markup is the
  * preferred SSOT; createElement + appendChild trees use {@see compileTimeDomTagName}
- * / {@see compileTimeDomInnerXml} instead (#35361). NestedJIT DomRegistry clone would
- * SIGSEGV on the returned object like importNode before the user-script materialize
- * path (#19212).
+ * / {@see compileTimeDomInnerXml} instead (#35361). appendChild()'s DOMNode return must
+ * propagate that metadata ({@see JIT::propagateDomAppendChildCompileTimeTag}, #35373)
+ * or cloneNode still aborts. NestedJIT DomRegistry clone would SIGSEGV on the returned
+ * object like importNode before the user-script materialize path (#19212).
  *
  * Materialize stores InnerXml for saveXML (#32355) and seeds LiveSlots via
  * {@see JitDomDocumentElement::syncChildrenFromXmlPublic} so firstChild walks
  * on the clone do not SIGSEGV (#32949).
  *
- * php-src: ext/dom/node.c php_dom_clone_node → xmlDocCopyNode (#32355, #32949, #35361)
+ * php-src: ext/dom/node.c php_dom_clone_node → xmlDocCopyNode (#32355, #32949, #35361, #35373)
  */
 final class JitDomCloneNode
 {
