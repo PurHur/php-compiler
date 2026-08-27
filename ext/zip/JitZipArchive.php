@@ -21,7 +21,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for ZipArchive open/add/close/get/locate/index/extract (#35424 / #35437 / #35440 / #35449 / #35465 / #35467).
+ * LLVM lowering for ZipArchive open/add/close/get/locate/index/extract (#35424 / #35437 / #35440 / #35449 / #35465 / #35467 / #35473).
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_*
  */
@@ -641,6 +641,41 @@ final class JitZipArchive
             $handle,
             $context->getTypeFromString('int64')->constInt(0, false),
             $name,
+            $newName
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /** ZipArchive::renameIndex — NestedJIT rename_index for slots 0/1 (#35473 leftover of #35450). */
+    public static function renameIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::renameIndex', 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower($context, $args[1], 'ZipArchive::renameIndex(): Argument #1 ($index)');
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        $newName = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[2],
+            'ZipArchive::renameIndex',
+            1,
+            'new_name'
+        );
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'rename_index',
+            $index,
+            $i64->constInt(0, false),
+            $empty,
             $newName
         );
         self::syncProps($context, $obj, $handle);
