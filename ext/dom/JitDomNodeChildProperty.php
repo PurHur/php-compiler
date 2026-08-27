@@ -138,6 +138,10 @@ final class JitDomNodeChildProperty
     /**
      * Nested firstChild/lastChild must inherit ownerDocument for setIdAttribute id-map
      * seeding — direct loadXML children get this at materialize time (#21644).
+     *
+     * Skip when the child edge is null (empty DocumentFragment after expand, or
+     * leaf with no children). {@see __value__readObject} on a null box SIGSEGVs
+     * under AOT (#33716 peer / #35518 re-#35461).
      */
     private static function seedChildOwnerFromParent(
         \PHPCompiler\JIT\Context $context,
@@ -150,6 +154,27 @@ final class JitDomNodeChildProperty
             return;
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_child_seed_owner');
+        $childPtr = JitValueBox::valuePtrFromVariable($context, $childVar);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($childPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NULL, false)
+        );
+        $bbSkip = BasicBlockHelper::append($context, 'dom_child_seed_null');
+        $bbSeed = BasicBlockHelper::append($context, 'dom_child_seed_obj');
+        $bbDone = BasicBlockHelper::append($context, 'dom_child_seed_done');
+        $context->builder->branchIf($isNull, $bbSkip, $bbSeed);
+
+        $context->builder->positionAtEnd($bbSkip);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbSeed);
         $childObj = self::loadObjectFromChildVar($context, $childVar);
         $elementClass = 'DOMElement';
         $elementClassId = $objectType->lookup($elementClass);
@@ -181,6 +206,9 @@ final class JitDomNodeChildProperty
             $docJit,
             JITVariable::TYPE_VALUE
         );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     private static function loadObjectFromChildVar(\PHPCompiler\JIT\Context $context, JITVariable $var): Value
