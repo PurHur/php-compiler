@@ -128,19 +128,31 @@ final class JitDomNodeListItem
      */
     private static function rememberTagListItemChildIndex(string $xml, string $tagQuery, int $index): void
     {
+        $meta = self::resolveTagListItemChildMeta($xml, $tagQuery, $index);
+        self::$lastFetchedChildIndex = $meta['childIndex'];
+        JitDomNodeChildProperty::$lastFetchedChildIndex = $meta['childIndex'];
+        self::$lastFetchedTagName = $meta['tag'];
+        JitDomNodeChildProperty::$lastFetchedTagName = $meta['tag'];
+    }
+
+    /**
+     * Resolve getElementsByTagName($tag)->item($N) to direct-child index + tag (#34780 / #35433).
+     *
+     * {@see item()} is the Nth tag match in document order, not parent->childNodes[$N].
+     *
+     * @return array{childIndex: ?int, tag: ?string, open: ?string}
+     */
+    public static function resolveTagListItemChildMeta(string $xml, string $tagQuery, int $index): array
+    {
         $fromElement = JitDomGetElementsByTagNameUserScript::lastTagQueryFromElement();
         $want = strtolower($tagQuery);
         $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
 
         // Document::getElementsByTagName('*'): item(0) is the documentElement.
         if (!$fromElement && ('*' === $want || '' === $want) && 0 === $index) {
-            self::$lastFetchedChildIndex = null;
-            JitDomNodeChildProperty::$lastFetchedChildIndex = null;
             $rootTag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
-            self::$lastFetchedTagName = $rootTag;
-            JitDomNodeChildProperty::$lastFetchedTagName = $rootTag;
 
-            return;
+            return ['childIndex' => null, 'tag' => $rootTag, 'open' => null];
         }
 
         $effectiveIndex = $index;
@@ -150,8 +162,6 @@ final class JitDomNodeListItem
         }
 
         $matchPos = 0;
-        $resolved = null;
-        $resolvedTag = null;
         foreach ($nodes as $i => $node) {
             if ('element' !== ($node['kind'] ?? null)) {
                 continue;
@@ -159,33 +169,22 @@ final class JitDomNodeListItem
             $t = strtolower((string) ($node['data'] ?? ''));
             if ('*' === $want || '' === $want || $t === $want) {
                 if ($matchPos === $effectiveIndex) {
-                    $resolved = $i;
-                    $resolvedTag = (string) $node['data'];
-                    break;
+                    return [
+                        'childIndex' => $i,
+                        'tag' => (string) $node['data'],
+                        'open' => isset($node['open']) ? (string) $node['open'] : null,
+                    ];
                 }
                 ++$matchPos;
             }
         }
 
-        if (null !== $resolved) {
-            self::$lastFetchedChildIndex = $resolved;
-            JitDomNodeChildProperty::$lastFetchedChildIndex = $resolved;
-            self::$lastFetchedTagName = $resolvedTag;
-            JitDomNodeChildProperty::$lastFetchedTagName = $resolvedTag;
-
-            return;
-        }
-
         // Nested match (not a direct child) — do not poison child index with item($N).
-        self::$lastFetchedChildIndex = null;
-        JitDomNodeChildProperty::$lastFetchedChildIndex = null;
         if ('*' === $want || '' === $want) {
-            self::$lastFetchedTagName = null;
-            JitDomNodeChildProperty::$lastFetchedTagName = null;
-        } else {
-            self::$lastFetchedTagName = $tagQuery;
-            JitDomNodeChildProperty::$lastFetchedTagName = $tagQuery;
+            return ['childIndex' => null, 'tag' => null, 'open' => null];
         }
+
+        return ['childIndex' => null, 'tag' => $tagQuery, 'open' => null];
     }
 
     private static function invokeOwnerAware(

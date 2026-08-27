@@ -16996,35 +16996,89 @@ class JIT {
             return;
         }
         $resultVar = $this->context->getVariableFromOp($result);
-        $resultVar->compileTimeDomChildIndex = $index;
+        // Default: childNodes->item(N) uses N as direct-child index (#32903).
+        $childIndex = $index;
+        $tag = null;
+        $attrs = null;
+
+        $xml = \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $tagQuery = \PHPCompiler\ext\dom\JitDomGetElementsByTagNameUserScript::lastTagQuery()
+            ?? \PHPCompiler\ext\dom\JitDomGetElementsByTagNameUserScript::liveItemTagQuery();
+        if (
+            null !== $xml
+            && \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+            && null !== $tagQuery
+        ) {
+            // getElementsByTagName NodeList: item($N) is Nth tag match, not childNodes[$N] (#35433 / #34780).
+            $meta = \PHPCompiler\ext\dom\JitDomNodeListItem::resolveTagListItemChildMeta(
+                $xml,
+                $tagQuery,
+                $index
+            );
+            $childIndex = $meta['childIndex'];
+            $tag = $meta['tag'];
+            if (null !== $meta['open'] && '' !== $meta['open']) {
+                $attrs = [];
+                foreach (
+                    \PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($meta['open']) as $pair
+                ) {
+                    $attrs[$pair['qname']] = $pair['value'];
+                    $pos = strpos($pair['qname'], ':');
+                    if (false !== $pos) {
+                        $attrs[substr($pair['qname'], $pos + 1)] = $pair['value'];
+                    }
+                }
+            }
+        } elseif (
+            null !== $xml
+            && \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+        ) {
+            $nodes = \PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+            if (isset($nodes[$index]) && 'element' === ($nodes[$index]['kind'] ?? null)) {
+                $tag = $nodes[$index]['data'] ?? null;
+                $open = $nodes[$index]['open'] ?? null;
+                if (null !== $open && '' !== $open) {
+                    $attrs = [];
+                    foreach (
+                        \PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open) as $pair
+                    ) {
+                        $attrs[$pair['qname']] = $pair['value'];
+                        $pos = strpos($pair['qname'], ':');
+                        if (false !== $pos) {
+                            $attrs[substr($pair['qname'], $pos + 1)] = $pair['value'];
+                        }
+                    }
+                }
+            }
+        }
+
+        $resultVar->compileTimeDomChildIndex = $childIndex;
         // Thin AOT materializes NodeList::item elements like firstChild (#32315).
         // Without classUserType, `$list->item(0)->hasAttributeNS(...)` ExternalMethod-nulls
         // even when loadXML seeded the Attr cache (#34618).
         $resultVar->classUserType = 'DOMElement';
+        if (null !== $tag && '' !== $tag) {
+            // Tag-list resolve must overwrite a wrong childNodes-index stamp (#35433).
+            $resultVar->compileTimeDomTagName = $tag;
+        }
+        if (null !== $attrs && [] !== $attrs) {
+            $resultVar->compileTimeDomAttributes = $attrs;
+        }
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
-                $this->context->namedVariableBindings[$resolved]->classUserType = 'DOMElement';
-                $this->context->namedVariableBindings[$resolved]->compileTimeDomChildIndex = $index;
+                $bind = $this->context->namedVariableBindings[$resolved];
+                $bind->classUserType = 'DOMElement';
+                $bind->compileTimeDomChildIndex = $childIndex;
+                if (null !== $tag && '' !== $tag) {
+                    $bind->compileTimeDomTagName = $tag;
+                }
+                if (null !== $attrs && [] !== $attrs) {
+                    $bind->compileTimeDomAttributes = $attrs;
+                }
             }
             $this->context->bindVariableByName($resolved, $resultVar);
-        }
-
-        $xml = \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (
-            null === $xml
-            || !\PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
-        ) {
-            return;
-        }
-        $nodes = \PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
-        if (!isset($nodes[$index]) || 'element' !== ($nodes[$index]['kind'] ?? null)) {
-            return;
-        }
-        $tag = $nodes[$index]['data'] ?? null;
-        if (null !== $tag && '' !== $tag && null === $resultVar->compileTimeDomTagName) {
-            $resultVar->compileTimeDomTagName = $tag;
         }
     }
 
