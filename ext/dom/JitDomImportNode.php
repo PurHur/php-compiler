@@ -650,21 +650,50 @@ final class JitDomImportNode
         }
         $markup = self::resolveSourceElementMarkup($sourceNode, $tag, $dstXml);
         if (null === $markup) {
-            return $empty;
+            return self::resolveSourceAttrInfoFromHtmlHit($tag) ?? $empty;
         }
         $parsed = DomParseSimpleXmlJitHelper::parseElementMarkupArgv($markup);
         if (null === $parsed) {
-            return $empty;
+            return self::resolveSourceAttrInfoFromHtmlHit($tag) ?? $empty;
         }
         $attrs = $parsed['attrs'];
         if ('' === trim($attrs)) {
-            return $empty;
+            return self::resolveSourceAttrInfoFromHtmlHit($tag) ?? $empty;
         }
         $open = '<'.$parsed['tag'].$attrs.'>';
 
         return [
             'attrs' => $attrs,
             'pairs' => DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($open),
+        ];
+    }
+
+    /**
+     * loadHTML / getElementById sources have no compile-time XML markup — recover id
+     * from the remembered HTML parse so importNode copies attrs (xmlDocCopyNode; #19212).
+     *
+     * @return null|array{attrs: string, pairs: list<array{qname: string, value: string}>}
+     */
+    private static function resolveSourceAttrInfoFromHtmlHit(string $tag): ?array
+    {
+        $html = JitDomLoadHTMLUserScript::lastGetElementByIdHit()
+            ?? JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+        if (null === $html) {
+            return null;
+        }
+        $hitTag = (string) ($html['tag'] ?? '');
+        if ('' !== $tag && '' !== $hitTag && $tag !== $hitTag) {
+            return null;
+        }
+        $id = (string) ($html['id'] ?? '');
+        if ('' === $id) {
+            return null;
+        }
+        $escaped = htmlspecialchars($id, ENT_QUOTES | ENT_XML1, 'UTF-8');
+
+        return [
+            'attrs' => ' id="'.$escaped.'"',
+            'pairs' => [['qname' => 'id', 'value' => $id]],
         ];
     }
 

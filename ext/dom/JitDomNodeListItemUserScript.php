@@ -564,7 +564,8 @@ final class JitDomNodeListItemUserScript
             $openTag,
             $inherited
         );
-        foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($openTag, $inherited) as $attrPair) {
+        $attrPairs = DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($openTag, $inherited);
+        foreach ($attrPairs as $attrPair) {
             $qname = $attrPair['qname'];
             $value = $attrPair['value'];
             $namespace = $attrPair['namespace'] ?? '';
@@ -581,6 +582,10 @@ final class JitDomNodeListItemUserScript
                 $attr,
                 $value
             );
+        }
+        if ([] !== $attrPairs) {
+            // getAttribute reads the element NamedNodeMap, not the global Attr cache (#27275).
+            JitDomCreateElement::storeAttributesPresence($context, $element, $attrPairs);
         }
 
         return self::boxObject($context, $element);
