@@ -11,8 +11,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link hook for mb_encode/decode_numericentity() — MbNumericEntityJitHelper (#35210 leftover of #7237).
  *
- * Direct NestedJIT (peer {@see MbTrimRuntime}) — not the old `__compiler_mb_*_numericentity4`
- * bridge ABI (function-return `__string__*` SIGSEGVs under thin AOT).
+ * NestedJIT via {@see JitNestedHelperCoerce::callHelper} for encode4/decode4 int map ABI
+ * (#35254 leftover of #35210; peer {@see MbStrPad} / {@see MbStrSplitRuntime}). Assert stays a
+ * two-string raw call (peer {@see MbTrimRuntime}).
  *
  * Runtime encoding assert: {@see MbNumericEntityJitHelper::assertEncodingArgv}.
  *
@@ -71,11 +72,32 @@ final class MbNumericEntity
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            'mb_numericentity'
-        );
+        // NestedJIT of this helper under PHP_COMPILER_PROFILE=8.4 soft-null produces a
+        // thin-AOT SIGSEGV on encode4/decode4 (default profile is fine). Clear profile
+        // for the NestedJIT TU only — call sites keep 8.4 soft-null. (#35254)
+        $prevProfile = getenv('PHP_COMPILER_PROFILE');
+        $cleared = false;
+        if (false !== $prevProfile && '' !== (string) $prevProfile && \function_exists('putenv')) {
+            putenv('PHP_COMPILER_PROFILE=');
+            unset($_ENV['PHP_COMPILER_PROFILE'], $_SERVER['PHP_COMPILER_PROFILE']);
+            $cleared = true;
+        }
+        try {
+            // Skip helper-runtime cache: stale prelinked unit mismatches NestedJIT int ABI
+            // (Module verify / thin-AOT SIGSEGV; peer preg #26888 / mb_str_split #34278). (#35254)
+            JitVmHelperLink::ensureCompiled(
+                $context,
+                self::HELPER_PATH,
+                self::COMPILED_HELPERS,
+                'mb_numericentity',
+                true
+            );
+        } finally {
+            if ($cleared && \function_exists('putenv')) {
+                putenv('PHP_COMPILER_PROFILE='.$prevProfile);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prevProfile;
+                $_SERVER['PHP_COMPILER_PROFILE'] = $prevProfile;
+            }
+        }
     }
 }
