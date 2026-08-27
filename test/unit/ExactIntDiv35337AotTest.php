@@ -7,36 +7,43 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: non-exact integer `/` yields float (#31968); exact quotients stay int (#35337).
+ * AOT: exact long/long `/` → int; non-exact → float (#35337).
  *
  * @see php-src Zend/zend_operators.c div_function
  *
  * @group llvm
  * @group aot
  */
-final class IntDivAlwaysFloat31968AotTest extends TestCase
+final class ExactIntDiv35337AotTest extends TestCase
 {
-    public function testVmIntDivIsAlwaysFloat(): void
+    private const EXPECTED = <<<'OUT'
+int(5)
+float(3.5)
+int(5)
+int(5)
+OUT;
+
+    public function testVmExactIntDiv(): void
     {
         $runtime = new Runtime();
         $code = file_get_contents(
-            dirname(__DIR__).'/repro/issue_31968_int_div_always_float.php'
+            dirname(__DIR__).'/repro/issue_35337_exact_int_div.php'
         );
         $this->assertNotFalse($code);
         ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'issue_31968_int_div_always_float.php'));
+        $runtime->run($runtime->parseAndCompile($code, 'issue_35337_exact_int_div.php'));
         $out = (string) ob_get_clean();
-        $this->assertSame("float(3.5)\nfloat(2.5)\n", $out);
+        $this->assertSame(self::EXPECTED."\n", $out);
     }
 
-    public function testAotIntDivIsAlwaysFloat(): void
+    public function testAotExactIntDiv(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
         $root = dirname(__DIR__, 2);
-        $src = $root.'/test/repro/issue_31968_int_div_always_float.php';
-        $bin = sys_get_temp_dir().'/phpc_issue_31968_div_'.getmypid().'.bin';
+        $src = $root.'/test/repro/issue_35337_exact_int_div.php';
+        $bin = sys_get_temp_dir().'/phpc_issue_35337_div_'.getmypid().'.bin';
         $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
@@ -47,7 +54,7 @@ final class IntDivAlwaysFloat31968AotTest extends TestCase
             $runOut = [];
             exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
             $this->assertSame(0, $runRc, implode("\n", $runOut));
-            $this->assertSame("float(3.5)\nfloat(2.5)\n", implode("\n", $runOut)."\n");
+            $this->assertSame(self::EXPECTED."\n", implode("\n", $runOut)."\n");
         } finally {
             @unlink($bin);
         }
