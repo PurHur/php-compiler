@@ -72,7 +72,9 @@ final class JitStreamIoKernel
         self::clearDeferStubs($context);
         self::ensureStreamGlobals($context);
         StreamFilter::ensureLinked($context);
-        // Inventory may have left apply_* as ret i32 0 on a __string__* decl (#19462).
+        // Thin AOT: NestedJIT apply SEGVs — pure-LLVM string-filter registry (#35426).
+        // Only fill identity for leftover inventory stubs (never wipe real apply bodies).
+        JitStreamFilterApplyKernel::implementPureLlvmApply($context);
         self::ensureIdentityStreamFilterApply($context);
         StreamGlobalsJit::implement($context);
 
@@ -124,8 +126,10 @@ final class JitStreamIoKernel
     }
 
     /**
-     * Force identity bodies for stream-filter apply ABI — inventory stubs used
-     * `ret i32 0` after ensureLibc declared `__string__*` return (#19462).
+     * Last-resort identity for inventory apply stubs only (#19462).
+     *
+     * Never delete NestedJIT / pure-LLVM apply bodies (#35426) — that made
+     * stream_filter_append(string.toupper) a no-op under thin AOT.
      */
     private static function ensureIdentityStreamFilterApply(Context $context): void
     {
@@ -139,9 +143,10 @@ final class JitStreamIoKernel
                 $fn = $context->module->addFunction($name, $ft);
             }
             if ($fn->countBasicBlocks() > 0) {
-                foreach (array_reverse($fn->getBasicBlocks()) as $block) {
-                    $block->delete();
-                }
+                // Real apply body already present — leave it (#35426).
+                $context->registerFunction($name, $fn);
+
+                continue;
             }
             $entry = $fn->appendBasicBlock('stream_filter_apply_identity');
             $context->builder->positionAtEnd($entry);

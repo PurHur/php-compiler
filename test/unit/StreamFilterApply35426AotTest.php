@@ -7,8 +7,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * AOT: stream_filter_append string.toupper / rot13 (#35426).
  *
- * Currently red on master (identity apply wipe). Guard documents expected Zend output
- * once pure-LLVM apply registry lands — see issue comment for next step.
+ * Pure-LLVM filter registry + apply (NestedJIT apply SEGVs under thin AOT).
  *
  * php-src: ext/standard/streamsfuncs.c
  *

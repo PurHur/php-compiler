@@ -13,6 +13,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -96,6 +97,8 @@ final class JitStreamFilterKernel
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
+        // Dual-write filter names for thin-AOT pure-LLVM apply (#35426).
+        JitStreamFilterApplyKernel::ensureRegistryAppend($context);
         self::implementAppendBridge($context);
         self::implementPrependBridge($context);
         self::implementRemoveBridge($context);
@@ -147,6 +150,23 @@ final class JitStreamFilterKernel
             $fn->getParam(1),
             $fn->getParam(2)
         );
+        // On success, also record filter name for pure-LLVM apply (#35426).
+        $minusOne = $i64->constInt(-1, true);
+        $okBb = $fn->appendBasicBlock($abiName.'_reg_ok');
+        $retBb = $fn->appendBasicBlock($abiName.'_ret');
+        $ok = $context->builder->icmp(Builder::INT_NE, $result, $minusOne);
+        $context->builder->branchIf($ok, $okBb, $retBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->call(
+            $context->lookupFunction(JitStreamFilterApplyKernel::REGISTRY_APPEND),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2)
+        );
+        $context->builder->branch($retBb);
+
+        $context->builder->positionAtEnd($retBb);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
