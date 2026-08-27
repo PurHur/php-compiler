@@ -98,11 +98,14 @@ final class JitDomNodeListItem
             return;
         }
 
-        // getElementsByTagName NodeList: item($N) is the Nth tag match in document
-        // order, not parent->childNodes[$N]. Using $N as a direct-child index made
-        // replaceChild InnerXml replace the wrong sibling (#34780).
+        // getElementsByTagName / simple DOMXPath //tag NodeLists: item($N) is the Nth
+        // tag match in document order, not parent->childNodes[$N]. Using $N as a
+        // direct-child index made replaceChild InnerXml replace the wrong sibling
+        // (#34780) and stamped XPath item() with sibling-0 attrs so setIdAttribute
+        // read id=x for //b and SIGSEGV'd (#35447 leftover #35433).
         $tagQuery = JitDomGetElementsByTagNameUserScript::lastTagQuery()
-            ?? JitDomGetElementsByTagNameUserScript::liveItemTagQuery();
+            ?? JitDomGetElementsByTagNameUserScript::liveItemTagQuery()
+            ?? JitDomXPathQueryUserScript::lastQueryTag();
         if (null !== $tagQuery) {
             self::rememberTagListItemChildIndex($xml, $tagQuery, $index);
 
@@ -124,7 +127,8 @@ final class JitDomNodeListItem
     }
 
     /**
-     * Map getElementsByTagName()->item($N) to a direct-child index for InnerXml (#34780).
+     * Map getElementsByTagName() / simple XPath //tag item($N) to a direct-child
+     * index for InnerXml and setIdAttribute attr stamps (#34780 / #35447).
      */
     private static function rememberTagListItemChildIndex(string $xml, string $tagQuery, int $index): void
     {
