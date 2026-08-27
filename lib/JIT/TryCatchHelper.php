@@ -141,6 +141,213 @@ final class TryCatchHelper
         return true;
     }
 
+    /**
+     * Defer LLVM break/continue/goto through an active try/finally (#35547 / #25240).
+     *
+     * @param list<Variable> $args
+     */
+    public static function leaveBranchTarget(
+        \PHPCompiler\JIT $jit,
+        Context $context,
+        Function_ $func,
+        Block $fromBlock,
+        Block $target,
+        array $args
+    ): BasicBlock {
+        $defer = self::buildLeaveDeferStubIfNeeded($jit, $context, $func, $fromBlock, $target, $args);
+        if (null !== $defer) {
+            return $defer;
+        }
+
+        return $jit->jitBranchEntryBlock($target, $func);
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    private static function buildLeaveDeferStubIfNeeded(
+        \PHPCompiler\JIT $jit,
+        Context $context,
+        Function_ $func,
+        Block $fromBlock,
+        Block $target,
+        array $args
+    ): ?BasicBlock {
+        $stack = $context->tryCatch->handlerStack;
+        if ([] === $stack) {
+            return null;
+        }
+        $matchingHandler = null;
+        $matchingIdx = null;
+        for ($i = \count($stack) - 1; $i >= 0; --$i) {
+            $handler = $stack[$i];
+            if (null === $handler->finallyOp) {
+                continue;
+            }
+            if (!self::leaveTargetNeedsFinallyUnwind($context, $handler, $fromBlock, $target)) {
+                continue;
+            }
+            $matchingHandler = $handler;
+            $matchingIdx = $i;
+            break;
+        }
+        if (null === $matchingHandler || null === $matchingIdx) {
+            return null;
+        }
+        // php-cfg wires try fall-through and `continue` to the try merge block (#35547).
+        // That edge must run finally, but the merge block is already the post-finally
+        // destination — branch into finally directly instead of goto-pending resume.
+        if ($target === $matchingHandler->mergeBlock) {
+            return self::finallyBbFor($jit, $func, $context, $matchingHandler, $args, false);
+        }
+        $matchingHandler->mayDeferGotoLeave = true;
+        self::ensureGotoPendingSlots($context, $func);
+        $resumeId = $context->tryCatch->nextGotoResumeId++;
+        $outerHandlers = [];
+        for ($j = $matchingIdx - 1; $j >= 0; --$j) {
+            $outer = $stack[$j];
+            if (null === $outer->finallyOp) {
+                continue;
+            }
+            if (self::leaveTargetNeedsFinallyUnwind($context, $outer, $fromBlock, $target)) {
+                $outerHandlers[] = $outer;
+            }
+        }
+        $runOrder = array_merge([$matchingHandler], $outerHandlers);
+        $next = null;
+        for ($k = \count($runOrder) - 1; $k >= 0; --$k) {
+            $handler = $runOrder[$k];
+            $handler->gotoPendingNext[$resumeId] = $next;
+            $handler->gotoPendingClears[$resumeId] = null === $next;
+            if (null === $next) {
+                $handler->gotoPendingResumeCfgTargets[$resumeId] = $target;
+            }
+            $next = self::finallyBbFor($jit, $func, $context, $handler, $args, false);
+        }
+        foreach ($runOrder as $handler) {
+            if (!\in_array($handler, $context->tryCatch->gotoResumeHandlers, true)) {
+                $context->tryCatch->gotoResumeHandlers[] = $handler;
+            }
+        }
+        $builder = $context->builder;
+        $saved = self::probeInsertBlock($builder);
+        $stub = self::appendBlock($func, 'leave_defer_finally_'.$resumeId);
+        $builder->positionAtEnd($stub);
+        self::storeGotoPending($context, $resumeId);
+        $builder->branch(self::finallyBbFor($jit, $func, $context, $matchingHandler, $args, false));
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+
+        return $stub;
+    }
+
+    private static function leaveTargetNeedsFinallyUnwind(
+        Context $context,
+        TryCatchHandler $handler,
+        Block $fromBlock,
+        Block $target
+    ): bool {
+        if (!self::blockIsInsideActiveTryBody($handler, $fromBlock)) {
+            return false;
+        }
+        if (null === $handler->finallyOp || null === $handler->finallyOp->block1) {
+            return false;
+        }
+        $finallyCfg = $handler->finallyOp->block1;
+        if ($target === $finallyCfg) {
+            return false;
+        }
+        if (isset($context->tryCatch->mergeBlockIds[spl_object_id($target)])) {
+            return true;
+        }
+
+        return !self::blockIsInsideActiveTryBody($handler, $target);
+    }
+
+    private static function blockIsInsideActiveTryBody(TryCatchHandler $handler, Block $target): bool
+    {
+        $entry = $handler->tryBodyBlock;
+        if (null === $entry) {
+            return false;
+        }
+        $merge = $handler->mergeBlock;
+        $finallyBlock = $handler->finallyOp->block1 ?? null;
+        if ($target === $entry) {
+            return true;
+        }
+        if ($target === $merge || $target === $finallyBlock) {
+            return false;
+        }
+        $leaveBlocked = [];
+        $leaveBlocked[spl_object_id($merge)] = true;
+        if (null !== $finallyBlock) {
+            $leaveBlocked[spl_object_id($finallyBlock)] = true;
+        }
+        if (!self::blockCanReach($entry, $target, $leaveBlocked)) {
+            return false;
+        }
+        if (self::blockCanReach($target, $merge, [])) {
+            return true;
+        }
+        if (null !== $finallyBlock && self::blockCanReach($target, $finallyBlock, [])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, true> $blocked
+     */
+    private static function blockCanReach(Block $from, Block $to, array $blocked): bool
+    {
+        if ($from === $to) {
+            return true;
+        }
+        $seen = [];
+        $queue = [$from];
+        while ([] !== $queue) {
+            /** @var Block $block */
+            $block = \array_pop($queue);
+            $id = spl_object_id($block);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach (self::blockBranchTargets($block) as $succ) {
+                if ($succ === $to) {
+                    return true;
+                }
+                if (isset($blocked[spl_object_id($succ)])) {
+                    continue;
+                }
+                $queue[] = $succ;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<Block> */
+    private static function blockBranchTargets(Block $block): array
+    {
+        $targets = [];
+        $n = $block->nOpCodes;
+        for ($i = 0; $i < $n; ++$i) {
+            $op = $block->opCodes[$i];
+            if (null !== $op->block1) {
+                $targets[] = $op->block1;
+            }
+            if (null !== $op->block2) {
+                $targets[] = $op->block2;
+            }
+            if (null !== $op->block3) {
+                $targets[] = $op->block3;
+            }
+        }
+
+        return $targets;
+    }
+
     public static function beginTry(
         \PHPCompiler\JIT $jit,
         Function_ $func,
@@ -160,10 +367,12 @@ final class TryCatchHelper
         }
         $arms = self::collectCatchOps($handlerBlock, $tryOpcodeIndex);
         $handler = new TryCatchHandler($mergeBlock, $arms);
+        $handler->tryBodyBlock = $tryOp->block1;
         $handler->finallyOp = self::findFinallyOp($handlerBlock, $tryOpcodeIndex);
         $handler->postTryOpcodesRemaining = self::countPostTryOpcodes($handlerBlock, $tryOpcodeIndex);
         $context->tryCatch->handlerStack[] = $handler;
         $context->tryCatch->mergeHandlers[spl_object_id($mergeBlock)] = $handler;
+        $context->tryCatch->mergeBlockIds[spl_object_id($mergeBlock)] = true;
 
         $builder = $context->builder;
         $branchBlock = null;
@@ -186,6 +395,10 @@ final class TryCatchHelper
         $builder->positionAtEnd($branchBlock);
         $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
         $builder->call($context->lookupFunction('phpc_jit_clear_return_pending'));
+        if (null !== $handler->finallyOp) {
+            self::ensureGotoPendingSlots($context, $func);
+            self::clearGotoPendingSlot($context, $func);
+        }
         $mergeHeaderBb = $context->scope->blockStorage[$mergeBlock] ?? null;
         if (!$handler->mergeBodyCompiled) {
             if (null === $mergeHeaderBb) {
@@ -1535,6 +1748,22 @@ final class TryCatchHelper
         $afterReturnCheck = self::appendBlock($func, 'try_finally_after_return_'.self::blockSuffix($handler));
         $builder->branchIf($hasReturnBool, $returnResume, $afterReturnCheck);
         $builder->positionAtEnd($afterReturnCheck);
+        if (null !== $handler->finallyOp) {
+            self::ensureGotoPendingSlots($context, $func);
+            $hasGoto = $builder->load(self::gotoPendingFlagGlobal($context));
+            $hasGotoBool = $builder->icmp(
+                Builder::INT_NE,
+                $hasGoto,
+                $context->getTypeFromString('int32')->constInt(0, false)
+            );
+            if (null === $handler->gotoResumeBb) {
+                $handler->gotoResumeBb = self::appendBlock($func, 'try_goto_resume_'.self::blockSuffix($handler));
+            }
+            $gotoResume = $handler->gotoResumeBb;
+            $afterGotoCheck = self::appendBlock($func, 'try_finally_after_goto_'.self::blockSuffix($handler));
+            $builder->branchIf($hasGotoBool, $gotoResume, $afterGotoCheck);
+            $builder->positionAtEnd($afterGotoCheck);
+        }
         $hasThrow = $builder->call($context->lookupFunction('phpc_jit_has_throw_pending'));
         $hasThrowBool = $builder->icmp(Builder::INT_NE, $hasThrow, $i32->constInt(0, false));
         $propagate = self::appendBlock($func, 'try_finally_propagate_'.self::blockSuffix($handler));
@@ -1596,6 +1825,232 @@ final class TryCatchHelper
         }
 
         return $resume;
+    }
+
+    public static function materializeAllPendingGotoResumeHandlers(Context $context): void
+    {
+        foreach ($context->tryCatch->gotoResumeHandlers as $handler) {
+            $gotoResume = $handler->gotoResumeBb;
+            $parent = $gotoResume?->getParent();
+            if (!$parent instanceof Function_) {
+                continue;
+            }
+            self::materializeGotoResumeBb($parent, $context, $handler);
+        }
+    }
+
+    public static function materializeAllGotoResumeHandlers(Context $context, Function_ $func): void
+    {
+        foreach ($context->tryCatch->gotoResumeHandlers as $handler) {
+            $gotoResume = $handler->gotoResumeBb;
+            $parent = $gotoResume?->getParent();
+            if (
+                null === $gotoResume
+                || !$parent instanceof Function_
+                || !self::sameLlvmFunction($parent, $func)
+            ) {
+                continue;
+            }
+            self::materializeGotoResumeBb($func, $context, $handler);
+        }
+    }
+
+    private static function materializeGotoResumeBb(
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler
+    ): void {
+        if ([] === $handler->gotoPendingNext || $handler->gotoResumeBbMaterialized) {
+            return;
+        }
+        self::resolveDeferredGotoResumeTargets($func, $context, $handler);
+        $gotoResume = $handler->gotoResumeBb;
+        $parent = $gotoResume?->getParent();
+        if (
+            null === $gotoResume
+            || !$parent instanceof Function_
+            || !self::sameLlvmFunction($parent, $func)
+        ) {
+            return;
+        }
+        $builder = $context->builder;
+        $saved = self::probeInsertBlock($builder);
+        $gotoResume = $handler->gotoResumeBb;
+        $builder->positionAtEnd($gotoResume);
+        if (null === $gotoResume->getTerminator()) {
+            self::emitGotoPendingResume($context, $func, $handler);
+            $handler->gotoResumeBbMaterialized = true;
+        }
+        BasicBlockHelper::restoreInsertBlock($context, $saved);
+    }
+
+    private static function resolveDeferredGotoResumeTargets(
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler
+    ): void {
+        foreach ($handler->gotoPendingResumeCfgTargets as $resumeId => $cfgTarget) {
+            if (!\array_key_exists($resumeId, $handler->gotoPendingNext)) {
+                continue;
+            }
+            $handler->gotoPendingNext[$resumeId] = self::cfgBranchEntryBlock($context, $func, $cfgTarget);
+            $handler->gotoPendingClears[$resumeId] = true;
+        }
+    }
+
+    private static function cfgBranchEntryBlock(
+        Context $context,
+        Function_ $func,
+        Block $branch
+    ): BasicBlock {
+        if ($context->scope->blockEntryStorage->contains($branch)) {
+            $entry = $context->scope->blockEntryStorage[$branch];
+            $entryParent = $entry->getParent();
+            if ($entryParent instanceof Function_ && self::sameLlvmFunction($entryParent, $func)) {
+                return $entry;
+            }
+        }
+        if ($context->scope->blockStorage->contains($branch)) {
+            $cached = $context->scope->blockStorage[$branch];
+            $cachedParent = $cached->getParent();
+            if ($cachedParent instanceof Function_ && self::sameLlvmFunction($cachedParent, $func)) {
+                return $cached;
+            }
+        }
+
+        throw new \LogicException('goto resume CFG block has no LLVM entry at seal time');
+    }
+
+    private static function gotoResumeBbFor(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler
+    ): BasicBlock {
+        if (null !== $handler->gotoResumeBb) {
+            return $handler->gotoResumeBb;
+        }
+        $resume = self::appendBlock($func, 'try_goto_resume_'.self::blockSuffix($handler));
+        $handler->gotoResumeBb = $resume;
+
+        return $resume;
+    }
+
+    private static function emitGotoPendingResume(
+        Context $context,
+        Function_ $func,
+        TryCatchHandler $handler
+    ): void {
+        $builder = $context->builder;
+        $entry = $builder->getInsertBlock();
+        if (null === $entry) {
+            throw new \LogicException('goto resume dispatch requires an insert block');
+        }
+        $mergeBb = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
+        if ([] === $handler->gotoPendingNext) {
+            if (null !== $mergeBb) {
+                $builder->branch($mergeBb);
+            } else {
+                $builder->returnVoid();
+            }
+
+            return;
+        }
+        $default = self::appendBlock($func, 'try_goto_resume_default_'.self::blockSuffix($handler));
+        $builder->positionAtEnd($default);
+        self::clearGotoPendingSlotValue($context);
+        if (null !== $mergeBb) {
+            $builder->branch($mergeBb);
+        } else {
+            $builder->returnVoid();
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $builder->positionAtEnd($entry);
+        $resumeId = $builder->load(self::gotoResumeIdGlobal($context));
+        $resume = $entry;
+        foreach ($handler->gotoPendingNext as $id => $nextBb) {
+            if (!$nextBb instanceof BasicBlock) {
+                throw new \LogicException('goto resume dispatch has unresolved CFG target at seal time');
+            }
+            $idConst = $i64->constInt($id, false);
+            $idMatch = $builder->icmp(Builder::INT_EQ, $resumeId, $idConst);
+            $nextMatch = self::appendBlock($func, 'try_goto_resume_id_'.$id.'_'.self::blockSuffix($handler));
+            $fallthrough = self::appendBlock($func, 'try_goto_resume_id_'.$id.'_fall_'.self::blockSuffix($handler));
+            $builder->positionAtEnd($resume);
+            $builder->branchIf($idMatch, $nextMatch, $fallthrough);
+            $builder->positionAtEnd($nextMatch);
+            if ($handler->gotoPendingClears[$id] ?? false) {
+                self::clearGotoPendingSlotValue($context);
+            }
+            $builder->branch($nextBb);
+            $resume = $fallthrough;
+        }
+        $builder->positionAtEnd($resume);
+        $builder->branch($default);
+    }
+
+    private static function gotoPendingFlagGlobal(Context $context): Value
+    {
+        if (null !== $context->tryCatch->gotoPendingFlagGlobal) {
+            return $context->tryCatch->gotoPendingFlagGlobal;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $global = $context->module->addGlobal($i32, 'phpc_jit_goto_pending_flag');
+        $global->setInitializer($i32->constInt(0, false));
+        $context->tryCatch->gotoPendingFlagGlobal = $global;
+
+        return $global;
+    }
+
+    private static function gotoResumeIdGlobal(Context $context): Value
+    {
+        if (null !== $context->tryCatch->gotoResumeIdGlobal) {
+            return $context->tryCatch->gotoResumeIdGlobal;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $global = $context->module->addGlobal($i64, 'phpc_jit_goto_resume_id');
+        $global->setInitializer($i64->constInt(0, false));
+        $context->tryCatch->gotoResumeIdGlobal = $global;
+
+        return $global;
+    }
+
+    private static function ensureGotoPendingSlots(Context $context, Function_ $func): void
+    {
+        self::gotoPendingFlagGlobal($context);
+        self::gotoResumeIdGlobal($context);
+    }
+
+    private static function clearGotoPendingSlot(Context $context, Function_ $func): void
+    {
+        self::clearGotoPendingSlotValue($context);
+        $builder = $context->builder;
+        $builder->store(
+            $context->getTypeFromString('int64')->constInt(0, false),
+            self::gotoResumeIdGlobal($context)
+        );
+    }
+
+    private static function clearGotoPendingSlotValue(Context $context): void
+    {
+        $builder = $context->builder;
+        $builder->store(
+            $context->getTypeFromString('int32')->constInt(0, false),
+            self::gotoPendingFlagGlobal($context)
+        );
+    }
+
+    private static function storeGotoPending(Context $context, int $resumeId): void
+    {
+        $builder = $context->builder;
+        $builder->store(
+            $context->getTypeFromString('int32')->constInt(1, false),
+            self::gotoPendingFlagGlobal($context)
+        );
+        $builder->store(
+            $context->getTypeFromString('int64')->constInt($resumeId, false),
+            self::gotoResumeIdGlobal($context)
+        );
     }
 
     private static function blockSuffix(TryCatchHandler $handler): string
@@ -1701,6 +2156,23 @@ final class TryCatchHandler
     public ?BasicBlock $finallyEpilogueBb = null;
 
     public ?BasicBlock $returnResumeBb = null;
+
+    public bool $mayDeferGotoLeave = false;
+
+    public ?BasicBlock $gotoResumeBb = null;
+
+    public bool $gotoResumeBbMaterialized = false;
+
+    public ?Block $tryBodyBlock = null;
+
+    /** @var array<int, BasicBlock|null> */
+    public array $gotoPendingNext = [];
+
+    /** @var array<int, bool> */
+    public array $gotoPendingClears = [];
+
+    /** @var array<int, Block> */
+    public array $gotoPendingResumeCfgTargets = [];
 
     /**
      * @param list<array{op: OpCode, catchTypes: list<string>}> $catchArms
