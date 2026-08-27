@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7940 |
-| Phase A inventory files (M2 ratio SSOT) | 7940 |
+| PHP files on vm.php path | 7943 |
+| Phase A inventory files (M2 ratio SSOT) | 7943 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25279 |
+| Source constructs flagged (warnings) | 25286 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -434,7 +434,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ImplementationHasFeature.php` | 0 | 1 |
 | `ext/dom/JitDomAdoptNode.php` | 0 | 1 |
 | `ext/dom/JitDomAppendChild.php` | 0 | 2 |
-| `ext/dom/JitDomAppendChildLiveSlots.php` | 0 | 21 |
+| `ext/dom/JitDomAppendChildLiveSlots.php` | 0 | 22 |
 | `ext/dom/JitDomAppendChildUserScript.php` | 0 | 14 |
 | `ext/dom/JitDomAppendData.php` | 0 | 1 |
 | `ext/dom/JitDomAttrRename.php` | 0 | 3 |
@@ -1551,11 +1551,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/JitMbConvertCase.php` | 0 | 1 |
 | `ext/mbstring/JitMbConvertEncoding.php` | 0 | 2 |
 | `ext/mbstring/JitMbConvertKana.php` | 0 | 1 |
+| `ext/mbstring/JitMbConvertVariables.php` | 0 | 1 |
 | `ext/mbstring/JitMbDetectEncoding.php` | 0 | 1 |
 | `ext/mbstring/JitMbDetectOrder.php` | 0 | 2 |
 | `ext/mbstring/JitMbEncodingRegistry.php` | 0 | 3 |
 | `ext/mbstring/JitMbEreg.php` | 0 | 1 |
-| `ext/mbstring/JitMbEregSearch.php` | 0 | 9 |
+| `ext/mbstring/JitMbEregSearch.php` | 0 | 10 |
 | `ext/mbstring/JitMbHttpInput.php` | 0 | 2 |
 | `ext/mbstring/JitMbHttpOutput.php` | 0 | 2 |
 | `ext/mbstring/JitMbInternalEncoding.php` | 0 | 2 |
@@ -1583,6 +1584,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbConvertCaseJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbConvertEncodingJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbConvertKanaJitHelper.php` | 0 | 1 |
+| `ext/mbstring/MbConvertVariablesJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbDetectEncodingJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbDetectOrderJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbEncodingAliasesJitHelper.php` | 0 | 1 |
@@ -5869,6 +5871,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MbConvertCaseRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbConvertEncodingRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbConvertKanaRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/MbConvertVariablesRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbDetectEncodingRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbDetectOrderRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbEncodingAliasesRuntime.php` | 0 | 1 |
@@ -6149,7 +6152,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringBase64Decode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBase64Encode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBin2hex.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBrotli.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringCaseCompare.php` | 0 | 1 |
@@ -6919,7 +6922,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableValuesLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableWriteLlvm.php` | 0 | 26 |
 | `lib/JIT/HeaderCallbackPolicy.php` | 0 | 1 |
-| `lib/JIT/Helper.php` | 0 | 14 |
+| `lib/JIT/Helper.php` | 0 | 15 |
 | `lib/JIT/HttpBuildQueryArrayLlvm.php` | 0 | 1 |
 | `lib/JIT/ImplementsHierarchyJitGuard.php` | 0 | 1 |
 | `lib/JIT/InArrayLlvm.php` | 0 | 2 |
@@ -10616,24 +10619,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 128)
 - new JITVariable (line 238)
 - new JITVariable (line 293)
-- new JITVariable (line 902)
-- new JITVariable (line 928)
-- new JITVariable (line 1033)
-- new JITVariable (line 1059)
-- new JITVariable (line 1080)
-- new JITVariable (line 1097)
-- new JITVariable (line 1152)
-- new JITVariable (line 1228)
+- new JITVariable (line 906)
+- new JITVariable (line 1054)
+- new JITVariable (line 1082)
+- new JITVariable (line 1187)
+- new JITVariable (line 1213)
 - new JITVariable (line 1234)
-- new JITVariable (line 1298)
-- new JITVariable (line 1336)
-- new JITVariable (line 1347)
-- new JITVariable (line 1354)
-- new JITVariable (line 1362)
-- new JITVariable (line 1369)
-- new JITVariable (line 1429)
-- new JITVariable (line 1458)
-- 26 class method(s)
+- new JITVariable (line 1251)
+- new JITVariable (line 1306)
+- new JITVariable (line 1382)
+- new JITVariable (line 1388)
+- new JITVariable (line 1452)
+- new JITVariable (line 1490)
+- new JITVariable (line 1501)
+- new JITVariable (line 1508)
+- new JITVariable (line 1516)
+- new JITVariable (line 1523)
+- new JITVariable (line 1583)
+- new JITVariable (line 1612)
+- 27 class method(s)
 
 ### `ext/dom/JitDomAppendChildUserScript.php`
 
@@ -10925,8 +10929,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomImportNode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 816)
-- 17 class method(s)
+- new JITVariable (line 845)
+- 18 class method(s)
 
 ### `ext/dom/JitDomImportSimpleXmlUserScript.php`
 
@@ -11252,7 +11256,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomSetIdAttribute.php`
 
 **Warnings** (review for bootstrap subset):
-- 24 class method(s)
+- 25 class method(s)
 - 6 closure(s)
 
 ### `ext/dom/JitDomSplitText.php`
@@ -19982,10 +19986,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/JitMbConvertEncoding.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 13 class method(s)
 - 1 closure(s)
 
 ### `ext/mbstring/JitMbConvertKana.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
+### `ext/mbstring/JitMbConvertVariables.php`
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
@@ -20011,20 +20020,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/JitMbEreg.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `ext/mbstring/JitMbEregSearch.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 151)
-- new ArgumentCountError (line 185)
-- new ArgumentCountError (line 213)
-- new ArgumentCountError (line 242)
-- new ArgumentCountError (line 277)
-- new ArgumentCountError (line 311)
-- new ArgumentCountError (line 328)
-- new ArgumentCountError (line 352)
-- 17 class method(s)
+- new HashTable (line 78)
+- new ArgumentCountError (line 183)
+- new ArgumentCountError (line 217)
+- new ArgumentCountError (line 245)
+- new ArgumentCountError (line 274)
+- new ArgumentCountError (line 309)
+- new ArgumentCountError (line 343)
+- new ArgumentCountError (line 360)
+- new ArgumentCountError (line 384)
+- 18 class method(s)
 
 ### `ext/mbstring/JitMbHttpInput.php`
 
@@ -20167,6 +20177,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/mbstring/MbConvertVariablesJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/mbstring/MbDetectEncodingJitHelper.php`
 
@@ -20469,7 +20484,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_convert_variables.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -32203,14 +32218,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new JsonException (line 137)
-- new JsonException (line 216)
-- new VmJsonExportException (line 272)
-- new ClassEntry (line 285)
-- new VmVariable (line 296)
-- new VmVariable (line 299)
-- new JITVariable (line 642)
-- new JITVariable (line 722)
-- new JITVariable (line 776)
+- new JsonException (line 218)
+- new VmJsonExportException (line 274)
+- new ClassEntry (line 287)
+- new VmVariable (line 298)
+- new VmVariable (line 301)
+- new JITVariable (line 644)
+- new JITVariable (line 724)
+- new JITVariable (line 778)
 - 13 class method(s)
 - 1 closure(s)
 
@@ -51161,6 +51176,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/MbConvertVariablesRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/MbDetectEncodingRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -52667,8 +52687,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringBitwiseNot.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 157)
-- 9 class method(s)
+- new Variable (line 113)
+- new Variable (line 186)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/StringBrotli.php`
 
@@ -57356,18 +57377,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Helper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 215)
-- new Variable (line 219)
-- new Variable (line 221)
-- new Variable (line 2431)
-- new Variable (line 2435)
-- new Variable (line 2646)
-- new Variable (line 2658)
-- new Variable (line 2808)
-- new Variable (line 3051)
-- new Variable (line 3067)
-- new Variable (line 3089)
-- new Variable (line 3100)
+- new Variable (line 216)
+- new Variable (line 252)
+- new Variable (line 256)
+- new Variable (line 258)
+- new Variable (line 2474)
+- new Variable (line 2478)
+- new Variable (line 2689)
+- new Variable (line 2701)
+- new Variable (line 2851)
+- new Variable (line 3094)
+- new Variable (line 3110)
+- new Variable (line 3132)
+- new Variable (line 3143)
 - 22 class method(s)
 - 8 closure(s)
 
