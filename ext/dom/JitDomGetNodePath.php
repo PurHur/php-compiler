@@ -343,6 +343,11 @@ final class JitDomGetNodePath
 
     private static function isDocumentClass(string $classLc): bool
     {
+        // DocumentFragment stand-in is DOMElement layout — not a document (#35461 peer).
+        if (str_contains($classLc, 'fragment')) {
+            return false;
+        }
+
         return str_contains($classLc, 'document') && !str_contains($classLc, 'element');
     }
 

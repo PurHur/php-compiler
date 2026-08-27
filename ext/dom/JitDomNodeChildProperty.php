@@ -298,10 +298,18 @@ final class JitDomNodeChildProperty
      * Element allocations store first/last on DOMElement. Using DOMNode indices
      * on those objects aliases tagName/nodeName (#32361). Documents keep DOMNode.
      * appendChild() return temps are typed DOMNode but allocate as DOMElement.
+     *
+     * DocumentFragment thin-AOT stand-in is also DOMElement ({@see JitDomCreateDocumentFragment});
+     * LiveSlots write first/last on DOMElement. The old "contains document && !element"
+     * heuristic mapped DOMDocumentFragment → DOMNode, so firstChild stayed null after
+     * appendChild while childNodes->length and parentNode were correct (#35461).
      */
     private static function childEdgeClass(string $classLc): string
     {
         $classLc = strtolower(str_replace('/', '\\', ltrim($classLc, '\\')));
+        if (str_contains($classLc, 'fragment')) {
+            return 'DOMElement';
+        }
         if (str_contains($classLc, 'document') && !str_contains($classLc, 'element')) {
             return self::CLASS_NODE;
         }
@@ -421,10 +429,15 @@ final class JitDomNodeChildProperty
         string $propName,
         ?JITVariable $receiverVar = null
     ): void {
-        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+        $propLc = strtolower($propName);
+        // loadXML SSOT, or createElement-tree InnerXml stamped by appendChild (#35461).
+        $hasLoadXml = JitDomLoadXMLUserScript::lastLoadWasPureUserScript();
+        $hasRecvInner = null !== $receiverVar
+            && null !== $receiverVar->compileTimeDomInnerXml
+            && '' !== $receiverVar->compileTimeDomInnerXml;
+        if (!$hasLoadXml && !$hasRecvInner) {
             return;
         }
-        $propLc = strtolower($propName);
         if ('nextsibling' === $propLc || 'previoussibling' === $propLc) {
             // Parent sibling list — receiver is the child edge, not the parent (#35021).
             $nodes = self::compileTimeParentSiblingNodes($receiverVar);
