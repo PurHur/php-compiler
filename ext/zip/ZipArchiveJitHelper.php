@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 /**
- * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450) —
+ * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455) —
  * CREATE/add/close/get/locate/index/rename/delete/status path.
  *
  * Single concurrent archive slot (scalars, not array tables): NestedJIT aborts on
@@ -16,7 +16,7 @@ namespace PHPCompiler\ext\zip;
  *
  * php-src: ext/zip/php_zip.c — zim_ZipArchive_* (open / addFromString / addFile / close /
  * getFromName / locateName / getFromIndex / getNameIndex / getStatusString /
- * renameName / deleteName)
+ * renameName / deleteName / deleteIndex)
  */
 final class ZipArchiveJitHelper
 {
@@ -174,6 +174,19 @@ final class ZipArchiveJitHelper
         // deleteName — clear the single-entry slot (#35450 leftover of #35424).
         if ('delete' === $op) {
             if (1 !== self::$h1open || '' === self::$h1name || '' === $s1 || $s1 !== self::$h1name) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            self::$h1name = '';
+            self::$h1data = '';
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        // deleteIndex — only index 0 in the single-entry slot (#35455 leftover of #35450).
+        if ('delete_index' === $op) {
+            if (1 !== self::$h1open || '' === self::$h1name || 0 !== $a) {
                 self::$h1status = 9;
 
                 return self::pack(0);
