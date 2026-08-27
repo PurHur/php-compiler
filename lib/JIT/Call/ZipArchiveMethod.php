@@ -43,6 +43,10 @@ final class ZipArchiveMethod implements Call
             $this->paramNames = ['name', 'method', 'compflags='];
         } elseif ('setcompressionindex' === $lc) {
             $this->paramNames = ['index', 'method', 'compflags='];
+        } elseif ('setencryptionname' === $lc) {
+            $this->paramNames = ['name', 'method', 'password='];
+        } elseif ('setencryptionindex' === $lc) {
+            $this->paramNames = ['index', 'method', 'password='];
         }
     }
 
@@ -87,6 +91,8 @@ final class ZipArchiveMethod implements Call
             'setpassword' => JitZipArchive::setPassword($context, ...$args),
             'setcompressionname' => JitZipArchive::setCompressionName($context, ...$args),
             'setcompressionindex' => JitZipArchive::setCompressionIndex($context, ...$args),
+            'setencryptionname' => JitZipArchive::setEncryptionName($context, ...$args),
+            'setencryptionindex' => JitZipArchive::setEncryptionIndex($context, ...$args),
             'statname' => JitZipArchive::statName($context, ...$args),
             'statindex' => JitZipArchive::statIndex($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
