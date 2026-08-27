@@ -1102,6 +1102,12 @@ final class VmValueCompare
         return $context->builder->icmp(Builder::INT_EQ, $same, $i1->constInt(0, false));
     }
 
+    /**
+     * Boxed __value__ ordered-compare native long — float promote (#23471); string via
+     * numeric path (#35320 leftover of #35317). Do not readLong on IS_STRING ("10"→0).
+     *
+     * php-src: Zend/zend_operators.c compare_function — IS_DOUBLE / IS_STRING vs IS_LONG.
+     */
     public static function orderedValueToNativeLong(
         Context $context,
         int $opcodeType,
@@ -1112,19 +1118,35 @@ final class VmValueCompare
             throw new \LogicException('Expected boxed __value__ operand');
         }
 
-        // Zend compare_function: IS_DOUBLE < IS_LONG promotes the long to double.
-        // __value__readLong truncates floats, giving wrong results (#23471).
-        $isDouble = \PHPCompiler\JIT\JitValueNumeric::valueIsDouble($context, $boxed);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
         $floatBb = BasicBlockHelper::append($context, 'ord_vbox_long_float');
+        $stringCheckBb = BasicBlockHelper::append($context, 'ord_vbox_long_string_check');
+        $stringBb = BasicBlockHelper::append($context, 'ord_vbox_long_string');
         $longBb = BasicBlockHelper::append($context, 'ord_vbox_long_long');
         $doneBb = BasicBlockHelper::append($context, 'ord_vbox_long_done');
-        $context->builder->branchIf($isDouble, $floatBb, $longBb);
+        $context->builder->branchIf($isDouble, $floatBb, $stringCheckBb);
 
         $context->builder->positionAtEnd($floatBb);
         $f64 = $context->getTypeFromString('double');
         $boxedDouble = $context->builder->call(
             $context->lookupFunction('__value__readDouble'),
-            JitValueBox::valuePtrFromVariable($context, $boxed)
+            $valuePtr
         );
         $nativeDouble = $context->builder->siToFp($nativeLong, $f64);
         $floatResult = VmFloatCompare::relationalCompare(
@@ -1136,8 +1158,21 @@ final class VmValueCompare
         $floatEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
+        $context->builder->positionAtEnd($stringCheckBb);
+        $context->builder->branchIf($isString, $stringBb, $longBb);
+
+        $context->builder->positionAtEnd($stringBb);
+        // Do not readLong on IS_STRING ("10"→0 → 0<10→true) (#35320 leftover of #35317).
+        $storedStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $stringCmp = self::spaceshipStringToNativeLong($context, $storedStr, $nativeLong);
+        $stringResult = self::boolFromSpaceshipCmp($context, $opcodeType, $stringCmp);
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
         $context->builder->positionAtEnd($longBb);
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $leftLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
@@ -1151,11 +1186,15 @@ final class VmValueCompare
         $i1 = $context->getTypeFromString('int1');
         $phi = $context->builder->phi($i1, 'ord_vbox_long_phi');
         $phi->addIncoming($floatResult, $floatEnd);
+        $phi->addIncoming($stringResult, $stringEnd);
         $phi->addIncoming($longResult, $longEnd);
 
         return $phi;
     }
 
+    /**
+     * Native long ordered-compare boxed __value__ — float (#23471); string (#35320).
+     */
     public static function orderedNativeLongToValue(
         Context $context,
         int $opcodeType,
@@ -1166,18 +1205,35 @@ final class VmValueCompare
             throw new \LogicException('Expected boxed __value__ operand');
         }
 
-        // Zend compare_function: IS_LONG < IS_DOUBLE promotes the long to double (#23471).
-        $isDouble = \PHPCompiler\JIT\JitValueNumeric::valueIsDouble($context, $boxed);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
         $floatBb = BasicBlockHelper::append($context, 'ord_long_vbox_float');
+        $stringCheckBb = BasicBlockHelper::append($context, 'ord_long_vbox_string_check');
+        $stringBb = BasicBlockHelper::append($context, 'ord_long_vbox_string');
         $longBb = BasicBlockHelper::append($context, 'ord_long_vbox_long');
         $doneBb = BasicBlockHelper::append($context, 'ord_long_vbox_done');
-        $context->builder->branchIf($isDouble, $floatBb, $longBb);
+        $context->builder->branchIf($isDouble, $floatBb, $stringCheckBb);
 
         $context->builder->positionAtEnd($floatBb);
         $f64 = $context->getTypeFromString('double');
         $boxedDouble = $context->builder->call(
             $context->lookupFunction('__value__readDouble'),
-            JitValueBox::valuePtrFromVariable($context, $boxed)
+            $valuePtr
         );
         $nativeDouble = $context->builder->siToFp($nativeLong, $f64);
         $floatResult = VmFloatCompare::relationalCompare(
@@ -1189,8 +1245,24 @@ final class VmValueCompare
         $floatEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
+        $context->builder->positionAtEnd($stringCheckBb);
+        $context->builder->branchIf($isString, $stringBb, $longBb);
+
+        $context->builder->positionAtEnd($stringBb);
+        $storedStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $stringCmp = $context->builder->sub(
+            $i64->constInt(0, false),
+            self::spaceshipStringToNativeLong($context, $storedStr, $nativeLong)
+        );
+        $stringResult = self::boolFromSpaceshipCmp($context, $opcodeType, $stringCmp);
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
         $context->builder->positionAtEnd($longBb);
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $rightLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
@@ -1204,6 +1276,7 @@ final class VmValueCompare
         $i1 = $context->getTypeFromString('int1');
         $phi = $context->builder->phi($i1, 'ord_long_vbox_phi');
         $phi->addIncoming($floatResult, $floatEnd);
+        $phi->addIncoming($stringResult, $stringEnd);
         $phi->addIncoming($longResult, $longEnd);
 
         return $phi;

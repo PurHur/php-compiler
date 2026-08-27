@@ -1245,6 +1245,58 @@ final class JitUnlikeCompare
             $strLongVal = $cmpPhi;
             $strLongEnd = $context->builder->getInsertBlock();
             $context->builder->branch($doneBb);
+        } elseif (self::isCompareOp($opType)) {
+            // Ordered < > <= >= boxed str×long — same numeric path as #35317 (#35320).
+            $strLongBb = BasicBlockHelper::append($context, $tag.'_ord_str_long');
+            $context->builder->positionAtEnd($preGenBb);
+            $context->builder->branchIf($strVsLong, $strLongBb, $genBb);
+
+            $context->builder->positionAtEnd($strLongBb);
+            $readStrFn = $context->lookupFunction('__value__readString');
+            $readLongFn = $context->lookupFunction('__value__readLong');
+            $strLeftBb = BasicBlockHelper::append($context, $tag.'_ord_str_left');
+            $strRightBb = BasicBlockHelper::append($context, $tag.'_ord_str_right');
+            $strLongJoin = BasicBlockHelper::append($context, $tag.'_ord_str_long_join');
+            $context->builder->branchIf($leftIsStr, $strLeftBb, $strRightBb);
+
+            $context->builder->positionAtEnd($strLeftBb);
+            $strL = $context->builder->call(
+                $readStrFn,
+                $context->builder->pointerCast($leftPtr, $readStrFn->getParam(0)->typeOf())
+            );
+            $longR = $context->builder->call(
+                $readLongFn,
+                $context->builder->pointerCast($rightPtr, $readLongFn->getParam(0)->typeOf())
+            );
+            $cmpL = \PHPCompiler\VM\VmValueCompare::spaceshipStringToNativeLong($context, $strL, $longR);
+            $boolL = \PHPCompiler\VM\VmValueCompare::boolFromSpaceshipCmp($context, $opType, $cmpL);
+            $strLeftEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($strLongJoin);
+
+            $context->builder->positionAtEnd($strRightBb);
+            $longL = $context->builder->call(
+                $readLongFn,
+                $context->builder->pointerCast($leftPtr, $readLongFn->getParam(0)->typeOf())
+            );
+            $strR = $context->builder->call(
+                $readStrFn,
+                $context->builder->pointerCast($rightPtr, $readStrFn->getParam(0)->typeOf())
+            );
+            $cmpR = $context->builder->sub(
+                $i64->constInt(0, false),
+                \PHPCompiler\VM\VmValueCompare::spaceshipStringToNativeLong($context, $strR, $longL)
+            );
+            $boolR = \PHPCompiler\VM\VmValueCompare::boolFromSpaceshipCmp($context, $opType, $cmpR);
+            $strRightEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($strLongJoin);
+
+            $context->builder->positionAtEnd($strLongJoin);
+            $boolPhi = $context->builder->phi($i1, $tag.'_ord_str_long_phi');
+            $boolPhi->addIncoming($boolL, $strLeftEnd);
+            $boolPhi->addIncoming($boolR, $strRightEnd);
+            $strLongVal = $boolPhi;
+            $strLongEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBb);
         } else {
             $context->builder->positionAtEnd($preGenBb);
             $context->builder->branch($genBb);
