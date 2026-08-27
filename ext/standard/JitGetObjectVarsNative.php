@@ -537,6 +537,28 @@ final class JitGetObjectVarsNative
 
     private static function valuePropertyIsSet(Context $context, JITVariable $fetched): Value
     {
+        // Invisible parent-private / already-boxed fetches have no live slot (#27226 / #35479).
+        // Probe the fetched __value__ directly instead of load_value_slot(null).
+        if (null === $fetched->objectPropertySlot) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $fetched);
+            $valueMap = $context->structFieldMap['__value__'];
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($valuePtr, $valueMap['type'])
+            );
+            $i8 = $context->getTypeFromString('int8');
+            $notNull = $context->builder->icmp(
+                Builder::INT_NE,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NULL, false)
+            );
+            $notUndefined = $context->builder->icmp(
+                Builder::INT_NE,
+                $typeByte,
+                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false)
+            );
+
+            return $context->builder->and($notNull, $notUndefined);
+        }
         $storage = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__object__load_value_slot'),
@@ -572,6 +594,16 @@ final class JitGetObjectVarsNative
     ): void {
         if (JITVariable::TYPE_VALUE === $propertyType) {
             $dest = HashTableHelper::writableStringKeyValueBox($context, $ht, $keyStr);
+            if (null === $fetched->objectPropertySlot) {
+                // Already-boxed / invisible-private fetch — copy __value__ (#27226 / #35479).
+                JitValueBox::copyFromPointer(
+                    $context,
+                    $dest->value,
+                    JitValueBox::valuePtrFromVariable($context, $fetched)
+                );
+
+                return;
+            }
             $context->builder->call(
                 $context->lookupFunction('__object__load_value_slot'),
                 $fetched->objectPropertySlot,
