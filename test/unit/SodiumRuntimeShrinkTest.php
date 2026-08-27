@@ -86,4 +86,24 @@ final class SodiumRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('StringSodiumGenerichash.php', $spine);
     }
+
+    /** #35378 — AOT/JIT sodium_bin2base64 via SodiumBase64JitHelper (no stub LogicException). */
+    public function testSodiumBin2base64CallUsesSodiumBase64JitHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sodium/sodium_bin2base64.php');
+        $this->assertStringContainsString('JitSodium::invokeBin2base64', $source);
+        $this->assertStringContainsString('lowerZparamStr', $source);
+        $this->assertStringNotContainsString('JIT is not supported', $source);
+
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/sodium/SodiumBase64JitHelper.php');
+        $this->assertStringContainsString('function bin2base64Argv', $helper);
+        $this->assertStringContainsString('Base64JitHelper::encodeArgv', $helper);
+
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSodium.php');
+        $this->assertStringContainsString('SodiumBase64JitHelper', $bridge);
+        $this->assertStringContainsString('BASE64_HELPER_BUNDLE', $bridge);
+
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('SodiumBase64JitHelper.php', $spine);
+    }
 }
