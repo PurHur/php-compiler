@@ -58,6 +58,10 @@ final class SubstrCompareRuntimeShrinkTest extends TestCase
         $expected = VmString::substr_compare('abc', 'ab', 0, 2);
         $this->assertSame($expected, SubstrCompareJitHelper::substrCompareArgv('abc', 'ab', 0, 2, false));
         $this->assertSame(0, $expected);
+
+        // php-src string.c — null $length means "compare per needle/haystack remainder" (#4297).
+        $this->assertSame(1, VmString::substr_compare('abcde', 'bc', 1, null, false));
+        $this->assertSame(1, SubstrCompareJitHelper::substrCompareArgv('abcde', 'bc', 1, -1, false));
     }
 
     public function testSpineBundleIncludesSubstrCompareJitHelper(): void

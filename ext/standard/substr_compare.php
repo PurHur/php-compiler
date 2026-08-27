@@ -85,6 +85,11 @@ final class substr_compare extends Internal
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
 
+        $literalFold = self::tryFoldCompileTimeLiteral($context, $args, $argc);
+        if (null !== $literalFold) {
+            return $literalFold;
+        }
+
         // Compile-time soft-null fold (#21515) — DEP + host-evaluate when operands are literals.
         $folded = self::tryFoldCompileTimeSoftNull($context, $args);
         if (null !== $folded) {
@@ -105,13 +110,20 @@ final class substr_compare extends Internal
         }
 
         StringSubstrCompare::ensureLinked($context);
-        $lengthVal = $i64->constInt(-1, false);
+        $lengthVal = $i64->constInt(-1, true);
         if ($argc >= 4) {
-            if (JITVariable::TYPE_VALUE === $args[3]->type && $args[3]->isNullConstant) {
-                $lengthVal = $i64->constInt(-1, false);
-            } else {
-                $lengthVal = self::lowerStrictIntArg($context, $args[3], 'substr_compare', 4, 'length');
-            }
+            [$hasLength, $lengthArg] = JitIntdiv::lowerSpliceLengthArg(
+                $context,
+                $args[3],
+                'substr_compare',
+                4,
+                'length'
+            );
+            $lengthVal = $context->builder->select(
+                $context->builder->not($hasLength),
+                $i64->constInt(-1, true),
+                $lengthArg
+            );
         }
         // Z_PARAM_BOOL $case_insensitive — strict TypeError; soft-null DEP+coerce (#29756).
         // Compile-time null under strict: emit catchable TypeError and stop (do not continue
@@ -146,6 +158,47 @@ final class substr_compare extends Internal
         $raw = $context->builder->call($fn, $p0, $p1, $offset, $lengthVal, $ci);
 
         return $context->builder->sExt($raw, $i64);
+    }
+
+    /**
+     * Host-evaluate when haystack, needle, and offset are compile-time literals (#4297).
+     */
+    private static function tryFoldCompileTimeLiteral(Context $context, array $args, int $argc): ?Value
+    {
+        $hayLit = JitStringArg::compileTimeLiteral($args[0]);
+        $needleLit = JitStringArg::compileTimeLiteral($args[1]);
+        if (null === $hayLit || null === $needleLit) {
+            return null;
+        }
+        if (self::isCompileTimeNull($args[2])) {
+            return null;
+        }
+        if (null === $args[2]->compileTimeLong) {
+            return null;
+        }
+        $offset = $args[2]->compileTimeLong;
+        $length = null;
+        if ($argc >= 4) {
+            if (self::isCompileTimeNull($args[3])) {
+                $length = null;
+            } elseif (null !== $args[3]->compileTimeLong) {
+                $length = $args[3]->compileTimeLong;
+            } else {
+                return null;
+            }
+        }
+        $caseInsensitive = false;
+        if (5 === $argc) {
+            if (null === $args[4]->compileTimeLong) {
+                return null;
+            }
+            $caseInsensitive = 0 !== $args[4]->compileTimeLong;
+        }
+
+        return $context->getTypeFromString('int64')->constInt(
+            VmString::substr_compare($hayLit, $needleLit, $offset, $length, $caseInsensitive),
+            true
+        );
     }
 
     /**
