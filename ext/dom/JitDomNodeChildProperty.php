@@ -29,6 +29,15 @@ final class JitDomNodeChildProperty
 
     public static ?int $lastFetchedChildIndex = null;
 
+    /**
+     * Survives documentElement re-fetch clearing {@see $lastFetchedTagName} (#32949).
+     * Needed when `$d->documentElement->replaceChild($new, $old)` evaluates the
+     * receiver after `$old = …->firstChild` (#35421).
+     */
+    public static ?string $stickyChildEdgeTagName = null;
+
+    public static ?int $stickyChildEdgeChildIndex = null;
+
     /** @var array<string, string>|null Open-tag attrs for {@see $lastFetchedChildIndex} (#34050). */
     public static ?array $lastFetchedAttributes = null;
 
@@ -533,6 +542,7 @@ final class JitDomNodeChildProperty
     {
         $result->compileTimeDomChildIndex = $index;
         self::$lastFetchedChildIndex = $index;
+        self::$stickyChildEdgeChildIndex = $index;
         $kind = $nodes[$index]['kind'] ?? '';
         // Text/comment/PI/CDATA payloads for CharacterData methods on firstChild temps
         // (#34314 / #34475 / #34952 / #34949).
@@ -563,12 +573,14 @@ final class JitDomNodeChildProperty
             }
             self::$lastFetchedTagName = null;
             self::$lastFetchedAttributes = null;
+            self::$stickyChildEdgeTagName = $result->compileTimeDomTagName;
 
             return;
         }
         if ('element' === $kind) {
             $result->compileTimeDomTagName = $nodes[$index]['data'];
             self::$lastFetchedTagName = $nodes[$index]['data'];
+            self::$stickyChildEdgeTagName = $nodes[$index]['data'];
             $inner = $nodes[$index]['inner'] ?? null;
             if (null !== $inner) {
                 $result->compileTimeDomInnerXml = $inner;

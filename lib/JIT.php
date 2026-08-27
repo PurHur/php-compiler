@@ -16901,6 +16901,26 @@ class JIT {
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
+        // ARG_SEND temps for firstChild/item() often drop compileTimeDom* (#32903).
+        // Recover lastFetched* before syncing the replaceChild/removeChild return so
+        // later cloneNode does not fall through to documentElement (#35421).
+        if (
+            $toCall instanceof JIT\Call\DomNodeReplaceChild
+            || $toCall instanceof JIT\Call\DomNodeRemoveChild
+        ) {
+            if (null === $child->compileTimeDomTagName || '' === $child->compileTimeDomTagName) {
+                $child->compileTimeDomTagName =
+                    \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedTagName
+                    ?? \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedTagName
+                    ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeTagName;
+            }
+            if (null === $child->compileTimeDomChildIndex) {
+                $child->compileTimeDomChildIndex =
+                    \PHPCompiler\ext\dom\JitDomNodeChildProperty::$lastFetchedChildIndex
+                    ?? \PHPCompiler\ext\dom\JitDomNodeListItem::$lastFetchedChildIndex
+                    ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeChildIndex;
+            }
+        }
         $resultVar = $this->context->getVariableFromOp($result);
         // Force-sync present child metadata (result is a fresh box of the same node).
         $this->syncCompileTimeDomTagName($resultVar, $child, true);
