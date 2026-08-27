@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\LlvmToolchain;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -60,5 +61,73 @@ final class GeneratorThrowCatchNoYield33726AotTest extends TestCase
         $this->assertStringContainsString('#33726', $fixture);
         $this->assertStringContainsString('--EXPECT--', $fixture);
         $this->assertStringContainsString("Cx\n", $fixture."\n");
+    }
+
+    /**
+     * Catch arm yields again after Generator::throw — must compile and match Zend (#35144).
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testAotGeneratorThrowCatchYieldAgainMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(__DIR__.'/../repro/issue_35144_generator_throw_catch_yield.php');
+    }
+
+    /**
+     * Catch without re-yield — NestedJIT must not poison generator resume IR (#35144).
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testAotGeneratorThrowCatchNoYieldMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(__DIR__.'/../repro/issue_gen_throw_catch_no_yield.php');
+    }
+
+    private function assertAotMatchesZend(string $src): void
+    {
+        $zend = $this->runPhp($src);
+        $aot = $this->runAot($src);
+        $this->assertSame($zend, $aot);
+    }
+
+    private function runPhp(string $src): string
+    {
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($src);
+        exec($cmd.' 2>&1', $out, $rc);
+        $this->assertSame(0, $rc, implode("\n", $out));
+
+        return implode("\n", $out);
+    }
+
+    private function runAot(string $src): string
+    {
+        $root = dirname(__DIR__, 2);
+        $bin = sys_get_temp_dir().'/gen_throw_catch_'.getmypid().'_'.md5($src);
+        $cmd = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
+            .escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src);
+        $cwd = getcwd();
+        chdir($root);
+        try {
+            exec($cmd.' 2>&1', $compOut, $compRc);
+            $this->assertSame(0, $compRc, implode("\n", $compOut));
+            $this->assertFileExists($bin);
+            exec(escapeshellarg($bin).' 2>&1', $out, $rc);
+            $this->assertSame(0, $rc, implode("\n", $out));
+
+            return implode("\n", $out);
+        } finally {
+            chdir($cwd);
+            @unlink($bin);
+        }
     }
 }

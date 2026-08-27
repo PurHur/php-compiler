@@ -140,6 +140,9 @@ final class GeneratorHelper
                 || OpCode::TYPE_RETURN === $op->type
                 || OpCode::TYPE_RETURN_VOID === $op->type
                 || OpCode::TYPE_YIELD === $op->type
+                // TYPE_TRY already wired by beginTryGeneratorResume above — re-lowering
+                // into gen_try_body_entry puts a second terminator mid-block (#35144).
+                || OpCode::TYPE_TRY === $op->type
             ) {
                 $stop = $i;
                 break;
