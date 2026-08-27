@@ -11,7 +11,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** mb_language() — NLS language setting (php-src ext/mbstring/mbstring.c; #4636, #21538). */
+/**
+ * mb_language() — NLS language setting (php-src ext/mbstring/mbstring.c; #4636, #21538, #35259).
+ *
+ * JIT/AOT: compile-time fold + NestedJIT via {@see JitMbLanguage}.
+ */
 final class mb_language extends Internal
 {
     public function __construct()
@@ -45,24 +49,6 @@ final class mb_language extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc > 1) {
-            throw new \ArgumentCountError(sprintf(
-                'mb_language() expects at most 1 argument, %d given',
-                $argc
-            ));
-        }
-        // Compile-time omitted/null getter fold (php-src Z_PARAM_STR_OR_NULL); setters stay VM-only.
-        if (0 === $argc
-            || (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
-        ) {
-            return $context->builder->load(
-                $context->constantStringFromString((string) MbstringState::language())
-            );
-        }
-
-        throw new \LogicException(
-            'mb_language() JIT setter is not supported in this compiler build'
-        );
+        return JitMbLanguage::invoke($context, $args);
     }
 }
