@@ -796,6 +796,19 @@ final class ZipArchiveJitHelper
 
             return self::pack(1);
         }
+        // registerProgressCallback / registerCancelCallback — open + success (#35539 / #20378).
+        // NestedJIT cannot store PHP callables; registration still returns true when open
+        // (callback invoke during mutate/close remains VM-only until a later leftover).
+        if ('rpc' === $op || 'rcc' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
         if ('status' === $op) {
             return self::pack(self::$h1status);
         }

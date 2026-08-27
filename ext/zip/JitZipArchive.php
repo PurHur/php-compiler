@@ -2477,6 +2477,64 @@ final class JitZipArchive
     }
 
     /**
+     * ZipArchive::registerProgressCallback — NestedJIT rpc (#35539 leftover of #35534 / #20378).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_registerProgressCallback
+     * Callable is accepted for arity/type; NestedJIT does not persist/invoke it yet.
+     */
+    public static function registerProgressCallback(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::registerProgressCallback', 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        // $rate + $callback accepted for arity; NestedJIT does not coerce/store them yet.
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        $ok = self::execLong(
+            $context,
+            'rpc',
+            $handle,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::registerCancelCallback — NestedJIT rcc (#35539 leftover of #35534 / #20378).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_registerCancelCallback
+     */
+    public static function registerCancelCallback(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::registerCancelCallback', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $i64 = $context->getTypeFromString('int64');
+        $ok = self::execLong(
+            $context,
+            'rcc',
+            $handle,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
      * ZipArchive::getStream — NestedJIT gstr + php://memory fopen/fwrite/rewind (#35534 leftover of #35531).
      *
      * php-src: ext/zip/php_zip.c — zim_ZipArchive_getStream
