@@ -3724,6 +3724,12 @@ class Object_ extends Type {
         if ('transliterator' === $lcname) {
             $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmTransliterator::classConstants());
         }
+        // IntlCalendar Call proxies are linked (#6151/#20756); seed FIELD_*/DOW_*/… so
+        // ClassConstFetch folds to compile-time long (#35389 peer of #35384). Without this,
+        // thin AOT raises Undefined constant IntlCalendar::FIELD_YEAR at runtime.
+        if ('intlcalendar' === $lcname) {
+            $this->seedExternalClassConstants($id, \PHPCompiler\ext\intl\VmIntlCalendar::classConstants());
+        }
         // Gate on advertisement (host ext/zip or PHP_COMPILER_ENABLE_ZIP), not PROFILE-only
         // supportsZip() — ENABLE_ZIP on the reference profile must seed CREATE/OVERWRITE for
         // ClassConstFetch (#34412 leftover of #28110); PROFILE=8.4 alone must not phantom-seed.
