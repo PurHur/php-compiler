@@ -194,15 +194,6 @@ final class TryCatchHelper
         if (null === $matchingHandler || null === $matchingIdx) {
             return null;
         }
-        // php-cfg wires try fall-through and `continue` to the try merge block (#35547).
-        // That edge must run finally, but the merge block is already the post-finally
-        // destination — branch into finally directly instead of goto-pending resume.
-        if ($target === $matchingHandler->mergeBlock) {
-            return self::finallyBbFor($jit, $func, $context, $matchingHandler, $args, false);
-        }
-        $matchingHandler->mayDeferGotoLeave = true;
-        self::ensureGotoPendingSlots($context, $func);
-        $resumeId = $context->tryCatch->nextGotoResumeId++;
         $outerHandlers = [];
         for ($j = $matchingIdx - 1; $j >= 0; --$j) {
             $outer = $stack[$j];
@@ -213,6 +204,16 @@ final class TryCatchHelper
                 $outerHandlers[] = $outer;
             }
         }
+        // php-cfg wires try fall-through and `continue` to the try merge block (#35547).
+        // That edge must run finally, but the merge block is already the post-finally
+        // destination — branch into finally directly instead of goto-pending resume.
+        // Nested try/finally still needs outer finally via goto-pending (#35547 follow-up).
+        if ($target === $matchingHandler->mergeBlock && [] === $outerHandlers) {
+            return self::finallyBbFor($jit, $func, $context, $matchingHandler, $args, false);
+        }
+        $matchingHandler->mayDeferGotoLeave = true;
+        self::ensureGotoPendingSlots($context, $func);
+        $resumeId = $context->tryCatch->nextGotoResumeId++;
         $runOrder = array_merge([$matchingHandler], $outerHandlers);
         $next = null;
         for ($k = \count($runOrder) - 1; $k >= 0; --$k) {
@@ -1768,11 +1769,14 @@ final class TryCatchHelper
         $hasThrowBool = $builder->icmp(Builder::INT_NE, $hasThrow, $i32->constInt(0, false));
         $propagate = self::appendBlock($func, 'try_finally_propagate_'.self::blockSuffix($handler));
         $uncaught = self::appendBlock($func, 'try_finally_uncaught_'.self::blockSuffix($handler));
+        $toMerge = self::appendBlock($func, 'try_finally_to_merge_'.self::blockSuffix($handler));
         if (null !== $mergeBb) {
-            $builder->branchIf($hasThrowBool, $propagate, $mergeBb);
+            $builder->branchIf($hasThrowBool, $propagate, $toMerge);
         } else {
             $builder->branchIf($hasThrowBool, $propagate, $uncaught);
         }
+        $builder->positionAtEnd($toMerge);
+        self::branchToMergeOrOuterFinallyUnwind($jit, $func, $context, $handler, $mergeBb, $args);
         $builder->positionAtEnd($propagate);
         // Peek at the enclosing handler without popping — popHandler here runs at
         // compile time and would drop the active try before the try body is lowered,
@@ -1803,6 +1807,80 @@ final class TryCatchHelper
         }
 
         return $epilogue;
+    }
+
+    /**
+     * After a finally body completes, rejoin merge or run an enclosing finally first
+     * (peer VM completeActiveFinallyUnwind → beginGotoFinallyUnwind, #25240 / #35547).
+     *
+     * @param list<Variable> $args
+     */
+    private static function branchToMergeOrOuterFinallyUnwind(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler,
+        ?BasicBlock $mergeBb,
+        array $args
+    ): void {
+        $builder = $context->builder;
+        if (null === $mergeBb) {
+            $builder->returnVoid();
+
+            return;
+        }
+        $outer = self::findOuterHandlerNeedingFinallyBeforeMerge(
+            $context,
+            $handler,
+            $handler->mergeBlock
+        );
+        if (null === $outer) {
+            $builder->branch($mergeBb);
+
+            return;
+        }
+        self::ensureGotoPendingSlots($context, $func);
+        $resumeId = $context->tryCatch->nextGotoResumeId++;
+        $outer->mayDeferGotoLeave = true;
+        $outer->gotoPendingNext[$resumeId] = null;
+        $outer->gotoPendingResumeCfgTargets[$resumeId] = $handler->mergeBlock;
+        $outer->gotoPendingClears[$resumeId] = true;
+        if (!\in_array($outer, $context->tryCatch->gotoResumeHandlers, true)) {
+            $context->tryCatch->gotoResumeHandlers[] = $outer;
+        }
+        self::storeGotoPending($context, $resumeId);
+        $builder->branch(self::finallyBbFor($jit, $func, $context, $outer, $args, false));
+    }
+
+    private static function findOuterHandlerNeedingFinallyBeforeMerge(
+        Context $context,
+        TryCatchHandler $completedHandler,
+        Block $mergeTarget
+    ): ?TryCatchHandler {
+        $stack = $context->tryCatch->handlerStack;
+        $completedIdx = array_search($completedHandler, $stack, true);
+        if (false === $completedIdx) {
+            return null;
+        }
+        for ($i = $completedIdx - 1; $i >= 0; --$i) {
+            $outer = $stack[$i];
+            if (null === $outer->finallyOp || null === $outer->finallyOp->block1) {
+                continue;
+            }
+            $tryBody = $completedHandler->tryBodyBlock;
+            if (null === $tryBody || !self::blockIsInsideActiveTryBody($outer, $tryBody)) {
+                continue;
+            }
+            if ($mergeTarget === $outer->finallyOp->block1) {
+                continue;
+            }
+            $isMerge = isset($context->tryCatch->mergeBlockIds[spl_object_id($mergeTarget)]);
+            if ($isMerge || !self::blockIsInsideActiveTryBody($outer, $mergeTarget)) {
+                return $outer;
+            }
+        }
+
+        return null;
     }
 
     private static function returnResumeBbFor(
