@@ -41,6 +41,27 @@ final class SodiumRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JIT is not supported', $source);
     }
 
+    /** #35357 — AOT/JIT sodium_hex2bin via SodiumHex2binJitHelper (no stub LogicException). */
+    public function testSodiumHex2binCallUsesSodiumHex2binJitHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sodium/sodium_hex2bin.php');
+        $this->assertStringContainsString('JitSodium::invokeHex2bin', $source);
+        $this->assertStringContainsString('lowerTrimFamilyString', $source);
+        $this->assertStringNotContainsString('JIT is not supported', $source);
+
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/sodium/SodiumHex2binJitHelper.php');
+        $this->assertStringContainsString('function hex2binArgv', $helper);
+        $this->assertStringContainsString('SodiumException', $helper);
+
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSodium.php');
+        $this->assertStringContainsString('SodiumHex2binJitHelper', $bridge);
+        $this->assertStringContainsString('__compiler_sodium_hex2bin', $bridge);
+        $this->assertStringContainsString('HEX2BIN_HELPER_PATH', $bridge);
+
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('SodiumHex2binJitHelper.php', $spine);
+    }
+
     /** #27318 — AOT/JIT xchacha AEAD via thin libsodium LLVM (no NestedJIT FFI). */
     public function testSodiumAeadXchachaCallUsesStringSodiumAead(): void
     {

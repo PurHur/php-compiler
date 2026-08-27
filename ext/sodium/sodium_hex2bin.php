@@ -8,12 +8,18 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** sodium_hex2bin() — hex to binary (php-src ext/sodium/libsodium.c; #3438, #24772). */
+/**
+ * sodium_hex2bin() — hex to binary (php-src ext/sodium/libsodium.c; #3438, #24772, #35357).
+ *
+ * JIT/AOT: NestedJIT {@see SodiumHex2binJitHelper} via {@see JitSodium::invokeHex2bin}
+ * / `__compiler_sodium_hex2bin` (peer sodium_pad #27687 / hex2bin #27008).
+ */
 final class sodium_hex2bin extends Internal
 {
     public function __construct()
@@ -53,6 +59,46 @@ final class sodium_hex2bin extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() JIT is not supported in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, $this->getName(), 1, 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+
+        $string = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[0],
+                $this->getName(),
+                0,
+                'string'
+            )
+            : JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[0],
+                $this->getName(),
+                0,
+                'string'
+            );
+
+        if (\count($args) >= 2) {
+            $ignore = $context->callerStrictTypes
+                ? JitStringBuiltinArg::lowerStrictOrCoercible(
+                    $context,
+                    $args[1],
+                    $this->getName(),
+                    1,
+                    'ignore'
+                )
+                : JitStringBuiltinArg::lowerTrimFamilyString(
+                    $context,
+                    $args[1],
+                    $this->getName(),
+                    1,
+                    'ignore'
+                );
+        } else {
+            $ignore = $context->builder->load($context->constantStringFromString(''));
+        }
+
+        return JitSodium::invokeHex2bin($context, $string, $ignore);
     }
 }

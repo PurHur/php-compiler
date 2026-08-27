@@ -21,6 +21,7 @@ final class StringSodium
 {
     private const HELPER_PATH = '/ext/sodium/SodiumJitHelper.php';
     private const PAD_HELPER_PATH = '/ext/sodium/SodiumPadJitHelper.php';
+    private const HEX2BIN_HELPER_PATH = '/ext/sodium/SodiumHex2binJitHelper.php';
 
     private const SECRETBOX_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::secretbox';
 
@@ -42,6 +43,8 @@ final class StringSodium
 
     private const UNPAD_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumPadJitHelper::unpad';
 
+    private const HEX2BIN_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumHex2binJitHelper::hex2binArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SECRETBOX_HELPER,
@@ -54,6 +57,11 @@ final class StringSodium
         self::COMPARE_HELPER,
     ];
 
+    /** @var list<string> */
+    private const HEX2BIN_COMPILED_HELPERS = [
+        self::HEX2BIN_HELPER,
+    ];
+
     public static function ensureLinked(Context $context): void
     {
         self::implementBridge($context, '__compiler_sodium_secretbox', self::SECRETBOX_HELPER);
@@ -64,6 +72,7 @@ final class StringSodium
         self::implementCompareBridge($context);
         self::implementPadBridge($context, '__compiler_sodium_pad', self::PAD_HELPER);
         self::implementPadBridge($context, '__compiler_sodium_unpad', self::UNPAD_HELPER);
+        self::implementHex2binBridge($context);
         self::implementBridge($context, '__compiler_sodium_stream_xor', self::STREAM_XOR_HELPER);
         self::implementBridge($context, '__compiler_sodium_stream_xchacha20_xor', self::STREAM_XCHACHA20_XOR_HELPER);
     }
@@ -76,6 +85,19 @@ final class StringSodium
             $context,
             self::padHelperFunction($context, $logical),
             [$string, $blockSize]
+        );
+
+        return JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+    }
+
+    /** #35357 — sodium_hex2bin NestedJIT (user-binary, peer pad #27687). */
+    public static function invokeHex2binHelper(Context $context, Value $string, Value $ignore): Value
+    {
+        self::ensureHex2binJitHelperCompiled($context);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::hex2binHelperFunction($context),
+            [$string, $ignore]
         );
 
         return JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
@@ -107,6 +129,41 @@ final class StringSodium
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             self::padHelperFunction($context, $helper),
+            [$fn->getParam(0), $fn->getParam(1)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
+        );
+        $context->registerFunction($abiName, $fn);
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    private static function implementHex2binBridge(Context $context): void
+    {
+        $abiName = '__compiler_sodium_hex2bin';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $restore = self::captureInsertBlock($context);
+        self::ensureHex2binJitHelperCompiled($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false, $strPtr, $strPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('sodium_hex2bin_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::hex2binHelperFunction($context),
             [$fn->getParam(0), $fn->getParam(1)]
         );
         $context->builder->returnValue(
@@ -334,6 +391,24 @@ final class StringSodium
             self::PAD_HELPER_PATH,
             [self::PAD_HELPER, self::UNPAD_HELPER],
             '#27687'
+        );
+    }
+
+    private static function hex2binHelperFunction(Context $context): LlvmFunction
+    {
+        self::ensureHex2binJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::HEX2BIN_HELPER, '#35357');
+    }
+
+    private static function ensureHex2binJitHelperCompiled(Context $context): void
+    {
+        // NestedJIT into the user binary (peer SodiumPadJitHelper) so SodiumException is real.
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HEX2BIN_HELPER_PATH,
+            self::HEX2BIN_COMPILED_HELPERS,
+            '#35357'
         );
     }
 }

@@ -2290,6 +2290,7 @@ require_once __DIR__.'/../../../ext/sodium/SodiumOneStringBoolFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumOneStringFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumPadFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumPadJitHelper.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumHex2binJitHelper.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumPwhashFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumPwhashScryptFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumPwhashStrFunction.php';

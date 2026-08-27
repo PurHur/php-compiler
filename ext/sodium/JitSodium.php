@@ -124,6 +124,12 @@ final class JitSodium
         return StringSodium::invokePadHelper($context, $name, $string, $blockSize);
     }
 
+    /** #35357 — sodium_hex2bin NestedJIT (peer pad #27687 / bin2hex #26871). */
+    public static function invokeHex2bin(Context $context, Value $string, Value $ignore): Value
+    {
+        return StringSodium::invokeHex2binHelper($context, $string, $ignore);
+    }
+
     public static function invokeStreamXor(
         Context $context,
         string $name,
