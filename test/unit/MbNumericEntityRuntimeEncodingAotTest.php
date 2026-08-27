@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: mb_encode/decode_numericentity() runtime encoding via NestedJIT (#35210 / #35254).
+ * AOT: mb_encode/decode_numericentity() runtime encoding via NestedJIT (#35210 / #35254 / #35265).
  *
  * @see php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_encode_numericentity)
  *
