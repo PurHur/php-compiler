@@ -141,31 +141,66 @@ class Helper {
                         goto return_long;
                     case OpCode::TYPE_BITWISE_NOT:
                         if (JitValueBox::isValueOperand($var)) {
+                            // Mixed result (string vs long): box into __value__ (#35305).
+                            // String tag must not fall through to JitLongArg / readLong
+                            // ("a"→0 → ~0→-1). Peer TYPE_STRING arm / #35301.
+                            // php-src: Zend/zend_operators.c bitwise_not_function
                             $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $var);
                             $map = $this->context->structFieldMap['__value__'];
                             $typeByte = $this->context->builder->load(
                                 $this->context->builder->structGep($valuePtr, $map['type'])
                             );
                             $i8 = $this->context->getTypeFromString('int8');
+                            $i64 = $this->context->getTypeFromString('int64');
+                            // Mask IS_REFCOUNTED — CV may store VM TYPE_STRING (4) or JIT (4|0x80).
+                            $kind = $this->context->builder->and(
+                                $typeByte,
+                                $i8->constInt(0x7f, false)
+                            );
+                            $isString = $this->context->builder->icmp(
+                                Builder::INT_EQ,
+                                $kind,
+                                $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+                            );
+                            $stringBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_string');
+                            $numericBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_numeric');
+                            $doneBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_done');
+                            $slot = JitValueBox::alloc($this->context);
+                            $slotPtr = JitValueBox::pointer($this->context, $slot);
+                            $this->context->builder->branchIf($isString, $stringBlock, $numericBlock);
+
+                            $this->context->builder->positionAtEnd($stringBlock);
+                            $strPtr = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readString'),
+                                $valuePtr
+                            );
+                            $strNot = Builtin\StringBitwiseNot::emitUnary($this->context, $strPtr);
+                            $this->context->builder->call(
+                                $this->context->lookupFunction('__value__writeString'),
+                                $slotPtr,
+                                $strNot->value
+                            );
+                            $this->context->builder->branch($doneBlock);
+
+                            $this->context->builder->positionAtEnd($numericBlock);
                             $isDouble = $this->context->builder->icmp(
                                 Builder::INT_EQ,
-                                $typeByte,
+                                $kind,
                                 $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
                             );
                             $doubleBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_double');
                             $longBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_long');
-                            $doneBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_done');
+                            $numericDone = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_numeric_done');
                             $this->context->builder->branchIf($isDouble, $doubleBlock, $longBlock);
                             $this->context->builder->positionAtEnd($doubleBlock);
                             $doubleVal = $this->context->builder->call(
                                 $this->context->lookupFunction('__value__readDouble'),
                                 $valuePtr
                             );
-                            $i64 = $this->context->getTypeFromString('int64');
                             $longFromDouble = $this->context->builder->fpToSi($doubleVal, $i64);
                             $notDouble = $this->context->builder->not($longFromDouble);
                             $doubleEnd = $this->context->builder->getInsertBlock();
-                            $this->context->builder->branch($doneBlock);
+                            $this->context->builder->branch($numericDone);
                             $this->context->builder->positionAtEnd($longBlock);
                             $longVal = $this->context->builder->call(
                                 $this->context->lookupFunction('__value__readLong'),
@@ -173,13 +208,26 @@ class Helper {
                             );
                             $notLong = $this->context->builder->not($longVal);
                             $longEnd = $this->context->builder->getInsertBlock();
-                            $this->context->builder->branch($doneBlock);
-                            $this->context->builder->positionAtEnd($doneBlock);
+                            $this->context->builder->branch($numericDone);
+                            $this->context->builder->positionAtEnd($numericDone);
                             $resultPhi = $this->context->builder->phi($i64, 'bitwise_not_vbox_long_phi');
                             $resultPhi->addIncoming($notDouble, $doubleEnd);
                             $resultPhi->addIncoming($notLong, $longEnd);
-                            $result = $resultPhi;
-                            goto return_long;
+                            $this->context->builder->call(
+                                $this->context->lookupFunction('__value__writeLong'),
+                                $slotPtr,
+                                $resultPhi
+                            );
+                            $this->context->builder->branch($doneBlock);
+
+                            $this->context->builder->positionAtEnd($doneBlock);
+
+                            return new Variable(
+                                $this->context,
+                                Variable::TYPE_VALUE,
+                                Variable::KIND_VARIABLE,
+                                $slot
+                            );
                         }
                         $long = JitLongArg::lower($this->context, $var, 'bitwise not operand');
                         $result = $this->context->builder->not($long);
