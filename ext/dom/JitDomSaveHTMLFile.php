@@ -4,62 +4,53 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT\Builtin\DomSaveHTMLFileRuntime;
+use PHPCompiler\ext\standard\JitFilePutContents;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringFilePutContents;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMDocument::saveHTMLFile() (#18268). */
+/**
+ * LLVM lowering for DOMDocument::saveHTMLFile() (#35549 / #18268).
+ *
+ * NestedJIT {@see VmDom::saveHTMLFile} is stubbed under thin AOT (#579), so compose the
+ * working user-script {@see JitDomSaveHTML} path with {@see JitFilePutContents}
+ * (peer {@see JitDomSave} / #35546).
+ *
+ * php-src: ext/dom/php_dom.c zim_DOMDocument_saveHTMLFile
+ */
 final class JitDomSaveHTMLFile
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2) {
-            throw new \LogicException('DOMDocument::saveHTMLFile() expects receiver and filename');
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_document_savehtmlfile_invoke');
+        if (!VmClassMethod::requireExactJitUserArgCount(
+            $context,
+            $args,
+            'DOMDocument::saveHTMLFile',
+            1
+        )) {
+            return VmClassMethod::jitArgcDummyReturn($context);
         }
 
-        $document = self::loadObjectArg($context, $args[0]);
-        $filename = self::loadStringArg($context, $args[1]);
-        $raw = $context->builder->call(
-            $context->lookupFunction(DomSaveHTMLFileRuntime::ABI_NAME),
-            $document,
-            $filename
-        );
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            JitValueBox::pointer($context, $slot),
-            $raw
-        );
-
-        return JitValueBox::normalizeValuePtr($context, $slot);
-    }
-
-    private static function loadObjectArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_OBJECT === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readObject'),
-                JitValueBox::valuePtrFromVariable($context, $arg)
-            );
-        }
-
-        throw new \LogicException('DOMDocument::saveHTMLFile() receiver must be an object');
-    }
-
-    private static function loadStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-
-        return $context->builder->call(
+        $htmlValuePtr = JitDomSaveHTML::invoke($context, $args[0]);
+        $htmlStr = $context->builder->call(
             $context->lookupFunction('__value__readString'),
-            JitValueBox::valuePtrFromVariable($context, $arg)
+            $htmlValuePtr
         );
+        $path = JitStringBuiltinArg::lower(
+            $context,
+            $args[1],
+            'DOMDocument::saveHTMLFile',
+            0,
+            'filename'
+        );
+        StringFilePutContents::ensureStandaloneBodies($context);
+        $flags = $context->context->int64Type()->constInt(0, false);
+
+        return JitFilePutContents::invoke($context, $path, $htmlStr, $flags);
     }
 }

@@ -34,6 +34,13 @@ final class FinallyBreakContinue35547AotTest extends TestCase
         );
     }
 
+    public function testContinueRepro35547FileMatchesZend(): void
+    {
+        $repro = $this->repoRoot.'/test/repro/issue_35547_aot_finally_continue.php';
+        $this->assertFileExists($repro);
+        $this->assertAotFileOutput($repro, "B0F0F1B2F2\n");
+    }
+
     public function testBreakInTryFinallyMatchesZend(): void
     {
         $this->assertAotFileOutput(
@@ -69,7 +76,7 @@ final class FinallyBreakContinue35547AotTest extends TestCase
     private function assertAotFileOutput(string $path, string $expected): void
     {
         $this->assertFileExists($path);
-        $out = tempnam(sys_get_temp_dir(), 'phpc_finally_leave_aot_');
+        $out = tempnam(sys_get_temp_dir(), 'phpc_fin_leave_aot_');
         $this->assertNotFalse($out);
         $env = $this->llvmEnv();
         $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
@@ -88,13 +95,7 @@ final class FinallyBreakContinue35547AotTest extends TestCase
         $code = proc_close($proc);
         $this->assertSame(0, $code, 'AOT compile failed: '.$stderr);
         $this->assertFileExists($out);
-        $run = proc_open(
-            [$out],
-            $descriptorSpec,
-            $runPipes,
-            $this->repoRoot,
-            $env
-        );
+        $run = proc_open([$out], $descriptorSpec, $runPipes, $this->repoRoot, $env);
         $this->assertIsResource($run);
         fclose($runPipes[0]);
         $stdout = stream_get_contents($runPipes[1]);
@@ -117,6 +118,7 @@ final class FinallyBreakContinue35547AotTest extends TestCase
                 $env[$key] = $v;
             }
         }
+        $env['PHP_COMPILER_HELPER_RUNTIME_CACHE_DIR'] = sys_get_temp_dir().'/phpc-fin-leave-'.getmypid();
 
         return $env;
     }
