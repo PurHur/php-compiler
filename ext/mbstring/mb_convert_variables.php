@@ -15,6 +15,8 @@ use PHPLLVM\Value;
 
 /**
  * mb_convert_variables() — in-place charset conversion (php-src ext/mbstring/mbstring.c; #4572).
+ *
+ * JIT/AOT via {@see JitMbConvertVariables} NestedJIT (#35315 leftover of #4572).
  */
 final class mb_convert_variables extends Internal
 {
@@ -64,6 +66,6 @@ final class mb_convert_variables extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('mb_convert_variables() is not lowered for JIT/AOT in this compiler build');
+        return JitMbConvertVariables::invoke($context, $args);
     }
 }
