@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringFilePutContents;
 use PHPCompiler\JIT\Context;
@@ -30,10 +31,10 @@ use PHPLLVM\Value;
  * openssl_csr_export_to_file() (#32697 leftover of #6421),
  * openssl_pkey_export() (#32705 leftover of #6295; runtime key #34755),
  * openssl_pkey_export_to_file() (#32705 leftover of #20287; runtime key #34755),
- * openssl_public_encrypt() (#32713 leftover of #6666; runtime key #34722),
- * openssl_private_encrypt() (#32757 leftover of #6666; runtime key #34722),
- * openssl_private_decrypt() (#32759 leftover of #6666; runtime key #34722),
- * openssl_public_decrypt() (#32761 leftover of #6666; runtime key #34722),
+ * openssl_public_encrypt() (#32713 leftover of #6666; runtime key #34722; softfail warn #35382),
+ * openssl_private_encrypt() (#32757 leftover of #6666; runtime key #34722; softfail warn #35382),
+ * openssl_private_decrypt() (#32759 leftover of #6666; runtime key #34722; softfail warn #35382),
+ * openssl_public_decrypt() (#32761 leftover of #6666; runtime key #34722; softfail warn #35382),
  * openssl_dh_compute_key() (#32771 leftover of #6596),
  * openssl_pkey_derive() (#32852 leftover of #15428), and
  * openssl_spki_verify() (#32776 leftover of #8690);
@@ -605,7 +606,9 @@ final class JitOpensslX509
             $encrypted,
             $key,
             $padding,
-            static fn (string $plain, string $pem, int $pad): string|false => VmOpensslPkeyNative::encrypt($plain, $pem, $pad)
+            static fn (string $plain, string $pem, int $pad): string|false => VmOpensslPkeyNative::encrypt($plain, $pem, $pad),
+            'openssl_public_encrypt',
+            false
         );
         if (null !== $baked) {
             return $baked;
@@ -618,7 +621,8 @@ final class JitOpensslX509
             $key,
             $padding,
             JitOpensslPkeyCryptKernel::EVP_PUBLIC_ENCRYPT,
-            'openssl_public_encrypt'
+            'openssl_public_encrypt',
+            false
         );
     }
 
@@ -640,7 +644,9 @@ final class JitOpensslX509
             $encrypted,
             $key,
             $padding,
-            static fn (string $plain, string $pem, int $pad): string|false => VmOpensslPkeyNative::privateEncrypt($plain, $pem, $pad)
+            static fn (string $plain, string $pem, int $pad): string|false => VmOpensslPkeyNative::privateEncrypt($plain, $pem, $pad),
+            'openssl_private_encrypt',
+            true
         );
         if (null !== $baked) {
             return $baked;
@@ -653,7 +659,8 @@ final class JitOpensslX509
             $key,
             $padding,
             JitOpensslPkeyCryptKernel::EVP_PRIVATE_ENCRYPT,
-            'openssl_private_encrypt'
+            'openssl_private_encrypt',
+            true
         );
     }
 
@@ -675,7 +682,9 @@ final class JitOpensslX509
             $decrypted,
             $key,
             $padding,
-            static fn (string $cipher, string $pem, int $pad): string|false => VmOpensslPkeyNative::decrypt($cipher, $pem, $pad)
+            static fn (string $cipher, string $pem, int $pad): string|false => VmOpensslPkeyNative::decrypt($cipher, $pem, $pad),
+            'openssl_private_decrypt',
+            true
         );
         if (null !== $baked) {
             return $baked;
@@ -688,7 +697,8 @@ final class JitOpensslX509
             $key,
             $padding,
             JitOpensslPkeyCryptKernel::EVP_PRIVATE_DECRYPT,
-            'openssl_private_decrypt'
+            'openssl_private_decrypt',
+            true
         );
     }
 
@@ -710,7 +720,9 @@ final class JitOpensslX509
             $decrypted,
             $key,
             $padding,
-            static fn (string $cipher, string $pem, int $pad): string|false => VmOpensslPkeyNative::publicDecrypt($cipher, $pem, $pad)
+            static fn (string $cipher, string $pem, int $pad): string|false => VmOpensslPkeyNative::publicDecrypt($cipher, $pem, $pad),
+            'openssl_public_decrypt',
+            false
         );
         if (null !== $baked) {
             return $baked;
@@ -723,12 +735,14 @@ final class JitOpensslX509
             $key,
             $padding,
             JitOpensslPkeyCryptKernel::EVP_PUBLIC_DECRYPT,
-            'openssl_public_decrypt'
+            'openssl_public_decrypt',
+            false
         );
     }
 
     /**
      * Compile-time bake when data, key PEM, and padding are all literals; otherwise null (#34722).
+     * Softfail emits Zend-shaped E_WARNING (#35382 leftover of #32713).
      *
      * @param callable(string, string, int): (string|false) $native
      */
@@ -738,7 +752,9 @@ final class JitOpensslX509
         JITVariable $out,
         JITVariable $key,
         ?JITVariable $padding,
-        callable $native
+        callable $native,
+        string $fnName,
+        bool $privateKey
     ): ?Value {
         $payload = JitStringArg::compileTimeLiteral($data);
         $pem = JitStringArg::compileTimeLiteral($key);
@@ -760,6 +776,8 @@ final class JitOpensslX509
 
         $result = $native($payload, $pem, $pad);
         if (false === $result) {
+            self::asymmetricInvalidKeyWarning($context, $fnName, $privateKey, $pem);
+
             return self::boxedFalse($context);
         }
 
@@ -777,6 +795,7 @@ final class JitOpensslX509
 
     /**
      * Runtime asymmetric crypt via {@see JitOpensslPkeyCryptKernel}; key via resolvePemString (#34722).
+     * Fail path emits E_WARNING (#35382).
      */
     private static function asymmetricCryptRuntime(
         Context $context,
@@ -785,7 +804,8 @@ final class JitOpensslX509
         JITVariable $key,
         ?JITVariable $padding,
         string $evpLeaf,
-        string $fnName
+        string $fnName,
+        bool $privateKey
     ): Value {
         JitOpensslPkeyCryptKernel::ensureEvpLeaves($context);
 
@@ -814,6 +834,7 @@ final class JitOpensslX509
         $context->builder->branchIf($isNull, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        self::asymmetricInvalidKeyWarning($context, $fnName, $privateKey, null);
         JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
         $context->builder->branch($doneBlock);
 
@@ -829,6 +850,47 @@ final class JitOpensslX509
         $context->builder->positionAtEnd($doneBlock);
 
         return $ptr;
+    }
+
+    /**
+     * Zend-shaped softfail E_WARNING for asymmetric crypt (#35382).
+     *
+     * php-src: ext/openssl/openssl.c — php_openssl_pkey_from_zval / encrypt|decrypt failure
+     */
+    private static function asymmetricInvalidKeyWarning(
+        Context $context,
+        string $fnName,
+        bool $privateKey,
+        ?string $pemLiteral
+    ): void {
+        JitBuiltinWarning::emit($context, self::asymmetricCryptSoftfailMessage($fnName, $privateKey, $pemLiteral));
+    }
+
+    /**
+     * Prefer Zend invalid-key wording when the PEM literal fails to parse; else Encryption/Decryption failed.
+     */
+    private static function asymmetricCryptSoftfailMessage(
+        string $fnName,
+        bool $privateKey,
+        ?string $pemLiteral
+    ): string {
+        if (null !== $pemLiteral && VmOpensslPkeyNative::available()) {
+            $keyOk = $privateKey
+                ? false !== VmOpensslPkeyNative::normalizePrivateKeyPem($pemLiteral)
+                : false !== VmOpensslPkeyNative::normalizePublicKeyPem($pemLiteral);
+            if (!$keyOk) {
+                return match ($fnName) {
+                    'openssl_private_encrypt' => 'openssl_private_encrypt(): key param is not a valid private key',
+                    'openssl_private_decrypt' => 'openssl_private_decrypt(): key parameter is not a valid private key',
+                    'openssl_public_decrypt' => 'openssl_public_decrypt(): key parameter is not a valid public key',
+                    default => 'openssl_public_encrypt(): key parameter is not a valid public key',
+                };
+            }
+        }
+
+        $failed = \str_contains($fnName, 'decrypt') ? 'Decryption failed' : 'Encryption failed';
+
+        return $fnName.'(): '.$failed;
     }
 
     /**
