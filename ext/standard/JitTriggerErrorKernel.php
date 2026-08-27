@@ -417,26 +417,20 @@ final class JitTriggerErrorKernel
             $file,
             $line
         );
-        // Gate print on error_reporting mask via getErrorReporting (NestedJIT
-        // isErrorLevelEnabled bool lowering is unreliable on standalone AOT — #21300).
-        $erLogical = 'PHPCompiler\\ext\\standard\\ErrorSilenceJitHelper::getErrorReporting';
-        $erFn = $context->functions[\strtolower($erLogical)] ?? null;
+        // Gate stderr print on error_reporting (respects `@` via ErrorSilenceJitHelper).
+        // Use the SilenceRuntime ABI — direct getErrorReporting lookup is often null at
+        // standalone link time, which skipped the gate and printed under @ (#9197 / #18105).
         $stderrBb = $fn->appendBasicBlock('trigger_error_stderr');
-        if (null !== $erFn) {
-            $er = $context->builder->call($erFn);
-            $masked = $context->builder->and(
-                $er,
-                $context->builder->zExt($level, $context->getTypeFromString('int64'))
-            );
-            $shouldPrint = $context->builder->icmp(
-                Builder::INT_NE,
-                $masked,
-                $context->getTypeFromString('int64')->constInt(0, false)
-            );
-            $context->builder->branchIf($shouldPrint, $stderrBb, $retBb);
-        } else {
-            $context->builder->branch($stderrBb);
-        }
+        $enabled = $context->builder->call(
+            $context->lookupFunction('__compiler_phpc_error_level_enabled'),
+            $level
+        );
+        $shouldPrint = $context->builder->icmp(
+            Builder::INT_NE,
+            $enabled,
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($shouldPrint, $stderrBb, $retBb);
 
         $context->builder->positionAtEnd($stderrBb);
         $context->builder->call(
