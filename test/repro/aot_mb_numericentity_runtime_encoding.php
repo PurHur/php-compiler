@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * #35210 — mb_encode/decode_numericentity() with runtime encoding under thin AOT.
+ * #35210 / #35254 — mb_encode/decode_numericentity() with runtime encoding under thin AOT.
  * php-src: ext/mbstring/mbstring.c PHP_FUNCTION(mb_encode_numericentity)
  */
 function enc(string $e): string

@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbNumericEntity;
 use PHPCompiler\JIT\CallUnpackHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -62,16 +63,13 @@ final class JitMbNumericEntity
             );
         }
 
-        $resultStr = $context->builder->call(
+        // Runtime int map ABI — raw call mismatches NestedJIT __value__* formals (#35254 / peer #34278).
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbNumericEntity::encode4Helper($context),
-            $str,
-            $mapScalars[0],
-            $mapScalars[1],
-            $mapScalars[2],
-            $mapScalars[3],
-            $encPtr,
-            $isHexI64
+            [$str, $mapScalars[0], $mapScalars[1], $mapScalars[2], $mapScalars[3], $encPtr, $isHexI64]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::materializeOwnedString($context, $resultStr);
     }
@@ -111,15 +109,12 @@ final class JitMbNumericEntity
             );
         }
 
-        $resultStr = $context->builder->call(
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
             MbNumericEntity::decode4Helper($context),
-            $str,
-            $mapScalars[0],
-            $mapScalars[1],
-            $mapScalars[2],
-            $mapScalars[3],
-            $encPtr
+            [$str, $mapScalars[0], $mapScalars[1], $mapScalars[2], $mapScalars[3], $encPtr]
         );
+        $resultStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
 
         return self::materializeOwnedString($context, $resultStr);
     }
