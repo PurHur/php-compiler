@@ -29,6 +29,8 @@ final class MbEregRuntime
 
     private const EREGI_REPLACE_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbEregJitHelper::eregiReplaceArgv';
 
+    private const EREG_TO_PCRE_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbEregJitHelper::eregToPcrePatternArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::EREG_MATCH_LOGICAL,
@@ -37,6 +39,7 @@ final class MbEregRuntime
         self::MATCH_ANCHORED_LOGICAL,
         self::EREG_REPLACE_LOGICAL,
         self::EREGI_REPLACE_LOGICAL,
+        self::EREG_TO_PCRE_LOGICAL,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -84,6 +87,13 @@ final class MbEregRuntime
         self::ensureJitHelperCompiled($context);
 
         return JitVmHelperLink::lookupCompiled($context, self::EREGI_REPLACE_LOGICAL, '#34389');
+    }
+
+    public static function eregToPcreHelper(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::EREG_TO_PCRE_LOGICAL, '#35335');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void

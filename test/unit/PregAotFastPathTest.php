@@ -173,6 +173,18 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(0, PregAotFastPath::replaceFindNext('/a/', 'xyz', 0));
     }
 
+    /** Issue #35335 — literal char-plus quantifier for preg/mb replace_callback find-next. */
+    public function testLiteralCharPlusReplaceFindNext(): void
+    {
+        $this->assertSame(1, PregAotFastPath::replaceFindNext('/a+/', 'xaaay', 0));
+        $this->assertSame(1, PregAotFastPath::takeLastReplacePos());
+        $this->assertSame(3, PregAotFastPath::takeLastReplaceBodyLen());
+        $this->assertSame(0, PregAotFastPath::replaceFindNext('/a+/', 'xaaay', 4));
+        $this->assertSame(1, PregAotFastPath::replaceFindNext('#a+#u', 'xaaay', 0));
+        $this->assertSame(1, PregAotFastPath::takeLastReplacePos());
+        $this->assertSame(3, PregAotFastPath::takeLastReplaceBodyLen());
+    }
+
     public function testLiteralCaptureGroups(): void
     {
         $this->assertSame(8, PregAotFastPath::patternKind('/(a)(b)/'));

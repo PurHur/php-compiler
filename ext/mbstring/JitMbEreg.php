@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\ext\standard\JitPregReplaceCallback;
 use PHPCompiler\ext\standard\JitExplode;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbEregRuntime;
@@ -12,8 +13,10 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStrictIntArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\PregReplaceCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -206,6 +209,116 @@ final class JitMbEreg
         );
 
         return self::boxStringFalseOrNull($context, $raw);
+    }
+
+    /**
+     * mb_ereg_replace_callback() — ERE→PCRE then thin preg callback bridge (#35335).
+     *
+     * @param list<JITVariable> $args
+     */
+    public static function invokeReplaceCallback(Context $context, array $args): Value
+    {
+        if (!PregReplaceCallbackPolicy::isJitLowerable($args[1])) {
+            throw new \LogicException(
+                'mb_ereg_replace_callback() callback must be '
+                .PregReplaceCallbackPolicy::JIT_SUBSET
+                .' for JIT/AOT in this compiler build; '
+                .PregReplaceCallbackPolicy::DEFERRED_KINDS.' are deferred (#1177, #35335)'
+            );
+        }
+
+        $pattern = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $args[0],
+            'mb_ereg_replace_callback',
+            0,
+            'pattern'
+        );
+        $string = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $args[2],
+            'mb_ereg_replace_callback',
+            2,
+            'string'
+        );
+        $optionsPtr = $context->builder->load($context->constantStringFromString(''));
+        $hasOptions = $context->getTypeFromString('int64')->constInt(0, false);
+        if (\count($args) >= 4) {
+            $optionsPtr = JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[3],
+                'mb_ereg_replace_callback',
+                3,
+                'options'
+            );
+            $hasOptions = $context->getTypeFromString('int64')->constInt(1, false);
+        }
+
+        $pcrePattern = self::lowerEregToPcrePattern(
+            $context,
+            $args[0],
+            $pattern,
+            $optionsPtr,
+            $hasOptions,
+            false,
+            $args[3] ?? null
+        );
+
+        return JitPregReplaceCallback::invoke(
+            $context,
+            $pcrePattern,
+            $args[1],
+            $string
+        );
+    }
+
+    /**
+     * Bake or runtime-convert mb ERE pattern to PCRE for preg thin helpers (#35335).
+     */
+    private static function lowerEregToPcrePattern(
+        Context $context,
+        JITVariable $patternArg,
+        Value $pattern,
+        Value $optionsPtr,
+        Value $hasOptions,
+        bool $caseInsensitive,
+        ?JITVariable $optionsArg = null
+    ): Value {
+        $patternLit = JitStringArg::compileTimeLiteral($patternArg);
+        $optionsLit = null !== $optionsArg ? JitStringArg::compileTimeLiteral($optionsArg) : null;
+        if (null !== $patternLit && (null === $optionsArg || null !== $optionsLit)) {
+            $hasOpt = null !== $optionsLit ? 1 : 0;
+            $optStr = $optionsLit ?? '';
+            $pcre = MbEregJitHelper::eregToPcrePatternArgv(
+                $patternLit,
+                $optStr,
+                $hasOpt,
+                $caseInsensitive ? 1 : 0
+            );
+            if ('' === $pcre) {
+                throw new \LogicException(
+                    'mb_ereg_replace_callback(): invalid ERE pattern for JIT/AOT in this compiler build'
+                );
+            }
+
+            return $context->builder->load($context->constantStringFromString($pcre));
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbEregRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_ereg_replace_cb_pcre');
+
+        $ci = $context->getTypeFromString('int64')->constInt($caseInsensitive ? 1 : 0, false);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            MbEregRuntime::eregToPcreHelper($context),
+            [$pattern, $optionsPtr, $hasOptions, $ci]
+        );
+
+        return JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
     }
 
     /**
