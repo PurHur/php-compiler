@@ -72,7 +72,7 @@ final class SplFileObjectFtruncate33348AotTest extends TestCase
         $call = (string) file_get_contents($root.'/lib/JIT/Call/SplFileObjectMethod.php');
         $this->assertStringContainsString("'ftruncate'", $call);
         $ctx = (string) file_get_contents($root.'/lib/JIT/Context.php');
-        $this->assertStringContainsString("'ftell', 'flock', 'ftruncate'", $ctx);
+        $this->assertStringContainsString("'ftell', 'fstat', 'flock', 'ftruncate'", $ctx);
         $this->assertStringContainsString('#33348', $ctx);
     }
 }

@@ -59,14 +59,15 @@ final class SplFileObjectFtellFstatFlock33336AotTest extends TestCase
         $helper = (string) file_get_contents($root.'/lib/VM/SplFileObjectJitHelper.php');
         $this->assertStringContainsString('compileFtell', $helper);
         $this->assertStringContainsString('compileFlock', $helper);
+        $this->assertStringContainsString('compileFstat', $helper);
         $this->assertStringContainsString('#33336', $helper);
-        $this->assertStringNotContainsString('compileFstat', $helper);
+        $this->assertStringContainsString('#33359', $helper);
         $call = (string) file_get_contents($root.'/lib/JIT/Call/SplFileObjectMethod.php');
         $this->assertStringContainsString("'ftell'", $call);
         $this->assertStringContainsString("'flock'", $call);
-        $this->assertStringNotContainsString("'fstat'", $call);
+        $this->assertStringContainsString("'fstat'", $call);
         $ctx = (string) file_get_contents($root.'/lib/JIT/Context.php');
-        $this->assertStringContainsString("'ftell', 'flock'", $ctx);
+        $this->assertStringContainsString("'ftell', 'fstat', 'flock'", $ctx);
         $this->assertStringContainsString('#33336', $ctx);
     }
 }
