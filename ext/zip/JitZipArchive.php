@@ -8,6 +8,9 @@ use PHPCompiler\ext\standard\JitFileGetContents;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
+use PHPCompiler\JIT\Builtin\StreamLifecycleRuntime;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Builtin\StringFilePutContents;
 use PHPCompiler\JIT\Builtin\ZipArchiveEmbedBridge;
 use PHPCompiler\JIT\Context;
@@ -2474,6 +2477,130 @@ final class JitZipArchive
     }
 
     /**
+     * ZipArchive::getStream — NestedJIT gstr + php://memory fopen/fwrite/rewind (#35534 leftover of #35531).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getStream
+     */
+    public static function getStream(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::getStream', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
+        StreamLifecycleRuntime::ensureLinkedForUserScriptLowering($context);
+        StreamReadRuntime::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::getStream',
+            0,
+            'name'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($name, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_gstr_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_gstr_lookup_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_gstr_done_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptySlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $emptySlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $emptyPtr = JitValueBox::pointer($context, $emptySlot);
+        $emptyTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        [$found, $data] = self::execLongAndPayload(
+            $context,
+            'gstr',
+            $handle,
+            $zero,
+            $name,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+        $streamPtr = self::boxStreamFromPayload($context, $found, $data);
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $ptrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($ptrTy);
+        $phi->addIncoming($emptyPtr, $emptyTail);
+        $phi->addIncoming($streamPtr, $okTail);
+
+        return $phi;
+    }
+
+    /**
+     * ZipArchive::getStreamIndex — NestedJIT gsi (#35534 leftover of #35531 / #20378).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getStreamIndex
+     */
+    public static function getStreamIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::getStreamIndex', 1, 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
+        StreamLifecycleRuntime::ensureLinkedForUserScriptLowering($context);
+        StreamReadRuntime::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower(
+            $context,
+            $args[1],
+            'ZipArchive::getStreamIndex(): Argument #1 ($index)'
+        );
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        [$found, $data] = self::execLongAndPayload(
+            $context,
+            'gsi',
+            $index,
+            $i64->constInt(0, false),
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxStreamFromPayload($context, $found, $data);
+    }
+
+    /**
+     * ZipArchive::getStreamName — flags ignored; same as getStream (#35534 leftover of #35531 / #20378).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getStreamName
+     */
+    public static function getStreamName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::getStreamName', 1, 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        // Optional $flags ignored (VmZipArchive::getStreamName).
+        return self::getStream($context, $args[0], $args[1]);
+    }
+
+    /**
      * ZipArchive::isCompressionMethodSupported — static pure IR (#35498 leftover of #35478 / #20363).
      *
      * php-src: ext/zip/php_zip.c — zim_ZipArchive_isCompressionMethodSupported
@@ -2865,6 +2992,84 @@ final class JitZipArchive
         JitValueBox::writeBool($context, $slot, $isTrue);
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * Open php://memory, write NestedJIT payload, rewind, box stream handle (#35534).
+     */
+    private static function boxStreamFromPayload(Context $context, Value $foundI64, Value $payload): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $isFound = $context->builder->icmp(Builder::INT_NE, $foundI64, $i64->constInt(0, false));
+        $id = (string) (++self::$serial);
+        $okBlock = BasicBlockHelper::append($context, 'zip_gstr_box_ok_'.$id);
+        $missBlock = BasicBlockHelper::append($context, 'zip_gstr_box_miss_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'zip_gstr_box_done_'.$id);
+        $context->builder->branchIf($isFound, $okBlock, $missBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $path = $context->builder->load($context->constantStringFromString('php://memory'));
+        $mode = $context->builder->load($context->constantStringFromString('w+b'));
+        $streamHandle = $context->builder->call(
+            $context->lookupFunction('__compiler_fopen'),
+            $path,
+            $mode
+        );
+        $openFail = $context->builder->icmp(Builder::INT_SLT, $streamHandle, $i64->constInt(0, false));
+        $openFailBlock = BasicBlockHelper::append($context, 'zip_gstr_fopen_fail_'.$id);
+        $writeBlock = BasicBlockHelper::append($context, 'zip_gstr_fwrite_'.$id);
+        $context->builder->branchIf($openFail, $openFailBlock, $writeBlock);
+
+        $context->builder->positionAtEnd($openFailBlock);
+        $ofSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $ofSlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $ofPtr = JitValueBox::pointer($context, $ofSlot);
+        $ofTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($writeBlock);
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $payload);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_fwrite'),
+            $streamHandle,
+            $payload,
+            $len
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_fseek'),
+            $streamHandle,
+            $i64->constInt(0, false),
+            $i64->constInt(0, false)
+        );
+        $okSlot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $okSlot, $streamHandle);
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $missSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $missSlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $missPtr = JitValueBox::pointer($context, $missSlot);
+        $missTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $ptrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($ptrTy);
+        $phi->addIncoming($okPtr, $okTail);
+        $phi->addIncoming($ofPtr, $ofTail);
+        $phi->addIncoming($missPtr, $missTail);
+
+        return $phi;
     }
 
     /**
