@@ -202,12 +202,14 @@ final class JitJsonEncode
      */
     public static function tryFoldEnumCase(Context $context, JITVariable $arg, int $flags): ?Value
     {
-        $wire = self::compileTimeEnumCaseWire($context, $arg);
-        if (null === $wire) {
-            return null;
-        }
-
+        // compileTimeEnumCaseWire() throws VmJsonExportException for unit enums
+        // (JSON_ERROR_NON_BACKED_ENUM). That must be caught here — throwing before the
+        // try aborted AOT compile (#35294 / leftover of #33790).
         try {
+            $wire = self::compileTimeEnumCaseWire($context, $arg);
+            if (null === $wire) {
+                return null;
+            }
             $encoded = VmJsonFormat::encodeExported($wire, $flags);
         } catch (VmJsonExportException $e) {
             if (VmJsonFlags::throwsOnError($flags)) {
