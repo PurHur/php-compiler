@@ -122,9 +122,12 @@ final class ZipArchiveMethod implements Call
             'setarchiveflag' => JitZipArchive::setArchiveFlag($context, ...$args),
             'getarchiveflag' => JitZipArchive::getArchiveFlag($context, ...$args),
             'clearerror' => JitZipArchive::clearError($context, ...$args),
+            'getstream' => JitZipArchive::getStream($context, ...$args),
+            'getstreamindex' => JitZipArchive::getStreamIndex($context, ...$args),
+            'getstreamname' => JitZipArchive::getStreamName($context, ...$args),
             'close' => JitZipArchive::close($context, ...$args),
             default => throw new \LogicException(
-                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35522/#35527/#35531)'
+                'ZipArchive::'.$this->method.'() JIT dispatch missing (#35424/#35531/#35534)'
             ),
         };
     }

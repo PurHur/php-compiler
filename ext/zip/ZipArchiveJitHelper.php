@@ -1317,6 +1317,67 @@ final class ZipArchiveJitHelper
             return self::pack(0);
         }
 
+        // getStream — $s1=name; payload = entry bytes (#35534 / #20378).
+        // Directory reject (trailing "/") is enforced in IR when needed; NestedJIT
+        // dislikes substr($s, -1) in this helper.
+        if ('gstr' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if ('' === $s1) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1data);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1data2);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+
+        // getStreamIndex — $a=index (#35534 / #20378).
+        if ('gsi' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if (0 === $a) {
+                if ('' === self::$h1name) {
+                    self::$h1status = 18;
+
+                    return self::pack(0);
+                }
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1data);
+            }
+            if (1 === $a) {
+                if ('' === self::$h1name2) {
+                    self::$h1status = 18;
+
+                    return self::pack(0);
+                }
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1data2);
+            }
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+
         return self::pack(0);
     }
 

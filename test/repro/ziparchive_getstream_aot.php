@@ -1,0 +1,30 @@
+<?php
+// ZipArchive::getStream / getStreamIndex / getStreamName — AOT must match VM (#35534 leftover of #35531 / #20378).
+$path = sys_get_temp_dir() . '/phpc_zip_35534_' . getmypid() . '.zip';
+@unlink($path);
+$z = new ZipArchive();
+$z->open($path, ZipArchive::CREATE);
+$z->addFromString('a.txt', 'hello');
+$z->addFromString('b.txt', 'world');
+$z->close();
+$z->open($path);
+$s = $z->getStream('a.txt');
+echo 'name=';
+echo false === $s ? 'false' : stream_get_contents($s);
+echo "\n";
+$s2 = $z->getStreamIndex(1);
+echo 'idx=';
+echo false === $s2 ? 'false' : stream_get_contents($s2);
+echo "\n";
+$s3 = $z->getStreamName('a.txt');
+echo 'name2=';
+echo false === $s3 ? 'false' : stream_get_contents($s3);
+echo "\n";
+echo 'miss=';
+var_export($z->getStream('nope'));
+echo "\n";
+echo 'empty=';
+var_export($z->getStream(''));
+echo "\n";
+$z->close();
+@unlink($path);
