@@ -6,9 +6,9 @@ namespace PHPCompiler\ext\zip;
 
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
- * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500) — CREATE/add/
- * close/get/locate/index/rename/delete/extract/status/count/archive-comment/entry-comment/
- * unchange/replaceFile/setPassword path.
+ * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500 /
+ * #35504) — CREATE/add/close/get/locate/index/rename/delete/extract/status/count/
+ * archive-comment/entry-comment/unchange/replaceFile/setPassword/statName/statIndex path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -21,10 +21,12 @@ namespace PHPCompiler\ext\zip;
  * renameName / renameIndex / deleteName / deleteIndex / extractTo / count /
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
- * unchangeName / replaceFile / setPassword)
+ * unchangeName / replaceFile / setPassword / statName / statIndex)
  */
 final class ZipArchiveJitHelper
 {
+    /** Packed RETURN_SB after rc: 7×int32 LE + name (#35504 / zim_ZipArchive_stat*). */
+    public const STAT_FIELD_BYTES = 28;
     private static int $nextId = 1;
 
     private static int $h1open = 0;
@@ -858,8 +860,84 @@ final class ZipArchiveJitHelper
 
             return self::pack(1);
         }
+        // statName — RETURN_SB packed payload (#35504 / zim_ZipArchive_statName). Short op stn.
+        if ('stn' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1status = 0;
+
+                return self::packStat(0, self::$h1name, self::$h1data);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packStat(1, self::$h1name2, self::$h1data2);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        // statIndex — RETURN_SB packed payload (#35504 / zim_ZipArchive_statIndex). Short op sti.
+        if ('sti' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 8;
+
+                return self::pack(0);
+            }
+            if (0 === $a) {
+                if ('' === self::$h1name) {
+                    self::$h1status = 18;
+
+                    return self::pack(0);
+                }
+                self::$h1status = 0;
+
+                return self::packStat(0, self::$h1name, self::$h1data);
+            }
+            if (1 === $a) {
+                if ('' === self::$h1name2) {
+                    self::$h1status = 18;
+
+                    return self::pack(0);
+                }
+                self::$h1status = 0;
+
+                return self::packStat(1, self::$h1name2, self::$h1data2);
+            }
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
 
         return self::pack(0);
+    }
+
+    /**
+     * Pack RETURN_SB fields for IR hashtable materialization (#35504).
+     *
+     * Layout after rc int32: index,crc,size,mtime,comp_size,comp_method,encryption_method + name.
+     */
+    private static function packStat(int $index, string $name, string $data): string
+    {
+        $size = strlen($data);
+        $crc = crc32($data);
+        if ($crc < 0) {
+            $crc += 0x100000000;
+        }
+        $payload = self::pack($index)
+            .self::pack((int) $crc)
+            .self::pack($size)
+            .self::pack(time())
+            .self::pack($size)
+            .self::pack(0)
+            .self::pack(0)
+            .$name;
+
+        return self::packPayload(1, $payload);
     }
 
     private static function snapSave(): void
