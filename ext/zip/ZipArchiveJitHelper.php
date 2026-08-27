@@ -7,9 +7,9 @@ namespace PHPCompiler\ext\zip;
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
  * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500 /
- * #35504 / #35506 / #35503 / #35508 / #35515 / #35522) — CREATE/add/close/get/locate/index/rename/delete/
+ * #35504 / #35506 / #35503 / #35508 / #35515 / #35522 / #35531 / #35534) — CREATE/add/close/get/locate/index/rename/delete/
  * extract/status/count/archive-comment/entry-comment/unchange/replaceFile/setPassword/stat/
- * setCompression/setEncryption/setMtime/setExternalAttributes/setArchiveFlag path.
+ * setCompression/setEncryption/setMtime/setExternalAttributes/setArchiveFlag/getStream path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -795,6 +795,43 @@ final class ZipArchiveJitHelper
             self::$h1status = 0;
 
             return self::pack(1);
+        }
+        // getStream / getStreamName — same payload as get (#35534 / #20378).
+        // Directory reject deferred to IR (substr/-1 NestedJIT hazards in this helper).
+        if ('gs' === $op) {
+            if (1 !== self::$h1open) {
+                return self::pack(0);
+            }
+            if ($s1 === self::$h1name) {
+                return self::packPayload(1, self::$h1data);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                return self::packPayload(1, self::$h1data2);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        // getStreamIndex — same as get_index (#35534 / #20378).
+        if ('gsi' === $op) {
+            if (1 !== self::$h1open || '' === self::$h1name) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            if (0 === $a) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1data);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1data2);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
         }
         if ('status' === $op) {
             return self::pack(self::$h1status);
