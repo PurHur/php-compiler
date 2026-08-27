@@ -63,6 +63,9 @@ final class pow extends Internal
 
             return $context->builder->siToFp($v, $double);
         }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return JitLongArg::lowerStringToDouble($context, $context->helper->loadValue($arg));
+        }
         $v = JitLongArg::lower($context, $arg, 'pow() argument');
 
         return $context->builder->siToFp($v, $double);
