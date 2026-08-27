@@ -126,6 +126,12 @@ final class Variable {
     public ?string $compileTimeDomInnerXml = null;
 
     /**
+     * Parent inner markup when fetched via firstChild/lastChild — ARG_SEND drops
+     * {@see compileTimeDomAttributes} but keeps index for setIdAttribute (#21644).
+     */
+    public ?string $compileTimeDomInnerXmlParent = null;
+
+    /**
      * Direct-child index under a loadXML root when fetched via firstChild/lastChild (#28671).
      */
     public ?int $compileTimeDomChildIndex = null;

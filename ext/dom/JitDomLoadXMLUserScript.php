@@ -13,6 +13,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** User-script standalone AOT: compile-time DOMDocument::loadXML() (#18268, #19211, #23251). */
@@ -1194,6 +1195,21 @@ final class JitDomLoadXMLUserScript
         if ('' === $idLit) {
             return;
         }
+        self::storeElementInIdMapFromValue(
+            $context,
+            $document,
+            $context->builder->load($context->constantStringFromString($idLit)),
+            $element
+        );
+    }
+
+    /** Runtime id string → element in PROP_ELEMENT_ID_MAP (multi-id setIdAttribute; #34696). */
+    public static function storeElementInIdMapFromValue(
+        Context $context,
+        Value $document,
+        Value $idStr,
+        Value $element
+    ): void {
         self::ensureDocumentPropertyLayout($context);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_DOCUMENT);
@@ -1205,7 +1221,6 @@ final class JitDomLoadXMLUserScript
             $classId
         );
         $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
-        $idStr = $context->builder->load($context->constantStringFromString($idLit));
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyObject'),
             $ht,
@@ -1213,6 +1228,56 @@ final class JitDomLoadXMLUserScript
             $element
         );
         self::writeElementIdMapHashtable($context, $document, $ht);
+    }
+
+    /** xmlAddID first-wins — do not replace an existing id map entry (#34050 / #25275). */
+    public static function storeElementInIdMapFromValueFirstWins(
+        Context $context,
+        Value $document,
+        Value $idStr,
+        Value $element
+    ): void {
+        self::ensureDocumentPropertyLayout($context);
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_DOCUMENT);
+        $mapVar = ObjectInstancePropertyLlvm::propertyFetchOrdinary(
+            $objectType,
+            $document,
+            self::CLASS_DOCUMENT,
+            VmDom::PROP_ELEMENT_ID_MAP,
+            $classId
+        );
+        $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
+        $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
+        $valPtr = JitValueBox::valuePtrFromVariable($context, $foundVar);
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valueMap['type'])
+        );
+        $already = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_OBJECT, false)
+        );
+        $skip = BasicBlockHelper::append($context, 'dom_idmap_fw_skip');
+        $write = BasicBlockHelper::append($context, 'dom_idmap_fw_write');
+        $done = BasicBlockHelper::append($context, 'dom_idmap_fw_done');
+        $context->builder->branchIf($already, $skip, $write);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($write);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyObject'),
+            $ht,
+            $idStr,
+            $element
+        );
+        self::writeElementIdMapHashtable($context, $document, $ht);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
     }
 
     /** Drop one id key from PROP_ELEMENT_ID_MAP after setAttribute/removeAttribute rebind (#19870). */

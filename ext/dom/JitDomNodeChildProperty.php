@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -101,6 +102,9 @@ final class JitDomNodeChildProperty
         if (!\in_array($propLc, ['nextsibling', 'previoussibling'], true)) {
             JitDomGetNodePath::annotateChildFetch($elemResult, $propName);
         }
+        if (\in_array($propLc, ['firstchild', 'lastchild'], true)) {
+            self::seedChildOwnerFromParent($context, $objectType, $elemResult, $obj, $slotClass);
+        }
         $elemPtr = JitValueBox::valuePtrFromVariable($context, $elemResult);
         $elemPred = $context->builder->getInsertBlock();
         $context->builder->branch($bbOut);
@@ -117,8 +121,154 @@ final class JitDomNodeChildProperty
             JitValueBox::normalizeValuePtr($context, $phi)
         );
         $out->classUserType = 'DOMElement';
+        self::copyCompileTimeChildStamps($out, $elemResult);
 
         return $out;
+    }
+
+    /**
+     * Nested firstChild/lastChild must inherit ownerDocument for setIdAttribute id-map
+     * seeding — direct loadXML children get this at materialize time (#21644).
+     */
+    private static function seedChildOwnerFromParent(
+        \PHPCompiler\JIT\Context $context,
+        Object_ $objectType,
+        JITVariable $childVar,
+        Value $parentObj,
+        string $parentClass
+    ): void {
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_child_seed_owner');
+        $childObj = self::loadObjectFromChildVar($context, $childVar);
+        $elementClass = 'DOMElement';
+        $elementClassId = $objectType->lookup($elementClass);
+        foreach ([VmDom::PROP_OWNER_DOCUMENT, VmDom::PROP_PARENT_NODE] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
+            }
+        }
+        $parentJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $parentObj
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($childObj, $elementClass, VmDom::PROP_PARENT_NODE),
+            $parentJit,
+            JITVariable::TYPE_VALUE
+        );
+        $docObj = self::resolveOwnerDocumentForNode($context, $objectType, $parentObj);
+        $docJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $docObj
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($childObj, $elementClass, VmDom::PROP_OWNER_DOCUMENT),
+            $docJit,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
+    private static function loadObjectFromChildVar(\PHPCompiler\JIT\Context $context, JITVariable $var): Value
+    {
+        if (JITVariable::TYPE_OBJECT === $var->type) {
+            return $context->helper->loadValue($var);
+        }
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $var)
+        );
+    }
+
+    private static function resolveOwnerDocumentForNode(
+        \PHPCompiler\JIT\Context $context,
+        Object_ $objectType,
+        Value $nodeObj
+    ): Value {
+        $objMap = $context->structFieldMap['__object__'];
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($nodeObj, $objMap['class_id'])
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $isDocBb = $fn->appendBasicBlock('dom_child_owner_is_doc');
+        $elBb = $fn->appendBasicBlock('dom_child_owner_el');
+        $doneBb = $fn->appendBasicBlock('dom_child_owner_done');
+        $docId = $objectType->lookup('DOMDocument');
+        $isDoc = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $context->constantFromInteger($docId, 'int64')
+        );
+        $xmlDocId = $objectType->lookup('Dom\\XMLDocument');
+        $isXmlDoc = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classIdVal,
+            $context->constantFromInteger($xmlDocId, 'int64')
+        );
+        $context->builder->branchIf($context->builder->or($isDoc, $isXmlDoc), $isDocBb, $elBb);
+
+        $context->builder->positionAtEnd($isDocBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($elBb);
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT, JITVariable::TYPE_VALUE);
+        }
+        $ownerVar = $objectType->propertyFetch($nodeObj, 'DOMElement', VmDom::PROP_OWNER_DOCUMENT);
+        $ownerObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $ownerVar)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($nodeObj->typeOf());
+        $phi->addIncoming($nodeObj, $isDocBb);
+        $phi->addIncoming($ownerObj, $elBb);
+
+        return $phi;
+    }
+
+    /** Phi out-temp must carry firstChild stamps applied on the element edge (#21644). */
+    private static function copyCompileTimeChildStamps(JITVariable $dest, JITVariable $src): void
+    {
+        if (null !== $src->compileTimeDomTagName) {
+            $dest->compileTimeDomTagName = $src->compileTimeDomTagName;
+        }
+        if (null !== $src->compileTimeDomInnerXml) {
+            $dest->compileTimeDomInnerXml = $src->compileTimeDomInnerXml;
+        }
+        if (null !== $src->compileTimeDomInnerXmlParent) {
+            $dest->compileTimeDomInnerXmlParent = $src->compileTimeDomInnerXmlParent;
+        }
+        if (null !== $src->compileTimeDomChildIndex) {
+            $dest->compileTimeDomChildIndex = $src->compileTimeDomChildIndex;
+        }
+        if (null !== $src->compileTimeDomNodePath) {
+            $dest->compileTimeDomNodePath = $src->compileTimeDomNodePath;
+        }
+        if (null !== $src->compileTimeDomLoadXml) {
+            $dest->compileTimeDomLoadXml = $src->compileTimeDomLoadXml;
+        }
+        if (null !== $src->compileTimeDomLineNo) {
+            $dest->compileTimeDomLineNo = $src->compileTimeDomLineNo;
+        }
+        if (null !== $src->compileTimeDomTextData) {
+            $dest->compileTimeDomTextData = $src->compileTimeDomTextData;
+        }
+        if (null !== $src->compileTimeDomAttributes) {
+            $dest->compileTimeDomAttributes = $src->compileTimeDomAttributes;
+        }
+        if (null !== $src->compileTimeDomElementId) {
+            $dest->compileTimeDomElementId = $src->compileTimeDomElementId;
+        }
     }
 
     private static function boxNullChildEdge(\PHPCompiler\JIT\Context $context): JITVariable
@@ -292,14 +442,34 @@ final class JitDomNodeChildProperty
             return;
         }
         if ('firstchild' === $propLc) {
+            self::stampParentInnerOnChild($result, $receiverVar);
             self::stampChildIndex($result, $nodes, 0);
 
             return;
         }
         if ('lastchild' === $propLc) {
+            self::stampParentInnerOnChild($result, $receiverVar);
             self::stampChildIndex($result, $nodes, \count($nodes) - 1);
 
             return;
+        }
+    }
+
+    private static function stampParentInnerOnChild(JITVariable $result, ?JITVariable $receiverVar): void
+    {
+        if (null === $receiverVar) {
+            return;
+        }
+        $parentInner = $receiverVar->compileTimeDomInnerXml;
+        if (null !== $parentInner && '' !== $parentInner) {
+            $result->compileTimeDomInnerXmlParent = $parentInner;
+
+            return;
+        }
+        $bound = $receiverVar->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($receiverVar);
+        if (null !== $bound && '' !== $bound) {
+            $result->compileTimeDomInnerXmlParent = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($bound);
         }
     }
 
