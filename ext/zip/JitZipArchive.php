@@ -1403,6 +1403,100 @@ final class JitZipArchive
         return self::boxBoolFromI64($context, $ok);
     }
 
+    /**
+     * ZipArchive::setMtimeName — NestedJIT smn (#35508 leftover of #35500 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setMtimeName
+     */
+    public static function setMtimeName(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::setMtimeName', 2, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $name = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[1],
+            'ZipArchive::setMtimeName',
+            0,
+            'name'
+        );
+        $timestamp = JitLongArg::lower($context, $args[2], 'ZipArchive::setMtimeName(): Argument #2 ($timestamp)');
+        $i64 = $context->getTypeFromString('int64');
+        if ($timestamp->typeOf() !== $i64) {
+            $timestamp = $context->builder->sext($timestamp, $i64);
+        }
+        // Empty name → ValueError in IR (#35508; NestedJIT throw SIGSEGVs — peer #35481).
+        $strMap = $context->structFieldMap['__string__'];
+        $nameLen = $context->builder->load(
+            $context->builder->structGep($name, $strMap['length'])
+        );
+        $zero = $i64->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nameLen, $zero);
+        $id = (string) (++self::$serial);
+        $emptyBlock = BasicBlockHelper::append($context, 'zip_smn_empty_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'zip_smn_ok_'.$id);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $okBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        ExceptionBridge::emitValueErrorAndAbort(
+            $context,
+            'ZipArchive::setMtimeName(): Argument #1 ($name) must not be empty'
+        );
+
+        $context->builder->positionAtEnd($okBlock);
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'smn',
+            $handle,
+            $timestamp,
+            $name,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
+    /**
+     * ZipArchive::setMtimeIndex — NestedJIT smi (#35508 leftover of #35500 / #20363).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setMtimeIndex
+     */
+    public static function setMtimeIndex(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'ZipArchive::setMtimeIndex', 2, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        ZipArchiveEmbedBridge::ensureLinked($context);
+        $obj = self::readObject($context, $args[0]);
+        $handle = self::loadHandle($context, $obj);
+        $index = JitLongArg::lower($context, $args[1], 'ZipArchive::setMtimeIndex(): Argument #1 ($index)');
+        $timestamp = JitLongArg::lower($context, $args[2], 'ZipArchive::setMtimeIndex(): Argument #2 ($timestamp)');
+        $i64 = $context->getTypeFromString('int64');
+        if ($index->typeOf() !== $i64) {
+            $index = $context->builder->sext($index, $i64);
+        }
+        if ($timestamp->typeOf() !== $i64) {
+            $timestamp = $context->builder->sext($timestamp, $i64);
+        }
+        $empty = ZipArchiveEmbedBridge::emptyString($context);
+        $ok = self::execLong(
+            $context,
+            'smi',
+            $index,
+            $timestamp,
+            $empty,
+            $empty
+        );
+        self::syncProps($context, $obj, $handle);
+
+        return self::boxBoolFromI64($context, $ok);
+    }
+
     public static function close(Context $context, JITVariable ...$args): Value
     {
         if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'ZipArchive::close', 0)) {
