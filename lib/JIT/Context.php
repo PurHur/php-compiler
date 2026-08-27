@@ -2227,6 +2227,8 @@ class Context {
             'statIndex',
             'setMtimeName',
             'setMtimeIndex',
+            'setExternalAttributesName',
+            'setExternalAttributesIndex',
         ] as $zipMethod) {
             $this->functionProxies['ziparchive::'.strtolower($zipMethod)] = new Call\ZipArchiveMethod(
                 $zipMethod

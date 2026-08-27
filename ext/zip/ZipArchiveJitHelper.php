@@ -7,8 +7,9 @@ namespace PHPCompiler\ext\zip;
 /**
  * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454 /
  * #35465 / #35466 / #35467 / #35472 / #35476 / #35486 / #35489 / #35491 / #35496 / #35500 /
- * #35504 / #35506 / #35503 / #35508) — CREATE/add/close/get/locate/index/rename/delete/extract/status/count/
- * archive-comment/entry-comment/unchange/replaceFile/setPassword/stat/setCompression/setEncryption/setMtime path.
+ * #35504 / #35506 / #35503 / #35508 / #35516) — CREATE/add/close/get/locate/index/rename/delete/
+ * extract/status/count/archive-comment/entry-comment/unchange/replaceFile/setPassword/stat/
+ * setCompression/setEncryption/setMtime/setExternalAttributes path.
  *
  * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
  * aborts on some static-int comparisons in this helper (#35454).
@@ -22,7 +23,8 @@ namespace PHPCompiler\ext\zip;
  * setArchiveComment / getArchiveComment / setCommentName / getCommentName /
  * setCommentIndex / getCommentIndex / unchangeAll / unchangeArchive / unchangeIndex /
  * unchangeName / replaceFile / setPassword / setCompressionName / setCompressionIndex /
- * setEncryptionName / setEncryptionIndex / statName / statIndex / setMtimeName / setMtimeIndex)
+ * setEncryptionName / setEncryptionIndex / statName / statIndex / setMtimeName / setMtimeIndex /
+ * setExternalAttributesName / setExternalAttributesIndex)
  */
 final class ZipArchiveJitHelper
 {
@@ -91,6 +93,16 @@ final class ZipArchiveJitHelper
 
     private static int $h1mtime2 = 0;
 
+    /** Per-entry opsys (ZIP_OPSYS_*) for slots 0/1 (#35516 / zim_ZipArchive_setExternalAttributes*). */
+    private static int $h1opsys = 3;
+
+    private static int $h1opsys2 = 3;
+
+    /** Per-entry external_attr for slots 0/1 (#35516). */
+    private static int $h1attr = 0;
+
+    private static int $h1attr2 = 0;
+
     public static function exec(string $op, int $a, int $b, string $s1, string $s2): string
     {
         if ('alloc' === $op) {
@@ -124,6 +136,10 @@ final class ZipArchiveJitHelper
             self::$h1encpw2 = '';
             self::$h1mtime = 0;
             self::$h1mtime2 = 0;
+            self::$h1opsys = 3;
+            self::$h1opsys2 = 3;
+            self::$h1attr = 0;
+            self::$h1attr2 = 0;
             self::snapSave();
 
             return self::pack($h);
@@ -155,6 +171,10 @@ final class ZipArchiveJitHelper
             self::$h1encpw2 = '';
             self::$h1mtime = 0;
             self::$h1mtime2 = 0;
+            self::$h1opsys = 3;
+            self::$h1opsys2 = 3;
+            self::$h1attr = 0;
+            self::$h1attr2 = 0;
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
                 $nlen = ord($data[26]) | (ord($data[27]) << 8);
                 $xlen = ord($data[28]) | (ord($data[29]) << 8);
@@ -268,6 +288,8 @@ final class ZipArchiveJitHelper
                 self::$h1ecomment = '';
                 self::$h1comp = 0;
                 self::$h1mtime = 0;
+                self::$h1opsys = 3;
+                self::$h1attr = 0;
             } elseif ($s1 === self::$h1name) {
                 self::$h1data = $s2;
             } elseif ('' === self::$h1name2) {
@@ -276,6 +298,8 @@ final class ZipArchiveJitHelper
                 self::$h1ecomment2 = '';
                 self::$h1comp2 = 0;
                 self::$h1mtime2 = 0;
+                self::$h1opsys2 = 3;
+                self::$h1attr2 = 0;
             } elseif ($s1 === self::$h1name2) {
                 self::$h1data2 = $s2;
             } else {
@@ -303,6 +327,8 @@ final class ZipArchiveJitHelper
                 self::$h1ecomment = '';
                 self::$h1comp = 0;
                 self::$h1mtime = 0;
+                self::$h1opsys = 3;
+                self::$h1attr = 0;
             } elseif ($s1 === self::$h1name) {
                 self::$h1status = 10;
 
@@ -313,6 +339,8 @@ final class ZipArchiveJitHelper
                 self::$h1ecomment2 = '';
                 self::$h1comp2 = 0;
                 self::$h1mtime2 = 0;
+                self::$h1opsys2 = 3;
+                self::$h1attr2 = 0;
             } elseif ($s1 === self::$h1name2) {
                 self::$h1status = 10;
 
@@ -478,6 +506,8 @@ final class ZipArchiveJitHelper
             self::$h1ecomment = '';
             self::$h1comp = 0;
             self::$h1mtime = 0;
+            self::$h1opsys = 3;
+            self::$h1attr = 0;
             self::$h1status = 0;
 
             return self::pack(1);
@@ -494,6 +524,8 @@ final class ZipArchiveJitHelper
             self::$h1ecomment = '';
             self::$h1comp = 0;
             self::$h1mtime = 0;
+            self::$h1opsys = 3;
+            self::$h1attr = 0;
             self::$h1status = 0;
 
             return self::pack(1);
@@ -631,6 +663,10 @@ final class ZipArchiveJitHelper
             self::$h1comp2 = 0;
             self::$h1mtime = 0;
             self::$h1mtime2 = 0;
+            self::$h1opsys = 3;
+            self::$h1opsys2 = 3;
+            self::$h1attr = 0;
+            self::$h1attr2 = 0;
             self::$h1status = 0;
 
             return self::packPayload(1, $local.$central.$eocd);
@@ -1118,7 +1154,63 @@ final class ZipArchiveJitHelper
             return self::pack(0);
         }
 
+        // setExternalAttributesName / Index — $b packs opsys<<32 | attr (#35516 / zim_ZipArchive_setExternalAttributes*).
+        // Empty name rejected in IR. xan uses $s1 name; xai uses $a index.
+        if ('xan' === $op) {
+            if (1 !== self::$h1open || '' === $s1) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            $opsys = (int) (($b >> 32) & 0xff);
+            $attr = (int) ($b & 0xffffffff);
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1opsys = $opsys;
+                self::$h1attr = $attr;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1opsys2 = $opsys;
+                self::$h1attr2 = $attr;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        if ('xai' === $op) {
+            if (1 !== self::$h1open) {
+                self::$h1status = 18;
+
+                return self::pack(0);
+            }
+            $opsys = (int) (($b >> 32) & 0xff);
+            $attr = (int) ($b & 0xffffffff);
+            if (0 === $a && '' !== self::$h1name) {
+                self::$h1opsys = $opsys;
+                self::$h1attr = $attr;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1opsys2 = $opsys;
+                self::$h1attr2 = $attr;
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+
         return self::pack(0);
+
     }
 
     /**
