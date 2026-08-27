@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\zip;
 
 /**
- * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455) —
+ * ZipArchive NestedJIT helper (#35424 / #35437 / #35440 / #35449 / #35450 / #35455 / #35454) —
  * CREATE/add/close/get/locate/index/rename/delete/status path.
  *
- * Single concurrent archive slot (scalars, not array tables): NestedJIT aborts on
- * nested-array state / refs. Sequential open→close→reopen matches php-src repros.
+ * Two scalar entry slots (no static arrays). Branch on empty-string sentinels — NestedJIT
+ * aborts on some static-int comparisons in this helper (#35454).
  *
  * Result encoding: 4-byte LE int32 + optional payload (get/close). Int returns via
  * NestedJIT arrive as ptrtoint of __value__ boxes, so the ABI is string-packed.
@@ -27,6 +27,10 @@ final class ZipArchiveJitHelper
     private static string $h1name = '';
 
     private static string $h1data = '';
+
+    private static string $h1name2 = '';
+
+    private static string $h1data2 = '';
 
     private static int $h1status = 0;
 
@@ -47,6 +51,8 @@ final class ZipArchiveJitHelper
             self::$h1open = 1;
             self::$h1name = '';
             self::$h1data = '';
+            self::$h1name2 = '';
+            self::$h1data2 = '';
             self::$h1status = 0;
 
             return self::pack($h);
@@ -62,6 +68,8 @@ final class ZipArchiveJitHelper
             $len = strlen($data);
             self::$h1name = '';
             self::$h1data = '';
+            self::$h1name2 = '';
+            self::$h1data2 = '';
             self::$h1open = 0;
             if ($len >= 30 && 0x04034b50 === (ord($data[0]) | (ord($data[1]) << 8) | (ord($data[2]) << 16) | (ord($data[3]) << 24))) {
                 $nlen = ord($data[26]) | (ord($data[27]) << 8);
@@ -71,6 +79,22 @@ final class ZipArchiveJitHelper
                 if ($off + $sz <= $len) {
                     self::$h1name = substr($data, 30, $nlen);
                     self::$h1data = substr($data, $off, $sz);
+                    self::$h1name2 = '';
+                    self::$h1data2 = '';
+                    $pos = $off + $sz;
+                    if ($pos + 30 <= $len) {
+                        $sig2 = ord($data[$pos]) | (ord($data[$pos + 1]) << 8) | (ord($data[$pos + 2]) << 16) | (ord($data[$pos + 3]) << 24);
+                        if (0x04034b50 === $sig2) {
+                            $nlen2 = ord($data[$pos + 26]) | (ord($data[$pos + 27]) << 8);
+                            $xlen2 = ord($data[$pos + 28]) | (ord($data[$pos + 29]) << 8);
+                            $sz2 = ord($data[$pos + 22]) | (ord($data[$pos + 23]) << 8) | (ord($data[$pos + 24]) << 16) | (ord($data[$pos + 25]) << 24);
+                            $off2 = $pos + 30 + $nlen2 + $xlen2;
+                            if ($off2 + $sz2 <= $len) {
+                                self::$h1name2 = substr($data, $pos + 30, $nlen2);
+                                self::$h1data2 = substr($data, $off2, $sz2);
+                            }
+                        }
+                    }
                     self::$h1open = 1;
                     self::$h1status = 0;
 
@@ -87,8 +111,22 @@ final class ZipArchiveJitHelper
 
                 return self::pack(0);
             }
-            self::$h1name = $s1;
-            self::$h1data = $s2;
+            // Empty-name sentinel for slot occupancy (#35454 NestedJIT).
+            if ('' === self::$h1name) {
+                self::$h1name = $s1;
+                self::$h1data = $s2;
+            } elseif ($s1 === self::$h1name) {
+                self::$h1data = $s2;
+            } elseif ('' === self::$h1name2) {
+                self::$h1name2 = $s1;
+                self::$h1data2 = $s2;
+            } elseif ($s1 === self::$h1name2) {
+                self::$h1data2 = $s2;
+            } else {
+                self::$h1status = 18;
+
+                return self::pack(0);
+            }
             self::$h1status = 0;
 
             return self::pack(1);
@@ -112,46 +150,78 @@ final class ZipArchiveJitHelper
             if (1 !== self::$h1open) {
                 return self::pack(0);
             }
-            if ($s1 !== self::$h1name) {
-                self::$h1status = 9;
-
-                return self::pack(0);
+            if ($s1 === self::$h1name) {
+                return self::packPayload(1, self::$h1data);
             }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                return self::packPayload(1, self::$h1data2);
+            }
+            self::$h1status = 9;
 
-            return self::packPayload(1, self::$h1data);
+            return self::pack(0);
         }
-        // locateName — single-entry index 0 or -1 miss (#35437).
+        // locateName — index 0/1 or -1 miss (#35437 / #35454).
         if ('locate' === $op) {
-            if (1 !== self::$h1open || '' === self::$h1name || $s1 !== self::$h1name) {
+            if (1 !== self::$h1open) {
                 self::$h1status = 9;
 
                 return self::pack(-1);
             }
-            self::$h1status = 0;
+            if ('' !== self::$h1name && $s1 === self::$h1name) {
+                self::$h1status = 0;
+
+                return self::pack(0);
+            }
+            if ('' !== self::$h1name2 && $s1 === self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::pack(1);
+            }
+            self::$h1status = 9;
+
+            return self::pack(-1);
+        }
+        // getFromIndex (#35437 / #35454).
+        if ('get_index' === $op) {
+            if (1 !== self::$h1open || '' === self::$h1name) {
+                self::$h1status = 9;
+
+                return self::pack(0);
+            }
+            if (0 === $a) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1data);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1data2);
+            }
+            self::$h1status = 9;
 
             return self::pack(0);
         }
-        // getFromIndex — only index 0 in the single-entry slot (#35437).
-        if ('get_index' === $op) {
-            if (1 !== self::$h1open || '' === self::$h1name || 0 !== $a) {
-                self::$h1status = 9;
-
-                return self::pack(0);
-            }
-            self::$h1status = 0;
-
-            return self::packPayload(1, self::$h1data);
-        }
-        // getNameIndex — only index 0 in the single-entry slot (#35440 leftover of #35437).
+        // getNameIndex (#35440 / #35454).
         if ('name_index' === $op) {
-            if (1 !== self::$h1open || '' === self::$h1name || 0 !== $a) {
+            if (1 !== self::$h1open || '' === self::$h1name) {
                 self::$h1status = 9;
 
                 return self::pack(0);
             }
-            self::$h1status = 0;
+            if (0 === $a) {
+                self::$h1status = 0;
 
-            return self::packPayload(1, self::$h1name);
+                return self::packPayload(1, self::$h1name);
+            }
+            if (1 === $a && '' !== self::$h1name2) {
+                self::$h1status = 0;
+
+                return self::packPayload(1, self::$h1name2);
+            }
+            self::$h1status = 9;
+
+            return self::pack(0);
         }
         // renameName — single-entry name swap (#35450 leftover of #35424).
         if ('rename' === $op) {
@@ -224,17 +294,46 @@ final class ZipArchiveJitHelper
                 .chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0)
                 .chr($loff & 255).chr(($loff >> 8) & 255).chr(($loff >> 16) & 255).chr(($loff >> 24) & 255)
                 .$name;
+            $countLow = 1;
+            if ('' !== self::$h1name2) {
+                $name2 = self::$h1name2;
+                $content2 = self::$h1data2;
+                $size2 = strlen($content2);
+                $nl2 = strlen($name2);
+                $loff2 = strlen($local);
+                $local .= chr(0x50).chr(0x4b).chr(0x03).chr(0x04)
+                    .chr(20).chr(0).chr(0).chr(0).chr(0).chr(0)
+                    .chr(0).chr(0).chr(0).chr(0)
+                    .chr(0).chr(0).chr(0).chr(0)
+                    .chr($size2 & 255).chr(($size2 >> 8) & 255).chr(($size2 >> 16) & 255).chr(($size2 >> 24) & 255)
+                    .chr($size2 & 255).chr(($size2 >> 8) & 255).chr(($size2 >> 16) & 255).chr(($size2 >> 24) & 255)
+                    .chr($nl2 & 255).chr(($nl2 >> 8) & 255).chr(0).chr(0)
+                    .$name2.$content2;
+                $central .= chr(0x50).chr(0x4b).chr(0x01).chr(0x02)
+                    .chr(20).chr(0).chr(20).chr(0).chr(0).chr(0).chr(0).chr(0)
+                    .chr(0).chr(0).chr(0).chr(0)
+                    .chr(0).chr(0).chr(0).chr(0)
+                    .chr($size2 & 255).chr(($size2 >> 8) & 255).chr(($size2 >> 16) & 255).chr(($size2 >> 24) & 255)
+                    .chr($size2 & 255).chr(($size2 >> 8) & 255).chr(($size2 >> 16) & 255).chr(($size2 >> 24) & 255)
+                    .chr($nl2 & 255).chr(($nl2 >> 8) & 255).chr(0).chr(0).chr(0).chr(0)
+                    .chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0).chr(0)
+                    .chr($loff2 & 255).chr(($loff2 >> 8) & 255).chr(($loff2 >> 16) & 255).chr(($loff2 >> 24) & 255)
+                    .$name2;
+                $countLow = 2;
+            }
             $clen = strlen($central);
             $llen = strlen($local);
             $eocd = chr(0x50).chr(0x4b).chr(0x05).chr(0x06)
                 .chr(0).chr(0).chr(0).chr(0)
-                .chr(1).chr(0).chr(1).chr(0)
+                .chr($countLow).chr(0).chr($countLow).chr(0)
                 .chr($clen & 255).chr(($clen >> 8) & 255).chr(($clen >> 16) & 255).chr(($clen >> 24) & 255)
                 .chr($llen & 255).chr(($llen >> 8) & 255).chr(($llen >> 16) & 255).chr(($llen >> 24) & 255)
                 .chr(0).chr(0);
             self::$h1open = 0;
             self::$h1name = '';
             self::$h1data = '';
+            self::$h1name2 = '';
+            self::$h1data2 = '';
             self::$h1status = 0;
 
             return self::packPayload(1, $local.$central.$eocd);
@@ -266,10 +365,24 @@ final class ZipArchiveJitHelper
             return self::pack(0);
         }
         if ('last_id' === $op) {
-            return self::pack(self::$h1name !== '' ? 0 : -1);
+            if ('' === self::$h1name) {
+                return self::pack(-1);
+            }
+            if ('' !== self::$h1name2) {
+                return self::pack(1);
+            }
+
+            return self::pack(0);
         }
         if ('num_files' === $op) {
-            return self::pack(self::$h1open === 1 && self::$h1name !== '' ? 1 : 0);
+            if (1 !== self::$h1open || '' === self::$h1name) {
+                return self::pack(0);
+            }
+            if ('' === self::$h1name2) {
+                return self::pack(1);
+            }
+
+            return self::pack(2);
         }
 
         return self::pack(0);
