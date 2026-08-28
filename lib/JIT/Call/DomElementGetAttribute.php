@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\ext\dom\DomUserScriptAttributeCacheLlvm;
+use PHPCompiler\ext\dom\JitDomAttributeNodeNS;
 use PHPCompiler\ext\dom\JitDomCreateElementAttrs;
 use PHPCompiler\ext\dom\JitDomImportNode;
 use PHPCompiler\ext\dom\JitDomNamedNodeMap;
@@ -69,6 +71,12 @@ final class DomElementGetAttribute implements Call
             }
         }
 
+        // User-script cache from createFromString / getAttributeNode — NamedNodeMap may
+        // lack pins until appendChild/setAttribute; read live Attr::$value (#21083).
+        if (null !== $nameLit && isset($args[0]) && self::cacheHasPresentLiteralName($nameLit)) {
+            return JitDomAttributeNodeNS::invokeGetAttributeLive($context, ...$args);
+        }
+
         // Per-element NamedNodeMap pins — correct after lastChild / getElementById
         // and for Attr::$value writes on attached attributes (#34863 / #19281).
         if (isset($args[0], $args[1])) {
@@ -77,6 +85,17 @@ final class DomElementGetAttribute implements Call
 
         // Otherwise fall back to importNode/getElementById HTML-id stub (#19212).
         return JitDomImportNode::invokeGetAttribute($context, ...$args);
+    }
+
+    private static function cacheHasPresentLiteralName(string $nameLit): bool
+    {
+        if (DomUserScriptAttributeCacheLlvm::hasPresentLiteral('', $nameLit)) {
+            return true;
+        }
+        $pos = strpos($nameLit, ':');
+
+        return false !== $pos
+            && DomUserScriptAttributeCacheLlvm::hasPresentLiteral('', substr($nameLit, $pos + 1));
     }
 
     private static function boxConstantString(Context $context, string $lit): Value

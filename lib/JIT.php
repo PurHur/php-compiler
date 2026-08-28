@@ -14775,7 +14775,11 @@ class JIT {
                     if (
                         null !== $nonObjectLabel
                         && $this->context->hasVariableOp($obj)
-                        && 'DOMAttr' === ($this->context->getVariableFromOp($obj)->classUserType ?? '')
+                        && \in_array(
+                            $this->context->getVariableFromOp($obj)->classUserType ?? '',
+                            ['DOMAttr', 'Dom\\Attr'],
+                            true
+                        )
                     ) {
                         $nonObjectLabel = null;
                     }
@@ -14939,6 +14943,23 @@ class JIT {
                         )
                     ) {
                         $declaringClass = 'DOMElement';
+                    }
+                    // Living Dom\Attr orphans lose static type; `$o->value` collides with
+                    // SensitiveParameterValue::$value on generic `object` (#21083 / #27108).
+                    if (
+                        null !== $propName
+                        && 'value' === strtolower($propName)
+                        && $this->context->hasVariableOp($obj)
+                    ) {
+                        $recvVar = $this->context->getVariableFromOp($obj);
+                        $attrLocal = $recvVar->compileTimeDomAttrLocalName ?? null;
+                        $attrClass = $recvVar->classUserType ?? null;
+                        if (
+                            null !== $attrLocal
+                            || (is_string($attrClass) && str_starts_with($attrClass, 'Dom\\'))
+                        ) {
+                            $declaringClass = 'Dom\\Attr';
+                        }
                     }
                     $receiver = $this->loadPropertyFetchReceiver($obj);
                     $phiDest = $this->ternaryEchoPhiPropertyFetchDest($block, $i);
@@ -17096,7 +17117,10 @@ class JIT {
         $resultVar = $this->context->getVariableFromOp($result);
         $resultVar->compileTimeDomAttrLocalName = $local;
         $resultVar->compileTimeDomAttrNamespace = $ns;
-        $resultVar->classUserType = 'DOMAttr';
+        $livingDoc = \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastDocumentClass();
+        $resultVar->classUserType = (null !== $livingDoc && str_starts_with($livingDoc, 'Dom\\'))
+            ? 'Dom\\Attr'
+            : 'DOMAttr';
     }
 
     /**
