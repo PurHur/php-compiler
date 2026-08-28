@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\MbConvertEncodingRuntime;
 use PHPCompiler\JIT\Builtin\MbConvertVariablesRuntime;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPLLVM\Builder;
@@ -36,6 +37,8 @@ final class MbConvertVariablesLlvm
         Value $lastDetectedSlot,
         Value $anyFailSlot
     ): void {
+        MbConvertEncodingRuntime::ensureLinked($context);
+        MbConvertVariablesRuntime::ensureLinked($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'mcv_array_call');
         $context->builder->call(
             self::ensureArrayFunction($context),
@@ -413,18 +416,19 @@ final class MbConvertVariablesLlvm
             $context->lookupFunction('__value__readString'),
             $valuePtr
         );
-        $convertedRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            MbConvertVariablesRuntime::convertStringHelper($context),
-            [$str, $toPtr, $fromPtr]
+        // Peer JitMbConvertVariables::lowerStringVar — convertStringHelper NestedJIT mis-returns (#35315).
+        $converted = $context->builder->call(
+            MbConvertEncodingRuntime::convertHelper($context),
+            $str,
+            $toPtr,
+            $fromPtr
         );
-        $converted = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $convertedRaw);
-        $detectedRaw = JitNestedHelperCoerce::callHelper(
-            $context,
+        $detected = $context->builder->call(
             MbConvertVariablesRuntime::detectHelper($context),
-            [$str, $toPtr, $fromPtr]
+            $str,
+            $toPtr,
+            $fromPtr
         );
-        $detected = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $detectedRaw);
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $converted);
         $context->builder->call($context->lookupFunction('__value__writeString'), $valuePtr, $owned);
         JitValueBox::publishAfterWrite($context, $valuePtr);
