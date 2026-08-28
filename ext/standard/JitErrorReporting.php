@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\IniRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** error_reporting() JIT/AOT lowering — {@see \PHPCompiler\JIT\Builtin\IniRuntime} (#5736, #3220). */
+/** error_reporting() JIT/AOT lowering — {@see \PHPCompiler\JIT\Builtin\IniRuntime} (#5736, #3220, #35614). */
 final class JitErrorReporting
 {
     public static function invoke(Context $context, ?JITVariable $levelArg): Value
@@ -28,6 +29,7 @@ final class JitErrorReporting
                 'error_level'
             );
         }
+        IniRuntime::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(

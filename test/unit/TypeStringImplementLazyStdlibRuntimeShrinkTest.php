@@ -60,15 +60,15 @@ final class TypeStringImplementLazyStdlibRuntimeShrinkTest extends TestCase
             $body,
             'standalone still defers String_::implement early (#13571)'
         );
-        $this->assertStringContainsString(
+        $this->assertStringNotContainsString(
             'StringBitwiseNot::implement',
             $body,
-            'bitwise-not stays eager until Helper call-site ensureLinked (#35301)'
+            'bitwise-not deferred — Helper call-site emitUnary (#35301 / #35614)'
         );
-        $this->assertStringContainsString(
+        $this->assertStringNotContainsString(
             'IniSet::implement',
             $body,
-            'ini ABIs still eager until JitIni get/set ensureLinked (#34848)'
+            'ini ABIs deferred — JitIni ensureLinked (#35614)'
         );
     }
 
