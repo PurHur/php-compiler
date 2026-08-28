@@ -620,6 +620,53 @@ final class JitDomAttributeNodeNS
         );
     }
 
+    /**
+     * True when Attr::$ownerElement is non-null and equals the receiver Element.
+     *
+     * Orphan createAttribute Attrs sit in the literal cache but are not on the map
+     * (php-src element.c php_dom_remove_attribute_node; #32707 leftover).
+     */
+    private static function attrOwnerElementEquals(Context $context, Value $element, Value $attr): Value
+    {
+        $objectType = $context->type->object;
+        $attrClassId = $objectType->lookup(self::CLASS_ATTR);
+        if (!$objectType->hasProperty($attrClassId, self::PROP_OWNER_ELEMENT)) {
+            self::ensureAttrPropertyLayout($objectType, $attrClassId);
+        }
+        $ownerElPtr = $context->builder->load(
+            $objectType->propertySlotFor($attr, self::CLASS_ATTR, self::PROP_OWNER_ELEMENT)
+        );
+        $ownerRaw = $context->builder->pointerCast(
+            $ownerElPtr,
+            $context->getTypeFromString('__value__*')
+        );
+        $ownerNull = JitNestedHelperCoerce::isHelperResultNull($context, $ownerRaw);
+        $tag = (string) (self::$boxSeq++);
+        $bbNull = BasicBlockHelper::append($context, 'dom_rmattr_owner_null_'.$tag);
+        $bbHas = BasicBlockHelper::append($context, 'dom_rmattr_owner_has_'.$tag);
+        $done = BasicBlockHelper::append($context, 'dom_rmattr_owner_done_'.$tag);
+        $i1 = $context->getTypeFromString('int1');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $i1);
+        $context->builder->branchIf($ownerNull, $bbNull, $bbHas);
+
+        $context->builder->positionAtEnd($bbNull);
+        $context->builder->store($i1->constInt(0, false), $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($bbHas);
+        $ownerEl = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::normalizeValuePtr($context, $ownerRaw)
+        );
+        $matches = $context->builder->icmp(Builder::INT_EQ, $ownerEl, $element);
+        $context->builder->store($matches, $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($resultSlot);
+    }
+
     /** php-src element.c php_dom_remove_attribute_node — detached Attr has null parent. */
     private static function clearOwnerElement(Context $context, Value $attr): void
     {
@@ -1702,6 +1749,13 @@ final class JitDomAttributeNodeNS
             $cont = BasicBlockHelper::append($context, 'dom_rmattrnode_cont_'.$seq);
             $context->builder->branchIf($isMatch, $hit, $cont);
             $context->builder->positionAtEnd($hit);
+            $owned = self::attrOwnerElementEquals($context, $element, $attr);
+            $bbOwned = BasicBlockHelper::append($context, 'dom_rmattrnode_owned_'.$seq);
+            $bbSkip = BasicBlockHelper::append($context, 'dom_rmattrnode_skip_'.$seq);
+            $context->builder->branchIf($owned, $bbOwned, $bbSkip);
+            $context->builder->positionAtEnd($bbSkip);
+            $context->builder->branch($cont);
+            $context->builder->positionAtEnd($bbOwned);
             DomUserScriptAttributeCacheLlvm::clearLiteral($context, $ns, $local);
             if ('' === $ns && 'id' === $local) {
                 DomUserScriptElementCacheLlvm::clearId($context);
