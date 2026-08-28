@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7962 |
-| Phase A inventory files (M2 ratio SSOT) | 7962 |
+| PHP files on vm.php path | 7965 |
+| Phase A inventory files (M2 ratio SSOT) | 7965 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25333 |
+| Source constructs flagged (warnings) | 25336 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1566,6 +1566,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/JitMbLanguage.php` | 0 | 2 |
 | `ext/mbstring/JitMbMimeheader.php` | 0 | 1 |
 | `ext/mbstring/JitMbNumericEntity.php` | 0 | 1 |
+| `ext/mbstring/JitMbOutputHandler.php` | 0 | 2 |
 | `ext/mbstring/JitMbParseStr.php` | 0 | 1 |
 | `ext/mbstring/JitMbPreferredMimeName.php` | 0 | 1 |
 | `ext/mbstring/JitMbRegexEncoding.php` | 0 | 2 |
@@ -1599,6 +1600,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbLanguageJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbMimeheaderJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbNumericEntityJitHelper.php` | 0 | 1 |
+| `ext/mbstring/MbOutputHandlerJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbPreferredMimeNameJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbRegexEncodingJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbRegexOptions.php` | 0 | 1 |
@@ -1659,7 +1661,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_list_encodings.php` | 0 | 2 |
 | `ext/mbstring/mb_ltrim.php` | 0 | 1 |
 | `ext/mbstring/mb_ord.php` | 0 | 4 |
-| `ext/mbstring/mb_output_handler.php` | 0 | 3 |
+| `ext/mbstring/mb_output_handler.php` | 0 | 2 |
 | `ext/mbstring/mb_parse_str.php` | 0 | 5 |
 | `ext/mbstring/mb_preferred_mime_name.php` | 0 | 2 |
 | `ext/mbstring/mb_regex_encoding.php` | 0 | 3 |
@@ -5894,6 +5896,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MbLanguageRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbMimeheaderRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbNumericEntity.php` | 0 | 1 |
+| `lib/JIT/Builtin/MbOutputHandlerRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbPreferredMimeNameRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbRegexEncodingRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbScrubRuntime.php` | 0 | 1 |
@@ -20114,6 +20117,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 18 class method(s)
 
+### `ext/mbstring/JitMbOutputHandler.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 35)
+- 6 class method(s)
+
 ### `ext/mbstring/JitMbParseStr.php`
 
 **Warnings** (review for bootstrap subset):
@@ -20282,6 +20291,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/mbstring/MbOutputHandlerJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/mbstring/MbPreferredMimeNameJitHelper.php`
 
@@ -20730,9 +20744,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_output_handler.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- new ArgumentCountError (line 53)
-- 4 class method(s)
+- new ArgumentCountError (line 30)
+- 2 class method(s)
 
 ### `ext/mbstring/mb_parse_str.php`
 
@@ -51324,6 +51337,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `lib/JIT/Builtin/MbOutputHandlerRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/MbPreferredMimeNameRuntime.php`
 
