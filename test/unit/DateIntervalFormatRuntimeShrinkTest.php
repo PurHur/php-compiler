@@ -43,15 +43,15 @@ final class DateIntervalFormatRuntimeShrinkTest extends TestCase
     {
         $this->assertSame(
             '1 2 3 4 5 6',
-            DateIntervalFormatJitHelper::formatFromScalars(1, 2, 3, 4, 5, 6, 0.0, 0, 0, 0, '%y %m %d %h %i %s')
+            DateIntervalFormatJitHelper::formatFromScalars(1, 2, 3, 4, 5, 6, 0, 0, 0, 0, '%y %m %d %h %i %s')
         );
         $this->assertSame(
             '7',
-            DateIntervalFormatJitHelper::formatFromScalars(0, 0, 0, 0, 0, 0, 0.0, 0, 1, 7, '%a')
+            DateIntervalFormatJitHelper::formatFromScalars(0, 0, 0, 0, 0, 0, 0, 0, 1, 7, '%a')
         );
         $this->assertSame(
             '(unknown)',
-            DateIntervalFormatJitHelper::formatFromScalars(0, 0, 0, 0, 0, 0, 0.0, 0, 0, 0, '%a')
+            DateIntervalFormatJitHelper::formatFromScalars(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '%a')
         );
     }
 }
