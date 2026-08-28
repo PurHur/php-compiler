@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\RecursiveLeavesFlattenRuntime;
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
@@ -13,6 +14,8 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\DirectoryIteratorJitHelper;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -42,11 +45,13 @@ final class RecursiveIteratorIteratorConstruct implements Call
         $srcHt = $context->helper->loadValue($srcHtVar);
         $flatHt = HashTableHelper::alloc($context);
         $keysHt = HashTableHelper::alloc($context);
+        $skipDots = self::emitInnerSkipDotsFlag($context, $inner);
         $context->builder->call(
             $context->lookupFunction(RecursiveLeavesFlattenRuntime::ABI),
             $srcHt,
             $flatHt,
-            $keysHt
+            $keysHt,
+            $skipDots
         );
         $flatVar = new Variable(
             $context,
@@ -133,6 +138,38 @@ final class RecursiveIteratorIteratorConstruct implements Call
         );
 
         return $slot;
+    }
+
+    /**
+     * Inner RecursiveDirectoryIterator may carry SPL_FILE_DIR_SKIP_DOTS in `__flags` (#34984 / #34624).
+     */
+    private static function emitInnerSkipDotsFlag(Context $context, Variable $inner): Value
+    {
+        $objPtr = $context->helper->loadValue(self::objectReceiver($context, $inner));
+        $flagsSlot = ObjectInstancePropertyLlvm::propertyFetchByRuntimeReceiverClass(
+            $context->type->object,
+            $objPtr,
+            DirectoryIteratorJitHelper::PROP_FLAGS
+        );
+        $i1 = $context->getTypeFromString('int1');
+        if (null === $flagsSlot) {
+            return $i1->constInt(0, false);
+        }
+        $i64 = $context->getTypeFromString('int64');
+        if (Variable::TYPE_NATIVE_LONG === $flagsSlot->type) {
+            $flagsVal = $context->helper->loadValue($flagsSlot);
+        } else {
+            $flagsVal = $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                JitValueBox::valuePtrFromVariable($context, $flagsSlot)
+            );
+        }
+        $masked = $context->builder->and(
+            $flagsVal,
+            $i64->constInt(DirectoryIteratorJitHelper::FLAG_SKIP_DOTS, false)
+        );
+
+        return $context->builder->icmp(Builder::INT_NE, $masked, $i64->constInt(0, false));
     }
 }
 

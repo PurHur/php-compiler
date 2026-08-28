@@ -56,23 +56,30 @@ final class RecursiveLeavesFlattenRuntime
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i1 = $context->getTypeFromString('int1');
         $void = $context->context->voidType();
 
         $walkProbe = $context->module->getNamedFunction(self::WALK_ABI);
-        $walkFt = $context->context->functionType($void, false, $htPtr, $htPtr, $htPtr);
+        $walkFt = $context->context->functionType($void, false, $htPtr, $htPtr, $htPtr, $i1);
         $walkFn = null !== $walkProbe ? $walkProbe : $context->module->addFunction(self::WALK_ABI, $walkFt);
         $context->registerFunction(self::WALK_ABI, $walkFn);
         self::emitWalk($context, $walkFn);
 
-        // void flatten(src, out_values, out_keys)
-        $ft = $context->context->functionType($void, false, $htPtr, $htPtr, $htPtr);
+        // void flatten(src, out_values, out_keys, skip_dots)
+        $ft = $context->context->functionType($void, false, $htPtr, $htPtr, $htPtr, $i1);
         $fn = null !== $probe ? $probe : $context->module->addFunction(self::ABI, $ft);
         $context->registerFunction(self::ABI, $fn);
         // Mid-construct ensureLinked: loweringLlvmFunction is the user fn (#33024 / #27211).
         BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI, static function () use ($context, $fn, $walkFn): void {
             $entry = $fn->appendBasicBlock('rii_flatten_entry');
             $context->builder->positionAtEnd($entry);
-            $context->builder->call($walkFn, $fn->getParam(0), $fn->getParam(1), $fn->getParam(2));
+            $context->builder->call(
+                $walkFn,
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2),
+                $fn->getParam(3)
+            );
             $context->builder->returnVoid();
         });
 
@@ -96,8 +103,9 @@ final class RecursiveLeavesFlattenRuntime
             $src = $walkFn->getParam(0);
             $outValues = $walkFn->getParam(1);
             $outKeys = $walkFn->getParam(2);
-            self::walkPacked($context, $walkFn, $src, $outValues, $outKeys);
-            self::walkStringKeys($context, $walkFn, $src, $outValues, $outKeys);
+            $skipDots = $walkFn->getParam(3);
+            self::walkPacked($context, $walkFn, $src, $outValues, $outKeys, $skipDots);
+            self::walkStringKeys($context, $walkFn, $src, $outValues, $outKeys, $skipDots);
             $context->builder->returnVoid();
         });
     }
@@ -107,7 +115,8 @@ final class RecursiveLeavesFlattenRuntime
         Value $walkFn,
         Value $src,
         Value $outValues,
-        Value $outKeys
+        Value $outKeys,
+        Value $skipDots
     ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
@@ -144,7 +153,7 @@ final class RecursiveLeavesFlattenRuntime
         $idxI64 = $context->builder->zExt($idx, $i64);
         JitValueBox::writeLong($context, $keySlot, $idxI64);
         $keyVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $keySlot);
-        self::emitElement($context, $walkFn, $outValues, $outKeys, $elem, $keyVar, $advance);
+        self::emitElement($context, $walkFn, $outValues, $outKeys, $elem, $keyVar, $advance, $skipDots);
 
         $context->builder->positionAtEnd($advance);
         $context->builder->store(
@@ -161,7 +170,8 @@ final class RecursiveLeavesFlattenRuntime
         Value $walkFn,
         Value $src,
         Value $outValues,
-        Value $outKeys
+        Value $outKeys,
+        Value $skipDots
     ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
@@ -193,7 +203,7 @@ final class RecursiveLeavesFlattenRuntime
         );
         $keyVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $keySlot);
         $advance = BasicBlockHelper::append($context, 'rii_walk_str_advance');
-        self::emitElement($context, $walkFn, $outValues, $outKeys, $elem, $keyVar, $advance);
+        self::emitElement($context, $walkFn, $outValues, $outKeys, $elem, $keyVar, $advance, $skipDots);
 
         $context->builder->positionAtEnd($advance);
         $next = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
@@ -210,7 +220,8 @@ final class RecursiveLeavesFlattenRuntime
         Value $outKeys,
         Variable $elem,
         Variable $keyVar,
-        BasicBlock $continueBb
+        BasicBlock $continueBb,
+        Value $skipDots
     ): void {
         $valPtr = JitValueBox::pointer($context, $elem->value);
         $valueMap = $context->structFieldMap['__value__'];
@@ -231,10 +242,37 @@ final class RecursiveLeavesFlattenRuntime
             $context->lookupFunction('__value__readHashtable'),
             $valPtr
         );
-        $context->builder->call($walkFn, $child, $outValues, $outKeys);
+        $context->builder->call($walkFn, $child, $outValues, $outKeys, $skipDots);
         $context->builder->branch($continueBb);
 
         $context->builder->positionAtEnd($leaf);
+        $checkDot = BasicBlockHelper::append($context, 'rii_walk_leaf_dot');
+        $storeLeaf = BasicBlockHelper::append($context, 'rii_walk_leaf_store');
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
+        $context->builder->branchIf($isString, $checkDot, $storeLeaf);
+
+        $context->builder->positionAtEnd($checkDot);
+        $wantSkip = $context->builder->icmp(
+            Builder::INT_NE,
+            $skipDots,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $dotCheck = BasicBlockHelper::append($context, 'rii_walk_leaf_dotname');
+        $context->builder->branchIf($wantSkip, $dotCheck, $storeLeaf);
+
+        $context->builder->positionAtEnd($dotCheck);
+        $namePtr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valPtr
+        );
+        $isDot = self::emitIsDotName($context, $namePtr);
+        $context->builder->branchIf($isDot, $continueBb, $storeLeaf);
+
+        $context->builder->positionAtEnd($storeLeaf);
         $valuesVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $outValues);
         $valuesVar->nextFreeElementFromRuntime = true;
         HashTableHelper::addElement($context, $valuesVar, $elem, null);
@@ -242,5 +280,32 @@ final class RecursiveLeavesFlattenRuntime
         $keysVar->nextFreeElementFromRuntime = true;
         HashTableHelper::addElement($context, $keysVar, $keyVar, null);
         $context->builder->branch($continueBb);
+    }
+
+    /** php-src SPL_FILE_DIR_SKIP_DOTS — mirror DirectoryIteratorJitHelper::emitIsDotName (#34984). */
+    private static function emitIsDotName(Context $context, Value $namePtr): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $namePtr);
+        $strMap = $context->structFieldMap['__string__'];
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $bytes = $context->builder->pointerCast(
+            $context->builder->structGep($namePtr, $strMap['value']),
+            $i8p
+        );
+        $b0 = $context->builder->load($bytes);
+        $b1 = $context->builder->load(
+            $context->builder->gep($bytes, $i64->constInt(1, false))
+        );
+        $dot = $i8->constInt(ord('.'), false);
+        $isOne = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(1, false));
+        $isTwo = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(2, false));
+        $b0Dot = $context->builder->icmp(Builder::INT_EQ, $b0, $dot);
+        $b1Dot = $context->builder->icmp(Builder::INT_EQ, $b1, $dot);
+        $single = $context->builder->and($isOne, $b0Dot);
+        $double = $context->builder->and($isTwo, $context->builder->and($b0Dot, $b1Dot));
+
+        return $context->builder->or($single, $double);
     }
 }

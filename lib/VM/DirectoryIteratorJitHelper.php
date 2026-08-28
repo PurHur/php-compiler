@@ -38,7 +38,7 @@ use PHPLLVM\Value;
 final class DirectoryIteratorJitHelper
 {
     /** php-src SPL_FILE_DIR_SKIP_DOTS — applied at iteration, not snapshot (#34984). */
-    private const FLAG_SKIP_DOTS = 4096;
+    public const FLAG_SKIP_DOTS = 4096;
 
     public const PROP_HT = '__spl_ht';
 

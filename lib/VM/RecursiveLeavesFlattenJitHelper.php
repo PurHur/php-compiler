@@ -21,7 +21,7 @@ final class RecursiveLeavesFlattenJitHelper
      *
      * @return array{0: HashTable, 1: HashTable}
      */
-    public static function flattenLeavesWithKeys($src): array
+    public static function flattenLeavesWithKeys($src, bool $skipDots = false): array
     {
         if (!$src instanceof HashTable) {
             throw new \TypeError(
@@ -31,25 +31,31 @@ final class RecursiveLeavesFlattenJitHelper
         }
         $out = new HashTable();
         $keys = new HashTable();
-        self::walk($src, $out, $keys);
+        self::walk($src, $out, $keys, $skipDots);
 
         return [$out, $keys];
     }
 
     /** @param HashTable $src */
-    public static function flattenLeaves($src)
+    public static function flattenLeaves($src, bool $skipDots = false)
     {
-        return self::flattenLeavesWithKeys($src)[0];
+        return self::flattenLeavesWithKeys($src, $skipDots)[0];
     }
 
-    private static function walk(HashTable $src, HashTable $out, HashTable $keys): void
+    private static function walk(HashTable $src, HashTable $out, HashTable $keys, bool $skipDots): void
     {
         $src->iterReset();
         while ($src->iterValid()) {
             $value = $src->iterCurrentValue()->resolveIndirect();
             if (Variable::TYPE_ARRAY === $value->type) {
-                self::walk($value->toArray(), $out, $keys);
+                self::walk($value->toArray(), $out, $keys, $skipDots);
                 continue;
+            }
+            if ($skipDots && Variable::TYPE_STRING === $value->type) {
+                $name = $value->toString();
+                if ('.' === $name || '..' === $name) {
+                    continue;
+                }
             }
             $copy = new Variable();
             $copy->copyFrom($value);
