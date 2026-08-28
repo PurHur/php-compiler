@@ -28042,33 +28042,37 @@ class JIT {
             // Prefer static methods; skip instance-only names that share a short name.
             // When $allowInstanceMethods (static:: from instance, #28050), invert: only
             // non-static proxies (caller $this is prepended at the call site).
-            if ($this->context->type->object->hasDeclaredClass($classLc)) {
-                $ownerId = $this->context->type->object->lookup($classLc);
-                if ($this->context->type->object->hasMethod($ownerId, $methodLc)) {
-                    $vis = $this->context->type->object->methodVisibility($ownerId, $methodLc);
-                    $ownerIsStatic = (0 !== ($vis & \PHPCfg\Func::FLAG_STATIC));
-                    if ($allowInstanceMethods) {
-                        if ($ownerIsStatic) {
-                            continue;
-                        }
-                        $resolvedLc = explode('::', $proxyName, 2)[0];
-                        if ($this->context->type->object->hasDeclaredClass($resolvedLc)) {
-                            $resolvedId = $this->context->type->object->lookup($resolvedLc);
-                            $resolvedVis = $this->context->type->object->methodVisibility($resolvedId, $methodLc);
-                            if (0 !== ($resolvedVis & \PHPCfg\Func::FLAG_STATIC)) {
-                                continue;
-                            }
-                        }
-                    } elseif (!$ownerIsStatic) {
-                        // May still be inherited as static from a parent — check resolved owner.
-                        $resolvedLc = explode('::', $proxyName, 2)[0];
-                        if ($this->context->type->object->hasDeclaredClass($resolvedLc)) {
-                            $resolvedId = $this->context->type->object->lookup($resolvedLc);
-                            $resolvedVis = $this->context->type->object->methodVisibility($resolvedId, $methodLc);
-                            if (0 === ($resolvedVis & \PHPCfg\Func::FLAG_STATIC)) {
-                                continue;
-                            }
-                        }
+            if (!$this->context->type->object->hasDeclaredClass($classLc)) {
+                continue;
+            }
+            $ownerId = $this->context->type->object->lookup($classLc);
+            // Lazy dom/ext proxies register on functionIsRegistered — skip classes that do
+            // not actually declare the method ($obj::method() / #31967).
+            if (!$this->context->type->object->hasMethod($ownerId, $methodLc)) {
+                continue;
+            }
+            $vis = $this->context->type->object->methodVisibility($ownerId, $methodLc);
+            $ownerIsStatic = (0 !== ($vis & \PHPCfg\Func::FLAG_STATIC));
+            if ($allowInstanceMethods) {
+                if ($ownerIsStatic) {
+                    continue;
+                }
+                $resolvedLc = explode('::', $proxyName, 2)[0];
+                if ($this->context->type->object->hasDeclaredClass($resolvedLc)) {
+                    $resolvedId = $this->context->type->object->lookup($resolvedLc);
+                    $resolvedVis = $this->context->type->object->methodVisibility($resolvedId, $methodLc);
+                    if (0 !== ($resolvedVis & \PHPCfg\Func::FLAG_STATIC)) {
+                        continue;
+                    }
+                }
+            } elseif (!$ownerIsStatic) {
+                // May still be inherited as static from a parent — check resolved owner.
+                $resolvedLc = explode('::', $proxyName, 2)[0];
+                if ($this->context->type->object->hasDeclaredClass($resolvedLc)) {
+                    $resolvedId = $this->context->type->object->lookup($resolvedLc);
+                    $resolvedVis = $this->context->type->object->methodVisibility($resolvedId, $methodLc);
+                    if (0 === ($resolvedVis & \PHPCfg\Func::FLAG_STATIC)) {
+                        continue;
                     }
                 }
             }
