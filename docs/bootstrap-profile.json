@@ -3308,6 +3308,7 @@
         "ext/standard/JitProcTerminate.php",
         "ext/standard/JitProgressNoteKernel.php",
         "ext/standard/JitPropertyExists.php",
+        "ext/standard/JitPropertyExistsObject.php",
         "ext/standard/JitQuotPrint.php",
         "ext/standard/JitQuotedPrintableDecode.php",
         "ext/standard/JitQuotedPrintableEncode.php",
@@ -8216,9 +8217,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7982,
+        "inventory_files": 7983,
         "excluded": 0,
-        "eligible": 7982,
+        "eligible": 7983,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
