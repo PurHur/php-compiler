@@ -41,6 +41,42 @@ final class FinallyBreakContinue35547AotTest extends TestCase
         $this->assertAotFileOutput($repro, "B0F0F1B2F2\n");
     }
 
+    public function testBreakInTryFinallyMatchesZendWithHelperRuntimeO0(): void
+    {
+        $repro = $this->repoRoot.'/test/repro/issue_25240_aot_finally_break.php';
+        $this->assertFileExists($repro);
+        $out = tempnam(sys_get_temp_dir(), 'phpc_fin_leave_o0_');
+        $this->assertNotFalse($out);
+        $env = $this->llvmEnv();
+        $env['PHP_COMPILER_HELPER_RUNTIME_O'] = '0';
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proc = proc_open(
+            [PHP_BINARY, $this->repoRoot.'/bin/compile.php', '-o', $out, $repro],
+            $descriptorSpec,
+            $pipes,
+            $this->repoRoot,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+        $this->assertSame(0, $code, 'AOT compile failed (O=0): '.$stderr);
+        $run = proc_open([$out], $descriptorSpec, $runPipes, $this->repoRoot, $env);
+        $this->assertIsResource($run);
+        fclose($runPipes[0]);
+        $stdout = stream_get_contents($runPipes[1]);
+        $runErr = stream_get_contents($runPipes[2]);
+        fclose($runPipes[1]);
+        fclose($runPipes[2]);
+        $runCode = proc_close($run);
+        @unlink($out);
+        $this->assertSame(0, $runCode, 'AOT run failed (O=0): '.$runErr);
+        $this->assertSame("B0F0B1F1\n", $stdout);
+    }
+
     public function testBreakInTryFinallyMatchesZend(): void
     {
         $this->assertAotFileOutput(

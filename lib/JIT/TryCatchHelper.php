@@ -213,7 +213,7 @@ final class TryCatchHelper
         }
         $matchingHandler->mayDeferGotoLeave = true;
         self::ensureGotoPendingSlots($context, $func);
-        $resumeId = $context->tryCatch->nextGotoResumeId++;
+        $resumeId = $context->nextGotoResumeId++;
         $runOrder = array_merge([$matchingHandler], $outerHandlers);
         $next = null;
         for ($k = \count($runOrder) - 1; $k >= 0; --$k) {
@@ -226,8 +226,8 @@ final class TryCatchHelper
             $next = self::finallyBbFor($jit, $func, $context, $handler, $args, false);
         }
         foreach ($runOrder as $handler) {
-            if (!\in_array($handler, $context->tryCatch->gotoResumeHandlers, true)) {
-                $context->tryCatch->gotoResumeHandlers[] = $handler;
+            if (!\in_array($handler, $context->gotoResumeHandlers, true)) {
+                $context->gotoResumeHandlers[] = $handler;
             }
         }
         $builder = $context->builder;
@@ -1840,13 +1840,13 @@ final class TryCatchHelper
             return;
         }
         self::ensureGotoPendingSlots($context, $func);
-        $resumeId = $context->tryCatch->nextGotoResumeId++;
+        $resumeId = $context->nextGotoResumeId++;
         $outer->mayDeferGotoLeave = true;
         $outer->gotoPendingNext[$resumeId] = null;
         $outer->gotoPendingResumeCfgTargets[$resumeId] = $handler->mergeBlock;
         $outer->gotoPendingClears[$resumeId] = true;
-        if (!\in_array($outer, $context->tryCatch->gotoResumeHandlers, true)) {
-            $context->tryCatch->gotoResumeHandlers[] = $outer;
+        if (!\in_array($outer, $context->gotoResumeHandlers, true)) {
+            $context->gotoResumeHandlers[] = $outer;
         }
         self::storeGotoPending($context, $resumeId);
         $builder->branch(self::finallyBbFor($jit, $func, $context, $outer, $args, false));
@@ -1907,7 +1907,7 @@ final class TryCatchHelper
 
     public static function materializeAllPendingGotoResumeHandlers(Context $context): void
     {
-        foreach ($context->tryCatch->gotoResumeHandlers as $handler) {
+        foreach ($context->gotoResumeHandlers as $handler) {
             $gotoResume = $handler->gotoResumeBb;
             $parent = $gotoResume?->getParent();
             if (!$parent instanceof Function_) {
@@ -1919,7 +1919,7 @@ final class TryCatchHelper
 
     public static function materializeAllGotoResumeHandlers(Context $context, Function_ $func): void
     {
-        foreach ($context->tryCatch->gotoResumeHandlers as $handler) {
+        foreach ($context->gotoResumeHandlers as $handler) {
             $gotoResume = $handler->gotoResumeBb;
             $parent = $gotoResume?->getParent();
             if (
@@ -2069,26 +2069,26 @@ final class TryCatchHelper
 
     private static function gotoPendingFlagGlobal(Context $context): Value
     {
-        if (null !== $context->tryCatch->gotoPendingFlagGlobal) {
-            return $context->tryCatch->gotoPendingFlagGlobal;
+        if (null !== $context->gotoPendingFlagGlobal) {
+            return $context->gotoPendingFlagGlobal;
         }
         $i32 = $context->getTypeFromString('int32');
         $global = $context->module->addGlobal($i32, 'phpc_jit_goto_pending_flag');
         $global->setInitializer($i32->constInt(0, false));
-        $context->tryCatch->gotoPendingFlagGlobal = $global;
+        $context->gotoPendingFlagGlobal = $global;
 
         return $global;
     }
 
     private static function gotoResumeIdGlobal(Context $context): Value
     {
-        if (null !== $context->tryCatch->gotoResumeIdGlobal) {
-            return $context->tryCatch->gotoResumeIdGlobal;
+        if (null !== $context->gotoResumeIdGlobal) {
+            return $context->gotoResumeIdGlobal;
         }
         $i64 = $context->getTypeFromString('int64');
         $global = $context->module->addGlobal($i64, 'phpc_jit_goto_resume_id');
         $global->setInitializer($i64->constInt(0, false));
-        $context->tryCatch->gotoResumeIdGlobal = $global;
+        $context->gotoResumeIdGlobal = $global;
 
         return $global;
     }

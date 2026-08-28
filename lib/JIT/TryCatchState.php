@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPLLVM\Value;
-
 final class TryCatchState
 {
     /** @var list<TryCatchHandler> */
@@ -25,15 +23,6 @@ final class TryCatchState
     /** @var array<int, true> spl_object_id(merge Block) => true (#35547) */
     public array $mergeBlockIds = [];
 
-    public int $nextGotoResumeId = 0;
-
-    /** @var list<TryCatchHandler> */
-    public array $gotoResumeHandlers = [];
-
-    public ?Value $gotoPendingFlagGlobal = null;
-
-    public ?Value $gotoResumeIdGlobal = null;
-
     /** Fresh try/catch stack for a JIT Context (avoids `new TryCatchState` in Context.php — #3027). */
     public static function create(): self
     {
@@ -50,9 +39,5 @@ final class TryCatchState
         $this->mergeHandlers = [];
         $this->returnFinallyStack = [];
         $this->mergeBlockIds = [];
-        $this->nextGotoResumeId = 0;
-        $this->gotoResumeHandlers = [];
-        $this->gotoPendingFlagGlobal = null;
-        $this->gotoResumeIdGlobal = null;
     }
 }
