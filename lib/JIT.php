@@ -19511,6 +19511,9 @@ class JIT {
                 $promoted
             );
         }
+        // Int-local widen to VALUE must mark assigned — guards only track VALUE slots
+        // (#23471 e28/mandelbrot spurious undef warnings after #35643).
+        $this->markScopeVariableAssignedIfTracked($resultOp, $promoted);
     }
 
     /**
@@ -21860,6 +21863,7 @@ class JIT {
             $result->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($result, $value, $force);
             $this->recordListUnpackAssignSlot($resultOp, $result);
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {
