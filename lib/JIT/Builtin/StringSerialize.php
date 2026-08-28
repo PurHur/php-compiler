@@ -131,9 +131,35 @@ final class StringSerialize
         }
 
         self::implementSerializeValueBridge($context);
+        // HT body emit (SerializeArrayLlvm) may call __compiler_serialize_object for nested
+        // boxed objects — declare before HT bridge body (#34483 / #33207 / Issue31967 tests).
+        self::ensureObjectAbiDeclared($context);
         self::implementSerializeHashtableBridge($context);
         self::implementObjectBridge($context);
         self::registerLinkedRuntime($context);
+    }
+
+    /**
+     * Forward-declare object serialize ABI so HT bridge body emit can lookup before
+     * {@see implementObjectBridge} fills the body (SerializeArrayLlvm → encodeBoxedValue).
+     */
+    private static function ensureObjectAbiDeclared(Context $context): LlvmFunction
+    {
+        $abiName = '__compiler_serialize_object';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe) {
+            $context->registerFunction($abiName, $probe);
+
+            return $probe;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $htPtr);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
+
+        return $fn;
     }
 
     /**
@@ -152,6 +178,7 @@ final class StringSerialize
 
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::implementSerializeValueBridge($context);
+        self::ensureObjectAbiDeclared($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -329,12 +356,11 @@ final class StringSerialize
         // Nested array props need HT ABI before object bag emit (#34493 / peer #34483).
         self::implementSerializeHashtableBridge($context);
 
-        $strPtr = $context->getTypeFromString('__string__*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr, $htPtr);
-        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $fn = self::ensureObjectAbiDeclared($context);
         // Register before body emit: EncodeBoxedValue may recurse into object ABI.
         $context->registerFunction($abiName, $fn);
+
+        $strPtr = $context->getTypeFromString('__string__*');
 
         JitVmHelperLink::ensureCompiled(
             $context,
