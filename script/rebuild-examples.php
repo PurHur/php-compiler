@@ -14,6 +14,10 @@ require_once __DIR__.'/rebuild-examples-ssot.php';
 require_once __DIR__.'/../test/support/CgiCookieJar.php';
 require_once __DIR__.'/../test/support/SessionsWebCgiEnv.php';
 
+if (defined('REBUILD_EXAMPLES_LIBRARY_ONLY')) {
+    return;
+}
+
 echo "Rebuilding Examples\n";
 
 $repoRoot = realpath(__DIR__.'/..') ?: __DIR__.'/..';
