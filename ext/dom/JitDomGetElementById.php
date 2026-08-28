@@ -110,6 +110,7 @@ final class JitDomGetElementById
             $context->builder->branchIf($isNullObj, $cacheMiss, $cacheHit);
 
             $context->builder->positionAtEnd($cacheHit);
+            // Single-slot cache is invalidated on detach; temps may lack parent slots (#19870).
             $hitBoxed = self::boxObjectResult($context, $cached);
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $hitBoxed), $resultSlot);
             $context->builder->branch($doneBlock);
@@ -154,7 +155,12 @@ final class JitDomGetElementById
             $context->builder->branchIf($mapIsObject, $mapOk, $mapNull);
 
             $context->builder->positionAtEnd($mapOk);
-            $context->builder->store($mapValPtr, $resultSlot);
+            $mapObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $mapValPtr
+            );
+            $mapBoxed = self::boxObjectIfConnected($context, $mapObj);
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $mapBoxed), $resultSlot);
             $context->builder->branch($doneBlock);
 
             $context->builder->positionAtEnd($mapNull);
@@ -278,6 +284,7 @@ final class JitDomGetElementById
 
         $context->builder->positionAtEnd($hitBlock);
         $element = self::materializeParsedElement($context, $receiver, $parsed);
+        JitDomLoadHTMLUserScript::rememberLastGetElementByIdHit($parsed);
         $boxed = self::boxObjectResult($context, $element);
         $context->builder->store(JitValueBox::normalizeValuePtr($context, $boxed), $resultSlot);
         $context->builder->branch($doneBlock);
@@ -504,5 +511,40 @@ final class JitDomGetElementById
             0,
             'elementId'
         );
+    }
+
+    /**
+     * php-src ext/dom/document.c — php_dom_is_node_connected on id-map hits (#23999 / #29694).
+     */
+    private static function boxObjectIfConnected(Context $context, Value $obj): Value
+    {
+        $objectType = $context->type->object;
+        $connected = JitDomNodeIsConnected::isConnectedFlag($objectType, $obj);
+        $yesBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_conn_yes');
+        $noBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_conn_no');
+        $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_conn_done');
+        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__value__*')
+        );
+        $context->builder->branchIf($connected, $yesBlock, $noBlock);
+
+        $context->builder->positionAtEnd($yesBlock);
+        $context->builder->store(
+            JitValueBox::normalizeValuePtr($context, self::boxObjectResult($context, $obj)),
+            $resultSlot
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($noBlock);
+        $context->builder->store(
+            JitValueBox::normalizeValuePtr($context, self::boxNullResult($context)),
+            $resultSlot
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
     }
 }

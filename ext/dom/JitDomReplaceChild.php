@@ -422,6 +422,8 @@ final class JitDomReplaceChild
         }
 
         JitDomReplaceChildLiveSlots::sync($context, $parent, $newChild, $oldChild, $childCount);
+        // Null parent/sibling slots on detached oldChild — peer document replaceChild (#19240 / #29694).
+        self::clearDetachedLinkSlots($context, $oldChild);
         // Drop thin-AOT getElementById cache after detach — single-slot cache may still
         // hold a sibling while xmlAddID keeps the detached node's ID (#29694).
         DomUserScriptElementCacheLlvm::clearId($context);
