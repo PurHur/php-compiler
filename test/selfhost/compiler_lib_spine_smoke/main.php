@@ -5711,6 +5711,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionFunctionParamCountLook
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionFunctionParamCountLowering.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionFunctionVariadicLookupRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParamSensitiveLowering.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ParamVariadicLookupRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ParamVariadicLowering.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrNativeOpsJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrl.php';
@@ -6502,6 +6504,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionObjectGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterIsSensitiveParameter.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterIsVariadic.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyGetAttributes.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyGetMangledName.php';
