@@ -47,6 +47,13 @@ final class ScalarReturnCheck
         $callableName = self::callableName($block);
         $expectedLabel = self::expectedLabel($constraint, $block->returnLiteralBoolType);
         $givenLabel = self::givenLabel($return);
+        // Zend weak mode: null is not a valid scalar return (#19695). const null lowers to a
+        // boxed __value__ (isNullConstant); invisible parent-private reads use TYPE_NULL (#19005).
+        if (Variable::TYPE_NULL === $return->type || $return->isNullConstant) {
+            self::raiseReturnTypeError($context, $callableName, $expectedLabel, 'null');
+
+            return false;
+        }
         // Boxed cells: zend_verify_return_type inspects the runtime tag (#29001 MiniWebApp).
         if (Variable::TYPE_VALUE === $return->type) {
             if ($block->strictTypes) {
@@ -58,6 +65,9 @@ final class ScalarReturnCheck
                     $callableName,
                     $expectedLabel
                 );
+            }
+            if (self::rejectWeakValueBoxNullReturn($context, $return, $callableName, $expectedLabel)) {
+                return false;
             }
             $coerced = self::coerceWeak(
                 $context,
@@ -484,6 +494,42 @@ final class ScalarReturnCheck
         $longVal = JitLongArg::lowerStringValue($context, $strPtr);
 
         return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $longVal);
+    }
+
+    /**
+     * Weak `: string`/`: int`/… — reject a runtime-null __value__ box before strval/intval (#19695).
+     *
+     * @return bool true when a TypeError path was emitted (caller must return false from enforce)
+     */
+    private static function rejectWeakValueBoxNullReturn(
+        Context $context,
+        Variable $return,
+        ?string $callableName,
+        string $expectedLabel
+    ): bool {
+        $fn = $context->builder->getInsertBlock()?->getParent();
+        if (!$fn instanceof \PHPLLVM\Value\Function_) {
+            self::raiseReturnTypeError($context, $callableName, $expectedLabel, 'null');
+
+            return true;
+        }
+        $isNull = JitValueCompare::valueBoxIsNull($context, $return);
+        $okBb = $fn->appendBasicBlock('scalar_return_weak_null_ok');
+        $failBb = $fn->appendBasicBlock('scalar_return_weak_null_fail');
+        $resumeBb = $fn->appendBasicBlock('scalar_return_weak_null_resume');
+        $context->builder->branchIf($isNull, $failBb, $okBb);
+
+        $context->builder->positionAtEnd($failBb);
+        self::raiseReturnTypeError($context, $callableName, $expectedLabel, 'null');
+        if (null === $context->builder->getInsertBlock()?->getTerminator()) {
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->branch($resumeBb);
+        $context->builder->positionAtEnd($resumeBb);
+
+        return false;
     }
 
     private static function raiseReturnTypeError(
