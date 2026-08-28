@@ -15,12 +15,12 @@ use PHPCompiler\VM\ErrorReporter;
 final class ErrorSilenceJitHelper
 {
     /**
-     * Zend startup error_reporting for compiled modules — bake the mask; do not call
-     * {@see ErrorReporter::defaultStartupReporting()} at runtime (#35563). That path reaches
+     * Zend startup error_reporting for compiled modules — bake {@see ErrorReporter::DEFAULT_STARTUP_REPORTING}
+     * (E_ALL & ~E_DEPRECATED & ~E_STRICT); do not call {@see ErrorReporter::defaultStartupReporting()}
      * {@see \PHPCompiler\CompilerVersion::languageProfileVersion()} which is null on thin AOT,
      * so eAll() / defaultStartupReporting() collapse to null and silence every stderr gate.
      */
-    private const COMPILED_DEFAULT_ERROR_REPORTING = ErrorReporter::E_ALL_LEGACY;
+  private const COMPILED_DEFAULT_ERROR_REPORTING = ErrorReporter::DEFAULT_STARTUP_REPORTING;
 
     /** BSS-zero reads as 0 — must not use {@code ??} on this slot; use {@see $compiledModuleDefaultsSeeded}. */
     private static int $errorReporting = 0;
