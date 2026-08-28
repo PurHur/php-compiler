@@ -52,6 +52,7 @@ function collectCapabilities(string $root): array
         'gnupg' => new PHPCompiler\ext\gnupg\Module(),
         'pspell' => new PHPCompiler\ext\pspell\Module(),
         'odbc' => new PHPCompiler\ext\odbc\Module(),
+        'oci8' => new PHPCompiler\ext\oci8\Module(),
         'sqlsrv' => new PHPCompiler\ext\sqlsrv\Module(),
         'dba' => new PHPCompiler\ext\dba\Module(),
         'mailparse' => new PHPCompiler\ext\mailparse\Module(),
