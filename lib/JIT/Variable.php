@@ -179,6 +179,17 @@ final class Variable {
     public ?int $compileTimeDomElementId = null;
 
     /**
+     * DOMAttr localName from getAttributeNode* / createAttribute* (#20501).
+     */
+    public ?string $compileTimeDomAttrLocalName = null;
+
+    /** DOMAttr namespaceURI paired with {@see $compileTimeDomAttrLocalName} (#20501). */
+    public ?string $compileTimeDomAttrNamespace = null;
+
+    /** Known DOMNodeList::$length for ephemeral Attr childNodes lists (#20501). */
+    public ?int $compileTimeDomNodeListLength = null;
+
+    /**
      * DatePeriod end-date form — ordered Unix timestamps for foreach snapshot (#26772).
      *
      * @var list<int>|null

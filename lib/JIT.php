@@ -14014,6 +14014,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $callArgs
                     );
+                    $this->propagateDomAttrNodeCompileTimeKey(
+                        $block->getOperand($op->arg1),
+                        $callArgs
+                    );
                     $this->propagateDomAppendChildCompileTimeTag(
                         $block->getOperand($op->arg1),
                         $callArgs
@@ -16350,14 +16354,13 @@ class JIT {
         }
         // Prior nullsafe on the same CV leaves CFG userType generic "object" even after
         // `$c = new C` refreshed classUserType on the binding (#32749, #29748 pattern).
-        if (
-            (null === $declaringClass || '' === $declaringClass || 'object' === strtolower(ltrim($declaringClass, '\\')))
-            && $this->context->hasVariableOpInScopes($obj)
-        ) {
+        // `$n = $el->childNodes; $n->length` — CFG userType stays DOMNode while the fetch
+        // result is tagged DOMNodeList (#20501).
+        if ($this->context->hasVariableOpInScopes($obj)) {
             $recv = $this->context->getVariableFromOpInScopes($obj);
             $tagged = $recv->classUserType ?? null;
-            if (is_string($tagged) && '' !== $tagged && 'object' !== strtolower($tagged)) {
-                $declaringClass = $tagged;
+            if (is_string($tagged) && '' !== $tagged && 'object' !== strtolower(ltrim($tagged, '\\'))) {
+                $declaringClass = ltrim($tagged, '\\');
             }
         }
         if (null !== $declaringClass && '' !== $declaringClass && '' !== $this->context->scope->className) {
@@ -16959,6 +16962,59 @@ class JIT {
             $inner = htmlspecialchars($valueArg->compileTimeString, ENT_QUOTES | ENT_XML1, 'UTF-8');
         }
         $resultVar->compileTimeDomInnerXml = $inner;
+    }
+
+    /**
+     * Stamp DOMAttr identity on getAttributeNode* / createAttribute* results (#20501).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private function propagateDomAttrNodeCompileTimeKey(Operand $result, array $callArgs): void
+    {
+        $toCall = $this->context->scope->toCall;
+        $ns = '';
+        $local = null;
+        if ($toCall instanceof JIT\Call\DomElementGetAttributeNode) {
+            $nameArg = $callArgs[1] ?? null;
+            if ($nameArg instanceof Variable) {
+                $local = $nameArg->compileTimeString;
+            }
+        } elseif ($toCall instanceof JIT\Call\DomElementGetAttributeNodeNS) {
+            $nsArg = $callArgs[1] ?? null;
+            $localArg = $callArgs[2] ?? null;
+            if ($nsArg instanceof Variable && $localArg instanceof Variable) {
+                $ns = $nsArg->isNullConstant ? '' : ($nsArg->compileTimeString ?? '');
+                $local = $localArg->compileTimeString;
+            }
+        } elseif ($toCall instanceof JIT\Call\DomDocumentCreateAttribute) {
+            $nameArg = $callArgs[1] ?? null;
+            if ($nameArg instanceof Variable) {
+                $local = $nameArg->compileTimeString;
+            }
+        } elseif ($toCall instanceof JIT\Call\DomDocumentCreateAttributeNS) {
+            $nsArg = $callArgs[1] ?? null;
+            $qArg = $callArgs[2] ?? null;
+            if ($nsArg instanceof Variable && $qArg instanceof Variable) {
+                $ns = $nsArg->isNullConstant ? '' : ($nsArg->compileTimeString ?? '');
+                $q = $qArg->compileTimeString;
+                if (null !== $q) {
+                    $pos = strpos($q, ':');
+                    $local = false === $pos ? $q : substr($q, $pos + 1);
+                }
+            }
+        } else {
+            return;
+        }
+        if (null === $local || '' === $local) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $resultVar->compileTimeDomAttrLocalName = $local;
+        $resultVar->compileTimeDomAttrNamespace = $ns;
+        $resultVar->classUserType = 'DOMAttr';
     }
 
     /**
@@ -22467,8 +22523,17 @@ class JIT {
         if ($force || null !== $src->compileTimeDomElementId) {
             $dest->compileTimeDomElementId = $src->compileTimeDomElementId;
         }
+        if ($force || null !== $src->compileTimeDomAttrLocalName) {
+            $dest->compileTimeDomAttrLocalName = $src->compileTimeDomAttrLocalName;
+        }
+        if ($force || null !== $src->compileTimeDomAttrNamespace) {
+            $dest->compileTimeDomAttrNamespace = $src->compileTimeDomAttrNamespace;
+        }
         if ($force || null !== $src->compileTimeDomLoadXml) {
             $dest->compileTimeDomLoadXml = $src->compileTimeDomLoadXml;
+        }
+        if ($force || null !== $src->compileTimeDomNodeListLength) {
+            $dest->compileTimeDomNodeListLength = $src->compileTimeDomNodeListLength;
         }
     }
 
@@ -30143,6 +30208,25 @@ class JIT {
     private function stampPropertyFetchReceiverOp(Variable $fetched, Operand $receiverOp): void
     {
         $fetched->objectPropertyReceiverOp = $receiverOp;
+        if (
+            'DOMNodeList' !== ($fetched->classUserType ?? '')
+            || null !== ($fetched->compileTimeDomNodeListLength ?? null)
+            || !$this->context->hasVariableOp($receiverOp)
+        ) {
+            return;
+        }
+        $receiverVar = $this->context->getVariableFromOp($receiverOp);
+        $local = $receiverVar->compileTimeDomAttrLocalName ?? null;
+        if (null === $local) {
+            return;
+        }
+        $valueLit = \PHPCompiler\ext\dom\JitDomAttrChildEdgeFetch::compileTimeAttrValuePublic(
+            $receiverVar->compileTimeDomAttrNamespace ?? '',
+            $local
+        );
+        if (null !== $valueLit) {
+            $fetched->compileTimeDomNodeListLength = '' !== $valueLit ? 1 : 0;
+        }
     }
 
     private function releaseCoalesceMergeSlotMapping(Block $block, Operand $coalesceResult): void
@@ -30196,6 +30280,13 @@ class JIT {
         $this->syncCompileTimeDomTagName($boxed, $fetched, true);
         if (null !== $fetched->classUserType) {
             $boxed->classUserType = $fetched->classUserType;
+        }
+        if (null !== $fetched->compileTimeDomNodeListLength) {
+            $boxed->compileTimeDomNodeListLength = $fetched->compileTimeDomNodeListLength;
+        }
+        if (null !== $fetched->compileTimeDomAttrLocalName) {
+            $boxed->compileTimeDomAttrLocalName = $fetched->compileTimeDomAttrLocalName;
+            $boxed->compileTimeDomAttrNamespace = $fetched->compileTimeDomAttrNamespace ?? '';
         }
 
         return $boxed;
@@ -30427,6 +30518,9 @@ class JIT {
     ): void {
         if (null !== $source->classUserType) {
             $dest->classUserType = $source->classUserType;
+        }
+        if (null !== $source->compileTimeDomNodeListLength) {
+            $dest->compileTimeDomNodeListLength = $source->compileTimeDomNodeListLength;
         }
         if (null !== $source->serializePayloadClass) {
             $dest->serializePayloadClass = $source->serializePayloadClass;

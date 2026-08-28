@@ -617,6 +617,32 @@ final class JitDomAttributeNodeNS
         );
     }
 
+    /** php-src element.c php_dom_remove_attribute_node — detached Attr has null parent. */
+    private static function clearOwnerElement(Context $context, Value $attr): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ATTR);
+        if (!$objectType->hasProperty($classId, self::PROP_OWNER_ELEMENT)) {
+            self::ensureAttrPropertyLayout($objectType, $classId);
+        }
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+        $nullJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $slot
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($attr, self::CLASS_ATTR, self::PROP_OWNER_ELEMENT),
+            $nullJit,
+            JITVariable::TYPE_NULL
+        );
+    }
+
     /**
      * php-src: Element::appendChild(Attr) ≡ setAttributeNode (attribute map, not childNodes) (#33570).
      *
@@ -1681,6 +1707,7 @@ final class JitDomAttributeNodeNS
         $context->builder->positionAtEnd($ok);
         // Live NamedNodeMap pins (#33143).
         JitDomNamedNodeMap::removeAttrPin($context, $element, $attr);
+        self::clearOwnerElement($context, $attr);
 
         return self::boxObjectResult($context, $attr);
     }

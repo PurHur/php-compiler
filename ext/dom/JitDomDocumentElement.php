@@ -397,23 +397,38 @@ final class JitDomDocumentElement
         $nodeClassId = $objectType->lookup('DOMNode');
         $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
         $docClassId = $objectType->lookup('DOMDocument');
-        $listClassId = $objectType->lookup('DOMNodeList');
-        // VALUE on DOMElement — peer first/last/sibling LiveSlots layout (#27476 / #28672).
-        // Writing DOMNode::childNodes indices into a DOMElement allocation is OOB (#24973).
-        // Document parents use DOMDocument layout (#34160).
         if (!$objectType->hasProperty($elementClassId, VmDom::PROP_CHILD_NODES)) {
             $objectType->defineProperty($elementClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
         }
         if (!$objectType->hasProperty($docClassId, VmDom::PROP_CHILD_NODES)) {
             $objectType->defineProperty($docClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
         }
-        // Keep DOMNode declared for Document / Fragment receivers.
         if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
             $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
         }
+        $listJit = self::buildChildNodesList($context, $element, $length, $item0, $item1);
         if (null === $slotClass) {
             $slotClass = self::CLASS_ELEMENT;
         }
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, $slotClass, VmDom::PROP_CHILD_NODES),
+            $listJit,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
+    /**
+     * Ephemeral NodeList for DOMAttr::$childNodes — never persist on the Attr object (#20501 / #35227).
+     */
+    public static function buildChildNodesList(
+        \PHPCompiler\JIT\Context $context,
+        Value $owner,
+        int $length,
+        ?Value $item0 = null,
+        ?Value $item1 = null
+    ): JITVariable {
+        $objectType = $context->type->object;
+        $listClassId = $objectType->lookup('DOMNodeList');
         if (!$objectType->hasProperty($listClassId, 'length')) {
             $objectType->defineProperty($listClassId, 'length', JITVariable::TYPE_NATIVE_LONG);
         }
@@ -442,7 +457,7 @@ final class JitDomDocumentElement
             $context,
             JITVariable::TYPE_OBJECT,
             JITVariable::KIND_VALUE,
-            $element
+            $owner
         );
         $objectType->propertyStore(
             $objectType->propertySlotFor($list, 'DOMNodeList', VmDom::PROP_CHILD_NODES_OWNER),
@@ -465,16 +480,12 @@ final class JitDomDocumentElement
                 JITVariable::TYPE_VALUE
             );
         }
-        $listJit = new JITVariable(
+
+        return new JITVariable(
             $context,
             JITVariable::TYPE_OBJECT,
             JITVariable::KIND_VALUE,
             $list
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($element, $slotClass, VmDom::PROP_CHILD_NODES),
-            $listJit,
-            JITVariable::TYPE_VALUE
         );
     }
 

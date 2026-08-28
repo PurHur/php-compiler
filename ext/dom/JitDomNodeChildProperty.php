@@ -82,10 +82,9 @@ final class JitDomNodeChildProperty
         $resultTy = $context->getTypeFromString('__value__*');
 
         $context->builder->positionAtEnd($bbAttr);
-        // Safe null until Attr tree-link slots are seeded like VmDom::syncAttributeTreeLinks.
-        // Returning null beats SIGSEGV on Element-layout GEP (#35227).
-        $attrNull = self::boxNullChildEdge($context);
-        $attrPtr = JitValueBox::valuePtrFromVariable($context, $attrNull);
+        $attrResult = JitDomAttrChildEdgeFetch::fetch($objectType, $obj, $propName, $receiverVar);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_child_edge_attr_cont');
+        $attrPtr = JitValueBox::valuePtrFromVariable($context, $attrResult);
         $attrPred = $context->builder->getInsertBlock();
         $context->builder->branch($bbOut);
 
