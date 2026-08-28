@@ -4308,6 +4308,7 @@ class Object_ extends Type {
             }
             $this->defineProperty($id, 'ownerElement', Variable::TYPE_VALUE);
             $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
+            $this->defineMethodVisibility($id, 'isid', \PHPCfg\Func::FLAG_PUBLIC);
         }
         if ('dom\\attr' === $lcname) {
             // Living Dom\Attr for thin AOT method_exists / property layout (#27108).
@@ -7878,6 +7879,15 @@ class Object_ extends Type {
 
     public function emitInstanceOf(Variable $expr, string $className): Variable
     {
+        $standin = \PHPCompiler\ext\dom\JitDomStandinGetClass::tryEmitInstanceOf(
+            $this->context,
+            $expr,
+            $className
+        );
+        if (null !== $standin) {
+            return $standin;
+        }
+
         $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
         $objMap = $this->context->structFieldMap['__object__'];
 
@@ -7908,6 +7918,28 @@ class Object_ extends Type {
                 $obj,
                 $objType->constNull()
             );
+            $objVar = new Variable(
+                $this->context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $obj
+            );
+            $standin = \PHPCompiler\ext\dom\JitDomStandinGetClass::tryEmitInstanceOf(
+                $this->context,
+                $objVar,
+                $className
+            );
+            if (null !== $standin) {
+                $match = $this->context->helper->loadValue($standin);
+                $match = $this->context->builder->and($isObject, $match);
+
+                return new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_BOOL,
+                    Variable::KIND_VALUE,
+                    $match
+                );
+            }
             $classId = $this->context->builder->load(
                 $this->context->builder->structGep($obj, $objMap['class_id'])
             );

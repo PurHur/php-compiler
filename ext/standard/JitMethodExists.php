@@ -73,6 +73,11 @@ final class JitMethodExists
     ): Value {
         $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
         if (null !== $classLiteral && null !== $methodLiteral
+            && 'domattr' === strtolower(ltrim($classLiteral, '\\'))
+            && 'isid' === strtolower($methodLiteral)) {
+            return $context->getTypeFromString('int1')->constInt(1, false);
+        }
+        if (null !== $classLiteral && null !== $methodLiteral
             && $context->type->object->hasUserDeclaredClass($classLiteral)) {
             return ReflectionBuiltinHelper::methodExistsLiteral(
                 $context,
@@ -117,6 +122,9 @@ final class JitMethodExists
         JITVariable $methodArg,
         string $methodLiteral
     ): Value {
+        if ('domattr' === strtolower(ltrim($classLit, '\\')) && 'isid' === strtolower($methodLiteral)) {
+            return $context->getTypeFromString('int1')->constInt(1, false);
+        }
         if ($context->type->object->hasUserDeclaredClass($classLit)) {
             return ReflectionBuiltinHelper::methodExistsLiteral($context, $classLit, $methodLiteral);
         }
@@ -138,6 +146,9 @@ final class JitMethodExists
         JITVariable $methodArg,
         string $method
     ): Value {
+        if ('isid' === strtolower($method)) {
+            \PHPCompiler\ext\dom\JitDomAttributeNodeNS::ensureClassicAttrMethods($context);
+        }
         StringCaseCompare::ensureStrcasecmpLinked($context);
         $i1 = $context->getTypeFromString('int1');
         $matched = $i1->constInt(0, false);
@@ -373,6 +384,9 @@ final class JitMethodExists
         // Ensure living Dom\Attr::rename is visible for method_exists (#27108).
         if ('rename' === strtolower($method)) {
             \PHPCompiler\ext\dom\JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
+        }
+        if ('isid' === strtolower($method)) {
+            \PHPCompiler\ext\dom\JitDomAttributeNodeNS::ensureClassicAttrMethods($context);
         }
         $exists = $i1->constInt(0, false);
         foreach ($object->allClassNamesById() as $id => $className) {

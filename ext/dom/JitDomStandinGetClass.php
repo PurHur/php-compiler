@@ -79,6 +79,95 @@ final class JitDomStandinGetClass
     }
 
     /**
+     * instanceof for character-data stand-ins allocated as DOMElement (#33607 peer).
+     *
+     * @return null when normal class_id instanceof should run
+     */
+    public static function tryEmitInstanceOf(
+        Context $context,
+        JITVariable $expr,
+        string $className
+    ): ?JITVariable {
+        $wantType = self::nodeTypeForStandinClass($className);
+        if (null === $wantType) {
+            return null;
+        }
+
+        if (JITVariable::TYPE_OBJECT === $expr->type) {
+            $obj = $context->helper->loadValue($expr);
+        } elseif (JITVariable::TYPE_VALUE === $expr->type) {
+            $obj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $expr)
+            );
+        } else {
+            return null;
+        }
+        $objectType = $context->type->object;
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        $i64 = $context->getTypeFromString('int64');
+        $isElement = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $i64->constInt($elementClassId, false)
+        );
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        $bbStand = BasicBlockHelper::append($context, 'dom_io_stand_check');
+        $bbMerge = BasicBlockHelper::append($context, 'dom_io_stand_merge');
+        $nonElementPred = $context->builder->getInsertBlock();
+        $context->builder->branchIf($isElement, $bbStand, $bbMerge);
+
+        $context->builder->positionAtEnd($bbStand);
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NODE_TYPE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_NODE_TYPE, JITVariable::TYPE_NATIVE_LONG);
+        }
+        $nodeTypeVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $obj,
+            self::CLASS_ELEMENT,
+            VmDom::PROP_NODE_TYPE,
+            $elementClassId
+        );
+        $nodeType = $context->helper->loadValue($nodeTypeVar);
+        $match = $context->builder->icmp(
+            Builder::INT_EQ,
+            $nodeType,
+            $i64->constInt($wantType, false)
+        );
+        $standPred = $context->builder->getInsertBlock();
+        $context->builder->branch($bbMerge);
+
+        $context->builder->positionAtEnd($bbMerge);
+        $i1 = $context->getTypeFromString('int1');
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($falseVal, $nonElementPred);
+        $phi->addIncoming($match, $standPred);
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_BOOL,
+            JITVariable::KIND_VALUE,
+            $phi
+        );
+    }
+
+    private static function nodeTypeForStandinClass(string $className): ?int
+    {
+        $lc = strtolower(ltrim($className, '\\'));
+        foreach (self::standinClassNamesByNodeType() as $type => $name) {
+            if (strtolower($name) === $lc) {
+                return $type;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @return array<int, string>
      */
     private static function standinClassNamesByNodeType(): array

@@ -63,6 +63,14 @@ final class JitDomSetIdAttribute
             DomSetIdAttributeRuntime::ensureFalseLinked($context);
             $abi = DomSetIdAttributeRuntime::ABI_FALSE;
         }
+        $nameLitPre = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (JitDomDocumentMethodKernel::shouldUse($context)
+            && null !== $nameLitPre
+            && 'id' === $nameLitPre
+        ) {
+            // Before NestedJIT ABI — helper may throw when DomRegistry lacks the attr (#29884).
+            DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, $isIdTrue);
+        }
         $context->builder->call(
             $context->lookupFunction($abi),
             $element,
@@ -214,8 +222,21 @@ final class JitDomSetIdAttribute
             return self::boxNull($context);
         }
 
+        // Thin-AOT getAttributeNode stamps lastFetchedKey — avoid Node ABI on boxed Attr temps (#29884).
+        $key = JitDomAttrRename::lastFetchedKey();
+        if (null !== $key && '' === $key[0] && '' !== $key[1]) {
+            $lit = new \PHPCfg\Operand\Literal($key[1]);
+            $lit->type = \PHPTypes\Type::string();
+            $nameVar = JITVariable::fromLiteral($context, $lit);
+
+            return self::invoke($context, $args[0], $nameVar, $args[2]);
+        }
+
         $element = self::loadObjectArg($context, $args[0]);
-        $attr = self::loadObjectArg($context, $args[1]);
+        $attr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $args[1])
+        );
         $isIdTrue = self::resolveIsIdTrue($context, $args[2]);
         if ($isIdTrue) {
             DomSetIdAttributeRuntime::ensureNodeTrueLinked($context);
@@ -232,6 +253,10 @@ final class JitDomSetIdAttribute
         if (JitDomDocumentMethodKernel::shouldUse($context) && $isIdTrue) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_node_post');
             self::storeCacheFromRuntimeAttrValue($context, $element, $attr);
+            $key = JitDomAttrRename::lastFetchedKey();
+            if (null !== $key) {
+                DomUserScriptAttributeCacheLlvm::markIdBearingLiteral($key[0], $key[1], true);
+            }
         } elseif (JitDomDocumentMethodKernel::shouldUse($context) && !$isIdTrue) {
             DomUserScriptElementCacheLlvm::invalidateIfElement($context, $element);
         }
@@ -892,6 +917,10 @@ final class JitDomSetIdAttribute
     /** NestedJIT bool load is unsafe — only constant false selects the false ABI (#29257). */
     private static function resolveIsIdTrue(Context $context, JITVariable $arg): bool
     {
+        // compileTimeLong is stamped on TYPE_NATIVE_BOOL and boxed bool literals (#26774).
+        if (null !== $arg->compileTimeLong) {
+            return 0 !== $arg->compileTimeLong;
+        }
         if (JITVariable::TYPE_NATIVE_BOOL !== $arg->type) {
             return true;
         }

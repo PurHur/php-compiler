@@ -2840,6 +2840,67 @@ final class VmDom
     }
 
     /** DOMElement::setIdAttribute() — manual ID map for getElementById() (php-src ext/dom/node.c; #14493). */
+    public static function seedThinAotElementAttribute(ObjectEntry $element, string $qName, string $value = ''): void
+    {
+        if (!DomRegistry::has($element)) {
+            return;
+        }
+        $state = DomRegistry::state($element);
+        if (!\array_key_exists($qName, $state->attributes)) {
+            $state->attributes[$qName] = $value;
+        }
+    }
+
+    /**
+     * Namespaced thin-AOT setAttributeNS may only populate the LLVM Attr cache (#29884).
+     *
+     * @param null|string $namespace Empty string is treated as null URI (peer setIdAttributeNS).
+     */
+    public static function seedThinAotNsElementAttribute(
+        ObjectEntry $element,
+        ?string $namespace,
+        string $localName,
+        string $value = ''
+    ): void {
+        if (!DomRegistry::has($element)) {
+            return;
+        }
+        $wantNs = $namespace ?? '';
+        $qualified = null;
+        if (DomUserScriptAttributeCacheLlvm::lastCreateNamespace() === $wantNs
+            && DomUserScriptAttributeCacheLlvm::lastCreateLocalName() === $localName) {
+            $qualified = DomUserScriptAttributeCacheLlvm::lastCreateQualifiedName();
+        }
+        $qName = $qualified ?? self::findAttributeQNameByNsAndLocal($element, $namespace, $localName);
+        if (null === $qName) {
+            $state = DomRegistry::state($element);
+            foreach ($state->attributes as $candidate => $_) {
+                if (self::isXmlnsAttributeName($candidate)) {
+                    continue;
+                }
+                [$prefix, $local] = self::splitQualifiedName($candidate);
+                if ($local !== $localName) {
+                    continue;
+                }
+                $attrNs = self::resolveAttributeNamespaceUri($element, $candidate, $prefix);
+                if ($attrNs === $wantNs) {
+                    $qName = $candidate;
+                    break;
+                }
+            }
+        }
+        if (null === $qName) {
+            $qName = $localName;
+        }
+        $state = DomRegistry::state($element);
+        if (!\array_key_exists($qName, $state->attributes)) {
+            $state->attributes[$qName] = $value;
+            if ('' !== $wantNs) {
+                $state->attributeNamespaces[$qName] = $wantNs;
+            }
+        }
+    }
+
     public static function setIdAttribute(ObjectEntry $element, string $name, bool $isId): void
     {
         if (!self::isElement($element)) {
@@ -2937,6 +2998,23 @@ final class VmDom
         }
         if (!self::isAttr($attr)) {
             throw new \TypeError('DOMElement::setIdAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+        if (!DomRegistry::has($attr)) {
+            $name = self::attrQNameFromProperties($attr);
+            if ('' === $name) {
+                DomExceptionConstants::raiseNotFound();
+            }
+            $value = '';
+            if ($attr->hasProperty(self::PROP_VALUE)) {
+                $valueVar = $attr->getProperty(self::PROP_VALUE)->resolveIndirect();
+                if (Variable::TYPE_STRING === $valueVar->type) {
+                    $value = $valueVar->toString();
+                }
+            }
+            self::seedThinAotElementAttribute($element, $name, $value);
+            self::applyIdAttributeRegistration($element, $name, $isId, $syncIdMap);
+
+            return;
         }
         $attrState = DomRegistry::state($attr);
         $name = $attrState->nodeName;
@@ -3114,8 +3192,14 @@ final class VmDom
         DomNodeState $nodeState,
         string $qName
     ): bool {
-        if (null !== $nodeState->idAttributeName && $qName === $nodeState->idAttributeName) {
-            return true;
+        if (null !== $nodeState->idAttributeName) {
+            if ($qName === $nodeState->idAttributeName) {
+                return true;
+            }
+            // Thin-AOT may register unprefixed local while Attr::$nodeName stays prefixed (#29884).
+            if (self::attributeQNameMatchesIdMarker($element, $nodeState, $qName)) {
+                return true;
+            }
         }
         // libxml XML_ATTRIBUTE_ID stamped on the attr (survives importNode; #20830, #23514).
         if (isset($nodeState->attributeIsId[$qName])) {
@@ -3241,6 +3325,37 @@ final class VmDom
     }
 
     /**
+     * True when $qName is the same namespaced attribute as {@see DomNodeState::$idAttributeName}.
+     *
+     * Thin-AOT setIdAttributeNS may register {@code aid} while Attr::$nodeName is {@code ex:aid}.
+     */
+    private static function attributeQNameMatchesIdMarker(
+        ObjectEntry $element,
+        DomNodeState $nodeState,
+        string $qName
+    ): bool {
+        if (null === $nodeState->idAttributeName) {
+            return false;
+        }
+        [$idPrefix, $idLocal] = self::splitQualifiedName($nodeState->idAttributeName);
+        [$qPrefix, $qLocal] = self::splitQualifiedName($qName);
+        if ($idLocal !== $qLocal || '' === $idLocal) {
+            return false;
+        }
+        $idNs = self::resolveAttributeNamespaceUri($element, $nodeState->idAttributeName, $idPrefix);
+        $qNs = self::resolveAttributeNamespaceUri($element, $qName, $qPrefix);
+        if ($idNs === $qNs) {
+            return true;
+        }
+        // Marker keyed by unprefixed local; Attr::$nodeName keeps prefix (#29884).
+        if ($idLocal === $qLocal && '' !== $idLocal && '' !== $idNs && '' === $idPrefix && '' !== $qPrefix) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * DOMAttr::isId() — true when attrp->atype == XML_ATTRIBUTE_ID (php-src ext/dom/attr.c; #20129).
      *
      * Orphan attributes (no ownerElement) are never IDs. Attached attrs follow
@@ -3251,22 +3366,112 @@ final class VmDom
         if (!self::isAttr($attr)) {
             throw new \TypeError('DOMAttr::isId() must be called on a DOMAttr');
         }
-        // Thin-AOT createAttribute / property Attrs may lack DomRegistry (#29884).
-        // Orphan / unregistered attrs are never IDs (php-src ext/dom/attr.c).
         if (!DomRegistry::has($attr)) {
-            return false;
+            // Thin-AOT createElement Attrs may lack DomRegistry; walk ownerElement (#29884).
+            if (!$attr->hasProperty(self::PROP_OWNER_ELEMENT)) {
+                return false;
+            }
+            $ownerVar = $attr->getProperty(self::PROP_OWNER_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $ownerVar->type) {
+                return false;
+            }
+            $owner = $ownerVar->toObject();
+            if (!self::isElement($owner) || !DomRegistry::has($owner)) {
+                return false;
+            }
+            $qName = self::attrQNameFromProperties($attr);
+
+            return self::elementAttributeIsIdBearing($owner, self::attrQNameFromProperties($attr));
         }
         $attrState = DomRegistry::state($attr);
         $ownerElementId = $attrState->ownerElementId;
         if (null === $ownerElementId) {
-            return false;
+            // wireOwnerElement sets PROP_OWNER_ELEMENT without ownerElementId (#29884).
+            if (!$attr->hasProperty(self::PROP_OWNER_ELEMENT)) {
+                return false;
+            }
+            $ownerVar = $attr->getProperty(self::PROP_OWNER_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $ownerVar->type) {
+                return false;
+            }
+            $owner = $ownerVar->toObject();
+            if (!self::isElement($owner) || !DomRegistry::has($owner)) {
+                return false;
+            }
+            $qName = self::attrQNameFromProperties($attr);
+            if ('' === $qName) {
+                $qName = $attrState->nodeName;
+            }
+
+            return self::elementAttributeIsIdBearing($owner, $qName);
         }
         $owner = DomRegistry::entry($ownerElementId);
         if (null === $owner || !self::isElement($owner)) {
             return false;
         }
+        $qName = self::attrQNameFromProperties($attr);
+        if ('' === $qName) {
+            $qName = $attrState->nodeName;
+        }
 
-        return self::elementAttributeIsIdBearing($owner, $attrState->nodeName);
+        return self::elementAttributeIsIdBearing($owner, $qName);
+    }
+
+    /** Value string from a thin-AOT Attr when DomRegistry is absent (#29884). */
+    public static function thinAttrValue(ObjectEntry $attr): string
+    {
+        if (!$attr->hasProperty(self::PROP_VALUE)) {
+            return '';
+        }
+        $valueVar = $attr->getProperty(self::PROP_VALUE)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $valueVar->type) {
+            return '';
+        }
+
+        return $valueVar->toString();
+    }
+
+    /**
+     * QName for setIdAttributeNode when the Attr object is LLVM-materialized (#29884).
+     */
+    public static function resolveThinAotSetIdNodeQName(ObjectEntry $element, ObjectEntry $attr): string
+    {
+        $qName = self::attrQNameFromProperties($attr);
+        if ('' !== $qName) {
+            return $qName;
+        }
+        if (DomRegistry::has($attr)) {
+            return DomRegistry::state($attr)->nodeName;
+        }
+        $value = self::thinAttrValue($attr);
+        if ('' !== $value && DomRegistry::has($element)) {
+            foreach (DomRegistry::state($element)->attributes as $candidate => $attrVal) {
+                if ($attrVal === $value) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /** QName for thin-AOT Attr objects that skip DomRegistry (#29884). */
+    private static function attrQNameFromProperties(ObjectEntry $attr): string
+    {
+        if ($attr->hasProperty(self::PROP_NODE_NAME)) {
+            $nameVar = $attr->getProperty(self::PROP_NODE_NAME)->resolveIndirect();
+            if (Variable::TYPE_STRING === $nameVar->type) {
+                return $nameVar->toString();
+            }
+        }
+        if ($attr->hasProperty(self::PROP_NAME)) {
+            $localVar = $attr->getProperty(self::PROP_NAME)->resolveIndirect();
+            if (Variable::TYPE_STRING === $localVar->type) {
+                return $localVar->toString();
+            }
+        }
+
+        return '';
     }
 
     /**
@@ -12495,8 +12700,20 @@ final class VmDom
 
     public static function isAttr(ObjectEntry $entry): bool
     {
-        return DomRegistry::has($entry)
-            && DomConstants::XML_ATTRIBUTE_NODE === DomRegistry::state($entry)->nodeType;
+        if (DomRegistry::has($entry)
+            && DomConstants::XML_ATTRIBUTE_NODE === DomRegistry::state($entry)->nodeType) {
+            return true;
+        }
+        // Thin-AOT LLVM Attr cache objects may skip DomRegistry (#29884).
+        if (!$entry->hasProperty(self::PROP_NODE_TYPE)) {
+            return false;
+        }
+        $typeVar = $entry->getProperty(self::PROP_NODE_TYPE)->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $typeVar->type) {
+            return false;
+        }
+
+        return DomConstants::XML_ATTRIBUTE_NODE === $typeVar->toInt();
     }
 
     /**

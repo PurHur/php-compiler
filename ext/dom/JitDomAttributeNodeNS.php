@@ -859,7 +859,7 @@ final class JitDomAttributeNodeNS
         return self::CLASS_ATTR;
     }
 
-    /** Seed Dom\Attr::rename for method_exists under thin AOT (#27108). */
+    /** Seed Dom\Attr::rename + DOMAttr::isId for method_exists under thin AOT (#27108, #29884). */
     public static function ensureLivingAttrMethods(Context $context): void
     {
         $objectType = $context->type->object;
@@ -869,6 +869,7 @@ final class JitDomAttributeNodeNS
         if (!$objectType->hasMethod($classId, 'rename')) {
             $objectType->defineMethodVisibility($classId, 'rename', $pub);
         }
+        self::ensureClassicAttrMethods($context);
         $elemId = $objectType->lookup('Dom\\Element');
         foreach ([
             'getattributenode', 'getattribute', 'hasattribute', 'getattributens',
@@ -881,6 +882,18 @@ final class JitDomAttributeNodeNS
         $docId = $objectType->lookup('Dom\\XMLDocument');
         if (!$objectType->hasMethod($docId, 'createattribute')) {
             $objectType->defineMethodVisibility($docId, 'createattribute', $pub);
+        }
+    }
+
+    /** DOMAttr::isId for method_exists on classic DOMDocument trees (#29884). */
+    public static function ensureClassicAttrMethods(Context $context): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ATTR);
+        self::ensureAttrPropertyLayout($objectType, $classId);
+        $pub = \PHPCfg\Func::FLAG_PUBLIC;
+        if (!$objectType->hasMethod($classId, 'isid')) {
+            $objectType->defineMethodVisibility($classId, 'isid', $pub);
         }
     }
 

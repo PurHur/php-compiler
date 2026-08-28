@@ -15,12 +15,16 @@ final class DomSetIdAttributeJitHelper
     public static function setIdTrueArgv(ObjectEntry $element, string $name): void
     {
         VmDom::syncDomRegistryParentChainFromProperties($element);
+        $value = DomUserScriptAttributeCacheLlvm::literalValue('', $name) ?? '';
+        VmDom::seedThinAotElementAttribute($element, $name, $value);
         VmDom::setIdAttribute($element, $name, true);
     }
 
     public static function setIdFalseArgv(ObjectEntry $element, string $name): void
     {
         VmDom::syncDomRegistryParentChainFromProperties($element);
+        $value = DomUserScriptAttributeCacheLlvm::literalValue('', $name) ?? '';
+        VmDom::seedThinAotElementAttribute($element, $name, $value);
         VmDom::setIdAttribute($element, $name, false);
     }
 
@@ -29,6 +33,8 @@ final class DomSetIdAttributeJitHelper
     {
         VmDom::syncDomRegistryParentChainFromProperties($element);
         $ns = '' === $namespace ? null : $namespace;
+        $value = DomUserScriptAttributeCacheLlvm::literalValue($namespace, $localName) ?? '';
+        VmDom::seedThinAotNsElementAttribute($element, $ns, $localName, $value);
         VmDom::setIdAttributeNS($element, $ns, $localName, true);
     }
 
@@ -36,18 +42,28 @@ final class DomSetIdAttributeJitHelper
     {
         VmDom::syncDomRegistryParentChainFromProperties($element);
         $ns = '' === $namespace ? null : $namespace;
+        $value = DomUserScriptAttributeCacheLlvm::literalValue($namespace, $localName) ?? '';
+        VmDom::seedThinAotNsElementAttribute($element, $ns, $localName, $value);
         VmDom::setIdAttributeNS($element, $ns, $localName, false);
     }
 
     public static function setIdNodeTrueArgv(ObjectEntry $element, ObjectEntry $attr): void
     {
         VmDom::syncDomRegistryParentChainFromProperties($element);
+        $qName = VmDom::resolveThinAotSetIdNodeQName($element, $attr);
+        if ('' !== $qName) {
+            VmDom::seedThinAotElementAttribute($element, $qName, VmDom::thinAttrValue($attr));
+        }
         VmDom::setIdAttributeNode($element, $attr, true);
     }
 
     public static function setIdNodeFalseArgv(ObjectEntry $element, ObjectEntry $attr): void
     {
         VmDom::syncDomRegistryParentChainFromProperties($element);
+        $qName = VmDom::resolveThinAotSetIdNodeQName($element, $attr);
+        if ('' !== $qName) {
+            VmDom::seedThinAotElementAttribute($element, $qName, VmDom::thinAttrValue($attr));
+        }
         VmDom::setIdAttributeNode($element, $attr, false);
     }
 }
