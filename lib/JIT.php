@@ -9518,6 +9518,9 @@ class JIT {
                         );
                     }
                     $this->context->setVariableOp($destOp, $staticVar);
+                    // Function-static CVs are always defined once DECLARE runs (lazy or runtime
+                    // init completed on this path) — quiet ZEND_CHECK_UNDEFINED_VAR on reads.
+                    JIT\UndefinedVariableHelper::markAssigned($this->context, $destOp, $staticVar);
                     $staticName = JIT\OperandName::resolve($destOp);
                     if (null !== $staticName && '' !== $staticName) {
                         $this->context->bindVariableByName($staticName, $staticVar);
