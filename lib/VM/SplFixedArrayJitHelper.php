@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -207,6 +209,29 @@ final class SplFixedArrayJitHelper
      */
     public static function compileToArray(Context $context, JITVariable $receiver): Value
     {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $slot),
+            $context->helper->loadValue(self::copyPackedHashtable($context, $receiver))
+        );
+
+        return $slot;
+    }
+
+    /**
+     * SplFixedArray::__debugInfo() — indexed element map (php-src spl_fixedarray_object_debug_info; #19783).
+     */
+    public static function compileDebugInfo(Context $context, JITVariable $receiver): Value
+    {
+        return self::compileToArray($context, $receiver);
+    }
+
+    /**
+     * Copy fixed `__spl_ht` slots for var_dump / __debugInfo (peer compileToArray).
+     */
+    public static function copyPackedHashtable(Context $context, JITVariable $receiver): JITVariable
+    {
         $ht = self::htPtr($context, self::loadObject($context, $receiver));
         $copy = new JITVariable(
             $context,
@@ -219,14 +244,8 @@ final class SplFixedArrayJitHelper
             $copy,
             new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht)
         );
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            JitValueBox::pointer($context, $slot),
-            $context->helper->loadValue($copy)
-        );
 
-        return $slot;
+        return $copy;
     }
 
     public static function compileOffsetGet(Context $context, JITVariable $receiver, JITVariable $index): Value
@@ -400,13 +419,14 @@ final class SplFixedArrayJitHelper
         $okBb = BasicBlockHelper::append($context, 'sfa_oob_ok');
         $context->builder->branchIf($ok, $okBb, $badBb);
         $context->builder->positionAtEnd($badBb);
-        $msg = 'Index invalid or out of range';
-        $context->builder->call(
-            $context->lookupFunction('__compiler_jit_raise_logic_exception'),
-            $context->builder->pointerCast($context->constantFromString($msg), $context->getTypeFromString('int8*')),
-            $context->constantFromInteger(\strlen($msg), 'size_t')
+        $exceptionClass = CompilerVersion::supportsSplFixedArrayOutOfBoundsException()
+            ? 'OutOfBoundsException'
+            : 'RuntimeException';
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            $exceptionClass,
+            'Index invalid or out of range'
         );
-        $context->builder->branch($okBb);
         $context->builder->positionAtEnd($okBb);
     }
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\ext\standard\JitGetObjectVars;
 use PHPCompiler\JIT\Call\HashTableExportKeyValuePairs;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPLLVM\Builder;
@@ -41,11 +40,7 @@ final class VarDumpObjectLlvm
             $valuePtr
         );
         $className = ReflectionBuiltinHelper::getDebugTypeClassName($context, $objVar);
-        $varsBoxed = JitGetObjectVars::invoke($context, $objVar, false);
-        $ht = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            JitValueBox::normalizeValuePtr($context, $varsBoxed)
-        );
+        $ht = VarDumpObjectDebugPropertiesLlvm::resolveHashtable($context, $objVar);
 
         $pairs = HashTableExportKeyValuePairs::exportPairsForSlice($context, $ht);
         $num = $context->builder->call(

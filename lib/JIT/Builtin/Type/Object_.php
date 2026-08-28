@@ -5002,7 +5002,7 @@ class Object_ extends Type {
             $pubStatic = $pub | \PHPCfg\Func::FLAG_STATIC;
             foreach ([
                 '__construct', 'count', 'getsize', 'setsize', 'toarray', 'getiterator',
-                'offsetget', 'offsetset', 'offsetexists', 'offsetunset',
+                'offsetget', 'offsetset', 'offsetexists', 'offsetunset', '__debuginfo',
                 'jsonserialize',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);

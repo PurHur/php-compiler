@@ -1884,7 +1884,7 @@ class Context {
         $this->type->object->lookup('SplFixedArray');
         foreach ([
             '__construct', 'fromArray', 'count', 'getSize', 'setSize', 'toArray',
-            'offsetGet', 'offsetSet', 'offsetExists', 'offsetUnset',
+            'offsetGet', 'offsetSet', 'offsetExists', 'offsetUnset', '__debugInfo',
         ] as $sfaMethod) {
             $this->functionProxies['splfixedarray::'.strtolower($sfaMethod)] = new Call\SplFixedArrayMethod($sfaMethod);
         }

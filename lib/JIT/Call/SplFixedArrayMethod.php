@@ -130,6 +130,16 @@ final class SplFixedArrayMethod implements Call
                     $index
                 )
             ),
+            '__debuginfo' => $this->callExactArg(
+                $context,
+                $args,
+                'SplFixedArray::__debugInfo',
+                0,
+                static fn (Context $ctx, Variable $self): Value => SplFixedArrayJitHelper::compileDebugInfo(
+                    $ctx,
+                    $self
+                )
+            ),
             default => throw new \LogicException(
                 'SplFixedArray JIT lowering is not implemented for '.$this->method.'()'
             ),
