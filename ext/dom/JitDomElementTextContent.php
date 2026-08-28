@@ -177,6 +177,11 @@ final class JitDomElementTextContent
             if (null !== $textLit) {
                 self::syncParentInnerXmlAfterTextContentWrite($context, $receiver, $textLit, $lvalue);
             }
+            $hostToken = $lvalue->compileTimeDomImportHostSxeToken
+                ?? JitDomImportSimpleXmlUserScript::lastHostImportToken();
+            if (null !== $hostToken && null !== $textLit) {
+                JitDomImportSimpleXmlUserScript::syncHostSimpleXmlText($context, $hostToken, $textLit);
+            }
             // fetchUserScriptTextContentMaybeAttr returns KIND_VALUE without objectPropertySlot
             // (#33904) — always store onto the Element STRING slots so reads/saveXML see the
             // write (regression of #33293 / #33983).
@@ -276,6 +281,9 @@ final class JitDomElementTextContent
             $var->compileTimeDomTagName = $receiverVar->compileTimeDomTagName;
         } elseif (null !== JitDomNodeChildProperty::$lastFetchedTagName) {
             $var->compileTimeDomTagName = JitDomNodeChildProperty::$lastFetchedTagName;
+        }
+        if (null !== $receiverVar?->compileTimeDomImportHostSxeToken) {
+            $var->compileTimeDomImportHostSxeToken = $receiverVar->compileTimeDomImportHostSxeToken;
         }
 
         return $var;

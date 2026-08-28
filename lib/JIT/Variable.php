@@ -174,6 +174,11 @@ final class Variable {
     public ?array $compileTimeDomAttributes = null;
 
     /**
+     * Host SimpleXMLElement token for dom_import_simplexml() live-sharing (#20137 / #34413).
+     */
+    public ?string $compileTimeDomImportHostSxeToken = null;
+
+    /**
      * Stable id linking createElement result ↔ setAttribute ARG_SEND copies (#32973).
      */
     public ?int $compileTimeDomElementId = null;

@@ -1504,6 +1504,91 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * Compile-time token for a tracked SimpleXMLElement receiver (#20137 dom_import_simplexml).
+     */
+    public static function compileTimeToken(JITVariable $receiver): ?string
+    {
+        return self::ensureCompileTimeToken($receiver, self::compileTimeTree($receiver));
+    }
+
+    /**
+     * Resolve or register a host-tree token when the tree is known (#20137).
+     */
+    public static function ensureCompileTimeToken(JITVariable $receiver, ?\SimpleXMLElement $tree): ?string
+    {
+        if (!UserScriptAotEnv::isActive() || !($tree instanceof \SimpleXMLElement)) {
+            return null;
+        }
+        $existing = self::compileTimeTokenFromReceiverOrTree($receiver, $tree);
+        if (null !== $existing) {
+            return $existing;
+        }
+        if (null === self::$trees) {
+            self::$trees = new \SplObjectStorage();
+        }
+        self::$trees[$receiver] = $tree;
+        $token = '__phpc_sxml_'.(++self::$tokenSeq);
+        $receiver->compileTimeString = $token;
+        self::$treesByToken[$token] = $tree;
+        self::$lastTree = $tree;
+
+        return $token;
+    }
+
+    private static function compileTimeTokenFromReceiverOrTree(
+        JITVariable $receiver,
+        \SimpleXMLElement $tree
+    ): ?string {
+        if (null !== $receiver->compileTimeString
+            && isset(self::$treesByToken[$receiver->compileTimeString])
+        ) {
+            return $receiver->compileTimeString;
+        }
+        if (null !== self::$trees && isset(self::$trees[$receiver])) {
+            foreach (self::$treesByToken as $token => $candidate) {
+                if ($candidate === self::$trees[$receiver]) {
+                    return $token;
+                }
+            }
+        }
+        foreach (self::$treesByToken as $token => $candidate) {
+            if ($candidate === $tree) {
+                return $token;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * dom_import_simplexml live-sharing — mutate the tracked host tree at compile time (#20137).
+     */
+    public static function syncHostTreeTextContent(Context $context, string $token, string $text): void
+    {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml')) {
+            return;
+        }
+        $tree = self::$treesByToken[$token] ?? null;
+        if (!$tree instanceof \SimpleXMLElement) {
+            return;
+        }
+        $tree[0] = $text;
+    }
+
+    /** @see syncHostTreeTextContent */
+    public static function syncHostTreeAttribute(Context $context, string $token, string $name, string $value): void
+    {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml')) {
+            return;
+        }
+        $tree = self::$treesByToken[$token] ?? null;
+        if (!$tree instanceof \SimpleXMLElement) {
+            return;
+        }
+        $tree[$name] = $value;
+    }
+
+    /**
      * Array-shaped operands must not fall back to lastTree for count() (#27413).
      * Value-boxed SXE from load/property still count via an exact host-tree token
      * once applyPendingElementAssign has bound it (#26863 / #28639).
