@@ -40,9 +40,9 @@ final class Issue34682BoxedBoolDivAotTest extends TestCase
         $aot = $this->runCmd([$bin]);
         @unlink($bin);
         $this->assertSame(0, $aot['rc'], "AOT run failed:\n".$aot['out']);
-        // Exact int division still returns float under AOT (same as typed #32337 `$n/$t`).
-        // The defect was float(0) / Division by zero from readDouble on bool.
-        $this->assertSame("float(0.5)\nfloat(5)\nfloat(0)\n", $aot['out']);
+        // AOT must match Zend: int/int stays int; the defect was float(0) / Division by zero
+        // from __value__readDouble on TYPE_NATIVE_BOOL (#34682).
+        $this->assertSame($zend, $aot['out']);
     }
 
     private function runPhp(string $file): string
