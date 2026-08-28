@@ -3393,6 +3393,7 @@ require_once __DIR__.'/../../../ext/standard/SessionNameJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SessionStartOptions.php';
 require_once __DIR__.'/../../../ext/standard/SessionStartOptionsAotJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SessionStartOptionsJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/SessionStartOptionsAotJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SessionStorageJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SetcookieLine.php';
 require_once __DIR__.'/../../../ext/standard/SetcookieOptions.php';
