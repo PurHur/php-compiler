@@ -24,13 +24,15 @@ final class MbCheckEncodingRuntimeAotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/mb_check_encoding_runtime_aot.php');
     }
 
-    public function testNoUndefinedTypeArrayConstant(): void
+    public function testNoUndefinedJitTypeArrayConstant(): void
     {
         $root = dirname(__DIR__, 2);
         $src = (string) file_get_contents($root.'/ext/mbstring/JitMbCheckEncoding.php');
-        $this->assertStringNotContainsString('TYPE_ARRAY', $src);
+        // #34254 — JIT\Variable has no TYPE_ARRAY; boxed VM arrays use VmVariable::TYPE_ARRAY (#35365).
+        $this->assertStringNotContainsString('JITVariable::TYPE_ARRAY', $src);
+        $this->assertStringContainsString('VmVariable::TYPE_ARRAY', $src);
         $this->assertStringContainsString('TYPE_HASHTABLE', $src);
-        $this->assertStringContainsString('function isArrayArg', $src);
+        $this->assertStringContainsString('lowerRuntimeValueBox', $src);
     }
 
     private function assertAotMatchesZend(string $src): void
