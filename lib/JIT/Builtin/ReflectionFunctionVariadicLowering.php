@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\JIT\Context;
 
 /**
@@ -29,7 +30,7 @@ final class ReflectionFunctionVariadicLowering
         $variadic = self::$variadicFunctions;
         self::resetAccumulated();
 
-        foreach (['call_user_func', 'array_map', 'array_multisort'] as $builtin) {
+        foreach (BuiltinParamNames::variadicInternalFunctionNames() as $builtin) {
             $variadic[strtolower($builtin)] = true;
         }
 
