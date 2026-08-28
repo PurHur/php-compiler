@@ -53,8 +53,28 @@ final class ObjectInstancePropertyLlvm
         if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomElementTextContent($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomElementTextContent::fetchNamed($object, $obj, $name, $receiverVar);
         }
+        if ('length' === strtolower($name)) {
+            $recv = $receiverVar;
+            if (null !== $recv) {
+                $ownerOp = $recv->objectPropertyReceiverOp;
+                if (null !== $ownerOp) {
+                    $ctx = $object->jitContext();
+                    if ($ctx->hasVariableOpInScopes($ownerOp)) {
+                        $owner = $ctx->getVariableFromOpInScopes($ownerOp);
+                        if (null !== ($owner->compileTimeDomAttrLocalName ?? null)) {
+                            return \PHPCompiler\ext\dom\JitDomNodeListLength::fetch($object, $obj, $recv);
+                        }
+                    }
+                }
+                if ('DOMNodeList' === ($recv->classUserType ?? '')
+                    || null !== ($recv->compileTimeDomNodeListLength ?? null)
+                ) {
+                    return \PHPCompiler\ext\dom\JitDomNodeListLength::fetch($object, $obj, $recv);
+                }
+            }
+        }
         if (\PHPCompiler\ext\dom\JitDomNodeListLength::isDomNodeListLength($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomNodeListLength::fetch($object, $obj);
+            return \PHPCompiler\ext\dom\JitDomNodeListLength::fetch($object, $obj, $receiverVar);
         }
         if (\PHPCompiler\ext\dom\JitDomNamedNodeMap::isLength($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomNamedNodeMap::fetchLength($object, $obj);
@@ -74,7 +94,7 @@ final class ObjectInstancePropertyLlvm
         // childNodes must use the DOMNode slot LiveSlots/loadXML write — fetching via
         // DOMElement defineProperty'd a second index past the allocation (#327xx).
         if (\PHPCompiler\ext\dom\JitDomChildNodesProperty::isDomChildNodesProperty($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomChildNodesProperty::fetch($object, $obj);
+            return \PHPCompiler\ext\dom\JitDomChildNodesProperty::fetch($object, $obj, $receiverVar);
         }
         if (!$forWrite) {
             $asProps = \PHPCompiler\VM\ArrayObjectJitHelper::tryPropertyFetchRead(

@@ -24,8 +24,28 @@ final class JitDomNodeListLength
         return 'domnodelist' === strtolower($classLc) && self::PROP_LENGTH === strtolower($propLc);
     }
 
-    public static function fetch(Object_ $objectType, Value $obj): JITVariable
+    public static function fetch(Object_ $objectType, Value $obj, ?JITVariable $receiverVar = null): JITVariable
     {
+        $knownLen = $receiverVar?->compileTimeDomNodeListLength ?? null;
+        if (null !== $knownLen) {
+            $context = $objectType->jitContext();
+            $i64 = $context->getTypeFromString('int64');
+            $nativeSlot = BasicBlockHelper::entryAlloca($context, $i64);
+            $context->builder->store($i64->constInt($knownLen, false), $nativeSlot);
+
+            return new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VARIABLE,
+                $nativeSlot
+            );
+        }
+
+        $attrLen = self::tryCompileTimeAttrChildNodesLength($objectType, $receiverVar);
+        if (null !== $attrLen) {
+            return $attrLen;
+        }
+
         $context = $objectType->jitContext();
         // GLOBAL_COUNT is only valid for getElementsByTagName / XPath snapshot lists,
         // not for childNodes lists which have their own per-instance length slot.
@@ -112,6 +132,41 @@ final class JitDomNodeListLength
             self::CLASS_NODELIST,
             self::PROP_LENGTH,
             $objectType->lookup(self::CLASS_NODELIST)
+        );
+    }
+
+    private static function tryCompileTimeAttrChildNodesLength(
+        Object_ $objectType,
+        ?JITVariable $receiverVar
+    ): ?JITVariable {
+        if (null === $receiverVar) {
+            return null;
+        }
+        $context = $objectType->jitContext();
+        $local = $receiverVar->compileTimeDomAttrLocalName ?? null;
+        $ns = $receiverVar->compileTimeDomAttrNamespace ?? '';
+        if (null === $local && null !== $receiverVar->objectPropertyReceiverOp) {
+            $ownerVar = $context->getVariableFromOpInScopes($receiverVar->objectPropertyReceiverOp);
+            $local = $ownerVar->compileTimeDomAttrLocalName ?? null;
+            $ns = $ownerVar->compileTimeDomAttrNamespace ?? '';
+        }
+        if (null === $local) {
+            return null;
+        }
+        $valueLit = JitDomAttrChildEdgeFetch::compileTimeAttrValuePublic($ns, $local);
+        if (null === $valueLit) {
+            return null;
+        }
+        $knownLen = '' !== $valueLit ? 1 : 0;
+        $i64 = $context->getTypeFromString('int64');
+        $nativeSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($i64->constInt($knownLen, false), $nativeSlot);
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VARIABLE,
+            $nativeSlot
         );
     }
 }

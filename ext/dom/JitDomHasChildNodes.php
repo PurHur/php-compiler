@@ -43,7 +43,44 @@ final class JitDomHasChildNodes
             throw new \LogicException('DOMNode::hasChildNodes() expects a receiver');
         }
 
-        return self::boxBoolResult($context, self::firstChildSlotIsSet($context, $receiver));
+        $attrLocal = $receiver->compileTimeDomAttrLocalName ?? null;
+        if (null !== $attrLocal) {
+            $cached = JitDomAttrChildEdgeFetch::compileTimeAttrValuePublic(
+                $receiver->compileTimeDomAttrNamespace ?? '',
+                $attrLocal
+            );
+            if (null !== $cached) {
+                $i1 = $context->getTypeFromString('int1');
+
+                return self::boxBoolResult(
+                    $context,
+                    $i1->constInt('' !== $cached ? 1 : 0, false)
+                );
+            }
+        }
+
+        $obj = self::loadObject($context, $receiver);
+        $objectType = $context->type->object;
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int1'));
+        $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $obj);
+        $bbAttr = BasicBlockHelper::append($context, 'dom_hcn_attr');
+        $bbElem = BasicBlockHelper::append($context, 'dom_hcn_elem');
+        $bbDone = BasicBlockHelper::append($context, 'dom_hcn_kind_done');
+        $context->builder->branchIf($isAttr, $bbAttr, $bbElem);
+
+        $context->builder->positionAtEnd($bbAttr);
+        // Avoid DOMAttr::$value / Element slot probes — OOB on thin-AOT attr objects (#35227).
+        $i1 = $context->getTypeFromString('int1');
+        $context->builder->store($i1->constInt(0, false), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbElem);
+        $context->builder->store(self::firstChildSlotIsSet($context, $receiver), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return self::boxBoolResult($context, $context->builder->load($resultSlot));
     }
 
     /** php-src: RETURN_BOOL(nodep->children != NULL). */

@@ -54,7 +54,7 @@ final class JitGetClass
             return self::invokeStringOperand($context, $arg, $allowString, $allowStringKnownFalse);
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            return ReflectionBuiltinHelper::getClassName($context, $arg);
+            return \PHPCompiler\ext\dom\JitDomStandinGetClass::emitClassName($context, $arg);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return self::boxed($context, $arg, $allowString, $allowStringKnownFalse);
@@ -188,7 +188,7 @@ final class JitGetClass
         $context->builder->positionAtEnd($okBlock);
         self::emitResourceOperandGuard($context, $arg);
 
-        return ReflectionBuiltinHelper::getClassName($context, $arg);
+        return \PHPCompiler\ext\dom\JitDomStandinGetClass::emitClassName($context, $arg);
     }
 
     private static function emitResourceOperandGuard(Context $context, JITVariable $arg): void

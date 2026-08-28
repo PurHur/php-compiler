@@ -43,7 +43,7 @@ final class JitDomChildNodesProperty
         return str_starts_with($classLc, 'dom');
     }
 
-    public static function fetch(Object_ $objectType, Value $obj): JITVariable
+    public static function fetch(Object_ $objectType, Value $obj, ?JITVariable $receiverVar = null): JITVariable
     {
         $context = $objectType->jitContext();
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_childnodes_fetch');
@@ -69,9 +69,9 @@ final class JitDomChildNodesProperty
         );
         $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $obj, 'dom_cn_fetch');
         $bbDoc = BasicBlockHelper::append($context, 'dom_cn_fetch_doc');
-        $bbEl = BasicBlockHelper::append($context, 'dom_cn_fetch_el');
+        $bbNotDoc = BasicBlockHelper::append($context, 'dom_cn_fetch_not_doc');
         $bbDone = BasicBlockHelper::append($context, 'dom_cn_fetch_done');
-        $context->builder->branchIf($isDoc, $bbDoc, $bbEl);
+        $context->builder->branchIf($isDoc, $bbDoc, $bbNotDoc);
 
         $context->builder->positionAtEnd($bbDoc);
         self::ensureEmptyListIfMissing($objectType, $obj, self::CLASS_DOCUMENT);
@@ -88,20 +88,65 @@ final class JitDomChildNodesProperty
         );
         $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbEl);
-        self::ensureEmptyListIfMissing($objectType, $obj, self::CLASS_ELEMENT);
-        $elList = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
-            $objectType,
-            $obj,
-            self::CLASS_ELEMENT,
-            VmDom::PROP_CHILD_NODES,
-            $elClassId
-        );
-        $context->builder->store(
-            JitValueBox::valuePtrFromVariable($context, $elList),
-            $resultSlot
-        );
-        $context->builder->branch($bbDone);
+        $context->builder->positionAtEnd($bbNotDoc);
+        if (null !== ($receiverVar?->compileTimeDomAttrLocalName ?? null)) {
+            $attrList = JitDomAttrChildEdgeFetch::fetchAttrChildNodes($objectType, $obj, $receiverVar);
+            if (null === ($attrList->compileTimeDomNodeListLength ?? null)) {
+                $valueLit = JitDomAttrChildEdgeFetch::compileTimeAttrValuePublic(
+                    $receiverVar->compileTimeDomAttrNamespace ?? '',
+                    $receiverVar->compileTimeDomAttrLocalName
+                );
+                if (null !== $valueLit) {
+                    $attrList->compileTimeDomNodeListLength = '' !== $valueLit ? 1 : 0;
+                }
+            }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_cn_fetch_attr_ct');
+            $context->builder->store(
+                JitValueBox::valuePtrFromVariable($context, $attrList),
+                $resultSlot
+            );
+            $context->builder->branch($bbDone);
+        } else {
+            $isAttr = JitDomAppendChildLiveSlots::isAttrNode($context, $obj);
+            $bbAttr = BasicBlockHelper::append($context, 'dom_cn_fetch_attr');
+            $bbEl = BasicBlockHelper::append($context, 'dom_cn_fetch_el');
+            $context->builder->branchIf($isAttr, $bbAttr, $bbEl);
+
+            $context->builder->positionAtEnd($bbAttr);
+            $attrList = JitDomAttrChildEdgeFetch::fetchAttrChildNodes($objectType, $obj, $receiverVar);
+            if (null === ($attrList->compileTimeDomNodeListLength ?? null)
+                && null !== ($receiverVar?->compileTimeDomAttrLocalName ?? null)
+            ) {
+                $valueLit = JitDomAttrChildEdgeFetch::compileTimeAttrValuePublic(
+                    $receiverVar->compileTimeDomAttrNamespace ?? '',
+                    $receiverVar->compileTimeDomAttrLocalName
+                );
+                if (null !== $valueLit) {
+                    $attrList->compileTimeDomNodeListLength = '' !== $valueLit ? 1 : 0;
+                }
+            }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_cn_attr_cont');
+            $context->builder->store(
+                JitValueBox::valuePtrFromVariable($context, $attrList),
+                $resultSlot
+            );
+            $context->builder->branch($bbDone);
+
+            $context->builder->positionAtEnd($bbEl);
+            self::ensureEmptyListIfMissing($objectType, $obj, self::CLASS_ELEMENT);
+            $elList = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $obj,
+                self::CLASS_ELEMENT,
+                VmDom::PROP_CHILD_NODES,
+                $elClassId
+            );
+            $context->builder->store(
+                JitValueBox::valuePtrFromVariable($context, $elList),
+                $resultSlot
+            );
+            $context->builder->branch($bbDone);
+        }
 
         $context->builder->positionAtEnd($bbDone);
         $result = new JITVariable(
@@ -111,6 +156,17 @@ final class JitDomChildNodesProperty
             JitValueBox::normalizeValuePtr($context, $context->builder->load($resultSlot))
         );
         $result->classUserType = self::CLASS_NODELIST;
+        if (null !== ($receiverVar?->compileTimeDomAttrLocalName ?? null)) {
+            $result->compileTimeDomAttrLocalName = $receiverVar->compileTimeDomAttrLocalName;
+            $result->compileTimeDomAttrNamespace = $receiverVar->compileTimeDomAttrNamespace ?? '';
+            $valueLit = JitDomAttrChildEdgeFetch::compileTimeAttrValuePublic(
+                $receiverVar->compileTimeDomAttrNamespace ?? '',
+                $receiverVar->compileTimeDomAttrLocalName
+            );
+            if (null !== $valueLit) {
+                $result->compileTimeDomNodeListLength = '' !== $valueLit ? 1 : 0;
+            }
+        }
 
         return $result;
     }
