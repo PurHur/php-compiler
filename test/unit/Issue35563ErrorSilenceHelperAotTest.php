@@ -86,9 +86,9 @@ final class Issue35563ErrorSilenceHelperAotTest extends TestCase
 
     public function testEnsureCompiledModuleDefaultsWired(): void
     {
-        $src = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/ErrorSilenceJitHelper.php');
-        $this->assertStringContainsString('ensureCompiledModuleDefaults', $src);
+        $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/SilenceRuntime.php');
+        $this->assertStringContainsString('G_ERROR_REPORTING', $src);
         $this->assertStringContainsString('#35563', $src);
-        $this->assertStringContainsString('compiledModuleDefaultsSeeded', $src);
+        $this->assertStringContainsString('E_ALL_LEGACY', $src);
     }
 }

@@ -32,10 +32,11 @@ final class ErrorSilenceJitHelper
     private static bool $displayErrors = false;
 
     /**
-     * NestedJIT under thin AOT does not apply PHP static property defaults (BSS-zero) (#33059, #35563).
+     * NestedJIT under thin AOT does not apply PHP static defaults (BSS-zero) (#33059, #35563).
      * {@see $errorReporting} reads as 0 before seed; only this flag distinguishes seeded from silenced-0.
+     * Int not bool — AOT bool static loads have mis-read as true on some paths (#35563).
      */
-    private static bool $compiledModuleDefaultsSeeded = false;
+    private static int $compiledModuleDefaultsSeeded = 0;
 
     /**
      * Seed compiled-module error_reporting before first gate — trigger_error may run before ini_get (#35563).
@@ -44,16 +45,16 @@ final class ErrorSilenceJitHelper
      */
     public static function ensureCompiledModuleDefaults(): void
     {
-        if (self::$compiledModuleDefaultsSeeded) {
+        if (0 !== self::$compiledModuleDefaultsSeeded) {
             return;
         }
-        self::$compiledModuleDefaultsSeeded = true;
+        self::$compiledModuleDefaultsSeeded = 1;
         self::$errorReporting = self::COMPILED_DEFAULT_ERROR_REPORTING;
     }
 
     private static function currentErrorReporting(): int
     {
-        if (!self::$compiledModuleDefaultsSeeded) {
+        if (0 === self::$compiledModuleDefaultsSeeded) {
             self::ensureCompiledModuleDefaults();
         }
 
@@ -130,7 +131,7 @@ final class ErrorSilenceJitHelper
 
     public static function iniRestoreErrorReporting(): void
     {
-        self::$compiledModuleDefaultsSeeded = true;
+        self::$compiledModuleDefaultsSeeded = 1;
         self::$errorReporting = self::COMPILED_DEFAULT_ERROR_REPORTING;
     }
 }
