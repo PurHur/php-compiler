@@ -291,35 +291,20 @@ class String_ extends Type {
             return;
         }
         \PHPCompiler\JIT\Builtin\StringBitwiseNot::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringHtmlspecialcharsDecode::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringPregQuote::implement($this->context);
+        // StringHtmlspecialchars … StringFilePutContents always-on implement removed (#35613):
+        // ext/standard/* and Jit* call sites already ensureLinked before lookup (peer #35609
+        // quotemeta/ctype/sodium batch). Scripts that never touch those builtins skip NestedJIT
+        // on the full load path. Leftover Type::implement vs Runtime ABI drift mints *.1
+        // (#31894 / #32122). IniSet/IniGet/ErrorReporting still eager here — JitIni::get/set
+        // and JitErrorReporting need call-site ensureLinked first (peer #34848 IniRuntime).
         // StringQuotemeta / CtypeRuntime / StringSodium always-on ensureLinked removed (#35609):
         // ext/standard/quotemeta.php / ext/ctype/JitCtype.php / ext/sodium/JitSodium already
         // ensureLinked before lookup (peer #34513 Type::initialize lazy). Scripts that never
         // call quotemeta()/ctype_*/sodium_* skip NestedJIT on the full load path. Leftover
         // Type::implement vs Runtime ABI drift mints *.1 (#31894 / #32122).
-        \PHPCompiler\JIT\Builtin\StringAddslashes::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringStripslashes::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringUrlencode::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringUrldecode::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringUcwords::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringSerialize::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringUnserialize::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringHttpBuildQuery::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringParseStr::implement($this->context);
         \PHPCompiler\JIT\Builtin\IniSet::implement($this->context);
         \PHPCompiler\JIT\Builtin\IniGet::implement($this->context);
         \PHPCompiler\JIT\Builtin\ErrorReporting::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringDeployPath::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringReadfile::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringFileGetContents::implement($this->context);
-        \PHPCompiler\JIT\Builtin\MimeContentTypeRuntime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\MetaTagsRuntime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\GetBrowserRuntime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringFilePutContents::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDateTime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringStrftime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringStrptime::implement($this->context);
