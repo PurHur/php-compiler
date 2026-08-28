@@ -18307,6 +18307,11 @@ class Compiler {
         if ($matched instanceof Op\Expr\Isset_ || $matched instanceof Op\Expr\Empty_) {
             return $matched;
         }
+        // var_dump(property_exists(...), isset(...)) — producers align 1:1; arg #0 is FuncCall,
+        // not the trailing Isset_. Do not map hoisted[$argIndex] onto isset for earlier args (#15646).
+        if (\count($producers) === \count($callArgs)) {
+            return null;
+        }
         $hoisted = [];
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $block->orig->children[$i];
