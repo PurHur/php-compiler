@@ -9,8 +9,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * Drop Type::register always-on StringTriggerError (#35392 / peer #34513 initialize).
  *
- * HashTable::implement declares undef-key ABIs + ensureLinked at entry; call sites
- * already ensure before lookup. Thin AOT must not NestedJIT trigger_error during
+ * HashTable::readStringKeyValue ensures undef-key ABIs; call sites already ensure
+ * before lookup. Thin AOT must not NestedJIT trigger_error during Type::register
  * Type::register (#31894 / #32122 .1 mint class).
  */
 final class TypeRegisterLazyStringTriggerErrorRuntimeShrinkTest extends TestCase
@@ -43,31 +43,28 @@ final class TypeRegisterLazyStringTriggerErrorRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testHashTableImplementEnsuresStringTriggerErrorBeforeLookups(): void
+    public function testHashTableReadStringKeyValueEnsuresStringTriggerErrorBeforeLookup(): void
     {
         $ht = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
-        $this->assertStringContainsString('#35392', $ht);
+        $this->assertStringContainsString('#35648', $ht);
+        $fnPos = strpos($ht, 'private function implementReadStringKeyValue(');
+        $this->assertNotFalse($fnPos);
+        $nextFn = strpos($ht, 'private function implementReadStringKeyHashtable(', $fnPos + 1);
+        $this->assertNotFalse($nextFn);
+        $chunk = substr($ht, $fnPos, $nextFn - $fnPos);
+        $this->assertStringContainsString(
+            'ensureUndefinedArrayKeyAbis',
+            $chunk,
+            'implementReadStringKeyValue must ensure undef-key ABIs before lookup (#35648)'
+        );
         $implPos = strpos($ht, 'public function implement(): void');
         $this->assertNotFalse($implPos);
         $implBody = substr($ht, $implPos, 600);
-        $this->assertStringContainsString(
-            'StringTriggerError::declareUndefinedArrayKeyAbis($this->context)',
-            $implBody,
-            'HashTable::implement must declare undef-key ABIs before lookups (#35392)'
-        );
-        $this->assertStringContainsString(
+        $this->assertStringNotContainsString(
             'StringTriggerError::ensureLinked($this->context)',
             $implBody,
-            'HashTable::implement must ensureLinked before undef-key lookup (#35392)'
+            'HashTable::implement must not eagerly ensureLinked (#35648)'
         );
-        $declPos = strpos($implBody, 'StringTriggerError::declareUndefinedArrayKeyAbis');
-        $ensurePos = strpos($implBody, 'StringTriggerError::ensureLinked');
-        $allocPos = strpos($implBody, 'implementAlloc');
-        $this->assertNotFalse($declPos);
-        $this->assertNotFalse($ensurePos);
-        $this->assertNotFalse($allocPos);
-        $this->assertLessThan($allocPos, $declPos);
-        $this->assertLessThan($allocPos, $ensurePos);
     }
 
     public function testJitScalarEnumCoerceEnsuresBeforeLookup(): void

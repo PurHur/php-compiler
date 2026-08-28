@@ -14,9 +14,10 @@ use PHPCompiler\JIT\Context;
  * Do not re-add empty always-on shells in {@see Type} — leftover decls mint
  * trigger_error.1 / undefined_array_key_warning_*.1 (#31894 / #32122 / #33234 / #33249).
  * Context ensureMinimal no longer eagerly links this (#34641); ensureFull likewise
- * (#35073). Type::register always-on declare+ensureLinked removed (#35392) —
- * {@see Type\HashTable::implement} declares/ensures at entry; call sites /
- * AssertFail::ensureLinked ensure before lookup.
+ * (#35073). Type::register always-on declare+ensureLinked removed (#35392).
+ * HashTable::implement entry ensure removed (#35648) — only readStringKeyValue +
+ * HashTableReadLlvm / call sites ensure before lookup; AssertFail::ensureLinked
+ * still covers assert paths.
  * {@see JitTriggerErrorKernel::declareTriggerErrorAbi} before SilenceRuntime NestedJIT (#33253).
  */
 final class StringTriggerError

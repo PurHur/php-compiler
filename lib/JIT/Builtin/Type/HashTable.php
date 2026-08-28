@@ -169,10 +169,11 @@ class HashTable extends Type
 
     public function implement(): void
     {
-        // Undef-key + trigger_error ABIs before any implement* lookup (#35392 / #33249).
-        // Type::register no longer eagerly NestedJIT StringTriggerError (#32122 .1 mint).
-        StringTriggerError::declareUndefinedArrayKeyAbis($this->context);
-        StringTriggerError::ensureLinked($this->context);
+        // StringTriggerError undef-key always-on ensureLinked removed (#35648 / peer #35392):
+        // only implementReadStringKeyValue emits __compiler_undefined_array_key_warning_*;
+        // HashTableReadLlvm / call sites already ensure before lookup. Thin hello-world
+        // must not NestedJIT trigger_error during HashTable init — leftover NestedJIT vs
+        // Runtime ABI drift mints undefined_array_key_warning_*.1 (#31894 / #32122).
         // StringNaturalCompare / StringStrcoll always-on ensureLinked removed (#35626):
         // locale/natural sort implement* call ensureStrcollAbis / ensureNaturalCompareAbis
         // before lookupFunction (peer #35614 Type::String_::implement lazy batch). Thin
@@ -259,6 +260,18 @@ class HashTable extends Type
     private function ensureNaturalCompareAbis(): void
     {
         StringNaturalCompare::ensureStandaloneBodies($this->context);
+    }
+
+    /**
+     * Undefined string-key read warning ABI — only for readStringKeyValue (#35648).
+     *
+     * peekStringKeyValue / isset paths must not NestedJIT trigger_error. Do not
+     * re-add at implement() entry — leftover decls mint undefined_array_key_warning_*.1.
+     */
+    private function ensureUndefinedArrayKeyAbis(): void
+    {
+        StringTriggerError::declareUndefinedArrayKeyAbis($this->context);
+        StringTriggerError::ensureLinked($this->context);
     }
 
     private function implementAlloc(): void
@@ -1615,6 +1628,7 @@ class HashTable extends Type
 
     private function implementReadStringKeyValue(): void
     {
+        $this->ensureUndefinedArrayKeyAbis();
         $fn = $this->context->lookupFunction('__hashtable__readStringKeyValue');
         $block = $fn->appendBasicBlock('main');
         $this->context->builder->positionAtEnd($block);

@@ -41,10 +41,10 @@ final class TypeDeadUndefinedArrayKeyAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register undef-key long ABI (#33249)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop;
-        // StringTriggerError register ensure moved to HashTable::implement (#35392).
+        // StringTriggerError register ensure moved to readStringKeyValue (#35648).
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $ht = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
-        $this->assertStringContainsString('StringTriggerError::ensureLinked', $ht);
+        $this->assertStringContainsString('ensureUndefinedArrayKeyAbis', $ht);
         $this->assertStringContainsString('StringTriggerError::declareUndefinedArrayKeyAbis', $ht);
     }
 

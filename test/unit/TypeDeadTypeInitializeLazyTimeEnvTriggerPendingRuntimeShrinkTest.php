@@ -49,9 +49,9 @@ final class TypeDeadTypeInitializeLazyTimeEnvTriggerPendingRuntimeShrinkTest ext
         );
         $ht = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
         $this->assertStringContainsString(
-            'StringTriggerError::ensureLinked($this->context)',
+            'ensureUndefinedArrayKeyAbis',
             $ht,
-            'HashTable::implement ensureLinked StringTriggerError for HELPER_RUNTIME_O=0 (#35392 / #33248)'
+            'HashTable readStringKeyValue ensures StringTriggerError for HELPER_RUNTIME_O=0 (#35648 / #33248)'
         );
         // SessionStorageGlobals::ensureGlobals also lazy as of #34566 (peer).
     }
