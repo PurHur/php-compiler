@@ -952,7 +952,7 @@ final class HelperRuntimeCache
                 if (null === $sourceAbs || !self::manifestFingerprintMatches($manifest, $sourceAbs)) {
                     continue; // stale — emitter will refresh it
                 }
-                if (!is_file($unitDir.'/unit.o') || !is_file($unitDir.'/unit.bc')) {
+                if (!self::unitObjectIsLinkable($unitDir) || !is_file($unitDir.'/unit.bc')) {
                     continue;
                 }
                 if (!isset($manifest['init_symbol']) || '' === (string) $manifest['init_symbol']) {
@@ -1214,7 +1214,7 @@ final class HelperRuntimeCache
         $objects = [];
         foreach (array_keys(self::$usedUnits) as $unitDir) {
             $object = $unitDir.'/unit.o';
-            if (is_file($object)) {
+            if (self::unitObjectIsLinkable($unitDir)) {
                 $objects[] = $object;
             }
         }
@@ -1225,6 +1225,17 @@ final class HelperRuntimeCache
     public static function markEmitting(): void
     {
         putenv(self::ENV_EMITTING.'=1');
+    }
+
+    /**
+     * A zero-byte unit.o can exist when emit was interrupted; it must not shadow the
+     * committed prelinked tier or link as an empty object (undefined helper symbols, #6229).
+     */
+    public static function unitObjectIsLinkable(string $unitDir): bool
+    {
+        $object = $unitDir.'/unit.o';
+
+        return is_file($object) && filesize($object) > 0;
     }
 
     private static function shouldInlineOnlyForUserScript(string $logicalLc): bool
