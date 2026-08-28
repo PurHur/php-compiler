@@ -37,8 +37,9 @@ final class SpineChunkMethodObjectThenVariadic24429AotTest extends TestCase
         $this->assertFileExists($bin);
         try {
             exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
-            $this->assertSame(0, $runRc, implode("\n", $runOut));
-            $this->assertStringContainsString('|2', implode("\n", $runOut)."\n");
+            $runJoined = implode("\n", $runOut);
+            $this->assertSame(0, $runRc, $runJoined);
+            $this->assertStringContainsString('SpineChunk24429\\Ctx|2', $runJoined);
         } finally {
             @unlink($bin);
         }

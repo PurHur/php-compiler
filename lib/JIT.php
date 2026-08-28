@@ -2991,6 +2991,16 @@ class JIT {
             $cfgParam = ($cfgIdx >= 0 && $cfgIdx < $cfgParamCount)
                 ? $block->func->params[$cfgIdx]
                 : null;
+            $llvmParamTy = $this->context->getStringFromType($arg);
+            if ('__value__*' === $llvmParamTy) {
+                $varType = Variable::TYPE_VALUE;
+            } elseif ('__object__*' === $llvmParamTy) {
+                $varType = Variable::TYPE_OBJECT;
+            } elseif ('__hashtable__*' === $llvmParamTy) {
+                $varType = Variable::TYPE_HASHTABLE;
+            } elseif ('__string__*' === $llvmParamTy) {
+                $varType = Variable::TYPE_STRING;
+            }
             if (
                 null !== $cfgParam
                 && JIT\NestedJitCompileScope::isActive()
@@ -4872,6 +4882,36 @@ class JIT {
         return null;
     }
 
+    /**
+     * User class-typed object formals use boxed {@see __value__*} at the LLVM ABI (#24429).
+     * Compiler/runtime methods keep native {@see __object__*} (DOM init, spine helpers).
+     */
+    private function cfgParamUsesBoxedUserObjectFormal(?Block $block, Type $rawType): bool
+    {
+        if (Type::TYPE_OBJECT !== $rawType->type) {
+            return false;
+        }
+        if ($this->isCfgObjectIdentityParamType($rawType) || $this->isCfgVmVariableParamType($rawType)) {
+            return false;
+        }
+        if ($this->cfgEnclosingFuncIsCompilerInternal($block)) {
+            return false;
+        }
+        $userType = strtolower(ltrim((string) ($rawType->userType ?? ''), '\\'));
+
+        return '' !== $userType && !\in_array($userType, ['object', 'mixed', 'stdclass'], true);
+    }
+
+    private function cfgEnclosingFuncIsCompilerInternal(?Block $block): bool
+    {
+        if (null === $block || null === $block->func || null === $block->func->class) {
+            return false;
+        }
+        $class = strtolower(ltrim((string) $block->func->class->value, '\\'));
+
+        return str_starts_with($class, 'phpcompiler\\');
+    }
+
     private function llvmTypeForCfgParam(
         \PHPCfg\Op\Expr\Param $param,
         ?Block $block = null,
@@ -4938,6 +4978,9 @@ class JIT {
         }
         if ($this->isCfgObjectIdentityParamType($rawType)) {
             return $this->context->getTypeFromString('__object__*');
+        }
+        if ($this->cfgParamUsesBoxedUserObjectFormal($block, $rawType)) {
+            return $this->context->getTypeFromString('__value__*');
         }
         $callback = $this->callbackTypeFromPhptype($rawType);
         if (null !== $callback) {
