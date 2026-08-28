@@ -13504,11 +13504,18 @@ class JIT {
                         break;
                     }
                     $this->context->callSiteLine = (int) ($op->arg1 ?? 0);
-                    [$callArgs, $callOperands] = $this->resolveJitOutgoingCall(
+                    [$callArgs, $callOperands, $deferredNamedBindingError] = $this->resolveJitOutgoingCall(
                         $this->context->scope->toCall,
                         $this->context->scope->args,
                         $this->context->scope->argOperands
                     );
+                    if ($deferredNamedBindingError) {
+                        JIT\BasicBlockHelper::ensureOpenInsertBlock(
+                            $this->context,
+                            'named_binding_error_resume'
+                        );
+                        break;
+                    }
                     $callArgs = $this->prependImplicitThisForStaticInstanceCall(
                         $block,
                         $this->context->scope->toCall,
@@ -13669,11 +13676,30 @@ class JIT {
                         break;
                     }
                     $this->context->callSiteLine = (int) ($op->arg2 ?? 0);
-                    [$callArgs, $callOperands] = $this->resolveJitOutgoingCall(
+                    [$callArgs, $callOperands, $deferredNamedBindingError] = $this->resolveJitOutgoingCall(
                         $this->context->scope->toCall,
                         $this->context->scope->args,
                         $this->context->scope->argOperands
                     );
+                    if ($deferredNamedBindingError) {
+                        JIT\BasicBlockHelper::ensureOpenInsertBlock(
+                            $this->context,
+                            'named_binding_error_resume'
+                        );
+                        $nullVar = new Variable(
+                            $this->context,
+                            Variable::TYPE_NULL,
+                            Variable::KIND_VALUE,
+                            $this->context->getTypeFromString('__value__*')->constNull()
+                        );
+                        $nullVar->isNullConstant = true;
+                        $this->assignCallResultOperand(
+                            $block->getOperand($op->arg1),
+                            $nullVar->value,
+                            $this->calleeReturnsByRef($this->context->scope->toCall)
+                        );
+                        break;
+                    }
                     $callArgs = $this->prependImplicitThisForStaticInstanceCall(
                         $block,
                         $this->context->scope->toCall,
@@ -28461,7 +28487,7 @@ class JIT {
      * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable}> $argEntries
      * @param list<Operand|null>                                                          $argOperands
      *
-     * @return array{0: list<Variable>, 1: list<Operand|null>}
+     * @return array{0: list<Variable>, 1: list<Operand|null>, 2: bool}
      */
     private function resolveJitOutgoingCall(JIT\Call $toCall, array $argEntries, array $argOperands): array
     {
@@ -28477,7 +28503,7 @@ class JIT {
             // Clear after rewrite — rewrite reads magicCallIsStatic (#27517).
             $this->context->scope->magicCallIsStatic = false;
             if (null !== $rewritten) {
-                return $rewritten;
+                return [$rewritten[0], $rewritten[1], false];
             }
         }
 
@@ -28529,12 +28555,12 @@ class JIT {
                     if (null !== $expanded) {
                         $full = array_merge($prefixVars, $expanded);
 
-                        return [$full, array_merge($prefixOperands, array_fill(0, \count($expanded), null))];
+                        return [$full, array_merge($prefixOperands, array_fill(0, \count($expanded), null)), false];
                     }
                 }
                 $full = array_merge($prefixVars, $namedUnpack[0]);
 
-                return [$full, array_merge($prefixOperands, $namedUnpack[1])];
+                return [$full, array_merge($prefixOperands, $namedUnpack[1]), false];
             }
 
             $callArgs = $this->finalizeJitCallArgs($userEntries);
@@ -28551,7 +28577,7 @@ class JIT {
                 if (null !== $expanded) {
                     $full = array_merge($prefixVars, $expanded);
 
-                    return [$full, array_merge($prefixOperands, array_fill(0, \count($expanded), null))];
+                    return [$full, array_merge($prefixOperands, array_fill(0, \count($expanded), null)), false];
                 }
             }
             $full = array_merge($prefixVars, $callArgs);
@@ -28559,6 +28585,7 @@ class JIT {
             return [
                 $full,
                 array_merge($prefixOperands, $userOperands),
+                false,
             ];
         }
 
@@ -28585,15 +28612,25 @@ class JIT {
                 if (null !== $compileTime) {
                     [$userArgs, $userOps] = $compileTime;
                 } else {
-                    [$userArgs, $userOps] = JIT\NamedArgs::resolveOutgoing(
-                        $userEntries,
-                        $userOperands,
-                        $paramNames,
-                        $variadicIndex,
-                        $builtinName,
-                        $this->context,
-                        null !== $builtinName
-                    );
+                    try {
+                        [$userArgs, $userOps] = JIT\NamedArgs::resolveOutgoing(
+                            $userEntries,
+                            $userOperands,
+                            $paramNames,
+                            $variadicIndex,
+                            $builtinName,
+                            $this->context,
+                            null !== $builtinName
+                        );
+                    } catch (\ArgumentCountError $e) {
+                        // Defer Zend call-binding errors to runtime so try/catch works (#23449).
+                        JIT\ExceptionBridge::emitArgumentCountErrorAndAbort(
+                            $this->context,
+                            $e->getMessage()
+                        );
+
+                        return [[], [], true];
+                    }
                 }
                 $callArgs = $prefix;
                 foreach ($userArgs as $idx => $value) {
@@ -28604,13 +28641,14 @@ class JIT {
                     $callOperands[$prefixLen + (int) $idx] = $operand;
                 }
 
-                return [$callArgs, $callOperands];
+                return [$callArgs, $callOperands, false];
             }
         }
 
         return [
             $this->finalizeJitCallArgs($argEntries),
             $argOperands,
+            false,
         ];
     }
 
