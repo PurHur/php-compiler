@@ -17,7 +17,7 @@ declare(strict_types=1);
  * The entries are literal `new` expressions on purpose: the AOT compiler resolves these statically,
  * and instantiating from a string would leave every module unreferenced and uncompiled.
  *
- * 82 extensions, all default-enabled — matching current behaviour, where every build pays for
+ * 83 extensions, all default-enabled — matching current behaviour, where every build pays for
  * every extension. Selecting a subset is the next step and will filter on
  * {@see \PHPCompiler\Module::isDefaultEnabled}.
  */
@@ -102,6 +102,7 @@ final class ExtensionRegistry
             new \PHPCompiler\ext\gnupg\Module(),
             new \PHPCompiler\ext\pspell\Module(),
             new \PHPCompiler\ext\mysqli\Module(),
+            new \PHPCompiler\ext\sqlsrv\Module(),
             new \PHPCompiler\ext\tidy\Module(),
             new \PHPCompiler\ext\pdo\Module(),
             new \PHPCompiler\ext\phar\Module(),
