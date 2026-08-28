@@ -244,17 +244,20 @@ final class JitDomAttributeNodeNS
                 && str_starts_with(JitDomLoadXMLUserScript::lastDocumentClass(), 'Dom\\');
             // Classic DOMAttr orphans are never IDs (#29884); living path already did this.
             JitDomAttrRename::rememberOrphan();
+            $attr = self::materializeAttrFromLiterals(
+                $context,
+                '',
+                $nameLit,
+                '',
+                $living ? self::CLASS_LIVING_ATTR : self::CLASS_ATTR,
+                $living
+            );
+            // Orphan slot for emitAttrValueSlotSync / getAttributeNode reuse (#35118).
+            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $nameLit, $attr, '');
 
             return self::boxObjectResult(
                 $context,
-                self::materializeAttrFromLiterals(
-                    $context,
-                    '',
-                    $nameLit,
-                    '',
-                    $living ? self::CLASS_LIVING_ATTR : self::CLASS_ATTR,
-                    $living
-                )
+                $attr
             );
         }
 

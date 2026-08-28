@@ -83,6 +83,77 @@ final class JitDomElementTextContent
         return $var;
     }
 
+    /**
+     * Dom\Attr / DOMAttr::$value read — mirror tryEmitStore / emitAttrValueSlotSync (#21083 / #27108).
+     *
+     * nodeValue uses fetchUserScriptTextContentMaybeAttr via isDomElementTextContent; `$value`
+     * collides with SensitiveParameterValue on generic `object` and needs the Attr STRING slot.
+     */
+    public static function fetchAttrValue(
+        Object_ $objectType,
+        Value $obj,
+        string $propName,
+        ?JITVariable $receiverVar = null
+    ): JITVariable {
+        $context = $objectType->jitContext();
+        $attrClass = JitDomAttributeNodeNS::attrClassForUserScriptCache();
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
+            $classId = $objectType->lookup($attrClass);
+            if (!$objectType->hasProperty($classId, 'value')) {
+                $objectType->defineProperty($classId, 'value', JITVariable::TYPE_STRING);
+            }
+            $fetched = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $obj,
+                $attrClass,
+                'value',
+                $classId
+            );
+            if (JITVariable::TYPE_STRING === $fetched->type) {
+                $fetched->objectPropertyReceiver = $obj;
+                $fetched->objectPropertyName = $propName;
+                $fetched->objectPropertyClassName = $attrClass;
+                $fetched->objectPropertyType = JITVariable::TYPE_STRING;
+                if (null !== $receiverVar?->compileTimeDomAttrLocalName) {
+                    $fetched->compileTimeDomAttrLocalName = $receiverVar->compileTimeDomAttrLocalName;
+                    $fetched->compileTimeDomAttrNamespace = $receiverVar->compileTimeDomAttrNamespace ?? '';
+                }
+
+                return $fetched;
+            }
+            $str = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                JitValueBox::normalizeValuePtr(
+                    $context,
+                    JitValueBox::valuePtrFromVariable($context, $fetched)
+                )
+            );
+        } else {
+            DomElementTextContentRuntime::ensureLinked($context);
+            $str = $context->builder->call(
+                $context->lookupFunction(DomElementTextContentRuntime::ABI_NAME),
+                $obj
+            );
+        }
+        $var = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $str
+        );
+        $var->objectPropertyReceiver = $obj;
+        $var->objectPropertyName = $propName;
+        $var->objectPropertyClassName = $attrClass;
+        $var->objectPropertyType = JITVariable::TYPE_STRING;
+        if (null !== $receiverVar?->compileTimeDomAttrLocalName) {
+            $var->compileTimeDomAttrLocalName = $receiverVar->compileTimeDomAttrLocalName;
+            $var->compileTimeDomAttrNamespace = $receiverVar->compileTimeDomAttrNamespace ?? '';
+        }
+
+        return $var;
+    }
+
     public static function isDomElementTextContent(string $classLc, string $propLc): bool
     {
         $propLc = strtolower($propLc);
@@ -109,18 +180,26 @@ final class JitDomElementTextContent
     {
         $propLc = strtolower($propLc);
         $classLc = strtolower(str_replace('/', '\\', ltrim($classLc, '\\')));
-        if (\in_array($classLc, ['dom\\attr', 'domattr'], true)
-            && \in_array($propLc, ['value', 'nodevalue', 'textcontent'], true)
-        ) {
+        if (!\in_array($propLc, ['value', 'nodevalue', 'textcontent'], true)) {
+            return false;
+        }
+        if (\in_array($classLc, ['dom\\attr', 'domattr'], true)) {
             return true;
         }
-        // Temps often lose Dom\Attr as CFG `object`. Prefer `$value` only — `$nodeValue` on
-        // `object` still belongs to the DOMElement textContent bridge (#23251).
-        return 'value' === $propLc
-            && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
-            && null !== JitDomLoadXMLUserScript::lastDocumentClass()
-            && str_starts_with((string) JitDomLoadXMLUserScript::lastDocumentClass(), 'Dom\\')
-            && \in_array($classLc, ['object', 'stdclass', ''], true);
+        $livingDoc = JitDomLoadXMLUserScript::lastDocumentClass();
+        if (null === $livingDoc || !str_starts_with($livingDoc, 'Dom\\')) {
+            // Temps often lose Dom\Attr as CFG `object`. Prefer `$value` only — `$nodeValue` on
+            // `object` still belongs to the DOMElement textContent bridge (#23251).
+            return 'value' === $propLc
+                && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+                && \in_array($classLc, ['object', 'stdclass', ''], true);
+        }
+        // Living Dom\Attr orphans from createAttribute lose static type (#21083).
+        if (\in_array($classLc, ['object', 'stdclass', ''], true) || JitDomAttrRename::lastAttrIsOrphan()) {
+            return 'value' === $propLc || 'nodevalue' === $propLc || 'textcontent' === $propLc;
+        }
+
+        return false;
     }
 
     /**
@@ -141,6 +220,19 @@ final class JitDomElementTextContent
         // Living / classic Attr value|nodeValue|textContent — direct TYPE_STRING slot write (#27108, #33864).
         // Must run before isDomElementTextContent so Attr::$nodeValue is not treated as Element.
         if (self::isDomAttrValueProperty($classLc, $propLc)) {
+            $str = self::loadStringValue($context, $value);
+            self::emitAttrValueSlotSync($context, $receiver, $str, $value);
+
+            return true;
+        }
+        // `$o->value =` on a living Dom\Attr orphan can resolve the write lvalue to
+        // SensitiveParameterValue::$value (detached TYPE_VALUE box) when both classes
+        // declare `value` — `$o->nodeValue =` is unaffected (#21083 / #27108).
+        if ('value' === $propLc
+            && 'sensitiveparametervalue' === $classLc
+            && null !== JitDomLoadXMLUserScript::lastDocumentClass()
+            && str_starts_with(JitDomLoadXMLUserScript::lastDocumentClass(), 'Dom\\')
+        ) {
             $str = self::loadStringValue($context, $value);
             self::emitAttrValueSlotSync($context, $receiver, $str, $value);
 

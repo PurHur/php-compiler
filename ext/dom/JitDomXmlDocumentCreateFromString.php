@@ -209,6 +209,8 @@ final class JitDomXmlDocumentCreateFromString
                 $attr,
                 $value
             );
+            // Pin parse-time attrs so getAttribute reads NamedNodeMap slots (#34863 / re-#21083).
+            JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
         }
 
         $slot = JitValueBox::alloc($context);

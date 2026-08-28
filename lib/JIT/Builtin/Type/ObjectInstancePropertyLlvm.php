@@ -50,7 +50,23 @@ final class ObjectInstancePropertyLlvm
         if (\PHPCompiler\ext\dom\JitDomElementNavigationProperty::isElementNavigationProperty($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomElementNavigationProperty::fetch($object, $obj, $name, $class, $receiverVar);
         }
-        if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomElementTextContent($classLc, strtolower($name))) {
+        $propLc = strtolower($name);
+        if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomAttrValueProperty($classLc, $propLc)) {
+            return \PHPCompiler\ext\dom\JitDomElementTextContent::fetchAttrValue($object, $obj, $name, $receiverVar);
+        }
+        // `$o->value` read on living Dom\Attr orphan resolves to SensitiveParameterValue::$value
+        // (TYPE_VALUE box) when both classes declare `value` — writes already redirect (#21083).
+        if ('value' === $propLc
+            && 'sensitiveparametervalue' === $classLc
+            && null !== \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastDocumentClass()
+            && str_starts_with(
+                (string) \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastDocumentClass(),
+                'Dom\\'
+            )
+        ) {
+            return \PHPCompiler\ext\dom\JitDomElementTextContent::fetchAttrValue($object, $obj, $name, $receiverVar);
+        }
+        if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomElementTextContent($classLc, $propLc)) {
             return \PHPCompiler\ext\dom\JitDomElementTextContent::fetchNamed($object, $obj, $name, $receiverVar);
         }
         if ('length' === strtolower($name)) {
