@@ -31,6 +31,17 @@ if ('1' === getenv('BENCH_FILEUPLOADWEB_AOT_ROW_ONLY')) {
     exit(0);
 }
 
+if ('1' === getenv('BENCH_FASTCGIWEB_AOT_ROW_ONLY')) {
+    putenv('BENCH_FASTCGIWEB=1');
+    putenv('BENCH_FASTCGIWEB_AOT=1');
+    echo "Rebuilding 009-FastCGIWeb AOT benchmark row only\n";
+    if (!patchFastCGIWebAotRowOnly($repoRoot)) {
+        exit(1);
+    }
+    echo "Done (009 AOT row only)\n";
+    exit(0);
+}
+
 echo "Rebuilding Examples\n";
 
 $llvmReady = isLlvmReady($repoRoot);
@@ -1037,6 +1048,39 @@ function patchFileUploadWebAotRowOnly(string $repoRoot): bool
 
     file_put_contents($readmePath, $newBody);
     echo '  006-FileUploadWeb AOT: compile='.trim($compile).' compiled='.trim($compiled)."\n";
+
+    return true;
+}
+
+/**
+ * Patch only the 009-FastCGIWeb AOT columns in examples/README.md (#2370).
+ * Use BENCH_FASTCGIWEB_AOT_ROW_ONLY=1 to avoid a full rebuild when ci-fast drift guard is red.
+ */
+function patchFastCGIWebAotRowOnly(string $repoRoot): bool
+{
+    $benchEnv = benchmarkEnv($repoRoot);
+    $result = tryBenchmarkFastCGIWebProjectAot($repoRoot, $benchEnv);
+    if (null === $result) {
+        fwrite(STDERR, "patchFastCGIWebAotRowOnly: AOT benchmark failed\n");
+
+        return false;
+    }
+
+    $readmePath = $repoRoot.'/examples/README.md';
+    $body = (string) file_get_contents($readmePath);
+    $pattern = '/(\|\s*009-FastCGIWeb\s*\|[^|]+\|[^|]+\|[^|]+\|)\s*n\/a\s*(\|\s*n\/a\s*\|)/i';
+    $compile = sprintf('         %0.5f |', $result['compile']);
+    $compiled = sprintf('         %0.5f |', $result['compiled']);
+    $replacement = '$1'.$compile.$compiled;
+    $newBody = preg_replace($pattern, $replacement, $body, 1, $count);
+    if (1 !== $count || !is_string($newBody)) {
+        fwrite(STDERR, "patchFastCGIWebAotRowOnly: could not patch 009 row\n");
+
+        return false;
+    }
+
+    file_put_contents($readmePath, $newBody);
+    echo '  009-FastCGIWeb AOT: compile='.trim($compile).' compiled='.trim($compiled)."\n";
 
     return true;
 }
