@@ -248,8 +248,13 @@ final class DomUserScriptElementCacheLlvm
         return $context->builder->icmp(Builder::INT_EQ, $storedOk, $i1->constInt(1, false));
     }
 
-    /** @return Value {@see __object__*} element or null */
-    public static function lookupObject(Context $context, Value $idStr): Value
+    /**
+     * @return Value {@see __object__*} element or null
+     *
+     * When $document is set, only return a hit when GLOBAL_DOC matches — setIdAttribute on
+     * document A must not satisfy getElementById on document B (#20830 / re-#19212).
+     */
+    public static function lookupObject(Context $context, Value $idStr, ?Value $document = null): Value
     {
         self::ensureGlobals($context);
         $objPtr = $context->getTypeFromString('__object__*');
@@ -282,6 +287,11 @@ final class DomUserScriptElementCacheLlvm
         $i64 = $context->getTypeFromString('int64');
         $idMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
         $cachedElem = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_ELEM));
+        if (null !== $document) {
+            $cachedDoc = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_DOC));
+            $docMatch = $context->builder->icmp(Builder::INT_EQ, $cachedDoc, $document);
+            $idMatch = $context->builder->and($idMatch, $docMatch);
+        }
         $found = $context->builder->select($idMatch, $cachedElem, $nullObj);
         $context->builder->store($found, $resultSlot);
         $context->builder->branch($doneBlock);
