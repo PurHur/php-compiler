@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
@@ -64,12 +65,13 @@ final class SplAutoloadOutput
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementRegisterApplyBridge($context);
         self::implementUnregisterApplyBridge($context);
         self::implementDispatch($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 
     public static function loadDepth(Context $context): Value
@@ -104,22 +106,24 @@ final class SplAutoloadOutput
         $fn = $context->module->addFunction($abiName, $ft);
         $context->registerFunction($abiName, $fn);
 
-        $entry = $fn->appendBasicBlock('spl_reg_bridge_entry');
-        $context->builder->positionAtEnd($entry);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn, $i32, $i64): void {
+            $entry = $fn->appendBasicBlock('spl_reg_bridge_entry');
+            $context->builder->positionAtEnd($entry);
 
-        $fnOpaque = $fn->getParam(0);
-        $metaOpaque = $fn->getParam(1);
-        $prepend = $fn->getParam(2);
-        $fnBits = $context->builder->ptrtoint($fnOpaque, $i64);
-        $metaBits = $context->builder->ptrtoint($metaOpaque, $i64);
-        $prependBool = $context->builder->icmp(Builder::INT_NE, $prepend, $i32->constInt(0, false));
-        $context->builder->call(
-            self::helperFunction($context, self::REGISTER_HELPER),
-            $fnBits,
-            $metaBits,
-            $prependBool
-        );
-        $context->builder->returnVoid();
+            $fnOpaque = $fn->getParam(0);
+            $metaOpaque = $fn->getParam(1);
+            $prepend = $fn->getParam(2);
+            $fnBits = $context->builder->ptrtoint($fnOpaque, $i64);
+            $metaBits = $context->builder->ptrtoint($metaOpaque, $i64);
+            $prependBool = $context->builder->icmp(Builder::INT_NE, $prepend, $i32->constInt(0, false));
+            $context->builder->call(
+                self::helperFunction($context, self::REGISTER_HELPER),
+                $fnBits,
+                $metaBits,
+                $prependBool
+            );
+            $context->builder->returnVoid();
+        });
     }
 
     private static function implementUnregisterApplyBridge(Context $context): void
@@ -132,16 +136,18 @@ final class SplAutoloadOutput
         $fn = $context->module->addFunction($abiName, $ft);
         $context->registerFunction($abiName, $fn);
 
-        $entry = $fn->appendBasicBlock('spl_unreg_bridge_entry');
-        $context->builder->positionAtEnd($entry);
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use ($context, $fn, $i32, $i64): void {
+            $entry = $fn->appendBasicBlock('spl_unreg_bridge_entry');
+            $context->builder->positionAtEnd($entry);
 
-        $fnOpaque = $fn->getParam(0);
-        $fnBits = $context->builder->ptrtoint($fnOpaque, $i64);
-        $found = $context->builder->call(
-            self::helperFunction($context, self::UNREGISTER_HELPER),
-            $fnBits
-        );
-        $context->builder->returnValue($context->builder->zext($found, $i32));
+            $fnOpaque = $fn->getParam(0);
+            $fnBits = $context->builder->ptrtoint($fnOpaque, $i64);
+            $found = $context->builder->call(
+                self::helperFunction($context, self::UNREGISTER_HELPER),
+                $fnBits
+            );
+            $context->builder->returnValue($context->builder->zext($found, $i32));
+        });
     }
 
     private static function implementDispatch(Context $context): void
@@ -157,60 +163,72 @@ final class SplAutoloadOutput
         $fn = $context->module->addFunction($abiName, $ft);
         $context->registerFunction($abiName, $fn);
 
-        $entry = $fn->appendBasicBlock('spl_disp_entry');
-        $bbLoopHead = $fn->appendBasicBlock('spl_disp_loop_head');
-        $bbLoopBody = $fn->appendBasicBlock('spl_disp_loop_body');
-        $bbCall = $fn->appendBasicBlock('spl_disp_call');
-        $bbNext = $fn->appendBasicBlock('spl_disp_next');
-        $bbRetZero = $fn->appendBasicBlock('spl_disp_ret_zero');
-        $bbRetOne = $fn->appendBasicBlock('spl_disp_ret_one');
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, $abiName, static function () use (
+            $context,
+            $fn,
+            $i8p,
+            $i32,
+            $i64,
+            $sizeT,
+            $cbFnTy,
+            $cbPtrTy
+        ): void {
+            $entry = $fn->appendBasicBlock('spl_disp_entry');
+            $bbLoopHead = $fn->appendBasicBlock('spl_disp_loop_head');
+            $bbLoopBody = $fn->appendBasicBlock('spl_disp_loop_body');
+            $bbCall = $fn->appendBasicBlock('spl_disp_call');
+            $bbNext = $fn->appendBasicBlock('spl_disp_next');
+            $bbRetZero = $fn->appendBasicBlock('spl_disp_ret_zero');
+            $bbRetOne = $fn->appendBasicBlock('spl_disp_ret_one');
 
-        $context->builder->positionAtEnd($entry);
-        $classPtr = $fn->getParam(0);
-        $classLen = $fn->getParam(1);
-        $iSlot = $context->builder->alloca($i32, 1, 'spl_disp_i');
-        $context->builder->store($i32->constInt(0, false), $iSlot);
+            $context->builder->positionAtEnd($entry);
+            $classPtr = $fn->getParam(0);
+            $classLen = $fn->getParam(1);
+            $iSlot = $context->builder->alloca($i32, 1, 'spl_disp_i');
+            $context->builder->store($i32->constInt(0, false), $iSlot);
 
-        $badName = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $classPtr, $i8p->constNull()),
-            $context->builder->icmp(Builder::INT_EQ, $classLen, $sizeT->constInt(0, false))
-        );
-        $context->builder->branchIf($badName, $bbRetZero, $bbLoopHead);
+            $badName = $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $classPtr, $i8p->constNull()),
+                $context->builder->icmp(Builder::INT_EQ, $classLen, $sizeT->constInt(0, false))
+            );
+            $context->builder->branchIf($badName, $bbRetZero, $bbLoopHead);
 
-        $context->builder->positionAtEnd($bbLoopHead);
-        $iVal = $context->builder->load($iSlot);
-        $depth = $context->builder->call(self::helperFunction($context, self::DEPTH_HELPER));
-        $inRange = $context->builder->icmp(Builder::INT_SLT, $iVal, $depth);
-        $context->builder->branchIf($inRange, $bbLoopBody, $bbRetZero);
+            $context->builder->positionAtEnd($bbLoopHead);
+            $iVal = $context->builder->load($iSlot);
+            $depth = $context->builder->call(self::helperFunction($context, self::DEPTH_HELPER));
+            $depthI32 = $context->builder->trunc($depth, $i32);
+            $inRange = $context->builder->icmp(Builder::INT_SLT, $iVal, $depthI32);
+            $context->builder->branchIf($inRange, $bbLoopBody, $bbRetZero);
 
-        $context->builder->positionAtEnd($bbLoopBody);
-        $idxI64 = $context->builder->sext($iVal, $i64);
-        $fnBits = $context->builder->call(
-            self::helperFunction($context, self::FN_OPAQUE_AT_HELPER),
-            $idxI64
-        );
-        $fnNull = $context->builder->icmp(Builder::INT_EQ, $fnBits, $i64->constInt(0, false));
-        $context->builder->branchIf($fnNull, $bbNext, $bbCall);
+            $context->builder->positionAtEnd($bbLoopBody);
+            $idxI64 = $context->builder->sext($iVal, $i64);
+            $fnBits = $context->builder->call(
+                self::helperFunction($context, self::FN_OPAQUE_AT_HELPER),
+                $idxI64
+            );
+            $fnNull = $context->builder->icmp(Builder::INT_EQ, $fnBits, $i64->constInt(0, false));
+            $context->builder->branchIf($fnNull, $bbNext, $bbCall);
 
-        $context->builder->positionAtEnd($bbCall);
-        $fnOpaque = $context->builder->inttoptr($fnBits, $i8p);
-        $cb = $context->builder->pointerCast($fnOpaque, $cbPtrTy);
-        $ret = self::emitIndirectCall($context, $cbFnTy, $cb, $classPtr, $classLen);
-        $ok = $context->builder->icmp(Builder::INT_NE, $ret, $i32->constInt(0, false));
-        $context->builder->branchIf($ok, $bbRetOne, $bbNext);
+            $context->builder->positionAtEnd($bbCall);
+            $fnOpaque = $context->builder->inttoptr($fnBits, $i8p);
+            $cb = $context->builder->pointerCast($fnOpaque, $cbPtrTy);
+            $ret = self::emitIndirectCall($context, $cbFnTy, $cb, $classPtr, $classLen);
+            $ok = $context->builder->icmp(Builder::INT_NE, $ret, $i32->constInt(0, false));
+            $context->builder->branchIf($ok, $bbRetOne, $bbNext);
 
-        $context->builder->positionAtEnd($bbNext);
-        $context->builder->store(
-            $context->builder->add($iVal, $i32->constInt(1, false)),
-            $iSlot
-        );
-        $context->builder->branch($bbLoopHead);
+            $context->builder->positionAtEnd($bbNext);
+            $context->builder->store(
+                $context->builder->add($iVal, $i32->constInt(1, false)),
+                $iSlot
+            );
+            $context->builder->branch($bbLoopHead);
 
-        $context->builder->positionAtEnd($bbRetZero);
-        $context->builder->returnValue($i32->constInt(0, false));
+            $context->builder->positionAtEnd($bbRetZero);
+            $context->builder->returnValue($i32->constInt(0, false));
 
-        $context->builder->positionAtEnd($bbRetOne);
-        $context->builder->returnValue($i32->constInt(1, false));
+            $context->builder->positionAtEnd($bbRetOne);
+            $context->builder->returnValue($i32->constInt(1, false));
+        });
     }
 
     private static function emitIndirectCall(Context $context, $fnTy, Value $fnPtr, Value ...$args): Value

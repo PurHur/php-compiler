@@ -33,7 +33,10 @@ final class JitSplAutoload
     ): Value {
         SplAutoloadOutput::ensureLinked($context);
 
-        return self::applyRegister($context, self::resolveShim($context, $callback), $callback, $prependArg);
+        $shim = self::resolveShim($context, $callback);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'spl_autoload_register_cont');
+
+        return self::applyRegister($context, $shim, $callback, $prependArg);
     }
 
     public static function callbackSnapshot(Context $context): Value
@@ -91,7 +94,10 @@ final class JitSplAutoload
     {
         SplAutoloadOutput::ensureLinked($context);
 
-        return self::applyUnregister($context, self::resolveShim($context, $callback));
+        $shim = self::resolveShim($context, $callback);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'spl_autoload_unregister_cont');
+
+        return self::applyUnregister($context, $shim);
     }
 
     public static function dispatchLiteral(Context $context, string $className): void
@@ -265,23 +271,30 @@ final class JitSplAutoload
         $shimFn = $context->module->addFunction($shimName, $cbFnTy);
         $context->registerFunction($shimName, $shimFn);
 
-        $resumeBlock = $context->builder->getInsertBlock();
-        $entry = $shimFn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
+        $resumeBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        BasicBlockHelper::scopeLoweringToFunction($context, $shimFn, $shimName, static function () use (
+            $context,
+            $shimFn,
+            $userFn,
+            $i32
+        ): void {
+            $entry = $shimFn->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($entry);
 
-        $classPtr = $shimFn->getParam(0);
-        $classLen = $shimFn->getParam(1);
-        $i64 = $context->getTypeFromString('int64');
+            $classPtr = $shimFn->getParam(0);
+            $classLen = $shimFn->getParam(1);
+            $i64 = $context->getTypeFromString('int64');
 
-        $classStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->trunc($classLen, $i64),
-            $classPtr
-        );
+            $classStr = $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $context->builder->trunc($classLen, $i64),
+                $classPtr
+            );
 
-        $context->builder->call($userFn->function, $classStr);
-        $context->builder->returnValue($i32->constInt(1, false));
-        $context->builder->positionAtEnd($resumeBlock);
+            $context->builder->call($userFn->function, $classStr);
+            $context->builder->returnValue($i32->constInt(1, false));
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $resumeBlock);
 
         self::$autoloadShims[$cacheKey] = $shimFn;
 
@@ -305,24 +318,30 @@ final class JitSplAutoload
         $shimFn = $context->module->addFunction($shimName, $cbFnTy);
         $context->registerFunction($shimName, $shimFn);
 
-        $resumeBlock = $context->builder->getInsertBlock();
-        $entry = $shimFn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
+        $resumeBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        BasicBlockHelper::scopeLoweringToFunction($context, $shimFn, $shimName, static function () use (
+            $context,
+            $shimFn,
+            $i32
+        ): void {
+            $entry = $shimFn->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($entry);
 
-        $classPtr = $shimFn->getParam(0);
-        $classLen = $shimFn->getParam(1);
-        $i64 = $context->getTypeFromString('int64');
-        $classStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->trunc($classLen, $i64),
-            $classPtr
-        );
-        $context->builder->call(
-            $context->lookupFunction('spl_autoload'),
-            $classStr
-        );
-        $context->builder->returnValue($i32->constInt(1, false));
-        $context->builder->positionAtEnd($resumeBlock);
+            $classPtr = $shimFn->getParam(0);
+            $classLen = $shimFn->getParam(1);
+            $i64 = $context->getTypeFromString('int64');
+            $classStr = $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $context->builder->trunc($classLen, $i64),
+                $classPtr
+            );
+            $context->builder->call(
+                $context->lookupFunction('spl_autoload'),
+                $classStr
+            );
+            $context->builder->returnValue($i32->constInt(1, false));
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $resumeBlock);
 
         self::$autoloadShims[$cacheKey] = $shimFn;
 
@@ -349,27 +368,35 @@ final class JitSplAutoload
         $shimFn = $context->module->addFunction($shimName, $cbFnTy);
         $context->registerFunction($shimName, $shimFn);
 
-        $resumeBlock = $context->builder->getInsertBlock();
-        $entry = $shimFn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
+        $resumeBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        BasicBlockHelper::scopeLoweringToFunction($context, $shimFn, $shimName, static function () use (
+            $context,
+            $shimFn,
+            $native,
+            $captures,
+            $i32
+        ): void {
+            $entry = $shimFn->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($entry);
 
-        $classPtr = $shimFn->getParam(0);
-        $classLen = $shimFn->getParam(1);
-        $i64 = $context->getTypeFromString('int64');
+            $classPtr = $shimFn->getParam(0);
+            $classLen = $shimFn->getParam(1);
+            $i64 = $context->getTypeFromString('int64');
 
-        $classStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->trunc($classLen, $i64),
-            $classPtr
-        );
+            $classStr = $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $context->builder->trunc($classLen, $i64),
+                $classPtr
+            );
 
-        $llvmArgs = [$classStr];
-        foreach ($captures as $capture) {
-            $llvmArgs[] = $context->helper->loadValue($capture);
-        }
-        $context->builder->call($native->function, ...$llvmArgs);
-        $context->builder->returnValue($i32->constInt(1, false));
-        $context->builder->positionAtEnd($resumeBlock);
+            $llvmArgs = [$classStr];
+            foreach ($captures as $capture) {
+                $llvmArgs[] = $context->helper->loadValue($capture);
+            }
+            $context->builder->call($native->function, ...$llvmArgs);
+            $context->builder->returnValue($i32->constInt(1, false));
+        });
+        BasicBlockHelper::restoreInsertBlock($context, $resumeBlock);
 
         self::$autoloadShims[$cacheKey] = $shimFn;
 
