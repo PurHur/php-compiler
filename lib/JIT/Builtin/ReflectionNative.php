@@ -78,6 +78,24 @@ final class ReflectionNative
         }
 
         $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        foreach (
+            [
+                ['__compiler_param_func_is_variadic', $i1, [$i8p, $i64]],
+                ['__compiler_param_method_is_variadic', $i1, [$i8p, $i8p, $i64]],
+            ] as [$name, $ret, $params]
+        ) {
+            $existing = $context->module->getNamedFunction($name);
+            if (null !== $existing) {
+                $context->registerFunction($name, $existing);
+
+                continue;
+            }
+            $ft = $context->context->functionType($ret, false, ...$params);
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
+
         $variadicAbi = '__compiler_refl_func_is_variadic';
         $existingVariadic = $context->module->getNamedFunction($variadicAbi);
         if (null !== $existingVariadic) {
