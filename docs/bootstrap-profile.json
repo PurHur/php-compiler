@@ -1572,6 +1572,7 @@
         "ext/mbstring/JitMbLanguage.php",
         "ext/mbstring/JitMbMimeheader.php",
         "ext/mbstring/JitMbNumericEntity.php",
+        "ext/mbstring/JitMbOutputHandler.php",
         "ext/mbstring/JitMbParseStr.php",
         "ext/mbstring/JitMbPreferredMimeName.php",
         "ext/mbstring/JitMbRegexEncoding.php",
@@ -1605,6 +1606,7 @@
         "ext/mbstring/MbLanguageJitHelper.php",
         "ext/mbstring/MbMimeheaderJitHelper.php",
         "ext/mbstring/MbNumericEntityJitHelper.php",
+        "ext/mbstring/MbOutputHandlerJitHelper.php",
         "ext/mbstring/MbPreferredMimeNameJitHelper.php",
         "ext/mbstring/MbRegexEncodingJitHelper.php",
         "ext/mbstring/MbRegexOptions.php",
@@ -5977,6 +5979,7 @@
         "lib/JIT/Builtin/MbLanguageRuntime.php",
         "lib/JIT/Builtin/MbMimeheaderRuntime.php",
         "lib/JIT/Builtin/MbNumericEntity.php",
+        "lib/JIT/Builtin/MbOutputHandlerRuntime.php",
         "lib/JIT/Builtin/MbPreferredMimeNameRuntime.php",
         "lib/JIT/Builtin/MbRegexEncodingRuntime.php",
         "lib/JIT/Builtin/MbScrubRuntime.php",
@@ -8196,9 +8199,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7962,
+        "inventory_files": 7965,
         "excluded": 0,
-        "eligible": 7962,
+        "eligible": 7965,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
