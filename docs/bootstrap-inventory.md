@@ -10900,7 +10900,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomGetElementById.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 15 class method(s)
 
 ### `ext/dom/JitDomGetElementsByTagName.php`
 
@@ -11110,7 +11110,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 52)
 - new JITVariable (line 74)
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/dom/JitDomNodeListForeachSnapshot.php`
 
@@ -11203,10 +11203,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 238)
 - new JITVariable (line 239)
 - new JITVariable (line 347)
-- new JITVariable (line 436)
-- new JITVariable (line 455)
-- new JITVariable (line 474)
-- new JITVariable (line 638)
+- new JITVariable (line 438)
+- new JITVariable (line 457)
+- new JITVariable (line 476)
+- new JITVariable (line 640)
 - 12 class method(s)
 
 ### `ext/dom/JitDomReplaceChildLiveSlots.php`
@@ -47701,7 +47701,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/HelperRuntimeCache.php`
 
 **Warnings** (review for bootstrap subset):
-- 43 class method(s)
+- 44 class method(s)
 - 3 closure(s)
 
 ### `lib/AOT/HelperUnitGlobalCtor.php`
