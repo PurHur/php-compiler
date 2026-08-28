@@ -17,8 +17,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathModf #22519).
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\ErrorSilenceJitHelper}; thin LLVM bridges
- * forward the ABI. Thin standalone AOT keeps error_reporting in module globals with a baked E_ALL_LEGACY
- * initializer — NestedJIT PHP statics are BSS-zero and writes do not persist (#35563).
+ * forward the ABI. Thin standalone AOT keeps error_reporting in module globals with a baked
+ * {@see ErrorReporter::DEFAULT_STARTUP_REPORTING} initializer — NestedJIT PHP statics are BSS-zero
+ * and writes do not persist (#35563).
  * Owns begin/end silence + error_reporting ABI module-locally (getNamedFunction first)
  * after Type always-on shells dropped (#32779 / #32122 name.1 class).
  * php-src: Zend/zend_execute.c — ZEND_SILENCE
@@ -140,7 +141,7 @@ final class SilenceRuntime
         self::restoreInsertBlock($context, $restoreBlock);
         $i64 = $context->getTypeFromString('int64');
         $context->builder->store(
-            $i64->constInt(ErrorReporter::E_ALL_LEGACY, false),
+            $i64->constInt(ErrorReporter::DEFAULT_STARTUP_REPORTING, false),
             self::globalPtr($context, self::G_ERROR_REPORTING, $i64)
         );
     }
@@ -335,7 +336,7 @@ final class SilenceRuntime
 
         if (null === $context->module->getNamedGlobal(self::G_ERROR_REPORTING)) {
             $g = $context->module->addGlobal($i64, self::G_ERROR_REPORTING);
-            $g->setInitializer($i64->constInt(ErrorReporter::E_ALL_LEGACY, false));
+            $g->setInitializer($i64->constInt(ErrorReporter::DEFAULT_STARTUP_REPORTING, false));
         }
         if (null === $context->module->getNamedGlobal(self::G_SAVED_ERROR_REPORTING)) {
             $g = $context->module->addGlobal($i64, self::G_SAVED_ERROR_REPORTING);

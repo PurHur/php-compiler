@@ -40,7 +40,7 @@ final class Issue35563ErrorSilenceHelperAotTest extends TestCase
             $stdout = (string) file_get_contents($outFile);
             $this->assertSame(0, $runRc, $stdout);
             $this->assertStringStartsWith("true\n", $stdout);
-            $this->assertMatchesRegularExpression('/\n32767\n$/', $stdout);
+            $this->assertMatchesRegularExpression('/\n22527\n$/', $stdout);
         } finally {
             @unlink($bin);
             @unlink($outFile);
@@ -89,6 +89,6 @@ final class Issue35563ErrorSilenceHelperAotTest extends TestCase
         $src = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/SilenceRuntime.php');
         $this->assertStringContainsString('G_ERROR_REPORTING', $src);
         $this->assertStringContainsString('#35563', $src);
-        $this->assertStringContainsString('E_ALL_LEGACY', $src);
+        $this->assertStringContainsString('DEFAULT_STARTUP_REPORTING', $src);
     }
 }
