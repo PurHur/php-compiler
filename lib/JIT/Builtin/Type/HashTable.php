@@ -173,7 +173,11 @@ class HashTable extends Type
         // Type::register no longer eagerly NestedJIT StringTriggerError (#32122 .1 mint).
         StringTriggerError::declareUndefinedArrayKeyAbis($this->context);
         StringTriggerError::ensureLinked($this->context);
-        $this->ensureStringCompareAbis();
+        // StringNaturalCompare / StringStrcoll always-on ensureLinked removed (#35626):
+        // locale/natural sort implement* call ensureStrcollAbis / ensureNaturalCompareAbis
+        // before lookupFunction (peer #35614 Type::String_::implement lazy batch). Thin
+        // hello-world must not NestedJIT strcoll/strnatcmp during init — leftover HashTable
+        // NestedJIT vs Runtime ABI drift mints strcoll.1 / strnatcmp.1 (#31894 / #32122).
         $this->ensureLibcStrtol();
         $this->implementAlloc();
         $this->implementGrow();
@@ -236,17 +240,25 @@ class HashTable extends Type
     }
 
     /**
-     * Length-aware string compare + PHP natural-order ABIs (#29019).
+     * Locale string compare ABI — only for ksort/asort locale sort implement* (#35626).
+     *
+     * Do not declare empty `strcoll` externs — PHP algorithm owned by {@see StringStrcoll},
+     * not libc. ksort string keys without locale use {@see JitStringCompare::strcmp} (memcmp).
+     */
+    private function ensureStrcollAbis(): void
+    {
+        StringStrcoll::ensureLinked($this->context);
+    }
+
+    /**
+     * PHP natural-order compare ABI — only for natsort implement* (#29019 / #35626).
      *
      * Do not declare empty `strnatcmp`/`strnatcasecmp` externs — those are PHP algorithms
-     * owned by {@see StringNaturalCompare}, not libc. ksort string keys use
-     * {@see JitStringCompare::strcmp} (memcmp); locale sorts use {@see StringStrcoll}.
+     * owned by {@see StringNaturalCompare}, not libc.
      */
-    private function ensureStringCompareAbis(): void
+    private function ensureNaturalCompareAbis(): void
     {
-        LibcExtern::register($this->context);
         StringNaturalCompare::ensureStandaloneBodies($this->context);
-        StringStrcoll::ensureLinked($this->context);
     }
 
     private function implementAlloc(): void
@@ -2329,6 +2341,7 @@ class HashTable extends Type
 
     private function implementSortStringKeysLocale(): void
     {
+        $this->ensureStrcollAbis();
         $fn = $this->context->lookupFunction('__hashtable__sortStringKeysLocale');
         $main = $fn->appendBasicBlock('main');
         $this->context->builder->positionAtEnd($main);
@@ -2714,6 +2727,7 @@ class HashTable extends Type
 
     private function implementSortStringKeyValuesLocale(): void
     {
+        $this->ensureStrcollAbis();
         $fn = $this->context->lookupFunction('__hashtable__sortStringKeyValuesLocale');
         $main = $fn->appendBasicBlock('main');
         $this->context->builder->positionAtEnd($main);
@@ -2869,6 +2883,7 @@ class HashTable extends Type
 
     private function implementSortStringKeyValuesNatural(): void
     {
+        $this->ensureNaturalCompareAbis();
         $fn = $this->context->lookupFunction('__hashtable__sortStringKeyValuesNatural');
         $main = $fn->appendBasicBlock('main');
         $this->context->builder->positionAtEnd($main);
@@ -2994,6 +3009,7 @@ class HashTable extends Type
 
     private function implementSortStringKeyValuesNaturalCase(): void
     {
+        $this->ensureNaturalCompareAbis();
         $fn = $this->context->lookupFunction('__hashtable__sortStringKeyValuesNaturalCase');
         $main = $fn->appendBasicBlock('main');
         $this->context->builder->positionAtEnd($main);
@@ -3408,6 +3424,7 @@ class HashTable extends Type
      */
     private function implementSortPackedNatural(bool $caseInsensitive): void
     {
+        $this->ensureNaturalCompareAbis();
         $abi = $caseInsensitive
             ? '__hashtable__sortPackedNaturalCase'
             : '__hashtable__sortPackedNatural';

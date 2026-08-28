@@ -14,9 +14,11 @@ final class HashTableCompareRuntimeShrinkTest extends TestCase
     public function testHashTableDoesNotDeclareEmptyStrnatLibcExterns(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
-        $this->assertStringContainsString('ensureStringCompareAbis', $source);
+        $this->assertStringContainsString('ensureStrcollAbis', $source);
+        $this->assertStringContainsString('ensureNaturalCompareAbis', $source);
         $this->assertStringContainsString('StringNaturalCompare::ensureStandaloneBodies', $source);
         $this->assertStringContainsString('StringStrcoll::ensureLinked', $source);
+        $this->assertStringContainsString('#35626', $source);
         $this->assertStringNotContainsString('ensureLibcStringCompare', $source);
         $this->assertStringNotContainsString("addFunction('strnatcmp'", $source);
         $this->assertStringNotContainsString("addFunction('strnatcasecmp'", $source);
