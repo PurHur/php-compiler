@@ -264,6 +264,83 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
         );
     }
 
+    public function testUnitObjectIsLinkableRejectsZeroByteObject(): void
+    {
+        $root = \dirname(__DIR__, 3);
+        $unitDir = \sys_get_temp_dir().'/phpc_helper_unit_'.bin2hex(random_bytes(4));
+        mkdir($unitDir);
+        try {
+            touch($unitDir.'/unit.o');
+            $this->assertFalse(HelperRuntimeCache::unitObjectIsLinkable($unitDir));
+
+            $prelinked = $root.'/prelinked/helper-runtime/x86_64-linux/units/ext_standard_ArrayIsListJitHelper_php';
+            $this->assertFileExists($prelinked.'/unit.o');
+            $this->assertTrue(HelperRuntimeCache::unitObjectIsLinkable($prelinked));
+        } finally {
+            @unlink($unitDir.'/unit.o');
+            @rmdir($unitDir);
+        }
+    }
+
+    /**
+     * @runInSeparateProcess
+     */
+    public function testHelperIndexFallsBackToPrelinkedWhenBuildCacheObjectEmpty(): void
+    {
+        $root = \dirname(__DIR__, 3);
+        $slug = 'ext_standard_ArrayIsListJitHelper_php';
+        $prelinkedDir = $root.'/prelinked/helper-runtime/x86_64-linux/units/'.$slug;
+        if (!is_dir($prelinkedDir) || !is_file($prelinkedDir.'/manifest.json')) {
+            $this->markTestSkipped('prelinked ArrayIsListJitHelper unit missing');
+        }
+        $fakeUnitsRoot = \sys_get_temp_dir().'/phpc_helper_units_'.bin2hex(random_bytes(4));
+        $buildDir = $fakeUnitsRoot.'/'.$slug;
+        mkdir($buildDir, 0775, true);
+        try {
+            copy($prelinkedDir.'/manifest.json', $buildDir.'/manifest.json');
+            copy($prelinkedDir.'/unit.bc', $buildDir.'/unit.bc');
+            touch($buildDir.'/unit.o');
+
+            $ref = new \ReflectionClass(HelperRuntimeCache::class);
+            $unitsProp = $ref->getProperty('helperIndex');
+            $unitsProp->setAccessible(true);
+            $unitsProp->setValue(null, null);
+
+            $scan = $ref->getMethod('helperIndex');
+            $scan->setAccessible(true);
+
+            // Mirror helperIndex scan: empty build unit.o must not win over prelinked.
+            $index = [];
+            foreach ([$fakeUnitsRoot, $root.'/prelinked/helper-runtime/x86_64-linux/units'] as $unitsRoot) {
+                foreach (glob($unitsRoot.'/*/manifest.json') ?: [] as $manifestPath) {
+                    $unitDir = \dirname($manifestPath);
+                    $manifest = json_decode((string) file_get_contents($manifestPath), true);
+                    if (!\is_array($manifest) || !isset($manifest['helpers'])) {
+                        continue;
+                    }
+                    if (!HelperRuntimeCache::unitObjectIsLinkable($unitDir) || !is_file($unitDir.'/unit.bc')) {
+                        continue;
+                    }
+                    foreach ($manifest['helpers'] as $logical => $symbol) {
+                        if (isset($index[$logical])) {
+                            continue;
+                        }
+                        $index[$logical] = $unitDir;
+                    }
+                }
+            }
+            $logical = 'phpcompiler\\ext\\standard\\arrayislistjithelper::islist';
+            $this->assertArrayHasKey($logical, $index);
+            $this->assertSame($prelinkedDir, $index[$logical]);
+        } finally {
+            @unlink($buildDir.'/unit.o');
+            @unlink($buildDir.'/unit.bc');
+            @unlink($buildDir.'/manifest.json');
+            @rmdir($buildDir);
+            @rmdir($fakeUnitsRoot);
+        }
+    }
+
     private function fingerprintViaSubprocess(string $root, string $unitFile, string $llvmPath): string
     {
         $php = escapeshellarg(PHP_BINARY);
