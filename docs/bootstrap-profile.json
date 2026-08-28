@@ -3622,6 +3622,7 @@
         "ext/standard/SessionGcJitHelper.php",
         "ext/standard/SessionNameJitHelper.php",
         "ext/standard/SessionStartOptions.php",
+        "ext/standard/SessionStartOptionsAotJitHelper.php",
         "ext/standard/SessionStartOptionsJitHelper.php",
         "ext/standard/SessionStorageJitHelper.php",
         "ext/standard/SetcookieLine.php",
@@ -8215,9 +8216,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7981,
+        "inventory_files": 7982,
         "excluded": 0,
-        "eligible": 7981,
+        "eligible": 7982,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
