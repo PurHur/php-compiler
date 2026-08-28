@@ -9469,6 +9469,7 @@ class JIT {
                     $this->markAssignRefLvalueAlias($srcVar);
                     $this->context->bindVariableByName($destName, $srcVar);
                     $this->context->setVariableOp($destOp, $srcVar);
+                    JIT\UndefinedVariableHelper::markAssigned($this->context, $destOp, $srcVar);
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL:
                     if (!isset($block->constants[$op->arg2])) {
@@ -11375,6 +11376,10 @@ class JIT {
                         $unsetName = JIT\OperandName::resolve($targetOp);
                         if (null !== $unsetName && '' !== $unsetName) {
                             $resolvedUnset = $this->context->resolveRefAliasName($unsetName);
+                            $foreachByRefUnset = $this->context->isForeachByRefLocalName(
+                                $resolvedUnset,
+                                $block
+                            );
                             if (isset($this->context->namedVariableBindings[$resolvedUnset])) {
                                 $bound = $this->context->namedVariableBindings[$resolvedUnset];
                                 // foreach ($a as &$v); unset($v) breaks the reference — it must not
@@ -11383,6 +11388,7 @@ class JIT {
                                     $bound->borrowedValueEntry
                                     || null !== $bound->foreachByRefPackedArm
                                     || isset($this->context->foreachByRefLocalNames[$resolvedUnset])
+                                    || $foreachByRefUnset
                                 ) {
                                     $nullVar = $this->jitNullVariable();
                                     $this->context->bindVariableByName($resolvedUnset, $nullVar);
@@ -11422,6 +11428,14 @@ class JIT {
                                     );
                                     break;
                                 }
+                            } elseif ($foreachByRefUnset) {
+                                // Block order may compile unset before the foreach body; CFG scan
+                                // still knows $v is a foreach-by-ref dest (#24010 / i11 differential).
+                                $nullVar = $this->jitNullVariable();
+                                $this->context->bindVariableByName($resolvedUnset, $nullVar);
+                                $this->context->setVariableOp($targetOp, $nullVar);
+                                unset($this->context->foreachByRefLocalNames[$resolvedUnset]);
+                                break;
                             }
                         }
                         if (
@@ -11435,6 +11449,14 @@ class JIT {
                             if (
                                 $target->borrowedValueEntry
                                 || null !== $target->foreachByRefPackedArm
+                                || (
+                                    null !== $unsetName
+                                    && '' !== $unsetName
+                                    && $this->context->isForeachByRefLocalName(
+                                        $this->context->resolveRefAliasName($unsetName),
+                                        $block
+                                    )
+                                )
                             ) {
                                 $nullVar = $this->jitNullVariable();
                                 $this->context->setVariableOp($targetOp, $nullVar);
