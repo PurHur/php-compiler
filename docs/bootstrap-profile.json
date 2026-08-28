@@ -437,6 +437,7 @@
         "ext/dom/JitDomAppendChildLiveSlots.php",
         "ext/dom/JitDomAppendChildUserScript.php",
         "ext/dom/JitDomAppendData.php",
+        "ext/dom/JitDomAttrChildEdgeFetch.php",
         "ext/dom/JitDomAttrRename.php",
         "ext/dom/JitDomAttributeNodeNS.php",
         "ext/dom/JitDomC14N.php",
@@ -519,6 +520,7 @@
         "ext/dom/JitDomSetIdAttribute.php",
         "ext/dom/JitDomSplitText.php",
         "ext/dom/JitDomStandaloneAotInitKernel.php",
+        "ext/dom/JitDomStandinGetClass.php",
         "ext/dom/JitDomSubstringData.php",
         "ext/dom/JitDomXPathEvaluate.php",
         "ext/dom/JitDomXPathEvaluateUserScript.php",
@@ -8209,9 +8211,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7975,
+        "inventory_files": 7977,
         "excluded": 0,
-        "eligible": 7975,
+        "eligible": 7977,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -8103,4 +8103,6 @@ require_once __DIR__.'/../../../ext/zip/ZipArchiveJitHelper.php';
 require_once __DIR__.'/../../../ext/zip/ZipArchiveJitSupport.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ZipArchiveEmbedBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ZipArchiveMethod.php';
+require_once __DIR__.'/../../../ext/dom/JitDomAttrChildEdgeFetch.php';
+require_once __DIR__.'/../../../ext/dom/JitDomStandinGetClass.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
