@@ -2625,13 +2625,18 @@ return_bool:
 
             return $variable->value;
         }
-        // Assigned locals may keep {@code __object__*} / {@code __string__*} in the slot
-        // (not {@code __object__**}) — an extra load structGeps the wrong address (#32540).
+        // LLVM formals (KIND_VALUE) already hold {@code __object__*} / {@code __string__*}
+        // rvalues — reload would treat the pointer as a slot address (#32540).
+        // KIND_VARIABLE stack slots are {@code __object__**} allocas: must load (#24429 typed
+        // param get_class/::class/instanceof saw the alloca address, not the object).
         $storageTy = $this->context->getStringFromType($variable->value->typeOf());
         if (
-            '__object__*' === $storageTy
-            || '__string__*' === $storageTy
-            || '__hashtable__*' === $storageTy
+            Variable::KIND_VALUE === $variable->kind
+            && (
+                '__object__*' === $storageTy
+                || '__string__*' === $storageTy
+                || '__hashtable__*' === $storageTy
+            )
         ) {
             return $variable->value;
         }
