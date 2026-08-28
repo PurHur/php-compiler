@@ -401,38 +401,15 @@ final class TryCatchHelper
             self::clearGotoPendingSlot($context, $func);
         }
         $mergeHeaderBb = $context->scope->blockStorage[$mergeBlock] ?? null;
-        if (!$handler->mergeBodyCompiled) {
-            if (null === $mergeHeaderBb) {
-                $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
-            }
-            $context->scope->blockStorage[$mergeBlock] = $mergeHeaderBb;
-            $context->scope->blockEntryStorage[$mergeBlock] = $mergeHeaderBb;
+        if (null === $mergeHeaderBb) {
+            $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+        }
+        $context->scope->blockStorage[$mergeBlock] = $mergeHeaderBb;
+        $context->scope->blockEntryStorage[$mergeBlock] = $mergeHeaderBb;
+        $mergeBodyBb = $handler->mergeBodyLlvmBb;
+        if (null === $mergeBodyBb) {
             $mergeBodyBb = self::appendBlock($func, 'try_merge_body_'.self::blockSuffix($handler));
             $handler->mergeBodyLlvmBb = $mergeBodyBb;
-            if (null === $mergeBodyBb->getTerminator()) {
-                // Detach this try while lowering the merge: php-cfg puts a following
-                // sibling try/catch in the same end block (#4041 / #23930). If this
-                // handler stays on the throw stack, the nested try is compiled as an
-                // inner EH region and the outer catch body is skipped / sees the wrong
-                // exception at runtime.
-                $savedThrowHandlerStack = $context->tryCatch->handlerStack;
-                self::detachHandlerFromThrowStack($context, $handler);
-                try {
-                    $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBodyBb);
-                } finally {
-                    $context->tryCatch->handlerStack = $savedThrowHandlerStack;
-                }
-            }
-            $builder->positionAtEnd($mergeHeaderBb);
-            if (null === $mergeHeaderBb->getTerminator()) {
-                $builder->branch($mergeBodyBb);
-            }
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'try_merge_after_compile');
-            $handler->mergeBodyCompiled = true;
-        } elseif (null === $mergeHeaderBb) {
-            $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
-            $context->scope->blockStorage[$mergeBlock] = $mergeHeaderBb;
-            $context->scope->blockEntryStorage[$mergeBlock] = $mergeHeaderBb;
         }
         $mergeBb = $mergeHeaderBb;
         $builder->positionAtEnd($branchBlock);
@@ -446,7 +423,47 @@ final class TryCatchHelper
         if (null !== $handler->finallyOp) {
             self::ensureFinallyLowering($jit, $func, $context, $handler, $args);
         }
-        self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args);
+        // Wire merge entry before lowering post-try merge opcodes: DOMAttr::isId() NestedJIT
+        // during merge compile must not leave try-body fallthrough orphaned (#25841).
+        self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args, $handler);
+        if (!$handler->mergeBodyCompiled) {
+            if (null === $mergeBodyBb->getTerminator()) {
+                // Detach this try while lowering the merge: php-cfg puts a following
+                // sibling try/catch in the same end block (#4041 / #23930). If this
+                // handler stays on the throw stack, the nested try is compiled as an
+                // inner EH region and the outer catch body is skipped / sees the wrong
+                // exception at runtime.
+                $savedThrowHandlerStack = $context->tryCatch->handlerStack;
+                self::detachHandlerFromThrowStack($context, $handler);
+                // Post-try merge is compiled via compileIncludedAtEntry with inlineIncludeDepth=0;
+                // without syntheticCfgBranch, sealFunction emits ret void on the open tail and
+                // DOMAttr::isId() (NestedJIT bridge) in the merge never runs (#25841).
+                $savedMergeSynthetic = $handler->mergeBlock->syntheticCfgBranch ?? false;
+                $handler->mergeBlock->syntheticCfgBranch = true;
+                ++$context->inlineIncludeDepth;
+                try {
+                    $mergeLimit = self::mergeOpcodeLimit($handler->mergeBlock);
+                    if ($mergeLimit > 0) {
+                        $jit->compileIncludedAtEntry(
+                            $func,
+                            $handler->mergeBlock,
+                            $mergeBodyBb,
+                            $mergeLimit
+                        );
+                    }
+                } finally {
+                    --$context->inlineIncludeDepth;
+                    $handler->mergeBlock->syntheticCfgBranch = $savedMergeSynthetic;
+                    $context->tryCatch->handlerStack = $savedThrowHandlerStack;
+                }
+            }
+            $builder->positionAtEnd($mergeHeaderBb);
+            if (null === $mergeHeaderBb->getTerminator()) {
+                $builder->branch($mergeBodyBb);
+            }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'try_merge_after_compile');
+            $handler->mergeBodyCompiled = true;
+        }
         $savedTrySynthetic = $tryOp->block1->syntheticCfgBranch;
         $tryOp->block1->syntheticCfgBranch = true;
         // Prefer the live LLVM tail from compileSubBlock: property-store guards
@@ -454,7 +471,7 @@ final class TryCatchHelper
         // blockStorage[tryBody] entry, so sealing that entry alone leaves the real
         // continuation unterminated and sealFunction later emits `ret void` — AOT
         // then exits after a successful `$obj->prop = …` inside try (#28078).
-        $tryTail = $jit->compileSubBlock($func, $tryOp->block1, ...$args);
+        $tryTail = $jit->compileTrySubBlock($func, $tryOp->block1, $args);
         $tryOp->block1->syntheticCfgBranch = $savedTrySynthetic;
         $elseExit = self::tryBodyTrailingJumpTarget($tryOp->block1);
         $elseEntryBb = null;
@@ -644,9 +661,12 @@ final class TryCatchHelper
         Context $context,
         Block $mergeCfgBlock,
         BasicBlock $mergeBb,
-        array $args
+        array $args,
+        ?TryCatchHandler $handler = null
     ): void {
-        $handler = $context->tryCatch->mergeHandlers[spl_object_id($mergeCfgBlock)] ?? null;
+        if (null === $handler) {
+            $handler = $context->tryCatch->mergeHandlers[spl_object_id($mergeCfgBlock)] ?? null;
+        }
         if (null === $handler || $handler->mergeEntryEmitted) {
             return;
         }
@@ -1606,6 +1626,22 @@ final class TryCatchHelper
         }
 
         return $count;
+    }
+
+    /**
+     * Post-try merge must not lower a sibling try/catch in the same php-cfg end block (#4041 / #23930).
+     */
+    public static function mergeOpcodeLimit(Block $mergeBlock): int
+    {
+        $n = $mergeBlock->nOpCodes;
+        for ($i = 0; $i < $n; ++$i) {
+            $type = $mergeBlock->opCodes[$i]->type;
+            if (OpCode::TYPE_TRY === $type || OpCode::TYPE_CATCH === $type || OpCode::TYPE_FINALLY === $type) {
+                return $i;
+            }
+        }
+
+        return $n;
     }
 
     /**
