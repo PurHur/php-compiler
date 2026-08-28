@@ -124,15 +124,32 @@ final class JitBuiltinWarning
         $i32 = $context->getTypeFromString('int32');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
         $msgLen = $sizeT->constInt(\strlen($message), false);
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
             $msgLen,
             $i32->constInt($level, false),
-            $emptyFile,
-            $i32->constInt(0, false)
+            self::errorTriggerFilePtr($context),
+            self::errorTriggerLineVal($context)
         );
+    }
+
+    private static function errorTriggerFilePtr(Context $context): Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $path = $context->jitAotEntryScriptPath;
+
+        return $context->builder->pointerCast(
+            $context->constantFromString('' !== $path ? $path : 'Standard input code'),
+            $i8p
+        );
+    }
+
+    private static function errorTriggerLineVal(Context $context): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+
+        return $i32->constInt(max(0, $context->callSiteLine), false);
     }
 
     public static function emitPathOpenFailed(Context $context, Value $pathStr, string $function): void
