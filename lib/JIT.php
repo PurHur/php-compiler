@@ -8175,6 +8175,24 @@ class JIT {
     }
 
     /**
+     * Try-body lowering after catch dispatch may have seeded blockStorage (#4041 / #25841).
+     *
+     * @param list<Variable> $args
+     */
+    public function compileTrySubBlock(
+        PHPLLVM\Value $func,
+        Block $block,
+        array $args
+    ): PHPLLVM\BasicBlock {
+        $limit = $block->nOpCodes;
+        if ($limit > 0 && OpCode::TYPE_JUMP === $block->opCodes[$limit - 1]->type) {
+            --$limit;
+        }
+
+        return $this->compileBlockInternal($func, $block, $limit, null, 0, true, ...$args);
+    }
+
+    /**
      * Lower a ?? / ??= arm at a pre-built entry BB after the test BB is sealed (#32880).
      *
      * Compiling arms before {@see Builder::branchIf} leaves the test BB open; NestedJIT /
@@ -8203,12 +8221,13 @@ class JIT {
     public function compileIncludedAtEntry(
         PHPLLVM\Value $func,
         Block $block,
-        PHPLLVM\BasicBlock $entryBlock
+        PHPLLVM\BasicBlock $entryBlock,
+        ?int $opcodeLimit = null
     ): PHPLLVM\BasicBlock {
-        $limit = $this->includedAtEntryOpcodeLimit($block);
+        $limit = $opcodeLimit ?? $this->includedAtEntryOpcodeLimit($block);
 
         $this->context->inlineIncludeExitBlock = null;
-        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock);
+        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, true);
         if (null !== $this->context->inlineIncludeExitBlock) {
             $exit = $this->context->inlineIncludeExitBlock;
         }
@@ -8585,13 +8604,19 @@ class JIT {
             $storageStale = !($existingParent instanceof PHPLLVM\Value\Function_
                 && JIT\TryCatchHelper::sameLlvmFunction($existingParent, $func));
         }
-        if (!$this->context->scope->blockStorage->contains($block) || null === $entryBlock || $storageStale) {
+        if (
+            !$this->context->scope->blockStorage->contains($block)
+            || null === $entryBlock
+            || $storageStale
+            || $allowRecompile
+        ) {
             $this->context->scope->blockStorage[$block] = $basicBlock;
         }
         if (
             !$this->context->scope->blockEntryStorage->contains($block)
             || null === $entryBlock
             || $storageStale
+            || $allowRecompile
         ) {
             $this->context->scope->blockEntryStorage[$block] = $basicBlock;
         }
