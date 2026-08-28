@@ -394,8 +394,8 @@ final class JitForwardStaticCall
             if (null !== $slot) {
                 // ['Class','method'] — peer #35090 / VmBoundMethodCallable (#35110).
                 $staticSlots = VmBoundMethodCallable::resolveStaticArrayCallableSlots($block, $slot);
-                if (null !== $staticSlots && isset($block->constants[$staticSlots[0]])) {
-                    $className = $block->constants[$staticSlots[0]]->toString();
+                if (null !== $staticSlots && isset($staticSlots[2]->constants[$staticSlots[0]])) {
+                    $className = $staticSlots[2]->constants[$staticSlots[0]]->toString();
 
                     return '' !== $className ? $className : null;
                 }

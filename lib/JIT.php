@@ -25524,7 +25524,7 @@ class JIT {
         if (null === $slots) {
             return false;
         }
-        $this->initJitStaticCall($block, $slots[0], $slots[1], false, true);
+        $this->initJitStaticCall($slots[2], $slots[0], $slots[1], false, true);
 
         return true;
     }

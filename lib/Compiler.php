@@ -13107,6 +13107,8 @@ class Compiler {
 
     protected function compileFunction(Op\Stmt\Function_ $function, Block $block): OpCode {
         $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params, $function->func);
+        // Decl-scope link for compile-time call-site traces (callable $c — not a CFG parent; #13686).
+        $funcBlock->enclosingDeclBlocks[] = $block;
         NoDiscardMetadata::applyToBlock($funcBlock, $function);
         DeprecatedMetadata::applyToBlock($funcBlock, $function);
         $this->markGeneratorIfNeeded($function, $funcBlock);

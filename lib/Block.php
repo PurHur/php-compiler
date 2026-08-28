@@ -37,6 +37,13 @@ class Block {
     /** @var Block[] CFG parent blocks (filled during compilation) */
     public array $parents = [];
 
+    /**
+     * Declaring CFG blocks for nested FUNCDEF bodies — not CFG predecessors (#13686).
+     *
+     * @var Block[]
+     */
+    public array $enclosingDeclBlocks = [];
+
     public int $nOpCodes = 0;
 
     public ?Func $func = null;

@@ -58,8 +58,9 @@ final class ArrayCallableStatic32299AotTest extends TestCase
                     continue;
                 }
                 $found = true;
-                $this->assertSame('C', $block->constants[$slots[0]]->toString());
-                $this->assertSame('m', $block->constants[$slots[1]]->toString());
+                $constBlock = $slots[2];
+                $this->assertSame('C', $constBlock->constants[$slots[0]]->toString());
+                $this->assertSame('m', $constBlock->constants[$slots[1]]->toString());
             }
             foreach ($block->blocks as $child) {
                 $queue[] = $child;
