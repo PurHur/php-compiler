@@ -33,6 +33,11 @@ final class ListUnpackJitHelper
         if (135 === $typeByte) {
             return true;
         }
+        // NestedJIT `$v->type` masks the value-box tag with 0x7f (#21921) — JIT hashtable
+        // is kind 7, not the full TYPE_HASHTABLE byte 135 (#33945 session_start options).
+        if (7 === $typeByte) {
+            return true;
+        }
 
         return false;
     }
