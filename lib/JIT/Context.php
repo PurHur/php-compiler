@@ -2098,6 +2098,7 @@ class Context {
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
             $this->functionProxies['reflectionparameter::issensitiveparameter'] = new Call\ReflectionParameterIsSensitiveParameter();
         }
+        $this->functionProxies['reflectionparameter::isvariadic'] = new Call\ReflectionParameterIsVariadic();
         if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
             $this->functionProxies['reflectionfunction::getnamedarguments'] = new Call\ReflectionFunctionGetNamedArguments();
             $this->functionProxies['reflectionmethod::getnamedarguments'] = new Call\ReflectionMethodGetNamedArguments();
@@ -3018,6 +3019,7 @@ class Context {
         }
         Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
         Builtin\ParamSensitiveLowering::implementLookupFunctions($this);
+        Builtin\ParamVariadicLowering::implementLookupFunctions($this);
         Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
         Builtin\ReflectionFunctionVariadicLowering::implementLookupFunctions($this);
         Builtin\ReflectionFunctionParamCountLowering::implementLookupFunctions($this);
