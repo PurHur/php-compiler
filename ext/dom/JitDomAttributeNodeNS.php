@@ -1267,6 +1267,11 @@ final class JitDomAttributeNodeNS
                     JitDomLoadHTMLUserScript::rememberCompileTimeParsed($parsed);
                 }
             }
+            $hostToken = $args[0]->compileTimeDomImportHostSxeToken
+                ?? JitDomImportSimpleXmlUserScript::lastHostImportToken();
+            if (null !== $hostToken) {
+                JitDomImportSimpleXmlUserScript::syncHostSimpleXmlAttribute($context, $hostToken, $nameLit, $valueLit);
+            }
 
             return self::boxObjectResult($context, $attr);
         }

@@ -15392,6 +15392,12 @@ class JIT {
                             $this->context->getVariableFromOp($obj)
                         );
                         $this->stampPropertyFetchReceiverOp($fetched, $obj);
+                        if ($this->context->hasVariableOp($obj)) {
+                            $recvVar = $this->context->getVariableFromOp($obj);
+                            if (null !== $recvVar->compileTimeDomImportHostSxeToken) {
+                                $fetched->compileTimeDomImportHostSxeToken = $recvVar->compileTimeDomImportHostSxeToken;
+                            }
+                        }
                         JIT\BasicBlockHelper::repositionToLastOpenIfInsertLost($this->context);
                         if ($forDimWrite) {
                             // BP_VAR_W auto-init (#31770); BP_VAR_RW ++/+= must Error (#31784).
@@ -17825,6 +17831,8 @@ class JIT {
             ) {
                 $this->context->namedVariableBindings[$resolved]->compileTimeDomAttributes
                     = $var->compileTimeDomAttributes;
+                $this->context->namedVariableBindings[$resolved]->compileTimeDomImportHostSxeToken
+                    = $var->compileTimeDomImportHostSxeToken;
                 $this->context->namedVariableBindings[$resolved]->classUserType = 'DOMElement';
             }
             $this->context->bindVariableByName($resolved, $var);
@@ -22603,6 +22611,9 @@ class JIT {
         }
         if ($force || null !== $src->compileTimeDomNodeListLength) {
             $dest->compileTimeDomNodeListLength = $src->compileTimeDomNodeListLength;
+        }
+        if ($force || null !== $src->compileTimeDomImportHostSxeToken) {
+            $dest->compileTimeDomImportHostSxeToken = $src->compileTimeDomImportHostSxeToken;
         }
     }
 
@@ -30648,6 +30659,9 @@ class JIT {
         }
         if (null !== $source->compileTimeDomLoadXml && null === $dest->compileTimeDomLoadXml) {
             $dest->compileTimeDomLoadXml = $source->compileTimeDomLoadXml;
+        }
+        if (null !== $source->compileTimeDomImportHostSxeToken && null === $dest->compileTimeDomImportHostSxeToken) {
+            $dest->compileTimeDomImportHostSxeToken = $source->compileTimeDomImportHostSxeToken;
         }
         $this->foldCompileTimeStringFromSlot($block, $sourceSlot, $dest);
     }

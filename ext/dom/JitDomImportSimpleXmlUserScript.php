@@ -34,6 +34,12 @@ final class JitDomImportSimpleXmlUserScript
     /** @var array<string, string>|null */
     private static ?array $pendingImportAttributes = null;
 
+    /** Host SXE compile-time token passed to dom_import_simplexml() (#20137). */
+    private static ?string $pendingImportHostSxeToken = null;
+
+    /** Last import host token — method-call receivers may drop compile-time stamps (#20137). */
+    private static ?string $lastHostImportToken = null;
+
     public static function tryImport(Context $context, JITVariable ...$args): ?Value
     {
         return self::tryImportInternal($context, false, ...$args);
@@ -162,6 +168,7 @@ final class JitDomImportSimpleXmlUserScript
         // compileTimeDomAttributes; stamp lastFetched for getAttribute (#34413).
         JitDomNodeChildProperty::$lastFetchedAttributes = $attrMap;
         self::$pendingImportAttributes = $attrMap;
+        self::$pendingImportHostSxeToken = JitSimpleXmlUserScript::ensureCompileTimeToken($args[0], $host);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
@@ -182,7 +189,40 @@ final class JitDomImportSimpleXmlUserScript
         $result->compileTimeDomAttributes = self::$pendingImportAttributes;
         JitDomNodeChildProperty::$lastFetchedAttributes = self::$pendingImportAttributes;
         self::$pendingImportAttributes = null;
+        $hostToken = self::$pendingImportHostSxeToken;
+        self::$pendingImportHostSxeToken = null;
+        if (null !== $hostToken && '' !== $hostToken) {
+            $result->compileTimeDomImportHostSxeToken = $hostToken;
+            self::$lastHostImportToken = $hostToken;
+        }
 
         return true;
+    }
+
+    public static function lastHostImportToken(): ?string
+    {
+        return self::$lastHostImportToken;
+    }
+
+    /** Mirror DOM textContent write onto the linked host SimpleXMLElement (#20137). */
+    public static function syncHostSimpleXmlText(Context $context, ?string $hostToken, string $text): void
+    {
+        if (null === $hostToken || '' === $hostToken) {
+            return;
+        }
+        JitSimpleXmlUserScript::syncHostTreeTextContent($context, $hostToken, $text);
+    }
+
+    /** Mirror DOM setAttribute onto the linked host SimpleXMLElement (#20137). */
+    public static function syncHostSimpleXmlAttribute(
+        Context $context,
+        ?string $hostToken,
+        string $name,
+        string $value
+    ): void {
+        if (null === $hostToken || '' === $hostToken || '' === $name) {
+            return;
+        }
+        JitSimpleXmlUserScript::syncHostTreeAttribute($context, $hostToken, $name, $value);
     }
 }
