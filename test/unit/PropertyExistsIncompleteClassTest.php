@@ -51,7 +51,7 @@ final class PropertyExistsIncompleteClassTest extends TestCase
         NativeLastError::clear();
         Superglobals::setActiveContext($ctx);
         try {
-            $this->assertFalse(PropertyExistsJitHelper::existsArgv($var, 'v'));
+            $this->assertSame(0, PropertyExistsJitHelper::existsArgv($var, 'v'));
             $this->assertTrue(ErrorLastJitHelper::isActive());
             $this->assertStringStartsWith(
                 'property_exists(): The script tried to access a property on an incomplete object.',
