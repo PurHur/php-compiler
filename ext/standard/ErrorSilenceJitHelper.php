@@ -14,6 +14,14 @@ use PHPCompiler\VM\ErrorReporter;
  */
 final class ErrorSilenceJitHelper
 {
+    /**
+     * Zend startup error_reporting for compiled modules — bake the mask; do not call
+     * {@see ErrorReporter::defaultStartupReporting()} at runtime (#35563). That path reaches
+     * {@see \PHPCompiler\CompilerVersion::languageProfileVersion()} which is null on thin AOT,
+     * so eAll() / defaultStartupReporting() collapse to null and silence every stderr gate.
+     */
+    private const COMPILED_DEFAULT_ERROR_REPORTING = ErrorReporter::E_ALL_LEGACY;
+
     private static ?int $errorReporting = null;
 
     private static int $silenceDepth = 0;
@@ -22,9 +30,31 @@ final class ErrorSilenceJitHelper
 
     private static bool $displayErrors = false;
 
+    /**
+     * NestedJIT under thin AOT does not apply PHP static property defaults (BSS-zero) (#33059, #35563).
+     * Nullable {@see $errorReporting} reads as 0, so {@code ??=} never seeds Zend startup mask.
+     */
+    private static bool $compiledModuleDefaultsSeeded = false;
+
+    /**
+     * Seed compiled-module error_reporting before first gate — trigger_error may run before ini_get (#35563).
+     *
+     * php-src: main/php_ini.c PG(error_reporting) startup default; VM uses {@see ErrorReporter}.
+     */
+    public static function ensureCompiledModuleDefaults(): void
+    {
+        if (self::$compiledModuleDefaultsSeeded) {
+            return;
+        }
+        self::$compiledModuleDefaultsSeeded = true;
+        self::$errorReporting = self::COMPILED_DEFAULT_ERROR_REPORTING;
+    }
+
     private static function currentErrorReporting(): int
     {
-        return self::$errorReporting ??= ErrorReporter::defaultStartupReporting();
+        self::ensureCompiledModuleDefaults();
+
+        return self::$errorReporting ?? self::COMPILED_DEFAULT_ERROR_REPORTING;
     }
 
     public static function beginSilence(): void
@@ -75,6 +105,7 @@ final class ErrorSilenceJitHelper
 
     public static function setErrorReporting(int $level): void
     {
+        self::ensureCompiledModuleDefaults();
         self::$errorReporting = $level;
     }
 
@@ -96,6 +127,7 @@ final class ErrorSilenceJitHelper
 
     public static function iniRestoreErrorReporting(): void
     {
-        self::$errorReporting = ErrorReporter::defaultStartupReporting();
+        self::$compiledModuleDefaultsSeeded = true;
+        self::$errorReporting = self::COMPILED_DEFAULT_ERROR_REPORTING;
     }
 }

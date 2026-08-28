@@ -75,6 +75,9 @@ final class SilenceRuntime
             // Prior NestedJIT ensureLinked may have built silence bridges while
             // StreamLifecycle no-op'd under NestedJitCompileScope (#35392 / #33248 O=0).
             StreamLifecycleRuntime::ensureLinked($context);
+            self::ensureJitHelperCompiled($context);
+            self::implementErrorLevelEnabledBridge($context);
+            self::implementErrorReportingBridge($context);
             self::registerLinkedRuntime($context);
 
             return;
