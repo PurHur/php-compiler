@@ -10,6 +10,7 @@ use PHPCompiler\ext\dom\DomExceptionConstants;
 use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
 use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomCreateElement;
+use PHPCompiler\ext\dom\JitDomCreateElementAttrs;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomCloneNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
@@ -1102,9 +1103,19 @@ final class DomNodeLiveMutationRuntime
                 $inner = JitDomImportNode::$lastMaterializedInnerXml ?? '';
             }
             $attrSuffix = '';
-            if (null !== $arg->compileTimeDomAttributes && [] !== $arg->compileTimeDomAttributes) {
+            $id = $arg->compileTimeDomElementId ?? null;
+            $attrMap = null !== $id ? JitDomCreateElementAttrs::get($id) : [];
+            // Never read compileTimeDomAttributes when ElementId is set — ARG_SEND temps
+            // inherit the parent's bag after setAttribute on replaceChild return (#35386).
+            if (null === $id
+                && null !== $arg->compileTimeDomAttributes
+                && [] !== $arg->compileTimeDomAttributes
+            ) {
+                $attrMap = $arg->compileTimeDomAttributes;
+            }
+            if (null !== $attrMap && [] !== $attrMap) {
                 $parts = [];
-                foreach ($arg->compileTimeDomAttributes as $name => $value) {
+                foreach ($attrMap as $name => $value) {
                     $parts[] = $name.'="'.htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8').'"';
                 }
                 if ([] !== $parts) {

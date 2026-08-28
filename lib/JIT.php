@@ -17018,9 +17018,10 @@ class JIT {
                     ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeChildIndex;
             }
         }
-        // createElement trees (no loadXML): keep parent compileTimeDomInnerXml in sync so
-        // firstChild/lastChild annotate can stamp tags for cloneNode (#35461).
-        // Must run even when the call result Operand is unused / untracked.
+        // createElement trees (no loadXML): stamp parent inner when LiveMutation did not
+        // refresh the receiver Variable (DocumentFragment appendChild #35461). When
+        // syncUserScriptInnerXmlFromArgs already concat markup, skip — a second concat
+        // duplicated children on cloneNode (#35386 re-open).
         if (
             $toCall instanceof JIT\Call\DomNodeAppendChild
             || $toCall instanceof JIT\Call\DomDocumentAppendChild
@@ -17028,9 +17029,15 @@ class JIT {
         ) {
             $parent = $callArgs[0] ?? null;
             if ($parent instanceof Variable) {
-                $this->appendCompileTimeDomInnerXmlChild($parent, $child);
+                $priorInner = $parent->compileTimeDomInnerXml ?? '';
+                if ('' === $priorInner) {
+                    $this->appendCompileTimeDomInnerXmlChild($parent, $child);
+                }
             }
         }
+        // Parent compileTimeDomInnerXml is stamped by DomNodeLiveMutationRuntime::
+        // syncUserScriptInnerXmlFromArgs during appendChild/insertBefore invoke — a second
+        // concat here duplicated children on cloneNode (#35386 re-open).
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
@@ -17056,8 +17063,9 @@ class JIT {
     /**
      * Append one child's outer markup onto the parent's compile-time InnerXml (#35461).
      *
-     * Used when there is no loadXML SSOT (createElement + appendChild/insertBefore trees)
-     * so {@see \PHPCompiler\ext\dom\JitDomNodeChildProperty} can stamp firstChild tags.
+     * Used when there is no loadXML SSOT and LiveMutation left the receiver inner empty
+     * (DocumentFragment). Element appendChild already updates inner via
+     * {@see DomNodeLiveMutationRuntime::syncUserScriptInnerXmlFromArgs}.
      */
     private function appendCompileTimeDomInnerXmlChild(Variable $parent, Variable $child): void
     {
@@ -17081,20 +17089,16 @@ class JIT {
             return;
         }
         $attrs = '';
-        $attrMap = $child->compileTimeDomAttributes;
-        if (null === $attrMap || [] === $attrMap) {
-            $id = $child->compileTimeDomElementId
-                ?? \PHPCompiler\ext\dom\JitDomCreateElementAttrs::lastId();
-            if (null !== $id) {
-                $attrMap = \PHPCompiler\ext\dom\JitDomCreateElementAttrs::get($id);
-            }
-        }
+        $id = $child->compileTimeDomElementId ?? null;
+        $attrMap = null !== $id ? \PHPCompiler\ext\dom\JitDomCreateElementAttrs::get($id) : [];
         if (null !== $attrMap && [] !== $attrMap) {
             $attrs = \PHPCompiler\ext\dom\JitDomCreateElementAttrs::formatSuffix($attrMap);
         }
         $inner = $child->compileTimeDomInnerXml ?? '';
         $openAttrs = '' === $attrs ? '' : (str_starts_with($attrs, ' ') ? $attrs : ' '.$attrs);
-        $markup = '<'.$tag.$openAttrs.'>'.$inner.'</'.$tag.'>';
+        $markup = '' === $inner
+            ? '<'.$tag.$openAttrs.'/>'
+            : '<'.$tag.$openAttrs.'>'.$inner.'</'.$tag.'>';
         $parent->compileTimeDomInnerXml = ($parent->compileTimeDomInnerXml ?? '').$markup;
     }
 
@@ -25615,6 +25619,21 @@ class JIT {
                 if ($this->context->functionIsRegistered('domnode::insertbefore')) {
                     $receiverVar = $this->context->getVariableFromOp($receiverOp);
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::insertbefore');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
+            // replaceChild return is oldChild — RuntimeIndirect skips propagateDomAppendChildCompileTimeTag
+            // so getAttribute/cloneNode on createElement trees lose attrs/inner (#35386 re-open).
+            if (
+                'replacechild' === $methodLcEarly
+                && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::replacechild');
+                if ($this->context->functionIsRegistered('domnode::replacechild')) {
+                    $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::replacechild');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
