@@ -33,7 +33,8 @@ final class MbstringRuntimeShrinkTest extends TestCase
     public function testMbStrlenDoesNotReferenceHostMbstring(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/ext/mbstring/mb_strlen.php');
-        $this->assertStringContainsString('VmString::utf8CharLength', $source);
+        // #34625: runtime encoding via VmMbstring::strlen (still no host \mb_strlen).
+        $this->assertStringContainsString('VmMbstring::strlen', $source);
         $this->assertStringNotContainsString('\\mb_strlen(', $source);
         $this->assertStringNotContainsString("function_exists('mb_strlen')", $source);
     }
