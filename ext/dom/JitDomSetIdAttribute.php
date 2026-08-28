@@ -232,7 +232,6 @@ final class JitDomSetIdAttribute
             return self::invoke($context, $args[0], $nameVar, $args[2]);
         }
 
-        $element = self::loadObjectArg($context, $args[0]);
         $attr = $context->builder->call(
             $context->lookupFunction('__value__readObject'),
             JitValueBox::valuePtrFromVariable($context, $args[1])
@@ -247,17 +246,18 @@ final class JitDomSetIdAttribute
         }
         $context->builder->call(
             $context->lookupFunction($abi),
-            $element,
             $attr
         );
         if (JitDomDocumentMethodKernel::shouldUse($context) && $isIdTrue) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_set_id_attribute_node_post');
+            $element = self::loadObjectArg($context, $args[0]);
             self::storeCacheFromRuntimeAttrValue($context, $element, $attr);
             $key = JitDomAttrRename::lastFetchedKey();
             if (null !== $key) {
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral($key[0], $key[1], true);
             }
         } elseif (JitDomDocumentMethodKernel::shouldUse($context) && !$isIdTrue) {
+            $element = self::loadObjectArg($context, $args[0]);
             DomUserScriptElementCacheLlvm::invalidateIfElement($context, $element);
         }
 
