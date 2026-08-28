@@ -616,6 +616,11 @@ final class VmValueCompare
         $i8 = $context->getTypeFromString('int8');
         $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
         $sameType = $context->builder->icmp(Builder::INT_EQ, $leftType, $rightType);
+        $bothArrayKinds = $context->builder->and(
+            self::isValueBoxArrayType($context, $leftType),
+            self::isValueBoxArrayType($context, $rightType)
+        );
+        $sameTypeOrBothArray = $context->builder->or($sameType, $bothArrayKinds);
 
         $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
         $bothNull = $context->builder->and(
@@ -646,7 +651,7 @@ final class VmValueCompare
         $matchPhi->addIncoming($trueVal, $entry);
         $matchPhi->addIncoming($typedMatch, $typedDone);
 
-        return $context->builder->and($sameType, $matchPhi);
+        return $context->builder->and($sameTypeOrBothArray, $matchPhi);
     }
 
     /**
@@ -687,6 +692,11 @@ final class VmValueCompare
             $context->builder->icmp(Builder::INT_EQ, $rightType, $objectTag)
         );
 
+        $bothArray = $context->builder->and(
+            self::isValueBoxArrayType($context, $leftType),
+            self::isValueBoxArrayType($context, $rightType)
+        );
+
         $entry = $context->builder->getInsertBlock();
         $i1 = $context->getTypeFromString('int1');
         $stringBlock = BasicBlockHelper::append($context, 'identical_value_string');
@@ -696,6 +706,8 @@ final class VmValueCompare
         $doubleBlock = BasicBlockHelper::append($context, 'identical_value_double');
         $objectCheckBlock = BasicBlockHelper::append($context, 'identical_value_object_check');
         $objectBlock = BasicBlockHelper::append($context, 'identical_value_object');
+        $arrayCheckBlock = BasicBlockHelper::append($context, 'identical_value_array_check');
+        $arrayBlock = BasicBlockHelper::append($context, 'identical_value_array');
         $typedFalseBlock = BasicBlockHelper::append($context, 'identical_value_typed_false');
         $doneBlock = BasicBlockHelper::append($context, 'identical_value_typed_done');
 
@@ -746,7 +758,7 @@ final class VmValueCompare
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($objectCheckBlock);
-        $context->builder->branchIf($bothObject, $objectBlock, $typedFalseBlock);
+        $context->builder->branchIf($bothObject, $objectBlock, $arrayCheckBlock);
 
         $context->builder->positionAtEnd($objectBlock);
         $leftObj = $context->builder->call(
@@ -770,6 +782,21 @@ final class VmValueCompare
         $objectMatch = $context->builder->icmp(Builder::INT_EQ, $leftHandle, $rightHandle);
         $context->builder->branch($doneBlock);
 
+        $context->builder->positionAtEnd($arrayCheckBlock);
+        $context->builder->branchIf($bothArray, $arrayBlock, $typedFalseBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $leftHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $leftPtr
+        );
+        $rightHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $rightPtr
+        );
+        $arrayMatch = self::identicalHashtablePair($context, $leftHt, $rightHt);
+        $context->builder->branch($doneBlock);
+
         $context->builder->positionAtEnd($typedFalseBlock);
         $context->builder->branch($doneBlock);
 
@@ -779,6 +806,7 @@ final class VmValueCompare
         $phi->addIncoming($longMatch, $longBlock);
         $phi->addIncoming($doubleMatch, $doubleBlock);
         $phi->addIncoming($objectMatch, $objectBlock);
+        $phi->addIncoming($arrayMatch, $arrayBlock);
         $phi->addIncoming($falseVal, $typedFalseBlock);
         $context->builder->branch($exitBlock);
 
@@ -1062,6 +1090,40 @@ final class VmValueCompare
             $pos,
             $context->builder->select($lt, $neg, $zero)
         );
+    }
+
+    /**
+     * Identical (===) on two {@see __hashtable__*} operands (#23485).
+     *
+     * php-src: zend_hash_compare(..., identical=1); VM SSOT {@see HashTable::compareIdentical()}.
+     */
+    public static function identicalHashtablePair(Context $context, Value $leftHt, Value $rightHt): Value
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $trueVal = $i1->constInt(1, false);
+        $samePtr = $context->builder->icmp(Builder::INT_EQ, $leftHt, $rightHt);
+        $deepMatch = self::looseEqualHashtablePair($context, $leftHt, $rightHt);
+
+        return $context->builder->select($samePtr, $trueVal, $deepMatch);
+    }
+
+    /** VM TYPE_ARRAY (6) or JIT TYPE_HASHTABLE kind (7) in a boxed {@see __value__} type byte. */
+    private static function isValueBoxArrayType(Context $context, Value $typeByte): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isVmArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_ARRAY, false)
+        );
+        $isJitHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+
+        return $context->builder->or($isVmArray, $isJitHt);
     }
 
     /**
