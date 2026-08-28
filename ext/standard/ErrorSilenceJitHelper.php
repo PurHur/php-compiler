@@ -47,14 +47,24 @@ final class ErrorSilenceJitHelper
             return;
         }
         self::$compiledModuleDefaultsSeeded = true;
-        self::$errorReporting = self::COMPILED_DEFAULT_ERROR_REPORTING;
+        if (null === self::$errorReporting || (0 === self::$errorReporting && 0 === self::$silenceDepth)) {
+            self::$errorReporting = self::COMPILED_DEFAULT_ERROR_REPORTING;
+        }
     }
 
     private static function currentErrorReporting(): int
     {
         self::ensureCompiledModuleDefaults();
+        $er = self::$errorReporting;
+        // BSS-zero: nullable static reads as 0, not null — treat unset-before-@ as startup mask (#35583).
+        if (null === $er && 0 === self::$silenceDepth) {
+            return self::COMPILED_DEFAULT_ERROR_REPORTING;
+        }
+        if (0 === $er && 0 === self::$silenceDepth && !self::$compiledModuleDefaultsSeeded) {
+            return self::COMPILED_DEFAULT_ERROR_REPORTING;
+        }
 
-        return self::$errorReporting ?? self::COMPILED_DEFAULT_ERROR_REPORTING;
+        return (int) ($er ?? self::COMPILED_DEFAULT_ERROR_REPORTING);
     }
 
     public static function beginSilence(): void

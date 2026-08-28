@@ -39,6 +39,8 @@ final class SilenceRuntime
 
     private const INI_RESTORE_ER_HELPER = 'PHPCompiler\\ext\\standard\\ErrorSilenceJitHelper::iniRestoreErrorReporting';
 
+    private const ENSURE_DEFAULTS_HELPER = 'PHPCompiler\\ext\\standard\\ErrorSilenceJitHelper::ensureCompiledModuleDefaults';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::BEGIN_HELPER,
@@ -48,6 +50,7 @@ final class SilenceRuntime
         self::INI_GET_ER_HELPER,
         self::SET_ER_HELPER,
         self::INI_RESTORE_ER_HELPER,
+        self::ENSURE_DEFAULTS_HELPER,
     ];
 
     /** @var list<string> */
