@@ -18,9 +18,21 @@ if (defined('REBUILD_EXAMPLES_LIBRARY_ONLY')) {
     return;
 }
 
+$repoRoot = realpath(__DIR__.'/..') ?: __DIR__.'/..';
+
+if ('1' === getenv('BENCH_FILEUPLOADWEB_AOT_ROW_ONLY')) {
+    putenv('BENCH_FILEUPLOADWEB=1');
+    putenv('BENCH_FILEUPLOADWEB_AOT=1');
+    echo "Rebuilding 006-FileUploadWeb AOT benchmark row only\n";
+    if (!patchFileUploadWebAotRowOnly($repoRoot)) {
+        exit(1);
+    }
+    echo "Done (006 AOT row only)\n";
+    exit(0);
+}
+
 echo "Rebuilding Examples\n";
 
-$repoRoot = realpath(__DIR__.'/..') ?: __DIR__.'/..';
 $llvmReady = isLlvmReady($repoRoot);
 $phpCmd = phpCommand();
 $benchEnv = benchmarkEnv($repoRoot);
@@ -994,6 +1006,39 @@ function fileUploadWebAotMultipartProbe(string $repoRoot, string $binary, array 
     }
 
     return str_contains($probe['stdout'], 'Uploaded: README.md');
+}
+
+/**
+ * Patch only the 006-FileUploadWeb AOT columns in examples/README.md (#2018, #2027).
+ * Use BENCH_FILEUPLOADWEB_AOT_ROW_ONLY=1 to avoid a full rebuild when ci-fast drift guard is red.
+ */
+function patchFileUploadWebAotRowOnly(string $repoRoot): bool
+{
+    $benchEnv = benchmarkEnv($repoRoot);
+    $result = tryBenchmarkFileUploadWebProjectAot($repoRoot, $benchEnv);
+    if (null === $result) {
+        fwrite(STDERR, "patchFileUploadWebAotRowOnly: AOT benchmark failed\n");
+
+        return false;
+    }
+
+    $readmePath = $repoRoot.'/examples/README.md';
+    $body = (string) file_get_contents($readmePath);
+    $pattern = '/(\|\s*006-FileUploadWeb\s*\|[^|]+\|[^|]+\|[^|]+\|)\s*n\/a\s*(\|\s*n\/a\s*\|)/i';
+    $compile = sprintf('         %0.5f |', $result['compile']);
+    $compiled = sprintf('         %0.5f |', $result['compiled']);
+    $replacement = '$1'.$compile.$compiled;
+    $newBody = preg_replace($pattern, $replacement, $body, 1, $count);
+    if (1 !== $count || !is_string($newBody)) {
+        fwrite(STDERR, "patchFileUploadWebAotRowOnly: could not patch 006 row\n");
+
+        return false;
+    }
+
+    file_put_contents($readmePath, $newBody);
+    echo '  006-FileUploadWeb AOT: compile='.trim($compile).' compiled='.trim($compiled)."\n";
+
+    return true;
 }
 
 /**
