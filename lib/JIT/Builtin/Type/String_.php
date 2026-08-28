@@ -290,35 +290,22 @@ class String_ extends Type {
             // User-script standalone AOT: defer nested-JIT stdlib helpers until ensureStandaloneBodies (#13571).
             return;
         }
-        \PHPCompiler\JIT\Builtin\StringBitwiseNot::implement($this->context);
+        // StringBitwiseNot / IniSet / IniGet / ErrorReporting / date-time always-on implement
+        // removed (#35614): Helper uses call-site LLVM for ~ (#35301); JitIni / JitErrorReporting
+        // and ext/standard/Jit* date call sites already ensureLinked before lookup (peer #35613
+        // stdlib batch, #34848 IniRuntime, #34241 date/time). Scripts that never touch those
+        // builtins skip NestedJIT on the full load path. Leftover Type::implement vs Runtime ABI
+        // drift mints *.1 (#31894 / #32122).
         // StringHtmlspecialchars … StringFilePutContents always-on implement removed (#35613):
         // ext/standard/* and Jit* call sites already ensureLinked before lookup (peer #35609
         // quotemeta/ctype/sodium batch). Scripts that never touch those builtins skip NestedJIT
         // on the full load path. Leftover Type::implement vs Runtime ABI drift mints *.1
-        // (#31894 / #32122). IniSet/IniGet/ErrorReporting still eager here — JitIni::get/set
-        // and JitErrorReporting need call-site ensureLinked first (peer #34848 IniRuntime).
+        // (#31894 / #32122).
         // StringQuotemeta / CtypeRuntime / StringSodium always-on ensureLinked removed (#35609):
         // ext/standard/quotemeta.php / ext/ctype/JitCtype.php / ext/sodium/JitSodium already
         // ensureLinked before lookup (peer #34513 Type::initialize lazy). Scripts that never
         // call quotemeta()/ctype_*/sodium_* skip NestedJIT on the full load path. Leftover
         // Type::implement vs Runtime ABI drift mints *.1 (#31894 / #32122).
-        \PHPCompiler\JIT\Builtin\IniSet::implement($this->context);
-        \PHPCompiler\JIT\Builtin\IniGet::implement($this->context);
-        \PHPCompiler\JIT\Builtin\ErrorReporting::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringDateTime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringStrftime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringStrptime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringStrtotime::implement($this->context);
-        // StringGetdate: no-op link; HT built in JitGetdate IR (#26900).
-        \PHPCompiler\JIT\Builtin\StringGmgetdate::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringGmmktime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringMktime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringSyslog::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringLocaltime::implement($this->context);
-        // StringIdate / StringGetdate: link at call-site only — early Type init NestedJIT
-        // of idate civil math segfaults user AOT (#26900).
-        \PHPCompiler\JIT\Builtin\StringMicrotime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringGettimeofday::implement($this->context);
     }
 
     private function implementStrlen(): void {
