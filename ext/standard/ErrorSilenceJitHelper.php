@@ -22,7 +22,8 @@ final class ErrorSilenceJitHelper
      */
     private const COMPILED_DEFAULT_ERROR_REPORTING = ErrorReporter::E_ALL_LEGACY;
 
-    private static ?int $errorReporting = null;
+    /** BSS-zero reads as 0 — must not use {@code ??} on this slot; use {@see $compiledModuleDefaultsSeeded}. */
+    private static int $errorReporting = 0;
 
     private static int $silenceDepth = 0;
 
@@ -32,7 +33,7 @@ final class ErrorSilenceJitHelper
 
     /**
      * NestedJIT under thin AOT does not apply PHP static property defaults (BSS-zero) (#33059, #35563).
-     * Nullable {@see $errorReporting} reads as 0, so {@code ??=} never seeds Zend startup mask.
+     * {@see $errorReporting} reads as 0 before seed; only this flag distinguishes seeded from silenced-0.
      */
     private static bool $compiledModuleDefaultsSeeded = false;
 
@@ -52,9 +53,11 @@ final class ErrorSilenceJitHelper
 
     private static function currentErrorReporting(): int
     {
-        self::ensureCompiledModuleDefaults();
+        if (!self::$compiledModuleDefaultsSeeded) {
+            self::ensureCompiledModuleDefaults();
+        }
 
-        return self::$errorReporting ?? self::COMPILED_DEFAULT_ERROR_REPORTING;
+        return self::$errorReporting;
     }
 
     public static function beginSilence(): void
