@@ -3083,6 +3083,7 @@ require_once __DIR__.'/../../../ext/standard/JitProcOpen.php';
 require_once __DIR__.'/../../../ext/standard/JitProcTerminate.php';
 require_once __DIR__.'/../../../ext/standard/JitProgressNoteKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitPropertyExists.php';
+require_once __DIR__.'/../../../ext/standard/JitPropertyExistsObject.php';
 require_once __DIR__.'/../../../ext/standard/JitQuotPrint.php';
 require_once __DIR__.'/../../../ext/standard/JitQuotedPrintableDecode.php';
 require_once __DIR__.'/../../../ext/standard/JitQuotedPrintableEncode.php';
