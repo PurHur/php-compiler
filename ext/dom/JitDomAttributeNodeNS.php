@@ -1172,7 +1172,7 @@ final class JitDomAttributeNodeNS
                 return self::boxBoolResult($context, true);
             }
             $hadIdAttr = 'id' === $nameLit && DomUserScriptAttributeCacheLlvm::hasPresentLiteral('', 'id');
-            $oldIdLit = 'id' === $nameLit ? self::compileTimePriorIdLiteral($args[0], $nameLit) : null;
+            $oldIdLit = 'id' === $nameLit ? self::compileTimePriorIdLiteral($args[0], $nameLit, $valueLit) : null;
             $attr = self::setAttributeLiteralReuseOrCreate($context, $nameLit, $valueLit);
             // Live NamedNodeMap pins/length (#33128).
             JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
@@ -1182,7 +1182,24 @@ final class JitDomAttributeNodeNS
                     JitDomLoadXMLUserScript::removeElementFromIdMap($context, $document, $oldIdLit);
                 }
                 if ('' !== $valueLit) {
-                    JitDomLoadXMLUserScript::storeElementInIdMap($context, $document, $valueLit, $element);
+                    $idStr = $context->builder->load($context->constantStringFromString($valueLit));
+                    // Rebind on the same element (a→b) may overwrite after remove above (#19870).
+                    // First id on a node, or stale cache oldId===newId, must stay first-wins (#29694).
+                    if (null !== $oldIdLit && '' !== $oldIdLit && $oldIdLit !== $valueLit) {
+                        JitDomLoadXMLUserScript::storeElementInIdMap(
+                            $context,
+                            $document,
+                            $valueLit,
+                            $element
+                        );
+                    } else {
+                        JitDomLoadXMLUserScript::storeElementInIdMapFromValueFirstWins(
+                            $context,
+                            $document,
+                            $idStr,
+                            $element
+                        );
+                    }
                 }
                 // Retarget single-slot cache when receiver matches, or oldId matches cached
                 // id (loadHTML getElementById pointer mismatch; #35329 / re-#19870).
@@ -1529,8 +1546,11 @@ final class JitDomAttributeNodeNS
      * Prefer the receiver's compile-time attrs over the name-keyed Attr cache — that cache
      * collapses sibling id= values to the last one in the document (#35321 / #34050).
      */
-    private static function compileTimePriorIdLiteral(JITVariable $receiver, string $nameLit): ?string
-    {
+    private static function compileTimePriorIdLiteral(
+        JITVariable $receiver,
+        string $nameLit,
+        ?string $valueLit = null
+    ): ?string {
         if ('id' !== $nameLit) {
             return null;
         }
@@ -1538,13 +1558,28 @@ final class JitDomAttributeNodeNS
         if (null !== $attrs && isset($attrs['id']) && '' !== $attrs['id']) {
             return $attrs['id'];
         }
-        $cached = DomUserScriptAttributeCacheLlvm::literalValue('', 'id');
-        if (null !== $cached && '' !== $cached) {
-            return $cached;
+
+        // loadHTML getElementById() → setAttribute('id', …) rebind on the paired node (#19870).
+        $hit = JitDomLoadHTMLUserScript::lastGetElementByIdHit();
+        if (null !== $hit
+            && '' !== ($hit['id'] ?? '')
+            && null !== $valueLit
+            && $hit['id'] !== $valueLit
+        ) {
+            return $hit['id'];
         }
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+        if (null !== $parsed
+            && '' !== ($parsed['id'] ?? '')
+            && null !== $valueLit
+            && $parsed['id'] !== $valueLit
+            && null !== JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml()
+        ) {
+            return $parsed['id'];
+        }
 
-        return null !== $parsed && '' !== ($parsed['id'] ?? '') ? $parsed['id'] : null;
+        // Do not consult the module Attr cache — collapses unrelated elements (#29694 / #35321).
+        return null;
     }
 
     private static function loadOwnerDocumentObject(Context $context, Value $element): Value

@@ -33,13 +33,18 @@ final class DomAttrIsId implements Call
         }
         $key = JitDomAttrRename::lastFetchedKey();
         if (null !== $key) {
+            // loadXML DTD ATTLIST ID / xml:id / setIdAttribute* stamp compile-time flags (#34821).
+            // Must precede the user-function {@code id} global — activeFunction is the script
+            // name in {main}, not only nested closures (#23514).
+            if (DomUserScriptAttributeCacheLlvm::isIdBearingLiteral($key[0], $key[1])) {
+                return $context->getTypeFromString('int1')->constInt(1, false);
+            }
             $active = $context->activeFunction;
             if ('' !== $active && !str_starts_with($active, '__') && '' === $key[0] && 'id' === $key[1]) {
                 return DomUserScriptAttributeCacheLlvm::loadIdBearingGlobal($context);
             }
-            $bearing = DomUserScriptAttributeCacheLlvm::isIdBearingLiteral($key[0], $key[1]);
 
-            return $context->getTypeFromString('int1')->constInt($bearing ? 1 : 0, false);
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
         return DomAttrIsIdRuntime::invoke($context, $args[0]);

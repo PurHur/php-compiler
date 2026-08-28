@@ -80,6 +80,27 @@ final class JitDomNodeIsConnected
     }
 
     /**
+     * int1 — php-src getElementById refuses IDs on disconnected nodes (#23999 / #29694).
+     *
+     * @return Value int1
+     */
+    public static function isConnectedFlag(Object_ $objectType, Value $obj): Value
+    {
+        $context = $objectType->jitContext();
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            return self::isConnectedViaParentSlots($objectType, $obj);
+        }
+        DomNodeIsConnectedRuntime::ensureLinked($context);
+        $flag = $context->builder->call(
+            $context->lookupFunction(DomNodeIsConnectedRuntime::ABI_NAME),
+            $obj
+        );
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->icmp(Builder::INT_NE, $flag, $i64->constInt(0, false));
+    }
+
+    /**
      * php-src dom_node_is_connected_read: true iff the document is an ancestor
      * (documents themselves are always connected).
      *

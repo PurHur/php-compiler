@@ -85,11 +85,11 @@ final class JitDomSetIdAttribute
                     ? self::$setAttributeIdValues[\count(self::$setAttributeIdValues) - 1]
                     : null;
             }
-            // After replaceChild, xmlAddID fails when this id is still owned by a detached
-            // node — do not seed the LLVM cache (#29694 / re-#25274). Duplicate setIdAttribute
-            // first-wins is handled by storeFirstWins / id-map first-wins (#34050).
-            $skipCache = JitDomLoadXMLUserScript::treeMutatedSinceLoad()
-                && null !== $idLitForSkip
+            // xmlAddID first-wins after replaceChild — do not seed LLVM cache when this id
+            // was already registered via setIdAttribute(true) earlier in the compile (#29694).
+            // Do not gate on treeMutatedSinceLoad: user-script replaceChild deliberately
+            // avoids that flag for C14N (#32972) but still needs the skip (#29694).
+            $skipCache = null !== $idLitForSkip
                 && '' !== $idLitForSkip
                 && isset(self::$registeredIdLiterals[$idLitForSkip]);
             if (!$skipCache) {
