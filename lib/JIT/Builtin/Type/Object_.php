@@ -315,10 +315,12 @@ class Object_ extends Type {
         $this->pointer = $this->context->getTypeFromString('__object__*');
         \PHPCompiler\JIT\ReadonlyBridge::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
-        \PHPCompiler\JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
-        \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($this->context);
-        // JitThrow linked on demand when compiling try/catch (#1056).
+        // TypeErrorRaise / ErrorRaise always-on ensureLinked removed (#35638): ExceptionBridge /
+        // ErrorBridge / emitRaise / readonly guards already ensureLinked before lookup (peer
+        // #34732 / #34769 / Context ensureMinimal drop). Eager NestedJIT on every compile
+        // (including thin hello-world) vs Runtime ABI drift mints type_error_*.1 / error_*.1
+        // (#31894 / #32122). JitThrow linked on demand when compiling try/catch (#1056).
 
         $this->registerFn('__object__load_value_slot', 'void', ['void**', '__value__*']);
         $this->registerFn('__object__prop_count', 'int32', ['__object__*']);
