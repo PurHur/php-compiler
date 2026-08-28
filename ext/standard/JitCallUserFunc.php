@@ -262,11 +262,12 @@ final class JitCallUserFunc
         if (null === $slots) {
             return null;
         }
-        if (!isset($block->constants[$slots[0]], $block->constants[$slots[1]])) {
+        $constBlock = $slots[2];
+        if (!isset($constBlock->constants[$slots[0]], $constBlock->constants[$slots[1]])) {
             return null;
         }
-        $className = $block->constants[$slots[0]]->toString();
-        $methodName = $block->constants[$slots[1]]->toString();
+        $className = $constBlock->constants[$slots[0]]->toString();
+        $methodName = $constBlock->constants[$slots[1]]->toString();
         if ('' === $className || '' === $methodName) {
             return null;
         }

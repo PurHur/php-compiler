@@ -342,6 +342,123 @@ final class VmBoundMethodCallable
             }
         }
 
+        // Parameter slots are filled via ARG_RECV — trace to caller ARG_SEND INIT_ARRAY (#13686).
+        if (null !== $block->func && !isset($visited['paramCallSite'])) {
+            $visited['paramCallSite'] = true;
+            $paramIdx = self::paramIndexForSlot($block, $slot);
+            if (null !== $paramIdx) {
+                $funcLc = strtolower($block->func->name);
+                foreach (self::blocksForCallSiteScan($block) as $scanBlock) {
+                    $sendSlot = self::findArgSendSlotForFunctionCall($scanBlock, $funcLc, $paramIdx);
+                    if (null !== $sendSlot) {
+                        $resolved = self::resolveBoundMethodArrayRootSlot($scanBlock, $sendSlot, $visited);
+                        if (null !== $resolved) {
+                            return $resolved;
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function paramIndexForSlot(Block $block, int $slot): ?int
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV === $op->type && (int) $op->arg1 === $slot) {
+                return (int) $op->arg2;
+            }
+        }
+        if (isset($block->paramCallableSlots[$slot])) {
+            $idx = array_search($slot, $block->paramNames, true);
+            if (false !== $idx) {
+                return (int) $idx;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<Block>
+     */
+    private static function blocksForCallSiteScan(Block $block): array
+    {
+        $roots = [$block];
+        foreach ($block->enclosingDeclBlocks as $enclosing) {
+            if ($enclosing instanceof Block) {
+                $roots[] = $enclosing;
+            }
+        }
+        $out = [];
+        $seen = [];
+        $queue = $roots;
+        while ([] !== $queue) {
+            $current = array_shift($queue);
+            $id = spl_object_id($current);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            $out[] = $current;
+            foreach ($current->opCodes as $op) {
+                foreach ([$op->block1 ?? null, $op->block2 ?? null, $op->block3 ?? null] as $child) {
+                    if ($child instanceof Block) {
+                        $queue[] = $child;
+                    }
+                }
+            }
+            foreach ($current->blocks as $child) {
+                if ($child instanceof Block) {
+                    $queue[] = $child;
+                }
+            }
+            foreach ($current->parents as $parent) {
+                if ($parent instanceof Block) {
+                    $queue[] = $parent;
+                }
+            }
+            foreach ($current->enclosingDeclBlocks as $enclosing) {
+                if ($enclosing instanceof Block) {
+                    $queue[] = $enclosing;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    private static function findArgSendSlotForFunctionCall(Block $block, string $funcLc, int $paramIdx): ?int
+    {
+        $pending = false;
+        $sendIndex = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $nameOp = $block->getOperand($op->arg1);
+                $pending = $nameOp instanceof Operand\Literal
+                    && strtolower((string) $nameOp->value) === $funcLc;
+                $sendIndex = 0;
+                continue;
+            }
+            if (!$pending) {
+                continue;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                if ($sendIndex === $paramIdx) {
+                    return (int) $op->arg1;
+                }
+                ++$sendIndex;
+                continue;
+            }
+            if (
+                OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type
+                || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+            ) {
+                $pending = false;
+            }
+        }
+
         return null;
     }
 
@@ -431,7 +548,7 @@ final class VmBoundMethodCallable
      * Bound `[object, method]` stays on {@see resolveBoundMethodReceiverOperand}; this path is
      * only the two-string static form. php-src: Zend/zend_execute.c ZEND_INIT_DYNAMIC_CALL.
      *
-     * @return array{0:int,1:int}|null
+     * @return array{0:int,1:int,2:Block}|null class const slot, method const slot, block holding constants
      */
     public static function resolveStaticArrayCallableSlots(Block $block, int $calleeSlot): ?array
     {
@@ -439,18 +556,28 @@ final class VmBoundMethodCallable
         if (null === $arraySlot) {
             return null;
         }
-        $classValueSlot = self::arrayElementValueSlot($block, $arraySlot, 0);
-        $methodValueSlot = self::arrayElementValueSlot($block, $arraySlot, 1);
-        if (null === $classValueSlot || null === $methodValueSlot) {
-            return null;
+        $scanBlocks = [$block];
+        foreach (self::blocksForCallSiteScan($block) as $extra) {
+            if ($extra !== $block) {
+                $scanBlocks[] = $extra;
+            }
         }
-        $classConstSlot = self::constantStringSlot($block, $classValueSlot);
-        $methodConstSlot = self::constantStringSlot($block, $methodValueSlot);
-        if (null === $classConstSlot || null === $methodConstSlot) {
-            return null;
+        foreach ($scanBlocks as $scanBlock) {
+            $classValueSlot = self::arrayElementValueSlot($scanBlock, $arraySlot, 0);
+            $methodValueSlot = self::arrayElementValueSlot($scanBlock, $arraySlot, 1);
+            if (null === $classValueSlot || null === $methodValueSlot) {
+                continue;
+            }
+            $classConstSlot = self::constantStringSlot($scanBlock, $classValueSlot);
+            $methodConstSlot = self::constantStringSlot($scanBlock, $methodValueSlot);
+            if (null === $classConstSlot || null === $methodConstSlot) {
+                continue;
+            }
+
+            return [$classConstSlot, $methodConstSlot, $scanBlock];
         }
 
-        return [$classConstSlot, $methodConstSlot];
+        return null;
     }
 
     private static function arrayElementValueSlot(
