@@ -436,6 +436,23 @@ class Context {
 
     public TryCatchState $tryCatch;
 
+    /**
+     * Module-wide try/finally goto-pending globals — must survive {@see TryCatchState::reset()}
+     * when nested helper JIT runs mid user-function lowering (#25240 / HELPER_RUNTIME_O=0).
+     */
+    public ?PHPLLVM\Value $gotoPendingFlagGlobal = null;
+
+    public ?PHPLLVM\Value $gotoResumeIdGlobal = null;
+
+    public int $nextGotoResumeId = 0;
+
+    /**
+     * Handlers needing goto-resume dispatch at module seal — survives {@see TryCatchState::reset()}.
+     *
+     * @var list<TryCatchHandler>
+     */
+    public array $gotoResumeHandlers = [];
+
     /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
