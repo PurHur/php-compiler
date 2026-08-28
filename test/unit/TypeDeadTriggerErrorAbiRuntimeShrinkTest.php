@@ -30,10 +30,10 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
             'Builtin\\Type must not always-register __compiler_trigger_error (#33234)'
         );
         // No further Type always-on leftover after #33267 exit/abort drop;
-        // StringTriggerError register ensure moved to HashTable::implement (#35392).
+        // StringTriggerError register ensure moved to readStringKeyValue (#35648).
         $this->assertStringContainsString('LibcExtern::ensureExitAbort', $type);
         $ht = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
-        $this->assertStringContainsString('StringTriggerError::ensureLinked', $ht);
+        $this->assertStringContainsString('ensureUndefinedArrayKeyAbis', $ht);
     }
 
     public function testRuntimeOwnerDeclaresTriggerErrorAbiModuleLocally(): void
@@ -111,14 +111,25 @@ final class TypeDeadTriggerErrorAbiRuntimeShrinkTest extends TestCase
         );
         $ht = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
         $this->assertStringContainsString(
-            'StringTriggerError::declareUndefinedArrayKeyAbis($this->context)',
+            'ensureUndefinedArrayKeyAbis',
             $ht,
-            'HashTable::implement declares undef-key ABIs (#35392 / #33249)'
+            'HashTable readStringKeyValue ensures undef-key ABIs (#35648 / #33249)'
         );
+        $fnPos = strpos($ht, 'private function implementReadStringKeyValue(');
+        $this->assertNotFalse($fnPos);
+        $chunk = substr($ht, $fnPos, 400);
+        $this->assertStringContainsString(
+            'ensureUndefinedArrayKeyAbis',
+            $chunk,
+            'readStringKeyValue must ensure undef-key ABIs (#35648 / #33248)'
+        );
+        $ensureMethodPos = strpos($ht, 'private function ensureUndefinedArrayKeyAbis');
+        $this->assertNotFalse($ensureMethodPos);
+        $ensureChunk = substr($ht, $ensureMethodPos, 400);
         $this->assertStringContainsString(
             'StringTriggerError::ensureLinked($this->context)',
-            $ht,
-            'HashTable::implement ensureLinked StringTriggerError (#35392 / #33248)'
+            $ensureChunk,
+            'ensureUndefinedArrayKeyAbis must ensureLinked StringTriggerError (#35648 / #33248)'
         );
     }
 
