@@ -98,7 +98,7 @@ final class JitDomGetElementById
             $context->builder->branchIf($cacheActive, $cacheBlock, $inactiveBlock);
 
             $context->builder->positionAtEnd($cacheBlock);
-            $cached = DomUserScriptElementCacheLlvm::lookupObject($context, $idStr);
+            $cached = DomUserScriptElementCacheLlvm::lookupObject($context, $idStr, $document);
             $objPtr = $context->getTypeFromString('__object__*');
             $isNullObj = $context->builder->icmp(
                 \PHPLLVM\Builder::INT_EQ,
