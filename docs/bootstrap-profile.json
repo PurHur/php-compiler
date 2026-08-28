@@ -6050,6 +6050,8 @@
         "lib/JIT/Builtin/PadTypeJit.php",
         "lib/JIT/Builtin/ParamSensitiveLookupRuntime.php",
         "lib/JIT/Builtin/ParamSensitiveLowering.php",
+        "lib/JIT/Builtin/ParamVariadicLookupRuntime.php",
+        "lib/JIT/Builtin/ParamVariadicLowering.php",
         "lib/JIT/Builtin/ParseStrNativeOpsJit.php",
         "lib/JIT/Builtin/ParseStrRuntime.php",
         "lib/JIT/Builtin/ParseUrl.php",
@@ -6898,6 +6900,7 @@
         "lib/JIT/Call/ReflectionParameterConstruct.php",
         "lib/JIT/Call/ReflectionParameterGetName.php",
         "lib/JIT/Call/ReflectionParameterIsSensitiveParameter.php",
+        "lib/JIT/Call/ReflectionParameterIsVariadic.php",
         "lib/JIT/Call/ReflectionPropertyConstruct.php",
         "lib/JIT/Call/ReflectionPropertyGetAttributes.php",
         "lib/JIT/Call/ReflectionPropertyGetMangledName.php",
@@ -8212,9 +8215,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7978,
+        "inventory_files": 7981,
         "excluded": 0,
-        "eligible": 7978,
+        "eligible": 7981,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
