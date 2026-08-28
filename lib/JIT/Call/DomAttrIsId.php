@@ -35,18 +35,20 @@ final class DomAttrIsId implements Call
         }
         $key = JitDomAttrRename::lastFetchedKey();
         if (null !== $key) {
+            $active = strtolower($context->activeFunction);
+            $inUserDeclaredFunction = '' !== $active
+                && !str_starts_with($active, '__')
+                && in_array($active, $context->userFunctionNames(), true);
             // loadXML DTD ATTLIST ID / xml:id / setIdAttribute* stamp compile-time flags (#34821).
-            // Must precede the user-function {@code id} global — activeFunction is the script
-            // name in {main}, not only nested closures (#23514).
-            if (DomUserScriptAttributeCacheLlvm::isIdBearingLiteral($key[0], $key[1])) {
+            // Module-wide idBearing stamps pollute user-function CFG paths (#23514 importNode).
+            if (!$inUserDeclaredFunction
+                && DomUserScriptAttributeCacheLlvm::isIdBearingLiteral($key[0], $key[1])
+            ) {
                 return $context->getTypeFromString('int1')->constInt(1, false);
             }
-            $active = $context->activeFunction;
-            if ('' !== $active && !str_starts_with($active, '__')) {
+            if ($inUserDeclaredFunction && '' === $key[0] && 'id' === $key[1]) {
                 // createElement id= toggles via module global — runtime stores from setIdAttribute (#29884).
-                if ('' === $key[0] && 'id' === $key[1]) {
-                    return DomUserScriptAttributeCacheLlvm::loadIdBearingGlobal($context);
-                }
+                return DomUserScriptAttributeCacheLlvm::loadIdBearingGlobal($context);
             }
 
             return DomAttrIsIdRuntime::invoke($context, $args[0]);

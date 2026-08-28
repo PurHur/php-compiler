@@ -3211,6 +3211,7 @@ final class VmDom
      * import from an ID source). Plain XML `id` imported into HTML stays non-ID (#23514).
      */
     private static function attributeQNameIsIdBearing(
+        ObjectEntry $element,
         ObjectEntry $document,
         DomNodeState $docState,
         DomNodeState $nodeState,
@@ -3341,6 +3342,7 @@ final class VmDom
         }
 
         return self::attributeQNameIsIdBearing(
+            $element,
             $document,
             DomRegistry::state($document),
             DomRegistry::state($element),
