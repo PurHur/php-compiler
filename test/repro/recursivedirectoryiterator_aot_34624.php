@@ -3,8 +3,7 @@
  * #34624 — AOT RecursiveDirectoryIterator foreach (php-src spl_directory.c).
  *
  * Fixture: test/fixtures/aot/cases/directoryiterator_27289_fixture/ (a.txt only).
- * RII+RDI must not SIGSEGV; leaf values may still be pathname strings under thin-AOT
- * LEAVES_ONLY flatten (Zend yields SplFileInfo) — assert no crash + filename present.
+ * RII+RDI must not SIGSEGV; with SKIP_DOTS LEAVES_ONLY flatten skips `.`/`..` (#34624).
  */
 $dir = __DIR__.'/../fixtures/aot/cases/directoryiterator_27289_fixture';
 
