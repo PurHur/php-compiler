@@ -27,7 +27,11 @@ final class ReflectionFunctionVariadicLookupRuntime
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($i1, false, $i8p);
-        $fn = $context->module->addFunction($abiName, $ft);
+        // Reuse declaration from ReflectionNative::registerDeclarations — addFunction
+        // on an existing name silently renames to *.1 with no callers (#31894 / #34218).
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('refl_func_is_variadic_entry');
         $context->builder->positionAtEnd($entry);
 

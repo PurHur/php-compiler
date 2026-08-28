@@ -2814,6 +2814,26 @@ final class BuiltinParamNames
     }
 
     /**
+     * Internal free functions ReflectionFunction::isVariadic() must report true for (#22045, #23593).
+     *
+     * @return list<string> lowercase names
+     */
+    public static function variadicInternalFunctionNames(): array
+    {
+        static $cache = null;
+        if (null !== $cache) {
+            return $cache;
+        }
+        $names = [];
+        foreach (self::zendInternalVariadicReflectionArityNames() as $fn) {
+            $names[] = strtolower($fn);
+        }
+        $cache = array_values(array_unique($names));
+
+        return $cache;
+    }
+
+    /**
      * php-src stub reflection arity for internal variadics (ext/standard/*.stub.php, #22825).
      *
      * Legacy InternalArgInfo often keeps pre-stub shapes (e.g. sprintf format+arg1+... → tot=3);
@@ -2868,6 +2888,55 @@ final class BuiltinParamNames
             'mb_convert_variables' => ['index' => 2, 'required' => 3, 'total' => 3],
             default => null,
         };
+    }
+
+    /** @return list<string> */
+    private static function zendInternalVariadicReflectionArityNames(): array
+    {
+        return [
+            'sprintf',
+            'printf',
+            'pack',
+            'fprintf',
+            'sscanf',
+            'fscanf',
+            'vfscanf',
+            'array_merge',
+            'array_merge_recursive',
+            'array_push',
+            'array_unshift',
+            'array_replace',
+            'array_replace_recursive',
+            'array_diff',
+            'array_diff_assoc',
+            'array_diff_key',
+            'array_diff_uassoc',
+            'array_diff_ukey',
+            'array_intersect',
+            'array_intersect_assoc',
+            'array_intersect_key',
+            'array_intersect_uassoc',
+            'array_intersect_ukey',
+            'array_udiff',
+            'array_udiff_assoc',
+            'array_udiff_uassoc',
+            'array_uintersect',
+            'array_uintersect_assoc',
+            'array_uintersect_uassoc',
+            'array_multisort',
+            'call_user_func',
+            'forward_static_call',
+            'compact',
+            'var_dump',
+            'debug_zval_dump',
+            'register_shutdown_function',
+            'register_tick_function',
+            'max',
+            'min',
+            'array_map',
+            'setlocale',
+            'mb_convert_variables',
+        ];
     }
 
     /**
