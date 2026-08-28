@@ -294,8 +294,11 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHtmlspecialcharsDecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringPregQuote::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringQuotemeta::ensureLinked($this->context);
-        \PHPCompiler\JIT\Builtin\CtypeRuntime::ensureLinked($this->context);
+        // StringQuotemeta / CtypeRuntime / StringSodium always-on ensureLinked removed (#35609):
+        // ext/standard/quotemeta.php / ext/ctype/JitCtype.php / ext/sodium/JitSodium already
+        // ensureLinked before lookup (peer #34513 Type::initialize lazy). Scripts that never
+        // call quotemeta()/ctype_*/sodium_* skip NestedJIT on the full load path. Leftover
+        // Type::implement vs Runtime ABI drift mints *.1 (#31894 / #32122).
         \PHPCompiler\JIT\Builtin\StringAddslashes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringStripslashes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUrlencode::implement($this->context);
@@ -303,7 +306,6 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUcwords::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringSodium::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\StringSerialize::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUnserialize::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHttpBuildQuery::implement($this->context);
