@@ -66,12 +66,6 @@ final class UndefinedVariableHelper
         if (null === $name) {
             return;
         }
-        $resolved = $context->resolveRefAliasName($name);
-        // Name already bound in this function (param/local) — treat as assigned even when
-        // the init flag global was missed (typed string formals / include inlines) (#31101).
-        if (isset($context->namedVariableBindings[$resolved])) {
-            return;
-        }
         // Arrow-fn / closure use() captures are bound in the LLVM prologue before body
         // code runs; emitting ZEND_CHECK_UNDEFINED_VAR for them is spurious (#10304, #24106).
         $block = $context->jitCurrentBlock;
@@ -106,10 +100,12 @@ final class UndefinedVariableHelper
 
     private static function emitAssignedFlagGuard(Context $context, string $name): void
     {
-        UndefinedVariableRuntime::ensureLinked($context);
-        if (null === BasicBlockHelper::tryGetInsertBlock($context)) {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $savedInsert) {
             return;
         }
+        UndefinedVariableRuntime::ensureLinked($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         $key = ScopeVariableAssignedFlags::flagKey($context, $name);
         $isAssigned = ScopeVariableAssignedFlags::isAssignedCondition($context, $key);
         try {

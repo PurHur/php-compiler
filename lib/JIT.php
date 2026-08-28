@@ -11615,6 +11615,13 @@ class JIT {
                         $arg = $this->resolveScriptGlobalForRuntimeRead($echoOp, $block)
                             ?? $this->context->getVariableFromOpInScopes($echoOp);
                     }
+                    if (null === $scriptGlobalEchoName && $this->context->hasVariableOp($echoOp)) {
+                        JIT\UndefinedVariableHelper::guardBeforeRuntimeRead(
+                            $this->context,
+                            $echoOp,
+                            $this->context->getVariableFromOp($echoOp)
+                        );
+                    }
                     if ($this->context->inlineIncludeDepth > 0) {
                         $echoName = JIT\OperandName::resolve($echoOp);
                         // Refresh before echo of inherited include-bindings after ?? (#866).

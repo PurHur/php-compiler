@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\JIT\LibcExtern;
@@ -33,6 +34,7 @@ final class UndefinedVariableRuntime
 
     public static function implement(Context $context): void
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $probe = $context->module->getNamedFunction(self::ABI_EMIT_WARNING);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -46,7 +48,11 @@ final class UndefinedVariableRuntime
         }
         self::implementEmitWarningBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null === $savedInsert) {
+            $context->builder->clearInsertionPosition();
+        } else {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
     }
 
     public static function emitWarningForName(Context $context, string $name): void
@@ -54,22 +60,24 @@ final class UndefinedVariableRuntime
         if ('' === $name) {
             return;
         }
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
         $message = \PHPCompiler\VM\UndefinedVariableJitHelper::warningMessage($name);
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
         $msgLen = $sizeT->constInt(\strlen($message), false);
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $lineVal = $i32->constInt(max(0, $context->callSiteLine), false);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
             $msgLen,
             $i32->constInt(ErrorReporter::E_WARNING, false),
-            $emptyFile,
-            $lineVal
+            self::errorTriggerFilePtr($context),
+            self::errorTriggerLineVal($context)
         );
     }
 
@@ -150,16 +158,32 @@ final class UndefinedVariableRuntime
             $fmtPtr,
             $bufPtr
         );
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $lineVal = $i32->constInt(max(0, $context->callSiteLine), false);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),
             $msgBufPtr,
             $context->builder->zext($written, $sizeT),
             $i32->constInt(ErrorReporter::E_WARNING, false),
-            $emptyFile,
-            $lineVal
+            self::errorTriggerFilePtr($context),
+            self::errorTriggerLineVal($context)
         );
+    }
+
+    private static function errorTriggerFilePtr(Context $context): \PHPLLVM\Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $path = $context->jitAotEntryScriptPath;
+
+        return $context->builder->pointerCast(
+            $context->constantFromString('' !== $path ? $path : 'Standard input code'),
+            $i8p
+        );
+    }
+
+    private static function errorTriggerLineVal(Context $context): \PHPLLVM\Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+
+        return $i32->constInt(max(0, $context->callSiteLine), false);
     }
 
     private static function registerLinkedRuntime(Context $context): void

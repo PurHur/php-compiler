@@ -277,12 +277,11 @@ final class JitIntdiv
                     } else {
                         BasicBlockHelper::ensureOpenInsertBlock($context, 'floatstr_int_prec_warn_setup');
                     }
-                    $i8p = $context->getTypeFromString('int8*');
-                    $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
                     self::emitConstFloatToIntPrecisionDeprecated(
                         $context,
                         VmMath::floatStringToIntPrecisionWarningMessage($lit),
-                        $emptyFile
+                        self::errorTriggerFilePtr($context),
+                        self::errorTriggerLineVal($context)
                     );
                 }
             } else {
@@ -495,7 +494,8 @@ final class JitIntdiv
         $charPtr = $context->getTypeFromString('char*');
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $errorFile = self::errorTriggerFilePtr($context);
+        $errorLine = self::errorTriggerLineVal($context);
         $nonFiniteMsg = BasicBlockHelper::append($context, 'intdiv_float_prec_nfin');
         $finiteMsg = BasicBlockHelper::append($context, 'intdiv_float_prec_fin');
         $context->builder->branchIf($nonFinite, $nonFiniteMsg, $finiteMsg);
@@ -510,7 +510,8 @@ final class JitIntdiv
         self::emitConstFloatToIntPrecisionDeprecated(
             $context,
             'Implicit conversion from float NAN to int loses precision',
-            $emptyFile
+            $errorFile,
+            $errorLine
         );
         $context->builder->branch($afterWarn);
         $context->builder->positionAtEnd($infBlock);
@@ -523,14 +524,16 @@ final class JitIntdiv
         self::emitConstFloatToIntPrecisionDeprecated(
             $context,
             'Implicit conversion from float -INF to int loses precision',
-            $emptyFile
+            $errorFile,
+            $errorLine
         );
         $context->builder->branch($afterWarn);
         $context->builder->positionAtEnd($posInfBlock);
         self::emitConstFloatToIntPrecisionDeprecated(
             $context,
             'Implicit conversion from float INF to int loses precision',
-            $emptyFile
+            $errorFile,
+            $errorLine
         );
         $context->builder->branch($afterWarn);
 
@@ -560,8 +563,8 @@ final class JitIntdiv
             $msgPtr,
             $context->builder->zExt($written, $sizeT),
             $i32->constInt(ErrorReporter::E_DEPRECATED, false),
-            $emptyFile,
-            $i32->constInt(0, false)
+            $errorFile,
+            $errorLine
         );
         $context->builder->call($context->lookupFunction('__mm__free'), $buf);
         $context->builder->branch($afterWarn);
@@ -572,7 +575,8 @@ final class JitIntdiv
     private static function emitConstFloatToIntPrecisionDeprecated(
         Context $context,
         string $message,
-        Value $emptyFile
+        Value $errorFile,
+        Value $errorLine
     ): void {
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
@@ -583,9 +587,27 @@ final class JitIntdiv
             $msgPtr,
             $sizeT->constInt(\strlen($message), false),
             $i32->constInt(ErrorReporter::E_DEPRECATED, false),
-            $emptyFile,
-            $i32->constInt(0, false)
+            $errorFile,
+            $errorLine
         );
+    }
+
+    private static function errorTriggerFilePtr(Context $context): Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $path = $context->jitAotEntryScriptPath;
+
+        return $context->builder->pointerCast(
+            $context->constantFromString('' !== $path ? $path : 'Standard input code'),
+            $i8p
+        );
+    }
+
+    private static function errorTriggerLineVal(Context $context): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+
+        return $i32->constInt(max(0, $context->callSiteLine), false);
     }
 
     /**
