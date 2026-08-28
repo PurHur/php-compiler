@@ -616,6 +616,12 @@ class AotTest extends BaseTest
      */
     private static function applyDefaultAotWebEnv(array &$env, string $caseName): void
     {
+        // session_start($options) repro compares body only — CLI semantics (#33945 / #33445).
+        if (str_contains($caseName, 'session_start_options_33945')) {
+            unset($env['REQUEST_METHOD'], $env['GATEWAY_INTERFACE']);
+
+            return;
+        }
         if (isset($env['REQUEST_METHOD'])) {
             return;
         }

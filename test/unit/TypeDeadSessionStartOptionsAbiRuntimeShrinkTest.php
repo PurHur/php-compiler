@@ -9,9 +9,9 @@ use PHPUnit\Framework\TestCase;
 /**
  * Drop Type::register always-on SessionStartOptions NestedJIT (#33945 / peer #33909).
  *
- * NestedJIT/AOT bridge stays SessionStartOptionsRuntime / JitSessionStartOptions
- * (php-src ext/session/session.c). Call-site ensureLinked owns the ABI so leftover
- * Type always-on NestedJIT cannot mint session_start_options_apply.1
+ * NestedJIT/AOT apply stays SessionStartOptionsRuntime / JitSessionStartOptions
+ * (php-src ext/session/session.c). Call-site applyOptionsAtCallSite owns the helper
+ * so leftover Type always-on NestedJIT cannot mint session_start_options_apply.1
  * (#31894 / #32122).
  */
 final class TypeDeadSessionStartOptionsAbiRuntimeShrinkTest extends TestCase
@@ -53,14 +53,14 @@ final class TypeDeadSessionStartOptionsAbiRuntimeShrinkTest extends TestCase
             'SessionStartOptionsRuntime::ensureLinked must link trigger_error before NestedJIT (#33248/#33945)'
         );
         $this->assertStringContainsString('__phpc_session_start_options_apply', $owner);
-        $this->assertStringContainsString('getNamedFunction', $owner);
+        $this->assertStringContainsString('compileTimeAssoc', $owner);
     }
 
     public function testCallSiteEnsureLinksBeforeLookup(): void
     {
         $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSessionStartOptions.php');
-        $this->assertStringContainsString('SessionStartOptionsRuntime::ensureLinked($context)', $jit);
-        $this->assertStringContainsString('SessionStartOptionsRuntime::ABI', $jit);
+        $this->assertStringContainsString('SessionStartOptionsRuntime::applyOptionsAtCallSite($context, $options)', $jit);
+        $this->assertStringContainsString('#33945', $jit);
     }
 
     public function testNoNewRuntimeCForSessionStartOptionsAbi(): void

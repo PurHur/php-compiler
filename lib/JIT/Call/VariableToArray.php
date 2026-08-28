@@ -34,7 +34,16 @@ final class VariableToArray implements Call
                 : $context->builder->load($receiver->value);
         }
         $ptr = JitValueBox::valuePtrFromVariable($context, $receiver);
+        // NestedJIT formals are `__value__*` with KIND_VARIABLE; loadHashtablePointer
+        // must see KIND_VALUE like {@see \PHPCompiler\ext\standard\JitJsonEncode::encodeBoxedValue}
+        // (#33945 session_start options — raw readHashtable SIGABRT on kind-7 boxes).
+        $boxedArray = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VALUE,
+            JitValueBox::normalizeValuePtr($context, $ptr)
+        );
 
-        return $context->builder->call($context->lookupFunction('__value__readHashtable'), $ptr);
+        return HashTableHelper::loadHashtablePointer($context, $boxedArray);
     }
 }
