@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\iconv\CharsetEngine;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MbConvertEncodingRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\MbConvertEncodingArrayLlvm;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -37,17 +42,44 @@ final class JitMbConvertEncoding
             return $folded;
         }
 
-        if (self::isArrayArg($args[0])) {
-            throw new \LogicException(
-                'mb_convert_encoding() array $string is not lowered for JIT/AOT in this compiler build'
-            );
-        }
-
         $fromIsDefault = 2 === $argc
             || (
                 3 === $argc
                 && (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant)
             );
+
+        if (self::isArrayArg($args[0])) {
+            $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+            MbConvertEncodingRuntime::ensureLinked($context);
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_convert_encoding_array_runtime');
+
+            [$toPtr, $assertTo] = self::toEncodingPtr($context, $args[1]);
+            if ($assertTo) {
+                $context->builder->call(
+                    MbConvertEncodingRuntime::assertToEncodingHelper($context),
+                    $toPtr
+                );
+            }
+
+            if ($fromIsDefault) {
+                $fromLit = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
+                $fromPtr = $context->builder->load($context->constantStringFromString($fromLit));
+            } else {
+                [$fromPtr, $assertFrom] = self::fromEncodingPtr($context, $args[2]);
+                if ($assertFrom) {
+                    $context->builder->call(
+                        MbConvertEncodingRuntime::assertFromEncodingHelper($context),
+                        $fromPtr
+                    );
+                }
+            }
+
+            return MbConvertEncodingArrayLlvm::convert($context, $args[0], $toPtr, $fromPtr);
+        }
+
         // Runtime / non-literal array $from_encoding — never JitStringBuiltinArg::lower (#35296).
         if (!$fromIsDefault && self::isArrayArg($args[2])) {
             throw new \LogicException(
@@ -200,10 +232,9 @@ final class JitMbConvertEncoding
         int $argc,
         bool $sourceIsNull
     ): ?Value {
-        $sourceLit = $sourceIsNull ? '' : JitStringBuiltinArg::compileTimeLiteral($args[0]);
         $toLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
         $fromList = self::compileTimeFromEncodingList($context, $args, $argc);
-        if (null === $sourceLit || null === $toLit || null === $fromList) {
+        if (null === $toLit || null === $fromList) {
             return null;
         }
         if ([] === $fromList) {
@@ -223,12 +254,28 @@ final class JitMbConvertEncoding
         if (!self::isValidMbConvertEncodingName($toLit)) {
             return self::foldFalse($context);
         }
-        $converted = VmMbstring::convertEncodingWithFromList($sourceLit, $toLit, $fromList);
-        if (false === $converted) {
-            return self::foldFalse($context);
+
+        $sourceLit = $sourceIsNull ? '' : JitStringBuiltinArg::compileTimeLiteral($args[0]);
+        if (null !== $sourceLit) {
+            $converted = VmMbstring::convertEncodingWithFromList($sourceLit, $toLit, $fromList);
+            if (false === $converted) {
+                return self::foldFalse($context);
+            }
+
+            return self::foldString($context, $converted);
         }
 
-        return self::foldString($context, $converted);
+        $sourceHt = self::compileTimeSourceHashTable($context, $args[0]);
+        if (null !== $sourceHt) {
+            $result = VmMbstring::convertEncodingSourceArray($sourceHt, $toLit, $fromList);
+            if (false === $result) {
+                return self::foldFalse($context);
+            }
+
+            return self::foldHashTable($context, $result);
+        }
+
+        return null;
     }
 
     /**
@@ -372,5 +419,142 @@ final class JitMbConvertEncoding
         );
 
         return $ptr;
+    }
+
+    private static function foldHashTable(Context $context, HashTable $table): Value
+    {
+        $htVar = HashTableHelper::variableFromVmHashTable($context, $table);
+        $ht = HashTableHelper::loadHashtablePointer($context, $htVar);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $ptr, $ht);
+
+        return $ptr;
+    }
+
+    /**
+     * @param array<string|int, mixed> $php
+     */
+    private static function phpAssocToHashTable(array $php): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($php as $key => $val) {
+            $cell = self::phpScalarToVariable($val);
+            if (\is_int($key) || (\is_string($key) && ctype_digit($key) && (string) (int) $key === $key)) {
+                $ht->addIndex((int) $key, $cell);
+            } else {
+                $ht->add((string) $key, $cell);
+            }
+        }
+
+        return $ht;
+    }
+
+    private static function phpScalarToVariable(mixed $val): VmVariable
+    {
+        $out = new VmVariable();
+        if (null === $val) {
+            $out->null();
+        } elseif (\is_bool($val)) {
+            $out->bool($val);
+        } elseif (\is_int($val)) {
+            $out->int($val);
+        } elseif (\is_float($val)) {
+            $out->float($val);
+        } elseif (\is_string($val)) {
+            $out->string($val);
+        } elseif (\is_array($val)) {
+            $out->array(self::phpAssocToHashTable($val));
+        } else {
+            $out->null();
+        }
+
+        return $out;
+    }
+
+    private static function compileTimeSourceHashTable(Context $context, JITVariable $arg): ?HashTable
+    {
+        if (\is_array($arg->compileTimeAssoc)) {
+            return self::phpAssocToHashTable($arg->compileTimeAssoc);
+        }
+        if (null !== ($arg->compileTimeArray ?? null)) {
+            $ht = new HashTable();
+            $i = 0;
+            foreach ($arg->compileTimeArray as $elem) {
+                if (\is_string($elem)) {
+                    $cell = new VmVariable();
+                    $cell->string($elem);
+                    $ht->addIndex($i, $cell);
+                } elseif ($elem instanceof JITVariable) {
+                    $s = JitStringArg::compileTimeLiteral($elem);
+                    if (null === $s) {
+                        return null;
+                    }
+                    $cell = new VmVariable();
+                    $cell->string($s);
+                    $ht->addIndex($i, $cell);
+                } else {
+                    return null;
+                }
+                ++$i;
+            }
+
+            return $ht;
+        }
+        if (!ArrayBuiltinHelper::isNativeArray($arg->type) || 0 === $arg->nextFreeElement) {
+            if ($arg->compileTimeEmptyArrayLiteral ?? false) {
+                return new HashTable();
+            }
+
+            return null;
+        }
+        $ht = new HashTable();
+        for ($i = 0; $i < $arg->nextFreeElement; ++$i) {
+            $elem = $arg->dimFetch(JITVariable::fromConstantInt($context, $i));
+            $resolved = self::compileTimeSourceElement($context, $elem);
+            if (null === $resolved) {
+                return null;
+            }
+            $ht->addIndex($i, $resolved);
+        }
+
+        return $ht;
+    }
+
+    private static function compileTimeSourceElement(Context $context, JITVariable $elem): ?VmVariable
+    {
+        $s = JitStringArg::compileTimeLiteral($elem);
+        if (null !== $s) {
+            $out = new VmVariable();
+            $out->string($s);
+
+            return $out;
+        }
+        if (null !== $elem->compileTimeLong && JITVariable::TYPE_NATIVE_LONG === $elem->type) {
+            $out = new VmVariable();
+            $out->int((int) $elem->compileTimeLong);
+
+            return $out;
+        }
+        if (null !== $elem->compileTimeFloat) {
+            $out = new VmVariable();
+            $out->float($elem->compileTimeFloat);
+
+            return $out;
+        }
+        if ($elem->isNullConstant || JITVariable::TYPE_NULL === $elem->type) {
+            $out = new VmVariable();
+            $out->null();
+
+            return $out;
+        }
+        if (null !== $elem->compileTimeBool) {
+            $out = new VmVariable();
+            $out->bool($elem->compileTimeBool);
+
+            return $out;
+        }
+
+        return null;
     }
 }

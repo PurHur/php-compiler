@@ -50,6 +50,17 @@ final class MbConvertEncodingRuntimeAotTest extends TestCase
         );
     }
 
+    public function testAotArrayStringOperandMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(
+            __DIR__.'/../repro/mb_convert_encoding_array_string_aot.php',
+            []
+        );
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
@@ -69,6 +80,7 @@ final class MbConvertEncodingRuntimeAotTest extends TestCase
             'array $from_encoding is not lowered for JIT/AOT runtime',
             $jit
         );
+        $this->assertStringContainsString('MbConvertEncodingArrayLlvm', $jit);
         $this->assertStringNotContainsString(
             'to_encoding must be a string literal in this compiler build',
             $jit
