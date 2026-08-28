@@ -1153,11 +1153,11 @@ final class JitDomDocumentMethodKernel
     public static function ensureSetIdAttributeNodeTrueBridge(Context $context): void
     {
         $objPtr = $context->getTypeFromString('__object__*');
-        self::ensureBridge(
+        self::ensureContextBridge(
             $context,
             \PHPCompiler\JIT\Builtin\DomSetIdAttributeRuntime::ABI_NODE_TRUE,
             'dom_element_set_id_attribute_node_true_user_script',
-            [$objPtr, $objPtr],
+            [$objPtr],
             $context->context->voidType(),
             'PHPCompiler\\ext\\dom\\DomSetIdAttributeJitHelper::setIdNodeTrueArgv',
             '/ext/dom/DomSetIdAttributeJitHelper.php'
@@ -1167,11 +1167,11 @@ final class JitDomDocumentMethodKernel
     public static function ensureSetIdAttributeNodeFalseBridge(Context $context): void
     {
         $objPtr = $context->getTypeFromString('__object__*');
-        self::ensureBridge(
+        self::ensureContextBridge(
             $context,
             \PHPCompiler\JIT\Builtin\DomSetIdAttributeRuntime::ABI_NODE_FALSE,
             'dom_element_set_id_attribute_node_false_user_script',
-            [$objPtr, $objPtr],
+            [$objPtr],
             $context->context->voidType(),
             'PHPCompiler\\ext\\dom\\DomSetIdAttributeJitHelper::setIdNodeFalseArgv',
             '/ext/dom/DomSetIdAttributeJitHelper.php'

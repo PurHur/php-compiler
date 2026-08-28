@@ -313,6 +313,97 @@ final class JitVmHelperLink
     }
 
     /**
+     * ABI bridge with implicit VmActiveContext as helper arg 0 (#33758 / peer DomAttrIsIdJitHelper).
+     *
+     * @param list<Type> $paramTypes ABI parameter types (helper receives Context + these)
+     */
+    public static function ensureContextBridge(
+        Context $context,
+        string $abiName,
+        string $entryBlockName,
+        array $paramTypes,
+        Type $returnType,
+        string $helperLogical,
+        string $relativeHelperPath,
+        array $compiledHelpers,
+        string $issueTag,
+        bool $skipHelperRuntimeCache = false
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (self::hasNamedBridgeEntry($probe, $entryBlockName)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        self::ensureCompiled(
+            $context,
+            $relativeHelperPath,
+            $compiledHelpers,
+            $issueTag,
+            $skipHelperRuntimeCache
+        );
+
+        $helperFn = self::lookupCompiled($context, $helperLogical, $issueTag);
+        $ft = $context->context->functionType($returnType, false, ...$paramTypes);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = self::bridgeEntryForEmit($fn, $entryBlockName);
+        $context->builder->positionAtEnd($entry);
+        $vmCtx = $context->builder->call(VmActiveContextLlvm::lookupAbi($context));
+        $args = [
+            JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $vmCtx,
+                $helperFn->getParam(0)->typeOf()
+            ),
+        ];
+        for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i + 1)->typeOf()
+            );
+        }
+        $result = $context->builder->call($helperFn, ...$args);
+        if ('void' === $context->getStringFromType($returnType)) {
+            $context->builder->returnVoid();
+        } else {
+            $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
+            $context->builder->returnValue($ret);
+        }
+        $context->registerFunction($abiName, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $fallback = null;
+            if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
+                $active = $context->functions[$context->activeFunction];
+                if ($active instanceof LlvmFunction) {
+                    $fallback = $active;
+                }
+            }
+            if (null === $fallback && $context->main instanceof LlvmFunction) {
+                $fallback = $context->main;
+            }
+            if (null !== $fallback && $fallback->countBasicBlocks() > 0) {
+                $context->builder->positionAtEnd($fallback->getEntryBasicBlock());
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+        }
+    }
+
+    /**
      * Resolve helper source path: ext/* and lib/* live at repo root; /VM/* under lib/.
      */
     private static function resolveHelperPath(string $relativeHelperPath): string

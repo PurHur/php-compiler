@@ -2968,6 +2968,30 @@ final class VmDom
     }
 
     /**
+     * Thin-AOT helper entry: resolve owner from Attr and delegate (#33758).
+     */
+    public static function setIdAttributeNodeOnAttrOwner(ObjectEntry $attr, bool $isId): void
+    {
+        if (!self::isAttr($attr)) {
+            throw new \TypeError('DOMElement::setIdAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+        if (!$attr->hasProperty(self::PROP_OWNER_ELEMENT)) {
+            return;
+        }
+        $ownerVar = $attr->getProperty(self::PROP_OWNER_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $ownerVar->type) {
+            return;
+        }
+        $element = $ownerVar->toObject();
+        self::syncDomRegistryParentChainFromProperties($element);
+        $qName = self::resolveThinAotSetIdNodeQName($element, $attr);
+        if ('' !== $qName) {
+            self::seedThinAotElementAttribute($element, $qName, self::thinAttrValue($attr));
+        }
+        self::setIdAttributeNode($element, $attr, $isId);
+    }
+
+    /**
      * DOMElement::setIdAttributeNode() — mark an owned Attr as ID (php-src ext/dom/element.c; #20123).
      * Zend: NOT_FOUND_ERR when attr->parent != element.
      */

@@ -144,11 +144,11 @@ final class DomSetIdAttributeRuntime
     private static function linkNode(Context $context, string $abi, string $entry, string $helper): void
     {
         $objPtr = $context->getTypeFromString('__object__*');
-        JitVmHelperLink::ensureBridge(
+        JitVmHelperLink::ensureContextBridge(
             $context,
             $abi,
             $entry,
-            [$objPtr, $objPtr],
+            [$objPtr],
             $context->context->voidType(),
             $helper,
             self::HELPER_PATH,

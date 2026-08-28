@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 
 /**
@@ -47,23 +48,13 @@ final class DomSetIdAttributeJitHelper
         VmDom::setIdAttributeNS($element, $ns, $localName, false);
     }
 
-    public static function setIdNodeTrueArgv(ObjectEntry $element, ObjectEntry $attr): void
+    public static function setIdNodeTrueArgv(Context $ctx, ObjectEntry $attr): void
     {
-        VmDom::syncDomRegistryParentChainFromProperties($element);
-        $qName = VmDom::resolveThinAotSetIdNodeQName($element, $attr);
-        if ('' !== $qName) {
-            VmDom::seedThinAotElementAttribute($element, $qName, VmDom::thinAttrValue($attr));
-        }
-        VmDom::setIdAttributeNode($element, $attr, true);
+        VmDom::setIdAttributeNodeOnAttrOwner($attr, true);
     }
 
-    public static function setIdNodeFalseArgv(ObjectEntry $element, ObjectEntry $attr): void
+    public static function setIdNodeFalseArgv(Context $ctx, ObjectEntry $attr): void
     {
-        VmDom::syncDomRegistryParentChainFromProperties($element);
-        $qName = VmDom::resolveThinAotSetIdNodeQName($element, $attr);
-        if ('' !== $qName) {
-            VmDom::seedThinAotElementAttribute($element, $qName, VmDom::thinAttrValue($attr));
-        }
-        VmDom::setIdAttributeNode($element, $attr, false);
+        VmDom::setIdAttributeNodeOnAttrOwner($attr, false);
     }
 }
