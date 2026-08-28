@@ -3622,6 +3622,7 @@
         "ext/standard/SessionGcJitHelper.php",
         "ext/standard/SessionNameJitHelper.php",
         "ext/standard/SessionStartOptions.php",
+        "ext/standard/SessionStartOptionsAotJitHelper.php",
         "ext/standard/SessionStartOptionsJitHelper.php",
         "ext/standard/SessionStorageJitHelper.php",
         "ext/standard/SetcookieLine.php",
