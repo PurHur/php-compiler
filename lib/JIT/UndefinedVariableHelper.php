@@ -16,18 +16,24 @@ final class UndefinedVariableHelper
 {
     public static function resolveTrackableName(Operand $op, Variable $var): ?string
     {
-        // VALUE boxes, native scalars, and native STRING slots (typed formals) — #10360 / #31101.
-        // Untyped locals start as i64/double allocas; guards must track them through float
-        // widen (promoteNativeLongLvalueToValueBox) or loop backedges warn spuriously (#23471).
-        if (
-            Variable::TYPE_VALUE !== $var->type
-            && Variable::TYPE_STRING !== $var->type
-            && Variable::TYPE_NATIVE_LONG !== $var->type
-            && Variable::TYPE_NATIVE_DOUBLE !== $var->type
-        ) {
+        if (Variable::KIND_VARIABLE !== $var->kind && !$var->functionStaticGlobal) {
             return null;
         }
-        if (Variable::KIND_VARIABLE !== $var->kind && !$var->functionStaticGlobal) {
+        // Script-global heap boxes and typed string formals (#10360 / #31101 MiniWebApp $route).
+        if ($var->functionStaticGlobal) {
+            if (
+                Variable::TYPE_VALUE !== $var->type
+                && Variable::TYPE_STRING !== $var->type
+            ) {
+                return null;
+            }
+        } elseif (!in_array($var->type, [
+            Variable::TYPE_VALUE,
+            Variable::TYPE_STRING,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::TYPE_NATIVE_BOOL,
+        ], true)) {
             return null;
         }
         $name = OperandName::resolve($op);
@@ -70,11 +76,21 @@ final class UndefinedVariableHelper
         if (null === $name) {
             return;
         }
+        $resolved = $context->resolveRefAliasName($name);
+        // foreach ($a as &$v) binds a live ref CV — reads/writes must not warn (#24010 / i11).
+        if (isset($context->foreachByRefLocalNames[$resolved])) {
+            return;
+        }
         // Arrow-fn / closure use() captures are bound in the LLVM prologue before body
         // code runs; emitting ZEND_CHECK_UNDEFINED_VAR for them is spurious (#10304, #24106).
         $block = $context->jitCurrentBlock;
-        if (null !== $block && in_array($name, $block->closureCaptureSlotNames, true)) {
-            return;
+        if (null !== $block) {
+            if (in_array($name, $block->closureCaptureSlotNames, true)) {
+                return;
+            }
+            if ($context->isForeachByRefLocalName($name, $block)) {
+                return;
+            }
         }
         self::emitAssignedFlagGuard($context, $name);
     }

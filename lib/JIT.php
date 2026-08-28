@@ -10518,7 +10518,11 @@ class JIT {
                         $this->context->setVariableOp($destOp, $value);
                         if (null !== $destName) {
                             $this->context->bindVariableByName($destName, $value);
-                            JIT\UndefinedVariableHelper::markAssigned($this->context, $destOp, $value);
+                            JIT\UndefinedVariableHelper::markAssigned(
+                                $this->context,
+                                $destOp,
+                                $value
+                            );
                         }
                         break;
                     }
@@ -19534,7 +19538,9 @@ class JIT {
                 $promoted
             );
         }
-        JIT\UndefinedVariableHelper::markAssigned($this->context, $resultOp, $promoted);
+        // Int-local widen to VALUE must mark assigned — guards only track VALUE slots
+        // (#23471 e28/mandelbrot spurious undef warnings after #35643).
+        $this->markScopeVariableAssignedIfTracked($resultOp, $promoted);
     }
 
     /**
@@ -20893,6 +20899,7 @@ class JIT {
         // Foreach by-ref must use hashtable index writes, not valueBoxAliasPtr (#4364, AOT {main}).
         if (null !== $result->foreachByRefPackedArm) {
             JIT\HashTableHelper::assignForeachByRefWritable($this->context, $result, $value);
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         }
@@ -20907,6 +20914,7 @@ class JIT {
                 $result->writableIndex,
                 $value
             );
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         }
@@ -21457,6 +21465,7 @@ class JIT {
             ) {
                 $this->copyObjectPropertyBacking($result, $value);
             }
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         }
@@ -21494,6 +21503,7 @@ class JIT {
                 $this->syncCompileTimeDatePeriod($result, $value, $force);
                 $this->noteDateTimeZoneLocal($resultOp, $value);
                 $this->noteDateTimeLocal($resultOp, $value);
+                $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
                 return;
             }
@@ -21570,6 +21580,7 @@ class JIT {
                     $this->syncCompileTimeDatePeriod($result, $value, $force);
                     $this->noteDateTimeZoneLocal($resultOp, $value);
                     $this->noteDateTimeLocal($resultOp, $value);
+                    $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
                     return;
                 }
@@ -21600,6 +21611,7 @@ class JIT {
                     $this->context->bindVariableByName($resolved, $result);
                 }
             }
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {
@@ -21628,7 +21640,8 @@ class JIT {
                 );
                     // Null → VALUE box is always a compile-time null for builtin soft-null (#22680).
                     $result->isNullConstant = true;
-    
+                    $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
                     return;
                 case Variable::TYPE_NATIVE_LONG:
                     if (null !== $result->writableHt && null !== $result->writableObjectKey) {
@@ -21671,7 +21684,8 @@ class JIT {
                     $result->compileTimeEnumCase = $value->compileTimeEnumCase;
                     // Keep scalar immediates across value-box assign (#23427).
                     $result->compileTimeLong = $value->compileTimeLong;
-    
+                    $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
                     return;
                 case Variable::TYPE_NATIVE_DOUBLE:
                     $this->context->builder->call(
@@ -21684,7 +21698,8 @@ class JIT {
                     $this->syncCompileTimeBcmathNumber($result, $value, $force);
                     $this->syncCompileTimeDomTagName($result, $value, $force);
                     $this->syncCompileTimeDatePeriod($result, $value, $force);
-    
+                    $this->markScopeVariableAssignedIfTracked($resultOp, $result);
+
                     return;
                 case Variable::TYPE_NATIVE_BOOL:
                     if (null !== $result->writableHt && null !== $result->writableStringKey) {
@@ -21707,6 +21722,7 @@ class JIT {
                     );
                     // Keep scalar immediates across value-box assign (#23427).
                     $result->compileTimeLong = $value->compileTimeLong;
+                    $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
                     return;
                 case Variable::TYPE_STRING:
@@ -21884,6 +21900,7 @@ class JIT {
             $result->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($result, $value, $force);
             $this->recordListUnpackAssignSlot($resultOp, $result);
+            $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
             return;
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {
