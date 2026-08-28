@@ -271,6 +271,9 @@ final class JitDomCloneNode
             $attrs = JitDomCreateElementAttrs::formatSuffix($attrMap);
         }
         $inner = $deep ? ($receiver->compileTimeDomInnerXml ?? '') : '';
+        if ($deep && '' !== $inner) {
+            $inner = self::dedupeAdjacentChildMarkup($inner);
+        }
         $openAttrs = '' === $attrs ? '' : (str_starts_with($attrs, ' ') ? $attrs : ' '.$attrs);
         $outer = '<'.$tag.$openAttrs.'>'.$inner.'</'.$tag.'>';
         $text = $deep ? DomParseSimpleXmlJitHelper::rootTextContentArgv($outer) : '';
@@ -282,6 +285,23 @@ final class JitDomCloneNode
             'inner' => $inner,
             'text' => $text,
         ];
+    }
+
+    /** Collapse compile-time inner doubled by dual-emit appendChild concat (#35386). */
+    private static function dedupeAdjacentChildMarkup(string $inner): string
+    {
+        $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks($inner);
+        if (\count($chunks) < 2) {
+            return $inner;
+        }
+        $deduped = [];
+        foreach ($chunks as $chunk) {
+            if ([] === $deduped || $deduped[\count($deduped) - 1] !== $chunk) {
+                $deduped[] = $chunk;
+            }
+        }
+
+        return \count($deduped) < \count($chunks) ? implode('', $deduped) : $inner;
     }
 
     /**

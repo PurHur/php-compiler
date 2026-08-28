@@ -136,6 +136,8 @@ final class JitDomReplaceChild
                 ? JitDomLoadXMLUserScript::lastCompileTimeXml()
                 : null);
         if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            self::rememberDetachedCreateElementChild($oldChildVar);
+
             return;
         }
         $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
@@ -192,6 +194,40 @@ final class JitDomReplaceChild
         $oldChildVar->compileTimeDomTagName = $parsedOld['tag'];
         $oldChildVar->compileTimeDomChildIndex = $index;
         $oldChildVar->compileTimeDomInnerXml = $parsedOld['inner'];
+        $oldChildVar->compileTimeDomNodePath = null;
+    }
+
+    /**
+     * createElement trees (no loadXML SSOT): synthesize detached markup from Variable/sticky
+     * tag + attrs — peer {@see JitDomRemoveChild::rememberDetachedChildBeforeLiveSlots} (#35386).
+     */
+    private static function rememberDetachedCreateElementChild(JITVariable $oldChildVar): void
+    {
+        $expectTag = $oldChildVar->compileTimeDomTagName
+            ?? JitDomNodeChildProperty::$stickyChildEdgeTagName
+            ?? JitDomNodeChildProperty::$lastFetchedTagName
+            ?? null;
+        if (null === $expectTag || '' === $expectTag) {
+            return;
+        }
+        $attrs = '';
+        $attrMap = $oldChildVar->compileTimeDomAttributes;
+        $id = $oldChildVar->compileTimeDomElementId ?? null;
+        if (null === $attrMap || [] === $attrMap) {
+            if (null !== $id) {
+                $attrMap = JitDomCreateElementAttrs::get($id);
+            }
+        }
+        if (null !== $attrMap && [] !== $attrMap) {
+            $attrs = JitDomCreateElementAttrs::formatSuffix($attrMap);
+        }
+        $inner = $oldChildVar->compileTimeDomInnerXml ?? '';
+        $openAttrs = '' === $attrs ? '' : (str_starts_with($attrs, ' ') ? $attrs : ' '.$attrs);
+        $markup = '' === $inner
+            ? '<'.$expectTag.$openAttrs.'/>'
+            : '<'.$expectTag.$openAttrs.'>'.$inner.'</'.$expectTag.'>';
+        JitDomCloneNode::rememberDetachedChildMarkup($markup);
+        $oldChildVar->compileTimeDomTagName = $expectTag;
         $oldChildVar->compileTimeDomNodePath = null;
     }
 

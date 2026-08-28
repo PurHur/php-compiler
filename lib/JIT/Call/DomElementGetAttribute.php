@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\ext\dom\JitDomCreateElementAttrs;
 use PHPCompiler\ext\dom\JitDomImportNode;
 use PHPCompiler\ext\dom\JitDomNamedNodeMap;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -47,6 +48,23 @@ final class DomElementGetAttribute implements Call
                 }
                 if (null !== $val && '' !== $val) {
                     return self::boxConstantString($context, $val);
+                }
+            }
+            // replaceChild clears the attrs bag on the return; read CreateElementAttrs (#35386).
+            $id = $args[0]->compileTimeDomElementId ?? null;
+            if (null !== $id) {
+                $fromSide = JitDomCreateElementAttrs::get($id);
+                if ([] !== $fromSide) {
+                    $val = $fromSide[$nameLit] ?? null;
+                    if (null === $val || '' === $val) {
+                        $pos = strpos($nameLit, ':');
+                        if (false !== $pos) {
+                            $val = $fromSide[substr($nameLit, $pos + 1)] ?? null;
+                        }
+                    }
+                    if (null !== $val && '' !== $val) {
+                        return self::boxConstantString($context, $val);
+                    }
                 }
             }
         }
