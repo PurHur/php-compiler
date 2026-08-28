@@ -16,10 +16,14 @@ final class UndefinedVariableHelper
 {
     public static function resolveTrackableName(Operand $op, Variable $var): ?string
     {
-        // VALUE boxes and native STRING slots (typed formals) — #10360 / #31101 MiniWebApp $route.
+        // VALUE boxes, native scalars, and native STRING slots (typed formals) — #10360 / #31101.
+        // Untyped locals start as i64/double allocas; guards must track them through float
+        // widen (promoteNativeLongLvalueToValueBox) or loop backedges warn spuriously (#23471).
         if (
             Variable::TYPE_VALUE !== $var->type
             && Variable::TYPE_STRING !== $var->type
+            && Variable::TYPE_NATIVE_LONG !== $var->type
+            && Variable::TYPE_NATIVE_DOUBLE !== $var->type
         ) {
             return null;
         }
