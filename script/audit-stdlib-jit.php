@@ -63,9 +63,13 @@ if ([] === $missing) {
     }
 }
 $md .= "\n## Deferred (VM-only)\n\n";
-foreach ($deferredRows as $row) {
-    $category = \PHPCompiler\JIT\SelfHostBuiltinPolicy::categoryFor($row['name']) ?? 'vm-only';
-    $md .= '- `'.$row['name'].'` ('.$category.') — `'.$row['file']."`\n";
+if ([] === $deferredRows) {
+    $md .= "_None — all open JIT deferrals cleared._\n";
+} else {
+    foreach ($deferredRows as $row) {
+        $category = \PHPCompiler\JIT\SelfHostBuiltinPolicy::categoryFor($row['name']) ?? 'vm-only';
+        $md .= '- `'.$row['name'].'` ('.$category.') — `'.$row['file']."`\n";
+    }
 }
 $md .= "\n## Present (sorted)\n\n";
 foreach ($present as $row) {
