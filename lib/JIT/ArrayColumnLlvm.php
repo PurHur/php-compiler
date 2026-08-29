@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
+use PHPCompiler\VM\EnumCasePropertyJitHelper;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -152,7 +154,7 @@ final class ArrayColumnLlvm
 
     /**
      * If $rowVar is an array hashtable, read $keyStr and append when present.
-     * Object/enum rows are skipped here (VM ArrayColumnJitHelper covers those).
+     * Enum case rows read name/value pseudo-properties (php-src array.c; #maintainer_gap_array_column_enum_cases_name).
      */
     private static function appendColumnFromRow(
         Context $context,
@@ -167,6 +169,7 @@ final class ArrayColumnLlvm
         $typeByte = $context->builder->load($context->builder->structGep($rowPtr, $valueMap['type']));
 
         $arrBb = BasicBlockHelper::append($context, 'array_column_row_arr_'.$tag);
+        $enumBb = BasicBlockHelper::append($context, 'array_column_row_enum_'.$tag);
         $done = BasicBlockHelper::append($context, 'array_column_row_done_'.$tag);
         // Value-box array rows use VM TYPE_ARRAY (6); some writers store JIT TYPE_HASHTABLE.
         $isVmArray = $context->builder->icmp(
@@ -180,7 +183,7 @@ final class ArrayColumnLlvm
             $i8->constInt(Variable::TYPE_HASHTABLE, false)
         );
         $isArray = $context->builder->or($isVmArray, $isJitHt);
-        $context->builder->branchIf($isArray, $arrBb, $done);
+        $context->builder->branchIf($isArray, $arrBb, $enumBb);
 
         $context->builder->positionAtEnd($arrBb);
         $rowHt = $context->builder->call(
@@ -228,6 +231,203 @@ final class ArrayColumnLlvm
         HashTableHelper::setAtIndex($context, $dest, $index, $cellVar);
         $context->builder->branch($done);
 
+        $context->builder->positionAtEnd($enumBb);
+        self::tryAppendEnumCaseColumn($context, $dest, $rowPtr, $typeByte, $keyStr, $done, $tag);
+
         $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Enum case rows: extract ->name / ->value when $keyStr matches (php-src php_array_column).
+     */
+    private static function tryAppendEnumCaseColumn(
+        Context $context,
+        Value $dest,
+        Value $rowPtr,
+        Value $typeByte,
+        Value $keyStr,
+        $done,
+        string $tag
+    ): void {
+        $objectType = $context->type->object;
+        if (!$objectType instanceof JitObjectType) {
+            $context->builder->branch($done);
+
+            return;
+        }
+        $enumIds = $objectType->registeredEnumClassIds();
+        if ([] === $enumIds) {
+            $context->builder->branch($done);
+
+            return;
+        }
+
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+        );
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(VmVariable::TYPE_ENUM_CASE & 0x7f, false)
+        );
+        $isObjectLike = $context->builder->or($isObject, $isEnumCase);
+
+        $objBb = BasicBlockHelper::append($context, 'array_column_enum_obj_'.$tag);
+        $context->builder->branchIf($isObjectLike, $objBb, $done);
+
+        $context->builder->positionAtEnd($objBb);
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $rowPtr
+        );
+
+        $nameKey = $context->builder->load($context->constantStringFromString('name'));
+        $valueKey = $context->builder->load($context->constantStringFromString('value'));
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $isNameKey = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $keyStr, $nameKey),
+            $zero
+        );
+        $isValueKey = $context->builder->icmp(
+            Builder::INT_EQ,
+            JitStringCompare::strcmp($context, $keyStr, $valueKey),
+            $zero
+        );
+        $isEnumProp = $context->builder->or($isNameKey, $isValueKey);
+
+        $propBb = BasicBlockHelper::append($context, 'array_column_enum_prop_'.$tag);
+        $context->builder->branchIf($isEnumProp, $propBb, $done);
+
+        $context->builder->positionAtEnd($propBb);
+        self::appendEnumCasePropertyWhenClassMatches(
+            $context,
+            $objectType,
+            $dest,
+            $objPtr,
+            $isNameKey,
+            $enumIds,
+            $done,
+            $tag
+        );
+    }
+
+    /**
+     * @param list<int> $enumIds
+     */
+    private static function appendEnumCasePropertyWhenClassMatches(
+        Context $context,
+        JitObjectType $objectType,
+        Value $dest,
+        Value $objPtr,
+        Value $isNameKey,
+        array $enumIds,
+        $done,
+        string $tag
+    ): void {
+        $objMap = $context->structFieldMap['__object__'];
+        $runtimeClassId = $context->builder->load(
+            $context->builder->structGep($objPtr, $objMap['class_id'])
+        );
+        $fn = BasicBlockHelper::parentFunction($context);
+        $i64 = $context->getTypeFromString('int64');
+        $checkBlock = $context->builder->getInsertBlock();
+        $lastIdx = \count($enumIds) - 1;
+        foreach ($enumIds as $idx => $enumId) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $runtimeClassId,
+                $i64->constInt($enumId, false)
+            );
+            $takeBlock = $fn->appendBasicBlock('array_column_enum_take_'.$enumId.'_'.$tag);
+            $nextBlock = $idx === $lastIdx
+                ? $done
+                : $fn->appendBasicBlock('array_column_enum_try_'.($idx + 1).'_'.$tag);
+            $context->builder->branchIf($match, $takeBlock, $nextBlock);
+
+            $context->builder->positionAtEnd($takeBlock);
+            $hasBacking = $objectType->enumHasBacking($enumId);
+            $nameBb = $fn->appendBasicBlock('array_column_enum_name_'.$enumId.'_'.$tag);
+            $valueBb = $fn->appendBasicBlock('array_column_enum_value_'.$enumId.'_'.$tag);
+            $context->builder->branchIf($isNameKey, $nameBb, $valueBb);
+
+            $context->builder->positionAtEnd($nameBb);
+            self::appendEnumCaseNameSlot($context, $objectType, $dest, $objPtr, $done, $tag.'_n'.$enumId);
+
+            $context->builder->positionAtEnd($valueBb);
+            if ($hasBacking) {
+                self::appendEnumCaseValueSlot($context, $objectType, $dest, $objPtr, $done, $tag.'_v'.$enumId);
+            } else {
+                $context->builder->branch($done);
+            }
+
+            $checkBlock = $nextBlock;
+        }
+        if ($checkBlock !== $done) {
+            $context->builder->positionAtEnd($checkBlock);
+            $context->builder->branch($done);
+        }
+    }
+
+    private static function appendEnumCaseNameSlot(
+        Context $context,
+        JitObjectType $objectType,
+        Value $dest,
+        Value $objPtr,
+        $done,
+        string $tag
+    ): void {
+        $slot = $objectType->enumCaseBuiltinPropertySlotPtr(
+            $objPtr,
+            EnumCasePropertyJitHelper::SLOT_NAME
+        );
+        $nameStr = $context->builder->pointerCast(
+            $context->builder->load($slot),
+            $context->getTypeFromString('__string__*')
+        );
+        $cellSlot = JitValueBox::alloc($context);
+        $cellPtr = JitValueBox::pointer($context, $cellSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $cellPtr,
+            $nameStr
+        );
+        $cellVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $cellSlot);
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $index = $context->builder->load($context->builder->structGep($dest, $htMap['nextFreeElement']));
+        HashTableHelper::setAtIndex($context, $dest, $index, $cellVar);
+        $context->builder->branch($done);
+    }
+
+    private static function appendEnumCaseValueSlot(
+        Context $context,
+        JitObjectType $objectType,
+        Value $dest,
+        Value $objPtr,
+        $done,
+        string $tag
+    ): void {
+        $slot = $objectType->enumCaseBuiltinPropertySlotPtr(
+            $objPtr,
+            EnumCasePropertyJitHelper::SLOT_VALUE
+        );
+        $cellSlot = JitValueBox::alloc($context);
+        $cellPtr = JitValueBox::pointer($context, $cellSlot);
+        $context->builder->call(
+            $context->lookupFunction('__object__load_value_slot'),
+            $slot,
+            $cellPtr
+        );
+        $cellVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $cellSlot);
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $index = $context->builder->load($context->builder->structGep($dest, $htMap['nextFreeElement']));
+        HashTableHelper::setAtIndex($context, $dest, $index, $cellVar);
+        $context->builder->branch($done);
     }
 }
