@@ -32,7 +32,13 @@ final class StringSubstrCompare
         self::SUBSTR_COMPARE_HELPER,
     ];
 
-    private const BRIDGE_ENTRY = 'substr_compare_bridge_entry';
+    private const BRIDGE_ENTRY = 'phpc_substr_compare_bridge_entry';
+
+    /** hay i8*, needle i8*, offset i64, length i64, case_insensitive i32 */
+    private const BRIDGE_PARAM_COUNT = 5;
+
+    /** Module-local ABI — avoids stale body-less `substr_compare` decl (#31894 / #4297). */
+    private const ABI_NAME = 'phpc_substr_compare';
 
     public static function ensureLinked(Context $context): void
     {
@@ -50,9 +56,9 @@ final class StringSubstrCompare
             return;
         }
 
-        $probe = $context->module->getNamedFunction('substr_compare');
+        $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
-            $context->registerFunction('substr_compare', $probe);
+            $context->registerFunction(self::ABI_NAME, $probe);
 
             return;
         }
@@ -72,7 +78,7 @@ final class StringSubstrCompare
 
     private static function implementBridge(Context $context): void
     {
-        $abiName = 'substr_compare';
+        $abiName = self::ABI_NAME;
         $probe = $context->module->getNamedFunction($abiName);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction($abiName, $probe);
@@ -84,9 +90,7 @@ final class StringSubstrCompare
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($i32, false, $i8p, $i8p, $i64, $i64, $i32);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
+        $fn = self::declareBridgeFunction($context, $abiName, $probe, $ft);
 
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
@@ -110,6 +114,27 @@ final class StringSubstrCompare
         );
         $context->builder->returnValue($context->builder->trunc($raw, $i32));
         $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * Ignore stale body-less decls with wrong param count (#31894 / #4297).
+     */
+    private static function declareBridgeFunction(
+        Context $context,
+        string $abiName,
+        ?LlvmFunction $probe,
+        \PHPLLVM\Type $ft
+    ): LlvmFunction {
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            return $probe;
+        }
+        if (null !== $probe && self::BRIDGE_PARAM_COUNT !== $probe->countParams()) {
+            $probe = null;
+        }
+
+        return null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
     }
 
     private static function stringFromCstr(Context $context, Value $cstr): Value
