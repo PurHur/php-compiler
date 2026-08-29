@@ -49,6 +49,7 @@ final class MbConvertVariables35315AotTest extends TestCase
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbConvertVariables.php');
         $this->assertStringContainsString('MbConvertVariablesRuntime::convertStringHelper', $jit);
         $this->assertStringContainsString('MbConvertVariablesRuntime::detectHelper', $jit);
+        $this->assertStringContainsString('MbConvertEncodingFromListLlvm::convert', $jit);
         $this->assertStringContainsString('MbConvertVariablesLlvm::convertArrayInPlace', $jit);
         $this->assertStringContainsString('MbConvertVariablesFromListLlvm::buildFromCsv', $jit);
         $this->assertStringNotContainsString(
@@ -74,9 +75,11 @@ final class MbConvertVariables35315AotTest extends TestCase
 
     private function runAot(string $src): string
     {
+        $root = dirname(__DIR__, 2);
         $bin = sys_get_temp_dir().'/phpc_mcv_35315_'.getmypid();
         @unlink($bin);
-        $compile = escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__, 2).'/bin/compile.php')
+        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
+            .escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $cout, $crc);
         $this->assertSame(0, $crc, implode("\n", $cout));

@@ -15,6 +15,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\MbConvertEncodingFromListLlvm;
 use PHPCompiler\JIT\MbConvertVariablesFromListLlvm;
 use PHPCompiler\JIT\MbConvertVariablesLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -48,6 +49,10 @@ final class JitMbConvertVariables
 
         $fromCsv = self::compileTimeFromCsv($args[1]);
         $runtimeFromArray = null === $fromCsv && self::isArrayArg($args[1]);
+        $fromUseRuntimeArrayList = $runtimeFromArray;
+        $fromUseCsvString = !$fromUseRuntimeArrayList
+            && null !== $fromCsv
+            && str_contains($fromCsv, ',');
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbConvertVariablesRuntime::ensureLinked($context);
@@ -129,7 +134,18 @@ final class JitMbConvertVariables
             } elseif (self::isObjectArg($args[$i])) {
                 self::lowerObjectVar($context, $args[$i], $toPtr, $fromPtr, $lastDetectedSlot, $anyFailSlot);
             } else {
-                self::lowerStringVar($context, $args[$i], $toPtr, $fromPtr, $lastDetectedSlot, $anyFailSlot, $i);
+                self::lowerStringVar(
+                    $context,
+                    $args[$i],
+                    $toPtr,
+                    $fromPtr,
+                    $lastDetectedSlot,
+                    $anyFailSlot,
+                    $i,
+                    $fromUseRuntimeArrayList,
+                    $fromUseCsvString,
+                    $args[1]
+                );
             }
         }
 
@@ -189,7 +205,10 @@ final class JitMbConvertVariables
         Value $fromPtr,
         Value $lastDetectedSlot,
         Value $anyFailSlot,
-        int $argIndex
+        int $argIndex,
+        bool $fromUseRuntimeArrayList,
+        bool $fromUseCsvString,
+        JITVariable $fromArg
     ): void {
         $i1 = $context->getTypeFromString('int1');
         $i64 = $context->getTypeFromString('int64');
@@ -219,19 +238,43 @@ final class JitMbConvertVariables
             $argIndex,
             'var'
         );
-        // MbConvertVariablesJitHelper::convertStringArgv parses CSV $from_encoding lists (#35315).
-        $converted = $context->builder->call(
-            MbConvertVariablesRuntime::convertStringHelper($context),
-            $str,
-            $toPtr,
-            $fromPtr
-        );
-        $detected = $context->builder->call(
-            MbConvertVariablesRuntime::detectHelper($context),
-            $str,
-            $toPtr,
-            $fromPtr
-        );
+        if ($fromUseRuntimeArrayList) {
+            // Runtime-built array $from_encoding — peer mb_convert_encoding FromListLlvm (#35315).
+            $resultBox = MbConvertEncodingFromListLlvm::convert($context, $str, $toPtr, $fromArg);
+            $converted = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $resultBox
+            );
+            $fromCsvPtr = MbConvertVariablesFromListLlvm::buildFromCsv($context, $fromArg);
+            $detected = $context->builder->call(
+                MbConvertVariablesRuntime::detectHelper($context),
+                $str,
+                $toPtr,
+                $fromCsvPtr
+            );
+        } elseif ($fromUseCsvString) {
+            $converted = $context->builder->call(
+                MbConvertVariablesRuntime::convertStringHelper($context),
+                $str,
+                $toPtr,
+                $fromPtr
+            );
+            $detected = $context->builder->call(
+                MbConvertVariablesRuntime::detectHelper($context),
+                $str,
+                $toPtr,
+                $fromPtr
+            );
+        } else {
+            // Single leaf $from_encoding — peer JitMbConvertEncoding::convertHelper (#35351).
+            $converted = $context->builder->call(
+                MbConvertEncodingRuntime::convertHelper($context),
+                $str,
+                $toPtr,
+                $fromPtr
+            );
+            $detected = $fromPtr;
+        }
 
         $owned = $context->builder->call($context->lookupFunction('__string__separate'), $converted);
         $context->builder->call($context->lookupFunction('__value__writeString'), $outPtr, $owned);
