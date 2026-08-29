@@ -45,7 +45,7 @@ final class openssl_cipher_iv_length extends Internal
             0,
             'cipher_algo'
         );
-        VmString::rejectEmptyBuiltinStringArg($cipher, 'openssl_cipher_iv_length', 0, 'cipher_algo');
+        VmString::rejectEmptyBuiltinStringArg($cipher, 'openssl_cipher_iv_length', 0, 'cipher_algo', true);
         $length = VmOpenssl::cipher_iv_length($cipher, $frame);
         if (false === $length) {
             $frame->returnVar->bool(false);
@@ -86,7 +86,7 @@ final class openssl_cipher_iv_length extends Internal
             $context->builder->positionAtEnd($err);
             JitOpensslRandomPseudoBytes::emitEmptyCipherAlgoError(
                 $context,
-                'openssl_cipher_iv_length(): Argument #1 ($cipher_algo) must not be empty'
+                VmString::emptyStringArgValueErrorMessageCannot('openssl_cipher_iv_length', 0, 'cipher_algo')
             );
             $context->builder->positionAtEnd($after);
             $slot = JitValueBox::alloc($context);

@@ -51,6 +51,15 @@ final class IniGetLeafJitHelper
         if ('session.use_strict_mode' === $option) {
             return '0';
         }
+        if ('session.use_cookies' === $option || 'SESSION.USE_COOKIES' === $option) {
+            return '1';
+        }
+        if ('session.use_only_cookies' === $option || 'SESSION.USE_ONLY_COOKIES' === $option) {
+            return '1';
+        }
+        if ('session.save_handler' === $option || 'SESSION.SAVE_HANDLER' === $option) {
+            return 'files';
+        }
         if ('zend.exception_ignore_args' === $option) {
             return self::$exceptionIgnoreArgs ? '1' : '0';
         }

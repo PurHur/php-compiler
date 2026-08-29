@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPLLVM\Builder;
@@ -25,10 +24,7 @@ final class JitOpensslRandomPseudoBytes
         $errBlock = BasicBlockHelper::append($context, 'ossl_rand_len_err');
         $context->builder->branchIf($invalid, $errBlock, $okBlock);
         $context->builder->positionAtEnd($errBlock);
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError($context, self::LENGTH_ERROR);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitValueErrorAndAbort($context, self::LENGTH_ERROR);
         $context->builder->positionAtEnd($okBlock);
     }
 
