@@ -788,6 +788,10 @@ final class DomParseSimpleXmlJitHelper
             // Re-resolve by concrete name at the same document-order index among all tags.
             return self::nthWildcardElementTextArgv($xml, $position, $name, $openTag);
         }
+        // Prefixed QName — local-name walk misses `n:a` (#21271 / nthTagOpenTagArgv #34936).
+        if (false !== strpos($tag, ':')) {
+            return self::nthQnameTextArgv($xml, $tag, $position);
+        }
         // Local-name open-tag (#34936) — close with the matched QName.
         $openTag = self::nthTagOpenTagArgv($xml, $tag, $position);
         if (null === $openTag) {
@@ -817,6 +821,102 @@ final class DomParseSimpleXmlJitHelper
         }
 
         return substr($xml, $gt + 1, $close - $gt - 1);
+    }
+
+    /**
+     * Nth (1-based) text for an XPath name-test with optional prefix (#21271).
+     *
+     * @param array<string, string> $registeredNamespaces prefix → URI
+     */
+    public static function nthXPathNameTestTextArgv(
+        string $xml,
+        string $tag,
+        int $position,
+        array $registeredNamespaces = []
+    ): ?string {
+        if ($position < 1) {
+            return null;
+        }
+        $tag = trim($tag);
+        if ('*' === $tag) {
+            return self::nthTagTextArgv($xml, '*', $position);
+        }
+        $colon = strpos($tag, ':');
+        if (false !== $colon) {
+            $prefix = substr($tag, 0, $colon);
+            $local = substr($tag, $colon + 1);
+            if ('' === $local || !isset($registeredNamespaces[$prefix])) {
+                return null;
+            }
+            $wantUri = $registeredNamespaces[$prefix];
+            $wantLocal = strtolower($local);
+        } else {
+            $wantUri = null;
+            $wantLocal = strtolower($tag);
+        }
+        $seen = 0;
+        foreach (self::walkElementsInScopeNamespaces($xml) as $element) {
+            if ('*' !== $wantLocal && 0 !== strcasecmp($element['local'], $wantLocal)) {
+                continue;
+            }
+            $elemPrefix = $element['prefix'];
+            $ns = $element['inScope'][$elemPrefix] ?? '';
+            if (null !== $wantUri) {
+                if ($ns !== $wantUri) {
+                    continue;
+                }
+            } elseif ('' !== $ns) {
+                continue;
+            }
+            ++$seen;
+            if ($seen === $position) {
+                return self::nthQnameTextArgv($xml, strtolower($element['qname']), 1);
+            }
+        }
+
+        return null;
+    }
+
+    /** Nth (1-based) text for a literal QName open-tag {@code <ns:local>} (#21271). */
+    public static function nthQnameTextArgv(string $xml, string $qname, int $position): ?string
+    {
+        if ($position < 1) {
+            return null;
+        }
+        $qname = strtolower($qname);
+        $needle = '<'.$qname;
+        $seen = 0;
+        $offset = 0;
+        $len = \strlen($xml);
+        while ($offset < $len && false !== ($pos = stripos($xml, $needle, $offset))) {
+            $after = $pos + \strlen($needle);
+            if ($after < $len) {
+                $next = $xml[$after];
+                if ('>' !== $next && '/' !== $next && ' ' !== $next) {
+                    $offset = $pos + 1;
+                    continue;
+                }
+            }
+            $gt = strpos($xml, '>', $pos);
+            if (false === $gt) {
+                break;
+            }
+            ++$seen;
+            if ($seen === $position) {
+                if ($gt > $pos && '/' === $xml[$gt - 1]) {
+                    return '';
+                }
+                $close = stripos($xml, '</'.$qname.'>', $gt + 1);
+                if (false === $close) {
+                    return '';
+                }
+
+                return substr($xml, $gt + 1, $close - $gt - 1);
+            }
+            $offset = $pos + 1;
+        }
+
+        return null;
     }
 
     /** Inner markup of the Nth element open-tag for "*" lists (#33063). */
