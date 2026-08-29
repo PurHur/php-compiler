@@ -8114,5 +8114,4 @@ require_once __DIR__.'/../../../ext/dom/JitDomAttrChildEdgeFetch.php';
 require_once __DIR__.'/../../../ext/dom/JitDomStandinGetClass.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableValueFilterLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/MbConvertEncodingFromListLlvm.php';
-require_once __DIR__.'/../../../lib/JIT/MbConvertVariablesFromListLlvm.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
