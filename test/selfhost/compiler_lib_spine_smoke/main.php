@@ -8094,6 +8094,7 @@ require_once __DIR__.'/../../../lib/JIT/PrintRObjectLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/SerializeArrayLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/SerializeObjectPropsLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/VarDumpArrayLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/VarDumpObjectDebugPropertiesLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/VarDumpObjectLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/VarExportArrayLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/VarExportObjectLlvm.php';

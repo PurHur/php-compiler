@@ -412,7 +412,10 @@ patch_already_applied() {
         && grep -q 'phpc_match_unhandled_operand_message' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-match-multi-cond-block.patch)
-      grep -q 'not after the JumpIf terminator' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      # Overlay in patches/overlays/php-cfg/match-parser-methods.php already inserts
+      # $this->block = $nextBlock without the comment — accept either marker (#30442).
+      grep -q 'not after the JumpIf terminator' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        || grep -q '\$this->block = \$nextBlock;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-incdec-expr.patch)
       grep -q 'new Op\\Expr\\PostInc' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
