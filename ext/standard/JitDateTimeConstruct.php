@@ -108,6 +108,34 @@ final class JitDateTimeConstruct
     }
 
     /**
+     * Allocate DateTime/DateTimeImmutable with owned slots for DatePeriod retention (#15124).
+     *
+     * Ctor temporaries from `new DateTime(...)` lose backing storage after dead-temp release;
+     * re-materialize from compile-time stamps when available (peer JitDatePeriodConstruct #27572).
+     */
+    public static function materializeOwnedFromArg(Context $context, JITVariable $arg): Value
+    {
+        $ts = $arg->compileTimeDateTimeTimestamp ?? null;
+        if (null !== $ts) {
+            $className = $arg->compileTimeDateTimeClassName ?? 'DateTime';
+            $objectType = $context->type->object;
+            $classId = $objectType->lookup($className);
+            $obj = $objectType->allocate($classId);
+            self::storeParsedInto($context, $obj, $className, [
+                'timestamp' => (int) $ts,
+                'microsecond' => (int) ($arg->compileTimeDateTimeMicrosecond ?? 0),
+                'timezone' => (string) ($arg->compileTimeTimezoneName ?? 'UTC'),
+            ]);
+            ReflectionSetup::markConstructed($context, $obj);
+
+            return $obj;
+        }
+        $src = ReflectionSetup::loadObjectFromArg($context, $arg);
+
+        return $context->type->object->cloneObject($src);
+    }
+
+    /**
      * @return array{timestamp: int, microsecond: int, timezone: string}
      */
     private static function parseAtCompileTime(
