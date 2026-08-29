@@ -114,12 +114,20 @@ final class is_a_ extends Internal
         );
         $i1 = $context->getTypeFromString('int1');
         $falseVal = $i1->constInt(0, false);
+        if (JITVariable::TYPE_OBJECT === $args[0]->type) {
+            return $context->helper->loadValue(
+                ReflectionBuiltinHelper::emitInstanceOf($context, $args[0], $className)
+            );
+        }
         $childLit = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
-        // Boxed locals (`$n = 'C'`) are TYPE_VALUE; emitInstanceOf would SIGSEGV (#32706).
+        // Boxed `$name = 'C'` class strings are TYPE_VALUE; emitInstanceOf would SIGSEGV (#32706).
+        // Skip when classUserType marks a live object — stale compileTimeString must not
+        // force allow_string=false false (#3478).
         if (
             JITVariable::TYPE_OBJECT !== $args[0]->type
             && \is_string($childLit)
             && '' !== $childLit
+            && '' === ($args[0]->classUserType ?? '')
         ) {
             if ($allowStringKnownFalse) {
                 return $falseVal;
