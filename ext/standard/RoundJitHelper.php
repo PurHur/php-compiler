@@ -44,10 +44,71 @@ final class RoundJitHelper
             $places = -308;
         }
 
-        $ap = $places < 0 ? -$places : $places;
-        // NestedJIT-safe scale: pow10 table + places==0 kernel (#27248 / #27249).
-        // Avoid the old fmul/cast/applyMode body — cold thin AOT mis-rounded (3 / 3.1).
-        $exponent = self::pow10abs($ap);
+        $apf = (float) $places;
+        if ($apf < 0.0) {
+            $apf = -$apf;
+        }
+        // Inline pow10 ladder — private static pow10abs() call aborts under thin AOT (#35741).
+        $exponent = 1.0;
+        if ($apf >= 1.0) {
+            if ($apf < 2.0) {
+                $exponent = 10.0;
+            } elseif ($apf < 3.0) {
+                $exponent = 100.0;
+            } elseif ($apf < 4.0) {
+                $exponent = 1000.0;
+            } elseif ($apf < 5.0) {
+                $exponent = 10000.0;
+            } elseif ($apf < 6.0) {
+                $exponent = 100000.0;
+            } elseif ($apf < 7.0) {
+                $exponent = 1000000.0;
+            } elseif ($apf < 8.0) {
+                $exponent = 10000000.0;
+            } elseif ($apf < 9.0) {
+                $exponent = 100000000.0;
+            } elseif ($apf < 10.0) {
+                $exponent = 1000000000.0;
+            } elseif ($apf < 11.0) {
+                $exponent = 10000000000.0;
+            } elseif ($apf < 12.0) {
+                $exponent = 100000000000.0;
+            } elseif ($apf < 13.0) {
+                $exponent = 1000000000000.0;
+            } elseif ($apf < 14.0) {
+                $exponent = 10000000000000.0;
+            } elseif ($apf < 15.0) {
+                $exponent = 100000000000000.0;
+            } elseif ($apf < 16.0) {
+                $exponent = 1.0e15;
+            } elseif ($apf < 17.0) {
+                $exponent = 1.0e16;
+            } elseif ($apf < 18.0) {
+                $exponent = 1.0e17;
+            } elseif ($apf < 19.0) {
+                $exponent = 1.0e18;
+            } elseif ($apf < 20.0) {
+                $exponent = 1.0e19;
+            } elseif ($apf < 21.0) {
+                $exponent = 1.0e20;
+            } elseif ($apf < 22.0) {
+                $exponent = 1.0e21;
+            } elseif ($apf < 23.0) {
+                $exponent = 1.0e22;
+            } else {
+                $exponent = 1.0e22;
+                $remaining = (int) $apf - 22;
+                if ($remaining < 0) {
+                    $remaining = 0;
+                }
+                if ($remaining > 286) {
+                    $remaining = 286;
+                }
+                for ($i = 0; $i < $remaining; ++$i) {
+                    $exponent *= 10.0;
+                }
+            }
+        }
         if ($places > 0) {
             $scaled = $num * $exponent;
         } else {
@@ -66,86 +127,90 @@ final class RoundJitHelper
     }
 
     /**
-     * 10**n for NestedJIT — no for-loop; no int `===` (cold AOT mis-matches, #27248).
-     *
-     * Use `$n < k` ladders only — NestedJIT int equality on the places abs value is unreliable.
+     * 10**n for host/VM callers — thin AOT must inline the ladder in {@see roundArgv} (#35741).
      */
-    private static function pow10abs(int $n): float
+    public static function pow10abs(int $n): float
     {
-        if ($n < 1) {
+        $nf = (float) $n;
+        if ($nf < 1.0) {
             return 1.0;
         }
-        if ($n < 2) {
+        if ($nf < 2.0) {
             return 10.0;
         }
-        if ($n < 3) {
+        if ($nf < 3.0) {
             return 100.0;
         }
-        if ($n < 4) {
+        if ($nf < 4.0) {
             return 1000.0;
         }
-        if ($n < 5) {
+        if ($nf < 5.0) {
             return 10000.0;
         }
-        if ($n < 6) {
+        if ($nf < 6.0) {
             return 100000.0;
         }
-        if ($n < 7) {
+        if ($nf < 7.0) {
             return 1000000.0;
         }
-        if ($n < 8) {
+        if ($nf < 8.0) {
             return 10000000.0;
         }
-        if ($n < 9) {
+        if ($nf < 9.0) {
             return 100000000.0;
         }
-        if ($n < 10) {
+        if ($nf < 10.0) {
             return 1000000000.0;
         }
-        if ($n < 11) {
+        if ($nf < 11.0) {
             return 10000000000.0;
         }
-        if ($n < 12) {
+        if ($nf < 12.0) {
             return 100000000000.0;
         }
-        if ($n < 13) {
+        if ($nf < 13.0) {
             return 1000000000000.0;
         }
-        if ($n < 14) {
+        if ($nf < 14.0) {
             return 10000000000000.0;
         }
-        if ($n < 15) {
+        if ($nf < 15.0) {
             return 100000000000000.0;
         }
-        if ($n < 16) {
+        if ($nf < 16.0) {
             return 1.0e15;
         }
-        if ($n < 17) {
+        if ($nf < 17.0) {
             return 1.0e16;
         }
-        if ($n < 18) {
+        if ($nf < 18.0) {
             return 1.0e17;
         }
-        if ($n < 19) {
+        if ($nf < 19.0) {
             return 1.0e18;
         }
-        if ($n < 20) {
+        if ($nf < 20.0) {
             return 1.0e19;
         }
-        if ($n < 21) {
+        if ($nf < 21.0) {
             return 1.0e20;
         }
-        if ($n < 22) {
+        if ($nf < 22.0) {
             return 1.0e21;
         }
-        if ($n < 23) {
+        if ($nf < 23.0) {
             return 1.0e22;
         }
         $exponent = 1.0e22;
-        $left = $n - 22;
-        while ($left > 0) {
+        $remaining = (int) $nf - 22;
+        if ($remaining < 0) {
+            $remaining = 0;
+        }
+        if ($remaining > 286) {
+            $remaining = 286;
+        }
+        for ($i = 0; $i < $remaining; ++$i) {
             $exponent *= 10.0;
-            $left = $left - 1;
         }
 
         return $exponent;

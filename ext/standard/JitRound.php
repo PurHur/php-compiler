@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitRoundModeArg;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -18,6 +19,9 @@ use PHPLLVM\Value;
  *
  * When num/precision/mode are compile-time scalars, evaluate on the host and emit a float
  * constant — NestedJIT RoundJitHelper mis-handles places>0 on cold AOT calls (#27249 / #26800).
+ *
+ * Runtime num with compile-time precision + default HALF_UP uses user-TU sprintf+strtod
+ * so Zend parity survives thin AOT fmul drift (#35741).
  */
 final class JitRound
 {
@@ -34,12 +38,23 @@ final class JitRound
         MathRound::ensureLinked($context);
 
         $number = self::coerceDouble($context, $args[0]);
-        $precision = isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])
-            ? self::lowerPrecisionArg($context, $args[1])
+        $precisionArg = isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])
+            ? $args[1]
+            : null;
+        $precision = null !== $precisionArg
+            ? self::lowerPrecisionArg($context, $precisionArg)
             : $context->getTypeFromString('int64')->constInt(0, false);
-        $mode = isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])
-            ? JitRoundModeArg::lower($context, $args[2], 'round')
+        $modeArg = isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])
+            ? $args[2]
+            : null;
+        $mode = null !== $modeArg
+            ? JitRoundModeArg::lower($context, $modeArg, 'round')
             : $context->getTypeFromString('int64')->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
+
+        $knownPlaces = self::compileTimePlaces($precisionArg);
+        if (null !== $knownPlaces && 0 !== $knownPlaces && self::isCompileTimeHalfUp($context, $modeArg)) {
+            return self::lowerRuntimeRoundHalfUpSprintf($context, $number, $knownPlaces);
+        }
 
         return MathRound::invoke($context, $number, $precision, $mode);
     }
@@ -75,6 +90,11 @@ final class JitRound
             ? self::lowerPrecisionArg($context, $precision)
             : $context->getTypeFromString('int64')->constInt(0, false);
         $modeVal = $context->getTypeFromString('int64')->constInt($mode, false);
+
+        $knownPlaces = self::compileTimePlaces($precision);
+        if (null !== $knownPlaces && 0 !== $knownPlaces && $mode === StdlibConstants::PHP_ROUND_HALF_UP) {
+            return self::lowerRuntimeRoundHalfUpSprintf($context, $number, $knownPlaces);
+        }
 
         return MathRound::invoke($context, $number, $prec, $modeVal);
     }
@@ -136,6 +156,70 @@ final class JitRound
         JitInternalStrictArg::requireInt($context, $arg, 'round', 'precision', 2);
 
         return JitIntdiv::lowerIntBuiltinArg($context, $arg, 'round', 2, 'precision');
+    }
+
+    private static function compileTimePlaces(?JITVariable $arg): ?int
+    {
+        if (null === $arg || NamedOptionalCallArgs::isOmittedOptional($arg)) {
+            return 0;
+        }
+        if (null === $arg->compileTimeLong) {
+            return null;
+        }
+
+        return (int) $arg->compileTimeLong;
+    }
+
+    private static function isCompileTimeHalfUp(Context $context, ?JITVariable $modeArg): bool
+    {
+        if (null === $modeArg || NamedOptionalCallArgs::isOmittedOptional($modeArg)) {
+            return true;
+        }
+        $resolved = RoundingModeJit::compileTimeRoundMode($context, $modeArg);
+        if (null !== $resolved) {
+            return $resolved === StdlibConstants::PHP_ROUND_HALF_UP;
+        }
+        if (null !== $modeArg->compileTimeLong) {
+            return (int) $modeArg->compileTimeLong === StdlibConstants::PHP_ROUND_HALF_UP;
+        }
+
+        return false;
+    }
+
+    /**
+     * round($runtime, literal places) with PHP_ROUND_HALF_UP — sprintf in user TU (#35741).
+     */
+    private static function lowerRuntimeRoundHalfUpSprintf(
+        Context $context,
+        Value $number,
+        int $places
+    ): Value {
+        $decimals = $places < 0 ? -$places : $places;
+        if ($decimals > 15) {
+            $decimals = 15;
+        }
+        $fmtGlobal = $context->constantStringFromString('%.'.$decimals.'f');
+        $fmtLoaded = $context->builder->load($fmtGlobal);
+        $fmtOwned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $fmtLoaded
+        );
+        $numVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_DOUBLE,
+            JITVariable::KIND_VALUE,
+            $number
+        );
+        $strPtr = JitSprintf::formatWithFmt($context, $fmtOwned, $numVar);
+        $charPtr = $context->builder->structGep(
+            $strPtr,
+            $context->structFieldIndex($strPtr, 'value')
+        );
+
+        LibcExtern::ensureStrtodDecl($context);
+        $endPtr = $context->getTypeFromString('int8**')->constNull();
+
+        return $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtr);
     }
 
     private static function coerceDouble(Context $context, JITVariable $arg): Value
