@@ -100,7 +100,7 @@ final class VmSoundex
                 continue;
             }
             if ($digit !== $last) {
-                if ('0' !== $digit && \strlen($out) < 4) {
+                if ('0' !== $digit) {
                     $out = $out.$digit;
                 }
                 $last = $digit;
@@ -109,17 +109,8 @@ final class VmSoundex
         if ('' === $out) {
             return '0000';
         }
-        $olen = \strlen($out);
-        if ($olen >= 4) {
-            return \substr($out, 0, 4);
-        }
-        if (1 === $olen) {
-            return $out.'000';
-        }
-        if (2 === $olen) {
-            return $out.'00';
-        }
 
-        return $out.'0';
+        // NestedJIT/AOT: avoid strlen($out) mid-loop; pad+truncate once (peer #26794 / #26882).
+        return \substr($out.'0000', 0, 4);
     }
 }
