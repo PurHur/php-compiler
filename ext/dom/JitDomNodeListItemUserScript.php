@@ -67,6 +67,11 @@ final class JitDomNodeListItemUserScript
 
         // Dynamic index: live walk when pinned root exists (#33659); else compile-time ladder (#33063).
         if (null === $index) {
+            $axisExpr = JitDomXPathQueryUserScript::lastXPathAxisExpr();
+            if (null !== $axisExpr && null !== $xml) {
+                return self::materializeDynamicIndexXPathAxisMatch($context, $xml, $axisExpr, $args[1]);
+            }
+
             if (null !== $tagQuery) {
                 if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
                     $indexVal = $context->helper->loadValue($arg);
@@ -176,6 +181,12 @@ final class JitDomNodeListItemUserScript
         }
         if ($index < 0) {
             return null;
+        }
+
+        // Host-folded XPath axis/boolean node-sets: item(N) for N>0 (#32003).
+        $axisExpr = JitDomXPathQueryUserScript::lastXPathAxisExpr();
+        if (null !== $axisExpr && null !== $xml) {
+            return self::materializeNthXPathAxisMatch($context, $xml, $axisExpr, $index);
         }
 
         // XPath //tag lists: prefer live pinned-root walk so item() keeps
@@ -426,6 +437,83 @@ final class JitDomNodeListItemUserScript
         }
 
         return $out;
+    }
+
+    /**
+     * Compile-time NodeList::item($i) over a host-folded XPath axis node-set (#32003).
+     */
+    private static function materializeDynamicIndexXPathAxisMatch(
+        Context $context,
+        string $xml,
+        string $expr,
+        JITVariable $indexArg
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_dyn_xpath_axis');
+        $count = JitDomXPathQueryUserScript::hostXPathAxisQueryLength($xml, $expr) ?? 0;
+        $i64 = $context->getTypeFromString('int64');
+        if (JITVariable::TYPE_NATIVE_LONG === $indexArg->type) {
+            $indexVal = $context->helper->loadValue($indexArg);
+        } elseif (JITVariable::TYPE_VALUE === $indexArg->type) {
+            $indexVal = $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                JitValueBox::valuePtrFromVariable($context, $indexArg)
+            );
+        } else {
+            throw new \LogicException('DOMNodeList::item() dynamic index must be an integer (#32003)');
+        }
+        $out = self::boxNull($context);
+        for ($i = 0; $i < $count; ++$i) {
+            $cand = self::materializeNthXPathAxisMatch($context, $xml, $expr, $i);
+            $isI = $context->builder->icmp(
+                Builder::INT_EQ,
+                $indexVal,
+                $i64->constInt($i, false)
+            );
+            $out = $context->builder->select($isI, $cand, $out);
+        }
+
+        return $out;
+    }
+
+    private static function materializeNthXPathAxisMatch(
+        Context $context,
+        string $xml,
+        string $expr,
+        int $index
+    ): Value {
+        $hostNode = JitDomXPathQueryUserScript::hostXPathAxisNodeAt($xml, $expr, $index);
+        if (null === $hostNode) {
+            return self::boxNull($context);
+        }
+
+        return self::materializeHostDomNode($context, $hostNode);
+    }
+
+    private static function materializeHostDomNode(Context $context, \DOMNode $node): Value
+    {
+        return self::boxObject($context, self::materializeHostDomNodeObject($context, $node));
+    }
+
+    private static function materializeHostDomNodeObject(Context $context, \DOMNode $node): Value
+    {
+        if ($node instanceof \DOMAttr) {
+            return JitDomAttributeNodeNS::materializeAttrFromLiterals(
+                $context,
+                (string) ($node->namespaceURI ?? ''),
+                $node->nodeName,
+                $node->value,
+                JitDomAttributeNodeNS::attrClassForUserScriptCache()
+            );
+        }
+        if ($node instanceof \DOMElement) {
+            return JitDomCreateElement::materializeElementWithTextContent(
+                $context,
+                $node->nodeName,
+                (string) $node->textContent
+            );
+        }
+
+        return $context->getTypeFromString('__object__*')->constNull();
     }
 
     /**
