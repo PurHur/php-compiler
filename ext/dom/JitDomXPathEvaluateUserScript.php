@@ -473,8 +473,23 @@ final class JitDomXPathEvaluateUserScript
         return self::boxString($context, $value);
     }
 
+    private static function isAttributeAxisLocationPath(string $inner): bool
+    {
+        if (preg_match('~(?:^|/)attribute::~', $inner)) {
+            return true;
+        }
+
+        return 1 === preg_match('~(?:^|/)@(?:[\w.*:-]+|\*)$~', $inner);
+    }
+
     private static function countForXPath(string $xml, string $inner): ?int
     {
+        if (self::isAttributeAxisLocationPath($inner)) {
+            $host = self::tryHostEvaluateScalar($xml, 'count('.$inner.')');
+            if (\is_int($host) || \is_float($host)) {
+                return (int) $host;
+            }
+        }
         // //tag[n] — at most one node (#19456).
         if (preg_match('~^//([*\w][\w:-]*)\[(\d+)\]$~', $inner, $posMatches)) {
             $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $posMatches[1], (int) $posMatches[2]);
@@ -528,6 +543,12 @@ final class JitDomXPathEvaluateUserScript
      */
     private static function stringForXPath(string $xml, string $inner): ?string
     {
+        if (self::isAttributeAxisLocationPath($inner)) {
+            $host = self::tryHostEvaluateScalar($xml, 'string('.$inner.')');
+            if (\is_string($host)) {
+                return $host;
+            }
+        }
         if (preg_match('~^//@([\w.-]+)$~', $inner, $matches)) {
             return DomParseSimpleXmlJitHelper::firstAttributeValueArgv($xml, $matches[1]);
         }
