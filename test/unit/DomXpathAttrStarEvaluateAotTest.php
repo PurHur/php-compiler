@@ -34,6 +34,12 @@ final class DomXpathAttrStarEvaluateAotTest extends TestCase
         $this->assertAotMatchesZend(__DIR__.'/../repro/aot_dom_xpath_rel_attr_star.php');
     }
 
+    /** Multiple host-folded axis queries in one script — axis id stamped per NodeList (#32003). */
+    public function testMultiQueryAttrStarNamesFnMatchesZend(): void
+    {
+        $this->assertAotMatchesZend(__DIR__.'/../repro/maintainer_gap_dom_xpath_attr_star.php');
+    }
+
     private function assertAotMatchesZend(string $src): void
     {
         $zend = $this->runPhp($src);

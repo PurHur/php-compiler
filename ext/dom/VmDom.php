@@ -249,6 +249,14 @@ final class VmDom
     public const PROP_CHILD_NODES_OWNER = '__phpcChildNodesOwner';
 
     /**
+     * Host-folded XPath axis NodeList → compile-time axis id for item() rematerialization (#32003).
+     *
+     * {@see JitDomXPathQueryUserScript::registerAxisExpr} assigns ids; item() reads this slot
+     * instead of a compilation-unit static so multiple query() results stay independent.
+     */
+    public const PROP_XPATH_AXIS_ID = '__phpcXPathAxisId';
+
+    /**
      * php-src stub property for Reflection (XMLReader #31639 pattern; #31753).
      *
      * Runtime reads for computed node props stay virtual via {@see DomNodePropertySupport}.

@@ -25,6 +25,12 @@ final class JitDomXPathQueryUserScript
     /** Last host-folded axis/boolean XPath for NodeList::item(N>0) (#32003). */
     private static ?string $lastXPathAxisExpr = null;
 
+    /** Per-compilation-unit axis id → XPath expr; stamped on each axis NodeList (#32003). */
+    private static int $nextXPathAxisId = 0;
+
+    /** @var array<int, string> */
+    private static array $xpathAxisExprById = [];
+
     public static function lastCacheKey(): ?string
     {
         return self::$lastCacheKey;
@@ -38,6 +44,26 @@ final class JitDomXPathQueryUserScript
     public static function lastXPathAxisExpr(): ?string
     {
         return self::$lastXPathAxisExpr;
+    }
+
+    /** @return array<int, string> */
+    public static function xpathAxisExprTable(): array
+    {
+        return self::$xpathAxisExprById;
+    }
+
+    public static function registerAxisExpr(string $expr): int
+    {
+        $trimmed = trim($expr);
+        foreach (self::$xpathAxisExprById as $id => $stored) {
+            if ($stored === $trimmed) {
+                return $id;
+            }
+        }
+        $id = ++self::$nextXPathAxisId;
+        self::$xpathAxisExprById[$id] = $trimmed;
+
+        return $id;
     }
 
     /** Clear stale query state when a non-XPath DOMNodeList is accessed (#32620). */
@@ -200,12 +226,15 @@ final class JitDomXPathQueryUserScript
         return self::boxNodeList($context, $count);
     }
 
-    private static function boxNodeList(Context $context, int $length): Value
+    private static function boxNodeList(Context $context, int $length, int $axisId = 0): Value
     {
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_NODELIST);
         if (!$objectType->hasProperty($classId, VmDom::PROP_CHILD_NODES_OWNER)) {
             $objectType->defineProperty($classId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
+        }
+        if (!$objectType->hasProperty($classId, VmDom::PROP_XPATH_AXIS_ID)) {
+            $objectType->defineProperty($classId, VmDom::PROP_XPATH_AXIS_ID, JITVariable::TYPE_NATIVE_LONG);
         }
         if (!$objectType->hasProperty($classId, 'length')) {
             $objectType->defineProperty($classId, 'length', JITVariable::TYPE_NATIVE_LONG);
@@ -221,6 +250,17 @@ final class JitDomXPathQueryUserScript
         $objectType->propertyStore(
             $objectType->propertySlotFor($list, self::CLASS_NODELIST, 'length'),
             $lengthVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $axisIdVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt($axisId, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($list, self::CLASS_NODELIST, VmDom::PROP_XPATH_AXIS_ID),
+            $axisIdVar,
             JITVariable::TYPE_NATIVE_LONG
         );
         $slot = JitValueBox::alloc($context);
@@ -360,6 +400,7 @@ final class JitDomXPathQueryUserScript
         self::$lastCacheKey = null;
         self::$lastQueryTag = null;
         self::$lastXPathAxisExpr = $trimmed;
+        $axisId = self::registerAxisExpr($trimmed);
         if ($count > 0) {
             $first = $list->item(0);
             if ($first instanceof \DOMNode) {
@@ -388,7 +429,7 @@ final class JitDomXPathQueryUserScript
         }
         DomUserScriptLiveTagListLlvm::initCount($context, 'xpath-axis', $count, true);
 
-        return self::boxNodeList($context, $count);
+        return self::boxNodeList($context, $count, $axisId);
     }
 
     /**
