@@ -4,60 +4,57 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
-
 /**
  * stat()/lstat() array for compiled JIT/AOT modules (#9585, php-in-PHP).
  *
- * SSOT: {@see VmFs::statInfo()} (VM); this helper uses {@see VmStatCache} only so
- * nested JIT standalone compile does not pull all of VmFs.
+ * Return type is `?array` (not {@see \PHPCompiler\VM\HashTable}): NestedJIT maps class HashTable
+ * to object ABI and aborts under thin AOT (#20652 peer FsGlobJitHelper; #35656).
+ *
+ * SSOT: {@see VmFs::statInfo()} (VM); nested JIT leaf uses @\stat/@\lstat like
+ * {@see FsGlobJitHelper} @\glob (do not call VmStatCache — re-enters this helper under thin AOT).
  * php-src: ext/standard/filestat.c — php_stat()
  */
 final class StatArrayJitHelper
 {
-    /** @return HashTable|null null when stat/lstat fails */
-    public static function statArgv(string $path, int $useLstat): ?HashTable
+    /**
+     * @return array<int|string, int>|null null when stat/lstat fails
+     */
+    public static function statArgv(string $path, int $useLstat): ?array
     {
         if ('' === $path) {
             return null;
         }
-        $raw = 0 !== $useLstat ? VmStatCache::lstat($path) : VmStatCache::stat($path);
-        if (false === $raw) {
+        // Leaf is @\stat/@\lstat — avoid VmStatCache/VmStatPure re-entering this helper under thin AOT
+        // (peer FsGlobJitHelper #27235 / #35656).
+        $raw = 0 !== $useLstat ? @\lstat($path) : @\stat($path);
+        if (!\is_array($raw)) {
             return null;
         }
 
-        return self::phpStatArrayToHashTable($raw);
+        return self::phpStatArrayNormalize($raw);
     }
 
     /**
      * @param array<int|string, int> $stat
+     *
+     * @return array<int|string, int>
      */
-    private static function phpStatArrayToHashTable(array $stat): HashTable
+    private static function phpStatArrayNormalize(array $stat): array
     {
         $keys = ['dev', 'ino', 'mode', 'nlink', 'uid', 'gid', 'rdev', 'size', 'atime', 'mtime', 'ctime', 'blksize', 'blocks'];
-        $ht = new HashTable();
-        $values = [];
+        $out = [];
         foreach ($keys as $i => $key) {
             if (isset($stat[$key])) {
-                $values[$i] = (int) $stat[$key];
+                $val = (int) $stat[$key];
             } elseif (isset($stat[$i])) {
-                $values[$i] = (int) $stat[$i];
+                $val = (int) $stat[$i];
             } else {
-                $values[$i] = 0;
+                $val = 0;
             }
-        }
-        foreach ($values as $i => $val) {
-            $indexed = new Variable();
-            $indexed->int($val);
-            $ht->updateIndex($i, $indexed);
-        }
-        foreach ($keys as $i => $key) {
-            $named = new Variable();
-            $named->int($values[$i]);
-            $ht->add($key, $named);
+            $out[$i] = $val;
+            $out[$key] = $val;
         }
 
-        return $ht;
+        return $out;
     }
 }
