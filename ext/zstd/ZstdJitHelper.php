@@ -12,6 +12,12 @@ namespace PHPCompiler\ext\zstd;
  */
 final class ZstdJitHelper
 {
+    /** php-in-PHP frame codec version — pecl ZSTD_VERSION_NUMBER shape (#28079 / #8869). */
+    public const VERSION_NUMBER = 10000;
+
+    /** pecl ZSTD_VERSION_TEXT (#28079 / #8869). */
+    public const VERSION_TEXT = '1.0.0';
+
     private const MAGIC = "\x28\xb5\x2f\xfd";
 
     private const DEFAULT_LEVEL = 3;
@@ -23,6 +29,16 @@ final class ZstdJitHelper
     private const BLOCK_TYPE_RAW = 0;
 
     private const BLOCK_TYPE_RLE = 1;
+
+    public static function versionNumber(): int
+    {
+        return self::VERSION_NUMBER;
+    }
+
+    public static function versionText(): string
+    {
+        return self::VERSION_TEXT;
+    }
 
     public static function compress(string $data, int $level = self::DEFAULT_LEVEL): ?string
     {
