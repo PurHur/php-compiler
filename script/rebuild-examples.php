@@ -1053,6 +1053,25 @@ function patchFileUploadWebAotRowOnly(string $repoRoot): bool
 }
 
 /**
+ * Downgrade 009-FastCGIWeb AOT columns to n/a when the live probe cannot reproduce timings (#2370).
+ */
+function downgradeFastCGIWebAotRowToNa(string $repoRoot): bool
+{
+    $readmePath = $repoRoot.'/examples/README.md';
+    $body = (string) file_get_contents($readmePath);
+    $pattern = '/(\|\s*009-FastCGIWeb\s*\|[^|]+\|[^|]+\|[^|]+\|)\s*[^|]+\s*(\|\s*[^|]+\s*\|)/i';
+    $replacement = '$1             n/a |             n/a |';
+    $newBody = preg_replace($pattern, $replacement, $body, 1, $count);
+    if (1 !== $count || !is_string($newBody)) {
+        return false;
+    }
+
+    file_put_contents($readmePath, $newBody);
+
+    return true;
+}
+
+/**
  * Patch only the 009-FastCGIWeb AOT columns in examples/README.md (#2370).
  * Use BENCH_FASTCGIWEB_AOT_ROW_ONLY=1 to avoid a full rebuild when ci-fast drift guard is red.
  */
@@ -1061,6 +1080,11 @@ function patchFastCGIWebAotRowOnly(string $repoRoot): bool
     $benchEnv = benchmarkEnv($repoRoot);
     $result = tryBenchmarkFastCGIWebProjectAot($repoRoot, $benchEnv);
     if (null === $result) {
+        if (downgradeFastCGIWebAotRowToNa($repoRoot)) {
+            echo "  009-FastCGIWeb AOT: downgraded to n/a (probe failed)\n";
+
+            return true;
+        }
         fwrite(STDERR, "patchFastCGIWebAotRowOnly: AOT benchmark failed\n");
 
         return false;

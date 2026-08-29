@@ -30,6 +30,31 @@ final class RebuildExamples009SyncTest extends TestCase
         $this->assertStringContainsString('benchmark table start', $script);
         $this->assertStringContainsString('BENCH_FASTCGIWEB_AOT', $script);
         $this->assertStringContainsString('fastcgi_web_aot_execute_probe', $script);
+        $this->assertStringContainsString('downgrade_fastcgi_web_aot_row_to_na', $script);
         $this->assertStringContainsString('#2370', $script);
+    }
+
+    public function testDowngradeFastCGIWebAotRowToNa(): void
+    {
+        if (!defined('REBUILD_EXAMPLES_LIBRARY_ONLY')) {
+            define('REBUILD_EXAMPLES_LIBRARY_ONLY', true);
+        }
+        require_once dirname(__DIR__, 2).'/script/rebuild-examples.php';
+
+        $root = dirname(__DIR__, 2);
+        $readme = $root.'/examples/README.md';
+        $backup = file_get_contents($readme);
+        $this->assertNotFalse($backup);
+
+        $this->assertTrue(downgradeFastCGIWebAotRowToNa($root));
+        $downgraded = file_get_contents($readme);
+        $this->assertNotFalse($downgraded);
+        $this->assertStringContainsString('009-FastCGIWeb', $downgraded);
+        $this->assertMatchesRegularExpression(
+            '/\|\s*009-FastCGIWeb\s*\|[^|]+\|[^|]+\|[^|]+\|\s*n\/a\s*\|\s*n\/a\s*\|/i',
+            $downgraded
+        );
+
+        file_put_contents($readme, $backup);
     }
 }

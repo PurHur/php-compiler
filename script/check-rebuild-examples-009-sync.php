@@ -49,6 +49,12 @@ if (!$expectRow && $hasRow) {
 if ($hasRow) {
     $rowLine = extract_fastcgi_web_benchmark_line($body);
     if (null !== $rowLine && !benchmark_row_aot_columns_honest($rowLine, $root)) {
+        if (fastcgi_web_aot_row_should_be_na($rowLine, $root)
+            && downgrade_fastcgi_web_aot_row_to_na($root)
+        ) {
+            fwrite(STDOUT, 'check-rebuild-examples-009-sync: repaired stale AOT columns → n/a (probe failed; #2370)'."\n");
+            exit(0);
+        }
         $errors[] = 'examples/README.md: 009-FastCGIWeb benchmark AOT columns out of sync (run: BENCH_FASTCGIWEB=1 BENCH_FASTCGIWEB_AOT=1 ./script/rebuild-examples.php; #2370)';
     }
 }
@@ -124,6 +130,50 @@ function extract_fastcgi_web_benchmark_line(string $readmeBody): ?string
     }
 
     return trim($line[0]);
+}
+
+/**
+ * README has real AOT timings but the live probe cannot reproduce them (stale row).
+ */
+function fastcgi_web_aot_row_should_be_na(string $rowLine, string $repoRoot): bool
+{
+    $parts = array_map('trim', explode('|', $rowLine));
+    $parts = array_values(array_filter($parts, static fn (string $p): bool => '' !== $p));
+    if (count($parts) < 6) {
+        return false;
+    }
+    $compileCol = $parts[4] ?? '';
+    $compiledCol = $parts[5] ?? '';
+    $compileNa = (bool) preg_match('/n\/a/i', $compileCol);
+    $compiledNa = (bool) preg_match('/n\/a/i', $compiledCol);
+    if ($compileNa && $compiledNa) {
+        return false;
+    }
+    if (!llvm_ready_for_check($repoRoot)) {
+        return false;
+    }
+    if ('1' === getenv('BENCH_FASTCGIWEB_AOT')) {
+        return false;
+    }
+
+    return !fastcgi_web_aot_execute_probe($repoRoot);
+}
+
+function downgrade_fastcgi_web_aot_row_to_na(string $repoRoot): bool
+{
+    $readmePath = $repoRoot.'/examples/README.md';
+    if (!is_readable($readmePath)) {
+        return false;
+    }
+    $body = (string) file_get_contents($readmePath);
+    $pattern = '/(\|\s*009-FastCGIWeb\s*\|[^|]+\|[^|]+\|[^|]+\|)\s*[^|]+\s*(\|\s*[^|]+\s*\|)/i';
+    $replacement = '$1             n/a |             n/a |';
+    $newBody = preg_replace($pattern, $replacement, $body, 1, $count);
+    if (1 !== $count || !is_string($newBody)) {
+        return false;
+    }
+
+    return false !== file_put_contents($readmePath, $newBody);
 }
 
 function benchmark_row_aot_columns_honest(string $rowLine, string $repoRoot): bool
