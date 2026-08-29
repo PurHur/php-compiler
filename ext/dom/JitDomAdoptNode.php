@@ -13,6 +13,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitValueCompare;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -58,13 +59,15 @@ final class JitDomAdoptNode
             return self::emitNotYetImplemented($context);
         }
 
+        $node = self::loadObjectArg($context, $args[1]);
+        self::guardUnsupportedAdoptNodeOrContinue($context, $node);
+
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            return self::invokeUserScriptAdopt($context, $args[0], $args[1]);
+            return self::invokeUserScriptAdopt($context, $args[0], $args[1], $node);
         }
 
         DomAdoptNodeRuntime::ensureLinked($context);
         $document = self::loadObjectArg($context, $args[0]);
-        $node = self::loadObjectArg($context, $args[1]);
         // DomRegistry reparent (documentId / detach). Discard NestedJIT object return —
         // reuse the caller-side node pointer for the call ABI (#29853).
         $context->builder->call(
@@ -82,10 +85,10 @@ final class JitDomAdoptNode
     private static function invokeUserScriptAdopt(
         Context $context,
         JITVariable $documentVar,
-        JITVariable $nodeVar
+        JITVariable $nodeVar,
+        Value $node
     ): Value {
         $document = self::loadObjectArg($context, $documentVar);
-        $node = self::loadObjectArg($context, $nodeVar);
 
         $parentVar = JitDomParentNodeProperty::fetch($context->type->object, $node);
         $bbDetach = BasicBlockHelper::append($context, 'dom_adopt_detach');
@@ -117,6 +120,81 @@ final class JitDomAdoptNode
 
         return self::boxObjectResult($context, $node);
     }
+
+    /**
+     * php-src dom_document_adopt_node — document/doctype/entity/notation are unsupported (#19654).
+     *
+     * NestedJIT {@see DomAdoptNodeJitHelper} throws {@see \DOMException} from VmDom, but thin-AOT
+     * catch arms only match when the throw is lowered via {@see TryCatchHelper::emitCatchableClassError}.
+     */
+    private static function guardUnsupportedAdoptNodeOrContinue(Context $context, Value $node): void
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_adopt_unsup_guard');
+        $isUnsupported = self::isUnsupportedAdoptNode($context, $node);
+        $bbReject = BasicBlockHelper::append($context, 'dom_adopt_unsup_reject');
+        $bbOk = BasicBlockHelper::append($context, 'dom_adopt_unsup_ok');
+        $context->builder->branchIf($isUnsupported, $bbReject, $bbOk);
+
+        $context->builder->positionAtEnd($bbReject);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'DOMException',
+            'Not Supported Error',
+            null,
+            '',
+            0,
+            DomExceptionConstants::NOT_SUPPORTED_ERR
+        );
+
+        $context->builder->positionAtEnd($bbOk);
+    }
+
+    /**
+     * Document / doctype / entity / notation cannot be adopted (VmDom::adoptNode peer).
+     */
+    private static function isUnsupportedAdoptNode(Context $context, Value $node): Value
+    {
+        $objectType = $context->type->object;
+        $map = $context->structFieldMap['__object__'];
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($node, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $match = null;
+        foreach (self::UNSUPPORTED_ADOPT_NODE_CLASSES as $className) {
+            if (!$objectType->hasDeclaredClass($className)) {
+                continue;
+            }
+            $id = $objectType->lookup($className);
+            $isClass = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classIdVal,
+                $i64->constInt($id, false)
+            );
+            $match = null === $match ? $isClass : $context->builder->or($match, $isClass);
+        }
+        if (null === $match) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
+
+        return $match;
+    }
+
+    /** @var list<string> */
+    private const UNSUPPORTED_ADOPT_NODE_CLASSES = [
+        'DOMDocument',
+        'DOMDocumentType',
+        'DOMEntity',
+        'DOMNotation',
+        'Dom\\Document',
+        'Dom\\HTMLDocument',
+        'Dom\\XMLDocument',
+        'Dom\\DocumentType',
+        'Dom\\Entity',
+        'Dom\\Notation',
+    ];
 
     /** Wire ownerDocument on the adopted node — Wrong Document on appendChild without this (#19654). */
     private static function storeOwnerDocument(Context $context, Value $node, Value $document): void
