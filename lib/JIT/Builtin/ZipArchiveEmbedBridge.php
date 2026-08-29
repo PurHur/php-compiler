@@ -20,9 +20,12 @@ final class ZipArchiveEmbedBridge
 
     private const EXEC = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::exec';
 
+    private const ADD_ENTRY = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::addEntry';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::EXEC,
+        self::ADD_ENTRY,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -33,6 +36,11 @@ final class ZipArchiveEmbedBridge
     public static function execHelper(): string
     {
         return self::EXEC;
+    }
+
+    public static function addEntryHelper(): string
+    {
+        return self::ADD_ENTRY;
     }
 
     public static function helperFunction(Context $context, string $logical): LlvmFunction
