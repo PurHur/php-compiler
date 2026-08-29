@@ -126,9 +126,17 @@ final class LateStaticBindingHelper
         $bool = $context->helper->loadValue($ok);
         $context->builder->branchIf($bool, $done, $fail);
         $context->builder->positionAtEnd($fail);
-        self::raiseStaticReturnTypeError(
+        ClassReturnCheck::emitObjectGivenLabelFailure(
             $context,
-            $prefix."Return value must be of type {$expectedName}, object returned"
+            $objectType,
+            $return,
+            $expectedName,
+            static function (string $given) use ($context, $prefix, $expectedName): void {
+                self::raiseStaticReturnTypeError(
+                    $context,
+                    $prefix."Return value must be of type {$expectedName}, {$given} returned"
+                );
+            }
         );
         $context->builder->positionAtEnd($done);
     }
