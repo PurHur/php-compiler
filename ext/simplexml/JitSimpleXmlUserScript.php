@@ -1332,12 +1332,41 @@ final class JitSimpleXmlUserScript
         if (false === $xml || '' === $xml) {
             return clone $tree;
         }
+        $xmlnsInject = self::xmlnsAttrForIsolation($tree, $xml);
+        if ('' !== $xmlnsInject) {
+            $xml = preg_replace('/^(<\s*[^\s>]+)/', '$1'.$xmlnsInject, $xml, 1) ?? $xml;
+        }
         $copy = \simplexml_load_string($xml);
         if ($copy instanceof \SimpleXMLElement) {
             return $copy;
         }
 
         return clone $tree;
+    }
+
+    /**
+     * Re-parse fragments lose ancestor xmlns — inject from getNamespaces(true) (#22738 / #27535).
+     */
+    private static function xmlnsAttrForIsolation(\SimpleXMLElement $tree, string $xml): string
+    {
+        if (!preg_match('/^<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)/', ltrim($xml), $m)) {
+            return '';
+        }
+        $openAttrs = $m[2] ?? '';
+        if (str_contains($openAttrs, 'xmlns')) {
+            return '';
+        }
+        $decls = [];
+        foreach ($tree->getNamespaces(true) as $prefix => $uri) {
+            $escaped = htmlspecialchars((string) $uri, ENT_QUOTES | ENT_XML1);
+            if ('' === $prefix) {
+                $decls[] = 'xmlns="'.$escaped.'"';
+            } else {
+                $decls[] = 'xmlns:'.$prefix.'="'.$escaped.'"';
+            }
+        }
+
+        return [] === $decls ? '' : ' '.implode(' ', $decls);
     }
 
     private static function bakeElementScalars(Context $context, JITVariable $receiver, \SimpleXMLElement $tree): void
