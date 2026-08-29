@@ -235,13 +235,14 @@ final class JitZipArchive
             1,
             'content'
         );
-        $ok = self::execLong(
+        $packed = JitNestedHelperCoerce::callHelper(
             $context,
-            "add",
-            $handle,
-            $context->getTypeFromString('int64')->constInt(0, false),
-            $name,
-            $content
+            ZipArchiveEmbedBridge::helperFunction($context, ZipArchiveEmbedBridge::addEntryHelper()),
+            [$name, $content]
+        );
+        $ok = self::int32LeFromString(
+            $context,
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $packed)
         );
         self::syncProps($context, $obj, $handle);
 

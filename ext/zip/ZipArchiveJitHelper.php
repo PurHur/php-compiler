@@ -119,6 +119,50 @@ final class ZipArchiveJitHelper
 
     private static int $agN = 0;
 
+    /**
+     * addFromString entry path — separate NestedJIT entry avoids exec() string-formal
+     * aliasing under thin AOT (#35454 / ZipArchive addFromString AOT name='status').
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_addFromString
+     */
+    public static function addEntry(string $name, string $content): string
+    {
+        if (1 !== self::$h1open) {
+            self::$h1status = 8;
+
+            return self::pack(0);
+        }
+        // Empty-name sentinel for slot occupancy (#35454 NestedJIT).
+        if ('' === self::$h1name) {
+            self::$h1name = $name;
+            self::$h1data = $content;
+            self::$h1ecomment = '';
+            self::$h1comp = 0;
+            self::$h1mtime = 0;
+            self::$h1opsys = 3;
+            self::$h1attr = 0;
+        } elseif ($name === self::$h1name) {
+            self::$h1data = $content;
+        } elseif ('' === self::$h1name2) {
+            self::$h1name2 = $name;
+            self::$h1data2 = $content;
+            self::$h1ecomment2 = '';
+            self::$h1comp2 = 0;
+            self::$h1mtime2 = 0;
+            self::$h1opsys2 = 3;
+            self::$h1attr2 = 0;
+        } elseif ($name === self::$h1name2) {
+            self::$h1data2 = $content;
+        } else {
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+        self::$h1status = 0;
+
+        return self::pack(1);
+    }
+
     public static function exec(string $op, int $a, int $b, string $s1, string $s2): string
     {
         if ('alloc' === $op) {
@@ -296,40 +340,7 @@ final class ZipArchiveJitHelper
             return self::pack(-19);
         }
         if ('add' === $op) {
-            if (1 !== self::$h1open) {
-                self::$h1status = 8;
-
-                return self::pack(0);
-            }
-            // Empty-name sentinel for slot occupancy (#35454 NestedJIT).
-            if ('' === self::$h1name) {
-                self::$h1name = $s1;
-                self::$h1data = $s2;
-                self::$h1ecomment = '';
-                self::$h1comp = 0;
-                self::$h1mtime = 0;
-                self::$h1opsys = 3;
-                self::$h1attr = 0;
-            } elseif ($s1 === self::$h1name) {
-                self::$h1data = $s2;
-            } elseif ('' === self::$h1name2) {
-                self::$h1name2 = $s1;
-                self::$h1data2 = $s2;
-                self::$h1ecomment2 = '';
-                self::$h1comp2 = 0;
-                self::$h1mtime2 = 0;
-                self::$h1opsys2 = 3;
-                self::$h1attr2 = 0;
-            } elseif ($s1 === self::$h1name2) {
-                self::$h1data2 = $s2;
-            } else {
-                self::$h1status = 18;
-
-                return self::pack(0);
-            }
-            self::$h1status = 0;
-
-            return self::pack(1);
+            return self::addEntry($s1, $s2);
         }
         // addir — addEmptyDir after IR appends "/" (#35465). Same slots as add; ER_EXISTS on dup.
         if ('addir' === $op) {

@@ -35,6 +35,7 @@ final class ZipArchiveMultiAddAotTest extends TestCase
         $src = (string) file_get_contents($root.'/ext/zip/ZipArchiveJitHelper.php');
         $this->assertStringContainsString('$h1name2', $src);
         $this->assertStringContainsString('$h1data2', $src);
+        $this->assertStringContainsString('addEntry', $src);
         $this->assertStringContainsString('#35454', $src);
     }
 
