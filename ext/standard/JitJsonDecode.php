@@ -89,6 +89,38 @@ final class JitJsonDecode
         return self::decodeRuntimeString($context, $jsonString);
     }
 
+    /**
+     * Runtime json string with compile-time $depth / $flags (assoc=true).
+     *
+     * When {@see JitStringArg::compileTimeLiteral} is available (e.g. folded str_repeat),
+     * reuse the compile-time decode+throw path (#10611, #12009).
+     */
+    public static function decodeRuntimeWithOptions(
+        Context $context,
+        JITVariable $json,
+        int $depth,
+        int $flags
+    ): Value {
+        $literal = JitStringArg::compileTimeLiteral($json);
+        if (null !== $literal) {
+            try {
+                $decoded = VmJsonFormat::decode($literal, true, $depth, $flags);
+            } catch (\JsonException $e) {
+                return JitJsonThrow::emitFromException($context, $e);
+            }
+            $sticky = VmJson::lastError();
+            if (0 !== $sticky && !VmJsonFlags::throwsOnError($flags)) {
+                JitJsonEncodeCompileTime::emitSetLastError($context, $sticky);
+            }
+
+            return self::materializeDecoded($context, $decoded, true);
+        }
+
+        throw new \LogicException(
+            'json_decode() depth/flags not supported at runtime in this compiler build'
+        );
+    }
+
     public static function decodeRuntimeString(Context $context, Value $jsonString): Value
     {
         return $context->builder->call(

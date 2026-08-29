@@ -13698,6 +13698,14 @@ class JIT {
                             $callArgs[0]
                         );
                     }
+                    $savedJsonDecodeFlagsOperandNoreturn = $this->context->jitJsonDecodeFlagsOperand;
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'json_decode' === strtolower($this->context->scope->toCall->getName())
+                        && isset($callOperands[3])
+                    ) {
+                        $this->context->jitJsonDecodeFlagsOperand = $callOperands[3];
+                    }
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
@@ -13711,6 +13719,7 @@ class JIT {
                         $callOperands
                     );
                     $this->invokeJitCall($this->context->scope->toCall, $callArgs);
+                    $this->context->jitJsonDecodeFlagsOperand = $savedJsonDecodeFlagsOperandNoreturn;
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->syncDateTimeZoneConstructMetaToAliases(
@@ -14030,6 +14039,7 @@ class JIT {
                     }
                     $savedJsonEncodeValueOperand = $this->context->jitJsonEncodeValueOperand;
                     $savedJsonEncodeFlagsOperand = $this->context->jitJsonEncodeFlagsOperand;
+                    $savedJsonDecodeFlagsOperand = $this->context->jitJsonDecodeFlagsOperand;
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
                         && 'json_encode' === strtolower($this->context->scope->toCall->getName())
@@ -14040,6 +14050,13 @@ class JIT {
                         if (isset($callOperands[1])) {
                             $this->context->jitJsonEncodeFlagsOperand = $callOperands[1];
                         }
+                    }
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'json_decode' === strtolower($this->context->scope->toCall->getName())
+                        && isset($callOperands[3])
+                    ) {
+                        $this->context->jitJsonDecodeFlagsOperand = $callOperands[3];
                     }
                     $savedIteratorToArrayOperand = $this->context->jitIteratorToArrayIteratorOperand;
                     if (
@@ -14099,6 +14116,7 @@ class JIT {
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
                     $this->context->jitJsonEncodeFlagsOperand = $savedJsonEncodeFlagsOperand;
+                    $this->context->jitJsonDecodeFlagsOperand = $savedJsonDecodeFlagsOperand;
                     $this->context->jitIteratorToArrayIteratorOperand = $savedIteratorToArrayOperand;
                     $this->context->jitXmlrpcEncodeValueOperand = $savedXmlrpcEncodeValueOperand;
                     $this->context->jitCallUserFuncArrayParamsOperand = $savedCallUserFuncArrayOperand;
@@ -14222,6 +14240,10 @@ class JIT {
                         $this->context->scope->toCall
                     );
                     $this->propagateSerializeFoldedString(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
+                    $this->propagateStrRepeatFoldedString(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
@@ -17519,6 +17541,33 @@ class JIT {
         }
         $folded = $this->context->jitSerializeFoldedString;
         $this->context->jitSerializeFoldedString = null;
+        if (null === $folded || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $resultVar = $this->context->getVariableFromOp($result);
+        $resultVar->compileTimeString = $folded;
+        $name = JIT\OperandName::resolve($result);
+        if (null === $name || '' === $name) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (isset($this->context->namedVariableBindings[$resolved])) {
+            $this->context->namedVariableBindings[$resolved]->compileTimeString = $folded;
+        }
+    }
+
+    /**
+     * Stamp compile-time str_repeat() on the result CV for json_decode depth+throw fold (#10611).
+     *
+     * @param CoreFunc\Internal|JIT\Call\Native|JIT\Call\ExternalMethod|JIT\Call\NestedClosureInvoke|null $toCall
+     */
+    private function propagateStrRepeatFoldedString(Operand $result, $toCall): void
+    {
+        if (!$toCall instanceof CoreFunc\Internal || 'str_repeat' !== strtolower($toCall->getName())) {
+            return;
+        }
+        $folded = $this->context->jitStrRepeatFoldedString;
+        $this->context->jitStrRepeatFoldedString = null;
         if (null === $folded || !$this->context->hasVariableOp($result)) {
             return;
         }
