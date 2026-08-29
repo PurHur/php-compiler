@@ -179,7 +179,11 @@ class HashTable extends Type
         // before lookupFunction (peer #35614 Type::String_::implement lazy batch). Thin
         // hello-world must not NestedJIT strcoll/strnatcmp during init — leftover HashTable
         // NestedJIT vs Runtime ABI drift mints strcoll.1 / strnatcmp.1 (#31894 / #32122).
-        $this->ensureLibcStrtol();
+        // Libc strtol(3) always-on ensureLibcStrtol removed (#35751): numeric-string key
+        // lookup calls ensureLibcStrtol before lookupFunction (peer #35626 strcoll batch,
+        // #31988 module-local decl). Thin hello-world must not declare strtol during
+        // HashTable init — leftover NestedJIT vs Runtime ABI drift mints strtol.1
+        // (#31894 / #32122).
         $this->implementAlloc();
         $this->implementGrow();
         $this->implementSetLongAt();
@@ -2162,6 +2166,7 @@ class HashTable extends Type
         PHPLLVM\Value $resultSlot,
         PHPLLVM\BasicBlock $done
     ): void {
+        $this->ensureLibcStrtol();
         $tryInt = $fn->appendBasicBlock('strkey_lookup_try_int');
         $parseInt = $fn->appendBasicBlock('strkey_lookup_parse_int');
         $intFound = $fn->appendBasicBlock('strkey_lookup_int_found');
