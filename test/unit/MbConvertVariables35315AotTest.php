@@ -46,6 +46,7 @@ final class MbConvertVariables35315AotTest extends TestCase
         $this->assertStringContainsString('function detectFromArgv', $helper);
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbConvertVariablesRuntime.php');
         $this->assertStringContainsString('convertStringHelper', $runtime);
+        $this->assertStringContainsString('HELPER_BUNDLE', $runtime);
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbConvertVariables.php');
         $this->assertStringContainsString('MbConvertVariablesRuntime::convertStringHelper', $jit);
         $this->assertStringContainsString('MbConvertVariablesRuntime::detectHelper', $jit);
