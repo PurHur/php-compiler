@@ -64,4 +64,29 @@ final class DomAdoptNode19654AotTest extends TestCase
             @unlink($bin);
         }
     }
+
+    public function testAotDocumentAdoptThrowsDomException(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/issue_19654_dom_adoptnode_document_reject_aot.php';
+        $this->assertFileExists($src);
+
+        $bin = sys_get_temp_dir().'/phpc_dom_adopt_doc_reject_'.getmypid();
+        $env = 'PHP_COMPILER_PROFILE=8.4 ';
+        $compile = $env.escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $cout, $crc);
+        $this->assertSame(0, $crc, "AOT compile failed:\n".implode("\n", $cout));
+
+        try {
+            $aot = [];
+            exec($env.escapeshellarg($bin).' 2>&1', $aot, $arc);
+            $this->assertSame(0, $arc, "AOT run rc=$arc out=".implode("\n", $aot));
+            $text = implode("\n", $aot);
+            $this->assertStringContainsString('code=9', $text);
+            $this->assertStringContainsString('msg=Not Supported Error', $text);
+        } finally {
+            @unlink($bin);
+        }
+    }
 }
