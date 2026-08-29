@@ -107,9 +107,11 @@ final class JitDomImportSimpleXmlUserScript
         $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($forParse);
         $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($forParse);
         $attrs = DomParseSimpleXmlJitHelper::rootAttributesArgv($forParse);
-        $element = JitDomCreateElement::materializeElementWithTextContent(
+        $nsProps = self::namespacePropsFromHost($host);
+        $element = JitDomCreateElementNS::materializeElementNSFromLiterals(
             $context,
-            $tag,
+            $nsProps['namespace'],
+            $nsProps['qualifiedName'],
             $text,
             $elemClass
         );
@@ -197,6 +199,37 @@ final class JitDomImportSimpleXmlUserScript
         }
 
         return true;
+    }
+
+    /**
+     * Namespace identity from the host libxml node — asXML() drops ancestor xmlns (#22738).
+     *
+     * @return array{namespace: ?string, qualifiedName: string}
+     */
+    private static function namespacePropsFromHost(\SimpleXMLElement $host): array
+    {
+        $xml = $host->asXML();
+        if (false === $xml || '' === $xml) {
+            return ['namespace' => null, 'qualifiedName' => 'root'];
+        }
+        $markup = DomParseSimpleXmlJitHelper::parseElementMarkupArgv(ltrim($xml));
+        $qualifiedName = null !== $markup
+            ? $markup['tag']
+            : DomParseSimpleXmlJitHelper::rootTagArgv($xml);
+        $colon = strpos($qualifiedName, ':');
+        $prefix = false === $colon ? '' : substr($qualifiedName, 0, $colon);
+        $namespaces = $host->getNamespaces(true);
+        $namespace = null;
+        if ('' !== $prefix && isset($namespaces[$prefix])) {
+            $namespace = $namespaces[$prefix];
+        } elseif ('' === $prefix && \array_key_exists('', $namespaces)) {
+            $namespace = $namespaces[''];
+        }
+
+        return [
+            'namespace' => $namespace,
+            'qualifiedName' => $qualifiedName,
+        ];
     }
 
     public static function lastHostImportToken(): ?string

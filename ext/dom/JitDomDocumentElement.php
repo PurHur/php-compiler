@@ -340,7 +340,8 @@ final class JitDomDocumentElement
         string $tag,
         string $text,
         string $openTag = '',
-        array $inScopeNs = []
+        array $inScopeNs = [],
+        string $className = self::CLASS_ELEMENT
     ): Value {
         $scope = $inScopeNs;
         if ('' !== $openTag) {
@@ -353,7 +354,8 @@ final class JitDomDocumentElement
                 $context,
                 $scope[$prefix],
                 $tag,
-                $text
+                $text,
+                $className
             );
         }
         // Default xmlns (including xmlns="") — Zend sets namespaceURI accordingly.
@@ -362,7 +364,8 @@ final class JitDomDocumentElement
                 $context,
                 $scope[''],
                 $tag,
-                $text
+                $text,
+                $className
             );
         }
 
@@ -374,7 +377,8 @@ final class JitDomDocumentElement
             $context,
             null,
             $tag,
-            $text
+            $text,
+            $className
         );
     }
 
