@@ -164,6 +164,42 @@ final class ZipArchiveJitHelper
     }
 
     /**
+     * setArchiveComment entry path — separate NestedJIT entry avoids exec() $s1/$s2 formal
+     * aliasing under thin AOT (peer addEntry / #35454; #35476 leftover).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setArchiveComment
+     */
+    public static function setArchiveCommentEntry(string $comment): string
+    {
+        if (1 !== self::$h1open) {
+            throw new \ValueError('Invalid or uninitialized Zip object');
+        }
+        self::$h1comment = $comment;
+        self::$h1status = 0;
+
+        return self::pack(1);
+    }
+
+    /**
+     * getArchiveComment entry path — separate NestedJIT entry avoids exec() formal aliasing
+     * under thin AOT (peer setArchiveCommentEntry / #35476 leftover).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getArchiveComment
+     */
+    public static function getArchiveCommentEntry(): string
+    {
+        if (1 !== self::$h1open) {
+            throw new \ValueError('Invalid or uninitialized Zip object');
+        }
+        self::$h1status = 0;
+        if ('' === self::$h1comment) {
+            return self::pack(0);
+        }
+
+        return self::packPayload(1, self::$h1comment);
+    }
+
+    /**
      * replaceFile entry path — separate NestedJIT entry avoids exec() $s2 formal aliasing
      * under thin AOT (peer addEntry / #35454 / #35710).
      *
