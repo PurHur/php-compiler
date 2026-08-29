@@ -4028,6 +4028,14 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_BUILTIN, Variable::TYPE_NATIVE_BOOL);
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_ALLOWS_NULL, Variable::TYPE_NATIVE_BOOL);
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_MEMBERS, Variable::TYPE_HASHTABLE);
+            // Cast/(string) on getReturnType() — ReflectionType hint misses proxy (#28780).
+            $this->defineMethodVisibility($id, '__tostring', \PHPCfg\Func::FLAG_PUBLIC, '__toString');
+        }
+        if ('reflectionuniontype' === $lcname) {
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_STRING, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_ALLOWS_NULL, Variable::TYPE_NATIVE_BOOL);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_MEMBERS, Variable::TYPE_HASHTABLE);
+            $this->defineMethodVisibility($id, '__tostring', \PHPCfg\Func::FLAG_PUBLIC, '__toString');
         }
         // HashContext JIT handle slot must exist before allocate() (ext/hash/JitHashContext.php, #3357).
         // __hcKey / __hcHmac required for standalone AOT final + hash_copy (#23585, #27264) —

@@ -110,6 +110,11 @@ final class ReflectionNative
         foreach (
             [
                 ['__compiler_refl_func_param_count', $sizeT, [$i8p]],
+                ['__compiler_refl_func_param_name_at', $i8p, [$i8p, $i64]],
+                ['__compiler_refl_func_param_type_label_at', $i8p, [$i8p, $i64]],
+                ['__compiler_refl_func_return_type_label', $i8p, [$i8p]],
+                ['__compiler_refl_func_param_default_available', $i1, [$i8p, $i64]],
+                ['__compiler_refl_type_from_label_cstr', $context->getTypeFromString('__value__*'), [$i8p]],
                 ['__compiler_refl_func_is_user_defined', $i1, [$i8p]],
                 // Thin AOT ReflectionMethod param counts (#34216).
                 ['__compiler_refl_method_param_count', $sizeT, [$i8p, $i8p]],

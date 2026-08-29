@@ -2015,6 +2015,11 @@ class Context {
         $this->functionProxies['reflectionproperty::getname'] = new Call\ReflectionPropertyGetName();
         $this->functionProxies['reflectionparameter::__construct'] = new Call\ReflectionParameterConstruct();
         $this->functionProxies['reflectionparameter::getname'] = new Call\ReflectionParameterGetName();
+        $this->functionProxies['reflectionparameter::gettype'] = new Call\ReflectionParameterGetType();
+        $this->functionProxies['reflectionparameter::hastype'] = new Call\ReflectionParameterHasType();
+        $this->functionProxies['reflectionparameter::allowsnull'] = new Call\ReflectionParameterAllowsNull();
+        $this->functionProxies['reflectionparameter::isdefaultvalueavailable'] = new Call\ReflectionParameterIsDefaultValueAvailable();
+        $this->functionProxies['reflectionparameter::getdefaultvalue'] = new Call\ReflectionParameterGetDefaultValue();
         $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
         // Thin AOT: isFinal used broken strcasecmp → true for every prop when table non-empty (#34047).
         $this->functionProxies['reflectionproperty::isfinal'] = new Call\ReflectionPropertyIsFinal();
@@ -2093,6 +2098,9 @@ class Context {
         $this->functionProxies['reflectionfunction::isvariadic'] = new Call\ReflectionFunctionIsVariadic();
         // Thin AOT: unbound getNumberOfParameters / isUserDefined / isInternal → NULL (#34218).
         $this->functionProxies['reflectionfunction::getnumberofparameters'] = new Call\ReflectionFunctionGetNumberOfParameters();
+        $this->functionProxies['reflectionfunction::getparameters'] = new Call\ReflectionFunctionGetParameters();
+        $this->functionProxies['reflectionfunction::getreturntype'] = new Call\ReflectionFunctionGetReturnType();
+        $this->functionProxies['reflectionfunction::hasreturntype'] = new Call\ReflectionFunctionHasReturnType();
         $this->functionProxies['reflectionfunction::isuserdefined'] = new Call\ReflectionFunctionIsUserDefined();
         $this->functionProxies['reflectionfunction::isinternal'] = new Call\ReflectionFunctionIsInternal();
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
@@ -2119,6 +2127,8 @@ class Context {
         $this->functionProxies['reflectionenumunitcase::getvalue'] = $unitCaseGetValue;
         $this->functionProxies['reflectionenumbackedcase::getvalue'] = $unitCaseGetValue;
         $this->functionProxies['reflectionnamedtype::getname'] = new Call\ReflectionNamedTypeGetName();
+        $this->functionProxies['reflectionnamedtype::__tostring'] = new Call\ReflectionNamedTypeToString();
+        $this->functionProxies['reflectionuniontype::__tostring'] = new Call\ReflectionUnionTypeToString();
         $this->functionProxies['exception::getmessage'] = new Call\ExceptionGetMessage('Exception');
         $this->functionProxies['exception::getcode'] = new Call\ExceptionGetCode('Exception');
         $exceptionToString = new Call\ExceptionToString();
@@ -3022,6 +3032,9 @@ class Context {
         Builtin\ParamVariadicLowering::implementLookupFunctions($this);
         Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
         Builtin\ReflectionFunctionVariadicLowering::implementLookupFunctions($this);
+        // Internal literal ReflectionFunction names first — param-count bridge must include
+        // their arity before ReflectionFunctionParamCountLowering's early-return (#28780).
+        Builtin\ReflectionInternalFunctionLowering::implementLookupFunctions($this);
         Builtin\ReflectionFunctionParamCountLowering::implementLookupFunctions($this);
         Builtin\ReflectionMethodQueryLowering::implementLookupFunctions($this);
         VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
