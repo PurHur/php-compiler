@@ -308,11 +308,12 @@ final class NamedArgs
             $idx = BuiltinParamNames::lookupNamedParamIndex($paramNames, $name, $functionName);
             if (false === $idx) {
                 if ($internalFunction) {
-                    // Non-variadic internals: Zend Error "Unknown named parameter $x" (#23490).
-                    // Variadics defer to too-few vs "does not accept unknown named" (#23449),
-                    // except call_user_func which forwards into the variadic pack (#23772 / #10637).
+                    // Defer unknown named internals to runtime so try/catch works under AOT (#24508).
+                    // Zend Error "Unknown named parameter $x" (#23490); variadics also defer
+                    // to too-few vs unknown (#23449), except call_user_func forwarding (#23772).
                     if (null === $variadicParamIndex) {
-                        throw new \Error("Unknown named parameter \${$name}");
+                        self::deferInternalUnknownNamed($name, $deferredUnknownNamed);
+                        continue;
                     }
                     if (
                         null !== $functionName
@@ -388,7 +389,11 @@ final class NamedArgs
             if ($given < $required) {
                 BuiltinParamNames::throwTooFewArgumentsError($functionName, $required, $given);
             }
-            BuiltinParamNames::throwUnknownNamedParameterError($functionName);
+            $unknownName = array_key_first($deferredUnknownNamed);
+            if (false === $unknownName || null === $unknownName) {
+                BuiltinParamNames::throwUnknownNamedParameterError($functionName);
+            }
+            throw new \Error("Unknown named parameter \${$unknownName}");
         }
 
         if (null !== $variadicParamIndex && ([] !== $variadicNamed || [] !== $variadicPositional)) {

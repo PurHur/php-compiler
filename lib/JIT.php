@@ -28829,6 +28829,14 @@ class JIT {
                         );
 
                         return [[], [], true];
+                    } catch (\Error $e) {
+                        // Defer unknown named-parameter binding to runtime (#24508, #23490).
+                        if (!str_starts_with($e->getMessage(), 'Unknown named parameter $')) {
+                            throw $e;
+                        }
+                        JIT\ExceptionBridge::emitErrorAndAbort($this->context, $e->getMessage());
+
+                        return [[], [], true];
                     }
                 }
                 $callArgs = $prefix;
