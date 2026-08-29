@@ -27,6 +27,17 @@ final class MbConvertVariables35315AotTest extends TestCase
         $this->assertSame($zend, $aot);
     }
 
+    public function testAotRuntimeFromArrayMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $src = __DIR__.'/../repro/aot_mb_convert_variables_runtime_from_array.php';
+        $zend = $this->runPhp($src);
+        $aot = $this->runAot($src);
+        $this->assertSame($zend, $aot);
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
@@ -36,10 +47,14 @@ final class MbConvertVariables35315AotTest extends TestCase
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbConvertVariablesRuntime.php');
         $this->assertStringContainsString('convertStringHelper', $runtime);
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbConvertVariables.php');
-        $this->assertStringContainsString('MbConvertEncodingRuntime::convertHelper', $jit);
+        $this->assertStringContainsString('MbConvertVariablesRuntime::convertStringHelper', $jit);
         $this->assertStringContainsString('MbConvertVariablesRuntime::detectHelper', $jit);
         $this->assertStringContainsString('MbConvertVariablesLlvm::convertArrayInPlace', $jit);
-        $this->assertStringNotContainsString('array $var is not lowered', $jit);
+        $this->assertStringContainsString('MbConvertVariablesFromListLlvm::buildFromCsv', $jit);
+        $this->assertStringNotContainsString(
+            'array $from_encoding is not lowered for JIT/AOT runtime',
+            $jit
+        );
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_convert_variables.php');
         $this->assertStringContainsString('JitMbConvertVariables::invoke', $src);
         $this->assertStringNotContainsString(

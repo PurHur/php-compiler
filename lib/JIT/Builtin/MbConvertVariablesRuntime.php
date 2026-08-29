@@ -19,6 +19,8 @@ final class MbConvertVariablesRuntime
 
     private const ENCODING_HELPER_PATH = '/ext/mbstring/MbConvertEncodingJitHelper.php';
 
+    private const DETECT_HELPER_PATH = '/ext/mbstring/MbDetectEncodingJitHelper.php';
+
     private const CONVERT_STRING_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbConvertVariablesJitHelper::convertStringArgv';
 
     private const DETECT_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbConvertVariablesJitHelper::detectFromArgv';
@@ -52,7 +54,7 @@ final class MbConvertVariablesRuntime
     {
         JitVmHelperLink::ensureCompiledBundle(
             $context,
-            [self::ENCODING_HELPER_PATH, self::HELPER_PATH],
+            [self::ENCODING_HELPER_PATH, self::DETECT_HELPER_PATH, self::HELPER_PATH],
             self::COMPILED_HELPERS,
             'mb_convert_variables'
         );

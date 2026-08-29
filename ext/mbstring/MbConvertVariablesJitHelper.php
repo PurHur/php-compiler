@@ -19,15 +19,28 @@ final class MbConvertVariablesJitHelper
     public static function convertStringArgv(string $str, string $toEncoding, string $fromCsv): string
     {
         $fromList = self::parseFromCsv($fromCsv);
-        foreach ($fromList as $from) {
-            if (!self::leafPairSupported($toEncoding, $from)) {
-                continue;
+        if ([] === $fromList) {
+            return '';
+        }
+        if (\count($fromList) > 1) {
+            $detected = MbDetectEncodingJitHelper::detectArgv(
+                $str,
+                self::orderCodesFromList($fromList),
+                0
+            );
+            if ('' === $detected || !self::leafPairSupported($toEncoding, $detected)) {
+                return '';
             }
 
-            return MbConvertEncodingJitHelper::convertArgv($str, $toEncoding, $from);
+            return MbConvertEncodingJitHelper::convertArgv($str, $toEncoding, $detected);
         }
 
-        return '';
+        $from = $fromList[0];
+        if (!self::leafPairSupported($toEncoding, $from)) {
+            return '';
+        }
+
+        return MbConvertEncodingJitHelper::convertArgv($str, $toEncoding, $from);
     }
 
     /**
@@ -39,15 +52,25 @@ final class MbConvertVariablesJitHelper
         if ([] === $fromList) {
             return '';
         }
-        foreach ($fromList as $from) {
-            if (!self::leafPairSupported($toEncoding, $from)) {
-                continue;
+        if (\count($fromList) > 1) {
+            $detected = MbDetectEncodingJitHelper::detectArgv(
+                $str,
+                self::orderCodesFromList($fromList),
+                0
+            );
+            if ('' === $detected || !self::leafPairSupported($toEncoding, $detected)) {
+                return '';
             }
 
-            return $from;
+            return $detected;
         }
 
-        return '';
+        $from = $fromList[0];
+        if (!self::leafPairSupported($toEncoding, $from)) {
+            return '';
+        }
+
+        return $from;
     }
 
     /**
@@ -71,5 +94,37 @@ final class MbConvertVariablesJitHelper
     private static function leafPairSupported(string $to, string $from): bool
     {
         return '' !== MbConvertEncodingJitHelper::convertArgv('a', $to, $from);
+    }
+
+    /**
+     * @param list<string> $fromList
+     */
+    private static function orderCodesFromList(array $fromList): string
+    {
+        $codes = '';
+        foreach ($fromList as $from) {
+            $codes .= self::orderCodeForEncoding($from);
+        }
+
+        return $codes;
+    }
+
+    private static function orderCodeForEncoding(string $encoding): string
+    {
+        $e = strtoupper($encoding);
+        if ('UTF8' === $e || 'UTF-8' === $e) {
+            return 'U';
+        }
+        if ('ASCII' === $e || 'US-ASCII' === $e) {
+            return 'A';
+        }
+        if ('LATIN1' === $e || 'LATIN-1' === $e || 'ISO-8859-1' === $e) {
+            return 'L';
+        }
+        if ('8BIT' === $e || 'BINARY' === $e) {
+            return 'B';
+        }
+
+        return '';
     }
 }
