@@ -232,8 +232,7 @@ final class ArrayColumnRuntime
     }
 
     /**
-     * Remaining ABIs: call-site stubs that avoid NestedJIT. Index_key / null-column
-     * full LLVM can land later; compile-time string column (ABI_COLUMN) is the #26955 gate.
+     * Remaining ABIs: call-site LLVM for index_key paths (#13970); null-column still stubbed where noted.
      */
     private static function emitPassthroughOrStubBridges(Context $context): void
     {
@@ -241,14 +240,65 @@ final class ArrayColumnRuntime
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
 
-        self::emitEmptyHtBridge($context, self::ABI_COLUMN_INDEX, [$htPtr, $strPtr, $strPtr]);
+        self::emitColumnIndexBridge($context);
         self::emitEmptyHtBridge($context, self::ABI_NULL, [$htPtr]);
-        self::emitEmptyHtBridge($context, self::ABI_NULL_INDEX, [$htPtr, $strPtr]);
+        self::emitColumnNullIndexBridge($context);
         self::emitRuntimeKeyBridge($context, self::ABI_COLUMN_RUNTIME, [$htPtr, $valuePtr]);
         self::emitEmptyHtBridge($context, self::ABI_COLUMN_RUNTIME_INDEX, [$htPtr, $valuePtr, $strPtr]);
         self::emitEmptyHtBridge($context, self::ABI_COLUMN_RUNTIME_RUNTIME_INDEX, [$htPtr, $valuePtr, $valuePtr]);
         self::emitEmptyHtBridge($context, self::ABI_COLUMN_INDEX_RUNTIME, [$htPtr, $strPtr, $valuePtr]);
         self::emitEmptyHtBridge($context, self::ABI_NULL_RUNTIME_INDEX, [$htPtr, $valuePtr]);
+    }
+
+    private static function emitColumnIndexBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $probe = $context->module->getNamedFunction(self::ABI_COLUMN_INDEX);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_COLUMN_INDEX,
+                $context->context->functionType($htPtr, false, $htPtr, $strPtr, $strPtr)
+            );
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_COLUMN_INDEX, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_column_with_key_index_entry');
+            $context->builder->positionAtEnd($entry);
+            $out = ArrayColumnLlvm::columnWithStringKeyAndIndex(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2)
+            );
+            $context->builder->returnValue($out);
+        });
+        $context->registerFunction(self::ABI_COLUMN_INDEX, $fn);
+    }
+
+    private static function emitColumnNullIndexBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $probe = $context->module->getNamedFunction(self::ABI_NULL_INDEX);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_NULL_INDEX,
+                $context->context->functionType($htPtr, false, $htPtr, $strPtr)
+            );
+
+        BasicBlockHelper::scopeLoweringToFunction($context, $fn, self::ABI_NULL_INDEX, static function () use ($context, $fn): void {
+            $entry = $fn->appendBasicBlock('array_column_null_index_entry');
+            $context->builder->positionAtEnd($entry);
+            $out = ArrayColumnLlvm::columnNullWithStringIndex(
+                $context,
+                $fn->getParam(0),
+                $fn->getParam(1)
+            );
+            $context->builder->returnValue($out);
+        });
+        $context->registerFunction(self::ABI_NULL_INDEX, $fn);
     }
 
     /** @param list<\PHPLLVM\Type> $params */
