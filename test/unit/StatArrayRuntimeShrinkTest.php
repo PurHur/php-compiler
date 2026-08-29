@@ -16,8 +16,8 @@ final class StatArrayRuntimeShrinkTest extends TestCase
     public function testStatArrayJitHelperDelegatesToVmFs(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/StatArrayJitHelper.php');
-        $this->assertStringContainsString('VmStatCache::stat', $source);
-        $this->assertStringContainsString('VmStatCache::lstat', $source);
+        $this->assertStringContainsString('@\\stat', $source);
+        $this->assertStringContainsString('@\\lstat', $source);
     }
 
     public function testStringFsDirJitDelegatesStatToRuntime(): void
@@ -55,10 +55,9 @@ final class StatArrayRuntimeShrinkTest extends TestCase
         $actual = StatArrayJitHelper::statArgv($path, 0);
         $this->assertNotNull($actual);
         $expSize = $expected->findIndex(7);
-        $actSize = $actual->findIndex(7);
         $this->assertNotNull($expSize);
-        $this->assertNotNull($actSize);
-        $this->assertSame($expSize->toInt(), $actSize->toInt());
+        $this->assertSame($expSize->toInt(), $actual[7]);
+        $this->assertSame($expSize->toInt(), $actual['size']);
         $this->assertNull(StatArrayJitHelper::statArgv('/nonexistent/phpc_stat_array_xyz', 0));
     }
 }
