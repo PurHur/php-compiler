@@ -6765,6 +6765,7 @@ require_once __DIR__.'/../../../lib/JIT/SuperglobalInit.php';
 require_once __DIR__.'/../../../lib/JIT/TryCatchHelper.php';
 require_once __DIR__.'/../../../lib/JIT/TryCatchState.php';
 require_once __DIR__.'/../../../lib/JIT/TypeCheck.php';
+require_once __DIR__.'/../../../lib/JIT/TypedPropertyClassAssignCheck.php';
 require_once __DIR__.'/../../../lib/JIT/TypedPropertyUninitGuard.php';
 require_once __DIR__.'/../../../lib/JIT/UndefinedPropertyFetchHelper.php';
 require_once __DIR__.'/../../../lib/JIT/UndefinedVariableHelper.php';
