@@ -133,6 +133,9 @@ PHP;
             // DOM JIT emitCatchableClassError before try body — catch(Throwable) dispatch
             // is built first; seed ext/dom DOMException like JsonException (#33596).
             'DOMException',
+            // PDO::__construct missing-driver — catch(Throwable) dispatch built before
+            // PdoConstruct emitCatchableClassError registers PDOException (#27619).
+            'PDOException',
             // Match / arithmetic engine errors — catch get_class before throw registers (#29747).
             'UnhandledMatchError', 'ArithmeticError', 'DivisionByZeroError',
             'ArgumentCountError', 'ParseError', 'CompileError', 'AssertionError',
