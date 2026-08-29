@@ -59,9 +59,14 @@ final class hexdec extends Internal
             }
         }
 
-        return MathBaseConvert::baseToZvalCall(
+        $folded = MathBaseConvert::tryFoldRadixToZval($context, $args[0], 16);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        return MathBaseConvert::radixStringToZvalCall(
             $context,
-            self::jitStringArg($context, $args[0]),
+            $args[0],
             16
         );
     }
