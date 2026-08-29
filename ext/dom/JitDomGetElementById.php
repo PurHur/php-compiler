@@ -67,7 +67,11 @@ final class JitDomGetElementById
         }
 
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
-        if (!$alreadyPaired && JitDomDocumentMethodKernel::shouldUse($context) && null !== $parsed) {
+        if (!$alreadyPaired
+            && JitDomDocumentMethodKernel::shouldUse($context)
+            && null !== $parsed
+            && JitDomLoadHTMLUserScript::receiverOwnsGlobalCompileTimeParsed($args[0])
+        ) {
             // Pair only on id match — otherwise consult the runtime id map (importNode; #19212).
             $idLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
             if (null === $idLit) {
@@ -389,6 +393,10 @@ final class JitDomGetElementById
         JITVariable $receiver,
         JITVariable $idArg
     ): ?Value {
+        if (!JitDomLoadHTMLUserScript::receiverOwnsGlobalCompileTimeParsed($receiver)) {
+            return null;
+        }
+
         $idLit = JitStringBuiltinArg::compileTimeLiteral($idArg);
         if (null === $idLit) {
             $idLit = $idArg->compileTimeString;

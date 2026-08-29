@@ -41,6 +41,9 @@ final class JitDomLoadHTMLUserScript
 
     private static ?int $lastCompileTimeOptions = null;
 
+    /** @var \SplObjectStorage<JITVariable, true>|null DOMDocument receivers that took compile-time loadHTML */
+    private static ?\SplObjectStorage $htmlByReceiver = null;
+
     public static function lastCompileTimeParsedHtml(): ?string
     {
         return self::$lastCompileTimeHtml;
@@ -79,6 +82,36 @@ final class JitDomLoadHTMLUserScript
     public static function rememberCompileTimeParsed(array $parsed): void
     {
         self::$lastCompileTimeParsed = $parsed;
+    }
+
+    public static function markReceiverHtmlLoaded(JITVariable $receiver): void
+    {
+        if (null === self::$htmlByReceiver) {
+            self::$htmlByReceiver = new \SplObjectStorage();
+        }
+        self::$htmlByReceiver[$receiver] = true;
+    }
+
+    public static function receiverHasCompileTimeHtmlLoad(?JITVariable $receiver): bool
+    {
+        if (null === $receiver) {
+            return false;
+        }
+
+        return null !== self::$htmlByReceiver && isset(self::$htmlByReceiver[$receiver]);
+    }
+
+    /**
+     * True when $receiver is the document that owns the global compile-time id parse
+     * (loadHTML receiver or loadXML-bound document — not a fresh/import target doc).
+     */
+    public static function receiverOwnsGlobalCompileTimeParsed(JITVariable $receiver): bool
+    {
+        if (null !== JitDomLoadXMLUserScript::compileTimeXmlFor($receiver)) {
+            return true;
+        }
+
+        return self::receiverHasCompileTimeHtmlLoad($receiver);
     }
 
     public static function shouldUse(Context $context): bool
@@ -132,6 +165,7 @@ final class JitDomLoadHTMLUserScript
             return $i1->constInt(0, false);
         }
         self::$lastCompileTimeParsed = $parsed;
+        self::markReceiverHtmlLoaded($args[0]);
 
         return self::materializeParsedHtml($context, $args[0], $parsed);
     }
@@ -271,6 +305,7 @@ final class JitDomLoadHTMLUserScript
     private static function materializeEmptyHtmlDocument(Context $context, JITVariable $receiver): Value
     {
         JitDomLoadXMLUserScript::markLastLoadPureUserScript();
+        self::markReceiverHtmlLoaded($receiver);
         $document = self::loadObjectArg($context, $receiver);
         self::materializeAndStoreHtmlDocumentElement($context, $document, null);
         self::pinUserScriptLoadSideEffects($context);

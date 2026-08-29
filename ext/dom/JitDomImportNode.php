@@ -344,6 +344,14 @@ final class JitDomImportNode
                 DomUserScriptAttributeCacheLlvm::markIdBearingLiteral('', 'id', true);
                 DomUserScriptAttributeCacheLlvm::storeIdBearingGlobal($context, true);
             }
+            // DTD ATTLIST ID / xml:id from an XML source must reindex on the destination
+            // document for getElementById() — html-only destinations stay unindexed (#23514).
+            if ($fromXml) {
+                $xmlIdLit = self::compileTimeXmlIdLiteralForImport($sourceNode, $tag, $attrInfo['pairs']);
+                if (null !== $xmlIdLit && !self::destinationHasCompileTimeHtmlLoad($documentVar)) {
+                    self::storeElementInIdMap($context, $documentVar, $xmlIdLit, $element);
+                }
+            }
         }
         if (!$fromXml) {
             self::storeElementInIdMap($context, $documentVar, $id, $element);
@@ -856,6 +864,50 @@ final class JitDomImportNode
      *
      * @param list<array{qname: string, value: string}> $pairs
      */
+    /**
+     * @param list<array{qname: string, value: string}> $pairs
+     */
+    private static function compileTimeXmlIdLiteralForImport(
+        JITVariable $sourceNode,
+        string $tag,
+        array $pairs
+    ): ?string {
+        foreach ($pairs as $pair) {
+            if ('xml:id' === $pair['qname'] && '' !== $pair['value']) {
+                return $pair['value'];
+            }
+        }
+        $idVal = null;
+        foreach ($pairs as $pair) {
+            if ('id' === $pair['qname'] && '' !== $pair['value']) {
+                $idVal = $pair['value'];
+                break;
+            }
+        }
+        if (null === $idVal) {
+            return null;
+        }
+        $srcXml = $sourceNode->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::compileTimeXmlFor($sourceNode)
+            ?? JitDomGetNodePath::$lastDocumentElementXml
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $srcXml || '' === trim($srcXml)) {
+            return null;
+        }
+        $dtdIds = DomParseSimpleXmlIdsJitHelper::parseDoctypeIdAttributes($srcXml);
+        $idAttr = $dtdIds[$tag] ?? $dtdIds[strtolower($tag)] ?? null;
+        if (null === $idAttr || 'id' !== $idAttr) {
+            return null;
+        }
+
+        return $idVal;
+    }
+
+    private static function destinationHasCompileTimeHtmlLoad(JITVariable $destinationDocument): bool
+    {
+        return JitDomLoadHTMLUserScript::receiverHasCompileTimeHtmlLoad($destinationDocument);
+    }
+
     private static function importedAttrsStampHtmlIdBearing(
         JITVariable $sourceNode,
         array $pairs,
