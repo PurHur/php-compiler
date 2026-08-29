@@ -5364,6 +5364,7 @@ require_once __DIR__.'/../../../lib/JIT/ArrayFlipLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayUniqueLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayWalkLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/MbConvertVariablesLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/MbConvertVariablesFromListLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/UsortKeyedLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/UsortPackedLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayUserSetOpsKeyLlvm.php';
