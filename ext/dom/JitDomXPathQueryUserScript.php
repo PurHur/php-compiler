@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPLLVM\Value;
@@ -71,6 +72,14 @@ final class JitDomXPathQueryUserScript
         $invalid = self::tryHostInvalidExpressionFalse($context, $xml, $exprLit, 'query');
         if (null !== $invalid) {
             return $invalid;
+        }
+
+        // Relative `@*` / `@name` with explicit context — host-fold via prior //tag (#32003 AOT).
+        if (\count($args) >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+            $relAttr = self::tryHostRelativeAttributeAxisCompileTime($context, $xml, $exprLit);
+            if (null !== $relAttr) {
+                return $relAttr;
+            }
         }
 
         // Named XPath axes / `..` — host Zend node-set at compile time (#31773).
@@ -226,6 +235,29 @@ final class JitDomXPathQueryUserScript
     }
 
     /**
+     * Relative abbreviated attribute axis with context node (#32003 AOT evaluate/query follow-up).
+     *
+     * When context is item(0) from the immediately preceding //tag query, fold to //tag/@…
+     * so user-script AOT avoids the context-less XPath ABI (returns empty / SIGSEGV).
+     */
+    private static function tryHostRelativeAttributeAxisCompileTime(
+        Context $context,
+        string $xml,
+        string $exprLit
+    ): ?Value {
+        $trimmed = trim($exprLit);
+        if (!preg_match('~^@(?:[\w.*:-]+|\*)$~', $trimmed)) {
+            return null;
+        }
+        $queryTag = self::$lastQueryTag;
+        if (null === $queryTag || '' === $queryTag || false !== strpos($queryTag, ':')) {
+            return null;
+        }
+
+        return self::tryHostTreeAxisCompileTime($context, $xml, '//'.$queryTag.'/'.$trimmed);
+    }
+
+    /**
      * Compile-time relative location paths from documentElement context (#20257 / #31738).
      */
     private static function tryRelativeCompileTime(Context $context, string $xml, string $exprLit): ?Value
@@ -283,6 +315,10 @@ final class JitDomXPathQueryUserScript
         // AOT ABI aborts on these paths.
         $positional = (bool) preg_match('~\[(?:last\(\)|position\(\))~i', $trimmed);
         $attrAxis = self::isHostFoldAttributeAxis($trimmed);
+        // Bare relative `@axis` needs an explicit context node — handled above (#32003 AOT).
+        if ($attrAxis && !str_contains($trimmed, '/')) {
+            return null;
+        }
         // Boolean `or`/`and`/`not(` — user-script regex only handles [@attr=v] (#32050).
         $boolExpr = str_contains($trimmed, ' or ')
             || str_contains($trimmed, ' and ')
