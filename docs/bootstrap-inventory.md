@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7984 |
-| Phase A inventory files (M2 ratio SSOT) | 7984 |
+| PHP files on vm.php path | 7985 |
+| Phase A inventory files (M2 ratio SSOT) | 7985 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25420 |
+| Source constructs flagged (warnings) | 25421 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7029,6 +7029,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/MagicMethodLlvm.php` | 0 | 17 |
 | `lib/JIT/MatchUnhandledJitHelper.php` | 0 | 1 |
 | `lib/JIT/MbConvertEncodingArrayLlvm.php` | 0 | 3 |
+| `lib/JIT/MbConvertEncodingFromListLlvm.php` | 0 | 1 |
 | `lib/JIT/MbConvertVariablesLlvm.php` | 0 | 2 |
 | `lib/JIT/McjitEmbedHostEcho.php` | 0 | 2 |
 | `lib/JIT/McjitEmbedRuntime.php` | 0 | 1 |
@@ -20065,19 +20066,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/JitMbConvertEncoding.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 440)
-- new VmVariable (line 455)
-- new HashTable (line 481)
-- new VmVariable (line 485)
-- new VmVariable (line 493)
-- new HashTable (line 506)
-- new HashTable (line 511)
-- new VmVariable (line 528)
-- new VmVariable (line 534)
-- new VmVariable (line 540)
-- new VmVariable (line 546)
-- new VmVariable (line 552)
-- 18 class method(s)
+- new HashTable (line 529)
+- new VmVariable (line 544)
+- new HashTable (line 570)
+- new VmVariable (line 574)
+- new VmVariable (line 582)
+- new HashTable (line 595)
+- new HashTable (line 600)
+- new VmVariable (line 617)
+- new VmVariable (line 623)
+- new VmVariable (line 629)
+- new VmVariable (line 635)
+- new VmVariable (line 641)
+- 20 class method(s)
 - 1 closure(s)
 
 ### `ext/mbstring/JitMbConvertKana.php`
@@ -26112,12 +26113,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SimpleXMLElement (line 267)
 - new JITVariable (line 445)
 - new JITVariable (line 468)
-- new JITVariable (line 722)
-- new JITVariable (line 1150)
-- new JITVariable (line 1222)
-- new JITVariable (line 1350)
-- new JITVariable (line 1363)
-- 60 class method(s)
+- new JITVariable (line 726)
+- new JITVariable (line 1179)
+- new JITVariable (line 1251)
+- new JITVariable (line 1379)
+- new JITVariable (line 1392)
+- 61 class method(s)
 - 1 closure(s)
 
 ### `ext/simplexml/JitSimpleXmlXpath.php`
@@ -58161,6 +58162,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 147)
 - new Variable (line 219)
 - 5 class method(s)
+
+### `lib/JIT/MbConvertEncodingFromListLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `lib/JIT/MbConvertVariablesLlvm.php`
 
