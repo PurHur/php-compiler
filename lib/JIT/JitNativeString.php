@@ -187,6 +187,14 @@ final class JitNativeString
                     );
                 }
                 $magic = MagicMethodDispatch::coerceObjectToString($context, $objVar, $classHint);
+                if (null === $magic && 'reflectiontype' === strtolower(ltrim($classHint, '\\'))) {
+                    foreach (['ReflectionNamedType', 'ReflectionUnionType'] as $concrete) {
+                        $magic = MagicMethodDispatch::coerceObjectToString($context, $objVar, $concrete);
+                        if (null !== $magic) {
+                            break;
+                        }
+                    }
+                }
                 if (null !== $magic) {
                     return $magic;
                 }
@@ -281,10 +289,33 @@ final class JitNativeString
                 $context->builder->branch($join);
                 $context->builder->positionAtEnd($notNum);
             }
-            $objFallback = (new \PHPCompiler\ext\standard\strval())->valueToString(
-                $context,
-                $valuePtr
+            $namedId = $context->type->object->lookup('ReflectionNamedType');
+            $isNamed = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classIdVal,
+                $i64->constInt($namedId, false)
             );
+            $yesNamed = BasicBlockHelper::append($context, 'cast_vbox_refl_named');
+            $noNamed = BasicBlockHelper::append($context, 'cast_vbox_refl_no');
+            $objFallbackMerge = BasicBlockHelper::append($context, 'cast_vbox_refl_fallback_merge');
+            $context->builder->branchIf($isNamed, $yesNamed, $noNamed);
+            $context->builder->positionAtEnd($yesNamed);
+            $toCall = $context->resolveFunctionProxy('reflectionnamedtype::__tostring');
+            $raw = $toCall->call($context, $objVar);
+            $namedFallback = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                $context,
+                JitValueBox::coerceToValuePtrForStore($context, $raw)
+            );
+            $yesNamedEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($objFallbackMerge);
+            $context->builder->positionAtEnd($noNamed);
+            $emptyFallback = $context->builder->load($context->constantStringFromString(''));
+            $noNamedEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($objFallbackMerge);
+            $context->builder->positionAtEnd($objFallbackMerge);
+            $objFallback = $context->builder->phi($namedFallback->typeOf(), 'cast_vbox_refl_fallback');
+            $objFallback->addIncoming($namedFallback, $yesNamedEnd);
+            $objFallback->addIncoming($emptyFallback, $noNamedEnd);
             $objFallbackEnd = $context->builder->getInsertBlock();
             $context->builder->branch($join);
 

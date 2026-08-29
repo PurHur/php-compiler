@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\Builtin\ReflectionInternalFunctionLowering;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -25,6 +26,9 @@ final class ReflectionFunctionConstruct implements Call
             );
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+        if (null !== ($args[1]->compileTimeString ?? null)) {
+            ReflectionInternalFunctionLowering::recordFunction($args[1]->compileTimeString);
+        }
         ReflectionSetup::emitSetStringPropertyFromVar(
             $context,
             $obj,

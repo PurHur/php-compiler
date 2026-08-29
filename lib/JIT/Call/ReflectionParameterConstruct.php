@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\BuiltinParamNames;
+use PHPCompiler\JIT\Builtin\ReflectionInternalFunctionLowering;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -33,6 +34,10 @@ final class ReflectionParameterConstruct implements Call
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         if ($this->tryInitInternalFunctionByLiteralIndex($context, $obj, $args[1], $args[2])) {
+            if (null !== ($args[1]->compileTimeString ?? null)) {
+                ReflectionInternalFunctionLowering::recordFunction($args[1]->compileTimeString);
+            }
+
             return $this->nullReturnSlot($context);
         }
 

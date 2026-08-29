@@ -33,6 +33,7 @@ final class ReflectionNamedTypeGetName implements Call
 
             return JitValueBox::alloc($context);
         }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'refl_namedtype_getname_cont');
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         [$cstr, $len] = ReflectionSetup::stringPropertyAsCstr(
             $context,

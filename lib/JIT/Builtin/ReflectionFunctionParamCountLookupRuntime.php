@@ -30,7 +30,7 @@ final class ReflectionFunctionParamCountLookupRuntime
     }
 
     /** @param array<string, int> $arityByFunc */
-    private static function implementParamCountBridge(Context $context, array $arityByFunc): void
+    public static function implementParamCountBridge(Context $context, array $arityByFunc): void
     {
         $abiName = '__compiler_refl_func_param_count';
         $probe = $context->module->getNamedFunction($abiName);
