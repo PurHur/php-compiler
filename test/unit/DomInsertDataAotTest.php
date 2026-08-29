@@ -36,6 +36,14 @@ final class DomInsertDataAotTest extends TestCase
         $this->assertSame(self::EXPECTED, $this->compileAndRun('issue_dom_insertdata_aot.php'));
     }
 
+    public function testAotInsertDataIndexSizeError(): void
+    {
+        $this->assertSame(
+            "Index Size Error\nIndex Size Error\nab\n",
+            $this->compileAndRun('issue_dom_insertdata_index_aot.php')
+        );
+    }
+
     public function testVmInsertDataIndexSizeError(): void
     {
         $runtime = new Runtime();
