@@ -67,9 +67,21 @@ final class JitDomNodeListItemUserScript
 
         // Dynamic index: live walk when pinned root exists (#33659); else compile-time ladder (#33063).
         if (null === $index) {
-            $axisExpr = JitDomXPathQueryUserScript::lastXPathAxisExpr();
-            if (null !== $axisExpr && null !== $xml) {
-                return self::materializeDynamicIndexXPathAxisMatch($context, $xml, $axisExpr, $args[1]);
+            $xpathAxisIdVal = null;
+            $xpathAxisBlock = null;
+            if ([] !== JitDomXPathQueryUserScript::xpathAxisExprTable() && null !== $xml) {
+                $xpathAxisIdVal = self::loadXPathAxisIdValue($context, $args[0]);
+                $i64 = $context->getTypeFromString('int64');
+                $hasAxis = $context->builder->icmp(
+                    Builder::INT_UGT,
+                    $xpathAxisIdVal,
+                    $i64->constInt(0, false)
+                );
+                $xpathAxisBlock = BasicBlockHelper::append($context, 'dom_nli_dyn_xpath_axis');
+                $bbCont = BasicBlockHelper::append($context, 'dom_nli_dyn_xpath_cont');
+                $context->builder->branchIf($hasAxis, $xpathAxisBlock, $bbCont);
+
+                $context->builder->positionAtEnd($bbCont);
             }
 
             if (null !== $tagQuery) {
@@ -177,6 +189,17 @@ final class JitDomNodeListItemUserScript
                     : $tagResult;
             }
 
+            if (null !== $xpathAxisBlock && null !== $xpathAxisIdVal && null !== $xml) {
+                $context->builder->positionAtEnd($xpathAxisBlock);
+
+                return self::materializeDynamicIndexXPathAxisMatchByAxisId(
+                    $context,
+                    $xml,
+                    $xpathAxisIdVal,
+                    $args[1]
+                );
+            }
+
             return null;
         }
         if ($index < 0) {
@@ -184,9 +207,21 @@ final class JitDomNodeListItemUserScript
         }
 
         // Host-folded XPath axis/boolean node-sets: item(N) for N>0 (#32003).
-        $axisExpr = JitDomXPathQueryUserScript::lastXPathAxisExpr();
-        if (null !== $axisExpr && null !== $xml) {
-            return self::materializeNthXPathAxisMatch($context, $xml, $axisExpr, $index);
+        $xpathAxisIdVal = null;
+        $xpathAxisBlock = null;
+        if ([] !== JitDomXPathQueryUserScript::xpathAxisExprTable() && null !== $xml) {
+            $xpathAxisIdVal = self::loadXPathAxisIdValue($context, $args[0]);
+            $i64 = $context->getTypeFromString('int64');
+            $hasAxis = $context->builder->icmp(
+                Builder::INT_UGT,
+                $xpathAxisIdVal,
+                $i64->constInt(0, false)
+            );
+            $xpathAxisBlock = BasicBlockHelper::append($context, 'dom_nli_const_xpath_axis');
+            $bbCont = BasicBlockHelper::append($context, 'dom_nli_const_xpath_cont');
+            $context->builder->branchIf($hasAxis, $xpathAxisBlock, $bbCont);
+
+            $context->builder->positionAtEnd($bbCont);
         }
 
         // XPath //tag lists: prefer live pinned-root walk so item() keeps
@@ -309,6 +344,23 @@ final class JitDomNodeListItemUserScript
                     $tagResult
                 )
                 : $tagResult;
+        }
+        if (null !== $xpathAxisBlock && null !== $xpathAxisIdVal && null !== $xml) {
+            $context->builder->positionAtEnd($xpathAxisBlock);
+            $i64 = $context->getTypeFromString('int64');
+            $constIndexVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $i64->constInt($index, false)
+            );
+
+            return self::materializeDynamicIndexXPathAxisMatchByAxisId(
+                $context,
+                $xml,
+                $xpathAxisIdVal,
+                $constIndexVar
+            );
         }
         if (0 !== $index) {
             return null;
@@ -470,6 +522,70 @@ final class JitDomNodeListItemUserScript
                 $i64->constInt($i, false)
             );
             $out = $context->builder->select($isI, $cand, $out);
+        }
+
+        return $out;
+    }
+
+    private static function loadXPathAxisIdValue(Context $context, JITVariable $listVar): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nli_load_xpath_axis_id');
+        $objectType = $context->type->object;
+        $listClassId = $objectType->lookup('DOMNodeList');
+        if (!$objectType->hasProperty($listClassId, VmDom::PROP_XPATH_AXIS_ID)) {
+            $objectType->defineProperty($listClassId, VmDom::PROP_XPATH_AXIS_ID, JITVariable::TYPE_NATIVE_LONG);
+        }
+        $list = JitDomNodeListItem::loadObjectArgForUserScript($context, $listVar);
+        $fetched = $objectType->propertyFetch(
+            $list,
+            'DOMNodeList',
+            VmDom::PROP_XPATH_AXIS_ID,
+            false,
+            $listVar
+        );
+
+        return $context->helper->loadValue($fetched);
+    }
+
+    private static function materializeDynamicIndexXPathAxisMatchByAxisId(
+        Context $context,
+        string $xml,
+        Value $axisIdVal,
+        JITVariable $indexArg
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_dyn_xpath_axis_id');
+        $i64 = $context->getTypeFromString('int64');
+        $out = self::boxNull($context);
+        foreach (JitDomXPathQueryUserScript::xpathAxisExprTable() as $id => $expr) {
+            $isId = $context->builder->icmp(
+                Builder::INT_EQ,
+                $axisIdVal,
+                $i64->constInt($id, false)
+            );
+            $cand = self::materializeDynamicIndexXPathAxisMatch($context, $xml, $expr, $indexArg);
+            $out = $context->builder->select($isId, $cand, $out);
+        }
+
+        return $out;
+    }
+
+    private static function materializeNthXPathAxisMatchByAxisId(
+        Context $context,
+        string $xml,
+        Value $axisIdVal,
+        int $index
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_xpath_axis_id');
+        $i64 = $context->getTypeFromString('int64');
+        $out = self::boxNull($context);
+        foreach (JitDomXPathQueryUserScript::xpathAxisExprTable() as $id => $expr) {
+            $isId = $context->builder->icmp(
+                Builder::INT_EQ,
+                $axisIdVal,
+                $i64->constInt($id, false)
+            );
+            $cand = self::materializeNthXPathAxisMatch($context, $xml, $expr, $index);
+            $out = $context->builder->select($isId, $cand, $out);
         }
 
         return $out;
