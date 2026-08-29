@@ -238,6 +238,10 @@ final class HelperRuntimeCache
         // #34800 — prelinked encodeArgv mis-reads `$data[$i+1]` / `<<` on binary; NestedJIT
         // `$i++` + intdiv encode matches Zend (peer MbMimeheaderJitHelper::b64Encode).
         'phpcompiler\\ext\\standard\\base64jithelper::encodeargv' => true,
+        // #35378 — prelinked SodiumBase64JitHelper unit.o throws base Exception (not
+        // SodiumException) on invalid variant id, so catch (SodiumException) misses it;
+        // NestedJIT Base64JitHelper + SodiumBase64JitHelper bundle matches VM/JIT.
+        'phpcompiler\\ext\\sodium\\sodiumbase64jithelper::bin2base64argv' => true,
         // #34824 — prelinked Crc32JitHelper unit.o miscomputes digests (equal-length strings
         // share one wrong CRC). NestedJIT of the bit-by-bit helper into the user AOT module
         // matches Zend/VM (same algorithm as user-script AOT; peer #34800 / #27077).
