@@ -16,6 +16,16 @@ final class VmZstdCore
         return true;
     }
 
+    public static function versionNumber(): int
+    {
+        return ZstdJitHelper::versionNumber();
+    }
+
+    public static function versionText(): string
+    {
+        return ZstdJitHelper::versionText();
+    }
+
     public static function compress(string $data, int $level = 3): string|false
     {
         $result = ZstdJitHelper::compress($data, $level);
