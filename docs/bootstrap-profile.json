@@ -7198,6 +7198,7 @@
         "lib/JIT/TryCatchState.php",
         "lib/JIT/TypeCheck.php",
         "lib/JIT/TypedParamCoerce.php",
+        "lib/JIT/TypedPropertyClassAssignCheck.php",
         "lib/JIT/TypedPropertyUninitGuard.php",
         "lib/JIT/UnboundThisGuard.php",
         "lib/JIT/UndefinedPropertyFetchHelper.php",
@@ -8235,9 +8236,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8001,
+        "inventory_files": 8002,
         "excluded": 0,
-        "eligible": 8001,
+        "eligible": 8002,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
