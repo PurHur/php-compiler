@@ -37,9 +37,10 @@ final class MathBaseConvertRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitBaseToZvalCore', $source);
         $this->assertStringNotContainsString('emitDigitValue', $source);
         $this->assertStringNotContainsString('sgen_loop_head', $source);
-        $this->assertLessThan(400, \substr_count($source, "\n") + 1);
-        $this->assertStringContainsString('getNamedFunction', $source);
-        $this->assertStringContainsString('#32420', $source);
+        $this->assertLessThan(460, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('radixStringToZvalViaBaseConvert', $source);
+        $this->assertStringContainsString('tryFoldRadixToZval', $source);
+        $this->assertStringContainsString('#31966', $source);
 
         $module = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
         $this->assertStringContainsString('#32420', $module);

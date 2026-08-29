@@ -6,10 +6,14 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\standard\base_convert_;
 use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\ext\standard\VmMath;
 use PHPLLVM\Builder;
@@ -202,10 +206,11 @@ final class MathBaseConvertRuntime
         $baseI64 = $context->builder->sext($base, $i64);
 
         // NestedJIT maps PHP `int` returns to i64; phpc_basetozval_result is i32 (#26511).
-        $tagWide = $context->builder->call(
+        // callHelper coerces __string__* / int ABI like phpc_base_convert bridge (#26884 / #31966).
+        $tagWide = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::PARSE_BASE_TO_ZVAL),
-            $fn->getParam(0),
-            $baseI64
+            [$fn->getParam(0), $baseI64]
         );
         $tag = $context->builder->trunc($tagWide, $i32);
         self::emitInvalidRadixCharsDeprecationIfNeeded($context);
@@ -235,11 +240,19 @@ final class MathBaseConvertRuntime
 
         $context->builder->positionAtEnd($fetchLong);
         // NestedJIT `int` → i64; keep as i64 for __value__writeLong (#26511).
-        $longI64 = $context->builder->call(self::helperFunction($context, self::LAST_LONG));
+        $longI64 = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::LAST_LONG),
+            []
+        );
         $context->builder->branch($afterFetch);
 
         $context->builder->positionAtEnd($fetchDouble);
-        $dblVal = $context->builder->call(self::helperFunction($context, self::LAST_DOUBLE));
+        $dblVal = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::LAST_DOUBLE),
+            []
+        );
         $context->builder->branch($afterFetch);
 
         $context->builder->positionAtEnd($afterFetch);
@@ -293,51 +306,71 @@ final class MathBaseConvertRuntime
 
     public static function baseToZvalCall(Context $context, Value $strPtr, int $base): Value
     {
+        // phpc_basetozval_result + inline parseBaseToZval mis-parse under NestedJIT inline
+        // (HELPER_RUNTIME_O=0); phpc_base_convert + strtol matches Zend (#31966 / #30535).
         self::ensureLinked($context);
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $double = $context->getTypeFromString('double');
-        $longOut = BasicBlockHelper::entryAlloca($context, $i64);
-        $doubleOut = BasicBlockHelper::entryAlloca($context, $double);
-        $isDouble = $context->builder->call(
-            $context->lookupFunction('phpc_basetozval_result'),
+        $decimalStr = $context->builder->call(
+            $context->lookupFunction('phpc_base_convert'),
             $strPtr,
             $i64->constInt($base, false),
-            $longOut,
-            $doubleOut
+            $i64->constInt(10, false)
         );
-        $isDoubleFlag = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->trunc($isDouble, $i32),
-            $i32->constInt(0, false)
+        $longVal = JitLongArg::lowerStringValue($context, $decimalStr);
+
+        return JitValueBox::coerceToValuePtrForStore($context, $longVal);
+    }
+
+    /**
+     * @internal hexdec/bindec/octdec — compile-time literal fold (peer base_convert_::tryFoldCompileTime).
+     */
+    public static function tryFoldRadixToZval(Context $context, JITVariable $arg, int $fromBase): ?Value
+    {
+        $str = JitStringArg::compileTimeLiteral($arg);
+        if (null === $str && null !== $arg->compileTimeLong) {
+            $str = (string) $arg->compileTimeLong;
+        }
+        if (null === $str) {
+            return null;
+        }
+        $result = VmMath::baseToZval($str, $fromBase);
+        if (VmMath::takeInvalidRadixCharsDeprecation()) {
+            return null;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        if (\is_float($result)) {
+            return JitValueBox::coerceToValuePtrForStore($context, $double->constReal($result));
+        }
+
+        return JitValueBox::coerceToValuePtrForStore($context, $i64->constInt((int) $result, false));
+    }
+
+    /** Runtime radix parse: delegate string lowering to base_convert_ (#31966). */
+    public static function radixStringToZvalViaBaseConvert(
+        Context $context,
+        JITVariable $strArg,
+        int $fromBase
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $fromArg = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $i64->constInt($fromBase, false)
         );
-
-        $slot = JitValueBox::alloc($context);
-        $slotPtr = JitValueBox::pointer($context, $slot);
-        $longBb = BasicBlockHelper::append($context, 'basetozval_long');
-        $doubleBb = BasicBlockHelper::append($context, 'basetozval_double');
-        $doneBb = BasicBlockHelper::append($context, 'basetozval_done');
-        $context->builder->branchIf($isDoubleFlag, $doubleBb, $longBb);
-
-        $context->builder->positionAtEnd($longBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $slotPtr,
-            $context->builder->load($longOut)
+        $fromArg->compileTimeLong = $fromBase;
+        $toArg = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $i64->constInt(10, false)
         );
-        $context->builder->branch($doneBb);
+        $toArg->compileTimeLong = 10;
+        $decimalStr = (new base_convert_())->call($context, $strArg, $fromArg, $toArg);
+        $longVal = JitLongArg::lowerStringValue($context, $decimalStr);
 
-        $context->builder->positionAtEnd($doubleBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeDouble'),
-            $slotPtr,
-            $context->builder->load($doubleOut)
-        );
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
-
-        return $slotPtr;
+        return JitValueBox::coerceToValuePtrForStore($context, $longVal);
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
