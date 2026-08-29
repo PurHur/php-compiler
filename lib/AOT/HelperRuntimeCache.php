@@ -277,6 +277,10 @@ final class HelperRuntimeCache
         // thin AOT (NestedJIT cannot construct HashTable — peer explode #27660). Force NestedJIT
         // of the string-joined peel into the user module; JitMbStrSplit rebuilds HT via JitExplode.
         'phpcompiler\\ext\\mbstring\\mbstrsplitjithelper::strsplitargv' => true,
+        // #35315 — prelinked MbConvertVariablesJitHelper unit.o aborts at runtime (MbDetectEncoding
+        // dep chain lacks init under HELPER_RUNTIME_O=1). NestedJIT bundle into user AOT matches O=0.
+        'phpcompiler\\ext\\mbstring\\mbconvertvariablesjithelper::convertstringargv' => true,
+        'phpcompiler\\ext\\mbstring\\mbconvertvariablesjithelper::detectfromargv' => true,
     ];
 
     private static bool $loggedHit = false;
