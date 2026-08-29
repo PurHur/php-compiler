@@ -22,10 +22,13 @@ final class ZipArchiveEmbedBridge
 
     private const ADD_ENTRY = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::addEntry';
 
+    private const REPLACE_ENTRY = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::replaceEntry';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::EXEC,
         self::ADD_ENTRY,
+        self::REPLACE_ENTRY,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -41,6 +44,11 @@ final class ZipArchiveEmbedBridge
     public static function addEntryHelper(): string
     {
         return self::ADD_ENTRY;
+    }
+
+    public static function replaceEntryHelper(): string
+    {
+        return self::REPLACE_ENTRY;
     }
 
     public static function helperFunction(Context $context, string $logical): LlvmFunction

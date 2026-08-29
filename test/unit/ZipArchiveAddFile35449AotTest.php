@@ -7,16 +7,18 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: ZipArchive::replaceFile NestedJIT (#35496 leftover of #35489).
+ * AOT: ZipArchive::addFile persists entry bytes through close/reopen (#35449).
  *
- * @see php-src ext/zip/php_zip.c zim_ZipArchive_replaceFile
+ * Peer #35710 addEntry — exec() $s2 formal aliasing dropped file contents under thin AOT.
+ *
+ * @see php-src ext/zip/php_zip.c zim_ZipArchive_addFile
  *
  * @group llvm
  * @group aot
  */
-final class ZipArchiveReplaceFile35496AotTest extends TestCase
+final class ZipArchiveAddFile35449AotTest extends TestCase
 {
-    public function testReplaceFileAotMatchesVm(): void
+    public function testAddFileAotMatchesVm(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
@@ -25,22 +27,18 @@ final class ZipArchiveReplaceFile35496AotTest extends TestCase
             $this->markTestSkipped('host ext/zip loaded');
         }
 
-        $src = __DIR__.'/../repro/ziparchive_replacefile_aot.php';
+        $src = __DIR__.'/../repro/ziparchive_addfile_status_aot.php';
         $this->assertSame($this->runVm($src), $this->runAot($src));
     }
 
-    public function testIrDispatchPresent(): void
+    public function testHelperUsesDedicatedAddEntryPath(): void
     {
         $root = dirname(__DIR__, 2);
         $jit = (string) file_get_contents($root.'/ext/zip/JitZipArchive.php');
-        $this->assertStringContainsString('replaceEntryHelper()', $jit);
-        $this->assertStringContainsString('function replaceFile', $jit);
+        $this->assertStringContainsString('addEntryHelper()', $jit);
+        $this->assertStringContainsString('function addFile', $jit);
         $helper = (string) file_get_contents($root.'/ext/zip/ZipArchiveJitHelper.php');
-        $this->assertStringContainsString('function replaceEntry', $helper);
-        $call = (string) file_get_contents($root.'/lib/JIT/Call/ZipArchiveMethod.php');
-        $this->assertStringContainsString("'replacefile'", $call);
-        $ctx = (string) file_get_contents($root.'/lib/JIT/Context.php');
-        $this->assertStringContainsString("'replaceFile'", $ctx);
+        $this->assertStringContainsString('function addEntry', $helper);
     }
 
     private function runVm(string $src): string
@@ -51,7 +49,7 @@ final class ZipArchiveReplaceFile35496AotTest extends TestCase
     private function runAot(string $src): string
     {
         $root = dirname(__DIR__, 2);
-        $bin = sys_get_temp_dir().'/zip_rpl_'.getmypid().'_'.md5($src);
+        $bin = sys_get_temp_dir().'/zip_addfile_'.getmypid().'_'.md5($src);
         $compile = 'env PHP_COMPILER_ENABLE_ZIP=1 '
             .escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php').' -o '
