@@ -163,14 +163,20 @@ final class VmMbConvertVariables
      */
     private static function convertString(string $source, string $to, array $fromEncodings): array
     {
-        foreach ($fromEncodings as $from) {
-            $converted = VmMbstring::convertEncoding($source, $to, $from);
-            if (false !== $converted) {
-                return [$converted, $from];
-            }
+        if ([] === $fromEncodings) {
+            return [false, null];
+        }
+        $fromCsv = implode(',', $fromEncodings);
+        $detected = MbConvertVariablesJitHelper::detectFromArgv($source, $to, $fromCsv);
+        if ('' === $detected) {
+            return [false, null];
+        }
+        $converted = MbConvertVariablesJitHelper::convertStringArgv($source, $to, $fromCsv);
+        if ('' === $converted) {
+            return [false, null];
         }
 
-        return [false, null];
+        return [$converted, $detected];
     }
 
     /**

@@ -16,6 +16,14 @@ use PHPUnit\Framework\TestCase;
  */
 final class MbConvertVariables35315AotTest extends TestCase
 {
+    public function testVmRuntimeFromArrayMatchesZend(): void
+    {
+        $src = __DIR__.'/../repro/aot_mb_convert_variables_runtime_from_array.php';
+        $zend = $this->runPhp($src);
+        $vm = $this->runVm($src);
+        $this->assertSame($zend, $vm);
+    }
+
     public function testAotMatchesZend(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
@@ -75,6 +83,20 @@ final class MbConvertVariables35315AotTest extends TestCase
             $src
         );
         $this->assertFileDoesNotExist($root.'/lib/AOT/runtime/mb_convert_variables.c');
+    }
+
+    private function runVm(string $src): string
+    {
+        $root = dirname(__DIR__, 2);
+        exec(
+            escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/vm.php').' '
+            .escapeshellarg($src).' 2>&1',
+            $out,
+            $rc
+        );
+        $this->assertSame(0, $rc, implode("\n", $out));
+
+        return implode("\n", $out);
     }
 
     private function runPhp(string $src): string
