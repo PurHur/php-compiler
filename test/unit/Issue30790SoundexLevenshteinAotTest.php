@@ -31,6 +31,20 @@ PHP,
         );
     }
 
+    public function testAotSoundexWashingtonRuntimeString(): void
+    {
+        $this->compileAndAssert(
+            <<<'PHP'
+<?php
+$s = 'Washington';
+echo soundex($s), "\n";
+echo soundex('Washington'), "\n";
+echo soundex('Lloyd'), "\n";
+PHP,
+            "W252\nW252\nL300\n"
+        );
+    }
+
     public function testAotLevenshteinKittenSitting(): void
     {
         $this->compileAndAssert(
