@@ -13,11 +13,12 @@ require_once __DIR__.'/stdlib-jit-deferred-lib.php';
  */
 function stdlib_jit_deferred_parse_audit_deferred(string $auditText): array
 {
-    if (!preg_match('/## Deferred \\(VM-only\\)\s*\n+(.*?)(?:\n## |\z)/s', $auditText, $section)) {
+    // Next section is `## Present` at BOL — not preceded by `\n## ` when Deferred is empty.
+    if (!preg_match('/## Deferred \\(VM-only\\)\n\n(.*?)(?=^## |\z)/ms', $auditText, $section)) {
         return [];
     }
     $body = $section[1];
-    if (preg_match('/_None — all JIT/', $body)) {
+    if (preg_match('/_None — all/', $body)) {
         return [];
     }
     if (!preg_match_all('/^- `([^`]+)`/m', $body, $matches)) {

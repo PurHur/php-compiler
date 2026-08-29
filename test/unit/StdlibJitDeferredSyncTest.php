@@ -48,6 +48,23 @@ MD;
         $this->assertSame(1, stdlib_jit_deferred_parse_audit_metric_count($audit, 'Deferred (VM-only)'));
     }
 
+    public function testAuditDeferredParserEmptySectionDoesNotIncludePresent(): void
+    {
+        $audit = <<<'MD'
+| Deferred (VM-only) | 0 |
+
+## Deferred (VM-only)
+
+_None — all open JIT deferrals cleared._
+
+## Present (sorted)
+
+- `abs` — `ext/standard/abs.php`
+MD;
+        $parsed = stdlib_jit_deferred_parse_audit_deferred($audit);
+        $this->assertSame([], $parsed);
+    }
+
     public function testCapabilitiesDeferralNoteRequiredWhenJitYes(): void
     {
         $row = '| `spl_autoload_register` | yes | yes | yes | standard | JIT PHPT |';
