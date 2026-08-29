@@ -15,6 +15,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\MbConvertVariablesFromListLlvm;
 use PHPCompiler\JIT\MbConvertVariablesLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -46,11 +47,7 @@ final class JitMbConvertVariables
         }
 
         $fromCsv = self::compileTimeFromCsv($args[1]);
-        if (null === $fromCsv && self::isArrayArg($args[1])) {
-            throw new \LogicException(
-                'mb_convert_variables() array $from_encoding is not lowered for JIT/AOT runtime in this compiler build'
-            );
-        }
+        $runtimeFromArray = null === $fromCsv && self::isArrayArg($args[1]);
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         MbConvertVariablesRuntime::ensureLinked($context);
@@ -103,6 +100,8 @@ final class JitMbConvertVariables
                 }
             }
             $fromPtr = $context->builder->load($context->constantStringFromString($fromCsv));
+        } elseif ($runtimeFromArray) {
+            $fromPtr = MbConvertVariablesFromListLlvm::buildFromCsv($context, $args[1]);
         } else {
             [$fromPtr, $fromLit] = self::encodingPtr($context, $args[1], 'from_encoding', 1);
             if (null !== $fromLit && !self::isLeafEncoding($fromLit)) {
@@ -220,10 +219,9 @@ final class JitMbConvertVariables
             $argIndex,
             'var'
         );
-        // Peer JitMbConvertEncoding::convertHelper — MbConvertVariablesJitHelper::convertStringArgv
-        // duplicates convertArgv but NestedJIT link for convertStringHelper mis-returns (#35315).
+        // MbConvertVariablesJitHelper::convertStringArgv parses CSV $from_encoding lists (#35315).
         $converted = $context->builder->call(
-            MbConvertEncodingRuntime::convertHelper($context),
+            MbConvertVariablesRuntime::convertStringHelper($context),
             $str,
             $toPtr,
             $fromPtr
