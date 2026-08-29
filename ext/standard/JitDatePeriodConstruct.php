@@ -33,14 +33,22 @@ final class JitDatePeriodConstruct
         $recurrences = ($includeStart ? 1 : 0) + ($includeEnd ? 1 : 0);
 
         $period = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        $start = ReflectionSetup::loadObjectFromArg($context, $args[1]);
         $interval = ReflectionSetup::loadObjectFromArg($context, $args[2]);
-        $end = ReflectionSetup::loadObjectFromArg($context, $args[3]);
 
-        self::storeObjectProperty($context, $period, 'start', $start);
+        self::storeObjectProperty(
+            $context,
+            $period,
+            'start',
+            JitDateTimeConstruct::materializeOwnedFromArg($context, $args[1])
+        );
         self::storeNullProperty($context, $period, 'current');
-        self::storeObjectProperty($context, $period, 'end', $end);
-        self::storeObjectProperty($context, $period, 'interval', $interval);
+        self::storeObjectProperty(
+            $context,
+            $period,
+            'end',
+            JitDateTimeConstruct::materializeOwnedFromArg($context, $args[3])
+        );
+        self::storeObjectProperty($context, $period, 'interval', self::cloneForStorage($context, $interval));
         self::storeLongProperty($context, $period, 'recurrences', $recurrences);
         self::storeBoolProperty($context, $period, 'include_start_date', $includeStart);
         self::storeBoolProperty($context, $period, 'include_end_date', $includeEnd);
@@ -95,13 +103,17 @@ final class JitDatePeriodConstruct
         $storedRecurrences = $includeStart ? ($userRecurrences + 1) : $userRecurrences;
 
         $period = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        $start = ReflectionSetup::loadObjectFromArg($context, $args[1]);
         $interval = ReflectionSetup::loadObjectFromArg($context, $args[2]);
 
-        self::storeObjectProperty($context, $period, 'start', $start);
+        self::storeObjectProperty(
+            $context,
+            $period,
+            'start',
+            JitDateTimeConstruct::materializeOwnedFromArg($context, $args[1])
+        );
         self::storeNullProperty($context, $period, 'current');
         self::storeNullProperty($context, $period, 'end');
-        self::storeObjectProperty($context, $period, 'interval', $interval);
+        self::storeObjectProperty($context, $period, 'interval', self::cloneForStorage($context, $interval));
         self::storeLongProperty($context, $period, 'recurrences', $storedRecurrences);
         self::storeBoolProperty($context, $period, 'include_start_date', $includeStart);
         self::storeBoolProperty($context, $period, 'include_end_date', false);
@@ -165,6 +177,12 @@ final class JitDatePeriodConstruct
         }
 
         throw new \LogicException($error);
+    }
+
+    private static function cloneForStorage(Context $context, Value $propObj): Value
+    {
+        // php-src DatePeriodSupport::cloneDateTimeForStorage — ctor temps lose backing slots (#15124).
+        return $context->type->object->cloneObject($propObj);
     }
 
     private static function storeObjectProperty(

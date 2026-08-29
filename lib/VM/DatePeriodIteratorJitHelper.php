@@ -288,28 +288,11 @@ final class DatePeriodIteratorJitHelper
 
     private static function cloneDateTimeObject(Context $context, JITVariable $dateSlot): Value
     {
-        $objectType = $context->type->object;
-        $src = $context->helper->loadValue($dateSlot);
-        $classId = $objectType->lookup(self::CLASS_DATETIME);
-        $obj = $objectType->allocate($classId);
-        $objectType->markObjectConstructed($obj);
-        $i64 = $context->getTypeFromString('int64');
-        foreach ([DateTimeSupport::TS_PROPERTY, DateTimeSupport::MICROSECOND_PROPERTY] as $prop) {
-            $val = $objectType->propertyFetch($src, self::CLASS_DATETIME, $prop);
-            $objectType->propertyStore(
-                $objectType->propertySlotFor($obj, self::CLASS_DATETIME, $prop),
-                $val,
-                JITVariable::TYPE_NATIVE_LONG
-            );
-        }
-        $tz = $objectType->propertyFetch($src, self::CLASS_DATETIME, DateTimeSupport::TZ_PROPERTY);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_DATETIME, DateTimeSupport::TZ_PROPERTY),
-            $tz,
-            JITVariable::TYPE_STRING
-        );
+        // php-src date_period_get_* clones via object's actual class (DateTime or DateTimeImmutable).
+        // Hardcoding DateTimeImmutable mis-copies DateTime slots → SIGSEGV on accessor use (#27572).
+        $src = self::loadObject($context, $dateSlot);
 
-        return $obj;
+        return $context->type->object->cloneObject($src);
     }
 
     private static function cloneDateTimeVariable(Context $context, JITVariable $dateSlot): JITVariable
