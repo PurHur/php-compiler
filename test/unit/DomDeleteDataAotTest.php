@@ -36,6 +36,14 @@ final class DomDeleteDataAotTest extends TestCase
         $this->assertSame(self::EXPECTED, $this->compileAndRun('issue_dom_deletedata_aot.php'));
     }
 
+    public function testAotDeleteDataIndexSizeError(): void
+    {
+        $this->assertSame(
+            "Index Size Error\nIndex Size Error\nab\n",
+            $this->compileAndRun('issue_dom_deletedata_index_aot.php')
+        );
+    }
+
     public function testVmDeleteDataIndexSizeError(): void
     {
         $runtime = new Runtime();

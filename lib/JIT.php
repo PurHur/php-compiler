@@ -26801,6 +26801,18 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::replacedata');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::replacedata');
                 }
+                if ('deletedata' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::deletedata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::deletedata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::deletedata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::deletedata');
+                }
+                if ('insertdata' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::insertdata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcomment::insertdata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::insertdata');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcharacterdata::insertdata');
+                }
                 if ('splittext' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::splittext');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domcdatasection::splittext');
@@ -26952,6 +26964,18 @@ class JIT {
                 }
                 if ('replacedata' === $methodLc && $this->context->functionIsRegistered('domtext::replacedata')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::replacedata');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('deletedata' === $methodLc && $this->context->functionIsRegistered('domtext::deletedata')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::deletedata');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if ('insertdata' === $methodLc && $this->context->functionIsRegistered('domtext::insertdata')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::insertdata');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -27338,6 +27362,24 @@ class JIT {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::replacedata');
             if ($this->context->functionIsRegistered('domtext::replacedata')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::replacedata');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('deletedata' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::deletedata');
+            if ($this->context->functionIsRegistered('domtext::deletedata')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::deletedata');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
+        if ('insertdata' === $methodLc) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtext::insertdata');
+            if ($this->context->functionIsRegistered('domtext::insertdata')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domtext::insertdata');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
