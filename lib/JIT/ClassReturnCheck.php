@@ -353,6 +353,21 @@ final class ClassReturnCheck
         self::emitUnreachableIfNeeded($context);
     }
 
+    /**
+     * `: static` return mismatches use {@see LateStaticBindingHelper}'s raise path (try/catch + standalone).
+     *
+     * @param callable(string $givenLabel): void $raiseGiven
+     */
+    public static function emitObjectGivenLabelFailure(
+        Context $context,
+        ObjectType $objectType,
+        Variable $arg,
+        string $expected,
+        callable $raiseGiven
+    ): void {
+        self::emitObjectGivenLabelFailureImpl($context, $objectType, $arg, $expected, $raiseGiven);
+    }
+
     private static function emitObjectFailureMessage(
         Context $context,
         ObjectType $objectType,
@@ -360,16 +375,37 @@ final class ClassReturnCheck
         ?string $callableName,
         string $expected
     ): void {
+        self::emitObjectGivenLabelFailureImpl(
+            $context,
+            $objectType,
+            $arg,
+            $expected,
+            static function (string $given) use ($context, $callableName, $expected): void {
+                self::raiseReturnTypeError($context, $callableName, $expected, $given);
+            }
+        );
+    }
+
+    /**
+     * @param callable(string $givenLabel): void $raiseGiven
+     */
+    private static function emitObjectGivenLabelFailureImpl(
+        Context $context,
+        ObjectType $objectType,
+        Variable $arg,
+        string $expected,
+        callable $raiseGiven
+    ): void {
         $scalarGiven = self::scalarGivenLabel($arg);
         if (null !== $scalarGiven) {
-            self::raiseReturnTypeError($context, $callableName, $expected, $scalarGiven);
+            $raiseGiven($scalarGiven);
 
             return;
         }
         // Compile-time class_id when available (zend_execute_API.c prints concrete class).
         $compileTime = JitOperandTypeLabel::givenLabel($context, $arg);
         if ('object' !== $compileTime) {
-            self::raiseReturnTypeError($context, $callableName, $expected, $compileTime);
+            $raiseGiven($compileTime);
 
             return;
         }
@@ -395,13 +431,13 @@ final class ClassReturnCheck
             $isId = $context->builder->icmp(Builder::INT_EQ, $classId, $expectedId);
             $context->builder->branchIf($isId, $matchBlock, $nextBlock);
             $context->builder->positionAtEnd($matchBlock);
-            self::raiseReturnTypeError($context, $callableName, $expected, $given);
+            $raiseGiven($given);
             $checkBlock = $nextBlock;
         }
         $context->builder->positionAtEnd($checkBlock);
         $context->builder->branch($defaultBlock);
         $context->builder->positionAtEnd($defaultBlock);
-        self::raiseReturnTypeError($context, $callableName, $expected, 'object');
+        $raiseGiven('object');
     }
 
     private static function generatorHasTraversableReturnTypeLabel(Block $block): bool
