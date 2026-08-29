@@ -84,7 +84,8 @@ final class MbConvertEncodingRuntimeAotTest extends TestCase
         $this->assertStringContainsString('convertHelper', $runtime);
         $this->assertStringContainsString('assertToEncodingHelper', $runtime);
         $fromList = (string) file_get_contents($root.'/lib/JIT/MbConvertEncodingFromListLlvm.php');
-        $this->assertStringContainsString('buildOrderCodesString', $fromList);
+        $this->assertStringContainsString('MbConvertVariablesFromListLlvm::buildFromCsv', $fromList);
+        $this->assertStringContainsString('MbConvertVariablesRuntime::convertStringHelper', $fromList);
         $this->assertStringContainsString('assertFromEncodingHelper', $runtime);
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbConvertEncoding.php');
         $this->assertStringContainsString('toEncodingPtr', $jit);
