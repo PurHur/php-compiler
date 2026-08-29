@@ -401,32 +401,15 @@ final class TryCatchHelper
             self::clearGotoPendingSlot($context, $func);
         }
         $mergeHeaderBb = $context->scope->blockStorage[$mergeBlock] ?? null;
-        if (null === $mergeHeaderBb) {
-            $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+        if (!$handler->mergeBodyCompiled) {
+            if (null === $mergeHeaderBb) {
+                $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+            }
             $context->scope->blockStorage[$mergeBlock] = $mergeHeaderBb;
             $context->scope->blockEntryStorage[$mergeBlock] = $mergeHeaderBb;
-        }
-        if (!$handler->mergeBodyCompiled && null === $handler->mergeBodyLlvmBb) {
-            $handler->mergeBodyLlvmBb = self::appendBlock($func, 'try_merge_body_'.self::blockSuffix($handler));
-        }
-        $mergeBb = $mergeHeaderBb;
-        $builder->positionAtEnd($branchBlock);
-        // Pin finally BB before dispatch so catch arms can branch to it, but compile
-        // the finally body only after dispatch exists — epilogue used to call
-        // dispatchBbFor mid-finally and rebuild catch wiring via wrapper !== (#24105).
-        if (null !== $handler->finallyOp) {
-            self::finallyBbFor($jit, $func, $context, $handler, $args, false);
-        }
-        $handler->dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
-        if (null !== $handler->finallyOp) {
-            self::ensureFinallyLowering($jit, $func, $context, $handler, $args);
-        }
-        // Wire merge entry before lowering post-try merge opcodes: DOMAttr::isId() NestedJIT
-        // during merge compile must not leave try-body fallthrough orphaned (#25841).
-        self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args, $handler);
-        if (!$handler->mergeBodyCompiled) {
-            $mergeBodyBb = $handler->mergeBodyLlvmBb;
-            if (null !== $mergeBodyBb && null === $mergeBodyBb->getTerminator()) {
+            $mergeBodyBb = self::appendBlock($func, 'try_merge_body_'.self::blockSuffix($handler));
+            $handler->mergeBodyLlvmBb = $mergeBodyBb;
+            if (null === $mergeBodyBb->getTerminator()) {
                 // Detach this try while lowering the merge: php-cfg puts a following
                 // sibling try/catch in the same end block (#4041 / #23930). If this
                 // handler stays on the throw stack, the nested try is compiled as an
@@ -446,7 +429,24 @@ final class TryCatchHelper
             }
             BasicBlockHelper::ensureOpenInsertBlock($context, 'try_merge_after_compile');
             $handler->mergeBodyCompiled = true;
+        } elseif (null === $mergeHeaderBb) {
+            $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+            $context->scope->blockStorage[$mergeBlock] = $mergeHeaderBb;
+            $context->scope->blockEntryStorage[$mergeBlock] = $mergeHeaderBb;
         }
+        $mergeBb = $mergeHeaderBb;
+        $builder->positionAtEnd($branchBlock);
+        // Pin finally BB before dispatch so catch arms can branch to it, but compile
+        // the finally body only after dispatch exists — epilogue used to call
+        // dispatchBbFor mid-finally and rebuild catch wiring via wrapper !== (#24105).
+        if (null !== $handler->finallyOp) {
+            self::finallyBbFor($jit, $func, $context, $handler, $args, false);
+        }
+        $handler->dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
+        if (null !== $handler->finallyOp) {
+            self::ensureFinallyLowering($jit, $func, $context, $handler, $args);
+        }
+        self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args, $handler);
         // DOM bridge nested compile during merge lowering can pop mergeHandlers (#25841).
         $context->tryCatch->mergeHandlers[spl_object_id($mergeBlock)] = $handler;
         if (null === $handler->mergeEntryBb) {
@@ -1617,22 +1617,6 @@ final class TryCatchHelper
         }
 
         return $count;
-    }
-
-    /**
-     * Post-try merge must not lower a sibling try/catch in the same php-cfg end block (#4041 / #23930).
-     */
-    public static function mergeOpcodeLimit(Block $mergeBlock): int
-    {
-        $n = $mergeBlock->nOpCodes;
-        for ($i = 0; $i < $n; ++$i) {
-            $type = $mergeBlock->opCodes[$i]->type;
-            if (OpCode::TYPE_TRY === $type || OpCode::TYPE_CATCH === $type || OpCode::TYPE_FINALLY === $type) {
-                return $i;
-            }
-        }
-
-        return $n;
     }
 
     /**
