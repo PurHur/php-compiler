@@ -289,33 +289,14 @@ final class JitNativeString
                 $context->builder->branch($join);
                 $context->builder->positionAtEnd($notNum);
             }
-            $namedId = $context->type->object->lookup('ReflectionNamedType');
-            $isNamed = $context->builder->icmp(
-                Builder::INT_EQ,
-                $classIdVal,
-                $i64->constInt($namedId, false)
-            );
-            $yesNamed = BasicBlockHelper::append($context, 'cast_vbox_refl_named');
-            $noNamed = BasicBlockHelper::append($context, 'cast_vbox_refl_no');
-            $objFallbackMerge = BasicBlockHelper::append($context, 'cast_vbox_refl_fallback_merge');
-            $context->builder->branchIf($isNamed, $yesNamed, $noNamed);
-            $context->builder->positionAtEnd($yesNamed);
-            $toCall = $context->resolveFunctionProxy('reflectionnamedtype::__tostring');
-            $raw = $toCall->call($context, $objVar);
-            $namedFallback = (new \PHPCompiler\ext\standard\strval())->valueToString(
+            // No compile-time class hint: __toString via runtime class_id (Spl iterators, Reflection*, …).
+            // Peer JitUnlikeCompare::objectVsString (#32514); was ReflectionNamedType-only (#26821).
+            $objFallback = self::coerceValueBoxObjectByStringableClassId(
                 $context,
-                JitValueBox::coerceToValuePtrForStore($context, $raw)
+                $objVar,
+                $classIdVal,
+                'cast_vbox_stringable_'.spl_object_id($context)
             );
-            $yesNamedEnd = $context->builder->getInsertBlock();
-            $context->builder->branch($objFallbackMerge);
-            $context->builder->positionAtEnd($noNamed);
-            $emptyFallback = $context->builder->load($context->constantStringFromString(''));
-            $noNamedEnd = $context->builder->getInsertBlock();
-            $context->builder->branch($objFallbackMerge);
-            $context->builder->positionAtEnd($objFallbackMerge);
-            $objFallback = $context->builder->phi($namedFallback->typeOf(), 'cast_vbox_refl_fallback');
-            $objFallback->addIncoming($namedFallback, $yesNamedEnd);
-            $objFallback->addIncoming($emptyFallback, $noNamedEnd);
             $objFallbackEnd = $context->builder->getInsertBlock();
             $context->builder->branch($join);
 
@@ -390,6 +371,75 @@ final class JitNativeString
                     'Cannot coerce JIT type '.Variable::getStringType($var->type).' to string for concat'
                 );
         }
+    }
+
+    /**
+     * Value-boxed object cast to string without a compile-time class hint: dispatch __toString by
+     * runtime class_id (DirectoryIterator foreach values, script globals — Zend cast handler).
+     */
+    private static function coerceValueBoxObjectByStringableClassId(
+        Context $context,
+        Variable $objVar,
+        Value $classIdVal,
+        string $tag
+    ): Value {
+        $objectBuiltin = $context->type->object;
+        $stringable = [];
+        foreach ($objectBuiltin->allClassNamesById() as $id => $name) {
+            $lc = strtolower(ltrim((string) $name, '\\'));
+            if ($objectBuiltin->classHasImplicitStringableLc($lc)) {
+                $stringable[(int) $id] = ltrim((string) $name, '\\');
+            }
+        }
+        $emptySample = $context->builder->load($context->constantStringFromString(''));
+        if ([] === $stringable) {
+            return $emptySample;
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $done = BasicBlockHelper::append($context, $tag.'_done');
+        $incoming = [];
+        $ids = array_keys($stringable);
+        $lastIdx = \count($ids) - 1;
+        $fallbackBlock = BasicBlockHelper::append($context, $tag.'_fallback');
+
+        foreach ($ids as $idx => $id) {
+            $matchBlock = BasicBlockHelper::append($context, $tag.'_match_'.$id);
+            $nextBlock = $idx === $lastIdx
+                ? $fallbackBlock
+                : BasicBlockHelper::append($context, $tag.'_next_'.$id);
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $classIdVal,
+                    $i64->constInt($id, false)
+                ),
+                $matchBlock,
+                $nextBlock
+            );
+            $context->builder->positionAtEnd($matchBlock);
+            $coerced = MagicMethodDispatch::coerceObjectToString($context, $objVar, $stringable[$id]);
+            $str = null === $coerced
+                ? $context->builder->load($context->constantStringFromString(''))
+                : $context->helper->loadValue($coerced);
+            $incoming[] = [$str, $context->builder->getInsertBlock()];
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($nextBlock);
+        }
+
+        $context->builder->positionAtEnd($fallbackBlock);
+        $incoming[] = [
+            $context->builder->load($context->constantStringFromString('')),
+            $context->builder->getInsertBlock(),
+        ];
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($emptySample->typeOf(), $tag.'_phi');
+        foreach ($incoming as [$val, $block]) {
+            $phi->addIncoming($val, $block);
+        }
+
+        return $phi;
     }
 
     /** Decimal string for a packed-list index (array_merge numeric-string keys; #3607). */
