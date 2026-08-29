@@ -591,6 +591,10 @@ final class JitSimpleXmlUserScript
      */
     public static function tryFoldDimIsset(Context $context, JITVariable $container, JITVariable $dim): ?Value
     {
+        $xpathIsset = self::tryFoldXpathListDimIsset($context, $container, $dim);
+        if (null !== $xpathIsset) {
+            return $xpathIsset;
+        }
         $exists = self::hostDimExists($container, $dim, $context);
         if (null !== $exists) {
             return $context->getTypeFromString('int1')->constInt($exists ? 1 : 0, false);
@@ -747,6 +751,31 @@ final class JitSimpleXmlUserScript
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * isset($xpathResult[$i]) — bounds check on packed xpath node-set (#27534 / #26911).
+     *
+     * hostDimExists deliberately skips xpath lists; without this fold, tryCompileRuntimeDimIsset
+     * probes SXE baked-dim slots on a TYPE_VALUE array and segfaults under AOT.
+     */
+    private static function tryFoldXpathListDimIsset(
+        Context $context,
+        JITVariable $container,
+        JITVariable $dim
+    ): ?Value {
+        $token = $container->compileTimeString;
+        if (null === $token || !isset(self::$xpathListsByToken[$token])) {
+            return null;
+        }
+        $idx = self::compileTimeDim($context, $dim);
+        if (!\is_int($idx)) {
+            return null;
+        }
+        $list = self::$xpathListsByToken[$token];
+        $exists = $idx >= 0 && $idx < \count($list);
+
+        return $context->getTypeFromString('int1')->constInt($exists ? 1 : 0, false);
     }
 
     /** @return bool|null null when not foldable */
