@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\VmArrayColumnArg;
-use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -54,21 +53,7 @@ final class JitArrayColumnArg
      */
     public static function compileTimeEnumLabel(Context $context, Variable $arg): ?string
     {
-        $label = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
-        if (null !== $label) {
-            return $label;
-        }
-        if (Variable::TYPE_OBJECT === $arg->type) {
-            return self::compileTimeObjectEnumLabel($context, $arg);
-        }
-        if (Variable::TYPE_VALUE === $arg->type) {
-            $constantType = self::constantValueBoxType($context, $arg);
-            if (VmVariable::TYPE_ENUM_CASE === $constantType) {
-                return JitOperandTypeLabel::compileTimeEnumClassName($context, $arg) ?? 'object';
-            }
-        }
-
-        return null;
+        return JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
     }
 
     public static function guardStrIntNullOperand(
@@ -161,7 +146,7 @@ final class JitArrayColumnArg
                     $valuePtr
                 );
                 $objVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
-                $enumLabel = self::compileTimeObjectEnumLabel($context, $objVar)
+                $enumLabel = self::compileTimeEnumLabel($context, $objVar)
                     ?? JitOperandTypeLabel::compileTimeEnumClassName($context, $objVar);
                 if (null !== $enumLabel) {
                     self::emitStrIntNullTypeErrorAndAbort($context, $function, $argIndex, $paramName, $enumLabel);
@@ -190,43 +175,6 @@ final class JitArrayColumnArg
         return true;
     }
 
-    private static function compileTimeObjectEnumLabel(Context $context, Variable $arg): ?string
-    {
-        $classId = self::constantObjectClassId($context, $arg);
-        if (null === $classId) {
-            return null;
-        }
-        $jitObject = $context->type->object;
-        if (!$jitObject instanceof JitObjectType) {
-            return null;
-        }
-        $lc = strtolower(ltrim($jitObject->classNameForId($classId), '\\'));
-        if (!isset($jitObject->enums[$lc])) {
-            return null;
-        }
-
-        return $jitObject->classNameForId($classId);
-    }
-
-    private static function constantObjectClassId(Context $context, Variable $arg): ?int
-    {
-        if (Variable::KIND_VALUE !== $arg->kind) {
-            return null;
-        }
-        $objMap = $context->structFieldMap['__object__'] ?? null;
-        if (null === $objMap || !isset($objMap['class_id'])) {
-            return null;
-        }
-        $classIdVal = $context->builder->load(
-            $context->builder->structGep($arg->value, $objMap['class_id'])
-        );
-        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
-            return null;
-        }
-
-        return (int) $classIdVal->getConstantValue();
-    }
-
     private static function constantValueBoxType(Context $context, Variable $arg): ?int
     {
         if (Variable::KIND_VALUE !== $arg->kind) {
@@ -239,11 +187,21 @@ final class JitArrayColumnArg
         $typeByte = $context->builder->load(
             $context->builder->structGep($arg->value, $map['type'])
         );
-        if (!method_exists($typeByte, 'isConstant') || !$typeByte->isConstant()) {
+
+        return self::constantIntFromLlvmValue($context, $typeByte);
+    }
+
+    private static function constantIntFromLlvmValue(Context $context, \PHPLLVM\Value $val): ?int
+    {
+        if (!isset($val->value)) {
+            return null;
+        }
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($val->value)) {
             return null;
         }
 
-        return (int) $typeByte->getConstantValue();
+        return (int) $lib->LLVMConstIntGetZExtValue($val->value);
     }
 
     private static function emitRuntimeValueBoxReject(

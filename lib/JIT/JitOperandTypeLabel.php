@@ -52,10 +52,9 @@ final class JitOperandTypeLabel
             return 'bool';
         }
         $value = $arg->value;
-        if (method_exists($value, 'isConstant') && $value->isConstant()
-            && method_exists($value, 'getConstantValue')
-        ) {
-            return 0 !== (int) $value->getConstantValue() ? 'true' : 'false';
+        $literal = self::constantIntFromLlvmValue($context, $value);
+        if (null !== $literal) {
+            return 0 !== $literal ? 'true' : 'false';
         }
 
         return 'bool';
@@ -106,13 +105,10 @@ final class JitOperandTypeLabel
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
         );
-        if (!method_exists($typeByte, 'isConstant') || !$typeByte->isConstant()) {
+        $type = self::constantIntFromLlvmValue($context, $typeByte);
+        if (null === $type) {
             return null;
         }
-        if (!method_exists($typeByte, 'getConstantValue')) {
-            return null;
-        }
-        $type = (int) $typeByte->getConstantValue();
         if (VmVariable::TYPE_OBJECT === $type) {
             $obj = $context->builder->call(
                 $context->lookupFunction('__value__readObject'),
@@ -134,10 +130,10 @@ final class JitOperandTypeLabel
         $classIdVal = $context->builder->load(
             $context->builder->structGep($valuePtr, $enumMap['class_id'])
         );
-        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
+        $classId = self::constantIntFromLlvmValue($context, $classIdVal);
+        if (null === $classId) {
             return null;
         }
-        $classId = (int) $classIdVal->getConstantValue();
         $jitObject = $context->type->object;
         if (!$jitObject instanceof JitObjectType) {
             return null;
@@ -181,13 +177,20 @@ final class JitOperandTypeLabel
         } catch (\Throwable) {
             return null;
         }
-        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
+        return self::constantIntFromLlvmValue($context, $classIdVal);
+    }
+
+    /** php-llvm Value has no getConstantValue — use LLVMConstIntGetZExtValue (#5974). */
+    private static function constantIntFromLlvmValue(Context $context, \PHPLLVM\Value $val): ?int
+    {
+        if (!isset($val->value)) {
             return null;
         }
-        if (!method_exists($classIdVal, 'getConstantValue')) {
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($val->value)) {
             return null;
         }
 
-        return (int) $classIdVal->getConstantValue();
+        return (int) $lib->LLVMConstIntGetZExtValue($val->value);
     }
 }
