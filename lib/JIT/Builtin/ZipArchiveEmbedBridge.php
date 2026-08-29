@@ -24,11 +24,17 @@ final class ZipArchiveEmbedBridge
 
     private const REPLACE_ENTRY = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::replaceEntry';
 
+    private const SET_ARCHIVE_COMMENT = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::setArchiveCommentEntry';
+
+    private const GET_ARCHIVE_COMMENT = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::getArchiveCommentEntry';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::EXEC,
         self::ADD_ENTRY,
         self::REPLACE_ENTRY,
+        self::SET_ARCHIVE_COMMENT,
+        self::GET_ARCHIVE_COMMENT,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -49,6 +55,16 @@ final class ZipArchiveEmbedBridge
     public static function replaceEntryHelper(): string
     {
         return self::REPLACE_ENTRY;
+    }
+
+    public static function setArchiveCommentHelper(): string
+    {
+        return self::SET_ARCHIVE_COMMENT;
+    }
+
+    public static function getArchiveCommentHelper(): string
+    {
+        return self::GET_ARCHIVE_COMMENT;
     }
 
     public static function helperFunction(Context $context, string $logical): LlvmFunction

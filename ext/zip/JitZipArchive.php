@@ -816,15 +816,14 @@ final class JitZipArchive
             0,
             'comment'
         );
-        $empty = ZipArchiveEmbedBridge::emptyString($context);
-        $i64 = $context->getTypeFromString('int64');
-        $ok = self::execLong(
+        $packed = JitNestedHelperCoerce::callHelper(
             $context,
-            'sac',
-            $handle,
-            $i64->constInt(0, false),
-            $comment,
-            $empty
+            ZipArchiveEmbedBridge::helperFunction($context, ZipArchiveEmbedBridge::setArchiveCommentHelper()),
+            [$comment]
+        );
+        $ok = self::int32LeFromString(
+            $context,
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $packed)
         );
         self::syncProps($context, $obj, $handle);
         self::storeValueStringProperty($context, $obj, VmZipArchive::PROP_COMMENT, $comment);
@@ -846,16 +845,16 @@ final class JitZipArchive
         ZipArchiveEmbedBridge::ensureLinked($context);
         $obj = self::readObject($context, $args[0]);
         $handle = self::loadHandle($context, $obj);
+        $packed = JitNestedHelperCoerce::callHelper(
+            $context,
+            ZipArchiveEmbedBridge::helperFunction($context, ZipArchiveEmbedBridge::getArchiveCommentHelper()),
+            []
+        );
+        $packedPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $packed);
+        $found = self::int32LeFromString($context, $packedPtr);
+        $data = self::payloadFromPacked($context, $packedPtr);
         $empty = ZipArchiveEmbedBridge::emptyString($context);
         $i64 = $context->getTypeFromString('int64');
-        [$found, $data] = self::execLongAndPayload(
-            $context,
-            'gac',
-            $handle,
-            $i64->constInt(0, false),
-            $empty,
-            $empty
-        );
         self::syncProps($context, $obj, $handle);
 
         $isFound = $context->builder->icmp(
