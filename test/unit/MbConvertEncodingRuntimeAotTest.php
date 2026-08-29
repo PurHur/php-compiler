@@ -72,6 +72,17 @@ final class MbConvertEncodingRuntimeAotTest extends TestCase
         );
     }
 
+    public function testAotRuntimeFromArrayMatchesZendWithHelperCache(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $src = __DIR__.'/../repro/aot_mb_convert_encoding_runtime_from_array.php';
+        $zend = $this->runPhp($src, []);
+        $aot = $this->runAot($src, [], true);
+        $this->assertSame($zend, $aot);
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
@@ -128,11 +139,12 @@ final class MbConvertEncodingRuntimeAotTest extends TestCase
     }
 
     /** @param list<string> $argv */
-    private function runAot(string $src, array $argv): string
+    private function runAot(string $src, array $argv = [], bool $helperCache = false): string
     {
         $root = dirname(__DIR__, 2);
         $bin = sys_get_temp_dir().'/mb_convert_encoding_'.getmypid().'_'.md5($src);
-        $cmd = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
+        $env = $helperCache ? 'env PHP_COMPILER_HELPER_RUNTIME_O=1 ' : 'env PHP_COMPILER_HELPER_RUNTIME_O=0 ';
+        $cmd = $env
             .escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src);

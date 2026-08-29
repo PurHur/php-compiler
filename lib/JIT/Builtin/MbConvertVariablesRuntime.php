@@ -22,6 +22,18 @@ final class MbConvertVariablesRuntime
 
     private const DETECT_HELPER_PATH = '/ext/mbstring/MbDetectEncodingJitHelper.php';
 
+    /**
+     * Single TU for helper-runtime emit — convertStringArgv must call detect/convert peers
+     * in-module; split units leave cross-class static calls unresolved under thin AOT (#35296).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::ENCODING_HELPER_PATH,
+        self::DETECT_HELPER_PATH,
+        self::HELPER_PATH,
+    ];
+
     private const CONVERT_STRING_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbConvertVariablesJitHelper::convertStringArgv';
 
     private const DETECT_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbConvertVariablesJitHelper::detectFromArgv';
@@ -119,7 +131,7 @@ final class MbConvertVariablesRuntime
     {
         JitVmHelperLink::ensureCompiledBundle(
             $context,
-            [self::ENCODING_HELPER_PATH, self::DETECT_HELPER_PATH, self::HELPER_PATH],
+            self::HELPER_BUNDLE,
             self::COMPILED_HELPERS,
             'mb_convert_variables'
         );
