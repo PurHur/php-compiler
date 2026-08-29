@@ -4338,6 +4338,20 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_NAMESPACE_URI, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_LOCAL_NAME, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\ext\dom\VmDom::PROP_ATTRIBUTES, Variable::TYPE_VALUE);
+            // method_exists on thin-AOT DOMDocument handles (#29853 / re-#19654).
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                'adoptnode',
+                'importnode',
+                'loadxml',
+                'loadhtml',
+                'appendchild',
+                'createelement',
+                'savexml',
+                'getelementbyid',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
             $this->markHasConstructor($id);
         }
         if ('domattr' === $lcname) {

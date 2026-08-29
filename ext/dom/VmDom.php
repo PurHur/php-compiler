@@ -11573,7 +11573,11 @@ final class VmDom
     {
         $state = DomRegistry::state($node);
         if (null === $state->parentId) {
-            return;
+            // Thin-AOT loadXML wires parentNode before DomRegistry parentId (#35241).
+            self::syncDomRegistryParentChainFromProperties($node);
+            if (null === $state->parentId) {
+                return;
+            }
         }
         $parent = DomRegistry::entry($state->parentId);
         if (null === $parent) {
@@ -11600,6 +11604,12 @@ final class VmDom
         $state = DomRegistry::state($node);
         if (DomConstants::XML_DOCUMENT_NODE !== $state->nodeType) {
             $state->documentId = $documentId;
+            if ($node->hasProperty(self::PROP_OWNER_DOCUMENT)) {
+                $doc = DomRegistry::entry($documentId);
+                if (null !== $doc) {
+                    $node->getProperty(self::PROP_OWNER_DOCUMENT)->object($doc);
+                }
+            }
         }
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
