@@ -25023,6 +25023,8 @@ class JIT {
             Variable::KIND_VALUE,
             $read->magicSetReceiver
         );
+        // tryEmitMagicSet resolves the class from receiver->objectPropertyClassName (#31992 AOT).
+        $receiverVar->objectPropertyClassName = $declaringClass;
         $propName = $read->magicSetName;
         $currentVal = JIT\MagicMethodDispatch::tryEmitMagicGet(
             $this->context,
