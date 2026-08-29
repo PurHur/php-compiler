@@ -21,6 +21,9 @@ final class JitDomXPathQueryUserScript
     /** Last simple //tag query tag for NodeList::item(N) materialization (#27275). */
     private static ?string $lastQueryTag = null;
 
+    /** Last host-folded axis/boolean XPath for NodeList::item(N>0) (#32003). */
+    private static ?string $lastXPathAxisExpr = null;
+
     public static function lastCacheKey(): ?string
     {
         return self::$lastCacheKey;
@@ -31,11 +34,17 @@ final class JitDomXPathQueryUserScript
         return self::$lastQueryTag;
     }
 
+    public static function lastXPathAxisExpr(): ?string
+    {
+        return self::$lastXPathAxisExpr;
+    }
+
     /** Clear stale query state when a non-XPath DOMNodeList is accessed (#32620). */
     public static function clearQueryState(): void
     {
         self::$lastCacheKey = null;
         self::$lastQueryTag = null;
+        self::$lastXPathAxisExpr = null;
     }
 
     public static function shouldUse(Context $context): bool
@@ -314,6 +323,7 @@ final class JitDomXPathQueryUserScript
         $count = $list->length;
         self::$lastCacheKey = null;
         self::$lastQueryTag = null;
+        self::$lastXPathAxisExpr = $trimmed;
         if ($count > 0) {
             $first = $list->item(0);
             if ($first instanceof \DOMNode) {
@@ -434,5 +444,65 @@ final class JitDomXPathQueryUserScript
     private static function isHostFoldAttributeAxis(string $expr): bool
     {
         return 1 === preg_match('~(?:^|/)@(?:[\w.*:-]+|\*)~', $expr);
+    }
+
+    /**
+     * Host Zend node-set length for a folded axis/boolean XPath (#32003 item(N>0)).
+     */
+    public static function hostXPathAxisQueryLength(string $xml, string $expr): ?int
+    {
+        $list = self::hostXPathAxisQuery($xml, $expr);
+
+        return null === $list ? null : $list->length;
+    }
+
+    /**
+     * Host Zend node-set item for compile-time NodeList::item(N) (#32003).
+     */
+    public static function hostXPathAxisNodeAt(string $xml, string $expr, int $index): ?\DOMNode
+    {
+        $list = self::hostXPathAxisQuery($xml, $expr);
+        if (null === $list || $index < 0 || $index >= $list->length) {
+            return null;
+        }
+
+        return $list->item($index);
+    }
+
+    private static function hostXPathAxisQuery(string $xml, string $expr): ?\DOMNodeList
+    {
+        if (!\extension_loaded('dom') || !\class_exists(\DOMDocument::class, false)) {
+            return null;
+        }
+        $trimmed = trim($expr);
+        set_error_handler(static function (): bool {
+            return true;
+        });
+        try {
+            $doc = new \DOMDocument();
+            if (!@$doc->loadXML($xml)) {
+                restore_error_handler();
+
+                return null;
+            }
+            $xpath = new \DOMXPath($doc);
+            foreach (JitDomXPathRegisterUserScript::namespaces() as $prefix => $uri) {
+                if ('' === $prefix) {
+                    continue;
+                }
+                @$xpath->registerNamespace($prefix, $uri);
+            }
+            $list = $xpath->query($trimmed);
+        } catch (\Throwable) {
+            restore_error_handler();
+
+            return null;
+        }
+        restore_error_handler();
+        if (false === $list) {
+            return null;
+        }
+
+        return $list;
     }
 }
