@@ -96,7 +96,9 @@ final class substr_compare extends Internal
             return $folded;
         }
 
-        // Soft-null before ensureLinked — helper link clears insert block (#21515 / peer #20007).
+        StringSubstrCompare::ensureLinked($context);
+
+        // Soft-null hay/needle — after ensureLinked (peer substr_count #21773 / #4297).
         if (self::isCompileTimeNull($args[0])) {
             JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'substr_compare', 0, 'haystack');
             if ($context->callerStrictTypes) {
@@ -109,7 +111,6 @@ final class substr_compare extends Internal
             }
         }
 
-        StringSubstrCompare::ensureLinked($context);
         $lengthVal = $i64->constInt(-1, true);
         if ($argc >= 4) {
             [$hasLength, $lengthArg] = JitIntdiv::lowerSpliceLengthArg(
@@ -120,9 +121,9 @@ final class substr_compare extends Internal
                 'length'
             );
             $lengthVal = $context->builder->select(
-                $context->builder->not($hasLength),
-                $i64->constInt(-1, true),
-                $lengthArg
+                $hasLength,
+                $lengthArg,
+                $i64->constInt(-1, true)
             );
         }
         // Z_PARAM_BOOL $case_insensitive — strict TypeError; soft-null DEP+coerce (#29756).
@@ -154,7 +155,7 @@ final class substr_compare extends Internal
         $p1 = $this->stringDataPtr($context, self::jitStringArg($context, $args[1], 1, 'needle'));
         // Z_PARAM_LONG $offset — soft-null DEP+coerce (#29504; peer substr_count #21657).
         $offset = JitChr::lowerZParamLongArg($context, $args[2], 'substr_compare', 3, 'offset');
-        $fn = $context->lookupFunction('substr_compare');
+        $fn = $context->lookupFunction('phpc_substr_compare');
         $raw = $context->builder->call($fn, $p0, $p1, $offset, $lengthVal, $ci);
 
         return $context->builder->sExt($raw, $i64);
@@ -177,16 +178,11 @@ final class substr_compare extends Internal
             return null;
         }
         $offset = $args[2]->compileTimeLong;
-        $length = null;
-        if ($argc >= 4) {
-            if (self::isCompileTimeNull($args[3])) {
-                $length = null;
-            } elseif (null !== $args[3]->compileTimeLong) {
-                $length = $args[3]->compileTimeLong;
-            } else {
-                return null;
-            }
+        $length = self::compileTimeLengthArg($args, $argc);
+        if (false === $length) {
+            return null;
         }
+
         $caseInsensitive = false;
         if (5 === $argc) {
             if (null === $args[4]->compileTimeLong) {
@@ -228,15 +224,9 @@ final class substr_compare extends Internal
             $offset = $args[2]->compileTimeLong;
         }
         $argc = \count($args);
-        $length = null;
-        if ($argc >= 4) {
-            if (JITVariable::TYPE_VALUE === $args[3]->type && ($args[3]->isNullConstant ?? false)) {
-                $length = null;
-            } elseif (null !== $args[3]->compileTimeLong) {
-                $length = $args[3]->compileTimeLong;
-            } else {
-                return null;
-            }
+        $length = self::compileTimeLengthArg($args, $argc);
+        if (false === $length) {
+            return null;
         }
         $caseInsensitive = false;
         if (5 === $argc) {
@@ -264,6 +254,45 @@ final class substr_compare extends Internal
     private static function isCompileTimeNull(JITVariable $arg): bool
     {
         return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
+    }
+
+    /**
+     * @return int|null|false null = omitted length; int = explicit; false = not compile-time known
+     */
+    private static function compileTimeLengthArg(array $args, int $argc): int|null|false
+    {
+        if ($argc < 4) {
+            return null;
+        }
+        if (self::isCompileTimeNull($args[3])) {
+            return null;
+        }
+        // Named locals / script-global heap boxes — length is runtime-only (#4297).
+        if (JITVariable::KIND_VARIABLE === $args[3]->kind) {
+            return false;
+        }
+        if (self::isCompileTimeIntLiteral($args[3])) {
+            return $args[3]->compileTimeLong;
+        }
+
+        return false;
+    }
+
+    /** Stale compileTimeLong on locals must not fold; only true SSA int constants (#4297). */
+    private static function isCompileTimeIntLiteral(JITVariable $arg): bool
+    {
+        if (null === $arg->compileTimeLong) {
+            return false;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type) {
+            return false;
+        }
+        if (JITVariable::KIND_VALUE !== $arg->kind) {
+            return false;
+        }
+
+        return null !== $arg->value
+            && \PHPLLVM\Value::KIND_CONSTANT_INT === $arg->value->getKind();
     }
 
     /**

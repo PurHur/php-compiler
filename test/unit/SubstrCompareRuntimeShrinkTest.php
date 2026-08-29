@@ -33,6 +33,7 @@ final class SubstrCompareRuntimeShrinkTest extends TestCase
 
         $bridge = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringSubstrCompare.php');
         $this->assertStringContainsString('SubstrCompareJitHelper', $bridge);
+        $this->assertStringContainsString('phpc_substr_compare', $bridge);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
         $this->assertStringNotContainsString('parseAndCompile', $bridge);
@@ -41,6 +42,7 @@ final class SubstrCompareRuntimeShrinkTest extends TestCase
 
         $builtin = (string) file_get_contents($this->repoRoot.'/ext/standard/substr_compare.php');
         $this->assertStringContainsString('StringSubstrCompare::ensureLinked', $builtin);
+        $this->assertStringContainsString("lookupFunction('phpc_substr_compare')", $builtin);
         $this->assertStringContainsString('no phpc_substr_compare.c', $builtin);
 
         $module = (string) file_get_contents($this->repoRoot.'/ext/standard/Module.php');
@@ -62,6 +64,7 @@ final class SubstrCompareRuntimeShrinkTest extends TestCase
         // php-src string.c — null $length means "compare per needle/haystack remainder" (#4297).
         $this->assertSame(1, VmString::substr_compare('abcde', 'bc', 1, null, false));
         $this->assertSame(1, SubstrCompareJitHelper::substrCompareArgv('abcde', 'bc', 1, -1, false));
+        $this->assertSame(0, SubstrCompareJitHelper::substrCompareArgv('abcde', 'bc', 1, 2, false));
     }
 
     public function testSpineBundleIncludesSubstrCompareJitHelper(): void

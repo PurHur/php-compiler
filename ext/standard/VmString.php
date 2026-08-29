@@ -1604,6 +1604,9 @@ final class VmString
         ?int $length = null,
         bool $caseInsensitive = false
     ): int {
+        if (null === $length) {
+            return self::substr_compareImplicitLength($haystack, $needle, $offset, $caseInsensitive);
+        }
         $hayLen = self::byteLength($haystack);
         if ($offset < 0) {
             $offset += $hayLen;
@@ -1644,6 +1647,45 @@ final class VmString
             if ($compareLen > $needleLen) {
                 return 1;
             }
+        }
+
+        return 0;
+    }
+
+    /**
+     * substr_compare() when $length is omitted — no nullable int param (#4297 NestedJIT helper TU).
+     *
+     * @internal JIT/AOT {@see SubstrCompareJitHelper} bridge sentinel length=-1
+     */
+    public static function substr_compareImplicitLength(
+        string $haystack,
+        string $needle,
+        int $offset,
+        bool $caseInsensitive = false
+    ): int {
+        $hayLen = self::byteLength($haystack);
+        if ($offset < 0) {
+            $offset += $hayLen;
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+        if ($offset > $hayLen) {
+            throw new \ValueError('substr_compare(): Argument #3 ($offset) must be contained in argument #1 ($haystack)');
+        }
+        $needleLen = self::byteLength($needle);
+        $hayRemain = $hayLen - $offset;
+        $compareLen = $hayRemain;
+        $length = $needleLen > $hayRemain ? $hayRemain : $needleLen;
+        $s1 = self::byteSlice($haystack, $offset, $length);
+        $cmp = $caseInsensitive
+            ? self::strncmpCase($s1, $needle, $length)
+            : self::strncmp($s1, $needle, $length);
+        if (0 !== $cmp) {
+            return $cmp;
+        }
+        if ($compareLen !== $needleLen) {
+            return $compareLen < $needleLen ? -1 : 1;
         }
 
         return 0;

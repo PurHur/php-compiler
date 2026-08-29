@@ -13551,7 +13551,19 @@ class JIT {
                             'ARG_SEND slot '.$sendSlot.' has neither operand nor constant'
                         );
                     } else {
-                        $sendValue = $this->context->getVariableFromOp($sendOperand);
+                        $sendLocalName = JIT\OperandName::resolve($sendOperand);
+                        // {main} script globals: scope slots can retain stale NATIVE_LONG after
+                        // the heap box was updated (echo path #23842; substr_compare $length #4297).
+                        $sendValue = $this->resolveScriptGlobalForRuntimeRead($sendOperand, $block);
+                        if (null === $sendValue) {
+                            $sendValue = $this->context->getVariableFromOp($sendOperand);
+                            if (null !== $sendLocalName && '' !== $sendLocalName) {
+                                $boundName = $this->context->resolveRefAliasName($sendLocalName);
+                                if (isset($this->context->namedVariableBindings[$boundName])) {
+                                    $sendValue = $this->context->namedVariableBindings[$boundName];
+                                }
+                            }
+                        }
                         if (
                             isset($block->constants[$sendSlot])
                             && \PHPCompiler\VM\Variable::TYPE_FLOAT === $block->constants[$sendSlot]->type
@@ -13574,10 +13586,17 @@ class JIT {
                                 null === $sendValue->compileTimeLong
                                 || \PHPCompiler\VM\Variable::TYPE_NULL === $block->constants[$sendSlot]->type
                             )
+                            && null === $sendLocalName
+                            && !(
+                                Variable::TYPE_VALUE === $sendValue->type
+                                && Variable::KIND_VARIABLE === $sendValue->kind
+                            )
                         ) {
                             // Bool/int/null literal Temporary often lands as TYPE_VALUE without
                             // compileTimeLong / isNullConstant; rematerialize so builtins can fold
                             // (json_decode assoc=null + JSON_THROW_ON_ERROR, #27623 / #23427).
+                            // Named locals ($len = null) must stay value boxes for nullable length
+                            // (substr_compare $length, #4297).
                             $sendValue = JIT\VmConstantJit::toVariable(
                                 $this->context,
                                 $block->constants[$sendSlot]
