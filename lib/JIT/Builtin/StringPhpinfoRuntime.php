@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -14,6 +16,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SessionGc #25916).
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\PhpinfoJitHelper}; thin LLVM bridges
  * forward the ABI. php-src: ext/standard/info.c
+ *
+ * Save/restore insert block on first-use link so thin AOT call sites are not left parentless
+ * (peer MimeContentTypeRuntime #33034 / #24508).
  */
 final class StringPhpinfoRuntime
 {
@@ -35,6 +40,10 @@ final class StringPhpinfoRuntime
         '__compiler_phpcredits',
     ];
 
+    private const PHPINFO_BRIDGE_ENTRY = 'phpinfo_bridge_entry';
+
+    private const PHPCREDITS_BRIDGE_ENTRY = 'phpcredits_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -47,11 +56,27 @@ final class StringPhpinfoRuntime
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_phpinfo');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (
+            JitVmHelperLink::hasNamedBridgeEntry($probe, self::PHPINFO_BRIDGE_ENTRY)
+            && JitVmHelperLink::hasNamedBridgeEntry(
+                $context->module->getNamedFunction('__compiler_phpcredits'),
+                self::PHPCREDITS_BRIDGE_ENTRY
+            )
+        ) {
             self::registerLinkedRuntime($context);
 
             return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
         }
 
         ObOutputRuntime::ensureLinked($context);
@@ -59,14 +84,19 @@ final class StringPhpinfoRuntime
         self::implementPhpinfoBridge($context);
         self::implementPhpcreditsBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementPhpinfoBridge(Context $context): void
     {
         $abiName = '__compiler_phpinfo';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::PHPINFO_BRIDGE_ENTRY)) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -78,12 +108,14 @@ final class StringPhpinfoRuntime
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
 
-        $entry = $fn->appendBasicBlock('phpinfo_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::PHPINFO_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
+        $result = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::PHPINFO_HELPER),
-            $context->builder->sext($fn->getParam(0), $i64)
+            [$context->builder->sext($fn->getParam(0), $i64)]
         );
         $context->builder->returnValue($context->builder->zext($result, $i32));
         $context->registerFunction($abiName, $fn);
@@ -93,7 +125,7 @@ final class StringPhpinfoRuntime
     {
         $abiName = '__compiler_phpcredits';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::PHPCREDITS_BRIDGE_ENTRY)) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -106,12 +138,14 @@ final class StringPhpinfoRuntime
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
+        $context->registerFunction($abiName, $fn);
 
-        $entry = $fn->appendBasicBlock('phpcredits_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::PHPCREDITS_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(
+        JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::PHPCREDITS_HELPER),
-            $context->builder->sext($fn->getParam(0), $i64)
+            [$context->builder->sext($fn->getParam(0), $i64)]
         );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
