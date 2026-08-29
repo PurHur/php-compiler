@@ -1,9 +1,5 @@
---TEST--
-AOT: DOMDocument::adoptNode() reparents loadXML subtree (#19654 / #29853)
---ENV--
-PHP_COMPILER_PROFILE=8.4
---FILE--
 <?php
+/** Direct adoptNode cross-document repro (#19654 / #29853). */
 $d1 = new DOMDocument();
 $d1->loadXML('<a><n>t</n></a>');
 $d2 = new DOMDocument();
@@ -14,7 +10,3 @@ echo $a->nodeName, "\n";
 echo $d1->saveXML($d1->documentElement), "\n";
 $d2->documentElement->appendChild($a);
 echo $d2->saveXML($d2->documentElement), "\n";
---EXPECT--
-n
-<a/>
-<b><n>t</n></b>

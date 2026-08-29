@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\DomAdoptNodeRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitValueCompare;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -23,12 +24,17 @@ use PHPLLVM\Value;
  * through NestedJIT object returns leaves a pointer that segfaults on property
  * fetch / appendChild (createElement helper returns a *new* object and is fine).
  *
+ * User-script AOT must detach via {@see JitDomRemoveChildLiveSlots} before DomRegistry
+ * adopt — appendChild only updates LiveSlots, so VmDom::detachNodeIfAttached no-ops (#19654).
+ *
  * Profile gate is evaluated in this user-script lowerer (not inside the helper TU):
  * helper-runtime objects are profile-agnostic and would otherwise bake 8.4 support
  * into default-profile binaries.
  */
 final class JitDomAdoptNode
 {
+    private const CLASS_ELEMENT = 'DOMElement';
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 2) {
@@ -52,6 +58,10 @@ final class JitDomAdoptNode
             return self::emitNotYetImplemented($context);
         }
 
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            return self::invokeUserScriptAdopt($context, $args[0], $args[1]);
+        }
+
         DomAdoptNodeRuntime::ensureLinked($context);
         $document = self::loadObjectArg($context, $args[0]);
         $node = self::loadObjectArg($context, $args[1]);
@@ -64,6 +74,118 @@ final class JitDomAdoptNode
         );
 
         return self::boxObjectResult($context, $node);
+    }
+
+    /**
+     * Thin-AOT adopt: LiveSlots detach (peer removeChild) then DomRegistry reparent (#19654).
+     */
+    private static function invokeUserScriptAdopt(
+        Context $context,
+        JITVariable $documentVar,
+        JITVariable $nodeVar
+    ): Value {
+        $document = self::loadObjectArg($context, $documentVar);
+        $node = self::loadObjectArg($context, $nodeVar);
+
+        $parentVar = JitDomParentNodeProperty::fetch($context->type->object, $node);
+        $bbDetach = BasicBlockHelper::append($context, 'dom_adopt_detach');
+        $bbSkipDetach = BasicBlockHelper::append($context, 'dom_adopt_skip_detach');
+        $bbAfterDetach = BasicBlockHelper::append($context, 'dom_adopt_after_detach');
+        $parentIsNull = JitValueCompare::valueBoxIsNull($context, $parentVar);
+        $context->builder->branchIf($parentIsNull, $bbSkipDetach, $bbDetach);
+
+        $context->builder->positionAtEnd($bbDetach);
+        $parent = self::loadObjectArg($context, $parentVar);
+        JitDomRemoveChildLiveSlots::sync($context, $parent, $node);
+        self::syncUserScriptInnerXmlAfterDetach($context, $parentVar, $nodeVar);
+        DomUserScriptElementCacheLlvm::invalidateIfElement($context, $node);
+        DomUserScriptLiveTagListLlvm::decrementForChildArg($context, $nodeVar);
+        $context->builder->branch($bbAfterDetach);
+
+        $context->builder->positionAtEnd($bbSkipDetach);
+        $context->builder->branch($bbAfterDetach);
+
+        $context->builder->positionAtEnd($bbAfterDetach);
+        self::storeOwnerDocument($context, $node, $document);
+
+        DomAdoptNodeRuntime::ensureLinked($context);
+        $context->builder->call(
+            $context->lookupFunction(DomAdoptNodeRuntime::ABI_NAME),
+            $document,
+            $node
+        );
+
+        return self::boxObjectResult($context, $node);
+    }
+
+    /** Wire ownerDocument on the adopted node — Wrong Document on appendChild without this (#19654). */
+    private static function storeOwnerDocument(Context $context, Value $node, Value $document): void
+    {
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT, JITVariable::TYPE_VALUE);
+        }
+        $docJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $document
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($node, self::CLASS_ELEMENT, VmDom::PROP_OWNER_DOCUMENT),
+            $docJit,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
+    /**
+     * Drop detached child markup from parent's INNER_XML seed (peer {@see JitDomRemoveChild}).
+     */
+    private static function syncUserScriptInnerXmlAfterDetach(
+        Context $context,
+        JITVariable $parentVar,
+        JITVariable $childVar
+    ): void {
+        $xml = $parentVar->compileTimeDomLoadXml
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
+        }
+        $nodes = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
+        $index = $childVar->compileTimeDomChildIndex
+            ?? JitDomNodeListItem::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$lastFetchedChildIndex
+            ?? JitDomNodeChildProperty::$stickyChildEdgeChildIndex
+            ?? null;
+        if (null === $index) {
+            $oldTag = $childVar->compileTimeDomTagName
+                ?? JitDomNodeListItem::$lastFetchedTagName
+                ?? JitDomNodeChildProperty::$lastFetchedTagName
+                ?? JitDomNodeChildProperty::$stickyChildEdgeTagName
+                ?? null;
+            if (null !== $oldTag) {
+                foreach ($nodes as $i => $node) {
+                    if ('element' === ($node['kind'] ?? '')
+                        && strtolower($oldTag) === ($node['data'] ?? null)
+                    ) {
+                        $index = $i;
+                        break;
+                    }
+                }
+            } elseif (1 === \count($nodes)) {
+                $index = 0;
+            }
+        }
+        if (null === $index) {
+            return;
+        }
+        $inner = DomParseSimpleXmlJitHelper::rootInnerXmlReplaceChildAt($xml, $index, '');
+        if (null !== $inner) {
+            $parent = self::loadObjectArg($context, $parentVar);
+            JitDomCreateElement::storeUserScriptInnerXml($context, $parent, $inner);
+            JitDomLoadXMLUserScript::refreshCompileTimeXmlWithRootInner($inner, $parentVar);
+        }
     }
 
     private static function emitNotYetImplemented(Context $context): Value

@@ -43,7 +43,8 @@ try {
     echo "fail: document adopt should reject\n";
     exit(1);
 } catch (DOMException $e) {
-    if (DOMException::NOT_SUPPORTED_ERR !== $e->getCode()) {
+    // DOMException::NOT_SUPPORTED_ERR is not ClassConstFetch-seeded in thin AOT (#19654).
+    if (9 !== $e->getCode()) {
         echo 'fail: wrong code ', $e->getCode(), "\n";
         exit(1);
     }
