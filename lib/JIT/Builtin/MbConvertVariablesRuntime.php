@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -25,6 +26,14 @@ final class MbConvertVariablesRuntime
 
     private const DETECT_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbConvertVariablesJitHelper::detectFromArgv';
 
+    private const ABI_CONVERT_STRING = 'phpc_mb_convert_variables_convert_string';
+
+    private const ABI_DETECT = 'phpc_mb_convert_variables_detect';
+
+    private const BRIDGE_CONVERT_STRING = 'mb_convert_variables_convert_string_bridge_entry';
+
+    private const BRIDGE_DETECT = 'mb_convert_variables_detect_bridge_entry';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::CONVERT_STRING_LOGICAL,
@@ -34,20 +43,76 @@ final class MbConvertVariablesRuntime
     public static function ensureLinked(Context $context): void
     {
         self::ensureJitHelperCompiled($context);
+        self::implementConvertString($context);
+        self::implementDetect($context);
     }
 
     public static function convertStringHelper(Context $context): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
+        self::ensureLinked($context);
 
-        return JitVmHelperLink::lookupCompiled($context, self::CONVERT_STRING_LOGICAL, 'mb_convert_variables');
+        return $context->lookupFunction(self::ABI_CONVERT_STRING);
     }
 
     public static function detectHelper(Context $context): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
+        self::ensureLinked($context);
 
-        return JitVmHelperLink::lookupCompiled($context, self::DETECT_LOGICAL, 'mb_convert_variables');
+        return $context->lookupFunction(self::ABI_DETECT);
+    }
+
+    private static function implementConvertString(Context $context): void
+    {
+        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_CONVERT_STRING);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_CONVERT_STRING)) {
+            $context->registerFunction(self::ABI_CONVERT_STRING, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_CONVERT_STRING,
+            self::BRIDGE_CONVERT_STRING,
+            [$strPtr, $strPtr, $strPtr],
+            $strPtr,
+            self::CONVERT_STRING_LOGICAL,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#35315'
+        );
+    }
+
+    private static function implementDetect(Context $context): void
+    {
+        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_DETECT);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_DETECT)) {
+            $context->registerFunction(self::ABI_DETECT, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_DETECT,
+            self::BRIDGE_DETECT,
+            [$strPtr, $strPtr, $strPtr],
+            $strPtr,
+            self::DETECT_LOGICAL,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#35315'
+        );
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
