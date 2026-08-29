@@ -54,7 +54,7 @@ final class JitMbStrcut
         $from = JitStrictIntArg::lower($context, $args[1], 'mb_strcut', 2, 'start');
         $i64 = $context->getTypeFromString('int64');
         if ($argc >= 3) {
-            if (JITVariable::TYPE_NULL === $args[2]->type) {
+            if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
                 $length = $i64->constInt(-1, true);
             } else {
                 $length = JitStrictIntArg::lower($context, $args[2], 'mb_strcut', 3, 'length');
@@ -198,7 +198,7 @@ final class JitMbStrcut
 
     private static function compileTimeOptionalInt(Context $context, JITVariable $arg): ?int
     {
-        if (JITVariable::TYPE_NULL === $arg->type) {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
             return -1;
         }
 
