@@ -349,7 +349,14 @@ final class JitDomXPathEvaluateUserScript
         $sum = 0.0;
         // Prefer QName scan for text when unprefixed null-NS; fall back to literal tag walk.
         for ($i = 1; $i <= $count; ++$i) {
-            $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $tag, $i);
+            $text = false !== strpos($tag, ':')
+                ? DomParseSimpleXmlJitHelper::nthXPathNameTestTextArgv(
+                    $xml,
+                    $tag,
+                    $i,
+                    JitDomXPathRegisterUserScript::namespaces()
+                )
+                : DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $tag, $i);
             if (null === $text) {
                 return null;
             }
@@ -601,8 +608,22 @@ final class JitDomXPathEvaluateUserScript
         // //tag or //tag[n] — element string-value (#19456).
         if (preg_match('~^//([*\w][\w:-]*)(?:\[(\d+)\])?$~', $inner, $matches)) {
             $position = isset($matches[2]) && '' !== $matches[2] ? (int) $matches[2] : 1;
+            $tag = $matches[1];
+            if (false !== strpos($tag, ':')) {
+                $host = self::tryHostEvaluateScalar($xml, 'string('.$inner.')');
+                if (\is_string($host)) {
+                    return $host;
+                }
 
-            return DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $matches[1], $position);
+                return DomParseSimpleXmlJitHelper::nthXPathNameTestTextArgv(
+                    $xml,
+                    $tag,
+                    $position,
+                    JitDomXPathRegisterUserScript::namespaces()
+                );
+            }
+
+            return DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $tag, $position);
         }
 
         return null;

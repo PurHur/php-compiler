@@ -312,6 +312,11 @@ final class DomInstanceMethodJit
         'domxpath::evaluate' => true,
         'domxpath::registernamespace' => true,
         'domxpath::registerphpfunctions' => true,
+        // Living Dom\XPath shares DOMXPath handlers (#20757 / #21271 AOT NULL stub).
+        'dom\\xpath::query' => true,
+        'dom\\xpath::evaluate' => true,
+        'dom\\xpath::registernamespace' => true,
+        'dom\\xpath::registerphpfunctions' => true,
         'domnodelist::item' => true,
         'domnamednodemap::item' => true,
         'dom\\namednodemap::item' => true,
@@ -1119,22 +1124,22 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domxpath::query' === $lc) {
+            if ('domxpath::query' === $lc || 'dom\\xpath::query' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomXPathQuery();
 
                 return;
             }
-            if ('domxpath::evaluate' === $lc) {
+            if ('domxpath::evaluate' === $lc || 'dom\\xpath::evaluate' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomXPathEvaluate();
 
                 return;
             }
-            if ('domxpath::registernamespace' === $lc) {
+            if ('domxpath::registernamespace' === $lc || 'dom\\xpath::registernamespace' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomXPathRegisterNamespace();
 
                 return;
             }
-            if ('domxpath::registerphpfunctions' === $lc) {
+            if ('domxpath::registerphpfunctions' === $lc || 'dom\\xpath::registerphpfunctions' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomXPathRegisterPhpFunctions();
 
                 return;
@@ -1456,6 +1461,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::createdocumentfragment');
             self::ensureProxy($context, 'domxpath::query');
             self::ensureProxy($context, 'domxpath::evaluate');
+            self::ensureProxy($context, 'dom\\xpath::query');
+            self::ensureProxy($context, 'dom\\xpath::evaluate');
             self::ensureProxy($context, 'domnodelist::item');
             self::ensureProxy($context, 'domnodelist::getiterator');
             self::ensureProxy($context, 'domnamednodemap::item');
@@ -1527,6 +1534,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domxpath::registernamespace');
             self::ensureProxy($context, 'domxpath::registerphpfunctions');
             self::ensureProxy($context, 'domxpath::registerphpfunctionns');
+            self::ensureProxy($context, 'dom\\xpath::registernamespace');
+            self::ensureProxy($context, 'dom\\xpath::registerphpfunctions');
             self::ensureProxy($context, 'domimplementation::createdocument');
             self::ensureProxy($context, 'domimplementation::createdocumenttype');
             self::ensureProxy($context, 'domimplementation::hasfeature');
@@ -1581,6 +1590,7 @@ final class DomInstanceMethodJit
         'domelement' => ['setattribute', 'setattributens', 'removeattribute', 'removeattributens', 'removeattributenode', 'hasattributens', 'setidattribute', 'setidattributens', 'setidattributenode', 'getelementsbytagname', 'getelementsbytagnamens', 'getnodepath', 'getlineno', 'insertadjacentelement', 'insertadjacenttext', 'insertadjacenthtml'],
         'domattr' => ['isid'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
+        'dom\\xpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],
         'domnamednodemap' => ['item', 'getnameditem', 'getnameditemns', 'getiterator'],
         'domtokenlist' => ['add', 'contains', 'item', 'toggle', 'remove', 'getiterator'],
