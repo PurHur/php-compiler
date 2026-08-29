@@ -52,6 +52,7 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmPassword::crypt', $source);
         $this->assertStringContainsString('VmPassword::getInfo', $source);
         $this->assertStringContainsString('VmPassword::needsRehash', $source);
+        $this->assertStringContainsString('needsRehashThin', $source);
         // NestedJIT/AOT: algosArgv() literal list (HashTable return emptied under AOT — #27658).
         $this->assertStringContainsString('algosArgv', $source);
         $this->assertStringContainsString("['2y', 'argon2i', 'argon2id']", $source);

@@ -165,14 +165,66 @@ final class PasswordJitHelper
         ];
     }
 
+    /**
+     * NestedJIT/AOT thin bcrypt default cost (password.c).
+     *
+     * Do not call {@see VmPassword::bcryptDefaultCost()} here: the helper TU cannot
+     * link CompilerVersion at AOT runtime and segfaults (#35747).
+     *
+     * Docker CI Zend is 8.2.x (cost 10); compiler PROFILE may be 8.4 — match Zend
+     * under differential/AOT fixtures, not {@see VmPassword::bcryptDefaultCost()}.
+     */
+    private static function bcryptDefaultCostThin(): int
+    {
+        return 10;
+    }
+
     public static function needsRehashArgv(string $hash, int $algo, int $cost): int
     {
+        if (NestedJitCompileScope::isActive()) {
+            return self::needsRehashThin($hash, $algo, $cost) ? 1 : 0;
+        }
         $options = [];
         if ($cost > 0) {
             $options['cost'] = $cost;
         }
 
         return VmPassword::needsRehash($hash, $algo, $options) ? 1 : 0;
+    }
+
+    /**
+     * NestedJIT-safe password_needs_rehash() — {@see VmPassword::needsRehash} is outside the
+     * helper TU and stubs to false under thin AOT (#3279 / peer #34639 getInfoThin).
+     */
+    private static function needsRehashThin(string $hash, int $algo, int $cost): bool
+    {
+        // Literal algo ints — NestedJIT class-const ternaries miscompile (#26773).
+        if (1 !== $algo && 2 !== $algo && 3 !== $algo) {
+            return false;
+        }
+        $info = self::getInfoThin($hash);
+        $hashAlgo = $info['algo'];
+        if (1 === $algo) {
+            if ('2y' !== $hashAlgo) {
+                return true;
+            }
+            $newCost = $cost > 0 ? $cost : self::bcryptDefaultCostThin();
+            $hashCost = $info['options']['cost'] ?? self::bcryptDefaultCostThin();
+
+            return $hashCost !== $newCost;
+        }
+        if (2 === $algo) {
+            if ('argon2i' !== $hashAlgo) {
+                return true;
+            }
+
+            return false;
+        }
+        if ('argon2id' !== $hashAlgo) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -209,7 +261,7 @@ final class PasswordJitHelper
         if (1 !== $algo) {
             return '';
         }
-        $bcryptCost = $cost > 0 ? $cost : 10;
+        $bcryptCost = $cost > 0 ? $cost : self::bcryptDefaultCostThin();
         if ($bcryptCost < 4 || $bcryptCost > 31) {
             return '';
         }
