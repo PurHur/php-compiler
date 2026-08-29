@@ -361,6 +361,107 @@ final class ReadonlyClassGuard
     }
 
     /**
+     * Reject `&$obj->readonlyProp` at ASSIGN_REF fetch (#25620, zend_readonly.c get_property_ptr_ptr).
+     *
+     * Initialized props: "Cannot modify readonly property …". Uninitialized: "Cannot indirectly modify …".
+     */
+    public static function emitBeforePropertyByRef(
+        Context $context,
+        Variable $var,
+        ?\PHPCompiler\JIT $jit = null
+    ): void {
+        $m5 = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        if ('1' === $m5 || 'true' === strtolower((string) $m5)) {
+            return;
+        }
+        if (null === $var->objectPropertySlot) {
+            return;
+        }
+        $objectType = $context->type->object;
+        assert($objectType instanceof Object_);
+        if (null === $var->objectPropertyReceiver && null !== $var->objectPropertySlot) {
+            $var->objectPropertyReceiver = $objectType->receiverForPropertySlot($var->objectPropertySlot);
+        }
+        if (null === $var->objectPropertyReceiver) {
+            return;
+        }
+        $propName = $var->objectPropertyName ?? 'property';
+        $guardClassIds = array_values(array_unique(array_merge(
+            $objectType->readonlyClassIds(),
+            $objectType->readonlyPropertyClassIdsForProperty($propName)
+        )));
+        if ([] === $guardClassIds) {
+            return;
+        }
+
+        BasicBlockHelper::positionAfterPrematureVoidReturn($context, 'readonly_byref_resume');
+        $entry = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $entry) {
+            return;
+        }
+        $fn = $entry->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+
+        $obj = $var->objectPropertyReceiver;
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $allowBlock = $fn->appendBasicBlock('readonly_byref_allow');
+        $exitBlock = $fn->appendBasicBlock('readonly_byref_exit');
+
+        $checkBlock = $entry;
+        foreach ($guardClassIds as $i => $id) {
+            $matchBlock = $fn->appendBasicBlock('readonly_byref_match_'.$id);
+            $nextCheck = $i + 1 < \count($guardClassIds)
+                ? $fn->appendBasicBlock('readonly_byref_try_'.($i + 1))
+                : $allowBlock;
+            $context->builder->positionAtEnd($checkBlock);
+            $expected = $context->constantFromInteger($id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $classId, $expected);
+            $context->builder->branchIf($isId, $matchBlock, $nextCheck);
+
+            $context->builder->positionAtEnd($matchBlock);
+            $declaringClass = MethodVisibility::formatAnonymousScopeForMessage(
+                $objectType->classNameForId($id)
+            );
+            $isUninit = self::emitPropertySlotIsUninitialized($context, $var);
+            if (null !== $isUninit) {
+                $indirectBlock = $fn->appendBasicBlock('readonly_byref_indirect_'.$id);
+                $directBlock = $fn->appendBasicBlock('readonly_byref_direct_'.$id);
+                $context->builder->branchIf($isUninit, $indirectBlock, $directBlock);
+                $context->builder->positionAtEnd($indirectBlock);
+                self::emitViolation(
+                    $context,
+                    $jit,
+                    sprintf(
+                        'Cannot indirectly modify readonly property %s::$%s',
+                        $declaringClass,
+                        $propName
+                    )
+                );
+                $context->builder->positionAtEnd($directBlock);
+                self::emitViolation(
+                    $context,
+                    $jit,
+                    sprintf('Cannot modify readonly property %s::$%s', $declaringClass, $propName)
+                );
+            } else {
+                self::emitViolation(
+                    $context,
+                    $jit,
+                    sprintf('Cannot modify readonly property %s::$%s', $declaringClass, $propName)
+                );
+            }
+            $checkBlock = $nextCheck;
+        }
+
+        $context->builder->positionAtEnd($allowBlock);
+        $context->builder->branch($exitBlock);
+        $context->builder->positionAtEnd($exitBlock);
+    }
+
+    /**
      * Reject child-scope initialization of inherited readonly properties during __construct (#9714).
      *
      * @return bool true when a violation was emitted and the store must be skipped

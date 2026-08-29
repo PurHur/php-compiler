@@ -9382,6 +9382,7 @@ class JIT {
                         }
                         $srcVar = $this->context->getVariableFromOp($srcOp);
                         JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
+                        JIT\ReadonlyClassGuard::emitBeforePropertyByRef($this->context, $srcVar, $this);
                         // `$o->p =& $v`: point the property slot at $v's value box (Zend IS_REFERENCE).
                         // Do not rebind $v onto the fetch temp — its alloca is not the heap box
                         // propertyStore writes (#34649 / re-#5370).
@@ -9456,6 +9457,7 @@ class JIT {
                         if ($this->context->hasVariableOp($srcOp)) {
                             $srcVar = $this->context->getVariableFromOp($srcOp);
                             JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
+                            JIT\ReadonlyClassGuard::emitBeforePropertyByRef($this->context, $srcVar, $this);
                             if (
                                 Variable::TYPE_VALUE === $srcVar->type
                                 && null === $srcVar->valueBoxAliasPtr
@@ -9480,6 +9482,7 @@ class JIT {
                     }
                     $srcVar = $this->context->getVariableFromOp($srcOp);
                     JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
+                    JIT\ReadonlyClassGuard::emitBeforePropertyByRef($this->context, $srcVar, $this);
                     $this->aliasAssignRefNamedDestToDimEntry($srcVar);
                     if (
                         Variable::TYPE_VALUE === $srcVar->type
