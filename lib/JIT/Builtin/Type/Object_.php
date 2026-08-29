@@ -137,6 +137,9 @@ class Object_ extends Type {
 
     /** @var array<int, array<int, string>> class id => property slot => declared type label (#31819) */
     private array $propertyDeclaredTypeLabels = [];
+
+    /** @var array<int, array<int, string>> class id => property slot => resolved class for instanceof (#31835 AOT) */
+    private array $propertyClassConstraints = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
     private array $methodDisplayNames = [];
     /** @var array<int, array<string, true>> classId => methodLc => declared here (not inheritMethodVisibility) (#34107) */
@@ -3590,9 +3593,37 @@ class Object_ extends Type {
         $this->propertyDeclaredTypeLabels[$classId][$propset[3]] = $label;
     }
 
+    public function definePropertyClassConstraint(int $classId, string $name, string $resolvedClass): void
+    {
+        $propset = $this->findInstancePropertySet($classId, $name);
+        if (null === $propset) {
+            return;
+        }
+        $this->propertyClassConstraints[$classId][$propset[3]] = ltrim($resolvedClass, '\\');
+    }
+
     public function propertySlotDeclaredTypeLabel(int $classId, int $slotIndex): string
     {
         return $this->propertyDeclaredTypeLabels[$classId][$slotIndex] ?? 'mixed';
+    }
+
+    public function propertySlotClassConstraint(int $classId, int $slotIndex): ?string
+    {
+        return $this->propertyClassConstraints[$classId][$slotIndex] ?? null;
+    }
+
+    public function stampInstancePropertyWriteMetadata(
+        Variable $var,
+        int $classId,
+        int $slotIndex,
+        string $propName
+    ): void {
+        $var->objectPropertyDnfArms = $this->dnfArmsForProperty($classId, $propName);
+        $constraint = $this->propertySlotClassConstraint($classId, $slotIndex);
+        if (null !== $constraint && '' !== $constraint) {
+            $var->objectPropertyClassConstraint = $constraint;
+            $var->objectPropertyDeclaredTypeLabel = $this->propertySlotDeclaredTypeLabel($classId, $slotIndex);
+        }
     }
 
     /** True when the slot stores a typed __value__ property (#4912). */
@@ -5980,6 +6011,10 @@ class Object_ extends Type {
         if (isset($this->propertyDeclaredTypeLabels[$parentId][$parentSlot])) {
             $this->propertyDeclaredTypeLabels[$childId][$childSlot]
                 = $this->propertyDeclaredTypeLabels[$parentId][$parentSlot];
+        }
+        if (isset($this->propertyClassConstraints[$parentId][$parentSlot])) {
+            $this->propertyClassConstraints[$childId][$childSlot]
+                = $this->propertyClassConstraints[$parentId][$parentSlot];
         }
         if (isset($this->propertyDefaults[$parentId][$parentSlot])) {
             $this->propertyDefaults[$childId][$childSlot]
@@ -8826,15 +8861,26 @@ class Object_ extends Type {
             }
         }
 
-        if (Variable::TYPE_OBJECT === $propertyType && Variable::TYPE_OBJECT === $value->type) {
-            $stored = $this->context->builder->pointerCast(
-                $this->context->helper->loadValue($value),
-                $voidPtr
-            );
-            $this->context->builder->store($stored, $slot);
-            $value->addref();
+        if (Variable::TYPE_OBJECT === $propertyType) {
+            $objectPtr = null;
+            if (Variable::TYPE_OBJECT === $value->type) {
+                $objectPtr = $this->context->helper->loadValue($value);
+            } elseif (Variable::TYPE_VALUE === $value->type) {
+                // Locals from `new` / assigns are boxed __value__; native object slots need
+                // __object__* not a mistaken value-box store (#31835 AOT leftover).
+                $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $value);
+                $objectPtr = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readObject'),
+                    $valuePtr
+                );
+            }
+            if (null !== $objectPtr) {
+                $stored = $this->context->builder->pointerCast($objectPtr, $voidPtr);
+                $this->context->builder->store($stored, $slot);
+                $value->addref();
 
-            return;
+                return;
+            }
         }
 
         if (Variable::TYPE_STRING === $propertyType) {

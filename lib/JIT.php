@@ -1151,6 +1151,8 @@ class JIT {
         $boxed->objectPropertyName = null;
         $boxed->objectPropertyClassName = null;
         $boxed->objectPropertyDnfArms = null;
+        $boxed->objectPropertyClassConstraint = null;
+        $boxed->objectPropertyDeclaredTypeLabel = null;
 
         return $boxed;
     }
@@ -18631,6 +18633,17 @@ class JIT {
                                 $proto->dnfArms
                             );
                         }
+                        if (
+                            null !== $proto->classConstraint
+                            && '' !== $proto->classConstraint
+                            && null === $proto->dnfArms
+                        ) {
+                            $this->context->type->object->definePropertyClassConstraint(
+                                $classId,
+                                $name->value,
+                                $proto->classConstraint
+                            );
+                        }
                         if (\PHPCompiler\VM\TypedPropertyCheck::propertyAllowsNull($proto)) {
                             $this->context->type->object->markPropertyAllowsNull($classId, $name->value);
                         }
@@ -21107,6 +21120,18 @@ class JIT {
                     $value,
                     $result->objectPropertyDnfArms
                 );
+            } elseif (
+                null !== $result->objectPropertyClassConstraint
+                && '' !== $result->objectPropertyClassConstraint
+            ) {
+                JIT\TypedPropertyClassAssignCheck::enforce(
+                    $this->context,
+                    $value,
+                    $result->objectPropertyClassConstraint,
+                    $result->objectPropertyClassName ?? '',
+                    $result->objectPropertyName ?? 'property',
+                    $result->objectPropertyDeclaredTypeLabel ?? $result->objectPropertyClassConstraint
+                );
             }
             if (null !== $result->objectPropertySlot) {
                 JIT\BasicBlockHelper::continueAfterDefiningValue(
@@ -22816,6 +22841,8 @@ class JIT {
             $dest->objectPropertyName = null;
             $dest->objectPropertyClassName = null;
             $dest->objectPropertyDnfArms = null;
+            $dest->objectPropertyClassConstraint = null;
+            $dest->objectPropertyDeclaredTypeLabel = null;
         } elseif ($this->isScalarObjectPropertyAliasType($src->objectPropertyType)) {
             // Scalar prop reads: copy the value only (#34465 / peer #33849).
             $dest->objectPropertySlot = null;
@@ -22825,6 +22852,8 @@ class JIT {
             $dest->objectPropertyName = null;
             $dest->objectPropertyClassName = null;
             $dest->objectPropertyDnfArms = null;
+            $dest->objectPropertyClassConstraint = null;
+            $dest->objectPropertyDeclaredTypeLabel = null;
         } else {
             $this->copyObjectPropertyBacking($dest, $src);
         }
@@ -22861,6 +22890,8 @@ class JIT {
         $dest->objectPropertyName = $src->objectPropertyName;
         $dest->objectPropertyClassName = $src->objectPropertyClassName;
         $dest->objectPropertyDnfArms = $src->objectPropertyDnfArms;
+        $dest->objectPropertyClassConstraint = $src->objectPropertyClassConstraint;
+        $dest->objectPropertyDeclaredTypeLabel = $src->objectPropertyDeclaredTypeLabel;
         $dest->closureCall = $src->closureCall;
         $dest->closureIsStatic = $src->closureIsStatic;
         $dest->closureIsMethodFake = $src->closureIsMethodFake;
@@ -24576,6 +24607,18 @@ class JIT {
                 $this->context,
                 $newVal,
                 $dest->objectPropertyDnfArms
+            );
+        } elseif (
+            null !== $dest->objectPropertyClassConstraint
+            && '' !== $dest->objectPropertyClassConstraint
+        ) {
+            JIT\TypedPropertyClassAssignCheck::enforce(
+                $this->context,
+                $newVal,
+                $dest->objectPropertyClassConstraint,
+                $dest->objectPropertyClassName ?? '',
+                $dest->objectPropertyName ?? 'property',
+                $dest->objectPropertyDeclaredTypeLabel ?? $dest->objectPropertyClassConstraint
             );
         }
         JIT\ReadonlyClassGuard::emitStoreUnlessPending(

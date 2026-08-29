@@ -241,7 +241,7 @@ final class ObjectInstancePropertyLlvm
                     $var->objectPropertyReceiver = $obj;
                     $var->objectPropertyName = $propset[1];
                     $var->objectPropertyClassName = $className;
-                    $var->objectPropertyDnfArms = $object->dnfArmsForProperty($classId, $propset[1]);
+                    $object->stampInstancePropertyWriteMetadata($var, $classId, $propset[3], $propset[1]);
                     $object->recordSlotReceiver($slot, $obj);
 
                     return $var;
@@ -263,7 +263,7 @@ final class ObjectInstancePropertyLlvm
                     $var->objectPropertyReceiver = $obj;
                     $var->objectPropertyName = $propset[1];
                     $var->objectPropertyClassName = $className;
-                    $var->objectPropertyDnfArms = $object->dnfArmsForProperty($classId, $propset[1]);
+                    $object->stampInstancePropertyWriteMetadata($var, $classId, $propset[3], $propset[1]);
                     $object->recordSlotReceiver($slot, $obj);
 
                     return $var;
@@ -359,7 +359,7 @@ final class ObjectInstancePropertyLlvm
                 $var->objectPropertyReceiver = $obj;
                 $var->objectPropertyName = $propset[1];
                 $var->objectPropertyClassName = $className;
-                $var->objectPropertyDnfArms = $object->dnfArmsForProperty($classId, $propset[1]);
+                $object->stampInstancePropertyWriteMetadata($var, $classId, $propset[3], $propset[1]);
                 $object->recordSlotReceiver($slot, $obj);
 
                 return $var;
