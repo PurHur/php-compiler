@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrRepeat;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -46,6 +47,15 @@ final class str_repeat extends Internal
             return $context->getTypeFromString('__string__*')->constNull();
         }
 
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        $times = self::compileTimeInt($context, $args[1]);
+        if (null !== $literal && null !== $times) {
+            $folded = VmString::repeat($literal, $times);
+            $context->jitStrRepeatFoldedString = $folded;
+
+            return $context->builder->load($context->constantStringFromString($folded));
+        }
+
         StringStrRepeat::ensureLinked($context);
 
         return $context->builder->call(
@@ -53,6 +63,21 @@ final class str_repeat extends Internal
             self::jitStringArg($context, $args[0]),
             JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_repeat', 2, 'times', true)
         );
+    }
+
+    private static function compileTimeInt(Context $context, JITVariable $var): ?int
+    {
+        if (null !== ($var->compileTimeLong ?? null)) {
+            return (int) $var->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $var->type && null !== $var->value) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+            }
+        }
+
+        return null;
     }
 
     private static function vmStringArg(Frame $frame): string

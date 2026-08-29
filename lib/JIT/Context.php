@@ -120,11 +120,17 @@ class Context {
     /** Operand for json_encode() flags arg — fold JSON_* | JSON_* (#35339). */
     public ?Operand $jitJsonEncodeFlagsOperand = null;
 
+    /** Operand for json_decode() flags arg when ARG_SEND lost compileTimeLong (#10611 / #12009). */
+    public ?Operand $jitJsonDecodeFlagsOperand = null;
+
     /** Compile-time json_encode() result for assignCallResultOperand (#24137). */
     public ?string $jitJsonEncodeFoldedString = null;
 
-    /** Compile-time serialize() result for assignCallResultOperand (#34576). */
+    /** Compile-time serialize() wire on the result CV so unserialize($s) can fold DateTime (#34576). */
     public ?string $jitSerializeFoldedString = null;
+
+    /** Compile-time str_repeat() result for json_decode($s, …, JSON_THROW_ON_ERROR) depth fold (#10611). */
+    public ?string $jitStrRepeatFoldedString = null;
 
     /** Operand for iterator_to_array() iterator arg — CFG userType for HT-backed SPL (#26825). */
     public ?Operand $jitIteratorToArrayIteratorOperand = null;

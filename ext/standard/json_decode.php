@@ -105,12 +105,12 @@ final class json_decode extends Internal
             return JitJsonDecode::materializeDecoded($context, $decoded, $assoc);
         }
 
-        if (512 !== $depth || 0 !== $flags) {
-            throw new \LogicException('json_decode() depth/flags not supported at runtime in this compiler build');
-        }
-
         if ($assoc) {
-            return JitJsonDecode::decodeRuntime($context, $args[0]);
+            if (512 === $depth && 0 === $flags) {
+                return JitJsonDecode::decodeRuntime($context, $args[0]);
+            }
+
+            return JitJsonDecode::decodeRuntimeWithOptions($context, $args[0], $depth, $flags);
         }
 
         // assoc=false runtime path is unsupported; soft-null / enum TypeError still apply first (#5907, #18665, #21223).
@@ -207,10 +207,112 @@ final class json_decode extends Internal
         }
         $flags = self::compileTimeInt($context, $args[3]);
         if (null === $flags) {
+            $flags = self::tryCompileTimeFlagsFromBlock($context);
+        }
+        if (null === $flags) {
             throw new \LogicException('json_decode() flags must be a compile-time integer in this compiler build');
         }
 
         return $flags;
+    }
+
+    /**
+     * Resolve flags from CFG when hoisted json_decode() lost compileTimeLong on ConstFetch (#10611 / #12009).
+     */
+    private static function tryCompileTimeFlagsFromBlock(Context $context): ?int
+    {
+        $block = $context->jitEnclosingBlock;
+        $flagsOp = $context->jitJsonDecodeFlagsOperand;
+        if (null === $block || null === $flagsOp) {
+            return null;
+        }
+        $slot = self::operandSlot($block, $flagsOp);
+        if (null === $slot) {
+            return null;
+        }
+
+        return self::slotJsonFlags($context, $block, $slot, []);
+    }
+
+    private static function operandSlot(\PHPCompiler\Block $block, \PHPCfg\Operand $op): ?int
+    {
+        foreach ($block->opCodes as $opcode) {
+            foreach ([$opcode->arg1, $opcode->arg2, $opcode->arg3] as $slot) {
+                if (null === $slot) {
+                    continue;
+                }
+                try {
+                    if ($block->getOperand($slot) === $op) {
+                        return $slot;
+                    }
+                } catch (\Throwable) {
+                    continue;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, true> $visited
+     */
+    private static function slotJsonFlags(
+        Context $context,
+        \PHPCompiler\Block $block,
+        int $slot,
+        array $visited
+    ): ?int {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+
+        if (isset($block->constants[$slot])) {
+            $const = $block->constants[$slot];
+            if (Variable::TYPE_INTEGER === $const->type) {
+                return $const->toInt();
+            }
+        }
+
+        foreach ($block->opCodes as $code) {
+            if ($code->arg1 !== $slot) {
+                continue;
+            }
+            if (\PHPCompiler\OpCode::TYPE_CONST_FETCH === $code->type) {
+                return self::jsonFlagsFromConstFetch($context, $block, $code);
+            }
+        }
+
+        return null;
+    }
+
+    private static function jsonFlagsFromConstFetch(
+        Context $context,
+        \PHPCompiler\Block $block,
+        \PHPCompiler\OpCode $op
+    ): ?int {
+        $nameOp = null !== $op->arg3 ? $block->getOperand($op->arg3) : $block->getOperand($op->arg2);
+        if (!$nameOp instanceof \PHPCfg\Operand\Literal) {
+            return null;
+        }
+        $name = (string) $nameOp->value;
+        $jsonFlags = VmJsonFlags::constants();
+        if (isset($jsonFlags[$name])) {
+            return $jsonFlags[$name];
+        }
+        $upper = strtoupper($name);
+        if (isset($jsonFlags[$upper])) {
+            return $jsonFlags[$upper];
+        }
+        if (null !== $context->runtime->vmContext) {
+            $phpVar = $context->runtime->vmContext->constantFetch($name);
+            if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+                return $phpVar->toInt();
+            }
+        }
+
+        return null;
     }
 
     private static function compileTimeBool(Context $context, JITVariable $var): ?bool
