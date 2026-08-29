@@ -38,6 +38,17 @@ final class MbConvertVariables35315AotTest extends TestCase
         $this->assertSame($zend, $aot);
     }
 
+    public function testAotRuntimeFromArrayWithHelperCacheMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $src = __DIR__.'/../repro/aot_mb_convert_variables_runtime_from_array.php';
+        $zend = $this->runPhp($src);
+        $aot = $this->runAot($src, helperRuntimeCache: true);
+        $this->assertSame($zend, $aot);
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
@@ -74,12 +85,15 @@ final class MbConvertVariables35315AotTest extends TestCase
         return implode("\n", $out);
     }
 
-    private function runAot(string $src): string
+    private function runAot(string $src, bool $helperRuntimeCache = false): string
     {
         $root = dirname(__DIR__, 2);
         $bin = sys_get_temp_dir().'/phpc_mcv_35315_'.getmypid();
         @unlink($bin);
-        $compile = 'env PHP_COMPILER_HELPER_RUNTIME_O=0 '
+        $env = $helperRuntimeCache
+            ? 'env PHP_COMPILER_HELPER_RUNTIME_O=1 '
+            : 'env PHP_COMPILER_HELPER_RUNTIME_O=0 ';
+        $compile = $env
             .escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
         exec($compile, $cout, $crc);

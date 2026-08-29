@@ -381,6 +381,9 @@ if (null !== $unitPath) {
         // #26989 — unit.o calls __compiler_preg_match without a provider in the helper TU;
         // NestedJIT into the user module so PregMatchRuntime can link (cold-build hello-world).
         '/ext/standard/PendingHeadersJitHelper.php' => true,
+        // #35315 — unit.o aborts at runtime (MbDetectEncodingJitHelper dep chain lacks init);
+        // NestedJIT convertStringArgv/detectFromArgv bundle into user AOT (peer htmlspecialchars).
+        '/ext/mbstring/MbConvertVariablesJitHelper.php' => true,
     ];
     file_put_contents($dir.'/manifest.json', json_encode([
         'fingerprint' => $unitFingerprint,
