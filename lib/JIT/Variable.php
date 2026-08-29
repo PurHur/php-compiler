@@ -353,6 +353,12 @@ final class Variable {
      */
     public ?array $objectPropertyDnfArms = null;
 
+    /** Resolved class name for native object-typed property writes (#31835 AOT). */
+    public ?string $objectPropertyClassConstraint = null;
+
+    /** Declared type label for property TypeError text (e.g. `self`, `parent`). */
+    public ?string $objectPropertyDeclaredTypeLabel = null;
+
     /** __set dispatch when the property slot does not exist (#146, #4022). */
     public ?\PHPLLVM\Value $magicSetReceiver = null;
 
