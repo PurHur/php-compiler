@@ -61,6 +61,17 @@ final class MbConvertEncodingRuntimeAotTest extends TestCase
         );
     }
 
+    public function testAotRuntimeFromArrayMatchesZend(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertAotMatchesZend(
+            __DIR__.'/../repro/aot_mb_convert_encoding_runtime_from_array.php',
+            []
+        );
+    }
+
     public function testHelperAndLoweringPresent(): void
     {
         $root = dirname(__DIR__, 2);
@@ -72,14 +83,14 @@ final class MbConvertEncodingRuntimeAotTest extends TestCase
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbConvertEncodingRuntime.php');
         $this->assertStringContainsString('convertHelper', $runtime);
         $this->assertStringContainsString('assertToEncodingHelper', $runtime);
+        $fromList = (string) file_get_contents($root.'/lib/JIT/MbConvertEncodingFromListLlvm.php');
+        $this->assertStringContainsString('buildOrderCodesString', $fromList);
         $this->assertStringContainsString('assertFromEncodingHelper', $runtime);
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbConvertEncoding.php');
         $this->assertStringContainsString('toEncodingPtr', $jit);
         $this->assertStringContainsString('compileTimeFromEncodingList', $jit);
-        $this->assertStringContainsString(
-            'array $from_encoding is not lowered for JIT/AOT runtime',
-            $jit
-        );
+        $this->assertStringContainsString('MbConvertEncodingFromListLlvm', $jit);
+        $this->assertStringContainsString('needsRuntimeFromEncodingList', $jit);
         $this->assertStringContainsString('MbConvertEncodingArrayLlvm', $jit);
         $this->assertStringNotContainsString(
             'to_encoding must be a string literal in this compiler build',
