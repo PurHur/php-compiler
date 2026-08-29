@@ -17,6 +17,7 @@ use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\MbConvertEncodingFromListLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -49,6 +50,12 @@ final class JitMbConvertEncoding
             );
 
         if (self::isArrayArg($args[0])) {
+            if (!$fromIsDefault && self::needsRuntimeFromEncodingList($context, $args, $argc)) {
+                throw new \LogicException(
+                    'mb_convert_encoding() array $string with runtime array $from_encoding is not lowered for JIT/AOT runtime in this compiler build'
+                );
+            }
+
             $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
             MbConvertEncodingRuntime::ensureLinked($context);
             if (null !== $savedInsert) {
@@ -81,10 +88,8 @@ final class JitMbConvertEncoding
         }
 
         // Runtime / non-literal array $from_encoding — never JitStringBuiltinArg::lower (#35296).
-        if (!$fromIsDefault && self::isArrayArg($args[2])) {
-            throw new \LogicException(
-                'mb_convert_encoding() array $from_encoding is not lowered for JIT/AOT runtime in this compiler build'
-            );
+        if (!$fromIsDefault && self::needsRuntimeFromEncodingList($context, $args, $argc)) {
+            return self::lowerRuntimeStringWithFromList($context, $args, $sourceIsNull);
         }
 
         // Link NestedJIT helpers before lowering args — NestedJIT can invalidate prior IR (#34270 / #35165).
@@ -136,6 +141,81 @@ final class JitMbConvertEncoding
         );
 
         return self::materializeOwnedString($context, $resultStr);
+    }
+
+    /**
+     * Runtime hashtable / dynamic array $from_encoding on a string operand (#35296 leftover).
+     *
+     * @param list<JITVariable> $args
+     */
+    private static function lowerRuntimeStringWithFromList(
+        Context $context,
+        array $args,
+        bool $sourceIsNull
+    ): Value {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbConvertEncodingRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_convert_encoding_from_list_runtime');
+
+        $str = $sourceIsNull
+            ? $context->builder->load($context->constantStringFromString(''))
+            : JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[0],
+                'mb_convert_encoding',
+                0,
+                'string'
+            );
+
+        [$toPtr, $assertTo] = self::toEncodingPtr($context, $args[1]);
+        if ($assertTo) {
+            $context->builder->call(
+                MbConvertEncodingRuntime::assertToEncodingHelper($context),
+                $toPtr
+            );
+        }
+
+        return MbConvertEncodingFromListLlvm::convert($context, $str, $toPtr, $args[2]);
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function needsRuntimeFromEncodingList(Context $context, array $args, int $argc): bool
+    {
+        if ($argc < 3) {
+            return false;
+        }
+        $arg = $args[2];
+        if ($arg->isNullConstant || JITVariable::TYPE_NULL === $arg->type) {
+            return false;
+        }
+        if (null !== self::compileTimeFromEncodingList($context, $args, $argc)) {
+            return false;
+        }
+        if (null !== JitStringBuiltinArg::compileTimeLiteral($arg)) {
+            return false;
+        }
+        if (self::isArrayArg($arg)) {
+            return true;
+        }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return false;
+        }
+        if (JITVariable::TYPE_HASHTABLE === $arg->type) {
+            return true;
+        }
+        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return true;
+        }
+        if ($arg->valueBoxHashtable ?? false) {
+            return true;
+        }
+
+        return JITVariable::TYPE_VALUE === $arg->type;
     }
 
     /**
@@ -298,6 +378,11 @@ final class JitMbConvertEncoding
 
         $arg = $args[2];
         if ($arg->compileTimeEmptyArrayLiteral ?? false) {
+            // Stale empty-literal flag on a mutated local — defer to runtime (#35296).
+            if (($arg->nextFreeElement ?? 0) > 0 || ($arg->nextFreeElementFromRuntime ?? false)) {
+                return null;
+            }
+
             return [];
         }
 
@@ -310,6 +395,10 @@ final class JitMbConvertEncoding
 
         $arr = $arg->compileTimeArray ?? null;
         if (null !== $arr) {
+            $packed = $arg->nextFreeElement ?? 0;
+            if ($packed > 0 && \count($arr) < $packed) {
+                return null;
+            }
             $order = [];
             foreach ($arr as $elem) {
                 if (\is_string($elem)) {
