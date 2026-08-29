@@ -163,6 +163,36 @@ final class ZipArchiveJitHelper
         return self::pack(1);
     }
 
+    /**
+     * replaceFile entry path — separate NestedJIT entry avoids exec() $s2 formal aliasing
+     * under thin AOT (peer addEntry / #35454 / #35710).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_replaceFile
+     */
+    public static function replaceEntry(int $index, string $content): string
+    {
+        if (1 !== self::$h1open) {
+            self::$h1status = 8;
+
+            return self::pack(0);
+        }
+        if (0 === $index && '' !== self::$h1name) {
+            self::$h1data = $content;
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        if (1 === $index && '' !== self::$h1name2) {
+            self::$h1data2 = $content;
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        self::$h1status = 9;
+
+        return self::pack(0);
+    }
+
     public static function exec(string $op, int $a, int $b, string $s1, string $s2): string
     {
         if ('alloc' === $op) {
@@ -1035,28 +1065,8 @@ final class ZipArchiveJitHelper
             return self::pack(0);
         }
         // replaceFile — replace slot data, keep name (#35496 / php-src zim_ZipArchive_replaceFile).
-        // Content is read in IR via file_get_contents; $s2 is the new bytes. $a = index.
         if ('rpl' === $op) {
-            if (1 !== self::$h1open) {
-                self::$h1status = 8;
-
-                return self::pack(0);
-            }
-            if (0 === $a && '' !== self::$h1name) {
-                self::$h1data = $s2;
-                self::$h1status = 0;
-
-                return self::pack(1);
-            }
-            if (1 === $a && '' !== self::$h1name2) {
-                self::$h1data2 = $s2;
-                self::$h1status = 0;
-
-                return self::pack(1);
-            }
-            self::$h1status = 9;
-
-            return self::pack(0);
+            return self::replaceEntry($a, $s2);
         }
         // setPassword — store session password (#35500 / zim_ZipArchive_setPassword).
         // Empty password → false (php-src). Short op spw.

@@ -378,7 +378,15 @@ final class JitZipArchive
                 $empty
             );
         }
-        $rcOk = self::execLong($context, 'add', $handle, $zero, $name, $content);
+        $packed = JitNestedHelperCoerce::callHelper(
+            $context,
+            ZipArchiveEmbedBridge::helperFunction($context, ZipArchiveEmbedBridge::addEntryHelper()),
+            [$name, $content]
+        );
+        $rcOk = self::int32LeFromString(
+            $context,
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $packed)
+        );
         $okTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -1360,7 +1368,15 @@ final class JitZipArchive
             $context->lookupFunction('__value__readString'),
             $contentsPtr
         );
-        $rcOk = self::execLong($context, 'rpl', $index, $zero, $empty, $content);
+        $packed = JitNestedHelperCoerce::callHelper(
+            $context,
+            ZipArchiveEmbedBridge::helperFunction($context, ZipArchiveEmbedBridge::replaceEntryHelper()),
+            [$index, $content]
+        );
+        $rcOk = self::int32LeFromString(
+            $context,
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $packed)
+        );
         $okTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
