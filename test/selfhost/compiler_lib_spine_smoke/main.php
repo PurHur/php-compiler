@@ -5560,6 +5560,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/FilterInputArrayRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FilterInputTypeJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FilterVarArrayLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FilterVarArrayRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/FilterVarRequireArrayLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FinfoFileRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FinfoBufferRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/NumberFormatterFormatRuntime.php';

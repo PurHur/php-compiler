@@ -29,8 +29,9 @@ final class TypeDeadAssertFailStringAbiRuntimeShrinkTest extends TestCase
             $type,
             'Builtin\\Type must not always-register __compiler_assert_fail_string (#33241)'
         );
-        // No further Type always-on leftover after #33267 exit/abort drop.
-        $this->assertStringContainsString('AssertFail::ensureLinked', $type);
+        // No further Type always-on leftover after #33267 exit/abort drop;
+        // AssertFail ensureLinked moved to JitAssert call site (#34463).
+        $this->assertStringContainsString('#34463', $type);
     }
 
     public function testRuntimeOwnerDeclaresAssertFailStringAbiModuleLocally(): void
@@ -47,10 +48,19 @@ final class TypeDeadAssertFailStringAbiRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('AssertFail::ensureLinked', $jit);
     }
 
-    public function testTypeInitializeStillEnsureLinksAssertFail(): void
+    public function testTypeInitializeNoLongerEagerLinksAssertFail(): void
     {
         $type = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type.php');
-        $this->assertStringContainsString('AssertFail::ensureLinked($this->context)', $type);
+        $initPos = strpos($type, 'public function initialize(): void');
+        $this->assertNotFalse($initPos);
+        $initBody = substr($type, $initPos);
+        $this->assertDoesNotMatchRegularExpression(
+            '/AssertFail::ensureLinked\\(\\$this->context\\)/',
+            $initBody,
+            'Type::initialize must not eagerly AssertFail::ensureLinked (#34463)'
+        );
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitAssert.php');
+        $this->assertStringContainsString('AssertFail::ensureLinked($context)', $jit);
     }
 
     public function testNoNewRuntimeCForAssertFailStringAbi(): void
