@@ -15,7 +15,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument::importNode() (#19212, #32350, #33097, #33362, #35118).
+ * LLVM lowering for DOMDocument::importNode() (#19212, #32350, #33097, #33362, #35118, #35801).
  *
  * php-src ext/dom/document.c PHP_METHOD(DOMDocument, importNode) → xmlDocCopyNode.
  * Thin-standalone AOT cannot return NestedJIT object pointers (property fetch
@@ -23,6 +23,8 @@ use PHPLLVM\Value;
  * a user-script DOMElement instead — tag/inner XML from compile-time loadXML
  * (#32350) or loadHTML getElementById (#19212). `$deep` must gate InnerXml (#33097).
  * Attributes are always copied (xmlDocCopyNode); #33097 only gated children (#33362).
+ * Deep XML imports must seed textContent/nodeValue from InnerXml (#35801) — peer
+ * {@see JitDomDocumentElement} child materialize (#33014).
  * Attr / leaf sources materialize as stand-ins (#35043 / #35098 / #35118) — never the
  * destination loadXML root via lastPath poisoning.
  */
@@ -312,6 +314,11 @@ final class JitDomImportNode
         if (!$deep) {
             $inner = '';
             $text = '';
+        } elseif ('' !== $inner && '' === $text) {
+            // XML deep import: LiveSlots sync children + InnerXml for saveXML, but the
+            // parent textContent/nodeValue slots were still seeded as '' (#35801).
+            // Peer loadXML child materialize (#33014) derives text from InnerXml first.
+            $text = DomParseSimpleXmlJitHelper::textContentFromInnerXmlArgv($inner);
         }
 
         self::$lastMaterializedTagName = $tag;
@@ -326,6 +333,7 @@ final class JitDomImportNode
             $text
         );
         if ($deep && '' !== $inner) {
+            // Overwrite text-only INNER_XML from storeTextContentSlots with real markup.
             JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
             // saveXML reads InnerXml; getElementsByTagName / firstChild need LiveSlots
             // (peer cloneNode #32949 / xmlDocCopyNode deep).
