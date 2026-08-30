@@ -20998,8 +20998,11 @@ class JIT {
         // ?: false arm (`'null'`) after the true arm fetched `$o->tagName`: bindPropertyFetchResult
         // can leave objectPropertySlot on a TYPE_VALUE phi temp, so a later scalar assign skips
         // assignToPointer and echo/`$x =` reads empty DOMElement::$tagName (#23514 / #33849).
+        // Only reseat forced coalesce/ternary merges — plain `$obj->prop = $rhs` is PROPERTY_FETCH
+        // + TYPE_ASSIGN with force=false and must keep writing the live property slot (#35874).
         if (
-            null === $value->objectPropertySlot
+            $force
+            && null === $value->objectPropertySlot
             && !$this->context->retainCoalesceInstancePropertyLvalue
             && $this->context->hasVariableOp($resultOp)
         ) {
