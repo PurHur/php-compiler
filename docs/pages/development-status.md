@@ -50,7 +50,7 @@ permalink: /development-status.html
 ### Still open (high signal)
 
 - **MCJIT execute** — `bin/jit.php -r` SIGSEGV ([#98](https://github.com/PurHur/php-compiler/issues/98))
-- **Literal spine ratio** — **8035/8036** ✅ (Jul 2026)
+- **Literal spine ratio** — **8036/8036** ✅ (Jul 2026)
 - **Compile-spine stub retirement** — shrink `PHP_COMPILER_SELFHOST_AOT` on M3 allowlist ([#1402](https://github.com/PurHur/php-compiler/issues/1402))
 - **007-ThrowsWeb AOT execute** — invalid POST segfault at runtime (link OK; slice `EXAMPLES_AOT_SMOKE_ONLY=007`)
 - **LLVM 14+ upgrade** — experimental `script/install-llvm14.sh` ([#174](https://github.com/PurHur/php-compiler/issues/174))
@@ -62,7 +62,7 @@ permalink: /development-status.html
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
 - **Self-host M0** — `compiler_minimal bundle OK` ✅
-- **Self-host M2** — spine **8035/8036** ✅; native link + lint ✅
+- **Self-host M2** — spine **8036/8036** ✅; native link + lint ✅
 - **Self-host M3** — HelloWorld strict `emit_path=native` ✅ ([#1493](https://github.com/PurHur/php-compiler/issues/1493)); inventory argv `bin/compile.php` ✅ ([#3024](https://github.com/PurHur/php-compiler/issues/3024) closed); compile-smoke strict native ✅ ([#1937](https://github.com/PurHur/php-compiler/issues/1937))
 - **Self-host M4** — `make bootstrap-loop-probe` full ladder ✅; gen-2→gen-3 full-spine recompile ✅
 - **Self-host M3–M5** — vendor prelink **7410/7412** ✅; **`make north-star5-verify-fast`** daily ✅; VM probe ~**20ms**. **`--strict` red** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) and **M3/M4 emit paths are prelinked blob COPIES, not native compiles** ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) — the byte-identical gen-0/gen-2/gen-3 result follows from copying and is not fixpoint evidence
