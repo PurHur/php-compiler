@@ -31,6 +31,7 @@ final class InternalStrictArg
             return;
         }
         if (Variable::TYPE_VALUE === $arg->type) {
+            self::rejectNullInt($context, $arg, $function, $paramName, $argNumber);
             self::enforceExactValueBox($context, $arg, Variable::TYPE_NATIVE_LONG, $function, $paramName, $argNumber, 'int');
 
             return;

@@ -28,6 +28,8 @@ final class StatArrayStandaloneTest extends TestCase
         $this->assertStringContainsString('__phpc_stat', $runtime);
 
         $helper = (string) file_get_contents(__DIR__.'/../../../ext/standard/StatArrayJitHelper.php');
-        $this->assertStringContainsString('VmStatCache::stat', $helper);
+        $this->assertStringContainsString('@\\stat', $helper);
+        $this->assertStringContainsString('@\\lstat', $helper);
+        $this->assertStringNotContainsString('VmStatCache::stat', $helper);
     }
 }

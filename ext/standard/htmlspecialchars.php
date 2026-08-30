@@ -17,6 +17,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringHtmlspecialchars;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -124,7 +125,7 @@ final class htmlspecialchars extends Internal
         if ($argc >= 2
             && $context->callerStrictTypes
             && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
-            JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'htmlspecialchars', 2, 'flags');
+            JitInternalStrictArg::rejectNullInt($context, $args[1], 'htmlspecialchars', 'flags', 2);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'htmlspecialchars_null_flags_te_cont');
 
             return $context->getTypeFromString('__string__*')->constNull();
