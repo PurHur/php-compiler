@@ -966,6 +966,117 @@ final class JitXmlReaderUserScript
     }
 
     /**
+     * XMLReader::moveToElement() leftover of fromString/read (#35940 / #27299 / #19395).
+     * php-src: zim_XMLReader_moveToElement / xmlTextReaderMoveToElement
+     *
+     * True only when leaving an attribute cursor; restores element name/value/nodeType
+     * from the compile-time event at __xr_pos.
+     */
+    public static function tryMoveToElement(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 1) {
+            throw new \LogicException('XMLReader::moveToElement() called without $this');
+        }
+
+        return self::emitMoveToElementSwitch($context, $args[0], self::$lastEvents);
+    }
+
+    /**
+     * Restore ELEMENT props when nodeType is ATTRIBUTE; else return false (#35940).
+     *
+     * @param list<array{nodeType: int, name: string, value: string}> $events
+     */
+    private static function emitMoveToElementSwitch(
+        Context $context,
+        JITVariable $receiver,
+        array $events
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_movetoelement_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_NAME);
+        self::ensureLayout($objectType, $classId);
+
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $posVal = $context->helper->loadValue(
+            $objectType->propertyFetch($obj, self::CLASS_NAME, self::PROP_POS)
+        );
+        $nodeTypeVal = $context->helper->loadValue(
+            $objectType->propertyFetch($obj, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE)
+        );
+
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $merge = BasicBlockHelper::append($context, 'xmlreader_movetoelement_merge');
+        $miss = BasicBlockHelper::append($context, 'xmlreader_movetoelement_miss');
+        $onAttr = BasicBlockHelper::append($context, 'xmlreader_movetoelement_onattr');
+
+        $isAttr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $nodeTypeVal,
+            $i64->constInt(XmlReaderConstants::ATTRIBUTE, true)
+        );
+        $context->builder->branchIf($isAttr, $onAttr, $miss);
+
+        $context->builder->positionAtEnd($miss);
+        $falseBox = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $falseBox, $i1->constInt(0, false));
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $falseBox), $resultSlot);
+        $context->builder->branch($merge);
+
+        $n = \count($events);
+        /** @var list<\PHPLLVM\BasicBlock> */
+        $caseBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $caseBlocks[$i] = BasicBlockHelper::append($context, 'xmlreader_movetoelement_case_'.$i);
+        }
+
+        $context->builder->positionAtEnd($onAttr);
+        $inRange = $context->builder->icmp(
+            Builder::INT_SLT,
+            $posVal,
+            $i64->constInt($n, true)
+        );
+        $nonNeg = $context->builder->icmp(
+            Builder::INT_SGE,
+            $posVal,
+            $i64->constInt(0, true)
+        );
+        $ok = $context->builder->and($inRange, $nonNeg);
+        $context->builder->branchIf(
+            $ok,
+            $n > 0 ? $caseBlocks[0] : $miss,
+            $miss
+        );
+
+        for ($i = 0; $i < $n; ++$i) {
+            $context->builder->positionAtEnd($caseBlocks[$i]);
+            $isThis = $context->builder->icmp(
+                Builder::INT_EQ,
+                $posVal,
+                $i64->constInt($i, true)
+            );
+            $apply = BasicBlockHelper::append($context, 'xmlreader_movetoelement_apply_'.$i);
+            $next = ($i + 1 < $n) ? $caseBlocks[$i + 1] : $miss;
+            $context->builder->branchIf($isThis, $apply, $next);
+
+            $context->builder->positionAtEnd($apply);
+            self::storeEventProps($context, $objectType, $obj, $events[$i]);
+            $trueBox = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $trueBox, $i1->constInt(1, false));
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $trueBox), $resultSlot);
+            $context->builder->branch($merge);
+        }
+
+        $context->builder->positionAtEnd($merge);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
      * Materialize DOMNode|false for the current __xr_pos (after a successful read).
      *
      * @param list<array{kind: string, xml?: string, data?: string}> $byPos

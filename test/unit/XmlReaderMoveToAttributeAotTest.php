@@ -7,15 +7,15 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT: XMLReader::moveToAttribute leftover of getAttribute (#35941 / #35918 / #27299).
+ * AOT: XMLReader::moveToAttribute/moveToElement leftover of fromString/read (#35940 / #35941 / #27299).
  *
- * @see php-src ext/xmlreader/php_xmlreader.c zim_XMLReader_moveToAttribute
+ * @see php-src ext/xmlreader/php_xmlreader.c zim_XMLReader_moveToAttribute / zim_XMLReader_moveToElement
  *
  * @group aot-lint
  */
 final class XmlReaderMoveToAttributeAotTest extends TestCase
 {
-    private const EXPECTED = "true\n'id'\n'42'\n2\nfalse\n'id'\n";
+    private const EXPECTED = "true\n'2'\ntrue\n'root'\n1\nfalse\nfalse\n";
 
     public function testVm(): void
     {
@@ -79,11 +79,16 @@ final class XmlReaderMoveToAttributeAotTest extends TestCase
     {
         $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/XmlReaderInstanceMethodJit.php');
         $this->assertStringContainsString("'xmlreader::movetoattribute' => true", $jit);
+        $this->assertStringContainsString("'xmlreader::movetoelement' => true", $jit);
         $method = (string) file_get_contents(dirname(__DIR__, 2).'/ext/xmlreader/JitXmlReaderMethod.php');
         $this->assertStringContainsString('tryMoveToAttribute', $method);
+        $this->assertStringContainsString('tryMoveToElement', $method);
         $user = (string) file_get_contents(dirname(__DIR__, 2).'/ext/xmlreader/JitXmlReaderUserScript.php');
         $this->assertStringContainsString('function tryMoveToAttribute', $user);
+        $this->assertStringContainsString('function tryMoveToElement', $user);
         $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/xmlreader_move_to_attribute.c');
         $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/xmlreader_move_to_attribute.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/AOT/runtime/xmlreader_move_to_element.c');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/runtime/xmlreader_move_to_element.c');
     }
 }

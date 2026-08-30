@@ -2464,6 +2464,8 @@ class Context {
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::close');
         // leftover of getAttribute (#35941 / #35918 / #27299)
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::movetoattribute');
+        // leftover of fromString/read (#35940 / #27299)
+        XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::movetoelement');
         if (CompilerVersion::supportsXmlReaderFactories()) {
             XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstring');
             // leftover of fromString (#35900 / #27299)
