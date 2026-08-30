@@ -30,6 +30,8 @@ final class JitXmlReaderMethod
             'readstring' => JitXmlReaderUserScript::tryReadString($context, ...$args),
             // leftover of fromString/open (#35911 / #27299) — php-src zim_XMLReader_expand
             'expand' => JitXmlReaderUserScript::tryExpand($context, ...$args),
+            // leftover of fromString/read (#35918 / #27299) — php-src zim_XMLReader_getAttribute
+            'getattribute' => JitXmlReaderUserScript::tryGetAttribute($context, ...$args),
             default => null,
         };
         if (null === $result) {
