@@ -23692,6 +23692,8 @@ class JIT {
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplFileObjectMethod
                 && '__construct' === strtolower($toCall->methodName()))
+            || ($toCall instanceof JIT\Call\Sqlite3Method
+                && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\GlobIteratorMethod
                 && '__construct' === strtolower($toCall->methodName()))
         ) {

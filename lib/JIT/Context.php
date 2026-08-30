@@ -2296,6 +2296,15 @@ class Context {
                 $zipMethod
             );
         }
+        // SQLite3 construct/exec/querySingle — NestedJIT leftover of advertise-only AOT (#35914 / #20565).
+        if (CompilerVersion::supportsSqlite3()) {
+            $this->type->object->lookup('SQLite3');
+            foreach (['__construct', 'exec', 'querySingle', 'close'] as $sqliteMethod) {
+                $this->functionProxies['sqlite3::'.strtolower($sqliteMethod)] = new Call\Sqlite3Method(
+                    $sqliteMethod
+                );
+            }
+        }
         $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
         $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();
         $this->functionProxies['dateinterval::format'] = new Call\DateIntervalFormat();
