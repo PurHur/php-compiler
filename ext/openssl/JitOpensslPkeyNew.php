@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\openssl;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\OpensslPkeyNewEmbedBridge;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -39,6 +41,58 @@ final class JitOpensslPkeyNew
     }
 
     /**
+     * Runtime options array — Hashtable dimFetch of bits/type then existing keygen (#35866).
+     *
+     * php-src: ext/openssl/openssl.c PHP_FUNCTION(openssl_pkey_new) / PHP_SSL_REQ_PARSE
+     */
+    public static function generateFromRuntimeOptions(Context $context, JITVariable $options): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ossl_pkey_new_rt_opts');
+        $ht = HashTableHelper::loadHashtablePointer($context, $options);
+        $bitsVal = self::readOptLong(
+            $context,
+            $ht,
+            'private_key_bits',
+            2048
+        );
+        $typeVal = self::readOptLong(
+            $context,
+            $ht,
+            'private_key_type',
+            OpensslConstants::OPENSSL_KEYTYPE_RSA
+        );
+
+        if ($context->isThinStandaloneAotMain()) {
+            return self::generateThinAotRuntimeValues($context, $bitsVal, $typeVal, true);
+        }
+
+        return self::generateViaNestedJitValues($context, $bitsVal, $typeVal, '');
+    }
+
+    /**
+     * Read string-keyed option as i64; missing / null → $default (peer socket_addrinfo hints).
+     */
+    private static function readOptLong(Context $context, Value $ht, string $key, int $default): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $keyStr = $context->builder->load($context->constantStringFromString($key));
+        $box = HashTableHelper::readStringKeyToValueBox($context, $ht, $keyStr);
+        $ptr = JitValueBox::valuePtrFromVariable($context, $box);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load($context->builder->structGep($ptr, $map['type']));
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_NULL, false)
+        );
+        $lowered = JitLongArg::lower($context, $box, 'openssl_pkey_new() options');
+
+        return $context->builder->select($isNull, $i64->constInt($default, false), $lowered);
+    }
+
+    /**
      * Thin AOT: call {@see JitOpensslPkeyKernel} at process runtime (RSA default).
      * Non-RSA types return false until dedicated leaves exist — never bake PEM constants.
      */
@@ -55,28 +109,59 @@ final class JitOpensslPkeyNew
 
             return JitValueBox::pointer($context, $slot);
         }
+        $i64 = $context->getTypeFromString('int64');
 
+        return self::generateThinAotRuntimeValues(
+            $context,
+            $i64->constInt($bits, false),
+            $i64->constInt($type, false),
+            false
+        );
+    }
+
+    /**
+     * @param bool $guardNonRsa When true, branch at runtime if type != RSA (runtime options).
+     */
+    private static function generateThinAotRuntimeValues(
+        Context $context,
+        Value $bitsVal,
+        Value $typeVal,
+        bool $guardNonRsa
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'ossl_pkey_new_aot_vals');
         JitOpensslPkeyKernel::ensureKeygenLeaf($context);
         $i64 = $context->getTypeFromString('int64');
-        $pemStr = $context->builder->call(
-            $context->lookupFunction(JitOpensslPkeyKernel::EVP_RSA_KEYGEN),
-            $i64->constInt($bits, false)
-        );
-
         $id = (string) (++self::$blockSerial);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
-        $failBlock = BasicBlockHelper::append($context, 'ossl_pkey_new_aot_fail_'.$id);
-        $okBlock = BasicBlockHelper::append($context, 'ossl_pkey_new_aot_ok_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'ossl_pkey_new_aot_done_'.$id);
+        $failBlock = BasicBlockHelper::append($context, 'ossl_pkey_new_aot_fail_'.$id);
+        $keygenBlock = BasicBlockHelper::append($context, 'ossl_pkey_new_aot_kg_'.$id);
 
-        $strPtrTy = $context->getTypeFromString('__string__*');
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $pemStr, $strPtrTy->constNull());
-        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+        if ($guardNonRsa) {
+            $isRsa = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeVal,
+                $i64->constInt(OpensslConstants::OPENSSL_KEYTYPE_RSA, false)
+            );
+            $context->builder->branchIf($isRsa, $keygenBlock, $failBlock);
+        } else {
+            $context->builder->branch($keygenBlock);
+        }
 
         $context->builder->positionAtEnd($failBlock);
         JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
         $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($keygenBlock);
+        $pemStr = $context->builder->call(
+            $context->lookupFunction(JitOpensslPkeyKernel::EVP_RSA_KEYGEN),
+            $bitsVal
+        );
+        $okBlock = BasicBlockHelper::append($context, 'ossl_pkey_new_aot_ok_'.$id);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $pemStr, $strPtrTy->constNull());
+        $context->builder->branchIf($isNull, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($okBlock);
         $objectType = $context->type->object;
@@ -114,12 +199,26 @@ final class JitOpensslPkeyNew
         int $type,
         string $curve
     ): Value {
+        $i64 = $context->getTypeFromString('int64');
+
+        return self::generateViaNestedJitValues(
+            $context,
+            $i64->constInt($bits, false),
+            $i64->constInt($type, false),
+            $curve
+        );
+    }
+
+    private static function generateViaNestedJitValues(
+        Context $context,
+        Value $bitsVal,
+        Value $typeVal,
+        string $curve
+    ): Value {
         OpensslPkeyNewEmbedBridge::ensureLinked($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'ossl_pkey_new');
 
         $i64 = $context->getTypeFromString('int64');
-        $bitsVal = $i64->constInt($bits, false);
-        $typeVal = $i64->constInt($type, false);
         $curveVal = $context->builder->load($context->constantStringFromString($curve));
 
         $pemRaw = JitNestedHelperCoerce::callHelper(
