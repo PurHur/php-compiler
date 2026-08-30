@@ -6,12 +6,15 @@ namespace PHPCompiler\ext\sqlite3;
 
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Value;
 
 /**
@@ -28,7 +31,7 @@ use PHPLLVM\Value;
  * zim_SQLite3_querySingle / zim_SQLite3_lastInsertRowID / zim_SQLite3_changes /
  * zim_SQLite3_lastErrorCode / zim_SQLite3_lastErrorMsg (#35966) /
  * zim_SQLite3_busyTimeout (#35972) / zim_SQLite3_enableExceptions (#35975) /
- * zim_SQLite3_escapeString (#35977)
+ * zim_SQLite3_escapeString (#35977) / zim_SQLite3_version (#35991)
  */
 final class JitSqlite3
 {
@@ -305,6 +308,50 @@ final class JitSqlite3
         }
 
         return self::boxString($context, $escaped);
+    }
+
+    /**
+     * SQLite3::version leftover of escapeString (#35991 / #35977).
+     * php-src zim_SQLite3_version / sqlite3_libversion — fold host libsqlite3 version at
+     * compile time (thin AOT has no libsqlite3 FFI at runtime).
+     */
+    public static function version(Context $context, JITVariable ...$args): Value
+    {
+        $offset = 0;
+        if (\count($args) >= 1 && JITVariable::TYPE_OBJECT === $args[0]->type) {
+            self::readObject($context, $args[0]);
+            $offset = 1;
+        }
+        $given = \count($args) - $offset;
+        if (0 !== $given) {
+            \PHPCompiler\JIT\ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                'SQLite3::version() expects exactly 0 arguments, '.$given.' given'
+            );
+            \PHPCompiler\JIT\BasicBlockHelper::ensureOpenInsertBlock($context, 'SQLite3::version_argc_cont');
+
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+
+        $info = VmSqlite3Native::version();
+        $ht = new HashTable();
+        $str = new VmVariable();
+        $str->string($info['versionString']);
+        $ht->add('versionString', $str);
+        $num = new VmVariable();
+        $num->int($info['versionNumber']);
+        $ht->add('versionNumber', $num);
+
+        $htVar = HashTableHelper::variableFromVmHashTable($context, $ht);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $context->helper->loadValue($htVar)
+        );
+
+        return $ptr;
     }
 
     /**
