@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8012 |
-| Phase A inventory files (M2 ratio SSOT) | 8012 |
+| PHP files on vm.php path | 8020 |
+| Phase A inventory files (M2 ratio SSOT) | 8020 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25503 |
+| Source constructs flagged (warnings) | 25521 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -341,6 +341,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomGetElementByIdJitHelper.php` | 0 | 1 |
 | `ext/dom/DomGetElementsByTagNameJitHelper.php` | 0 | 1 |
 | `ext/dom/DomGetRootNodeJitHelper.php` | 0 | 1 |
+| `ext/dom/DomHtmlDocumentCreateFromFileJitHelper.php` | 0 | 2 |
 | `ext/dom/DomHtmlDocumentCreateFromStringJitHelper.php` | 0 | 2 |
 | `ext/dom/DomHtmlDocumentPropertySupport.php` | 0 | 3 |
 | `ext/dom/DomHtmlElementPropertySupport.php` | 0 | 2 |
@@ -380,6 +381,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomXPathEvaluateJitHelper.php` | 0 | 1 |
 | `ext/dom/DomXPathQueryJitHelper.php` | 0 | 1 |
 | `ext/dom/DomXPathSerializeDeny.php` | 0 | 3 |
+| `ext/dom/DomXmlDocumentCreateFromFileJitHelper.php` | 0 | 2 |
 | `ext/dom/DomXmlDocumentCreateFromStringJitHelper.php` | 0 | 2 |
 | `ext/dom/ElementAppendChild.php` | 0 | 1 |
 | `ext/dom/ElementClosest.php` | 0 | 3 |
@@ -471,6 +473,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomGetNodePath.php` | 0 | 2 |
 | `ext/dom/JitDomHasAttributes.php` | 0 | 1 |
 | `ext/dom/JitDomHasChildNodes.php` | 0 | 1 |
+| `ext/dom/JitDomHtmlDocumentCreateFromFile.php` | 0 | 4 |
 | `ext/dom/JitDomHtmlDocumentCreateFromString.php` | 0 | 5 |
 | `ext/dom/JitDomHtmlDocumentSaveHtml.php` | 0 | 2 |
 | `ext/dom/JitDomImportNode.php` | 0 | 2 |
@@ -528,6 +531,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomXPathQuery.php` | 0 | 1 |
 | `ext/dom/JitDomXPathQueryUserScript.php` | 0 | 10 |
 | `ext/dom/JitDomXPathRegisterUserScript.php` | 0 | 1 |
+| `ext/dom/JitDomXmlDocumentCreateFromFile.php` | 0 | 4 |
 | `ext/dom/JitDomXmlDocumentCreateFromString.php` | 0 | 3 |
 | `ext/dom/LivingImplementationCreateDocument.php` | 0 | 3 |
 | `ext/dom/LivingImplementationCreateDocumentType.php` | 0 | 3 |
@@ -5717,6 +5721,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DomElementTextContentRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomGetElementByIdRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomGetElementsByTagNameRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/DomHtmlDocumentCreateFromFileRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomHtmlDocumentCreateFromStringRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomImportNodeRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomInsertAdjacentRuntime.php` | 0 | 1 |
@@ -5741,6 +5746,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DomSyncElementIdMapRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomXPathEvaluateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomXPathQueryRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/DomXmlDocumentCreateFromFileRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomXmlDocumentCreateFromStringRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/EasterDateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/EasterDaysRuntime.php` | 0 | 1 |
@@ -6584,6 +6590,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DomElementSetIdAttributeNS.php` | 0 | 1 |
 | `lib/JIT/Call/DomElementSetIdAttributeNode.php` | 0 | 1 |
 | `lib/JIT/Call/DomElementToggleAttribute.php` | 0 | 1 |
+| `lib/JIT/Call/DomHtmlDocumentCreateFromFile.php` | 0 | 1 |
 | `lib/JIT/Call/DomHtmlDocumentCreateFromString.php` | 0 | 1 |
 | `lib/JIT/Call/DomHtmlDocumentSaveHtml.php` | 0 | 1 |
 | `lib/JIT/Call/DomImplementationCreateDocument.php` | 0 | 1 |
@@ -6630,6 +6637,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DomXPathQuery.php` | 0 | 1 |
 | `lib/JIT/Call/DomXPathRegisterNamespace.php` | 0 | 1 |
 | `lib/JIT/Call/DomXPathRegisterPhpFunctions.php` | 0 | 1 |
+| `lib/JIT/Call/DomXmlDocumentCreateFromFile.php` | 0 | 1 |
 | `lib/JIT/Call/DomXmlDocumentCreateFromString.php` | 0 | 1 |
 | `lib/JIT/Call/EmitCatchableError.php` | 0 | 1 |
 | `lib/JIT/Call/EmptyIteratorMethod.php` | 0 | 1 |
@@ -6926,7 +6934,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 350 |
+| `lib/JIT/Context.php` | 0 | 352 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -10012,6 +10020,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dom/DomHtmlDocumentCreateFromFileJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new DOMException (line 25)
+- 1 class method(s)
+
 ### `ext/dom/DomHtmlDocumentCreateFromStringJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10379,6 +10393,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 23)
 - new Exception (line 30)
 - 4 class method(s)
+
+### `ext/dom/DomXmlDocumentCreateFromFileJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new DOMException (line 25)
+- 1 class method(s)
 
 ### `ext/dom/DomXmlDocumentCreateFromStringJitHelper.php`
 
@@ -10935,7 +10955,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomDocumentMethodKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 102 class method(s)
+- 104 class method(s)
 
 ### `ext/dom/JitDomElementNavigationProperty.php`
 
@@ -10997,6 +11017,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `ext/dom/JitDomHtmlDocumentCreateFromFile.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new DOMException (line 62)
+- new JITVariable (line 128)
+- 3 class method(s)
+
 ### `ext/dom/JitDomHtmlDocumentCreateFromString.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11015,7 +11043,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomImportNode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 857)
+- new JITVariable (line 865)
 - 21 class method(s)
 
 ### `ext/dom/JitDomImportSimpleXmlUserScript.php`
@@ -11413,6 +11441,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
+
+### `ext/dom/JitDomXmlDocumentCreateFromFile.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new DOMException (line 59)
+- new JITVariable (line 124)
+- 3 class method(s)
 
 ### `ext/dom/JitDomXmlDocumentCreateFromString.php`
 
@@ -50504,6 +50540,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Builtin/DomHtmlDocumentCreateFromFileRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/DomHtmlDocumentCreateFromStringRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50640,6 +50681,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 
 ### `lib/JIT/Builtin/DomXPathQueryRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/DomXmlDocumentCreateFromFileRuntime.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -54412,28 +54458,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2872)
 - new Variable (line 2885)
 - new Variable (line 3154)
-- new VMVariable (line 5353)
-- new VMVariable (line 5373)
-- new VMVariable (line 5383)
-- new VMVariable (line 5403)
-- new VMVariable (line 6843)
-- new ReflectionClassConstant (line 7576)
-- new Variable (line 8024)
-- new Variable (line 8044)
-- new Variable (line 8059)
-- new Variable (line 8072)
-- new Variable (line 8080)
-- new Variable (line 8103)
-- new Variable (line 8129)
-- new Variable (line 8137)
-- new Variable (line 8211)
-- new Literal (line 8228)
-- new Literal (line 8233)
-- new Literal (line 8238)
-- new Variable (line 8249)
-- new Variable (line 8282)
-- new Variable (line 8305)
-- new Variable (line 8843)
+- new VMVariable (line 5355)
+- new VMVariable (line 5375)
+- new VMVariable (line 5385)
+- new VMVariable (line 5405)
+- new VMVariable (line 6845)
+- new ReflectionClassConstant (line 7578)
+- new Variable (line 8026)
+- new Variable (line 8046)
+- new Variable (line 8061)
+- new Variable (line 8074)
+- new Variable (line 8082)
+- new Variable (line 8105)
+- new Variable (line 8131)
+- new Variable (line 8139)
+- new Variable (line 8213)
+- new Literal (line 8230)
+- new Literal (line 8235)
+- new Literal (line 8240)
+- new Variable (line 8251)
+- new Variable (line 8284)
+- new Variable (line 8307)
+- new Variable (line 8845)
 - 333 class method(s)
 - 8 closure(s)
 
@@ -55137,6 +55183,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/DomHtmlDocumentCreateFromFile.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/DomHtmlDocumentCreateFromString.php`
 
 **Warnings** (review for bootstrap subset):
@@ -55364,6 +55415,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `lib/JIT/Call/DomXPathRegisterPhpFunctions.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DomXmlDocumentCreateFromFile.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -57347,20 +57403,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\PdoQuote (line 2427)
 - new Call\DomXmlDocumentCreateFromString (line 2430)
 - new Call\DomHtmlDocumentCreateFromString (line 2431)
-- new Result (line 2907)
-- new Result (line 2929)
-- new Variable (line 3767)
-- new Variable (line 4028)
-- new Variable (line 4321)
-- new Variable (line 4404)
-- new VMVariable (line 4573)
-- new VMVariable (line 4589)
-- new VMVariable (line 4595)
-- new VMVariable (line 4601)
-- new VMVariable (line 4612)
-- new Variable (line 4676)
-- new Variable (line 4696)
-- new Variable (line 4741)
+- new Call\DomXmlDocumentCreateFromFile (line 2432)
+- new Call\DomHtmlDocumentCreateFromFile (line 2433)
+- new Result (line 2909)
+- new Result (line 2931)
+- new Variable (line 3769)
+- new Variable (line 4030)
+- new Variable (line 4323)
+- new Variable (line 4406)
+- new VMVariable (line 4575)
+- new VMVariable (line 4591)
+- new VMVariable (line 4597)
+- new VMVariable (line 4603)
+- new VMVariable (line 4614)
+- new Variable (line 4678)
+- new Variable (line 4698)
+- new Variable (line 4743)
 - 115 class method(s)
 - 31 closure(s)
 
@@ -58204,18 +58262,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 258)
-- new Variable (line 943)
-- new Variable (line 964)
-- new Variable (line 983)
-- new Variable (line 995)
-- new Variable (line 998)
-- new Variable (line 1364)
-- new Variable (line 1373)
-- new Variable (line 1393)
-- new Variable (line 1402)
-- new Variable (line 1473)
-- new Variable (line 1485)
-- 30 class method(s)
+- new Variable (line 1058)
+- new Variable (line 1079)
+- new Variable (line 1098)
+- new Variable (line 1110)
+- new Variable (line 1113)
+- new Variable (line 1479)
+- new Variable (line 1488)
+- new Variable (line 1508)
+- new Variable (line 1517)
+- new Variable (line 1588)
+- new Variable (line 1600)
+- 32 class method(s)
 
 ### `lib/JIT/JitValueBox.php`
 
