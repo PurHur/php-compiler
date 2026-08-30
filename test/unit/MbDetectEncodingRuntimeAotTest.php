@@ -40,7 +40,7 @@ final class MbDetectEncodingRuntimeAotTest extends TestCase
         $this->assertStringNotContainsString('int $strict', $helper);
         $this->assertStringContainsString('strpos', $helper);
         $jit = (string) file_get_contents($root.'/ext/mbstring/JitMbDetectEncoding.php');
-        $this->assertStringContainsString('Link NestedJIT helpers before lowering args', $jit);
+        $this->assertStringContainsString('Bridge/NestedJIT setup before haystack lowering', $jit);
         $this->assertStringContainsString('strictFlagString', $jit);
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_detect_encoding.php');
         $this->assertStringContainsString('JitMbDetectEncoding::invoke', $src);
