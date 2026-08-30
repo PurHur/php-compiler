@@ -859,6 +859,44 @@ final class JitXmlReaderUserScript
     }
 
     /**
+     * XMLReader::getParserProperty() leftover of fromString/read (#35962 / #27299 / #19553).
+     * php-src: zim_XMLReader_getParserProperty / xmlTextReaderGetParserProp
+     *
+     * Defaults match {@see XmlReaderState::$parserProps} after tokenize folds; setParserProperty
+     * is not yet folded, so compile-time property ints always return the stamped defaults.
+     */
+    public static function tryGetParserProperty(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 2) {
+            throw new \LogicException('XMLReader::getParserProperty() expects $this and $property');
+        }
+        $property = self::compileTimeIntArg($context, $args[1]);
+        if (null === $property) {
+            return null;
+        }
+        $defaults = [
+            XmlReaderConstants::LOADDTD => false,
+            XmlReaderConstants::DEFAULTATTRS => false,
+            XmlReaderConstants::VALIDATE => false,
+            XmlReaderConstants::SUBST_ENTITIES => false,
+        ];
+        if (!\array_key_exists($property, $defaults)) {
+            throw new \ValueError(
+                'XMLReader::getParserProperty(): Argument #1 ($property) must be a valid parser property'
+            );
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_getparserproperty_cont');
+        $i1 = $context->getTypeFromString('int1');
+        $box = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $box, $i1->constInt($defaults[$property] ? 1 : 0, false));
+
+        return JitValueBox::normalizeValuePtr($context, $box);
+    }
+
+    /**
      * XMLReader::moveToAttribute() leftover of getAttribute (#35941 / #35918 / #27299 / #19395).
      * php-src: zim_XMLReader_moveToAttribute / xmlTextReaderMoveToAttribute
      */
