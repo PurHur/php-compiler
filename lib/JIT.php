@@ -18168,31 +18168,39 @@ class JIT {
                 if (Variable::TYPE_OBJECT === $prior->type) {
                     // Legacy path: void __construct on an unboxed TYPE_OBJECT `new` temp.
                     if ($this->isVoidJitConstructCall($this->context->scope->toCall)) {
-                        $this->markNewObjectConstructedAfterCall(
-                            $this->context->scope->toCall,
-                            $this->context->scope->args
-                        );
-                        if ($this->context->scope->toCall instanceof JIT\Call\BcMathNumberConstruct) {
-                            $thisArg = $this->context->scope->args[0] ?? null;
-                            $ct = ($thisArg instanceof Variable)
-                                ? $thisArg->compileTimeBcmathNumber
-                                : null;
-                            if (null !== $ct) {
-                                $prior->compileTimeBcmathNumber = $ct;
-                                $name = JIT\OperandName::resolve($result);
-                                if (null !== $name && '' !== $name) {
-                                    $resolved = $this->context->resolveRefAliasName($name);
-                                    if (isset($this->context->namedVariableBindings[$resolved])) {
-                                        $this->context->namedVariableBindings[$resolved]
-                                            ->compileTimeBcmathNumber = $ct;
-                                    }
-                                    $this->context->bindVariableByName($resolved, $prior);
+                        if (
+                            $this->context->scope->toCall instanceof JIT\Call\DateTimeConstruct
+                            || $this->context->scope->toCall instanceof JIT\Call\DateTimeImmutableConstruct
+                        ) {
+                            // JitDateTimeConstruct returns an initialized __value__* box (#35752).
+                            // Drop the empty New_ shell and assign the box below (#35802).
+                        } else {
+                            $this->markNewObjectConstructedAfterCall(
+                                $this->context->scope->toCall,
+                                $this->context->scope->args
+                            );
+                            if ($this->context->scope->toCall instanceof JIT\Call\BcMathNumberConstruct) {
+                                $thisArg = $this->context->scope->args[0] ?? null;
+                                $ct = ($thisArg instanceof Variable)
+                                    ? $thisArg->compileTimeBcmathNumber
+                                    : null;
+                                if (null !== $ct) {
                                     $prior->compileTimeBcmathNumber = $ct;
+                                    $name = JIT\OperandName::resolve($result);
+                                    if (null !== $name && '' !== $name) {
+                                        $resolved = $this->context->resolveRefAliasName($name);
+                                        if (isset($this->context->namedVariableBindings[$resolved])) {
+                                            $this->context->namedVariableBindings[$resolved]
+                                                ->compileTimeBcmathNumber = $ct;
+                                        }
+                                        $this->context->bindVariableByName($resolved, $prior);
+                                        $prior->compileTimeBcmathNumber = $ct;
+                                    }
                                 }
                             }
-                        }
 
-                        return;
+                            return;
+                        }
                     }
                     // Inline f(); g() must not inherit object-typed operand slots (#18052).
                     $prior->free();
@@ -21270,13 +21278,29 @@ class JIT {
             JIT\ReadonlyClassGuard::emitStoreUnlessPending(
                 $this->context,
                 function () use ($result, $value): void {
+                    $constraint = strtolower(ltrim((string) ($result->objectPropertyClassConstraint ?? ''), '\\'));
+                    if (\in_array($constraint, ['datetime', 'datetimeimmutable'], true)) {
+                        $valueClass = strtolower(ltrim((string) (
+                            $value->compileTimeDateTimeClassName ?? $value->classUserType ?? ''
+                        ), '\\'));
+                        // Reused New_ temps keep the prior DateTime(Immutable) class hint and block
+                        // pending instant copy — typed property stores get an empty shell (#35802).
+                        if ('' !== $valueClass && $valueClass !== $constraint) {
+                            $value->compileTimeDateTimeTimestamp = null;
+                            $value->compileTimeDateTimeMicrosecond = null;
+                            $value->compileTimeTimezoneName = null;
+                            $value->compileTimeDateTimeClassName = null;
+                            if (\in_array($valueClass, ['datetime', 'datetimeimmutable'], true)) {
+                                $value->classUserType = null;
+                            }
+                        }
+                    }
                     $pending = $this->context->pendingDateTimePropertyInstant;
                     if (
                         is_array($pending)
                         && isset($pending['timestamp'])
                         && null === $value->compileTimeDateTimeTimestamp
                     ) {
-                        $constraint = strtolower(ltrim((string) ($result->objectPropertyClassConstraint ?? ''), '\\'));
                         $pendingClass = strtolower(ltrim((string) ($pending['className'] ?? 'datetime'), '\\'));
                         if (
                             \in_array($constraint, ['datetime', 'datetimeimmutable'], true)
@@ -23491,13 +23515,22 @@ class JIT {
         ];
         $stamp($first);
         $resultVar = $this->context->lastDateTimeNewResultVar;
-        if ($resultVar instanceof JIT\Variable) {
+        $resultOp = $this->context->lastDateTimeNewResultOp;
+        if ($resultOp instanceof \PHPCfg\Operand && $this->context->hasVariableOp($resultOp)) {
+            // EXEC_RETURN may replace the New_ shell with JitDateTimeConstruct's __value__* box
+            // (#35752). Never revert scope[$resultOp] to construct $this (#35802).
+            $live = $this->context->getVariableFromOp($resultOp);
+            $stamp($live);
+            $this->context->scope->variables[$resultOp] = $live;
+            $resultVar = $live;
+        } elseif ($resultVar instanceof JIT\Variable) {
             $stamp($resultVar);
         }
-        $resultOp = $this->context->lastDateTimeNewResultOp;
         $publishName = null;
         if ($resultOp instanceof \PHPCfg\Operand) {
-            $this->context->scope->variables[$resultOp] = $first;
+            if (!$this->context->hasVariableOp($resultOp)) {
+                $this->context->scope->variables[$resultOp] = $first;
+            }
             $publishName = JIT\OperandName::resolve($resultOp);
         }
         // Temporary New_ results often have no Operand name (#32691 / re-#27309). Prefer a

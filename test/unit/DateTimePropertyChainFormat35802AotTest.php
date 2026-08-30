@@ -9,8 +9,6 @@ use PHPUnit\Framework\TestCase;
 /**
  * AOT: chained typed DateTime/DateTimeImmutable property ->format() after prior date call (#35802).
  *
- * applyDateTimeLocalInstantToReceiver must not stamp property-fetch temps from unrelated constructs.
- *
  * @see php-src ext/date/php_date.c zim_DateTime_format / zim_DateTimeImmutable_format
  *
  * @group llvm

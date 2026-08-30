@@ -8944,6 +8944,17 @@ class Object_ extends Type {
             ) {
                 $pendingClass = strtolower(ltrim((string) ($pending['className'] ?? 'datetime'), '\\'));
                 $hint = strtolower(ltrim((string) ($value->classUserType ?? ''), '\\'));
+                if (
+                    '' !== $hint
+                    && $hint !== $pendingClass
+                    && \in_array($hint, ['datetime', 'datetimeimmutable'], true)
+                ) {
+                    // Operand reuse: prior DateTime(Immutable) hint must not block pending (#35802).
+                    $value->classUserType = null;
+                    $value->compileTimeDateTimeClassName = null;
+                    $value->compileTimeDateTimeTimestamp = null;
+                    $hint = '';
+                }
                 if ('' === $hint || $hint === $pendingClass) {
                     $value->compileTimeDateTimeTimestamp = (int) $pending['timestamp'];
                     $value->compileTimeDateTimeMicrosecond = (int) ($pending['microsecond'] ?? 0);
