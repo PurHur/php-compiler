@@ -159,6 +159,10 @@ final class json_encode extends Internal
         if (null !== $datePeriodFold) {
             return $datePeriodFold;
         }
+        $dateIntervalFold = JitJsonEncode::tryFoldDateInterval($context, $args[0], $knownFlags ?? 0);
+        if (null !== $dateIntervalFold) {
+            return $dateIntervalFold;
+        }
         $dateFold = JitJsonEncode::tryFoldDateTimeFamily($context, $args[0], $knownFlags ?? 0);
         if (null !== $dateFold) {
             return $dateFold;

@@ -20,6 +20,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\ext\simplexml\JitSimpleXmlUserScript;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
+use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DatePeriodSupport;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -37,6 +38,7 @@ use PHPLLVM\Value;
  * JsonSerializable: call jsonSerialize() then encode the wire (php_json_encode_serializable_object).
  * DateTime/DateTimeImmutable/DateTimeZone: Zend wire, not empty get_object_vars (#33752 / #14143).
  * DatePeriod: compile-time construct bag → Zend json wire (#14144 / peer #34585).
+ * DateInterval: compile-time construct/diff stamp → Zend json wire (#14144 peer).
  * Enum cases: VmJson export wire (JsonSerializable + backing scalar), not get_object_vars (#6880).
  */
 final class JitJsonEncode
@@ -51,6 +53,10 @@ final class JitJsonEncode
         $datePeriodFold = self::tryFoldDatePeriod($context, $arg, 0);
         if (null !== $datePeriodFold) {
             return $datePeriodFold;
+        }
+        $dateIntervalFold = self::tryFoldDateInterval($context, $arg, 0);
+        if (null !== $dateIntervalFold) {
+            return $dateIntervalFold;
         }
 
         $enumFold = self::tryFoldEnumCase($context, $arg, 0);
@@ -92,6 +98,10 @@ final class JitJsonEncode
             $datePeriodFold = self::tryFoldDatePeriod($context, $arg, 0);
             if (null !== $datePeriodFold) {
                 return $datePeriodFold;
+            }
+            $dateIntervalFold = self::tryFoldDateInterval($context, $arg, 0);
+            if (null !== $dateIntervalFold) {
+                return $dateIntervalFold;
             }
             $dateFold = self::tryFoldDateTimeFamily($context, $arg, 0);
             if (null !== $dateFold) {
@@ -252,11 +262,74 @@ final class JitJsonEncode
     }
 
     /**
+     * Fold DateInterval to Zend json_encode wire (#14144 peer).
+     *
+     * Thin AOT get_object_vars strips DateInterval storage → {}. Reuse construct/diff
+     * compile-time stamp ({@see JitDateIntervalConstruct}, {@see JitDateMutation::lowerDiff}).
+     *
+     * php-src: ext/json/php_json.c — php_json_encode before get_object_vars
+     */
+    public static function tryFoldDateInterval(Context $context, JITVariable $arg, int $flags): ?Value
+    {
+        $wire = self::compileTimeDateIntervalJsonWire($arg);
+        if (null === $wire) {
+            return null;
+        }
+
+        try {
+            $encoded = VmJsonFormat::encodeExported($wire, $flags);
+        } catch (VmJsonExportException $e) {
+            if (VmJsonFlags::throwsOnError($flags)) {
+                return JitJsonThrow::emitFromException(
+                    $context,
+                    new \JsonException(VmJson::errorMsgForCode($e->errorCode), $e->errorCode)
+                );
+            }
+            JitJsonEncodeCompileTime::emitSetLastError($context, $e->errorCode);
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return JitValueBox::pointer($context, $slot);
+        } catch (\JsonException $e) {
+            return JitJsonThrow::emitFromException($context, $e);
+        }
+        if (false === $encoded) {
+            $sticky = VmJson::lastError();
+            JitJsonEncodeCompileTime::emitSetLastError($context, $sticky);
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        $sticky = VmJson::lastError();
+        if (0 !== $sticky) {
+            JitJsonEncodeCompileTime::emitSetLastError($context, $sticky);
+        }
+
+        return $context->builder->load($context->constantStringFromString($encoded));
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function compileTimeDateIntervalJsonWire(JITVariable $arg): ?array
+    {
+        if (!\is_array($arg->compileTimeDateInterval)) {
+            return null;
+        }
+
+        return DateIntervalSupport::exportZendJsonWireFromCompileTimeState($arg->compileTimeDateInterval);
+    }
+
+    /**
      * @return array{date: string, timezone_type: int, timezone: string}|array{timezone_type: int, timezone: string}|null
      */
     private static function compileTimeDateTimeFamilyWire(JITVariable $arg): ?array
     {
         if (\is_array($arg->compileTimeDatePeriodSerialize)) {
+            return null;
+        }
+        if (\is_array($arg->compileTimeDateInterval)) {
             return null;
         }
         if (null !== $arg->compileTimeDateTimeTimestamp) {
@@ -428,6 +501,10 @@ final class JitJsonEncode
         $datePeriodFold = self::tryFoldDatePeriod($context, $arg, 0);
         if (null !== $datePeriodFold) {
             return $datePeriodFold;
+        }
+        $dateIntervalFold = self::tryFoldDateInterval($context, $arg, 0);
+        if (null !== $dateIntervalFold) {
+            return $dateIntervalFold;
         }
         $dateFold = self::tryFoldDateTimeFamily($context, $arg, 0);
         if (null !== $dateFold) {

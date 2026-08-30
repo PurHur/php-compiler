@@ -268,19 +268,42 @@ final class DateIntervalSupport
      */
     public static function exportZendJsonWireDateInterval(ObjectEntry $interval): array
     {
-        $state = self::readState($interval);
+        return self::exportZendJsonWireFromCompileTimeState(self::readState($interval), $interval);
+    }
+
+    /**
+     * Zend json_encode wire from a construct / diff / createFromDateString stamp (#14144).
+     *
+     * @param array<string, mixed> $state
+     *
+     * @return array<string, mixed>
+     */
+    public static function exportZendJsonWireFromCompileTimeState(array $state, ?ObjectEntry $interval = null): array
+    {
+        if (
+            !empty($state['from_string'])
+            && isset($state['date_string'])
+            && \is_string($state['date_string'])
+        ) {
+            return [
+                'from_string' => true,
+                'date_string' => $state['date_string'],
+            ];
+        }
 
         return [
-            'y' => $state['y'],
-            'm' => $state['m'],
-            'd' => $state['d'],
-            'h' => $state['h'],
-            'i' => $state['i'],
-            's' => $state['s'],
-            'f' => $state['f'],
-            'invert' => $state['invert'],
-            'days' => $state['days'],
-            'from_string' => self::isFromDateString($interval),
+            'y' => (int) ($state['y'] ?? 0),
+            'm' => (int) ($state['m'] ?? 0),
+            'd' => (int) ($state['d'] ?? 0),
+            'h' => (int) ($state['h'] ?? 0),
+            'i' => (int) ($state['i'] ?? 0),
+            's' => (int) ($state['s'] ?? 0),
+            'f' => (float) ($state['f'] ?? 0.0),
+            'invert' => (int) ($state['invert'] ?? 0),
+            'days' => \array_key_exists('days', $state) ? $state['days'] : false,
+            'from_string' => null !== $interval
+                ? self::isFromDateString($interval)
+                : (bool) ($state['from_string'] ?? false),
         ];
     }
 
