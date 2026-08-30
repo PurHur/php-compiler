@@ -27,6 +27,7 @@ final class XmlReaderEvent
          * @var array<string, string>
          */
         public array $nsScope = [],
+        public string $xmlLang = '',
     ) {
     }
 }
