@@ -25,4 +25,21 @@ final class JitSimpleXmlCount
             'SimpleXMLElement::count() user-script AOT requires a compile-time tree (#26863)'
         );
     }
+
+    /**
+     * SimpleXMLElement::hasChildren() — leftover of count AOT (#35827 / php-src sxe.c).
+     */
+    public static function invokeHasChildren(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SimpleXMLElement::hasChildren', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $us = JitSimpleXmlUserScript::tryHasChildren($context, ...$args);
+        if (null !== $us) {
+            return $us;
+        }
+        throw new \LogicException(
+            'SimpleXMLElement::hasChildren() user-script AOT requires a compile-time tree (#35827 leftover of #26863)'
+        );
+    }
 }

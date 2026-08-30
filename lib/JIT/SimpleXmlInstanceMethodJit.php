@@ -25,6 +25,8 @@ final class SimpleXmlInstanceMethodJit
         'simplexmlelement::offsetexists' => true,
         'simplexmlelement::offsetunset' => true,
         'simplexmlelement::count' => true,
+        // leftover of count AOT (#26863 / #35827) — php-src sxe.c PHP_METHOD(SimpleXMLElement, hasChildren)
+        'simplexmlelement::haschildren' => true,
         'simplexmlelement::__tostring' => true,
         'simplexmlelement::children' => true,
         'simplexmlelement::attributes' => true,
@@ -116,6 +118,11 @@ final class SimpleXmlInstanceMethodJit
         }
         if ('simplexmlelement::count' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementCount();
+
+            return;
+        }
+        if ('simplexmlelement::haschildren' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementCount('hasChildren');
 
             return;
         }
