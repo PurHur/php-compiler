@@ -639,11 +639,126 @@ final class JitUnlikeCompare
         if ($rightBox && (Variable::TYPE_NATIVE_BOOL === $left->type || self::isNullOperand($left))) {
             return self::boxedArrayVsNativeScalar($context, $opType, $right, $left, false);
         }
+        // Assigned `$a = []` / `$o = new C` are TYPE_VALUE; vs native long the
+        // previous return-null fell through to 0<=>n (#35799 leftover of #32528).
+        if ($leftBox && self::isNativeNumberOrString($right)) {
+            return self::boxedUnlikeVsNative($context, $opType, $left, $right, true);
+        }
+        if ($rightBox && self::isNativeNumberOrString($left)) {
+            return self::boxedUnlikeVsNative($context, $opType, $right, $left, false);
+        }
         if ($leftBox && $rightBox) {
             return self::twoBoxedOrdered($context, $opType, $left, $right);
         }
 
         return null;
+    }
+
+    private static function isNativeNumberOrString(Variable $var): bool
+    {
+        return Variable::TYPE_NATIVE_LONG === $var->type
+            || Variable::TYPE_NATIVE_DOUBLE === $var->type
+            || Variable::TYPE_STRING === $var->type;
+    }
+
+    /**
+     * Boxed TYPE_VALUE vs native long/double/string (#35799 leftover of #32503/#32528).
+     *
+     * php-src zend_operators.c compare_function: IS_ARRAY vs number/string →
+     * array is greater; plain object vs number → E_NOTICE + legacy 1.
+     */
+    private static function boxedUnlikeVsNative(
+        Context $context,
+        int $opType,
+        Variable $boxed,
+        Variable $scalar,
+        bool $boxOnLeft
+    ): Variable {
+        $ptr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $kind = self::valuePtrKind($context, $ptr);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isObj = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+        );
+        $scalarIsNumber = Variable::TYPE_NATIVE_LONG === $scalar->type
+            || Variable::TYPE_NATIVE_DOUBLE === $scalar->type;
+        $tag = 'box_nat_'.spl_object_id($context).'_'.spl_object_id($boxed);
+        $htBlock = BasicBlockHelper::append($context, $tag.'_ht');
+        $notHt = BasicBlockHelper::append($context, $tag.'_not_ht');
+        $genBlock = BasicBlockHelper::append($context, $tag.'_gen');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $objBlock = $scalarIsNumber ? BasicBlockHelper::append($context, $tag.'_obj') : null;
+        $context->builder->branchIf($isHt, $htBlock, $notHt);
+
+        $context->builder->positionAtEnd($htBlock);
+        $htCmp = $i64->constInt($boxOnLeft ? 1 : -1, true);
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($notHt);
+        if ($scalarIsNumber && null !== $objBlock) {
+            $context->builder->branchIf($isObj, $objBlock, $genBlock);
+        } else {
+            $context->builder->branch($genBlock);
+        }
+
+        $objCmp = null;
+        $objEnd = null;
+        if ($scalarIsNumber && null !== $objBlock) {
+            $context->builder->positionAtEnd($objBlock);
+            $objPtr = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $ptr
+            );
+            $asFloat = Variable::TYPE_NATIVE_DOUBLE === $scalar->type;
+            $coerced = JitScalarTypeCoerce::emitPlainObjectToScalar(
+                $context,
+                $objPtr,
+                $asFloat ? 'float' : 'int',
+                ErrorReporter::E_NOTICE
+            );
+            $other = $context->helper->loadValue($scalar);
+            if ($asFloat) {
+                $objRaw = self::doubleSpaceshipI64($context, $coerced, $other);
+            } else {
+                if ($other->typeOf() !== $coerced->typeOf()) {
+                    $other = $context->builder->intCast($other, $coerced->typeOf());
+                }
+                $objRaw = self::longSpaceshipI64($context, $coerced, $other);
+            }
+            $objCmp = $boxOnLeft ? $objRaw : self::negateCmp($context, $objRaw);
+            $objEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+        }
+
+        $context->builder->positionAtEnd($genBlock);
+        \PHPCompiler\JIT\Builtin\SpaceshipRuntime::ensureLinked($context);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::assignToPointer($context, JitValueBox::pointer($context, $slot), $scalar);
+        $nativePtr = JitValueBox::pointer($context, $slot);
+        $genCmp = $boxOnLeft
+            ? \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callValueSpaceship($context, $ptr, $nativePtr)
+            : \PHPCompiler\JIT\Builtin\SpaceshipRuntime::callValueSpaceship($context, $nativePtr, $ptr);
+        $genEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, $tag.'_phi');
+        $phi->addIncoming($htCmp, $htEnd);
+        if (null !== $objCmp && null !== $objEnd) {
+            $phi->addIncoming($objCmp, $objEnd);
+        }
+        $phi->addIncoming($genCmp, $genEnd);
+
+        return self::fromSpaceshipValue($context, $opType, $phi);
     }
 
     private static function boxedArrayVsNativeScalar(
