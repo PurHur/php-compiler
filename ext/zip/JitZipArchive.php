@@ -288,14 +288,14 @@ final class JitZipArchive
         $context->builder->positionAtEnd($okBlock);
         $slash = ZipArchiveEmbedBridge::opString($context, '/');
         $dirnameSlash = JitStringConcat::concat($context, $dirname, $slash, false);
-        $empty = ZipArchiveEmbedBridge::emptyString($context);
-        $rcOk = self::execLong(
+        $packedOk = JitNestedHelperCoerce::callHelper(
             $context,
-            'addir',
-            $handle,
-            $zero,
-            $dirnameSlash,
-            $empty
+            ZipArchiveEmbedBridge::helperFunction($context, ZipArchiveEmbedBridge::addEmptyDirHelper()),
+            [$dirnameSlash]
+        );
+        $rcOk = self::int32LeFromString(
+            $context,
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $packedOk)
         );
         $okTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
