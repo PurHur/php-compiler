@@ -468,7 +468,22 @@ final class VmXmlReader
             return null;
         }
         $current = $state->current;
-        if (null === $current || XmlReaderConstants::ELEMENT !== $current->nodeType) {
+        if (null === $current) {
+            return null;
+        }
+
+        return self::lookupAttributeNsOnEvent($current, $localName, $namespaceUri);
+    }
+
+    /**
+     * Compile-time peer of {@see getAttributeNs} for user-script AOT (#35925 leftover of #35918).
+     */
+    public static function lookupAttributeNsOnEvent(
+        XmlReaderEvent $current,
+        string $localName,
+        string $namespaceUri
+    ): ?string {
+        if (XmlReaderConstants::ELEMENT !== $current->nodeType) {
             return null;
         }
         foreach ($current->attributes as $attrName => $value) {

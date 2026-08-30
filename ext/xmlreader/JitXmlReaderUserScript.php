@@ -63,6 +63,13 @@ final class JitXmlReaderUserScript
      */
     private static ?array $lastAttributes = null;
 
+    /**
+     * Tokenized events for getAttributeNs() (#35925 leftover of #35918).
+     *
+     * @var list<XmlReaderEvent>|null
+     */
+    private static ?array $lastRawEvents = null;
+
     /** Set when the last XML()/open lowering was the instance form (#35106 / #35907). */
     public static bool $lastCallWasInstance = false;
 
@@ -263,6 +270,7 @@ final class JitXmlReaderUserScript
         self::$lastReadString = $readString;
         self::$lastExpandSpec = $expand;
         self::$lastAttributes = $attributes;
+        self::$lastRawEvents = $rawEvents;
 
         if (null !== $instanceReceiver) {
             return self::resetReceiverForParse($context, $instanceReceiver);
@@ -483,6 +491,37 @@ final class JitXmlReaderUserScript
         }
 
         return self::emitPosNullableStringSwitch($context, $args[0], $byPos, 'getAttribute');
+    }
+
+    /**
+     * XMLReader::getAttributeNs() leftover of getAttribute (#35925 / #35918 / #27299 / #19412).
+     * php-src: zim_XMLReader_getAttributeNs — compile-time local+URI + __xr_pos lookup.
+     */
+    public static function tryGetAttributeNs(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastRawEvents || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 3) {
+            throw new \LogicException('XMLReader::getAttributeNs() expects $this, $name, and $namespace');
+        }
+        $local = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        $ns = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null === $local || null === $ns) {
+            return null;
+        }
+        if ('' === $local) {
+            throw new \ValueError('XMLReader::getAttributeNs(): Argument #1 ($name) cannot be empty');
+        }
+        if ('' === $ns) {
+            throw new \ValueError('XMLReader::getAttributeNs(): Argument #2 ($namespace) cannot be empty');
+        }
+        $byPos = [];
+        foreach (self::$lastRawEvents as $ev) {
+            $byPos[] = VmXmlReader::lookupAttributeNsOnEvent($ev, $local, $ns);
+        }
+
+        return self::emitPosNullableStringSwitch($context, $args[0], $byPos, 'getAttributeNs');
     }
 
     /**
