@@ -26,6 +26,15 @@ final class JitDomCreateDocumentFragment
     /** True when the last createDocumentFragment() materialized (#35871). */
     public static bool $lastMaterialized = false;
 
+    public const TAG_KIND = '#document-fragment';
+
+    /**
+     * Compile-time children of the last createDocumentFragment tree (#35881 leftover of #35871).
+     *
+     * @var list<array{kind: string, data: string, content?: string, inner?: string}>
+     */
+    public static array $lastChildren = [];
+
     private const CLASS_STANDIN = 'DOMElement';
 
     private const PROP_NODE_NAME = 'nodeName';
@@ -43,6 +52,7 @@ final class JitDomCreateDocumentFragment
 
         $document = self::loadObjectArg($context, $args[0]);
         self::$lastMaterialized = true;
+        self::$lastChildren = [];
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);
@@ -50,7 +60,7 @@ final class JitDomCreateDocumentFragment
         $obj = $objectType->allocate($classId);
         $objectType->markObjectConstructed($obj);
 
-        self::storeStringLiteral($context, $obj, self::PROP_NODE_NAME, '#document-fragment');
+        self::storeStringLiteral($context, $obj, self::PROP_NODE_NAME, self::TAG_KIND);
         // saveXML fetches textContent/INNER_XML on every node (#32315). Empty fragment
         // xmlNodeDump is "" (php-src ext/dom/document.c → xmlNewDocFragment).
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, '');
@@ -72,6 +82,78 @@ final class JitDomCreateDocumentFragment
             self::CLASS_STANDIN,
             DomConstants::XML_DOCUMENT_FRAG_NODE
         );
+
+        return $obj;
+    }
+
+
+    /** Record one appendChild onto the open createDocumentFragment (#35881). */
+    public static function rememberAppendedChild(JITVariable $child): void
+    {
+        if (!self::$lastMaterialized) {
+            return;
+        }
+        $tag = $child->compileTimeDomTagName ?? null;
+        if ('#text' === $tag || (null === $tag && null !== $child->compileTimeDomTextData)) {
+            self::$lastChildren[] = [
+                'kind' => 'text',
+                'data' => $child->compileTimeDomTextData
+                    ?? JitDomCreateTextNode::$lastMaterializedData
+                    ?? '',
+            ];
+
+            return;
+        }
+        if ('#comment' === $tag) {
+            self::$lastChildren[] = [
+                'kind' => 'comment',
+                'data' => $child->compileTimeDomTextData
+                    ?? JitDomCreateComment::$lastMaterializedData
+                    ?? '',
+            ];
+
+            return;
+        }
+        if ('#cdata-section' === $tag) {
+            self::$lastChildren[] = [
+                'kind' => 'cdata',
+                'data' => $child->compileTimeDomTextData
+                    ?? JitDomCreateCDATASection::$lastMaterializedData
+                    ?? '',
+            ];
+
+            return;
+        }
+        if (JitDomCreateProcessingInstruction::TAG_KIND === $tag) {
+            self::$lastChildren[] = [
+                'kind' => 'pi',
+                'data' => $child->compileTimeDomAttributes['target']
+                    ?? JitDomCreateProcessingInstruction::$lastMaterializedTarget
+                    ?? '',
+                'content' => $child->compileTimeDomTextData
+                    ?? JitDomCreateProcessingInstruction::$lastMaterializedData
+                    ?? '',
+            ];
+
+            return;
+        }
+        if (null !== $tag && '' !== $tag && !str_starts_with($tag, '#')) {
+            self::$lastChildren[] = [
+                'kind' => 'element',
+                'data' => $tag,
+                'inner' => $child->compileTimeDomInnerXml ?? '',
+            ];
+        }
+    }
+
+    /** Fresh DocumentFragment stand-in for importNode deep-copy (#35881). */
+    public static function materialize(Context $context, JITVariable $documentVar): Value
+    {
+        // Keep lastChildren snapshot for the caller; only clear the open-tree flag.
+        $saved = self::$lastChildren;
+        $args = [$documentVar];
+        $obj = self::invoke($context, ...$args);
+        self::$lastChildren = $saved;
 
         return $obj;
     }

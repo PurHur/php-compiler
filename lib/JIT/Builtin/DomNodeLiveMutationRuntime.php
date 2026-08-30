@@ -12,6 +12,9 @@ use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomAppendChildUserScript;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateElementAttrs;
+use PHPCompiler\ext\dom\JitDomCreateComment;
+use PHPCompiler\ext\dom\JitDomCreateDocumentFragment;
+use PHPCompiler\ext\dom\JitDomCreateProcessingInstruction;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomCloneNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
@@ -338,7 +341,20 @@ final class DomNodeLiveMutationRuntime
                 JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
                 $moved = 1 === \count($extraArgs)
                     && self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0]);
-                if (!$moved) {
+                $fragmentRecv = JitDomCreateDocumentFragment::TAG_KIND
+                        === ($receiver->compileTimeDomTagName ?? null)
+                    || JitDomCreateDocumentFragment::$lastMaterialized;
+                // Always record fragment children for importNode — even when InnerXml
+                // was refreshed via move-to-end (#35871 / #35881).
+                if ($fragmentRecv) {
+                    foreach ($extraArgs as $arg) {
+                        JitDomCreateDocumentFragment::rememberAppendedChild($arg);
+                    }
+                    $receiver->compileTimeDomInnerXml = self::fragmentInnerXmlFromLastChildren();
+                } elseif (!$moved) {
+                    // Rebuild already wrote the INNER_XML slot from live children. A follow-up
+                    // syncUserScriptInnerXmlFromArgs still concatenates onto compile-time
+                    // Variable metadata and doubles fragment markup (#35881 leftover of #35871).
                     self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind, true);
                 }
                 $context->builder->branch($bbAppendDone);
@@ -1153,6 +1169,37 @@ final class DomNodeLiveMutationRuntime
         }
 
         return $arg->compileTimeDomTextData;
+    }
+
+
+    /**
+     * Rebuild fragment compile-time InnerXml from rememberAppendedChild (#35881).
+     */
+    private static function fragmentInnerXmlFromLastChildren(): string
+    {
+        $rebuilt = '';
+        foreach (JitDomCreateDocumentFragment::$lastChildren as $node) {
+            $kind = $node['kind'] ?? '';
+            if ('text' === $kind) {
+                $rebuilt .= $node['data'] ?? '';
+            } elseif ('comment' === $kind) {
+                $rebuilt .= '<!--'.($node['data'] ?? '').'-->';
+            } elseif ('cdata' === $kind) {
+                $rebuilt .= '<![CDATA['.($node['data'] ?? '').']]>';
+            } elseif ('pi' === $kind) {
+                $rebuilt .= '<?'.($node['data'] ?? '')
+                    .(isset($node['content']) && '' !== $node['content'] ? ' '.$node['content'] : '')
+                    .'?'.'>';
+            } elseif ('element' === $kind) {
+                $tag = $node['data'] ?? '';
+                $childInner = $node['inner'] ?? '';
+                $rebuilt .= '' === $childInner
+                    ? '<'.$tag.'/>'
+                    : '<'.$tag.'>'.$childInner.'</'.$tag.'>';
+            }
+        }
+
+        return $rebuilt;
     }
 
     /**
