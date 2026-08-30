@@ -3945,6 +3945,11 @@ class Object_ extends Type {
             // php-src ext/sqlite3/sqlite3.c — authorizer + open flags (#28098 / #20683).
             // Seed for AOT/JIT ClassConstFetch (peer ZipArchive #28110).
             $this->seedExternalClassConstants($id, Sqlite3Constants::CLASS_CONSTANTS);
+            // NestedJIT handle — late defineProperty after new SIGSEGVs (peer ZipArchive #35002 / #35914).
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_ID, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_ROW, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_HAS, Variable::TYPE_NATIVE_LONG);
+            $this->markHasConstructor($id);
         }
         if ('sqlite3stmt' === $lcname && CompilerVersion::supportsSqlite3()) {
             $this->seedExternalClassConstants($id, Sqlite3Constants::STMT_CLASS_CONSTANTS);
@@ -5714,6 +5719,9 @@ class Object_ extends Type {
 
         // HashContext JIT handle (ext/hash/JitHashContext.php, #3357 / #27264).
         if ('hashcontext' === $lcClass && ('__hcid' === $lcName || '__hchmac' === $lcName)) {
+            return Variable::TYPE_NATIVE_LONG;
+        }
+        if ('sqlite3' === $lcClass && ('__sqliteid' === $lcName || '__sqliterow' === $lcName || '__sqlitehas' === $lcName)) {
             return Variable::TYPE_NATIVE_LONG;
         }
         if (
