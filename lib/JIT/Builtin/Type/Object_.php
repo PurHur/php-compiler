@@ -3961,6 +3961,15 @@ class Object_ extends Type {
         }
         if ('sqlite3stmt' === $lcname && CompilerVersion::supportsSqlite3()) {
             $this->seedExternalClassConstants($id, Sqlite3Constants::STMT_CLASS_CONSTANTS);
+            // prepare/getSQL fold (#36010 leftover of #36001).
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_STMT_SQL, Variable::TYPE_STRING);
+        }
+        if ('sqlite3result' === $lcname && CompilerVersion::supportsSqlite3()) {
+            // query/fetchArray fold (#36010 leftover of #36001).
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_RESULT_VAL, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_RESULT_HAS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_RESULT_FETCHED, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_RESULT_COL, Variable::TYPE_STRING);
         }
     }
 
