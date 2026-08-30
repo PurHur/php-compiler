@@ -187,9 +187,7 @@ final class ArrayUserSetOpsRuntime
 
     private static function requireClosureCallback(Context $context, JITVariable $callback): void
     {
-        if (!UsortCallbackPolicy::isClosureJitLowerable($callback)) {
-            throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
-        }
+        UsortCallbackPolicy::assertJitLowerable($context, $callback);
     }
 
     /**

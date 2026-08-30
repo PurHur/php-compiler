@@ -47,9 +47,7 @@ final class UsortRuntime
 
     public static function usortPacked(Context $context, JITVariable $array, JITVariable $callback): Value
     {
-        if (!UsortCallbackPolicy::isJitLowerable($callback)) {
-            throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
-        }
+        UsortCallbackPolicy::assertJitLowerable($context, $callback);
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
             self::sortPackedWithClosure($context, $array, $callback);
         } else {
@@ -61,9 +59,7 @@ final class UsortRuntime
 
     public static function uksortKeys(Context $context, JITVariable $array, JITVariable $callback): Value
     {
-        if (!UsortCallbackPolicy::isJitLowerable($callback)) {
-            throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
-        }
+        UsortCallbackPolicy::assertJitLowerable($context, $callback);
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
             self::sortKeysWithClosure($context, $array, $callback);
         } else {
@@ -75,9 +71,7 @@ final class UsortRuntime
 
     public static function uasortValues(Context $context, JITVariable $array, JITVariable $callback): Value
     {
-        if (!UsortCallbackPolicy::isJitLowerable($callback)) {
-            throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
-        }
+        UsortCallbackPolicy::assertJitLowerable($context, $callback);
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
             self::sortValuesWithClosure($context, $array, $callback);
         } else {

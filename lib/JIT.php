@@ -21734,6 +21734,7 @@ class JIT {
                 $this->syncCompileTimeDatePeriod($result, $value, $force);
                 $this->noteDateTimeZoneLocal($resultOp, $value);
                 $this->noteDateTimeLocal($resultOp, $value);
+                $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
                 $this->markScopeVariableAssignedIfTracked($resultOp, $result);
 
                 return;
@@ -22048,6 +22049,7 @@ class JIT {
                         $this->valueBoxPointer($value)
                     );
                     $this->copyValueBoxJitFlags($result, $value, $force);
+                    $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
                     $this->recordListUnpackAssignSlot($resultOp, $result);
 
                     return;

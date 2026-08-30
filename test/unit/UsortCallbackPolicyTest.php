@@ -39,6 +39,18 @@ final class UsortCallbackPolicyTest extends TestCase
         $this->assertTrue(UsortCallbackPolicy::isJitLowerable($callback));
     }
 
+    public function testPrepareJitCallbackIsNoOpWhenMetadataPresent(): void
+    {
+        $call = $this->createMock(Native::class);
+        $callback = (new \ReflectionClass(JITVariable::class))->newInstanceWithoutConstructor();
+        $callback->closureCall = $call;
+        $context = $this->createMock(\PHPCompiler\JIT\Context::class);
+
+        UsortCallbackPolicy::prepareJitCallback($context, $callback);
+
+        $this->assertSame($call, $callback->closureCall);
+    }
+
     public function testVmAllowsStrcmpFamilyNames(): void
     {
         foreach (['strcmp', 'strcasecmp', 'strcoll', 'strnatcmp', 'strnatcasecmp'] as $name) {

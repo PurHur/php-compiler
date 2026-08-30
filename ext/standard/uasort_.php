@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\UsortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
-use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -89,9 +88,6 @@ final class uasort_ extends Internal
     {
         if (2 !== \count($args)) {
             throw new \LogicException('uasort() requires exactly two arguments');
-        }
-        if (!UsortCallbackPolicy::isJitLowerable($args[1])) {
-            throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         // php-src Z_PARAM_ARRAY — catchable TypeError under AOT try/catch (#27510 peer).
         ExceptionBridge::ensureLinked($context);
