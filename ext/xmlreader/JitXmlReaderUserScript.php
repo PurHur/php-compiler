@@ -10,6 +10,7 @@ use PHPCompiler\ext\dom\JitDomCreateComment;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomDocumentElement;
+use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -84,6 +85,12 @@ final class JitXmlReaderUserScript
      * @var list<int>|null
      */
     private static ?array $lastNextSibling = null;
+
+    /**
+     * Parse validity for isValid() when no schema/VALIDATE mode is active (#35959 / #27299).
+     * Mirrors {@see XmlReaderState::$valid} after {@see VmXmlReader::bindParsedSource}.
+     */
+    private static ?bool $lastValid = null;
 
     /** Set when the last XML()/open lowering was the instance form (#35106 / #35907). */
     public static bool $lastCallWasInstance = false;
@@ -267,6 +274,8 @@ final class JitXmlReaderUserScript
             ];
         }
         self::$lastEvents = $events;
+        // Same validity gate as VmXmlReader::bindParsedSource (#35959).
+        self::$lastValid = [] === VmXml::validationErrorRecords($lit);
         $inner = [];
         $outer = [];
         $readString = [];
@@ -762,6 +771,33 @@ final class JitXmlReaderUserScript
         }
 
         return self::emitNextSwitch($context, $args[0], $targets);
+    }
+
+    /**
+     * XMLReader::isValid() leftover of fromString/read (#35959 / #27299 / #6135).
+     * php-src: zim_XMLReader_isValid / xmlTextReaderIsValid.
+     * Without schema/VALIDATE (not yet AOT-folded), returns stamped parse validity.
+     */
+    public static function tryIsValid(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastEvents || null === self::$lastValid) {
+            return null;
+        }
+        if (\count($args) < 1) {
+            throw new \LogicException('XMLReader::isValid() called without $this');
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_isvalid_cont');
+        // Touch receiver so lowering stays tied to the tracked reader object.
+        self::loadObject($context, $args[0]);
+        $i1 = $context->getTypeFromString('int1');
+        $box = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $box,
+            $i1->constInt(self::$lastValid ? 1 : 0, false)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $box);
     }
 
     /**
