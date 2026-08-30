@@ -73,47 +73,7 @@ final class JitNativeString
                 return $magic;
             }
             // Catch temps often lack a compile-time class hint — try Throwable::__toString (#26796).
-            $isThrowable = ReflectionBuiltinHelper::emitInstanceOf($context, $var, 'Throwable');
-            $isBool = Variable::TYPE_NATIVE_BOOL === $isThrowable->type
-                ? $isThrowable->value
-                : $context->helper->loadValue($isThrowable);
-            $yesBb = BasicBlockHelper::append($context, 'jit_cast_throwable_yes');
-            $noBb = BasicBlockHelper::append($context, 'jit_cast_throwable_no');
-            $joinBb = BasicBlockHelper::append($context, 'jit_cast_throwable_join');
-            $context->builder->branchIf($isBool, $yesBb, $noBb);
-            $context->builder->positionAtEnd($yesBb);
-            $toCall = $context->resolveFunctionProxy('exception::__tostring');
-            $raw = $toCall->call($context, $var);
-            $strPtr = (new \PHPCompiler\ext\standard\strval())->valueToString(
-                $context,
-                JitValueBox::coerceToValuePtrForStore($context, $raw)
-            );
-            $yesEnd = $context->builder->getInsertBlock();
-            $context->builder->branch($joinBb);
-            $context->builder->positionAtEnd($noBb);
-            $hint = $classHint ?? '';
-            if ('' !== $hint && 'object' !== strtolower($hint)) {
-                // Zend zend_std_cast_object_tostring — Error when no __toString (#26821).
-                Builtin\ErrorRaise::ensureLinked($context);
-                Builtin\ErrorRaise::emitRaise(
-                    $context,
-                    \PHPCompiler\VM\ValueEchoSupport::objectToStringErrorMessage($hint)
-                );
-            }
-            $empty = $context->builder->load($context->constantStringFromString(''));
-            $noEnd = $context->builder->getInsertBlock();
-            $context->builder->branch($joinBb);
-            $context->builder->positionAtEnd($joinBb);
-            $phi = $context->builder->phi($strPtr->typeOf());
-            $phi->addIncoming($strPtr, $yesEnd);
-            $phi->addIncoming($empty, $noEnd);
-
-            return new Variable(
-                $context,
-                Variable::TYPE_STRING,
-                Variable::KIND_VALUE,
-                $phi
-            );
+            return self::tryCoerceThrowableToString($context, $var, $classHint ?? '');
         }
         if (Variable::TYPE_VALUE === $var->type) {
             self::ensureInsertBlock($context);
@@ -157,6 +117,7 @@ final class JitNativeString
                 null !== $classHint
                 && '' !== $classHint
                 && 'object' !== strtolower($classHint)
+                && !$context->type->object->isInterfaceClassLc(strtolower(ltrim($classHint, '\\')))
             ) {
                 $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
                 $objPtr = $context->builder->call(
@@ -202,18 +163,8 @@ final class JitNativeString
                 if (null !== $magic) {
                     return $magic;
                 }
-                Builtin\ErrorRaise::ensureLinked($context);
-                Builtin\ErrorRaise::emitRaise(
-                    $context,
-                    \PHPCompiler\VM\ValueEchoSupport::objectToStringErrorMessage($classHint)
-                );
 
-                return new Variable(
-                    $context,
-                    Variable::TYPE_STRING,
-                    Variable::KIND_VALUE,
-                    $context->builder->load($context->constantStringFromString(''))
-                );
+                return self::tryCoerceThrowableToString($context, $objVar, $classHint);
             }
 
             // Value-boxed objects without a class hint: BcMath\Number (#24683 / #26803) and
@@ -464,10 +415,8 @@ final class JitNativeString
         }
 
         $context->builder->positionAtEnd($fallbackBlock);
-        $incoming[] = [
-            $context->builder->load($context->constantStringFromString('')),
-            $context->builder->getInsertBlock(),
-        ];
+        $throwable = self::tryCoerceThrowableToString($context, $objVar, '');
+        $incoming[] = [$context->helper->loadValue($throwable), $context->builder->getInsertBlock()];
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
         $phi = $context->builder->phi($emptySample->typeOf(), $tag.'_phi');
@@ -476,6 +425,58 @@ final class JitNativeString
         }
 
         return $phi;
+    }
+
+    /**
+     * Throwable/Exception (string) cast — catch(Throwable $e) and runtime class_id fallback (#26796).
+     */
+    private static function tryCoerceThrowableToString(
+        Context $context,
+        Variable $objVar,
+        string $classHint
+    ): Variable {
+        $isThrowable = ReflectionBuiltinHelper::emitInstanceOf($context, $objVar, 'Throwable');
+        $isBool = Variable::TYPE_NATIVE_BOOL === $isThrowable->type
+            ? $isThrowable->value
+            : $context->helper->loadValue($isThrowable);
+        $tag = 'jit_cast_throwable_'.(++self::$coerceResumeSerial);
+        $yesBb = BasicBlockHelper::append($context, $tag.'_yes');
+        $noBb = BasicBlockHelper::append($context, $tag.'_no');
+        $joinBb = BasicBlockHelper::append($context, $tag.'_join');
+        $context->builder->branchIf($isBool, $yesBb, $noBb);
+        $context->builder->positionAtEnd($yesBb);
+        $toCall = $context->resolveFunctionProxy('exception::__tostring');
+        $raw = $toCall->call($context, $objVar);
+        $strPtr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+            $context,
+            JitValueBox::coerceToValuePtrForStore($context, $raw)
+        );
+        $yesEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($joinBb);
+        $context->builder->positionAtEnd($noBb);
+        $hint = ltrim($classHint, '\\');
+        if ('' !== $hint && 'object' !== strtolower($hint)) {
+            // Zend zend_std_cast_object_tostring — Error when no __toString (#26821).
+            Builtin\ErrorRaise::ensureLinked($context);
+            Builtin\ErrorRaise::emitRaise(
+                $context,
+                \PHPCompiler\VM\ValueEchoSupport::objectToStringErrorMessage($hint)
+            );
+        }
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $noEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($joinBb);
+        $context->builder->positionAtEnd($joinBb);
+        $phi = $context->builder->phi($strPtr->typeOf(), $tag.'_phi');
+        $phi->addIncoming($strPtr, $yesEnd);
+        $phi->addIncoming($empty, $noEnd);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $phi
+        );
     }
 
     /** Decimal string for a packed-list index (array_merge numeric-string keys; #3607). */
