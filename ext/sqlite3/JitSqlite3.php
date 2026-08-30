@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\sqlite3;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -28,7 +32,7 @@ use PHPLLVM\Value;
  * zim_SQLite3_querySingle / zim_SQLite3_lastInsertRowID / zim_SQLite3_changes /
  * zim_SQLite3_lastErrorCode / zim_SQLite3_lastErrorMsg (#35966) /
  * zim_SQLite3_busyTimeout (#35972) / zim_SQLite3_enableExceptions (#35975) /
- * zim_SQLite3_escapeString (#35977)
+ * zim_SQLite3_escapeString (#35977) / zim_SQLite3_version (#35991 leftover of #35977)
  */
 final class JitSqlite3
 {
@@ -305,6 +309,55 @@ final class JitSqlite3
         }
 
         return self::boxString($context, $escaped);
+    }
+
+    /**
+     * SQLite3::version leftover of escapeString (#35991 / #35977).
+     * php-src zim_SQLite3_version: sqlite3_libversion + sqlite3_libversion_number.
+     * Fold in the compiler process (thin AOT has no libsqlite3 FFI at runtime).
+     */
+    public static function version(Context $context, JITVariable ...$args): Value
+    {
+        $offset = 0;
+        if (\count($args) >= 1 && JITVariable::TYPE_OBJECT === $args[0]->type) {
+            $offset = 1;
+        }
+        $given = \count($args) - $offset;
+        if (0 !== $given) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                'SQLite3::version() expects exactly 0 arguments, '.$given.' given'
+            );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'SQLite3::version_argc_cont');
+
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        try {
+            $info = VmSqlite3Native::version();
+        } catch (\Throwable $e) {
+            throw new \LogicException(
+                'SQLite3::version() user-script AOT requires libsqlite3 FFI at compile time (#35991): '
+                .$e->getMessage(),
+                0,
+                $e
+            );
+        }
+        $ht = new HashTable();
+        $str = new Variable();
+        $str->string($info['versionString']);
+        $ht->add('versionString', $str);
+        $num = new Variable();
+        $num->int($info['versionNumber']);
+        $ht->add('versionNumber', $num);
+        $global = $context->constantArrayFromVmHashTable(
+            'sqlite3_version_'.$info['versionString'].'_'.$info['versionNumber'],
+            $ht
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::copyFromPointer($context, $slot, $context->builder->load($global));
+
+        return $ptr;
     }
 
     /**
