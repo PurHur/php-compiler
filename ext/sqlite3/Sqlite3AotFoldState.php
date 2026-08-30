@@ -111,6 +111,100 @@ final class Sqlite3AotFoldState
         return VmSqlite3Native::STEP_DONE === $rc || VmSqlite3Native::STEP_ROW === $rc;
     }
 
+    /**
+     * @return list<array{assoc: array<string, mixed>, num: array<int, mixed>}>
+     */
+    public static function stmtQueryRows(int $stmtId): array
+    {
+        if (!isset(self::$stmts[$stmtId])) {
+            return [];
+        }
+        $st = self::$stmts[$stmtId];
+        if ($st['dbId'] <= 0 || !isset(self::$dbs[$st['dbId']])) {
+            return [];
+        }
+        $db = self::$dbs[$st['dbId']];
+        $stmt = VmSqlite3Native::prepare($db, $st['sql']);
+        foreach ($st['binds'] as $idx => $value) {
+            VmSqlite3Native::bindValue($stmt, (int) $idx, $value);
+        }
+        $rows = [];
+        while (true) {
+            $rc = VmSqlite3Native::step($stmt);
+            if (VmSqlite3Native::STEP_ROW !== $rc) {
+                break;
+            }
+            $count = VmSqlite3Native::columnCount($stmt);
+            $assoc = [];
+            $num = [];
+            for ($i = 0; $i < $count; ++$i) {
+                $name = VmSqlite3Native::columnName($stmt, $i);
+                $value = VmSqlite3Native::columnValueAt($stmt, $i);
+                $assoc[$name] = $value;
+                $num[$i] = $value;
+            }
+            $rows[] = ['assoc' => $assoc, 'num' => $num];
+        }
+        VmSqlite3Native::finalize($stmt);
+
+        return $rows;
+    }
+
+    public static function stmtReadonly(int $stmtId): bool
+    {
+        if (!isset(self::$stmts[$stmtId])) {
+            return false;
+        }
+        $st = self::$stmts[$stmtId];
+        if ($st['dbId'] <= 0 || !isset(self::$dbs[$st['dbId']])) {
+            return false;
+        }
+        $db = self::$dbs[$st['dbId']];
+        $stmt = VmSqlite3Native::prepare($db, $st['sql']);
+        $ro = VmSqlite3Native::stmtReadonly($stmt);
+        VmSqlite3Native::finalize($stmt);
+
+        return $ro;
+    }
+
+    /** 1-based index, or 0 when the name is unknown (sqlite3_bind_parameter_index). */
+    public static function bindParameterIndex(int $stmtId, string $name): int
+    {
+        if (!isset(self::$stmts[$stmtId])) {
+            return 0;
+        }
+        $st = self::$stmts[$stmtId];
+        if ($st['dbId'] <= 0 || !isset(self::$dbs[$st['dbId']])) {
+            return 0;
+        }
+        if (':' !== $name[0] && '@' !== $name[0]) {
+            $name = ':'.$name;
+        }
+        $db = self::$dbs[$st['dbId']];
+        $stmt = VmSqlite3Native::prepare($db, $st['sql']);
+        $idx = VmSqlite3Native::bindParameterIndex($stmt, $name);
+        VmSqlite3Native::finalize($stmt);
+
+        return $idx;
+    }
+
+    public static function nativeParamCount(int $dbId, string $sql): int
+    {
+        if ($dbId <= 0 || !isset(self::$dbs[$dbId])) {
+            return self::paramCount($sql);
+        }
+        $stmt = VmSqlite3Native::prepare(self::$dbs[$dbId], $sql);
+        $n = VmSqlite3Native::bindParameterCount($stmt);
+        VmSqlite3Native::finalize($stmt);
+
+        return $n;
+    }
+
+    public static function isSelectSql(string $sql): bool
+    {
+        return 1 === preg_match('/^\s*SELECT\b/is', $sql);
+    }
+
     public static function changes(int $dbId): int
     {
         if ($dbId <= 0 || !isset(self::$dbs[$dbId])) {
@@ -132,5 +226,10 @@ final class Sqlite3AotFoldState
     public static function paramCount(string $sql): int
     {
         return substr_count($sql, '?') + substr_count($sql, ':');
+    }
+
+    public static function stmtSql(int $stmtId): ?string
+    {
+        return self::$stmts[$stmtId]['sql'] ?? null;
     }
 }

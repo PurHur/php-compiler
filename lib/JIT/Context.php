@@ -2305,13 +2305,17 @@ class Context {
                 );
             }
             $this->type->object->lookup('SQLite3Stmt');
-            foreach (['getSQL', 'paramCount', 'bindValue', 'execute'] as $stmtMethod) {
+            foreach (['getSQL', 'paramCount', 'bindValue', 'bindParam', 'execute', 'readOnly'] as $stmtMethod) {
                 $this->functionProxies['sqlite3stmt::'.strtolower($stmtMethod)] = new Call\Sqlite3StmtMethod(
                     $stmtMethod
                 );
             }
             $this->type->object->lookup('SQLite3Result');
-            $this->functionProxies['sqlite3result::fetcharray'] = new Call\Sqlite3ResultMethod('fetchArray');
+            foreach (['fetchArray', 'columnType'] as $resultMethod) {
+                $this->functionProxies['sqlite3result::'.strtolower($resultMethod)] = new Call\Sqlite3ResultMethod(
+                    $resultMethod
+                );
+            }
         }
         $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
         $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();

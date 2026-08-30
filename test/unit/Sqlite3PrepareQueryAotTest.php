@@ -36,14 +36,25 @@ final class Sqlite3PrepareQueryAotTest extends TestCase
         $this->assertSame($this->runVm($src), $this->runAot($src));
     }
 
+    public function testStmtBindParamComplianceReproMatchesVm(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+
+        $src = __DIR__.'/../repro/sqlite3_stmt_bindparam_aot.php';
+        $this->assertSame($this->runVm($src), $this->runAot($src));
+    }
+
     public function testProxiesRegistered(): void
     {
         $root = dirname(__DIR__, 2);
         $src = (string) file_get_contents($root.'/lib/JIT/Context.php');
         $this->assertStringContainsString("'open', 'prepare', 'query'", $src);
-        $this->assertStringContainsString("'bindValue', 'execute'", $src);
+        $this->assertStringContainsString("'bindValue', 'bindParam', 'execute', 'readOnly'", $src);
+        $this->assertStringContainsString("'fetchArray', 'columnType'", $src);
         $this->assertStringContainsString('sqlite3stmt::', $src);
-        $this->assertStringContainsString('sqlite3result::fetcharray', $src);
+        $this->assertStringContainsString('sqlite3result::', $src);
         $jit = (string) file_get_contents($root.'/ext/sqlite3/JitSqlite3.php');
         $this->assertStringContainsString('function prepare(', $jit);
         $this->assertStringContainsString('function query(', $jit);
