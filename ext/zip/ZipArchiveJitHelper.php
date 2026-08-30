@@ -250,6 +250,122 @@ final class ZipArchiveJitHelper
     }
 
     /**
+     * setCommentName entry path — separate NestedJIT entry avoids exec() $s1/$s2 formal
+     * aliasing under thin AOT (peer setArchiveCommentEntry / #35486 leftover).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setCommentName
+     */
+    public static function setCommentNameEntry(string $name, string $comment): string
+    {
+        if (1 !== self::$h1open || '' === $name) {
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        if ('' !== self::$h1name && $name === self::$h1name) {
+            self::$h1ecomment = $comment;
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        if ('' !== self::$h1name2 && $name === self::$h1name2) {
+            self::$h1ecomment2 = $comment;
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        self::$h1status = 9;
+
+        return self::pack(0);
+    }
+
+    /**
+     * getCommentName entry path — separate NestedJIT entry avoids exec() formal aliasing
+     * under thin AOT (peer getArchiveCommentEntry / #35486 leftover).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getCommentName
+     */
+    public static function getCommentNameEntry(string $name): string
+    {
+        if (1 !== self::$h1open || '' === $name) {
+            self::$h1status = 9;
+
+            return self::pack(0);
+        }
+        if ('' !== self::$h1name && $name === self::$h1name) {
+            self::$h1status = 0;
+
+            return self::packPayload(1, self::$h1ecomment);
+        }
+        if ('' !== self::$h1name2 && $name === self::$h1name2) {
+            self::$h1status = 0;
+
+            return self::packPayload(1, self::$h1ecomment2);
+        }
+        self::$h1status = 9;
+
+        return self::pack(0);
+    }
+
+    /**
+     * setCommentIndex entry path — separate NestedJIT entry avoids exec() $s1 formal aliasing
+     * under thin AOT (peer replaceEntry / #35486 leftover).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_setCommentIndex
+     */
+    public static function setCommentIndexEntry(int $index, string $comment): string
+    {
+        if (1 !== self::$h1open) {
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+        if (0 === $index && '' !== self::$h1name) {
+            self::$h1ecomment = $comment;
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        if (1 === $index && '' !== self::$h1name2) {
+            self::$h1ecomment2 = $comment;
+            self::$h1status = 0;
+
+            return self::pack(1);
+        }
+        self::$h1status = 18;
+
+        return self::pack(0);
+    }
+
+    /**
+     * getCommentIndex entry path — separate NestedJIT entry avoids exec() formal aliasing
+     * under thin AOT (peer getCommentNameEntry / #35486 leftover).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_getCommentIndex
+     */
+    public static function getCommentIndexEntry(int $index): string
+    {
+        if (1 !== self::$h1open) {
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+        if (0 === $index && '' !== self::$h1name) {
+            self::$h1status = 0;
+
+            return self::packPayload(1, self::$h1ecomment);
+        }
+        if (1 === $index && '' !== self::$h1name2) {
+            self::$h1status = 0;
+
+            return self::packPayload(1, self::$h1ecomment2);
+        }
+        self::$h1status = 18;
+
+        return self::pack(0);
+    }
+
+    /**
      * replaceFile entry path — separate NestedJIT entry avoids exec() $s2 formal aliasing
      * under thin AOT (peer addEntry / #35454 / #35710).
      *

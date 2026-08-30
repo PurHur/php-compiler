@@ -39,10 +39,13 @@ final class ZipArchiveEntryComment35486AotTest extends TestCase
         $this->assertStringContainsString("'setCommentIndex'", $src);
         $this->assertStringContainsString("'getCommentIndex'", $src);
         $helper = (string) file_get_contents($root.'/ext/zip/ZipArchiveJitHelper.php');
-        $this->assertStringContainsString("'scn'", $helper);
-        $this->assertStringContainsString("'gcn'", $helper);
-        $this->assertStringContainsString("'sci'", $helper);
-        $this->assertStringContainsString("'gci'", $helper);
+        $this->assertStringContainsString('setCommentNameEntry', $helper);
+        $this->assertStringContainsString('getCommentNameEntry', $helper);
+        $this->assertStringContainsString('setCommentIndexEntry', $helper);
+        $this->assertStringContainsString('getCommentIndexEntry', $helper);
+        $bridge = (string) file_get_contents($root.'/lib/JIT/Builtin/ZipArchiveEmbedBridge.php');
+        $this->assertStringContainsString('setCommentNameHelper', $bridge);
+        $this->assertStringContainsString('getCommentNameHelper', $bridge);
     }
 
     private function runVm(string $src): string

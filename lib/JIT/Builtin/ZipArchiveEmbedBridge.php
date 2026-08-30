@@ -30,6 +30,14 @@ final class ZipArchiveEmbedBridge
 
     private const GET_ARCHIVE_COMMENT = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::getArchiveCommentEntry';
 
+    private const SET_COMMENT_NAME = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::setCommentNameEntry';
+
+    private const GET_COMMENT_NAME = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::getCommentNameEntry';
+
+    private const SET_COMMENT_INDEX = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::setCommentIndexEntry';
+
+    private const GET_COMMENT_INDEX = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::getCommentIndexEntry';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::EXEC,
@@ -38,6 +46,10 @@ final class ZipArchiveEmbedBridge
         self::REPLACE_ENTRY,
         self::SET_ARCHIVE_COMMENT,
         self::GET_ARCHIVE_COMMENT,
+        self::SET_COMMENT_NAME,
+        self::GET_COMMENT_NAME,
+        self::SET_COMMENT_INDEX,
+        self::GET_COMMENT_INDEX,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -73,6 +85,26 @@ final class ZipArchiveEmbedBridge
     public static function getArchiveCommentHelper(): string
     {
         return self::GET_ARCHIVE_COMMENT;
+    }
+
+    public static function setCommentNameHelper(): string
+    {
+        return self::SET_COMMENT_NAME;
+    }
+
+    public static function getCommentNameHelper(): string
+    {
+        return self::GET_COMMENT_NAME;
+    }
+
+    public static function setCommentIndexHelper(): string
+    {
+        return self::SET_COMMENT_INDEX;
+    }
+
+    public static function getCommentIndexHelper(): string
+    {
+        return self::GET_COMMENT_INDEX;
     }
 
     public static function helperFunction(Context $context, string $logical): LlvmFunction
