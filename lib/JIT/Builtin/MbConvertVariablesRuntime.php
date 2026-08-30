@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -20,6 +21,8 @@ final class MbConvertVariablesRuntime
 
     private const ENCODING_HELPER_PATH = '/ext/mbstring/MbConvertEncodingJitHelper.php';
 
+    private const SUBST_HELPER_PATH = '/ext/mbstring/MbConvertSubstJitHelper.php';
+
     private const DETECT_HELPER_PATH = '/ext/mbstring/MbDetectEncodingJitHelper.php';
 
     /**
@@ -29,6 +32,7 @@ final class MbConvertVariablesRuntime
      * @var list<string>
      */
     private const HELPER_BUNDLE = [
+        self::SUBST_HELPER_PATH,
         self::ENCODING_HELPER_PATH,
         self::DETECT_HELPER_PATH,
         self::HELPER_PATH,
@@ -66,6 +70,21 @@ final class MbConvertVariablesRuntime
         return $context->lookupFunction(self::ABI_CONVERT_STRING);
     }
 
+    public static function callConvertString(
+        Context $context,
+        Value $str,
+        Value $toPtr,
+        Value $fromCsv
+    ): Value {
+        return $context->builder->call(
+            self::convertStringHelper($context),
+            $str,
+            $toPtr,
+            $fromCsv,
+            MbConvertEncodingRuntime::substCodeValue($context)
+        );
+    }
+
     public static function detectHelper(Context $context): LlvmFunction
     {
         self::ensureLinked($context);
@@ -87,11 +106,12 @@ final class MbConvertVariablesRuntime
         }
 
         $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_CONVERT_STRING,
             self::BRIDGE_CONVERT_STRING,
-            [$strPtr, $strPtr, $strPtr],
+            [$strPtr, $strPtr, $strPtr, $i64],
             $strPtr,
             self::CONVERT_STRING_LOGICAL,
             self::HELPER_PATH,

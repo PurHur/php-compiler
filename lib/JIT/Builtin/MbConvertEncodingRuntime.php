@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -20,11 +21,19 @@ final class MbConvertEncodingRuntime
 {
     private const HELPER_PATH = '/ext/mbstring/MbConvertEncodingJitHelper.php';
 
+    private const SUBST_HELPER_PATH = '/ext/mbstring/MbConvertSubstJitHelper.php';
+
     private const CONVERT_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbConvertEncodingJitHelper::convertArgv';
 
     private const ASSERT_TO_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbConvertEncodingJitHelper::assertToEncodingArgv';
 
     private const ASSERT_FROM_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbConvertEncodingJitHelper::assertFromEncodingArgv';
+
+    /** @var list<string> */
+    private const HELPER_BUNDLE = [
+        self::SUBST_HELPER_PATH,
+        self::HELPER_PATH,
+    ];
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -36,6 +45,25 @@ final class MbConvertEncodingRuntime
     public static function ensureLinked(Context $context): void
     {
         self::ensureJitHelperCompiled($context);
+        MbSubstituteCharacterRuntime::ensureLinked($context);
+    }
+
+    public static function substCodeValue(Context $context): Value
+    {
+        MbSubstituteCharacterRuntime::ensureLinked($context);
+
+        return $context->builder->load(MbSubstituteCharacterRuntime::substCodeGlobal($context));
+    }
+
+    public static function callConvert(Context $context, Value $str, Value $toPtr, Value $fromPtr): Value
+    {
+        return $context->builder->call(
+            self::convertHelper($context),
+            $str,
+            $toPtr,
+            $fromPtr,
+            self::substCodeValue($context)
+        );
     }
 
     public static function convertHelper(Context $context): LlvmFunction
@@ -61,9 +89,9 @@ final class MbConvertEncodingRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
+            self::HELPER_BUNDLE,
             self::COMPILED_HELPERS,
             'mb_convert_encoding'
         );

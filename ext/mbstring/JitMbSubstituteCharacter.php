@@ -130,8 +130,22 @@ final class JitMbSubstituteCharacter
         $i64 = $context->getTypeFromString('int64');
         $g = MbSubstituteCharacterRuntime::substCodeGlobal($context);
         $context->builder->store($i64->constInt($packed, true), $g);
+        self::syncMbstringStateFromPacked($packed);
 
         return $context->constantFromBool(true);
+    }
+
+    private static function syncMbstringStateFromPacked(int $packed): void
+    {
+        if ($packed === MbSubstituteCharacterJitHelper::CODE_NONE) {
+            MbstringState::substituteCharacter('none');
+        } elseif ($packed === MbSubstituteCharacterJitHelper::CODE_LONG) {
+            MbstringState::substituteCharacter('long');
+        } elseif ($packed === MbSubstituteCharacterJitHelper::CODE_ENTITY) {
+            MbstringState::substituteCharacter('entity');
+        } else {
+            MbstringState::substituteCharacter($packed);
+        }
     }
 
     private static function lowerSetRuntime(Context $context, JITVariable $arg): Value

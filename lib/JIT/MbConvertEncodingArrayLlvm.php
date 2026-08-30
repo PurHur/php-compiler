@@ -196,7 +196,7 @@ final class MbConvertEncodingArrayLlvm
         $convertedRaw = JitNestedHelperCoerce::callHelper(
             $context,
             MbConvertEncodingRuntime::convertHelper($context),
-            [$str, $toPtr, $fromPtr]
+            [$str, $toPtr, $fromPtr, MbConvertEncodingRuntime::substCodeValue($context)]
         );
         $converted = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $convertedRaw);
         $owned = $context->builder->call(

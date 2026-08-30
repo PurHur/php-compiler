@@ -70,8 +70,8 @@ final class MbConvertEncodingFromListLlvm
             MbConvertEncodingRuntime::assertFromEncodingHelper($context),
             $fromPtr
         );
-        $singleResult = $context->builder->call(
-            MbConvertEncodingRuntime::convertHelper($context),
+        $singleResult = MbConvertEncodingRuntime::callConvert(
+            $context,
             $str,
             $toPtr,
             $fromPtr
@@ -103,8 +103,8 @@ final class MbConvertEncodingFromListLlvm
         // Runtime CSV + NestedJIT detect-then-convert (peer #35315) — avoids invalid IR from
         // __string__alloc order-code builder on size_t→int64 mismatch (#35296 leftover).
         $fromCsv = MbConvertVariablesFromListLlvm::buildFromCsv($context, $fromArg);
-        $resultStr = $context->builder->call(
-            MbConvertVariablesRuntime::convertStringHelper($context),
+        $resultStr = MbConvertVariablesRuntime::callConvertString(
+            $context,
             $str,
             $toPtr,
             $fromCsv
