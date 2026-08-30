@@ -9498,6 +9498,9 @@ class JIT {
                         && null === $srcVar->valueBoxAliasPtr
                         && !$srcVar->borrowedValueEntry
                         && null === $srcVar->writableHt
+                        // Live property/static slots must not get a by-value copy pointer (#35898).
+                        && null === $srcVar->objectPropertySlot
+                        && null === $srcVar->staticPropertyGlobal
                     ) {
                         $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
                             $this->context,
@@ -20241,6 +20244,8 @@ class JIT {
                     null !== $bound->valueBoxAliasPtr
                     || $bound->borrowedValueEntry
                     || null !== $bound->foreachByRefPackedArm
+                    || null !== $bound->objectPropertySlot
+                    || $bound->assignRefLvalueAlias
                 ) {
                     $this->context->scope->variables[$resultOp] = $bound;
 
@@ -21175,6 +21180,8 @@ class JIT {
         // Only reseat forced coalesce/ternary merges. `$obj->prop = $rhs` is also TYPE_VALUE
         // with a live slot (php-cfg PROPERTY_FETCH + ASSIGN) — stripping it made AOT ignore
         // untyped/string instance writes (leftover of #35863 / #35874).
+        // `$r =& $obj->prop; $r = N` keeps objectPropertySlot via assignRefLvalueAlias — reseating
+        // here made the write a local-box no-op (silent wrong output; #35898 / leftover of #34649).
         if (
             $force
             && null === $value->objectPropertySlot
@@ -21184,6 +21191,7 @@ class JIT {
             $mergeDest = $this->context->getVariableFromOp($resultOp);
             if (
                 null !== $mergeDest->objectPropertySlot
+                && !$mergeDest->assignRefLvalueAlias
                 && Variable::TYPE_VALUE === $mergeDest->type
                 && null === $mergeDest->staticPropertyGlobal
                 && !$mergeDest->functionStaticGlobal
