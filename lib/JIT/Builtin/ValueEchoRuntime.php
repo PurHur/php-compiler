@@ -160,6 +160,32 @@ final class ValueEchoRuntime
         }
 
         $tag = 'ev'.(string) ++self::$seq;
+
+        // ReflectionParameter::getType() boxes advertise ?ReflectionType but hold
+        // ReflectionNamedType — use cast handler like (string) (re-#25469).
+        if (null !== $classHint) {
+            $hintLc = strtolower(ltrim($classHint, '\\'));
+            if (str_starts_with($hintLc, '?')) {
+                $hintLc = substr($hintLc, 1);
+            }
+            if (str_starts_with($hintLc, 'reflection')) {
+                JitNativeString::ensureInsertBlock($context);
+                $boxed = new Variable(
+                    $context,
+                    JitVariable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $valuePtr
+                );
+                ValueEchoHelper::echoStringVariable(
+                    $context,
+                    JitNativeString::coerce($context, $boxed)
+                );
+                BasicBlockHelper::branchToFreshContinue($context, 'echo_refl_type_done_'.$tag);
+
+                return;
+            }
+        }
+
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
@@ -253,18 +279,19 @@ final class ValueEchoRuntime
         $context->builder->branchIf(self::callTypeIsObject($context, $typeByte), $objectBlock, $afterObject);
 
         $context->builder->positionAtEnd($objectBlock);
-        $objPtr = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
+        $boxed = new Variable(
+            $context,
+            JitVariable::TYPE_VALUE,
+            Variable::KIND_VALUE,
             $valuePtr
         );
-        $objVar = new Variable(
+        // MagicMethodDispatch + strval() on ReflectionNamedType::__toString returns empty;
+        // JitNativeString::coerce matches (string) cast (runtime class_id, #25469).
+        JitNativeString::ensureInsertBlock($context);
+        ValueEchoHelper::echoStringVariable(
             $context,
-            Variable::TYPE_OBJECT,
-            Variable::KIND_VALUE,
-            $objPtr
+            JitNativeString::coerce($context, $boxed)
         );
-        // Thread Operand userType so assigned locals call __toString (#33986).
-        ValueEchoHelper::echoObjectVariable($context, $objVar, $classHint);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterObject);
@@ -279,8 +306,16 @@ final class ValueEchoRuntime
         $strLen = $context->builder->load(
             $context->builder->structGep($strPtr, $strMap['length'])
         );
-        $strChars = $context->builder->structGep($strPtr, $strMap['value']);
         $sizeT = $context->getTypeFromString('size_t');
+        $hasChars = $context->builder->icmp(
+            Builder::INT_UGT,
+            $strLen,
+            $sizeT->constInt(0, false)
+        );
+        $stringEchoBlock = BasicBlockHelper::append($context, 'echo_value_string_emit_'.$tag);
+        $context->builder->branchIf($hasChars, $stringEchoBlock, $fallbackBlock);
+        $context->builder->positionAtEnd($stringEchoBlock);
+        $strChars = $context->builder->structGep($strPtr, $strMap['value']);
         $context->builder->call(
             $context->lookupFunction('__phpc_ob_echo_substr'),
             $strChars,

@@ -2111,6 +2111,7 @@ class Context {
         $this->functionProxies['reflectionfunction::isvariadic'] = new Call\ReflectionFunctionIsVariadic();
         // Thin AOT: unbound getNumberOfParameters / isUserDefined / isInternal → NULL (#34218).
         $this->functionProxies['reflectionfunction::getnumberofparameters'] = new Call\ReflectionFunctionGetNumberOfParameters();
+        $this->functionProxies['reflectionfunction::getnumberofrequiredparameters'] = new Call\ReflectionFunctionGetNumberOfRequiredParameters();
         $this->functionProxies['reflectionfunction::getparameters'] = new Call\ReflectionFunctionGetParameters();
         $this->functionProxies['reflectionfunction::getreturntype'] = new Call\ReflectionFunctionGetReturnType();
         $this->functionProxies['reflectionfunction::hasreturntype'] = new Call\ReflectionFunctionHasReturnType();
@@ -2120,6 +2121,7 @@ class Context {
             $this->functionProxies['reflectionparameter::issensitiveparameter'] = new Call\ReflectionParameterIsSensitiveParameter();
         }
         $this->functionProxies['reflectionparameter::isvariadic'] = new Call\ReflectionParameterIsVariadic();
+        $this->functionProxies['reflectionparameter::isoptional'] = new Call\ReflectionParameterIsOptional();
         if (CompilerVersion::supportsReflectionFunctionGetNamedArguments()) {
             $this->functionProxies['reflectionfunction::getnamedarguments'] = new Call\ReflectionFunctionGetNamedArguments();
             $this->functionProxies['reflectionmethod::getnamedarguments'] = new Call\ReflectionMethodGetNamedArguments();

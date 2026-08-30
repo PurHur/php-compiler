@@ -122,6 +122,13 @@ final class ValueEchoHelper
             return;
         }
 
+        $byClassId = JitNativeString::tryCoerceObjectVariableByStringableClassId($context, $objectVar);
+        if (null !== $byClassId) {
+            self::echoStringVariable($context, $byClassId);
+
+            return;
+        }
+
         $asString = MagicMethodDispatch::coerceObjectToString($context, $objectVar, $classHint);
         if (null !== $asString) {
             self::echoStringVariable($context, $asString);

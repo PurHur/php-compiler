@@ -14,15 +14,15 @@ use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
-/** ReflectionParameter::getDefaultValue() — JIT/AOT (#28780). */
-final class ReflectionParameterGetDefaultValue implements Call
+/** ReflectionParameter::isOptional() — JIT/AOT (#25469, ext/reflection/php_reflection.c). */
+final class ReflectionParameterIsOptional implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
         if (!VmClassMethod::requireExactJitUserArgCount(
             $context,
             $args,
-            'ReflectionParameter::getDefaultValue()',
+            'ReflectionParameter::isOptional()',
             0
         )) {
             return VmClassMethod::jitArgcDummyReturn($context);
@@ -31,16 +31,13 @@ final class ReflectionParameterGetDefaultValue implements Call
         ReflectionRuntime::ensureLinked($context);
         ReflectionNative::registerDeclarations($context);
 
-        $folded = ReflectionInternalParamJitHelper::emitDefaultValueFromRecordedInternal($context, $args[0]);
+        $folded = ReflectionInternalParamJitHelper::emitIsOptionalFromRecordedInternal($context, $args[0]);
         if (null !== $folded) {
             return $folded;
         }
 
         $resultSlot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            JitValueBox::pointer($context, $resultSlot)
-        );
+        JitValueBox::writeBool($context, $resultSlot, $context->getTypeFromString('int1')->constInt(0, false));
 
         return $resultSlot;
     }
