@@ -59,12 +59,7 @@ final class MultisortRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        // Body emitted by Type\HashTable::implementMultisortPacked() at context init (#26908).
-        $fn = $context->module->getNamedFunction(self::ABI_MULTISORT_PACKED);
-        if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_MULTISORT_PACKED.' missing after HashTable type init (#26908)');
-        }
-        $context->registerFunction(self::ABI_MULTISORT_PACKED, $fn);
+        $context->type->hashtable->ensureSortAbi(self::ABI_MULTISORT_PACKED);
     }
 
     public static function ensureStandaloneBodies(Context $context): void

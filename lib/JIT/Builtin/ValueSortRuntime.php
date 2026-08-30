@@ -48,6 +48,7 @@ final class ValueSortRuntime
 
     public static function asortByValueLocale(Context $context, JITVariable $array): void
     {
+        $context->type->hashtable->ensureSortAbi(self::ABI_ASORT_LOCALE);
         self::invokeStrKeyAbi($context, $array, self::ABI_ASORT_LOCALE);
     }
 
@@ -101,8 +102,8 @@ final class ValueSortRuntime
     public static function ensureLinked(Context $context): void
     {
         self::assertAbi($context, self::ABI_ASORT);
-        self::assertAbi($context, self::ABI_ASORT_LOCALE);
         self::assertAbi($context, self::ABI_ARSORT);
+        // locale ABI is ensureSortAbi on asortByValueLocale only (#35904).
     }
 
     private static function assertAbi(Context $context, string $name): void

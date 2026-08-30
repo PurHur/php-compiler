@@ -31,11 +31,15 @@ final class HashTableLazyStringCompareRuntimeShrinkTest extends TestCase
             '$this->ensureNaturalCompareAbis',
             'StringNaturalCompare::ensureStandaloneBodies',
             'StringStrcoll::ensureLinked',
+            'implementSortStringKeysLocale',
+            'implementSortStringKeyValuesLocale',
+            'implementSortPackedNatural',
+            'implementMultisortPacked',
         ] as $forbidden) {
             $this->assertStringNotContainsString(
                 $forbidden,
                 $body,
-                'HashTable::implement must not eagerly '.$forbidden.' (#35626)'
+                'HashTable::implement must not eagerly '.$forbidden.' (#35626 / #35904)'
             );
         }
     }

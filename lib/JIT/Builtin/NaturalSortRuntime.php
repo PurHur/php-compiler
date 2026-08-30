@@ -56,28 +56,20 @@ final class NaturalSortRuntime
     {
         if ($caseInsensitive) {
             StringNaturalCompare::ensureStrnatcasecmpLinked($context);
+            $context->type->hashtable->ensureSortAbi(self::ABI_STRKEY_NATURAL_CASE);
         } else {
             StringNaturalCompare::ensureStrnatcmpLinked($context);
+            $context->type->hashtable->ensureSortAbi(self::ABI_STRKEY_NATURAL);
         }
-        self::assertAbi($context, $caseInsensitive ? self::ABI_PACKED_NATURAL_CASE : self::ABI_PACKED_NATURAL);
-        self::assertAbi($context, $caseInsensitive ? self::ABI_STRKEY_NATURAL_CASE : self::ABI_STRKEY_NATURAL);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
         StringNaturalCompare::ensureStandaloneBodies($context);
-        self::assertAbi($context, self::ABI_PACKED_NATURAL);
-        self::assertAbi($context, self::ABI_PACKED_NATURAL_CASE);
-        self::assertAbi($context, self::ABI_STRKEY_NATURAL);
-        self::assertAbi($context, self::ABI_STRKEY_NATURAL_CASE);
-    }
-
-    private static function assertAbi(Context $context, string $name): void
-    {
-        $fn = $context->module->getNamedFunction($name);
-        if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException($name.' missing after HashTable type init (#26975)');
-        }
-        $context->registerFunction($name, $fn);
+        $ht = $context->type->hashtable;
+        $ht->ensureSortAbi(self::ABI_STRKEY_NATURAL);
+        $ht->ensureSortAbi(self::ABI_STRKEY_NATURAL_CASE);
+        $ht->ensureSortAbi(self::ABI_PACKED_NATURAL);
+        $ht->ensureSortAbi(self::ABI_PACKED_NATURAL_CASE);
     }
 }
