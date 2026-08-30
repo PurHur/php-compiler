@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlwriter;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -53,6 +54,55 @@ final class JitXmlWriterUserScript
         $ok = $writer->openMemory();
 
         return self::boolValue($context, $ok);
+    }
+
+    /**
+     * XMLWriter::toMemory() leftover of openMemory (#19606 / #35872).
+     * php-src: zim_XMLWriter_toMemory — static factory = new + xmlTextWriterStartDocument buffer.
+     * Host PHP 8.2 has no toMemory(); fold via new XMLWriter + openMemory.
+     */
+    public static function tryToMemory(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || !\extension_loaded('xmlwriter')
+            || !\class_exists(\XMLWriter::class, false)
+        ) {
+            return null;
+        }
+        $writer = new \XMLWriter();
+        if (!$writer->openMemory()) {
+            return null;
+        }
+
+        return self::materializeFactoryObject($context, $writer);
+    }
+
+    /**
+     * XMLWriter::toUri() leftover of openUri (#19606 / #35872).
+     * php-src: zim_XMLWriter_toUri — static factory = new + xmlNewTextWriterFilename.
+     */
+    public static function tryToUri(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || !\extension_loaded('xmlwriter')
+            || !\class_exists(\XMLWriter::class, false)
+            || !isset($args[0])
+        ) {
+            return null;
+        }
+        $uri = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (null === $uri || str_starts_with($uri, '__phpc_xw_')) {
+            return null;
+        }
+        if ('' === $uri) {
+            throw new \ValueError('XMLWriter::toUri(): Argument #1 ($uri) cannot be empty');
+        }
+        $writer = new \XMLWriter();
+        if (!@$writer->openUri($uri)) {
+            throw new \Error('XMLWriter::toUri(): Unable to open URI');
+        }
+
+        return self::materializeFactoryObject($context, $writer);
     }
 
     /**
@@ -931,6 +981,33 @@ final class JitXmlWriterUserScript
         return null;
     }
 
+    /**
+     * Allocate a constructed XMLWriter box and attach the host writer (#19606).
+     */
+    private static function materializeFactoryObject(Context $context, \XMLWriter $writer): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlwriter_factory_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('XMLWriter');
+        $obj = $objectType->allocate($classId);
+        $objectType->markObjectConstructed($obj);
+        $receiver = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $obj
+        );
+        self::store($receiver, $writer);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $obj
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
     private static function requireWriter(?JITVariable $receiver): ?\XMLWriter
     {
         if (null === $receiver) {
@@ -960,6 +1037,15 @@ final class JitXmlWriterUserScript
         $receiver->compileTimeString = $token;
         self::$writersByToken[$token] = $writer;
         self::$lastWriter = $writer;
+    }
+
+    /** Stamp EXEC_RETURN / `$w = XMLWriter::toMemory()` so later methods find the host writer. */
+    public static function bindResultVariable(JITVariable $var): void
+    {
+        if (null === self::$lastWriter) {
+            return;
+        }
+        self::store($var, self::$lastWriter);
     }
 
     private static function lookup(JITVariable $receiver): ?\XMLWriter

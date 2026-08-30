@@ -14,6 +14,10 @@ final class XmlWriterInstanceMethodJit
         'xmlwriter::openmemory' => true,
         // leftover of openMemory AOT (#19551 / #35872) — php-src zim_XMLWriter_openUri
         'xmlwriter::openuri' => true,
+        // leftover of openMemory AOT (#19606 / #35872) — php-src zim_XMLWriter_toMemory
+        'xmlwriter::tomemory' => true,
+        // leftover of openUri AOT (#19606 / #35872) — php-src zim_XMLWriter_toUri
+        'xmlwriter::touri' => true,
         'xmlwriter::startdocument' => true,
         'xmlwriter::startelement' => true,
         'xmlwriter::startelementns' => true,
@@ -77,6 +81,22 @@ final class XmlWriterInstanceMethodJit
         }
         if (isset($context->functionProxies[$lc])
             && !($context->functionProxies[$lc] instanceof Call\ExternalMethod)) {
+            return;
+        }
+        if ('xmlwriter::tomemory' === $lc) {
+            if (!\PHPCompiler\CompilerVersion::supportsXmlWriterFactories()) {
+                return;
+            }
+            $context->functionProxies[$lc] = new Call\XmlWriterToMemory();
+
+            return;
+        }
+        if ('xmlwriter::touri' === $lc) {
+            if (!\PHPCompiler\CompilerVersion::supportsXmlWriterFactories()) {
+                return;
+            }
+            $context->functionProxies[$lc] = new Call\XmlWriterToUri();
+
             return;
         }
         $methodLc = substr($lc, \strlen('xmlwriter::'));

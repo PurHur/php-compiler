@@ -14200,6 +14200,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateXmlWriterFactoryResultType(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     $this->propagateDomHtmlDocumentCfsResultType(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
@@ -17973,6 +17977,36 @@ class JIT {
     }
 
     /**
+     * XMLWriter::toMemory()/toUri() — static factories return XMLWriter (#19606 leftover of #35872).
+     */
+    private function propagateXmlWriterFactoryResultType(Operand $result, mixed $toCall): void
+    {
+        if (
+            !($toCall instanceof JIT\Call\XmlWriterToMemory)
+            && !($toCall instanceof JIT\Call\XmlWriterToUri)
+        ) {
+            return;
+        }
+        $result->type = new Type(Type::TYPE_OBJECT, [], 'XMLWriter');
+        if ($this->context->hasVariableOp($result)) {
+            $var = $this->context->getVariableFromOp($result);
+            $var->classUserType = 'XMLWriter';
+            \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::bindResultVariable($var);
+            $name = JIT\OperandName::resolve($result);
+            if (null !== $name && '' !== $name) {
+                $resolved = $this->context->resolveRefAliasName($name);
+                if (isset($this->context->namedVariableBindings[$resolved])) {
+                    $this->context->namedVariableBindings[$resolved]->classUserType = 'XMLWriter';
+                    \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::bindResultVariable(
+                        $this->context->namedVariableBindings[$resolved]
+                    );
+                }
+                $this->context->bindVariableByName($resolved, $var);
+            }
+        }
+    }
+
+    /**
      * Dom\HTMLDocument::createFromString/File — tag the result so saveXml folds
      * the living tree instead of empty LiveSlots {@code <html/>} (leftover of #31324).
      */
@@ -18600,6 +18634,34 @@ class JIT {
                 $resultVar->classUserType = 'XMLReader';
                 $this->context->setVariableOp($result, $resultVar);
                 $result->type = new Type(Type::TYPE_OBJECT, [], 'XMLReader');
+                $name = JIT\OperandName::resolve($result);
+                if (null !== $name && '' !== $name) {
+                    $resolved = $this->context->resolveRefAliasName($name);
+                    $this->context->bindVariableByName($resolved, $resultVar);
+                }
+
+                return;
+            }
+            if (
+                $this->context->scope->toCall instanceof JIT\Call\XmlWriterToMemory
+                || $this->context->scope->toCall instanceof JIT\Call\XmlWriterToUri
+            ) {
+                $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
+                if ($this->context->hasVariableOp($result)) {
+                    $this->context->getVariableFromOp($result)->free();
+                }
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer($this->context, $slot, $ptr);
+                $resultVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $resultVar->classUserType = 'XMLWriter';
+                \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::bindResultVariable($resultVar);
+                $this->context->setVariableOp($result, $resultVar);
+                $result->type = new Type(Type::TYPE_OBJECT, [], 'XMLWriter');
                 $name = JIT\OperandName::resolve($result);
                 if (null !== $name && '' !== $name) {
                     $resolved = $this->context->resolveRefAliasName($name);
