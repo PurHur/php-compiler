@@ -6784,6 +6784,7 @@
         "lib/JIT/Call/IntlDateFormatterCreate.php",
         "lib/JIT/Call/IntlDateFormatterFormat.php",
         "lib/JIT/Call/LimitIteratorConstruct.php",
+        "lib/JIT/Call/LimitIteratorMethod.php",
         "lib/JIT/Call/MessageFormatterConstruct.php",
         "lib/JIT/Call/MessageFormatterFormat.php",
         "lib/JIT/Call/MultipleIteratorMethod.php",
@@ -7841,6 +7842,7 @@
         "lib/VM/LazyGhostTraitSupport.php",
         "lib/VM/LazyObjectSupport.php",
         "lib/VM/LazyPropertySupport.php",
+        "lib/VM/LimitIteratorJitHelper.php",
         "lib/VM/ListUnpackJitHelper.php",
         "lib/VM/MagicCallArgs.php",
         "lib/VM/MagicMethodInvocationAborted.php",
@@ -8240,9 +8242,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8006,
+        "inventory_files": 8008,
         "excluded": 0,
-        "eligible": 8006,
+        "eligible": 8008,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
