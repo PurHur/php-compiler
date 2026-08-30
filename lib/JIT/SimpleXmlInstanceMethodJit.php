@@ -19,6 +19,8 @@ final class SimpleXmlInstanceMethodJit
         'simplexmlelement::xpath' => true,
         'simplexmlelement::registerxpathnamespace' => true,
         'simplexmlelement::__get' => true,
+        // leftover of __get / property isset-unset AOT (#35814 / #35824) — php-src sxe.c sxe_property_write
+        'simplexmlelement::__set' => true,
         'simplexmlelement::offsetget' => true,
         'simplexmlelement::offsetunset' => true,
         'simplexmlelement::count' => true,
@@ -83,6 +85,11 @@ final class SimpleXmlInstanceMethodJit
         }
         if ('simplexmlelement::__get' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementGet();
+
+            return;
+        }
+        if ('simplexmlelement::__set' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementGet('__set');
 
             return;
         }

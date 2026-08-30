@@ -93,6 +93,14 @@ final class Variable {
 
     public bool $isArrayAccessWritableOffset = false;
 
+    /**
+     * FETCH_OBJ_W on a compile-time SimpleXMLElement — ASSIGN host-folds via tryPropSet
+     * (#35824 leftover of #35814 / php-src sxe_property_write).
+     */
+    public ?Variable $writableSxePropReceiver = null;
+
+    public ?string $writableSxePropName = null;
+
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 

@@ -15131,6 +15131,36 @@ class JIT {
                     $propFetchForWrite = $forWrite
                         || $this->varFetchDestUsedAsPlainAssignStore($block, $i, (int) $op->arg1);
                     if ($name instanceof Operand\Literal) {
+                        // User-script AOT: SimpleXMLElement property write via host tree
+                        // (#35824 leftover of #35814). Generic __set is a silent no-op.
+                        if (
+                            $forWrite
+                            && JIT\UserScriptAotEnv::isActive()
+                            && $this->context->hasVariableOp($obj)
+                        ) {
+                            $declLcSxe = strtolower(ltrim($declaringClass, '\\'));
+                            $recvSxe = $this->context->getVariableFromOp($obj);
+                            $recvClassLc = strtolower(ltrim((string) ($recvSxe->classUserType ?? ''), '\\'));
+                            $isSxe = 'simplexmlelement' === $declLcSxe
+                                || 'simplemxml_element' === $declLcSxe
+                                || 'simplexmlelement' === $recvClassLc
+                                || 'simplemxml_element' === $recvClassLc;
+                            if ($isSxe) {
+                                $sxePropWrite = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryPreparePropWrite(
+                                    $this->context,
+                                    $recvSxe,
+                                    (string) $name->value
+                                );
+                                if (null !== $sxePropWrite) {
+                                    if ($forceBranchMerge) {
+                                        $this->assignOperand($result, $sxePropWrite, true);
+                                    } else {
+                                        $this->context->scope->variables[$result] = $sxePropWrite;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
                         // PHPCfg types `new static()` receivers as static — skip declaring-class
                         // guards that target a bogus "static" ClassEntry (#31937).
                         // Also: unserialize() runtime O: results lack classUserType — use
@@ -21153,6 +21183,25 @@ class JIT {
             $value
         )) {
             return;
+        }
+        // SimpleXMLElement property write — host sxe_property_write (#35824 leftover of #35814).
+        if (
+            JIT\UserScriptAotEnv::isActive()
+            && null !== $result->writableSxePropReceiver
+            && null !== $result->writableSxePropName
+        ) {
+            $sxePropSet = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryPropSet(
+                $this->context,
+                $result->writableSxePropReceiver,
+                $result->writableSxePropName,
+                $value
+            );
+            if (null !== $sxePropSet) {
+                return;
+            }
+            throw new \LogicException(
+                'SimpleXMLElement::__set() user-script AOT requires a compile-time tree (#35824 leftover of #35814)'
+            );
         }
         // __set / ARRAY_AS_PROPS lvalues are KIND_VALUE Temporary placeholders — must dispatch
         // before temp→stack promotion, which allocates a fresh Variable and drops the markers

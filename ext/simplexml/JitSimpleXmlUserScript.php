@@ -831,6 +831,65 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * FETCH_OBJ_W lvalue for a compile-time SXE tree (#35824 leftover of #35814 / #26863).
+     *
+     * Thin AOT boxes SimpleXMLElement as TYPE_VALUE; generic __set is unregistered so
+     * ASSIGN is a silent no-op. Mark a prop-write slot so ASSIGN host-folds via {@see tryPropSet}.
+     */
+    public static function tryPreparePropWrite(
+        Context $context,
+        JITVariable $container,
+        string $propName
+    ): ?JITVariable {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml') || '' === $propName) {
+            return null;
+        }
+        if (null === self::lookup($container)) {
+            return null;
+        }
+        $slot = JitValueBox::alloc($context);
+        $var = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
+        $var->writableSxePropReceiver = $container;
+        $var->writableSxePropName = $propName;
+
+        return $var;
+    }
+
+    /**
+     * SimpleXMLElement::__set — host sxe_property_write (#35824 / php-src sxe.c).
+     *
+     * Mutates the compile-time tree so a later asXML()/__get fold sees the write
+     * (peer tryOffsetSet / tryPropUnset).
+     */
+    public static function tryPropSet(
+        Context $context,
+        JITVariable $receiver,
+        string $propName,
+        JITVariable $value
+    ): ?Value {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml') || '' === $propName) {
+            return null;
+        }
+        $tree = self::lookupExact($receiver) ?? self::lookup($receiver);
+        if (null === $tree) {
+            return null;
+        }
+        $text = self::compileTimeOffsetSetValue($context, $value);
+        if (null === $text) {
+            throw new \LogicException(
+                'SimpleXMLElement::__set() user-script AOT requires a compile-time value (#35824 leftover of #35814)'
+            );
+        }
+        try {
+            $tree->{$propName} = $text;
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::nullValue($context);
+    }
+
+    /**
      * isset($sxe[$dim]) — host has_dimension (php-src sxe_object_has_dimension; #34555).
      *
      * Thin AOT boxes SXE as TYPE_VALUE so ArrayAccess isset is skipped and HT probe
