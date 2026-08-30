@@ -17413,10 +17413,13 @@ class JIT {
             $parent = $callArgs[0] ?? null;
             if ($parent instanceof Variable) {
                 $priorInner = $parent->compileTimeDomInnerXml ?? '';
-                $isFrag = '#document-fragment' === ($parent->compileTimeDomTagName ?? null);
-                // DocumentFragment: LiveMutation leaves Variable inner empty (#35461) — always
-                // concat each child. Elements: only seed when empty (LiveMutation owns refresh).
-                if ($isFrag || '' === $priorInner) {
+                $isFrag = \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND
+                    === ($parent->compileTimeDomTagName ?? null)
+                    || \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::$lastMaterialized;
+                if ($isFrag) {
+                    // LiveMutation records lastChildren + sets InnerXml (#35881). Do not
+                    // concat here — that doubled fragment markup for importNode.
+                } elseif ('' === $priorInner) {
                     $this->appendCompileTimeDomInnerXmlChild($parent, $child);
                 }
             }
@@ -17794,14 +17797,14 @@ class JIT {
             return;
         }
         $var = $this->context->getVariableFromOp($result);
-        $var->compileTimeDomTagName = '#document-fragment';
+        $var->compileTimeDomTagName = \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND;
         $var->compileTimeDomInnerXml = $var->compileTimeDomInnerXml ?? '';
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
                 $bound = $this->context->namedVariableBindings[$resolved];
-                $bound->compileTimeDomTagName = '#document-fragment';
+                $bound->compileTimeDomTagName = \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND;
                 $bound->compileTimeDomInnerXml = $bound->compileTimeDomInnerXml ?? '';
             }
             $this->context->bindVariableByName($resolved, $var);
