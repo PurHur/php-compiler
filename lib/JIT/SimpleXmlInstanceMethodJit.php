@@ -21,6 +21,8 @@ final class SimpleXmlInstanceMethodJit
         'simplexmlelement::__get' => true,
         'simplexmlelement::__set' => true,
         'simplexmlelement::offsetget' => true,
+        'simplexmlelement::offsetset' => true,
+        'simplexmlelement::offsetexists' => true,
         'simplexmlelement::offsetunset' => true,
         'simplexmlelement::count' => true,
         'simplexmlelement::__tostring' => true,
@@ -94,6 +96,16 @@ final class SimpleXmlInstanceMethodJit
         }
         if ('simplexmlelement::offsetget' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementOffsetGet();
+
+            return;
+        }
+        if ('simplexmlelement::offsetset' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementOffsetGet('offsetSet');
+
+            return;
+        }
+        if ('simplexmlelement::offsetexists' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementOffsetGet('offsetExists');
 
             return;
         }
