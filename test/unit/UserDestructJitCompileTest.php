@@ -9,51 +9,52 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * LLVM compile-only verify for user __destruct() JIT/AOT lowering (#4013, #4096).
+ * User __destruct() VM + AOT compile/execute (#4013, #4096).
+ *
+ * JIT {@see JIT\Context::compileCommon()} module-verify on tiny scripts is not a
+ * reliable gate here (parentless IR under the MCJIT path); AOT via bin/compile.php
+ * is the release path and matches Zend.
  *
  * @group llvm
+ * @group aot
  *
  * @see https://github.com/php/php-src/blob/master/Zend/zend_objects.c zend_objects_destroy_object
  */
 final class UserDestructJitCompileTest extends TestCase
 {
-    private string $repoRoot;
+    private const EXPECT = "dtor\nafter\n";
 
-    protected function setUp(): void
+    public function testVmUserDestructOnUnsetMatchesZend(): void
     {
-        $this->repoRoot = dirname(__DIR__, 2);
-        if (!LlvmToolchain::isReady($this->repoRoot)) {
-            $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
-            $this->markTestSkipped($reason.' — user __destruct JIT compile test needs LLVM');
+        $code = file_get_contents(dirname(__DIR__).'/repro/aot_user_destruct_unset.php');
+        $this->assertNotFalse($code);
+        ob_start();
+        (new Runtime())->run((new Runtime())->parseAndCompile($code, 'aot_user_destruct_unset.php'));
+        $out = (string) ob_get_clean();
+        $this->assertSame(self::EXPECT, $out);
+    }
+
+    public function testAotUserDestructCompileAndRunMatchesVm(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
         }
-    }
-
-    public function testUserDestructModuleVerifies(): void
-    {
-        $code = <<<'PHP'
-<?php
-class R {
-    public function __destruct() {
-        echo "dtor\n";
-    }
-}
-$o = new R();
-unset($o);
-PHP;
-
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($code, 'user_destruct_jit_compile.php');
-        $this->assertNotNull($block);
-        $runtime->jitCompileBlock($block);
-
-        $context = $runtime->loadJitContext();
-        $verify = new \ReflectionMethod($context, 'compileCommon');
-        $verify->setAccessible(true);
-        $verify->invoke($context);
-
-        $module = $context->module;
-        $this->assertNotNull($module->getNamedFunction('__object__invoke_destructor'));
-        $this->assertNotNull($module->getNamedFunction('phpc_destruct_try_invoke'));
-        $this->assertNotNull($module->getNamedFunction('phpc_gc_run_shutdown_destructors'));
+        $root = dirname(__DIR__, 2);
+        $src = $root.'/test/repro/aot_user_destruct_unset.php';
+        $bin = sys_get_temp_dir().'/phpc_aot_user_destruct_'.getmypid().'.bin';
+        $compile = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        $this->assertFileExists($bin);
+        try {
+            $runOut = [];
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame(self::EXPECT, implode("\n", $runOut)."\n");
+        } finally {
+            @unlink($bin);
+        }
     }
 }
