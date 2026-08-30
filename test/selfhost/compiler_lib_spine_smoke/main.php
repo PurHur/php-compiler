@@ -97,6 +97,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 // Thin AOT PDO driver honesty (#27619 / #28643) — inventory units must stay on spine (#1922).
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -2013,7 +2014,9 @@ require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlChildren.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlConstruct.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlCount.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlGet.php';
+require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlGetDocNamespaces.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlGetName.php';
+require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlGetNamespaces.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlLoadFile.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlLoadString.php';
 require_once __DIR__.'/../../../ext/simplexml/JitSimpleXmlOffsetGet.php';
@@ -6552,7 +6555,9 @@ require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementChildren.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementCount.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementGet.php';
+require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementGetDocNamespaces.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementGetName.php';
+require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementGetNamespaces.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementOffsetGet.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementToString.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementRegisterXPathNamespace.php';
@@ -7995,36 +8000,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/DomAttrIsIdRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomAttrIsId.php';
 require_once __DIR__.'/../../../lib/JIT/TypedParamCoerce.php';
 require_once __DIR__.'/../../../lib/JIT/StaticPropertyAsNonStaticJitGuard.php';
-// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
-// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
-
-$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
-if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
-    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
-    run('Standard input code', '<?php echo "vm driver ok\n";', []);
-    exit(0);
-}
-
-$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
-if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
-    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
-    run('Standard input code', '<?php echo "1\n";', []);
-    exit(0);
-}
-
-// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
-// Use builtins so JitMbMimeheader const-folds via Zend → VmMbstring::encodeMimeheader
-// / decodeMimeheader. Direct top-level VmMbstring::encodeMimeheader() STATICCALL_INIT
-// fails honest full-spine AOT when late methods on the large VmMbstring class are not
-// registered in the module (#22642 r13). String anchors below keep the VM smoke test.
-$__spineMimeEnc = mb_encode_mimeheader('Hello 世界', 'UTF-8');
-$__spineMimeDec = mb_decode_mimeheader($__spineMimeEnc);
-unset($__spineMimeEnc, $__spineMimeDec);
-// VmMbstring::encodeMimeheader VmMbstring::decodeMimeheader
-
-// M2 spine unit: setcookie options array parser Vm inventory (#8698).
-\PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
-
+require_once __DIR__.'/../../../lib/JIT/Call/LimitIteratorMethod.php';
+require_once __DIR__.'/../../../lib/VM/LimitIteratorJitHelper.php';
 require_once __DIR__.'/../../../lib/AOT/AotEmitFastExit.php';
 require_once __DIR__.'/../../../ext/dom/JitDomSaveSerializationArgs.php';
 require_once __DIR__.'/../../../ext/imagick/ImagickClassMethod.php';
@@ -8134,4 +8111,34 @@ require_once __DIR__.'/../../../ext/dom/JitDomAttrChildEdgeFetch.php';
 require_once __DIR__.'/../../../ext/dom/JitDomStandinGetClass.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableValueFilterLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/MbConvertEncodingFromListLlvm.php';
+// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
+// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
+
+$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
+if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
+    run('Standard input code', '<?php echo "vm driver ok\n";', []);
+    exit(0);
+}
+
+$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
+if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
+    run('Standard input code', '<?php echo "1\n";', []);
+    exit(0);
+}
+
+// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
+// Use builtins so JitMbMimeheader const-folds via Zend → VmMbstring::encodeMimeheader
+// / decodeMimeheader. Direct top-level VmMbstring::encodeMimeheader() STATICCALL_INIT
+// fails honest full-spine AOT when late methods on the large VmMbstring class are not
+// registered in the module (#22642 r13). String anchors below keep the VM smoke test.
+$__spineMimeEnc = mb_encode_mimeheader('Hello 世界', 'UTF-8');
+$__spineMimeDec = mb_decode_mimeheader($__spineMimeEnc);
+unset($__spineMimeEnc, $__spineMimeDec);
+// VmMbstring::encodeMimeheader VmMbstring::decodeMimeheader
+
+// M2 spine unit: setcookie options array parser Vm inventory (#8698).
+\PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
+
 echo "compiler_lib_spine_smoke bundle OK\n";
