@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Builtin\Type\ObjectEnumCasePropertyLlvm;
 use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\ext\simplexml\JitSimpleXmlUserScript;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPCompiler\VM\DateTimeSupport;
@@ -47,6 +48,12 @@ final class JitJsonEncode
         $enumFold = self::tryFoldEnumCase($context, $arg, 0);
         if (null !== $enumFold) {
             return $enumFold;
+        }
+
+        // SimpleXMLElement is not JsonSerializable; thin AOT get_object_vars is {} (#35850 leftover of #35795).
+        $sxeFold = JitSimpleXmlUserScript::tryFoldJsonEncode($context, $arg, 0);
+        if (null !== $sxeFold) {
+            return self::stringOrFalse($context, $sxeFold);
         }
 
         if (JITVariable::TYPE_HASHTABLE === $arg->type || ArrayBuiltinHelper::isNativeArray($arg->type)) {
@@ -342,6 +349,10 @@ final class JitJsonEncode
             // path is also used from encodeBoxedValue which expects a raw string*.
             // Constant DateTime wire is always a string pointer.
             return $dateFold;
+        }
+        $sxeFold = JitSimpleXmlUserScript::tryFoldJsonEncode($context, $arg, 0);
+        if (null !== $sxeFold) {
+            return $sxeFold;
         }
 
         $overlay = $context->getTypeFromString('int64')->constInt(
