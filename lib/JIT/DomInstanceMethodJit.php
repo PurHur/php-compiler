@@ -345,6 +345,10 @@ final class DomInstanceMethodJit
         'dom\\xmldocument::getelementbyid' => true,
         'dom\\document::getelementbyid' => true,
         'dom\\htmldocument::savehtml' => true,
+        // Dom\Document::saveXml leftover of saveHtml / CFS (#31324 / php_dom.stub.php).
+        'dom\\document::savexml' => true,
+        'dom\\htmldocument::savexml' => true,
+        'dom\\xmldocument::savexml' => true,
         'domimplementation::createdocument' => true,
         'domimplementation::createdocumenttype' => true,
         'domimplementation::hasfeature' => true,
@@ -676,7 +680,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domdocument::savexml' === $lc) {
+            if ('domdocument::savexml' === $lc
+                || 'dom\\document::savexml' === $lc
+                || 'dom\\htmldocument::savexml' === $lc
+                || 'dom\\xmldocument::savexml' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomDocumentSaveXML();
 
                 return;
@@ -1555,6 +1563,9 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\xmldocument::getelementbyid');
             self::ensureProxy($context, 'dom\\document::getelementbyid');
             self::ensureProxy($context, 'dom\\htmldocument::savehtml');
+            self::ensureProxy($context, 'dom\\document::savexml');
+            self::ensureProxy($context, 'dom\\htmldocument::savexml');
+            self::ensureProxy($context, 'dom\\xmldocument::savexml');
             self::ensureProxy($context, 'dom\\attr::rename');
             self::ensureProxy($context, 'dom\\element::rename');
             self::ensureProxy($context, 'dom\\htmlelement::rename');

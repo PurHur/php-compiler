@@ -14191,6 +14191,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateDomHtmlDocumentCfsResultType(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     $this->propagateDomRemoveAttributeNodeResultType(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
@@ -17823,6 +17827,33 @@ class JIT {
                 }
                 $this->context->bindVariableByName($resolved, $var);
             }
+        }
+    }
+
+    /**
+     * Dom\HTMLDocument::createFromString/File — tag the result so saveXml folds
+     * the living tree instead of empty LiveSlots {@code <html/>} (leftover of #31324).
+     */
+    private function propagateDomHtmlDocumentCfsResultType(Operand $result, mixed $toCall): void
+    {
+        if (
+            !($toCall instanceof JIT\Call\DomHtmlDocumentCreateFromString)
+            && !($toCall instanceof JIT\Call\DomHtmlDocumentCreateFromFile)
+        ) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        $var->classUserType = 'Dom\\HTMLDocument';
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->classUserType = 'Dom\\HTMLDocument';
+            }
+            $this->context->bindVariableByName($resolved, $var);
         }
     }
 
