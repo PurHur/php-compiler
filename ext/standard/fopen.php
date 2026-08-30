@@ -82,6 +82,12 @@ final class fopen extends Internal
             );
         }
 
+        $pathLit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (null !== $pathLit && '' !== $pathLit) {
+            // Recover URI for XMLWriter::toStream host fold (#35895).
+            \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::noteFopenPath($pathLit);
+        }
+
         return JitFopen::invoke(
             $context,
             JitStreamPath::lowerNonEmptyPath($context, $args[0], 'fopen', 0, 'filename'),

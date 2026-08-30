@@ -2444,10 +2444,11 @@ class Context {
         if (CompilerVersion::supportsXmlReaderFactories()) {
             XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstring');
         }
-        // XMLWriter::toMemory / toUri — leftover of openMemory/openUri (#19606 / #35872).
+        // XMLWriter::toMemory / toUri / toStream — leftover of openMemory/openUri (#19606 / #35872 / #35895).
         if (CompilerVersion::supportsXmlWriterFactories()) {
             XmlWriterInstanceMethodJit::ensureProxy($this, 'xmlwriter::tomemory');
             XmlWriterInstanceMethodJit::ensureProxy($this, 'xmlwriter::touri');
+            XmlWriterInstanceMethodJit::ensureProxy($this, 'xmlwriter::tostream');
         }
         if (CompilerVersion::supportsDomTokenList()) {
             DomInstanceMethodJit::registerKnownProxies($this);
