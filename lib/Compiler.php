@@ -40890,6 +40890,25 @@ class Compiler {
             return null;
         }
         if (1 === ($callIndex - $probeIndex)) {
+            // Dead temp whose sole writer is a *different* nested FuncCall must not steal the
+            // immediately-previous EXEC_RETURN — that produced passphrase=iv=str_repeat('i')
+            // for openssl_decrypt(..., str_repeat('k'), 0, str_repeat('i')) before a later ?:
+            // (#35879 / Ack-class #23472). Leave null for exactHoistedCallArgProducerSlot.
+            if (
+                $callArg instanceof Operand
+                && 1 === \count($callArg->ops ?? [])
+            ) {
+                $soleWriter = $callArg->ops[0];
+                if (
+                    (
+                        $soleWriter instanceof Op\Expr\FuncCall
+                        || $soleWriter instanceof Op\Expr\NsFuncCall
+                    )
+                    && $soleWriter !== $prev
+                ) {
+                    return null;
+                }
+            }
             if (null === $block->slotForOperand($prev->result)) {
                 foreach ($this->compileExpr($prev, $block) as $op) {
                     $block->addOpCode($op);
@@ -51327,9 +51346,18 @@ class Compiler {
                     (int) $argIndex
                 );
                 if (null !== $adjacentNestedProducerSlot) {
+                    // Prefer exact argument→producer link over adjacent last-EXEC_RETURN steal
+                    // (openssl_decrypt(str_repeat('k'), …, str_repeat('i')) + later ?: left both
+                    // args on the IV slot — #35879 / peer #23354 exactHoisted last word).
+                    $exactAdjacentSlot = $this->exactHoistedCallArgProducerSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $sends
+                    );
                     $sends[] = new OpCode(
                         OpCode::TYPE_ARG_SEND,
-                        $adjacentNestedProducerSlot,
+                        null !== $exactAdjacentSlot ? $exactAdjacentSlot : $adjacentNestedProducerSlot,
                         $nameSlot,
                         $unpackFlag
                     );
