@@ -2516,6 +2516,7 @@ require_once __DIR__.'/../../../ext/sqlite3/SQLite3Prepare.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3Query.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3QuerySingle.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3Version.php';
+require_once __DIR__.'/../../../ext/sqlite3/Sqlite3AotFoldState.php';
 require_once __DIR__.'/../../../ext/sqlite3/Sqlite3ClassMethod.php';
 require_once __DIR__.'/../../../ext/sqlite3/Sqlite3Constants.php';
 require_once __DIR__.'/../../../ext/sqlite3/Sqlite3ExtensionPolicy.php';
