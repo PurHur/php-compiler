@@ -932,6 +932,93 @@ final class JitDomNamedNodeMap
         $context->builder->positionAtEnd($done);
     }
 
+    /**
+     * Prior Attr pinned on {@code $element} for (namespaceURI, localName), or null.
+     *
+     * php-src {@code setAttributeNode} returns the replaced node on this element only —
+     * orphan {@code createAttribute} cache entries must not count (#20676).
+     *
+     * @return Value {@see __object__*}
+     */
+    public static function findPinnedAttrOnElement(
+        Context $context,
+        Value $element,
+        string $namespace,
+        string $localName,
+        string $elementClass = 'DOMElement'
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nnm_find_pin');
+        $objectType = $context->type->object;
+        $elemClassId = $objectType->lookup($elementClass);
+        if (!$objectType->hasProperty($elemClassId, VmDom::PROP_ATTRIBUTES)) {
+            $objectType->defineProperty($elemClassId, VmDom::PROP_ATTRIBUTES, JITVariable::TYPE_VALUE);
+        }
+        $mapClassId = $objectType->lookup(self::CLASS_MAP);
+        self::ensureLayout($objectType, $mapClassId);
+        self::ensureAttrNameLayout($objectType);
+
+        $map = self::loadAttributesMapOrAllocate($context, $element, $elementClass);
+        $localNameStr = $context->builder->load($context->constantStringFromString($localName));
+        if ('' === $namespace) {
+            $attrBox = self::emitRuntimeGetNamedItem(
+                $context,
+                $map,
+                $localNameStr
+            );
+        } else {
+            self::ensureAttrNsLayout($objectType);
+            $nsStr = $context->builder->load($context->constantStringFromString($namespace));
+            $attrBox = self::emitRuntimeGetNamedItemNS(
+                $context,
+                $map,
+                $nsStr,
+                $localNameStr
+            );
+        }
+
+        return self::readObjectPtrFromValueBox($context, $attrBox);
+    }
+
+    /** @return Value {@see __object__*} */
+    private static function readObjectPtrFromValueBox(Context $context, Value $attrBox): Value
+    {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $done = $fn->appendBasicBlock('dom_nnm_rovb_done');
+        $miss = $fn->appendBasicBlock('dom_nnm_rovb_miss');
+        $hit = $fn->appendBasicBlock('dom_nnm_rovb_hit');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__object__*'));
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+
+        $attrValPtr = JitValueBox::normalizeValuePtr($context, $attrBox);
+        $attrType = $context->builder->load(
+            $context->builder->structGep($attrValPtr, $valueMap['type'])
+        );
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $attrType,
+            $i8->constInt(JITVariable::TYPE_OBJECT, false)
+        );
+        $context->builder->branchIf($isObject, $hit, $miss);
+
+        $context->builder->positionAtEnd($miss);
+        $context->builder->store($objPtrTy->constNull(), $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($hit);
+        $attrObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $attrValPtr
+        );
+        $context->builder->store($attrObj, $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($resultSlot);
+    }
+
     private static function loadObject(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_OBJECT === $arg->type) {
