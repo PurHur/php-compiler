@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8035 |
-| Phase A inventory files (M2 ratio SSOT) | 8035 |
+| PHP files on vm.php path | 8036 |
+| Phase A inventory files (M2 ratio SSOT) | 8036 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25590 |
+| Source constructs flagged (warnings) | 25591 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2677,6 +2677,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/SQLite3QuerySingle.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3SetAuthorizer.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3Version.php` | 0 | 4 |
+| `ext/sqlite3/Sqlite3AotFoldState.php` | 0 | 1 |
 | `ext/sqlite3/Sqlite3ClassMethod.php` | 0 | 1 |
 | `ext/sqlite3/Sqlite3Constants.php` | 0 | 1 |
 | `ext/sqlite3/Sqlite3ExtensionPolicy.php` | 0 | 1 |
@@ -29448,21 +29449,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sqlite3/JitSqlite3.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 284)
-- new HashTable (line 544)
-- new Variable (line 545)
-- new Variable (line 548)
-- 24 class method(s)
+- new JITVariable (line 323)
+- new HashTable (line 605)
+- new Variable (line 606)
+- new Variable (line 609)
+- 26 class method(s)
 
 ### `ext/sqlite3/JitSqlite3Result.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 7 class method(s)
 
 ### `ext/sqlite3/JitSqlite3Stmt.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 9 class method(s)
 
 ### `ext/sqlite3/Module.php`
 
@@ -29596,6 +29597,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 29)
 - new Variable (line 32)
 - 1 class method(s)
+
+### `ext/sqlite3/Sqlite3AotFoldState.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `ext/sqlite3/Sqlite3ClassMethod.php`
 
@@ -54526,28 +54532,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2910)
 - new Variable (line 2923)
 - new Variable (line 3202)
-- new VMVariable (line 5450)
-- new VMVariable (line 5470)
-- new VMVariable (line 5480)
-- new VMVariable (line 5500)
-- new VMVariable (line 6966)
-- new ReflectionClassConstant (line 7699)
-- new Variable (line 8147)
-- new Variable (line 8167)
-- new Variable (line 8182)
-- new Variable (line 8195)
-- new Variable (line 8203)
+- new VMVariable (line 5473)
+- new VMVariable (line 5493)
+- new VMVariable (line 5503)
+- new VMVariable (line 5523)
+- new VMVariable (line 6989)
+- new ReflectionClassConstant (line 7722)
+- new Variable (line 8170)
+- new Variable (line 8190)
+- new Variable (line 8205)
+- new Variable (line 8218)
 - new Variable (line 8226)
-- new Variable (line 8252)
-- new Variable (line 8260)
-- new Variable (line 8334)
-- new Literal (line 8351)
-- new Literal (line 8356)
-- new Literal (line 8361)
-- new Variable (line 8372)
-- new Variable (line 8405)
+- new Variable (line 8249)
+- new Variable (line 8275)
+- new Variable (line 8283)
+- new Variable (line 8357)
+- new Literal (line 8374)
+- new Literal (line 8379)
+- new Literal (line 8384)
+- new Variable (line 8395)
 - new Variable (line 8428)
-- new Variable (line 8966)
+- new Variable (line 8451)
+- new Variable (line 8989)
 - 334 class method(s)
 - 8 closure(s)
 
