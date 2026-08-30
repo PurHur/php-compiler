@@ -175,6 +175,20 @@ final class IssetHelperLlvm
         if (VmIsset::issetOnPropertyRejectsArrayContainer($container, $containerOp, $issetOnProperty)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
+        // Thin-AOT SXE property isset — fold before value-box declared-slot probe (#35814).
+        if ($issetOnProperty) {
+            $propName = VmIsset::literalStringKey($dimOp);
+            if (null !== $propName) {
+                $sxePropIsset = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldPropIsset(
+                    $context,
+                    $container,
+                    $propName
+                );
+                if (null !== $sxePropIsset) {
+                    return $sxePropIsset;
+                }
+            }
+        }
         // Thin-AOT SXE is often TYPE_VALUE — ArrayAccess isset is skipped (#34555).
         if (!$issetOnProperty) {
             $sxeIsset = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldDimIsset(
