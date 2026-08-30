@@ -38,16 +38,21 @@ final class HttpResponseCodeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
     }
 
-    /** Issue #11206: standalone C main wrapper must not re-enter implement() and clear the insert block. */
-    public function testEmitResetForStandaloneMainDoesNotRelink(): void
+    /** #35803: emitReset self-ensures; implement() restores insert block (#33965 / peer #35443). */
+    public function testEmitResetForStandaloneMainSelfEnsures(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/HttpResponseRuntime.php');
-        $this->assertStringContainsString('function emitResetForStandaloneMain', $source);
-        $this->assertStringNotContainsString(
-            "emitResetForStandaloneMain(Context \$context): void\n    {\n        if (Builtin::LOAD_TYPE_STANDALONE !== \$context->loadType) {\n            return;\n        }\n        self::ensureLinked(\$context);",
-            $source
-        );
-        $this->assertStringContainsString('__phpc_http_response_status_reset', $source);
+        $pos = strpos($source, 'public static function emitResetForStandaloneMain');
+        $this->assertNotFalse($pos);
+        $next = strpos($source, 'public static function emitStandaloneStatusLine', $pos);
+        $this->assertNotFalse($next);
+        $body = substr($source, $pos, $next - $pos);
+        $this->assertStringContainsString('self::ensureLinked($context)', $body);
+        $ensurePos = strpos($body, 'self::ensureLinked($context)');
+        $lookupPos = strpos($body, "__phpc_http_response_status_reset");
+        $this->assertNotFalse($ensurePos);
+        $this->assertNotFalse($lookupPos);
+        $this->assertLessThan($lookupPos, $ensurePos);
     }
 
     public function testPendingHeadersUsesHttpResponseRuntimeNotGlobal(): void

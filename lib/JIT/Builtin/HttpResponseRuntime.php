@@ -90,9 +90,9 @@ final class HttpResponseRuntime
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        // Context::ensureStandaloneBodies linked bridges before this emit (#33965).
-        // Do not re-enter ensureLinked/implement() here — mid-insert NestedJIT clears
-        // the insert block and parentless-ifies session/progress IR (#11206).
+        // Lazy bodies — compileToFile no longer HttpResponseRuntime::ensureStandaloneBodies
+        // (#35803 / peer #35443). implement() saves/restores insert block (#33965).
+        self::ensureLinked($context);
         $context->builder->call($context->lookupFunction('__phpc_http_response_status_reset'));
     }
 
