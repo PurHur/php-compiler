@@ -4618,6 +4618,11 @@ class Object_ extends Type {
             }
             $this->setClassInterfaces($displayName, $ifaces);
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            if ('limititerator' === $lcname) {
+                $this->defineProperty($id, \PHPCompiler\VM\LimitIteratorJitHelper::PROP_OFFSET, Variable::TYPE_NATIVE_LONG);
+                $this->defineProperty($id, \PHPCompiler\VM\LimitIteratorJitHelper::PROP_LIMIT, Variable::TYPE_NATIVE_LONG);
+                $this->defineProperty($id, \PHPCompiler\VM\LimitIteratorJitHelper::PROP_SRC_NUM, Variable::TYPE_NATIVE_LONG);
+            }
             if ('appenditerator' === $lcname) {
                 // Parallel original keys — spreadInto renumbers packed indices (#27312).
                 $this->defineProperty($id, \PHPCompiler\JIT\Call\AppendIteratorMethod::PROP_KEYS, Variable::TYPE_HASHTABLE);

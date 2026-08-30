@@ -80,8 +80,12 @@ final class Issue31621LimitIteratorNullOffsetLimitTest extends TestCase
         fclose($rpipes[2]);
         $this->assertSame(0, proc_close($run), $stdout.$stderr);
         @unlink($outBin);
-        // AOT HT snapshot: limit 0 → empty array (no rewind OOB); soft-null DEPs on stderr.
-        $this->assertSame("ok:[]\n", $stdout);
+        // AOT rewind OOB — same as VM/JIT (#31621).
+        $this->assertStringContainsString('OutOfBoundsException', $stdout.$stderr);
+        $this->assertStringContainsString(
+            'Cannot seek to 0 which is behind offset 0 plus count 0',
+            $stdout.$stderr
+        );
         $this->assertStringContainsString(
             'LimitIterator::__construct(): Passing null to parameter #2 ($offset) of type int is deprecated',
             $stderr

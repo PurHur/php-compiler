@@ -575,6 +575,11 @@ final class VmIteratorForeach
 
             return;
         }
+        if (null !== $containerUserType
+            && 'limititerator' === strtolower(ltrim($containerUserType, '\\'))) {
+            $receiver = IteratorProtocolHelper::normalizeObjectReceiver($context, $array);
+            LimitIteratorJitHelper::compileRewindOobCheck($context, $receiver);
+        }
         // WeakMap before generic asHashtable — string-key HT walk, not ObjectProperty (#33860).
         if (self::usesWeakMapHashtable($containerUserType)) {
             WeakRefRuntime::ensureLinked($context);

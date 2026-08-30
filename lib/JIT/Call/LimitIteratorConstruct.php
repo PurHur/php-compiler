@@ -12,6 +12,7 @@ use PHPCompiler\JIT\HashTableSliceLlvm;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\LimitIteratorJitHelper;
 use PHPCompiler\VM\SplOuterIteratorHt;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -127,6 +128,21 @@ final class LimitIteratorConstruct implements Call
             SplOuterIteratorHt::PROP_HT
         );
         $context->type->object->propertyStore($slot, $slicedVar, Variable::TYPE_HASHTABLE);
+
+        $sizeT = $context->getTypeFromString('size_t');
+        $srcNum = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $srcHt
+        );
+        $srcNumI64 = $context->builder->truncOrBitCast($srcNum, $sizeT);
+        $srcNumI64 = $context->builder->truncOrBitCast($srcNumI64, $i64);
+        LimitIteratorJitHelper::storeMetadata(
+            $context,
+            $context->helper->loadValue($receiver),
+            $offset,
+            $count,
+            $srcNumI64
+        );
 
         return self::voidResult($context);
     }

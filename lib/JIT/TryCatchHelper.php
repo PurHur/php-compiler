@@ -924,6 +924,104 @@ final class TryCatchHelper
         $context->builder->branch($dispatchBb);
     }
 
+    /** Like {@see emitCatchableClassError} but the message is already a {@see __string__*} value. */
+    public static function emitCatchableClassErrorWithStringValue(
+        Context $context,
+        string $className,
+        Value $msgStr,
+        ?\PHPCompiler\JIT $jit = null,
+        string $file = '',
+        int $line = 0,
+        int $code = 0
+    ): void {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $insert) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'catchable_error_resume');
+            $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        }
+        $handler = self::resolveThrowHandler($context);
+        if (null === $handler || null === $insert) {
+            ErrorRaise::emitRaise($context, 'OutOfBoundsException');
+
+            return;
+        }
+        $func = $insert->getParent();
+        assert($func instanceof Function_);
+        $dispatchBb = null !== $jit
+            ? self::dispatchBbFor($jit, $func, $context, $handler, [])
+            : $handler->dispatchBb;
+        if (null === $dispatchBb) {
+            ErrorRaise::emitRaise($context, 'OutOfBoundsException');
+
+            return;
+        }
+
+        $object = $context->type->object;
+        GetClassRuntime::ensureLinked($context);
+        $object->lookup($className);
+        $classId = $object->lookup($className);
+        $obj = $object->allocate($classId);
+        $object->markObjectConstructed($obj);
+        $msgVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $msgStr);
+        $object->storeInstanceProperty($obj, $className, 'message', $msgVar);
+        if ($code !== 0) {
+            if (!$object->hasProperty($classId, ExceptionSupport::PROP_CODE)) {
+                $object->defineProperty($classId, ExceptionSupport::PROP_CODE, Variable::TYPE_NATIVE_LONG);
+            }
+            $codeVar = new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $context->constantFromInteger($code)
+            );
+            $object->storeInstanceProperty($obj, $className, ExceptionSupport::PROP_CODE, $codeVar);
+        }
+        if ('' === $file) {
+            $file = $context->jitAotEntryScriptPath;
+        }
+        if ('' === $file) {
+            $file = 'Unknown';
+        }
+        if ($line <= 0) {
+            $line = max(0, $context->callSiteLine);
+        }
+        if ($context->evalInlineDepth > 0 && $line > 0) {
+            $line = VmEval::unwrapEvalLine($line);
+        }
+        $fileStr = $context->builder->load($context->constantStringFromString($file));
+        $fileVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $fileStr);
+        $object->storeInstanceProperty($obj, $className, ExceptionSupport::PROP_FILE, $fileVar);
+        $lineVar = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $context->constantFromInteger(max(0, $line))
+        );
+        $object->storeInstanceProperty($obj, $className, ExceptionSupport::PROP_LINE, $lineVar);
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+        $context->builder->branch($dispatchBb);
+    }
+
+    /** Pend OutOfBoundsException for caller after-call dispatch (iterator_to_array / rewind). */
+    public static function emitPendOutOfBoundsForCaller(Context $context, Value $msgStr): void
+    {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            JitThrow::ensureStandaloneBodies($context);
+        }
+        GetClassRuntime::ensureLinked($context);
+        $object = $context->type->object;
+        $object->lookup('OutOfBoundsException');
+        $obj = $object->allocate($object->lookup('OutOfBoundsException'));
+        $object->markObjectConstructed($obj);
+        $msgVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $msgStr);
+        $object->storeInstanceProperty($obj, 'Exception', ExceptionSupport::PROP_MESSAGE, $msgVar);
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+    }
+
     /**
      * Class hint for catch-bound $e so method resolution finds Error/Exception proxies (#27106).
      *

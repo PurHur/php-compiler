@@ -14,6 +14,7 @@ use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitIterableArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\LimitIteratorJitHelper;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -244,6 +245,9 @@ final class JitIteratorToArray
         $className = ltrim((string) $userType, '\\');
         if ('' === $className || 'object' === strtolower($className)) {
             $className = 'ArrayIterator';
+        }
+        if ('limititerator' === strtolower($className)) {
+            LimitIteratorJitHelper::compileRewindOobCheck($context, $receiver);
         }
         $objPtr = $context->helper->loadValue($receiver);
         $slot = $context->type->object->propertySlotFor(
