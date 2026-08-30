@@ -1653,6 +1653,8 @@ class Context {
         $this->type->object->lookup('RegexIterator');
         $this->type->object->lookup('CallbackFilterIterator');
         $this->functionProxies['limititerator::__construct'] = new Call\LimitIteratorConstruct();
+        $this->functionProxies['limititerator::rewind'] = new Call\LimitIteratorMethod('rewind');
+        $this->functionProxies['limititerator::seek'] = new Call\LimitIteratorMethod('seek');
         $this->functionProxies['appenditerator::__construct'] = new Call\AppendIteratorMethod('__construct');
         $this->functionProxies['appenditerator::append'] = new Call\AppendIteratorMethod('append');
         $this->functionProxies['regexiterator::__construct'] = new Call\RegexIteratorConstruct();
