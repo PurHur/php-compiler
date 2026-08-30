@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\VmDateInterval;
+use PHPCompiler\ext\standard\VmDateTimeNative;
 use PHPCompiler\Frame;
 
 /**
@@ -634,6 +635,73 @@ final class DatePeriodSupport
             .\PHPCompiler\ext\standard\VmSerializeFormat::encodeExported((bool) $bag['include_end_date']);
 
         return 'O:10:"DatePeriod":7:{'.$body.'}';
+    }
+
+    /**
+     * Build Zend json_encode wire from compile-time construct stamps (#14144 / peer #34585).
+     *
+     * Thin AOT get_object_vars strips DatePeriod storage → {}. Reuse
+     * {@see JitDatePeriodConstruct::stampCompileTimeSerializeBag} bag.
+     *
+     * php-src: ext/json/php_json.c — php_json_encode_date_period
+     *
+     * @param array{
+     *   start: array{timestamp: int, micro: int, tz: string, class: string},
+     *   end: ?array{timestamp: int, micro: int, tz: string, class: string},
+     *   interval: array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int},
+     *   recurrences: int,
+     *   include_start_date: bool,
+     *   include_end_date: bool
+     * } $bag
+     *
+     * @return array<string, mixed>
+     */
+    public static function exportZendJsonWireFromCompileTimeBag(array $bag): array
+    {
+        $intervalState = $bag['interval'];
+
+        return [
+            'start' => self::exportDateTimeLikeJsonWireFromStamp($bag['start']),
+            'current' => null,
+            'end' => null === $bag['end']
+                ? null
+                : self::exportDateTimeLikeJsonWireFromStamp($bag['end']),
+            'interval' => [
+                'y' => (int) $intervalState['y'],
+                'm' => (int) $intervalState['m'],
+                'd' => (int) $intervalState['d'],
+                'h' => (int) $intervalState['h'],
+                'i' => (int) $intervalState['i'],
+                's' => (int) $intervalState['s'],
+                'f' => (float) $intervalState['f'],
+                'invert' => (int) $intervalState['invert'],
+                'days' => false,
+                'from_string' => false,
+            ],
+            'recurrences' => (int) $bag['recurrences'],
+            'include_start_date' => (bool) $bag['include_start_date'],
+            'include_end_date' => (bool) $bag['include_end_date'],
+        ];
+    }
+
+    /**
+     * @param array{timestamp: int, micro: int, tz: string, class: string} $stamp
+     *
+     * @return array{date: string, timezone_type: int, timezone: string}
+     */
+    private static function exportDateTimeLikeJsonWireFromStamp(array $stamp): array
+    {
+        $tz = '' !== $stamp['tz'] ? $stamp['tz'] : 'UTC';
+
+        return [
+            'date' => VmDateTimeNative::formatZendDateWire(
+                (int) $stamp['timestamp'],
+                (int) $stamp['micro'],
+                $tz
+            ),
+            'timezone_type' => DateTimeSupport::zendTimezoneWireType($tz),
+            'timezone' => $tz,
+        ];
     }
 
     /**
