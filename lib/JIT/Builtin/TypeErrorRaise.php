@@ -413,7 +413,7 @@ final class TypeErrorRaise
             $context->lookupFunction('snprintf'),
             $linePtr,
             $context->constantFromInteger(512, 'size_t'),
-            self::cstrPtrFromLiteral($context, 'PHP Fatal error:  Uncaught ArgumentCountError: %s\n'),
+            self::cstrPtrFromLiteral($context, "PHP Fatal error:  Uncaught ArgumentCountError: %s\n"),
             $msgPtr
         );
         $context->builder->branch($bbAfterFmt);
@@ -422,7 +422,7 @@ final class TypeErrorRaise
             $context->lookupFunction('snprintf'),
             $linePtr,
             $context->constantFromInteger(512, 'size_t'),
-            self::cstrPtrFromLiteral($context, 'PHP Fatal error:  Uncaught ValueError: %s\n'),
+            self::cstrPtrFromLiteral($context, "PHP Fatal error:  Uncaught ValueError: %s\n"),
             $msgPtr
         );
         $context->builder->branch($bbAfterFmt);
@@ -431,7 +431,7 @@ final class TypeErrorRaise
             $context->lookupFunction('snprintf'),
             $linePtr,
             $context->constantFromInteger(512, 'size_t'),
-            self::cstrPtrFromLiteral($context, 'PHP Fatal error:  Uncaught TypeError: %s\n'),
+            self::cstrPtrFromLiteral($context, "PHP Fatal error:  Uncaught TypeError: %s\n"),
             $msgPtr
         );
         $context->builder->branch($bbAfterFmt);
