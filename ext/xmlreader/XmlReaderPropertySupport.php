@@ -114,7 +114,7 @@ final class XmlReaderPropertySupport
             return $var;
         }
         if ('xmllang' === $lc) {
-            $var->string('');
+            $var->string(null !== $event ? $event->xmlLang : '');
 
             return $var;
         }
