@@ -42,6 +42,8 @@ final class XmlReaderInstanceMethodJit
         'xmlreader::close' => true,
         // leftover of getAttribute (#35941 / #35918 / #27299) — php-src zim_XMLReader_moveToAttribute
         'xmlreader::movetoattribute' => true,
+        // leftover of moveToAttribute (#35940 / #27299) — php-src zim_XMLReader_moveToElement
+        'xmlreader::movetoelement' => true,
     ];
 
     public static function isXmlReaderInstanceMethodProxy(string $proxyName): bool
