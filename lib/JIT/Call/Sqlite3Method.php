@@ -13,9 +13,10 @@ use PHPLLVM\Value;
 /**
  * SQLite3 thin-AOT methods — __construct / exec / querySingle / close /
  * lastInsertRowID / changes / lastErrorCode / lastErrorMsg / busyTimeout /
- * enableExceptions / escapeString
+ * enableExceptions / escapeString / version
  * (#35931 leftover of #35914; lastError leftover #35966; busyTimeout leftover #35972;
- * enableExceptions leftover #35975; escapeString leftover #35977).
+ * enableExceptions leftover #35975; escapeString leftover #35977;
+ * version leftover #35991).
  *
  * php-src: ext/sqlite3/sqlite3.c
  */
@@ -50,6 +51,10 @@ final class Sqlite3Method implements Call
             // Static or instance — positional string; no implicit $this for static (#35977).
             $this->paramNames = ['string'];
             $this->namedArgsReceiverPrefix = 0;
+        } elseif ('version' === $lc) {
+            // Static ZEND_METHOD — no implicit $this for SQLite3::version() (#35991).
+            $this->paramNames = [];
+            $this->namedArgsReceiverPrefix = 0;
         }
     }
 
@@ -72,8 +77,9 @@ final class Sqlite3Method implements Call
             'busytimeout' => JitSqlite3::busyTimeout($context, ...$args),
             'enableexceptions' => JitSqlite3::enableExceptions($context, ...$args),
             'escapestring' => JitSqlite3::escapeString($context, ...$args),
+            'version' => JitSqlite3::version($context, ...$args),
             default => throw new \LogicException(
-                'SQLite3::'.$this->method.'() JIT dispatch missing (#35931 / #35977)'
+                'SQLite3::'.$this->method.'() JIT dispatch missing (#35931 / #35991)'
             ),
         };
     }
