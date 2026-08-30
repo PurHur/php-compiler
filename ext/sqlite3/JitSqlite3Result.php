@@ -97,6 +97,52 @@ final class JitSqlite3Result
     }
 
     /**
+     * php-src zim_SQLite3Result_columnType — false when no current row (#19854).
+     */
+    public static function columnType(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3Result::columnType', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $obj = self::readObject($context, $args[0]);
+        $columnLit = $args[1]->compileTimeLong ?? null;
+        if (null === $columnLit) {
+            JitLongArg::lower($context, $args[1], 'SQLite3Result::columnType(): Argument #1 ($column)');
+        }
+        $resultSlot = JitValueBox::alloc($context);
+        $resultPtr = JitValueBox::pointer($context, $resultSlot);
+        $i64 = $context->getTypeFromString('int64');
+        $cursor = self::loadLong($context, $obj, Sqlite3JitSupport::RESULT_PROP_CURSOR);
+
+        $bbDone = BasicBlockHelper::append($context, 'sqlite3_coltype_done');
+        $bbFalse = BasicBlockHelper::append($context, 'sqlite3_coltype_false');
+        $bbInt = BasicBlockHelper::append($context, 'sqlite3_coltype_int');
+
+        $hasRow = $context->builder->icmp(\PHPLLVM\Builder::INT_SGT, $cursor, $i64->constInt(0, false));
+        $context->builder->branchIf($hasRow, $bbInt, $bbFalse);
+
+        $context->builder->positionAtEnd($bbInt);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $resultPtr,
+            $i64->constInt(VmSqlite3Native::TYPE_TEXT, false)
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbFalse);
+        JitValueBox::writeBool(
+            $context,
+            $resultSlot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return $resultPtr;
+    }
+
+    /**
      * @param list<array{assoc: array<string, mixed>, num: array<int, mixed>}> $rows
      */
     private static function emitMultiRowFetch(

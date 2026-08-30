@@ -26,6 +26,8 @@ final class Sqlite3ResultMethod implements Call
         $this->name = 'SQLite3Result::'.$method;
         if ('fetcharray' === strtolower($method)) {
             $this->paramNames = ['mode='];
+        } elseif ('columntype' === strtolower($method)) {
+            $this->paramNames = ['column'];
         }
     }
 
@@ -38,6 +40,7 @@ final class Sqlite3ResultMethod implements Call
     {
         return match (strtolower($this->method)) {
             'fetcharray' => JitSqlite3Result::fetchArray($context, ...$args),
+            'columntype' => JitSqlite3Result::columnType($context, ...$args),
             default => throw new \LogicException(
                 'SQLite3Result::'.$this->method.'() JIT dispatch missing (#36010)'
             ),

@@ -48,6 +48,9 @@ final class Sqlite3JitSupport
     /** Fold stmt id for bindValue/execute (#36010 compliance). */
     public const STMT_PROP_FOLD_ID = '__sqliteStmtFoldId';
 
+    /** sqlite3_stmt_readonly fold (#19854 leftover of #36010). */
+    public const STMT_PROP_READONLY = '__sqliteStmtRo';
+
     /** SQLite3Result NestedJIT (#36010 leftover of #36001). */
     public const RESULT_CLASS = 'SQLite3Result';
 

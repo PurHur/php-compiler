@@ -312,6 +312,7 @@ final class JitSqlite3
             }
             $paramCount = substr_count($sqlLit, '?');
             if (self::$compileFoldDbId > 0) {
+                $paramCount = Sqlite3AotFoldState::nativeParamCount(self::$compileFoldDbId, $sqlLit);
                 $foldStmtId = Sqlite3AotFoldState::prepare(self::$compileFoldDbId, $sqlLit);
                 self::$lastFoldStmtId = $foldStmtId;
             }
@@ -339,6 +340,19 @@ final class JitSqlite3
             Sqlite3JitSupport::STMT_CLASS,
             Sqlite3JitSupport::STMT_PROP_PARAM_COUNT,
             $i64->constInt($paramCount, false)
+        );
+        $readonly = 0;
+        if ($foldStmtId > 0) {
+            $readonly = Sqlite3AotFoldState::stmtReadonly($foldStmtId) ? 1 : 0;
+        } elseif (null !== $sqlLit) {
+            $readonly = Sqlite3AotFoldState::isSelectSql($sqlLit) ? 1 : 0;
+        }
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $stmt,
+            Sqlite3JitSupport::STMT_CLASS,
+            Sqlite3JitSupport::STMT_PROP_READONLY,
+            $i64->constInt($readonly, false)
         );
         ReflectionSetup::emitSetLongPropertyFromValue(
             $context,
