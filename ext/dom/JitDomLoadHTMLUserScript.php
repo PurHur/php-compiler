@@ -49,6 +49,22 @@ final class JitDomLoadHTMLUserScript
         return self::$lastCompileTimeHtml;
     }
 
+    /**
+     * Seed the compile-time HTML literal from Dom\HTMLDocument::createFromString
+     * so getElementById can re-scan ids without loadHTML (#35792).
+     */
+    public static function rememberCompileTimeHtml(string $html): void
+    {
+        if ('' === trim($html)) {
+            return;
+        }
+        self::$lastCompileTimeHtml = $html;
+        $parsed = DomParseSimpleHtmlJitHelper::parseArgv($html);
+        if (null !== $parsed) {
+            self::$lastCompileTimeParsed = $parsed;
+        }
+    }
+
     public static function lastCompileTimeOptions(): ?int
     {
         return self::$lastCompileTimeOptions;

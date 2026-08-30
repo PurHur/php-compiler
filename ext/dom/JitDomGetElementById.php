@@ -57,9 +57,13 @@ final class JitDomGetElementById
         // After a compile-time getElementById hit (typical: source loadHTML), further lookups
         // must use the runtime id map so importNode materialize on a *different* document is
         // visible (HTML→XML; #20830). Pairing again would fabricate an element on the wrong doc.
+        // createFromString has no NestedJIT id-map — keep folding every id against the CFS
+        // literal (#35792).
         $alreadyPaired = null !== JitDomLoadHTMLUserScript::lastGetElementByIdHit();
+        $cfsSource = JitDomHtmlDocumentSaveHtml::lastCreateFromStringSource();
+        $keepFoldingCfs = null !== $cfsSource && '' !== trim($cfsSource);
 
-        if (!$alreadyPaired && JitDomDocumentMethodKernel::shouldUse($context)) {
+        if ((!$alreadyPaired || $keepFoldingCfs) && JitDomDocumentMethodKernel::shouldUse($context)) {
             $compileTime = self::tryUserScriptCompileTimeLookup($context, $args[0], $args[1]);
             if (null !== $compileTime) {
                 return $compileTime;
@@ -393,7 +397,9 @@ final class JitDomGetElementById
         JITVariable $receiver,
         JITVariable $idArg
     ): ?Value {
-        if (!JitDomLoadHTMLUserScript::receiverOwnsGlobalCompileTimeParsed($receiver)) {
+        $htmlFromCfs = JitDomHtmlDocumentSaveHtml::lastCreateFromStringSource();
+        $ownsLoadHtml = JitDomLoadHTMLUserScript::receiverOwnsGlobalCompileTimeParsed($receiver);
+        if (!$ownsLoadHtml && (null === $htmlFromCfs || '' === trim($htmlFromCfs))) {
             return null;
         }
 
@@ -408,7 +414,8 @@ final class JitDomGetElementById
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
         if (null === $parsed || $parsed['id'] !== $idLit) {
             // Full html/body documents may remember a different "first" id; re-scan (#32996).
-            $htmlLit = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+            // createFromString also stores that literal (#35792).
+            $htmlLit = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml() ?? $htmlFromCfs;
             if (null !== $htmlLit && '' !== trim($htmlLit)) {
                 $byId = DomParseSimpleHtmlJitHelper::parseIdElementArgv($htmlLit, $idLit);
                 if (null !== $byId) {
@@ -418,18 +425,23 @@ final class JitDomGetElementById
             }
         }
         if (null === $parsed) {
-            if ('missing' === $idLit) {
+            if ('missing' === $idLit || (null !== $htmlFromCfs && !$ownsLoadHtml)) {
                 return self::boxNullResult($context);
             }
 
             return null;
         }
         if ($parsed['id'] !== $idLit) {
-            if ('missing' === $idLit) {
+            if ('missing' === $idLit || (null !== $htmlFromCfs && !$ownsLoadHtml)) {
                 return self::boxNullResult($context);
             }
 
             return null;
+        }
+
+        // php-src html5 parser: HTML element nodeName/tagName are uppercase (#19580).
+        if (null !== $htmlFromCfs && !$ownsLoadHtml) {
+            $parsed['tag'] = strtoupper($parsed['tag']);
         }
 
         JitDomLoadHTMLUserScript::rememberLastGetElementByIdHit($parsed);

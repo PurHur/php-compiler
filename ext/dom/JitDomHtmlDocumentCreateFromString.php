@@ -148,6 +148,8 @@ final class JitDomHtmlDocumentCreateFromString
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_html_cfs_us_materialize');
         JitDomHtmlDocumentSaveHtml::rememberCreateFromString($source, 0);
+        // Pair getElementById with this CFS literal — loadHTML's id-map path is cold (#35792).
+        JitDomLoadHTMLUserScript::rememberCompileTimeHtml($source);
         // textContent fetch reads property slots when last load was pure user-script (#24121 / #27300).
         JitDomLoadXMLUserScript::markLastLoadPureUserScript();
         JitDomLoadXMLUserScript::rememberLivingDocumentClass(self::CLASS_DOCUMENT);
