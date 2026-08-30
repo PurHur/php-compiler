@@ -12,6 +12,8 @@ final class XmlWriterInstanceMethodJit
     /** @var array<string, true> */
     private const METHODS = [
         'xmlwriter::openmemory' => true,
+        // leftover of openMemory AOT (#19551 / #35872) — php-src zim_XMLWriter_openUri
+        'xmlwriter::openuri' => true,
         'xmlwriter::startdocument' => true,
         'xmlwriter::startelement' => true,
         'xmlwriter::startelementns' => true,
