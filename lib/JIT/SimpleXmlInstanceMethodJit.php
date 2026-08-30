@@ -27,6 +27,13 @@ final class SimpleXmlInstanceMethodJit
         'simplexmlelement::count' => true,
         // leftover of count AOT (#26863 / #35827) — php-src sxe.c PHP_METHOD(SimpleXMLElement, hasChildren)
         'simplexmlelement::haschildren' => true,
+        // leftover of hasChildren (#35827 / #35844) — php-src sxe.c Iterator + getChildren
+        'simplexmlelement::rewind' => true,
+        'simplexmlelement::valid' => true,
+        'simplexmlelement::key' => true,
+        'simplexmlelement::current' => true,
+        'simplexmlelement::next' => true,
+        'simplexmlelement::getchildren' => true,
         'simplexmlelement::__tostring' => true,
         'simplexmlelement::children' => true,
         'simplexmlelement::attributes' => true,
@@ -123,6 +130,36 @@ final class SimpleXmlInstanceMethodJit
         }
         if ('simplexmlelement::haschildren' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementCount('hasChildren');
+
+            return;
+        }
+        if ('simplexmlelement::rewind' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementCount('rewind');
+
+            return;
+        }
+        if ('simplexmlelement::valid' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementCount('valid');
+
+            return;
+        }
+        if ('simplexmlelement::key' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementCount('key');
+
+            return;
+        }
+        if ('simplexmlelement::current' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementCount('current');
+
+            return;
+        }
+        if ('simplexmlelement::next' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementCount('next');
+
+            return;
+        }
+        if ('simplexmlelement::getchildren' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementCount('getChildren');
 
             return;
         }

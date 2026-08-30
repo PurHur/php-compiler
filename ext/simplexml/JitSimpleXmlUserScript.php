@@ -1150,29 +1150,77 @@ final class JitSimpleXmlUserScript
     /**
      * SimpleXMLElement::hasChildren — host RecursiveIterator (php-src sxe.c; #35827 leftover of #26863).
      *
-     * Fresh trees are not rewound: Zend returns false (UNDEF iter.data). Exact host match
-     * only — lastTree would mis-fold foreach/child views.
+     * Fresh trees are not rewound: Zend returns false (UNDEF iter.data). Chained
+     * `(new SimpleXMLElement(...))->hasChildren()` binds lastTree, not the temp.
      */
     public static function tryHasChildren(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::tryIteratorMethod($context, 'hasChildren', ...$args);
+    }
+
+    /**
+     * Iterator / RecursiveIterator host folds leftover of hasChildren (#35844 / php-src sxe.c).
+     * rewind/next mutate the compile-time tree so later hasChildren/valid/key/getChildren match Zend.
+     */
+    public static function tryIteratorMethod(Context $context, string $method, JITVariable ...$args): ?Value
     {
         if ([] === $args || !\extension_loaded('simplexml')) {
             return null;
         }
-        // Chained `(new SimpleXMLElement(...))->hasChildren()` binds lastTree, not the temp.
         $tree = self::lookup($args[0]);
         if (null === $tree) {
             return null;
         }
         try {
-            $has = $tree->hasChildren();
+            switch ($method) {
+                case 'rewind':
+                    $tree->rewind();
+
+                    return self::nullValue($context);
+                case 'next':
+                    $tree->next();
+
+                    return self::nullValue($context);
+                case 'valid':
+                    return self::boxHostBool($context, (bool) $tree->valid());
+                case 'hasChildren':
+                    return self::boxHostBool($context, (bool) $tree->hasChildren());
+                case 'key':
+                    $key = $tree->key();
+                    if (!\is_string($key) && !\is_int($key)) {
+                        return self::nullValue($context);
+                    }
+
+                    return self::boxConstantString($context, (string) $key);
+                case 'current':
+                    $cur = $tree->current();
+                    if (!($cur instanceof \SimpleXMLElement)) {
+                        return self::nullValue($context);
+                    }
+
+                    return self::materializeElement($context, $cur);
+                case 'getChildren':
+                    $kids = $tree->getChildren();
+                    if (!($kids instanceof \SimpleXMLElement)) {
+                        return self::nullValue($context);
+                    }
+
+                    return self::materializeElement($context, $kids);
+            }
         } catch (\Throwable) {
             return null;
         }
+
+        return null;
+    }
+
+    private static function boxHostBool(Context $context, bool $value): Value
+    {
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeBool(
             $context,
             $slot,
-            $context->getTypeFromString('int1')->constInt($has ? 1 : 0, false)
+            $context->getTypeFromString('int1')->constInt($value ? 1 : 0, false)
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
