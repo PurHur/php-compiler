@@ -98,10 +98,13 @@ final class JitDateTimeConstruct
         $args[0]->compileTimeDateTimeMicrosecond = $parsed['microsecond'];
         $args[0]->compileTimeTimezoneName = $parsed['timezone'];
 
+        // Return the initialized object box so `$prop = new DateTime(...)` EXEC_RETURN
+        // does not wipe the `new` temp with null (#35752; peer Exception #23641).
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            JitValueBox::pointer($context, $slot)
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $obj
         );
 
         return $slot;

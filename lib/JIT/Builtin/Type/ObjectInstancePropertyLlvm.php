@@ -32,6 +32,23 @@ final class ObjectInstancePropertyLlvm
         ?Variable $receiverVar = null
     ): Variable {
         $classLc = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
+        if (
+            !$forWrite
+            && !\in_array($classLc, ['static', 'self', 'parent', 'object'], true)
+        ) {
+            $storageId = $object->instancePropertyStorageClassIdForFetch($classId, $name);
+            if ($storageId !== $classId) {
+                return self::propertyFetchOrdinary(
+                    $object,
+                    $obj,
+                    $object->classNameForId($storageId),
+                    $name,
+                    $storageId,
+                    false,
+                    $receiverVar
+                );
+            }
+        }
         if (\PHPCompiler\ext\dom\JitDomNodeChildProperty::isDomNodeChildProperty($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomNodeChildProperty::fetch(
                 $object,
@@ -500,7 +517,16 @@ final class ObjectInstancePropertyLlvm
                 : $fn->appendBasicBlock('prop_fetch_rt_try_'.$classId);
             $context->builder->branchIf($match, $caseBlock, $nextBlock);
             $context->builder->positionAtEnd($caseBlock);
-            $fetched = self::propertyFetchOrdinary($object, $obj, $className, $name, $classId, $forWrite);
+            $fetchClassId = $object->instancePropertyStorageClassIdForFetch($classId, $name);
+            $fetchClassName = $object->classNameForId($fetchClassId);
+            $fetched = self::propertyFetchOrdinary(
+                $object,
+                $obj,
+                $fetchClassName,
+                $name,
+                $fetchClassId,
+                $forWrite
+            );
             if (null !== $slotAlloca && null !== $fetched->objectPropertySlot) {
                 $context->builder->store(
                     $context->builder->pointerCast(
