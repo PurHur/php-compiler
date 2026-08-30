@@ -12130,9 +12130,35 @@ class JIT {
                         );
                         break;
                     }
-                    if (null !== $powDest->writableHt) {
-                        JIT\JitValueBox::copyFromPointer($this->context, $powDest->value, $powResult);
-                        JIT\HashTableHelper::commitDimWriteLvalue($this->context, $powDest);
+                    // In-place `$r **= n` after `$r =& $obj->prop[$k]`: php-cfg dest is dead
+                    // without writableHt; the left operand keeps the HT slot or valueBoxAliasPtr (#35984).
+                    $powDim = $powDest;
+                    if (
+                        null === $powDim->writableHt
+                        && null === $powDim->valueBoxAliasPtr
+                        && (
+                            null !== $powLeft->writableHt
+                            || null !== $powLeft->valueBoxAliasPtr
+                        )
+                    ) {
+                        $powDim = $powLeft;
+                    }
+                    if (null !== $powDim->valueBoxAliasPtr) {
+                        $this->context->setVariableOp($powDestOp, $powDim);
+                        $this->assignOperand(
+                            $powDestOp,
+                            new Variable(
+                                $this->context,
+                                Variable::TYPE_VALUE,
+                                Variable::KIND_VALUE,
+                                $powResult
+                            ),
+                            true
+                        );
+                    } elseif (null !== $powDim->writableHt) {
+                        $this->context->setVariableOp($powDestOp, $powDim);
+                        JIT\JitValueBox::copyFromPointer($this->context, $powDim->value, $powResult);
+                        JIT\HashTableHelper::commitDimWriteLvalue($this->context, $powDim);
                     } else {
                         $this->assignOperandValue($powDestOp, $powResult, true);
                     }
