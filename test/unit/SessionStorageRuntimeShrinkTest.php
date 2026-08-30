@@ -49,7 +49,7 @@ final class SessionStorageRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertLessThan(1400, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(1600, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void

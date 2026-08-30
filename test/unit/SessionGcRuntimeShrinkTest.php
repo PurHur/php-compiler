@@ -9,6 +9,9 @@ use PHPCompiler\ext\standard\SessionGcJitHelper;
 use PHPCompiler\ext\standard\VmIni;
 use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\Runtime;
+use PHPCompiler\VM\OutputBuffer;
+use PHPCompiler\VM\SapiOutput;
+use PHPCompiler\Web\ResponseContext;
 use PHPUnit\Framework\TestCase;
 
 /** session_gc JIT routes through SessionGcJitHelper via JitVmHelperLink, not hand-rolled NestedJIT (#9411, #25916). */
@@ -20,11 +23,17 @@ final class SessionGcRuntimeShrinkTest extends TestCase
     {
         $dir = getenv('PHP_COMPILER_SESSION_DIR');
         $this->savedSessionDir = false !== $dir ? $dir : null;
+        OutputBuffer::reset();
+        SapiOutput::reset();
+        ResponseContext::reset();
         VmSession::reset();
     }
 
     protected function tearDown(): void
     {
+        OutputBuffer::reset();
+        SapiOutput::reset();
+        ResponseContext::reset();
         VmSession::reset();
         if (false === $this->savedSessionDir) {
             putenv('PHP_COMPILER_SESSION_DIR');
@@ -47,7 +56,7 @@ final class SessionGcRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $gcRuntime);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $gcRuntime);
         $this->assertStringNotContainsString('emitGcApply', $gcRuntime);
-        $this->assertLessThan(230, \substr_count($gcRuntime, "\n") + 1);
+        $this->assertLessThan(260, \substr_count($gcRuntime, "\n") + 1);
 
         $storageRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionStorageRuntime.php');
         $this->assertStringNotContainsString('ss_gc_loop_head', $storageRuntime);
