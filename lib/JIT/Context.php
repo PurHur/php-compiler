@@ -4406,6 +4406,12 @@ class Context {
         }
 
         if ($this->scope->variables->contains($op)) {
+            $bound = $this->resolveNamedBindingBySlot($op);
+            if (null !== $bound) {
+                $this->scope->variables[$op] = $bound;
+
+                return $bound;
+            }
             $block = $this->jitCurrentBlock;
             if (null !== $block && null !== $block->func) {
                 $slot = $block->slotForOperand($op);
@@ -4430,7 +4436,45 @@ class Context {
             }
         }
 
+        $bound = $this->resolveNamedBindingBySlot($op);
+        if (null !== $bound) {
+            $this->scope->variables[$op] = $bound;
+
+            return $bound;
+        }
+
         return $this->scope->variables[$op];
+    }
+
+    /**
+     * Loop headers reuse CFG slot numbers — prefer live named bindings over stale
+     * compare temps so `$i < $len` reads the post-increment alloca (#36018 / #32605).
+     */
+    private function resolveNamedBindingBySlot(Operand $op): ?Variable
+    {
+        $block = $this->jitCurrentBlock ?? $this->jitEnclosingBlock;
+        if (null === $block || null === $block->func) {
+            return null;
+        }
+        $slot = $block->slotForOperand($op);
+        if (null === $slot) {
+            return null;
+        }
+        foreach ($block->scopedOperands() as $scopeOp) {
+            $pname = OperandName::resolve($scopeOp);
+            if (null === $pname || '' === $pname) {
+                continue;
+            }
+            if ($block->slotForOperand($scopeOp) !== $slot) {
+                continue;
+            }
+            $resolved = $this->resolveRefAliasName($pname);
+            if (isset($this->namedVariableBindings[$resolved])) {
+                return $this->namedVariableBindings[$resolved];
+            }
+        }
+
+        return null;
     }
 
     public function findThisVariable(): ?Variable

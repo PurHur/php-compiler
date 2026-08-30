@@ -47,6 +47,30 @@ final class JitDomNodeListLength
         }
 
         $context = $objectType->jitContext();
+        $block = $context->jitEnclosingBlock;
+        $inUserFunc = null !== $block && null !== $block->func && !$block->isMainScript();
+        // NodeList parameters passed into user functions must read stamped instance
+        // length — unit-global GLOBAL_COUNT reflects the last query in the unit (#36018).
+        if ($inUserFunc) {
+            $classId = $objectType->lookup(self::CLASS_NODELIST);
+            $fetched = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $obj,
+                self::CLASS_NODELIST,
+                self::PROP_LENGTH,
+                $classId
+            );
+            $i64 = $context->getTypeFromString('int64');
+            $nativeSlot = BasicBlockHelper::entryAlloca($context, $i64);
+            $context->builder->store($context->helper->loadValue($fetched), $nativeSlot);
+
+            return new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VARIABLE,
+                $nativeSlot
+            );
+        }
         // GLOBAL_COUNT is only valid for getElementsByTagName / XPath snapshot lists,
         // not for childNodes lists which have their own per-instance length slot.
         // A childNodes list has PROP_CHILD_NODES_OWNER set; check at runtime to
@@ -61,6 +85,46 @@ final class JitDomNodeListLength
             if (!$objectType->hasProperty($classId, VmDom::PROP_CHILD_NODES_OWNER)) {
                 $objectType->defineProperty($classId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
             }
+            if (!$objectType->hasProperty($classId, VmDom::PROP_XPATH_AXIS_ID)) {
+                $objectType->defineProperty($classId, VmDom::PROP_XPATH_AXIS_ID, JITVariable::TYPE_NATIVE_LONG);
+            }
+            $bbInstance = BasicBlockHelper::append($context, 'dom_nll_instance');
+            $bbMerge = BasicBlockHelper::append($context, 'dom_nll_merge');
+            $bbOwnerPath = BasicBlockHelper::append($context, 'dom_nll_owner_path');
+            $i64 = $context->getTypeFromString('int64');
+            // Host-folded XPath axis NodeLists stamp per-instance length + axis id (#32003).
+            // Inside user functions the receiver is a parameter — GLOBAL_COUNT is unit-global
+            // and must not drive `$n->length` in loop JUMPIF (#36018).
+            $instanceLenProbe = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $obj,
+                self::CLASS_NODELIST,
+                self::PROP_LENGTH,
+                $classId
+            );
+            $instanceLenProbeVal = $context->helper->loadValue($instanceLenProbe);
+            $axisFetched = $objectType->propertyFetch(
+                $obj,
+                self::CLASS_NODELIST,
+                VmDom::PROP_XPATH_AXIS_ID,
+                false,
+                $receiverVar
+            );
+            $axisId = $context->helper->loadValue($axisFetched);
+            $hasAxis = $context->builder->icmp(
+                Builder::INT_UGT,
+                $axisId,
+                $i64->constInt(0, false)
+            );
+            $hasStampedLen = $context->builder->icmp(
+                Builder::INT_UGT,
+                $instanceLenProbeVal,
+                $i64->constInt(0, false)
+            );
+            $useInstance = $context->builder->or($hasAxis, $hasStampedLen);
+            $context->builder->branchIf($useInstance, $bbInstance, $bbOwnerPath);
+
+            $context->builder->positionAtEnd($bbOwnerPath);
             $ownerSlot = $objectType->propertySlotFor($obj, self::CLASS_NODELIST, VmDom::PROP_CHILD_NODES_OWNER);
             $ownerValuePtrRaw = $context->builder->load($ownerSlot);
             $voidPtr = $context->getTypeFromString('void*');
@@ -87,8 +151,6 @@ final class JitDomNodeListLength
                 $ownerObj,
                 $objPtrTy->constNull()
             );
-            $bbInstance = BasicBlockHelper::append($context, 'dom_nll_instance');
-            $bbMerge = BasicBlockHelper::append($context, 'dom_nll_merge');
             $context->builder->branchIf($hasOwner, $bbInstance, $bbGlobal);
 
             $context->builder->positionAtEnd($bbInstance);
@@ -100,17 +162,18 @@ final class JitDomNodeListLength
                 $classId
             );
             $instanceVal = $context->helper->loadValue($instanceLen);
+            $instanceEnd = $context->builder->getInsertBlock();
             $context->builder->branch($bbMerge);
 
             $context->builder->positionAtEnd($bbGlobal);
             $globalVal = DomUserScriptLiveTagListLlvm::readStoredCount($context);
+            $globalEnd = $context->builder->getInsertBlock();
             $context->builder->branch($bbMerge);
 
             $context->builder->positionAtEnd($bbMerge);
-            $i64 = $context->getTypeFromString('int64');
             $phi = $context->builder->phi($i64);
-            $phi->addIncoming($instanceVal, $bbInstance);
-            $phi->addIncoming($globalVal, $bbGlobal);
+            $phi->addIncoming($instanceVal, $instanceEnd);
+            $phi->addIncoming($globalVal, $globalEnd);
             // Keep native-long fetch shape aligned with propertyFetchDeclaredSlot(): callers
             // expect TYPE_NATIVE_LONG KIND_VALUE to carry an int64* storage pointer.
             // Returning the raw i64 phi here makes later generic loads treat it as a pointer

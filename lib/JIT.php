@@ -1143,6 +1143,14 @@ class JIT {
         if (!$this->isScalarObjectPropertyAliasType($var->objectPropertyType)) {
             return $var;
         }
+        $propType = $var->objectPropertyType ?? $var->type;
+        if (\in_array($propType, [
+            Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::TYPE_NATIVE_DOUBLE,
+        ], true)) {
+            return $this->snapshotNativeScalarPropertyRead($var, $propType);
+        }
         $boxed = $this->reseatPropertyFetchReadIntoValueBox($var);
         $boxed->objectPropertySlot = null;
         $boxed->objectPropertyType = null;
@@ -20319,6 +20327,7 @@ class JIT {
     {
         $var = $this->context->getVariableFromOp($op);
         JIT\UndefinedVariableHelper::guardBeforeRuntimeRead($this->context, $op, $var);
+        $var = $this->ensureNamedNativeLongLocalAlloca($op, $var);
 
         return $var;
     }
@@ -21300,6 +21309,7 @@ class JIT {
         )) {
             $value = $this->detachScalarObjectPropertyAliasForAssign($value);
         }
+        $value = $this->coerceNamedLocalNativeLongPropertyAssign($resultOp, $value);
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         // ?: false arm (`'null'`) after the true arm fetched `$o->tagName`: bindPropertyFetchResult
         // can leave objectPropertySlot on a TYPE_VALUE phi temp, so a later scalar assign skips
@@ -21444,6 +21454,36 @@ class JIT {
                 $this->markScopeVariableAssignedIfTracked($resultOp, $var);
 
                 return;
+            } elseif (
+                Variable::TYPE_NATIVE_LONG === $value->type
+                && Variable::KIND_VALUE === $value->kind
+                && null !== $value->value
+                && \PHPLLVM\Value::KIND_CONSTANT_INT === $value->value->getKind()
+                && null !== ($initName = JIT\OperandName::resolve($resultOp))
+                && '' !== $initName
+                && null !== $this->context->jitEnclosingBlock?->func
+                && !$this->context->jitEnclosingBlock->isMainScript()
+            ) {
+                // Named function locals must live in an i64 alloca so loop JUMPIF and
+                // post-increment share one slot — KIND_VALUE literals go stale (#36018).
+                $i64 = $this->context->getTypeFromString('int64');
+                $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $i64);
+                $this->context->builder->store($this->context->helper->loadValue($value), $slot);
+                $var = new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $var->addref();
+                $this->context->setVariableOp($resultOp, $var);
+                $this->context->bindVariableByName(
+                    $this->context->resolveRefAliasName($initName),
+                    $var
+                );
+                $this->markScopeVariableAssignedIfTracked($resultOp, $var);
+
+                return;
             } else {
                 // it's a kind!
                 $var = $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
@@ -21463,6 +21503,7 @@ class JIT {
             }
         }
         $result = $this->resolveAssignLvalue($resultOp);
+        $result = $this->ensureNamedNativeLongLocalAlloca($resultOp, $result);
         // Locals that still carry a non-hashtable property alias from a prior read assign
         // must rebind — writing through would mutate the previous object (#34465).
         // Intentional ASSIGN_REF aliases (`$o->p =& $v`) must keep the slot (#34649).
@@ -24909,6 +24950,125 @@ class JIT {
         }
     }
 
+    /**
+     * Promote named function locals from stale KIND_VALUE i64 literals to an alloca (#36018).
+     */
+    private function ensureNamedNativeLongLocalAlloca(Operand $resultOp, JIT\Variable $result): JIT\Variable
+    {
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $bound = $this->context->namedVariableBindings[$resolved];
+                if (Variable::KIND_VARIABLE === $bound->kind && Variable::TYPE_NATIVE_LONG === $bound->type) {
+                    $this->context->setVariableOp($resultOp, $bound);
+
+                    return $bound;
+                }
+            }
+        }
+        if (Variable::KIND_VARIABLE === $result->kind && Variable::TYPE_NATIVE_LONG === $result->type) {
+            return $result;
+        }
+        if (Variable::TYPE_NATIVE_LONG !== $result->type || Variable::KIND_VALUE !== $result->kind) {
+            return $result;
+        }
+        if (null === $result->value || \PHPLLVM\Value::KIND_CONSTANT_INT !== $result->value->getKind()) {
+            return $result;
+        }
+        if (null === $name || '' === $name) {
+            return $result;
+        }
+        $block = $this->context->jitEnclosingBlock;
+        if (null === $block || null === $block->func || $block->isMainScript()) {
+            return $result;
+        }
+        $i64 = $this->context->getTypeFromString('int64');
+        $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $i64);
+        $this->context->builder->store($this->context->helper->loadValue($result), $slot);
+        $allocaVar = new JIT\Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $allocaVar->addref();
+        $allocaVar->compileTimeLong = null;
+        $this->context->setVariableOp($resultOp, $allocaVar);
+        $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $allocaVar);
+
+        return $allocaVar;
+    }
+
+    /**
+     * Named locals ($i++) must not constant-fold on a stale LLVM i64 literal — loop
+     * JUMPIF still reads the original slot (#36018 / peer #32605 / #32831).
+     */
+    private function isNamedLocalIncDec(Operand $readOp, Operand $writeOp): bool
+    {
+        $name = JIT\OperandName::resolve($readOp) ?? JIT\OperandName::resolve($writeOp);
+        if (null === $name || '' === $name) {
+            return false;
+        }
+        $block = $this->context->jitEnclosingBlock;
+        if (null === $block || null === $block->func || $block->isMainScript()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Promote `$i = 0; …; $i++` locals from KIND_VALUE i64 literals to an alloca so
+     * loop headers and post-increment share one mutable slot (#36018).
+     *
+     * @return array{0: JIT\Variable, 1: JIT\Variable}
+     */
+    private function materializeNamedNativeLongLocalForIncDec(
+        Operand $readOp,
+        Operand $writeOp,
+        JIT\Variable $read,
+        JIT\Variable $write
+    ): array {
+        if (!$this->isNamedLocalIncDec($readOp, $writeOp)) {
+            return [$read, $write];
+        }
+        if (Variable::KIND_VARIABLE === $write->kind && Variable::TYPE_NATIVE_LONG === $write->type) {
+            return [$read, $write];
+        }
+        if (Variable::TYPE_NATIVE_LONG !== $read->type || Variable::TYPE_NATIVE_LONG !== $write->type) {
+            return [$read, $write];
+        }
+        if (Variable::KIND_VALUE !== $write->kind || null === $write->value) {
+            return [$read, $write];
+        }
+        if (\PHPLLVM\Value::KIND_CONSTANT_INT !== $write->value->getKind()) {
+            return [$read, $write];
+        }
+        $i64 = $this->context->getTypeFromString('int64');
+        $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $i64);
+        $cur = $this->context->helper->loadValue($read);
+        $this->context->builder->store($cur, $slot);
+        $allocaVar = new JIT\Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $allocaVar->addref();
+        $allocaVar->compileTimeLong = null;
+        $name = JIT\OperandName::resolve($writeOp) ?? JIT\OperandName::resolve($readOp);
+        if (null !== $name && '' !== $name) {
+            $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $allocaVar);
+        }
+        $this->context->setVariableOp($writeOp, $allocaVar);
+        if ($readOp !== $writeOp) {
+            $this->context->setVariableOp($readOp, $allocaVar);
+        }
+
+        return [$allocaVar, $allocaVar];
+    }
+
     private function compileIncDecOp(Block $block, OpCode $op, bool $increment, bool $prefix): void
     {
         $this->maybeRefreshIncludeBindingsBeforeUse();
@@ -25157,7 +25317,10 @@ class JIT {
 
         if (Variable::TYPE_NATIVE_LONG === $read->type) {
             $this->guardIncDecResourceOperand($read, $increment, $readOp);
-            $folded = JIT\JitIncDec::tryFoldConstantLong($this->context, $read, $increment);
+            [$read, $write] = $this->materializeNamedNativeLongLocalForIncDec($readOp, $writeOp, $read, $write);
+            $folded = $this->isNamedLocalIncDec($readOp, $writeOp)
+                ? null
+                : JIT\JitIncDec::tryFoldConstantLong($this->context, $read, $increment);
             if (null !== $folded) {
                 if (!$prefix) {
                     $this->assignOperand($resultOp, $read, true);
@@ -26044,10 +26207,121 @@ class JIT {
 
     private function compileBinaryOp(OpCode $op, Variable $left, Variable $right): Variable
     {
+        if ($this->isOrderedCompareOpcode($op->type)) {
+            [$left, $right] = $this->materializeOrderedCompareNativeLongOperands($left, $right);
+        }
         // VALUE×VALUE &|^ must go through Helper::binaryOp so string tags use
         // StringBitwiseNot::emitBinary (Zend bitwise_*_function). A prior
         // readLong-only short-circuit coerced "$a & $b" to int (#35312).
         return $this->context->helper->binaryOp($op, $left, $right);
+    }
+
+    private static function isOrderedCompareOpcode(int $opcodeType): bool
+    {
+        return OpCode::TYPE_SMALLER === $opcodeType
+            || OpCode::TYPE_GREATER === $opcodeType
+            || OpCode::TYPE_SMALLER_OR_EQUAL === $opcodeType
+            || OpCode::TYPE_GREATER_OR_EQUAL === $opcodeType;
+    }
+
+    /**
+     * User-function `$i < $len` must not use orderedNativeLongToValue on boxed
+     * property temps — snapshot to i64 like `(int)$len` (#36018).
+     *
+     * @return array{0: Variable, 1: Variable}
+     */
+    private function materializeOrderedCompareNativeLongOperands(Variable $left, Variable $right): array
+    {
+        $block = $this->context->jitEnclosingBlock;
+        if (null === $block || null === $block->func || $block->isMainScript()) {
+            return [$left, $right];
+        }
+        if (Variable::TYPE_NATIVE_LONG === $left->type
+            && Variable::TYPE_VALUE === $right->type
+            && JIT\JitValueBox::isValueOperand($right)
+        ) {
+            $right = $this->coerceValueBoxToNativeLongAlloca($right);
+        }
+        if (Variable::TYPE_NATIVE_LONG === $right->type
+            && Variable::TYPE_VALUE === $left->type
+            && JIT\JitValueBox::isValueOperand($left)
+        ) {
+            $left = $this->coerceValueBoxToNativeLongAlloca($left);
+        }
+
+        return [$left, $right];
+    }
+
+    private function coerceValueBoxToNativeLongAlloca(Variable $var): Variable
+    {
+        if (null !== $var->objectPropertySlot) {
+            $propType = $var->objectPropertyType ?? $var->type;
+            if (Variable::TYPE_NATIVE_LONG === $propType) {
+                return $this->snapshotNativeScalarPropertyRead($var, $propType);
+            }
+        }
+        $long = ext\standard\JitZendScalarCast::emitIntCast($this->context, $var);
+        $i64 = $this->context->getTypeFromString('int64');
+        $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $i64);
+        $this->context->builder->store($long, $slot);
+        $native = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $native->addref();
+        $native->compileTimeLong = null;
+
+        return $native;
+    }
+
+    /**
+     * DOMNodeList::$length and other native scalar property reads stay __value__-boxed
+     * for identical/echo — ordered `<` needs native i64 like `(int)$len` (#36018).
+     */
+    private function materializeDomNodeListLengthCompareOperand(Variable $var): Variable
+    {
+        if (Variable::TYPE_NATIVE_LONG === $var->type
+            && Variable::KIND_VARIABLE === $var->kind
+            && null === $var->objectPropertySlot
+        ) {
+            return $var;
+        }
+        if (null !== $var->objectPropertySlot) {
+            $propType = $var->objectPropertyType ?? $var->type;
+            if (\in_array($propType, [
+                Variable::TYPE_NATIVE_LONG,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::TYPE_NATIVE_DOUBLE,
+            ], true)) {
+                return $this->snapshotNativeScalarPropertyRead($var, $propType);
+            }
+
+            return $var;
+        }
+        if (Variable::TYPE_VALUE !== $var->type || !JIT\JitValueBox::isValueOperand($var)) {
+            return $var;
+        }
+        $isNativeLongProp = Variable::TYPE_NATIVE_LONG === ($var->objectPropertyType ?? null);
+        $isDomNodeListLen = null !== ($var->compileTimeDomNodeListLength ?? null);
+        if (!$isNativeLongProp && !$isDomNodeListLen) {
+            return $var;
+        }
+        $long = ext\standard\JitZendScalarCast::emitIntCast($this->context, $var);
+        $i64 = $this->context->getTypeFromString('int64');
+        $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $i64);
+        $this->context->builder->store($long, $slot);
+        $native = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $native->addref();
+        $native->compileTimeLong = null;
+
+        return $native;
     }
 
     private function jitVariableArrayClassConstant(string $constName): ?Variable
@@ -31440,6 +31714,77 @@ class JIT {
     }
 
     /**
+     * Copy a native declared property read into a stack slot — loop JUMPIF must not
+     * compare through a live objectPropertySlot or boxed __value__ alias (#36018).
+     */
+    private function snapshotNativeScalarPropertyRead(Variable $fetched, int $propType): Variable
+    {
+        $loaded = $this->context->helper->loadValue($fetched);
+        $tyName = match ($propType) {
+            Variable::TYPE_NATIVE_BOOL => 'int1',
+            Variable::TYPE_NATIVE_DOUBLE => 'double',
+            default => 'int64',
+        };
+        $ty = $this->context->getTypeFromString($tyName);
+        $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $ty);
+        $this->context->builder->store($loaded, $slot);
+        $snap = new Variable(
+            $this->context,
+            $propType,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $snap->addref();
+        $snap->compileTimeLong = null;
+        $snap->compileTimeFloat = null;
+        if (null !== $fetched->compileTimeDomNodeListLength) {
+            $snap->compileTimeDomNodeListLength = $fetched->compileTimeDomNodeListLength;
+        }
+
+        return $snap;
+    }
+
+    /**
+     * `$len = $n->length` in user functions must bind native i64 like `(int)$n->length` (#36018).
+     */
+    private function coerceNamedLocalNativeLongPropertyAssign(Operand $resultOp, Variable $value): Variable
+    {
+        $name = JIT\OperandName::resolve($resultOp);
+        if (null === $name || '' === $name) {
+            return $value;
+        }
+        $block = $this->context->jitEnclosingBlock;
+        if (null === $block || null === $block->func || $block->isMainScript()) {
+            return $value;
+        }
+        if (Variable::TYPE_VALUE !== $value->type || !JIT\JitValueBox::isValueOperand($value)) {
+            return $value;
+        }
+        $isNativeLongProp = Variable::TYPE_NATIVE_LONG === ($value->objectPropertyType ?? null);
+        $isDomNodeListLen = null !== ($value->compileTimeDomNodeListLength ?? null);
+        if (!$isNativeLongProp && !$isDomNodeListLen) {
+            return $value;
+        }
+        $long = ext\standard\JitZendScalarCast::emitIntCast($this->context, $value);
+        $i64 = $this->context->getTypeFromString('int64');
+        $slot = JIT\BasicBlockHelper::entryAlloca($this->context, $i64);
+        $this->context->builder->store($long, $slot);
+        $native = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $native->addref();
+        $native->compileTimeLong = null;
+        if ($isDomNodeListLen) {
+            $native->compileTimeDomNodeListLength = $value->compileTimeDomNodeListLength;
+        }
+
+        return $native;
+    }
+
+    /**
      * Read fetches keep objectPropertySlot on branch-local SSA; ARG_SEND / var_dump load it later
      * from a block where the GEP does not dominate (#33760, peer #32988).
      */
@@ -31467,6 +31812,15 @@ class JIT {
             return $fetched;
         }
         $propType = $fetched->objectPropertyType ?? $fetched->type;
+        // Native scalar declared properties (e.g. DOMNodeList::$length) must not stay
+        // live-slot aliased or __value__-boxed — loop `$i < $len` needs snapshot i64 (#36018).
+        if (\in_array($propType, [
+            Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::TYPE_NATIVE_DOUBLE,
+        ], true)) {
+            return $this->snapshotNativeScalarPropertyRead($fetched, $propType);
+        }
         $slot = JIT\JitValueBox::alloc($this->context);
         JIT\Builtin\Type\ObjectInstancePropertyLlvm::boxFetchedPropertyIntoValue(
             $this->context->type->object,

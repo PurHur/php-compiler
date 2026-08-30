@@ -481,7 +481,7 @@ final class JitDomNodeListItemUserScript
         $i64 = $context->getTypeFromString('int64');
         // Same index lowering as JitDomNodeListItem::loadIntArg.
         if (JITVariable::TYPE_NATIVE_LONG === $indexArg->type) {
-            $indexVal = $context->helper->loadValue($indexArg);
+            $indexVal = \PHPCompiler\JIT\JitLongArg::lower($context, $indexArg, 'DOMNodeList::item() index');
         } elseif (JITVariable::TYPE_VALUE === $indexArg->type) {
             $indexVal = $context->builder->call(
                 $context->lookupFunction('__value__readLong'),
@@ -517,7 +517,7 @@ final class JitDomNodeListItemUserScript
         $count = JitDomXPathQueryUserScript::hostXPathAxisQueryLength($xml, $expr) ?? 0;
         $i64 = $context->getTypeFromString('int64');
         if (JITVariable::TYPE_NATIVE_LONG === $indexArg->type) {
-            $indexVal = $context->helper->loadValue($indexArg);
+            $indexVal = \PHPCompiler\JIT\JitLongArg::lower($context, $indexArg, 'DOMNodeList::item() index');
         } elseif (JITVariable::TYPE_VALUE === $indexArg->type) {
             $indexVal = $context->builder->call(
                 $context->lookupFunction('__value__readLong'),
