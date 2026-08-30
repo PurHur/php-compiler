@@ -26,6 +26,8 @@ final class JitXmlReaderMethod
             'readinnerxml' => JitXmlReaderUserScript::tryReadInnerXml($context, ...$args),
             // leftover of fromString read (#35908 / #27299) — php-src zim_XMLReader_readOuterXml
             'readouterxml' => JitXmlReaderUserScript::tryReadOuterXml($context, ...$args),
+            // leftover of fromString/open (#35911 / #27299) — php-src zim_XMLReader_expand
+            'expand' => JitXmlReaderUserScript::tryExpand($context, ...$args),
             default => null,
         };
         if (null === $result) {
