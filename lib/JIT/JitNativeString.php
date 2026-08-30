@@ -187,7 +187,11 @@ final class JitNativeString
                     );
                 }
                 $magic = MagicMethodDispatch::coerceObjectToString($context, $objVar, $classHint);
-                if (null === $magic && 'reflectiontype' === strtolower(ltrim($classHint, '\\'))) {
+                $hintLc = strtolower(ltrim($classHint, '\\'));
+                if (str_starts_with($hintLc, '?')) {
+                    $hintLc = substr($hintLc, 1);
+                }
+                if (null === $magic && 'reflectiontype' === $hintLc) {
                     foreach (['ReflectionNamedType', 'ReflectionUnionType'] as $concrete) {
                         $magic = MagicMethodDispatch::coerceObjectToString($context, $objVar, $concrete);
                         if (null !== $magic) {
@@ -371,6 +375,38 @@ final class JitNativeString
                     'Cannot coerce JIT type '.Variable::getStringType($var->type).' to string for concat'
                 );
         }
+    }
+
+    /**
+     * Echo/cast fallback when compile-time class hints lie (e.g. ?ReflectionType locals
+     * holding ReflectionNamedType — #25469).
+     */
+    public static function tryCoerceObjectVariableByStringableClassId(
+        Context $context,
+        Variable $objectVar,
+    ): ?Variable {
+        if (Variable::TYPE_OBJECT !== $objectVar->type) {
+            return null;
+        }
+        self::ensureInsertBlock($context);
+        $objPtr = $context->helper->loadValue($objectVar);
+        $map = $context->structFieldMap['__object__'];
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $strPtr = self::coerceValueBoxObjectByStringableClassId(
+            $context,
+            $objectVar,
+            $classIdVal,
+            'obj_str_classid_'.spl_object_id($context)
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $strPtr
+        );
     }
 
     /**

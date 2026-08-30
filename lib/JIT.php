@@ -11868,15 +11868,9 @@ class JIT {
                     }
                     switch ($arg->type) {
                         case Variable::TYPE_VALUE:
-                            $echoSlot = JIT\JitValueBox::alloc($this->context);
-                            JIT\JitValueBox::copyFromPointer(
-                                $this->context,
-                                $echoSlot,
-                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
-                            );
                             JIT\ValueEchoHelper::echo(
                                 $this->context,
-                                JIT\JitValueBox::pointer($this->context, $echoSlot),
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg),
                                 $echoClassHint
                             );
                             break;

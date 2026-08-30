@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\Builtin\ReflectionInternalParamJitHelper;
 use PHPCompiler\JIT\Builtin\ReflectionNative;
 use PHPCompiler\JIT\Builtin\ReflectionRuntime;
 use PHPCompiler\JIT\Call;
@@ -31,6 +32,12 @@ final class ReflectionParameterHasType implements Call
 
         ReflectionRuntime::ensureLinked($context);
         ReflectionNative::registerDeclarations($context);
+
+        $folded = ReflectionInternalParamJitHelper::emitHasTypeFromRecordedInternal($context, $args[0]);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         LibcExtern::ensureStrlenDecl($context);
         $labelPtr = ReflectionParameterGetType::paramTypeLabelCstr($context, $args[0]);
         $labelLen = $context->builder->call(

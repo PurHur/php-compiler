@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\BuiltinInternalArgInfo;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionInternalFunctionLowering;
+use PHPCompiler\JIT\Builtin\ReflectionInternalParamJitHelper;
 use PHPCompiler\JIT\Builtin\ReflectionNative;
 use PHPCompiler\JIT\Builtin\ReflectionRuntime;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
@@ -34,6 +35,11 @@ final class ReflectionParameterGetType implements Call
 
         ReflectionRuntime::ensureLinked($context);
         ReflectionNative::registerDeclarations($context);
+
+        $folded = ReflectionInternalParamJitHelper::emitTypeFromRecordedInternal($context, $args[0]);
+        if (null !== $folded) {
+            return $folded;
+        }
 
         $recorded = ReflectionInternalFunctionLowering::recordedFunctions();
         if (1 === \count($recorded)) {

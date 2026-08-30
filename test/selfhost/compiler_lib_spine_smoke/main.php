@@ -5790,6 +5790,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionNamedArgumentsLowering
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionFunctionVariadicLowering.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionInternalFunctionLookupRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionInternalFunctionLowering.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionInternalParamJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionParameterJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionTypeFromLabelLookupRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionTypeJitHelper.php';
@@ -6497,6 +6498,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionIsVariadic.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionGetNamedArguments.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionGetNumberOfParameters.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionGetNumberOfRequiredParameters.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionGetParameters.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionGetReturnType.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionHasReturnType.php';
@@ -6520,6 +6522,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterGetDefaultValue.
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterGetType.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterHasType.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterIsOptional.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterIsDefaultValueAvailable.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterIsSensitiveParameter.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterIsVariadic.php';
