@@ -452,6 +452,13 @@ final class Variable {
      */
     public ?array $compileTimeAssoc = null;
 
+    /**
+     * Host iterator_to_array() result for json_encode wire fold (#35852).
+     *
+     * @var array<int|string, mixed>|null
+     */
+    public ?array $compileTimeIteratorToArrayHostArray = null;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 

@@ -51,6 +51,13 @@ final class JitJsonEncode
         }
 
         // SimpleXMLElement is not JsonSerializable; thin AOT get_object_vars is {} (#35850 leftover of #35795).
+        $itaJson = JitSimpleXmlUserScript::tryFoldJsonEncodeIteratorToArrayHost($arg, 0);
+        if (null !== $itaJson) {
+            return self::stringOrFalse(
+                $context,
+                $context->builder->load($context->constantStringFromString($itaJson))
+            );
+        }
         $sxeFold = JitSimpleXmlUserScript::tryFoldJsonEncode($context, $arg, 0);
         if (null !== $sxeFold) {
             return self::stringOrFalse($context, $sxeFold);

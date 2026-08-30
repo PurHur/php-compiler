@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\simplexml\JitSimpleXmlUserScript;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
@@ -30,6 +31,14 @@ final class JitIteratorToArray
     public static function invoke(Context $context, Variable $iterator, bool $preserveKeys): Value
     {
         ExceptionBridge::ensureLinked($context);
+        $sxeFold = JitSimpleXmlUserScript::tryMaterializeHostIteratorToArrayHashtable(
+            $context,
+            $iterator,
+            $preserveKeys
+        );
+        if (null !== $sxeFold) {
+            return self::wrapHashTable($context, $sxeFold);
+        }
 
         return self::wrapHashTable($context, self::materializeHashtable($context, $iterator, $preserveKeys));
     }
@@ -72,6 +81,14 @@ final class JitIteratorToArray
         bool $preserveKeys,
         ?string $containerUserType = null
     ): Value {
+        $sxeFold = JitSimpleXmlUserScript::tryMaterializeHostIteratorToArrayHashtable(
+            $context,
+            $iterator,
+            $preserveKeys
+        );
+        if (null !== $sxeFold) {
+            return $sxeFold;
+        }
         if (Variable::TYPE_NULL === $iterator->type || ($iterator->isNullConstant ?? false)) {
             JitIterableArg::emitIterableTypeErrorAndAbort(
                 $context,

@@ -63,6 +63,9 @@ final class JitSimpleXmlUserScript
     /** @var array<string, list<JITVariable>> */
     private static array $xpathListsByToken = [];
 
+    /** @var array<int|string, mixed>|null */
+    private static ?array $pendingIteratorToArrayHostArray = null;
+
     public static function lastConstructParseFailed(): bool
     {
         return self::$lastConstructParseFailed;
@@ -1733,6 +1736,23 @@ final class JitSimpleXmlUserScript
         return true;
     }
 
+    /**
+     * Attach host iterator_to_array wire after Call result assign (#35852).
+     *
+     * @return bool true when pending host array was applied
+     */
+    public static function applyPendingIteratorToArrayHostArray(JITVariable $result): bool
+    {
+        $pending = self::$pendingIteratorToArrayHostArray;
+        self::$pendingIteratorToArrayHostArray = null;
+        if (null === $pending) {
+            return false;
+        }
+        $result->compileTimeIteratorToArrayHostArray = $pending;
+
+        return true;
+    }
+
     private static function store(JITVariable $receiver, \SimpleXMLElement $tree, bool $asRoot = false): void
     {
         if (null === self::$trees) {
@@ -2041,7 +2061,11 @@ final class JitSimpleXmlUserScript
      */
     public static function tryFoldJsonEncode(Context $context, JITVariable $arg, int $flags): ?Value
     {
-        $tree = self::compileTimeTree($arg);
+        $tree = self::lookupExact($arg);
+        if (null === $tree && JITVariable::TYPE_OBJECT === $arg->type) {
+            // Chained (new SimpleXMLElement(...))->… binds lastTree, not the temp (#35844).
+            $tree = self::$lastTree;
+        }
         if (null === $tree) {
             return null;
         }
@@ -2055,6 +2079,105 @@ final class JitSimpleXmlUserScript
         }
 
         return $context->builder->load($context->constantStringFromString($encoded));
+    }
+
+    /**
+     * iterator_to_array($sxe) — host spl iterator_to_array + sxe Iterator (#35852 leftover of #35844).
+     *
+     * Host-folded rewind/valid/next are compile-time no-ops; the runtime Iterator loop never
+     * terminates. Materialize on the host when the compile-time tree is known (peer #35850).
+     *
+     * @return Value|null __hashtable__* for {@see \PHPCompiler\ext\standard\JitIteratorToArray}
+     */
+    public static function tryMaterializeHostIteratorToArrayHashtable(
+        Context $context,
+        JITVariable $arg,
+        bool $preserveKeys
+    ): ?Value {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::compileTimeTree($arg);
+        if (null === $tree) {
+            return null;
+        }
+        try {
+            $arr = \iterator_to_array($tree, $preserveKeys);
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!\is_array($arr)) {
+            return null;
+        }
+        self::$pendingIteratorToArrayHostArray = $arr;
+        $ht = self::materializeHostIteratorToArrayHashtable($context, $arr);
+        if (null === $ht) {
+            self::$pendingIteratorToArrayHostArray = null;
+        }
+
+        return $ht;
+    }
+
+    /**
+     * @param array<int|string, mixed> $arr
+     */
+    private static function materializeHostIteratorToArrayHashtable(Context $context, array $arr): ?Value
+    {
+        $ht = HashTableHelper::alloc($context);
+        $i64 = $context->getTypeFromString('int64');
+        $classId = $context->type->object->lookup('SimpleXMLElement');
+        try {
+            foreach ($arr as $key => $value) {
+                if (!($value instanceof \SimpleXMLElement)) {
+                    return null;
+                }
+                $obj = $context->type->object->allocate($classId);
+                $context->type->object->markObjectConstructed($obj);
+                $receiver = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_OBJECT,
+                    JITVariable::KIND_VALUE,
+                    $obj
+                );
+                self::bindHostTreeForSnapshot($context, $receiver, $value);
+                if (\is_int($key)) {
+                    HashTableHelper::setAtIndex(
+                        $context,
+                        $ht,
+                        $i64->constInt($key, false),
+                        $receiver
+                    );
+                } else {
+                    $keyStr = $context->builder->load(
+                        $context->constantStringFromString((string) $key)
+                    );
+                    HashTableHelper::setAtStringKey($context, $ht, $keyStr, $receiver);
+                }
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+        $context->refcount->addref($ht);
+
+        return $ht;
+    }
+
+    /**
+     * json_encode(iterator_to_array($sxe)) — host wire when the array was materialized at compile time (#35852).
+     */
+    public static function tryFoldJsonEncodeIteratorToArrayHost(JITVariable $arg, int $flags): ?string
+    {
+        $arr = $arg->compileTimeIteratorToArrayHostArray ?? null;
+        if (!\is_array($arr)) {
+            return null;
+        }
+        try {
+            $encoded = \json_encode($arr, $flags);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return \is_string($encoded) ? $encoded : null;
     }
 
     /**
