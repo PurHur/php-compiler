@@ -20,6 +20,10 @@ final class XmlReaderInstanceMethodJit
         // leftover of fromUri AOT (#35907 / #27299) — php-src zim_xmlreader_open
         'xmlreader::open' => true,
         'xmlreader::read' => true,
+        // leftover of fromString read (#35908 / #27299) — php-src zim_XMLReader_readInnerXml
+        'xmlreader::readinnerxml' => true,
+        // leftover of fromString read (#35908 / #27299) — php-src zim_XMLReader_readOuterXml
+        'xmlreader::readouterxml' => true,
     ];
 
     public static function isXmlReaderInstanceMethodProxy(string $proxyName): bool
