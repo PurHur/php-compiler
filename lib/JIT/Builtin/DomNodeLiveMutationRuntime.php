@@ -12,8 +12,8 @@ use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomAppendChildUserScript;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateElementAttrs;
-use PHPCompiler\ext\dom\JitDomCreateComment;
 use PHPCompiler\ext\dom\JitDomCreateCDATASection;
+use PHPCompiler\ext\dom\JitDomCreateComment;
 use PHPCompiler\ext\dom\JitDomCreateDocumentFragment;
 use PHPCompiler\ext\dom\JitDomCreateProcessingInstruction;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
@@ -49,6 +49,18 @@ use PHPLLVM\Value;
 final class DomNodeLiveMutationRuntime
 {
     public const MAX_EXTRA_ARGS = 4;
+
+    /**
+     * Epoch for compile-time InnerXml Variable stamps. Both bbDoc* and bbEl* IR arms
+     * execute this PHP during emission; without a once-guard the same delta is concat'd
+     * twice (#35997 leftover of #35881).
+     */
+    private static int $compileTimeInnerXmlEpoch = 0;
+
+    private static int $compileTimeInnerXmlDoneEpoch = -1;
+
+    /** True while emitting dual doc/el IR arms that share one InnerXml epoch (#35997). */
+    private static bool $shareCompileTimeInnerXmlEpoch = false;
 
     private const HELPER_PATH = '/ext/dom/DomCreateElementJitHelper.php';
 
@@ -313,6 +325,11 @@ final class DomNodeLiveMutationRuntime
                 $bbDocAppend = BasicBlockHelper::append($context, 'dom_append_doc');
                 $bbElAppend = BasicBlockHelper::append($context, 'dom_append_el');
                 $bbAppendDone = BasicBlockHelper::append($context, 'dom_append_done');
+                // Both IR arms below emit PHP compile-time side effects — share one epoch
+                // so syncUserScriptInnerXmlFromArgs stamps Variable metadata once (#35997).
+                self::$shareCompileTimeInnerXmlEpoch = true;
+                ++self::$compileTimeInnerXmlEpoch;
+                self::$compileTimeInnerXmlDoneEpoch = -1;
                 $context->builder->branchIf($isDoc, $bbDocAppend, $bbElAppend);
 
                 $context->builder->positionAtEnd($bbDocAppend);
@@ -346,6 +363,9 @@ final class DomNodeLiveMutationRuntime
                 }
                 $moved = 1 === \count($extraArgs)
                     && self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0]);
+                // Only the fragment Variable itself — not "$lastMaterialized" — owns
+                // lastChildren. Nested createElement→appendChild(text) / cloneNode while a
+                // fragment is open must not pollute the list (#35997 leftover of #35881).
                 $fragmentRecv = JitDomCreateDocumentFragment::TAG_KIND
                     === ($receiver->compileTimeDomTagName ?? null);
                 // Record only direct appendChild onto the fragment stand-in (#35881).
@@ -380,6 +400,7 @@ final class DomNodeLiveMutationRuntime
                 $context->builder->branch($bbAppendDone);
 
                 $context->builder->positionAtEnd($bbAppendDone);
+                self::$shareCompileTimeInnerXmlEpoch = false;
 
                 return self::nullValuePtr($context);
             }
@@ -393,6 +414,9 @@ final class DomNodeLiveMutationRuntime
                 $bbDocPrepend = BasicBlockHelper::append($context, 'dom_prepend_doc');
                 $bbElPrepend = BasicBlockHelper::append($context, 'dom_prepend_el');
                 $bbPrependDone = BasicBlockHelper::append($context, 'dom_prepend_done');
+                self::$shareCompileTimeInnerXmlEpoch = true;
+                ++self::$compileTimeInnerXmlEpoch;
+                self::$compileTimeInnerXmlDoneEpoch = -1;
                 $context->builder->branchIf($isDoc, $bbDocPrepend, $bbElPrepend);
 
                 $context->builder->positionAtEnd($bbDocPrepend);
@@ -456,6 +480,7 @@ final class DomNodeLiveMutationRuntime
                 $context->builder->branch($bbPrependDone);
 
                 $context->builder->positionAtEnd($bbPrependDone);
+                self::$shareCompileTimeInnerXmlEpoch = false;
 
                 return self::nullValuePtr($context);
             }
@@ -1304,14 +1329,21 @@ final class DomNodeLiveMutationRuntime
         $delta = implode('', $pieces);
         // Keep Variable metadata so createElement trees can cloneNode without loadXML (#35361).
         $priorMeta = $receiver->compileTimeDomInnerXml ?? '';
-        if ('prepend' === $kind) {
-            $receiver->compileTimeDomInnerXml = str_starts_with($priorMeta, $delta)
-                ? $priorMeta
-                : $delta.$priorMeta;
-        } elseif ('' !== $delta && '' !== $priorMeta && str_ends_with($priorMeta, $delta)) {
-            $receiver->compileTimeDomInnerXml = $priorMeta;
-        } else {
-            $receiver->compileTimeDomInnerXml = $priorMeta.$delta;
+        // Dual doc/el IR arms share one epoch; other callers bump so each sync stamps (#35997).
+        if (!self::$shareCompileTimeInnerXmlEpoch) {
+            ++self::$compileTimeInnerXmlEpoch;
+        }
+        if (self::$compileTimeInnerXmlDoneEpoch !== self::$compileTimeInnerXmlEpoch) {
+            self::$compileTimeInnerXmlDoneEpoch = self::$compileTimeInnerXmlEpoch;
+            if ('prepend' === $kind) {
+                $receiver->compileTimeDomInnerXml = str_starts_with($priorMeta, $delta)
+                    ? $priorMeta
+                    : $delta.$priorMeta;
+            } elseif ('' !== $delta && '' !== $priorMeta && str_ends_with($priorMeta, $delta)) {
+                $receiver->compileTimeDomInnerXml = $priorMeta;
+            } else {
+                $receiver->compileTimeDomInnerXml = $priorMeta.$delta;
+            }
         }
         // Nested firstChild/lastChild + createTextNode: slot often lacks loadXML-seeded
         // inner ("1"), so runtime load+concat yields only the delta (#33000).
