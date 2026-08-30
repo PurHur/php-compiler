@@ -1032,6 +1032,85 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * Fold SimpleXMLElement::addAttribute via host php-src (sxe.c zim_simplexmlelement_addAttribute; #35806).
+     * Mutates the host tree so a subsequent asXML() fold includes the attribute.
+     */
+    public static function tryAddAttribute(Context $context, JITVariable ...$args): ?Value
+    {
+        if (\count($args) < 3 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        // Soft-null $qualifiedName — E_DEPRECATED then empty → ValueError (#31554 / sxe.c).
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[1],
+                'SimpleXMLElement::addAttribute',
+                0,
+                'qualifiedName'
+            );
+            throw new \ValueError(
+                'SimpleXMLElement::addAttribute(): Argument #1 ($qualifiedName) cannot be empty'
+            );
+        }
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $name) {
+            return null;
+        }
+        if ('' === $name) {
+            throw new \ValueError(
+                'SimpleXMLElement::addAttribute(): Argument #1 ($qualifiedName) cannot be empty'
+            );
+        }
+        if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+            throw new \TypeError('SimpleXMLElement::addAttribute(): Argument #2 ($value) must be of type string');
+        }
+        $value = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null === $value) {
+            return null;
+        }
+        $namespace = null;
+        if (isset($args[3])) {
+            if (JITVariable::TYPE_NULL === $args[3]->type) {
+                $namespace = null;
+            } else {
+                $namespace = JitStringBuiltinArg::compileTimeLiteral($args[3]) ?? $args[3]->compileTimeString;
+                if (null === $namespace) {
+                    return null;
+                }
+            }
+        }
+        $warn = null;
+        set_error_handler(static function (int $_errno, string $errstr) use (&$warn): bool {
+            $warn = $errstr;
+
+            return true;
+        });
+        try {
+            if (null !== $namespace && '' !== $namespace) {
+                $tree->addAttribute($name, $value, $namespace);
+            } else {
+                $tree->addAttribute($name, $value);
+            }
+        } catch (\ValueError $e) {
+            throw $e;
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            restore_error_handler();
+        }
+        if (is_string($warn) && '' !== $warn) {
+            JitBuiltinWarning::emit($context, $warn);
+        }
+
+        return self::nullValue($context);
+    }
+
+    /**
      * Compile-time SimpleXMLElement::registerXPathNamespace via host php-src (#27534 / #31656).
      * Mutates the host tree so a subsequent literal xpath() fold sees registered prefixes.
      * Soft-null prefix/namespace — E_DEPRECATED then empty-prefix → false (sxe.c).
