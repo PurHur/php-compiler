@@ -46,6 +46,8 @@ final class XmlReaderInstanceMethodJit
         'xmlreader::movetoattributeno' => true,
         // leftover of moveToAttribute (#35948 / #35941 / #27299) — php-src zim_XMLReader_moveToFirstAttribute
         'xmlreader::movetofirstattribute' => true,
+        // leftover of moveToAttribute (#35951 / #35941 / #27299) — php-src zim_XMLReader_moveToAttributeNs
+        'xmlreader::movetoattributens' => true,
         // leftover of moveToAttribute (#35940 / #27299) — php-src zim_XMLReader_moveToElement
         'xmlreader::movetoelement' => true,
         // leftover of moveToAttribute (#35952 / #35941 / #27299) — php-src zim_XMLReader_moveToNextAttribute

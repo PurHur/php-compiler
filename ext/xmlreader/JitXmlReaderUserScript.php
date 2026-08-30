@@ -937,6 +937,72 @@ final class JitXmlReaderUserScript
     }
 
     /**
+     * XMLReader::moveToAttributeNs() leftover of moveToAttribute (#35951 / #35941 / #27299).
+     * php-src: zim_XMLReader_moveToAttributeNs / xmlTextReaderMoveToAttributeNs
+     */
+    public static function tryMoveToAttributeNs(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot()
+            || null === self::$lastAttributes
+            || null === self::$lastAttrNodeTypes
+            || null === self::$lastNsScopes
+            || null === self::$lastEvents
+        ) {
+            return null;
+        }
+        if (\count($args) < 3) {
+            throw new \LogicException('XMLReader::moveToAttributeNs() expects $this, $name, $namespace');
+        }
+        $local = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        $ns = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null === $local || null === $ns) {
+            return null;
+        }
+        if ('' === $local) {
+            throw new \ValueError('XMLReader::moveToAttributeNs(): Argument #1 ($name) cannot be empty');
+        }
+        if ('' === $ns) {
+            throw new \ValueError('XMLReader::moveToAttributeNs(): Argument #2 ($namespace) cannot be empty');
+        }
+        $hits = [];
+        foreach (self::$lastAttributes as $i => $attrs) {
+            $hits[] = self::lookupMoveToAttributeNsHitAtPos($i, $local, $ns);
+        }
+
+        return self::emitMoveToAttributeSwitch($context, $args[0], $hits);
+    }
+
+    /**
+     * @return ?array{name: string, value: string}
+     */
+    private static function lookupMoveToAttributeNsHitAtPos(
+        int $pos,
+        string $localName,
+        string $namespaceUri
+    ): ?array {
+        if (null === self::$lastAttrNodeTypes
+            || !isset(self::$lastAttrNodeTypes[$pos])
+            || XmlReaderConstants::ELEMENT !== self::$lastAttrNodeTypes[$pos]
+        ) {
+            return null;
+        }
+        $attrs = self::$lastAttributes[$pos] ?? [];
+        $nsScope = self::$lastNsScopes[$pos] ?? [];
+        foreach ($attrs as $attrName => $value) {
+            if (VmXmlReader::attributeLocalNamePublic($attrName) !== $localName) {
+                continue;
+            }
+            if (VmXmlReader::attributeNamespaceUriPublic($attrName, $nsScope) !== $namespaceUri) {
+                continue;
+            }
+
+            return ['name' => $attrName, 'value' => $value];
+        }
+
+        return null;
+    }
+
+    /**
      * Move the AOT cursor onto an attribute node (or leave it unchanged on miss) (#35941).
      *
      * @param list<?array{name: string, value: string}> $hits
