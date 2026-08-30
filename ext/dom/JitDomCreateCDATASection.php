@@ -23,6 +23,9 @@ use PHPLLVM\Value;
  */
 final class JitDomCreateCDATASection
 {
+    /** Compile-time body of the last createCDATASection stand-in (#35871). */
+    public static ?string $lastMaterializedData = null;
+
     private const CLASS_STANDIN = 'DOMElement';
 
     private const PROP_NODE_NAME = 'nodeName';
@@ -62,6 +65,12 @@ final class JitDomCreateCDATASection
 
     public static function materialize(Context $context, string $data): Value
     {
+        self::$lastMaterializedData = $data;
+        JitDomCreateDocumentFragment::$lastCreated = false;
+        JitDomCreateComment::$lastMaterializedData = null;
+        JitDomCreateTextNode::$lastMaterializedData = null;
+        JitDomCreateProcessingInstruction::$lastMaterializedTarget = null;
+        JitDomCreateProcessingInstruction::$lastMaterializedData = null;
         JitDomSubstringData::remember($data);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
@@ -83,6 +92,7 @@ final class JitDomCreateCDATASection
 
     private static function materializeFromRuntimeData(Context $context, JITVariable $dataArg): Value
     {
+        self::$lastMaterializedData = null;
         JitDomSubstringData::remember(null);
         $dataStr = self::loadStringArg($context, $dataArg);
         $objectType = $context->type->object;

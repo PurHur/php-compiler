@@ -15,7 +15,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for DOMDocument::importNode() (#19212, #32350, #33097, #33362, #35118, #35801).
+ * LLVM lowering for DOMDocument::importNode() (#19212, #32350, #33097, #33362, #35118, #35801, #35871).
  *
  * php-src ext/dom/document.c PHP_METHOD(DOMDocument, importNode) → xmlDocCopyNode.
  * Thin-standalone AOT cannot return NestedJIT object pointers (property fetch
@@ -27,6 +27,8 @@ use PHPLLVM\Value;
  * {@see JitDomDocumentElement} child materialize (#33014).
  * Attr / leaf sources materialize as stand-ins (#35043 / #35098 / #35118) — never the
  * destination loadXML root via lastPath poisoning.
+ * createComment / createCDATASection / createProcessingInstruction / createDocumentFragment
+ * stamp leaf/fragment metadata so importNode does not fall through to `div` (#35871).
  */
 final class JitDomImportNode
 {
@@ -170,6 +172,10 @@ final class JitDomImportNode
      * #35098 / peer cloneNode). Element-only fallback would return the destination
      * root tag (e.g. `r`) as a DOMElement.
      *
+     * Detached createComment / createCDATASection / createProcessingInstruction /
+     * createDocumentFragment must stamp leaf/fragment metadata (#35871 leftover of
+     * #35098) — otherwise ARG_SEND temps fall through to the HTML `div` stub.
+     *
      * DOMAttr / Dom\Attr sources must materialize via
      * {@see JitDomAttributeNodeNS::materializeAttrFromLiterals} (#35118). getAttributeNode
      * leaves {@see JitDomAttrRename::lastFetchedKey} while `$src->documentElement` poisons
@@ -181,6 +187,11 @@ final class JitDomImportNode
         JITVariable $sourceNode,
         bool $deep
     ): Value {
+        // Explicit #document-fragment tag before leaf fallbacks (#35871).
+        if (JitDomCreateDocumentFragment::TAG_KIND === $sourceNode->compileTimeDomTagName) {
+            return self::materializeImportedFragment($context, $documentVar, $sourceNode, $deep);
+        }
+
         $leaf = self::resolveSourceLeafSpec($sourceNode, $documentVar);
         if (null !== $leaf) {
             self::$lastMaterializedInnerXml = '';
@@ -203,6 +214,12 @@ final class JitDomImportNode
             }
 
             return self::boxObjectResult($context, $object);
+        }
+
+        // Detached createDocumentFragment after leaf last* checks (#35871).
+        $fragment = self::resolveSourceFragmentSpec($sourceNode);
+        if (null !== $fragment) {
+            return self::materializeImportedFragment($context, $documentVar, $sourceNode, $deep);
         }
 
         $attrSpec = self::resolveSourceAttrSpec($sourceNode);
@@ -485,7 +502,131 @@ final class JitDomImportNode
     }
 
     /**
-     * Leaf import source: text / comment / CDATA / PI (#35043 / #35098).
+     * DocumentFragment import source (#35871) — php-src xmlDocCopyNode on a fragment.
+     *
+     * @return null|array{inner: string}
+     */
+    private static function resolveSourceFragmentSpec(JITVariable $sourceNode): ?array
+    {
+        $tag = $sourceNode->compileTimeDomTagName;
+        if (JitDomCreateDocumentFragment::TAG_KIND === $tag) {
+            return ['inner' => $sourceNode->compileTimeDomInnerXml ?? ''];
+        }
+        // ARG_SEND may drop the tag after createDocumentFragment (#35871). Keep
+        // lastCreated true across createTextNode children so fragment+text imports
+        // still resolve; createComment/CDATA/PI/Element clear the flag.
+        if (
+            JitDomCreateDocumentFragment::$lastCreated
+            && (null === $tag || '' === $tag)
+            && null === $sourceNode->compileTimeDomTextData
+            && null === $sourceNode->compileTimeDomChildIndex
+            && null === $sourceNode->compileTimeDomNodePath
+            && null === JitDomNodeChildProperty::$lastFetchedTagName
+            && null === JitDomCreateComment::$lastMaterializedData
+            && null === JitDomCreateCDATASection::$lastMaterializedData
+            && null === JitDomCreateProcessingInstruction::$lastMaterializedTarget
+        ) {
+            return ['inner' => $sourceNode->compileTimeDomInnerXml ?? ''];
+        }
+
+        return null;
+    }
+
+    /**
+     * Thin-AOT importNode(DocumentFragment): new fragment + deep-copy children (#35871).
+     */
+    private static function materializeImportedFragment(
+        Context $context,
+        JITVariable $documentVar,
+        JITVariable $sourceNode,
+        bool $deep
+    ): Value {
+        self::$lastMaterializedTagName = JitDomCreateDocumentFragment::TAG_KIND;
+        $inner = $deep ? ($sourceNode->compileTimeDomInnerXml ?? '') : '';
+        // Dual-emit appendChild / childNodes->length can double compile-time InnerXml text
+        // (#35386 / #35871). Collapse adjacent duplicate chunks, then undupe a trailing
+        // text payload that is exactly last createTextNode doubled.
+        if ('' !== $inner) {
+            $inner = self::dedupeAdjacentFragmentInner($inner);
+            $lastText = JitDomCreateTextNode::$lastMaterializedData;
+            if (null !== $lastText && '' !== $lastText && str_ends_with($inner, $lastText.$lastText)) {
+                $inner = substr($inner, 0, -\strlen($lastText));
+            }
+        }
+        self::$lastMaterializedInnerXml = $inner;
+
+        $frag = JitDomCreateDocumentFragment::materialize($context, $documentVar);
+
+        if ($deep && '' !== $inner) {
+            foreach (DomParseSimpleXmlJitHelper::parseSiblingNodesArgv($inner) as $node) {
+                $child = self::materializeFragmentChildFromSpec($context, $node);
+                if (null === $child) {
+                    continue;
+                }
+                JitDomAppendChildLiveSlots::syncNonFragment($context, $frag, $child);
+            }
+            JitDomCreateElement::storeUserScriptInnerXml($context, $frag, $inner);
+        }
+
+        return self::boxObjectResult($context, $frag);
+    }
+
+    /** Collapse doubled child markup from dual-emit appendChild (#35386 / #35871). */
+    private static function dedupeAdjacentFragmentInner(string $inner): string
+    {
+        $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks($inner);
+        if (\count($chunks) < 2) {
+            return $inner;
+        }
+        $deduped = [];
+        foreach ($chunks as $chunk) {
+            if ([] === $deduped || $deduped[\count($deduped) - 1] !== $chunk) {
+                $deduped[] = $chunk;
+            }
+        }
+
+        return implode('', $deduped);
+    }
+
+    /**
+     * @param array{kind: string, data: string, content?: string, inner?: string, open?: string} $node
+     */
+    private static function materializeFragmentChildFromSpec(Context $context, array $node): ?Value
+    {
+        $kind = $node['kind'] ?? '';
+        if ('comment' === $kind) {
+            return JitDomCreateComment::materialize($context, $node['data']);
+        }
+        if ('cdata' === $kind) {
+            return JitDomCreateCDATASection::materialize($context, $node['data']);
+        }
+        if ('pi' === $kind) {
+            return JitDomCreateProcessingInstruction::materialize(
+                $context,
+                $node['data'],
+                $node['content'] ?? ''
+            );
+        }
+        if ('text' === $kind) {
+            return JitDomCreateTextNode::materialize($context, $node['data']);
+        }
+        if ('element' === $kind) {
+            $tag = $node['data'];
+            $childInner = $node['inner'] ?? '';
+            $text = '' === $childInner
+                ? ''
+                : DomParseSimpleXmlJitHelper::rootTextContentArgv(
+                    '<'.$tag.'>'.$childInner.'</'.$tag.'>'
+                );
+
+            return JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        }
+
+        return null;
+    }
+
+    /**
+     * Leaf import source: text / comment / CDATA / PI (#35043 / #35098 / #35871).
      *
      * {@see JITVariable::$compileTimeDomTextData} is shared by CharacterData kinds on
      * firstChild temps — resolve kind from tag / child index before materializing.
@@ -512,12 +653,15 @@ final class JitDomImportNode
         if (JitDomCreateProcessingInstruction::TAG_KIND === $tag) {
             $target = $sourceNode->compileTimeDomAttributes['target']
                 ?? JitDomNodeChildProperty::$lastFetchedPiTarget
+                ?? JitDomCreateProcessingInstruction::$lastMaterializedTarget
                 ?? '';
 
             return [
                 'kind' => 'pi',
                 'data' => $target,
-                'content' => $textData ?? '',
+                'content' => $textData
+                    ?? JitDomCreateProcessingInstruction::$lastMaterializedData
+                    ?? '',
             ];
         }
         if ('#text' === $tag) {
@@ -526,7 +670,7 @@ final class JitDomImportNode
                 'data' => $textData ?? JitDomCreateTextNode::$lastMaterializedData ?? '',
             ];
         }
-        // Element tag — not a character-data leaf.
+        // Fragment / element tag — not a character-data leaf.
         if (null !== $tag && '' !== $tag) {
             return null;
         }
@@ -563,11 +707,34 @@ final class JitDomImportNode
             return ['kind' => 'text', 'data' => $textData];
         }
 
+        // Detached createComment / CDATA / PI: ARG_SEND may drop stamps (#35871).
+        if (
+            null === $sourceNode->compileTimeDomNodePath
+            && null === JitDomNodeChildProperty::$lastFetchedTagName
+        ) {
+            if (null !== JitDomCreateComment::$lastMaterializedData) {
+                return ['kind' => 'comment', 'data' => JitDomCreateComment::$lastMaterializedData];
+            }
+            if (null !== JitDomCreateCDATASection::$lastMaterializedData) {
+                return ['kind' => 'cdata', 'data' => JitDomCreateCDATASection::$lastMaterializedData];
+            }
+            if (null !== JitDomCreateProcessingInstruction::$lastMaterializedTarget) {
+                return [
+                    'kind' => 'pi',
+                    'data' => JitDomCreateProcessingInstruction::$lastMaterializedTarget,
+                    'content' => JitDomCreateProcessingInstruction::$lastMaterializedData ?? '',
+                ];
+            }
+        }
+
         // Detached createTextNode: ARG_SEND may drop TextData but leave lastMaterializedData
-        // and no element child-fetch stamp (peer splitText #32362).
+        // and no element child-fetch stamp (peer splitText #32362). Skip when a fragment was
+        // the last document create — text children must not steal importNode($frag) (#35871).
         if (null === $sourceNode->compileTimeDomNodePath
             && null === JitDomNodeChildProperty::$lastFetchedTagName
             && null !== JitDomCreateTextNode::$lastMaterializedData
+            && !JitDomCreateDocumentFragment::$lastCreated
+            && null === $sourceNode->compileTimeDomInnerXml
         ) {
             return ['kind' => 'text', 'data' => JitDomCreateTextNode::$lastMaterializedData];
         }

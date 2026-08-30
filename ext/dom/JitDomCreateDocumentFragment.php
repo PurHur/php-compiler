@@ -25,6 +25,11 @@ final class JitDomCreateDocumentFragment
 {
     private const CLASS_STANDIN = 'DOMElement';
 
+    /** True when the last createDocumentFragment was a thin-AOT stand-in (#35871). */
+    public static bool $lastCreated = false;
+
+    public const TAG_KIND = '#document-fragment';
+
     private const PROP_NODE_NAME = 'nodeName';
 
     private const PROP_TEXT_CONTENT = 'textContent';
@@ -38,7 +43,14 @@ final class JitDomCreateDocumentFragment
             throw new \LogicException('DOMDocument::createDocumentFragment() called without $this');
         }
 
-        $document = self::loadObjectArg($context, $args[0]);
+        return self::materialize($context, $args[0]);
+    }
+
+    /** Raw DocumentFragment stand-in for importNode deep-copy (#35871). */
+    public static function materialize(Context $context, JITVariable $documentVar): Value
+    {
+        self::$lastCreated = true;
+        $document = self::loadObjectArg($context, $documentVar);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);
@@ -46,7 +58,7 @@ final class JitDomCreateDocumentFragment
         $obj = $objectType->allocate($classId);
         $objectType->markObjectConstructed($obj);
 
-        self::storeStringLiteral($context, $obj, self::PROP_NODE_NAME, '#document-fragment');
+        self::storeStringLiteral($context, $obj, self::PROP_NODE_NAME, self::TAG_KIND);
         // saveXML fetches textContent/INNER_XML on every node (#32315). Empty fragment
         // xmlNodeDump is "" (php-src ext/dom/document.c → xmlNewDocFragment).
         self::storeStringLiteral($context, $obj, self::PROP_TEXT_CONTENT, '');

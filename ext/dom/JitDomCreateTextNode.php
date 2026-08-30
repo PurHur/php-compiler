@@ -75,6 +75,12 @@ final class JitDomCreateTextNode
     public static function materialize(Context $context, string $data = ''): Value
     {
         self::$lastMaterializedData = $data;
+        // Do not clear DocumentFragment::$lastCreated — fragment trees append createTextNode
+        // children and importNode($frag) must still see the fragment (#35871).
+        JitDomCreateComment::$lastMaterializedData = null;
+        JitDomCreateCDATASection::$lastMaterializedData = null;
+        JitDomCreateProcessingInstruction::$lastMaterializedTarget = null;
+        JitDomCreateProcessingInstruction::$lastMaterializedData = null;
         JitDomSubstringData::remember($data);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);

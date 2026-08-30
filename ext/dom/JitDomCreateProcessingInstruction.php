@@ -26,6 +26,12 @@ final class JitDomCreateProcessingInstruction
     /** Internal saveXML discriminator; not a Zend PI nodeName. */
     public const TAG_KIND = '#pi';
 
+    /** Compile-time target of the last createProcessingInstruction (#35871). */
+    public static ?string $lastMaterializedTarget = null;
+
+    /** Compile-time data of the last createProcessingInstruction (#35871). */
+    public static ?string $lastMaterializedData = null;
+
     private const PROP_NODE_NAME = 'nodeName';
 
     private const PROP_TAG_NAME = 'tagName';
@@ -84,6 +90,12 @@ final class JitDomCreateProcessingInstruction
 
     public static function materialize(Context $context, string $target, string $data): Value
     {
+        self::$lastMaterializedTarget = $target;
+        self::$lastMaterializedData = $data;
+        JitDomCreateDocumentFragment::$lastCreated = false;
+        JitDomCreateComment::$lastMaterializedData = null;
+        JitDomCreateCDATASection::$lastMaterializedData = null;
+        JitDomCreateTextNode::$lastMaterializedData = null;
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);
@@ -110,6 +122,8 @@ final class JitDomCreateProcessingInstruction
 
     private static function materializeFromRuntime(Context $context, Value $targetStr, Value $dataStr): Value
     {
+        self::$lastMaterializedTarget = null;
+        self::$lastMaterializedData = null;
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);

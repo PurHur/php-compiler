@@ -14252,6 +14252,18 @@ class JIT {
                     $this->propagateDomCreateTextNodeCompileTimeData(
                         $block->getOperand($op->arg1)
                     );
+                    $this->propagateDomCreateCommentCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
+                    $this->propagateDomCreateCDATASectionCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
+                    $this->propagateDomCreateProcessingInstructionCompileTimeData(
+                        $block->getOperand($op->arg1)
+                    );
+                    $this->propagateDomCreateDocumentFragmentCompileTimeTag(
+                        $block->getOperand($op->arg1)
+                    );
                     $this->propagateDomTextSplitTextCompileTimeData(
                         $block->getOperand($op->arg1)
                     );
@@ -17171,7 +17183,7 @@ class JIT {
         $srcTag = $src->compileTimeDomTagName;
         $leafTag = $materializedTag
             ?? (
-                \in_array($srcTag, ['#text', '#comment', '#cdata-section', '#pi'], true)
+                \in_array($srcTag, ['#text', '#comment', '#cdata-section', '#pi', '#document-fragment'], true)
                     ? $srcTag
                     : null
             );
@@ -17179,6 +17191,16 @@ class JIT {
             ?? (
                 '#text' === ($srcTag ?? null)
                     ? \PHPCompiler\ext\dom\JitDomCreateTextNode::$lastMaterializedData
+                    : null
+            )
+            ?? (
+                '#comment' === ($srcTag ?? null) || '#comment' === ($materializedTag ?? null)
+                    ? \PHPCompiler\ext\dom\JitDomCreateComment::$lastMaterializedData
+                    : null
+            )
+            ?? (
+                '#cdata-section' === ($srcTag ?? null) || '#cdata-section' === ($materializedTag ?? null)
+                    ? \PHPCompiler\ext\dom\JitDomCreateCDATASection::$lastMaterializedData
                     : null
             )
             ?? (
@@ -17193,6 +17215,17 @@ class JIT {
             }
             $resultVar->compileTimeDomTagName = '#text' === $leafTag ? null : $leafTag;
             $resultVar->compileTimeDomInnerXml = null;
+            $resultVar->compileTimeDomLoadXml = null;
+            $resultVar->compileTimeDomAttributes = null;
+
+            return;
+        }
+        if (null !== $leafTag && '#document-fragment' === $leafTag) {
+            $resultVar->compileTimeDomTagName = '#document-fragment';
+            $resultVar->compileTimeDomInnerXml =
+                \PHPCompiler\ext\dom\JitDomImportNode::$lastMaterializedInnerXml
+                ?? $src->compileTimeDomInnerXml
+                ?? '';
             $resultVar->compileTimeDomLoadXml = null;
             $resultVar->compileTimeDomAttributes = null;
 
@@ -17720,6 +17753,100 @@ class JIT {
             return;
         }
         $this->bindCompileTimeDomTextData($result, $data);
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeDomTagName = '#text';
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->compileTimeDomTagName = '#text';
+            }
+        }
+    }
+
+    /** Remember createComment('lit') for importNode (#35871 leftover of #35098). */
+    private function propagateDomCreateCommentCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateComment)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomCreateComment::$lastMaterializedData;
+        if (null === $data || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->bindCompileTimeDomTextData($result, $data);
+        $this->bindCompileTimeDomTagName($result, '#comment');
+    }
+
+    /** Remember createCDATASection('lit') for importNode (#35871). */
+    private function propagateDomCreateCDATASectionCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateCDATASection)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomCreateCDATASection::$lastMaterializedData;
+        if (null === $data || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->bindCompileTimeDomTextData($result, $data);
+        $this->bindCompileTimeDomTagName($result, '#cdata-section');
+    }
+
+    /** Remember createProcessingInstruction for importNode (#35871). */
+    private function propagateDomCreateProcessingInstructionCompileTimeData(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateProcessingInstruction)) {
+            return;
+        }
+        $target = \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::$lastMaterializedTarget;
+        if (null === $target || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $data = \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::$lastMaterializedData ?? '';
+        $this->bindCompileTimeDomTextData($result, $data);
+        $this->bindCompileTimeDomTagName($result, \PHPCompiler\ext\dom\JitDomCreateProcessingInstruction::TAG_KIND);
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeDomAttributes = ['target' => $target];
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->compileTimeDomAttributes = ['target' => $target];
+            }
+        }
+    }
+
+    /** Remember createDocumentFragment tag for importNode (#35871). */
+    private function propagateDomCreateDocumentFragmentCompileTimeTag(Operand $result): void
+    {
+        if (!($this->context->scope->toCall instanceof JIT\Call\DomDocumentCreateDocumentFragment)) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $this->bindCompileTimeDomTagName(
+            $result,
+            \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND
+        );
+        $var = $this->context->getVariableFromOp($result);
+        if (null === $var->compileTimeDomInnerXml) {
+            $var->compileTimeDomInnerXml = '';
+        }
+    }
+
+    private function bindCompileTimeDomTagName(Operand $result, string $tag): void
+    {
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeDomTagName = $tag;
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->compileTimeDomTagName = $tag;
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
     }
 
     /** Remember splitText() tail data on the result Variable (#32362). */
