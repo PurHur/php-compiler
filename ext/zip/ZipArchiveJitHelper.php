@@ -164,6 +164,56 @@ final class ZipArchiveJitHelper
     }
 
     /**
+     * addEmptyDir entry path — separate NestedJIT entry avoids exec() $s1/$s2 formal
+     * aliasing under thin AOT (peer addEntry / #35454; #35465 leftover).
+     *
+     * php-src: ext/zip/php_zip.c — zim_ZipArchive_addEmptyDir
+     */
+    public static function addEmptyDirEntry(string $dirname): string
+    {
+        if (1 !== self::$h1open) {
+            self::$h1status = 8;
+
+            return self::pack(0);
+        }
+        if ('' === $dirname) {
+            return self::pack(0);
+        }
+        if ('' === self::$h1name) {
+            self::$h1name = $dirname;
+            self::$h1data = '';
+            self::$h1ecomment = '';
+            self::$h1comp = 0;
+            self::$h1mtime = 0;
+            self::$h1opsys = 3;
+            self::$h1attr = 0;
+        } elseif ($dirname === self::$h1name) {
+            self::$h1status = 10;
+
+            return self::pack(0);
+        } elseif ('' === self::$h1name2) {
+            self::$h1name2 = $dirname;
+            self::$h1data2 = '';
+            self::$h1ecomment2 = '';
+            self::$h1comp2 = 0;
+            self::$h1mtime2 = 0;
+            self::$h1opsys2 = 3;
+            self::$h1attr2 = 0;
+        } elseif ($dirname === self::$h1name2) {
+            self::$h1status = 10;
+
+            return self::pack(0);
+        } else {
+            self::$h1status = 18;
+
+            return self::pack(0);
+        }
+        self::$h1status = 0;
+
+        return self::pack(1);
+    }
+
+    /**
      * setArchiveComment entry path — separate NestedJIT entry avoids exec() $s1/$s2 formal
      * aliasing under thin AOT (peer addEntry / #35454; #35476 leftover).
      *

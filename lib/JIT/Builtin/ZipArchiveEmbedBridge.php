@@ -22,6 +22,8 @@ final class ZipArchiveEmbedBridge
 
     private const ADD_ENTRY = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::addEntry';
 
+    private const ADD_EMPTY_DIR = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::addEmptyDirEntry';
+
     private const REPLACE_ENTRY = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::replaceEntry';
 
     private const SET_ARCHIVE_COMMENT = 'PHPCompiler\\ext\\zip\\ZipArchiveJitHelper::setArchiveCommentEntry';
@@ -32,6 +34,7 @@ final class ZipArchiveEmbedBridge
     private const COMPILED_HELPERS = [
         self::EXEC,
         self::ADD_ENTRY,
+        self::ADD_EMPTY_DIR,
         self::REPLACE_ENTRY,
         self::SET_ARCHIVE_COMMENT,
         self::GET_ARCHIVE_COMMENT,
@@ -50,6 +53,11 @@ final class ZipArchiveEmbedBridge
     public static function addEntryHelper(): string
     {
         return self::ADD_ENTRY;
+    }
+
+    public static function addEmptyDirHelper(): string
+    {
+        return self::ADD_EMPTY_DIR;
     }
 
     public static function replaceEntryHelper(): string
