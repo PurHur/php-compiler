@@ -1946,6 +1946,15 @@ final class JitSimpleXmlUserScript
         return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
+    /**
+     * True when this Variable is a host-tracked SimpleXMLElement (exact/token, not lastTree).
+     * FETCH_OBJ recovery for child-view temps that lost CFG userType (#35834).
+     */
+    public static function isTrackedReceiver(JITVariable $receiver): bool
+    {
+        return null !== self::lookupExact($receiver);
+    }
+
     private static function lookupExact(JITVariable $receiver): ?\SimpleXMLElement
     {
         if (null !== self::$trees && isset(self::$trees[$receiver])) {

@@ -15419,7 +15419,6 @@ class JIT {
                                     if (null !== $sxeFetched) {
                                         $this->assignOperandValue($result, $sxeFetched);
                                         $magicVar = $this->context->getVariableFromOp($result);
-                                        $magicVar->magicGetOverloadedClass = 'SimpleXMLElement';
                                         $magicVar->magicGetOverloadedName = $name->value;
                                         // Bind host tree + baked name/text onto the property
                                         // result — same as dim (#27438) — so (string)$sxe->child
@@ -15427,6 +15426,10 @@ class JIT {
                                         \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign(
                                             $magicVar
                                         );
+                                        // Stamp class like children()/asXML results (#35828). Without
+                                        // it, `$x->a->b` / `$x->a->b =` sees generic `object` and
+                                        // skips tryGet/tryPropSet (silent empty / no-op; #35834).
+                                        $this->stampSimpleXmlElementUserType($result, $magicVar);
                                         break;
                                     }
                                 }
@@ -16746,10 +16749,26 @@ class JIT {
             $tagged = $bound->classUserType ?? null;
         }
         if (!is_string($tagged) || '' === $tagged) {
+            // Child-view temps from `$sxe->child` are TYPE_VALUE with a host token
+            // but no classUserType until stampSimpleXmlElementUserType (#35834).
+            if ($this->context->hasVariableOpInScopes($obj)) {
+                $recv = $this->context->getVariableFromOpInScopes($obj);
+                if (\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::isTrackedReceiver($recv)) {
+                    return 'SimpleXMLElement';
+                }
+            }
+
             return $declaringClass;
         }
         $tagLc = strtolower(ltrim($tagged, '\\'));
         if ('' === $tagLc || \in_array($tagLc, ['object', 'stdclass'], true)) {
+            if ($this->context->hasVariableOpInScopes($obj)) {
+                $recv = $this->context->getVariableFromOpInScopes($obj);
+                if (\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::isTrackedReceiver($recv)) {
+                    return 'SimpleXMLElement';
+                }
+            }
+
             return $declaringClass;
         }
 
@@ -18031,25 +18050,33 @@ class JIT {
         if (!\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign($var)) {
             return;
         }
-        // children()/attributes()/__get/dim results are TYPE_VALUE boxes; without a class
-        // stamp FETCH_OBJ skips tryGet and child props become null (#35828 leftover of #27535).
+        $this->stampSimpleXmlElementUserType($result, $var);
+    }
+
+    /**
+     * Child views are TYPE_VALUE boxes; without a class stamp FETCH_OBJ skips tryGet /
+     * tryPropSet and nested `$sxe->a->b` is empty / a silent write no-op (#35828, #35834).
+     */
+    private function stampSimpleXmlElementUserType(Operand $result, Variable $var): void
+    {
         $var->classUserType = 'SimpleXMLElement';
         $var->magicGetOverloadedClass = 'SimpleXMLElement';
         $result->type = new Type(Type::TYPE_OBJECT, [], 'SimpleXMLElement');
         $name = JIT\OperandName::resolve($result);
-        if (null !== $name && '' !== $name) {
-            $resolved = $this->context->resolveRefAliasName($name);
-            if (isset($this->context->namedVariableBindings[$resolved])
-                && $this->context->namedVariableBindings[$resolved] !== $var
-            ) {
-                if (null !== $var->compileTimeString) {
-                    $this->context->namedVariableBindings[$resolved]->compileTimeString = $var->compileTimeString;
-                }
-                $this->context->namedVariableBindings[$resolved]->classUserType = 'SimpleXMLElement';
-                $this->context->namedVariableBindings[$resolved]->magicGetOverloadedClass = 'SimpleXMLElement';
-            }
-            $this->context->bindVariableByName($resolved, $var);
+        if (null === $name || '' === $name) {
+            return;
         }
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (isset($this->context->namedVariableBindings[$resolved])
+            && $this->context->namedVariableBindings[$resolved] !== $var
+        ) {
+            if (null !== $var->compileTimeString) {
+                $this->context->namedVariableBindings[$resolved]->compileTimeString = $var->compileTimeString;
+            }
+            $this->context->namedVariableBindings[$resolved]->classUserType = 'SimpleXMLElement';
+            $this->context->namedVariableBindings[$resolved]->magicGetOverloadedClass = 'SimpleXMLElement';
+        }
+        $this->context->bindVariableByName($resolved, $var);
     }
 
     private function propagateDomImportSimpleXmlCompileTime(Operand $result, mixed $toCall): void
