@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** VM-only incremental zlib builtins (ext/zlib/zlib.c; issue #4656). */
+/** Incremental zlib builtins (ext/zlib/zlib.c; #4656). JIT/AOT: {@see JitZlibIncremental} (#35885). */
 abstract class ZlibIncrementalFunction extends Internal
 {
     final protected function requireArgCountBetween(int $argc, int $min, int $max): void
@@ -34,6 +34,6 @@ abstract class ZlibIncrementalFunction extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() is not lowered for JIT/AOT in this compiler build');
+        return JitZlibIncremental::dispatch($context, $this->getName(), ...$args);
     }
 }
