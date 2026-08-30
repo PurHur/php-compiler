@@ -1362,6 +1362,7 @@ require_once __DIR__.'/../../../ext/mbstring/JitMbUcfirstLcfirst.php';
 require_once __DIR__.'/../../../ext/mbstring/KanaConvert.php';
 require_once __DIR__.'/../../../ext/mbstring/MimeHeaderConvert.php';
 require_once __DIR__.'/../../../ext/mbstring/MbConvertCaseJitHelper.php';
+require_once __DIR__.'/../../../ext/mbstring/MbConvertSubstJitHelper.php';
 require_once __DIR__.'/../../../ext/mbstring/MbConvertEncodingJitHelper.php';
 require_once __DIR__.'/../../../ext/mbstring/MbConvertSubstJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/MbConvertEncodingArrayLlvm.php';
