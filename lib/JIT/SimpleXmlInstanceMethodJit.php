@@ -24,6 +24,9 @@ final class SimpleXmlInstanceMethodJit
         'simplexmlelement::children' => true,
         'simplexmlelement::attributes' => true,
         'simplexmlelement::getname' => true,
+        // leftover of getName/attributes AOT (#27535 / #35798) — php-src sxe.c zim_simplexmlelement_getNamespaces
+        'simplexmlelement::getnamespaces' => true,
+        'simplexmlelement::getdocnamespaces' => true,
     ];
 
     public static function isSimpleXmlInstanceMethodProxy(string $proxyName): bool
@@ -103,6 +106,16 @@ final class SimpleXmlInstanceMethodJit
         }
         if ('simplexmlelement::getname' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementGetName();
+
+            return;
+        }
+        if ('simplexmlelement::getnamespaces' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementGetNamespaces();
+
+            return;
+        }
+        if ('simplexmlelement::getdocnamespaces' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementGetDocNamespaces();
         }
     }
 }

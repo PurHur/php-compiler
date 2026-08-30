@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8016 |
-| Phase A inventory files (M2 ratio SSOT) | 8016 |
+| PHP files on vm.php path | 8020 |
+| Phase A inventory files (M2 ratio SSOT) | 8020 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25514 |
+| Source constructs flagged (warnings) | 25521 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2245,7 +2245,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/JitSimpleXmlConstruct.php` | 0 | 2 |
 | `ext/simplexml/JitSimpleXmlCount.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlGet.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlGetDocNamespaces.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlGetName.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlGetNamespaces.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlLoadFile.php` | 0 | 2 |
 | `ext/simplexml/JitSimpleXmlLoadString.php` | 0 | 2 |
 | `ext/simplexml/JitSimpleXmlOffsetGet.php` | 0 | 1 |
@@ -3160,7 +3162,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitIteratorToArray.php` | 0 | 14 |
 | `ext/standard/JitIteratorWalk.php` | 0 | 6 |
 | `ext/standard/JitJsonDecode.php` | 0 | 1 |
-| `ext/standard/JitJsonEncode.php` | 0 | 11 |
+| `ext/standard/JitJsonEncode.php` | 0 | 12 |
 | `ext/standard/JitJsonEncodeCompileTime.php` | 0 | 27 |
 | `ext/standard/JitJsonLastError.php` | 0 | 1 |
 | `ext/standard/JitJsonLastErrorMsg.php` | 0 | 1 |
@@ -6874,7 +6876,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/SimpleXMLElementConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementCount.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementGet.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementGetDocNamespaces.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementGetName.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementGetNamespaces.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementOffsetGet.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementRegisterXPathNamespace.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementToString.php` | 0 | 1 |
@@ -7116,7 +7120,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ShutdownCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/SidecarPathRemap.php` | 0 | 1 |
 | `lib/JIT/SimpleXmlForeachSnapshot.php` | 0 | 3 |
-| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 13 |
+| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 15 |
 | `lib/JIT/SplAutoloadCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/StaticPropertyAsNonStaticJitGuard.php` | 0 | 2 |
 | `lib/JIT/StaticPropertyVisibilityJitGuard.php` | 0 | 2 |
@@ -11039,7 +11043,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomImportNode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 857)
+- new JITVariable (line 865)
 - 21 class method(s)
 
 ### `ext/dom/JitDomImportSimpleXmlUserScript.php`
@@ -26144,7 +26148,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/simplexml/JitSimpleXmlGetDocNamespaces.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/simplexml/JitSimpleXmlGetName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/JitSimpleXmlGetNamespaces.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -26181,14 +26195,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new SimpleXMLElement (line 267)
-- new JITVariable (line 445)
-- new JITVariable (line 468)
-- new JITVariable (line 726)
-- new JITVariable (line 1179)
-- new JITVariable (line 1251)
-- new JITVariable (line 1408)
-- new JITVariable (line 1421)
-- 62 class method(s)
+- new JITVariable (line 519)
+- new JITVariable (line 542)
+- new JITVariable (line 800)
+- new JITVariable (line 1253)
+- new JITVariable (line 1325)
+- new JITVariable (line 1482)
+- new JITVariable (line 1495)
+- 65 class method(s)
 - 1 closure(s)
 
 ### `ext/simplexml/JitSimpleXmlXpath.php`
@@ -32488,16 +32502,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitJsonEncode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JsonException (line 137)
-- new JsonException (line 218)
-- new VmJsonExportException (line 274)
-- new ClassEntry (line 287)
-- new VmVariable (line 298)
-- new VmVariable (line 301)
-- new JITVariable (line 644)
-- new JITVariable (line 724)
-- new JITVariable (line 778)
-- 13 class method(s)
+- new JsonException (line 141)
+- new JsonException (line 222)
+- new VmJsonExportException (line 278)
+- new ClassEntry (line 291)
+- new VmVariable (line 302)
+- new VmVariable (line 305)
+- new RuntimeIndirectInstanceMethodCall (line 411)
+- new JITVariable (line 834)
+- new JITVariable (line 921)
+- new JITVariable (line 975)
+- 17 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/JitJsonEncodeCompileTime.php`
@@ -56686,7 +56701,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/SimpleXMLElementGetDocNamespaces.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/SimpleXMLElementGetName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/SimpleXMLElementGetNamespaces.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -58237,18 +58262,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 258)
-- new Variable (line 943)
-- new Variable (line 964)
-- new Variable (line 983)
-- new Variable (line 995)
-- new Variable (line 998)
-- new Variable (line 1364)
-- new Variable (line 1373)
-- new Variable (line 1393)
-- new Variable (line 1402)
-- new Variable (line 1473)
-- new Variable (line 1485)
-- 30 class method(s)
+- new Variable (line 1058)
+- new Variable (line 1079)
+- new Variable (line 1098)
+- new Variable (line 1110)
+- new Variable (line 1113)
+- new Variable (line 1479)
+- new Variable (line 1488)
+- new Variable (line 1508)
+- new Variable (line 1517)
+- new Variable (line 1588)
+- new Variable (line 1600)
+- 32 class method(s)
 
 ### `lib/JIT/JitValueBox.php`
 
@@ -58766,18 +58791,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SimpleXmlInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\SimpleXMLElementConstruct (line 47)
-- new Call\SimpleXMLElementAddChild (line 52)
-- new Call\SimpleXMLElementAsXml (line 58)
-- new Call\SimpleXMLElementXpath (line 65)
-- new Call\SimpleXMLElementRegisterXPathNamespace (line 70)
-- new Call\SimpleXMLElementGet (line 75)
-- new Call\SimpleXMLElementOffsetGet (line 80)
-- new Call\SimpleXMLElementCount (line 85)
-- new Call\SimpleXMLElementToString (line 90)
-- new Call\SimpleXMLElementChildren (line 95)
-- new Call\SimpleXMLElementAttributes (line 100)
-- new Call\SimpleXMLElementGetName (line 105)
+- new Call\SimpleXMLElementConstruct (line 50)
+- new Call\SimpleXMLElementAddChild (line 55)
+- new Call\SimpleXMLElementAsXml (line 61)
+- new Call\SimpleXMLElementXpath (line 68)
+- new Call\SimpleXMLElementRegisterXPathNamespace (line 73)
+- new Call\SimpleXMLElementGet (line 78)
+- new Call\SimpleXMLElementOffsetGet (line 83)
+- new Call\SimpleXMLElementCount (line 88)
+- new Call\SimpleXMLElementToString (line 93)
+- new Call\SimpleXMLElementChildren (line 98)
+- new Call\SimpleXMLElementAttributes (line 103)
+- new Call\SimpleXMLElementGetName (line 108)
+- new Call\SimpleXMLElementGetNamespaces (line 113)
+- new Call\SimpleXMLElementGetDocNamespaces (line 118)
 - 2 class method(s)
 
 ### `lib/JIT/SplAutoloadCallbackPolicy.php`

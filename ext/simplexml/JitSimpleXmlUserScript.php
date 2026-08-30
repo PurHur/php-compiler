@@ -400,6 +400,80 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * SimpleXMLElement::getNamespaces — host sxe_add_namespaces (php-src ext/simplexml/sxe.c).
+     * Exact match only — lastTree would mis-fold foreach/child views.
+     */
+    public static function tryGetNamespaces(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookupExact($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $recursive = false;
+        if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
+            $parsed = self::compileTimeBool($context, $args[1]);
+            if (null === $parsed) {
+                return null;
+            }
+            $recursive = $parsed;
+        }
+        try {
+            $map = $tree->getNamespaces($recursive);
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!\is_array($map)) {
+            return null;
+        }
+
+        return self::boxHostStringMap($context, $map);
+    }
+
+    /**
+     * SimpleXMLElement::getDocNamespaces — host sxe_add_registered_namespaces
+     * (php-src ext/simplexml/sxe.c PHP_METHOD(SimpleXMLElement, getDocNamespaces)).
+     */
+    public static function tryGetDocNamespaces(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookupExact($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $recursive = false;
+        $fromRoot = true;
+        if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
+            $parsed = self::compileTimeBool($context, $args[1]);
+            if (null === $parsed) {
+                return null;
+            }
+            $recursive = $parsed;
+        }
+        if (isset($args[2]) && JITVariable::TYPE_NULL !== $args[2]->type) {
+            $parsed = self::compileTimeBool($context, $args[2]);
+            if (null === $parsed) {
+                return null;
+            }
+            $fromRoot = $parsed;
+        }
+        try {
+            $map = $tree->getDocNamespaces($recursive, $fromRoot);
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!\is_array($map)) {
+            return null;
+        }
+
+        return self::boxHostStringMap($context, $map);
+    }
+
+    /**
      * Fold (string)$sxe / echo when a host tree is known (#26863).
      * Exact match only — lastTree would mis-fold foreach values (#27535).
      */
@@ -1506,6 +1580,29 @@ final class JitSimpleXmlUserScript
     public static function simpleXmlElementClassId(Context $context): int
     {
         return $context->type->object->lookup('SimpleXMLElement');
+    }
+
+    /**
+     * @param array<string|int, string> $map prefix ('' = default) => URI
+     */
+    private static function boxHostStringMap(Context $context, array $map): Value
+    {
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($map as $key => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->string((string) $value);
+            $ht->update((string) $key, $var);
+        }
+
+        $htVar = HashTableHelper::variableFromVmHashTable($context, $ht);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $slot),
+            $context->helper->loadValue($htVar)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     private static function boxConstantString(Context $context, string $text): Value
