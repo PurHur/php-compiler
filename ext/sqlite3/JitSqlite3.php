@@ -32,7 +32,8 @@ use PHPLLVM\Value;
  * zim_SQLite3_querySingle / zim_SQLite3_lastInsertRowID / zim_SQLite3_changes /
  * zim_SQLite3_lastErrorCode / zim_SQLite3_lastErrorMsg (#35966) /
  * zim_SQLite3_busyTimeout (#35972) / zim_SQLite3_enableExceptions (#35975) /
- * zim_SQLite3_escapeString (#35977) / zim_SQLite3_version (#35991 leftover of #35977)
+ * zim_SQLite3_escapeString (#35977) / zim_SQLite3_version (#35991 leftover of #35977) /
+ * zim_SQLite3_open (#36001 leftover of #35991)
  */
 final class JitSqlite3
 {
@@ -170,6 +171,84 @@ final class JitSqlite3
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_HAS, $i64->constInt(0, false));
 
         return self::boxBool($context, true);
+    }
+
+    /**
+     * SQLite3::open leftover of version (#36001 / #35991).
+     * php-src zim_sqlite3_open: throw Exception when already open; reopen after close.
+     * Thin AOT folds open/reopen onto {@see Sqlite3JitSupport} props (same honesty class as
+     * __construct — no libsqlite3 FFI at runtime).
+     */
+    public static function open(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'SQLite3::open', 1, 3)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $obj = self::readObject($context, $args[0]);
+        JitStringBuiltinArg::lower(
+            $context,
+            $args[1],
+            'SQLite3::open',
+            1,
+            'filename'
+        );
+        if (\count($args) >= 3) {
+            JitLongArg::lower($context, $args[2], 'SQLite3::open(): Argument #2 ($flags)');
+        }
+        if (\count($args) >= 4) {
+            JitStringBuiltinArg::lower(
+                $context,
+                $args[3],
+                'SQLite3::open',
+                3,
+                'encryption_key'
+            );
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $id = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_ID);
+        $alreadyOpen = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $id,
+            $i64->constInt(0, false)
+        );
+        $bbThrow = BasicBlockHelper::append($context, 'sqlite3_open_already');
+        $bbOk = BasicBlockHelper::append($context, 'sqlite3_open_ok');
+        $context->builder->branchIf($alreadyOpen, $bbThrow, $bbOk);
+
+        $context->builder->positionAtEnd($bbThrow);
+        if (null !== \PHPCompiler\JIT\TryCatchHelper::resolveThrowHandler($context)) {
+            \PHPCompiler\JIT\TryCatchHelper::emitCatchableClassError(
+                $context,
+                'Exception',
+                'Already initialised DB Object'
+            );
+        } else {
+            ExceptionBridge::emitErrorAndAbort($context, 'Already initialised DB Object');
+        }
+        $seal = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null !== $seal && null === $seal->getTerminator()) {
+            ExceptionBridge::emitErrorAndAbort($context, 'Already initialised DB Object');
+        }
+
+        $context->builder->positionAtEnd($bbOk);
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ID, $i64->constInt(1, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ROW, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_HAS, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ROW_COUNT, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_SUM, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_INT_PK, $i64->constInt(0, false));
+        // Keep PROP_EXCEPTIONS across close/reopen (php-src retains exception mode on the object).
+
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+
+        return JitValueBox::pointer($context, $slot);
     }
 
     public static function lastInsertRowID(Context $context, JITVariable ...$args): Value
