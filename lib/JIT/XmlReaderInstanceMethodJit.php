@@ -24,6 +24,8 @@ final class XmlReaderInstanceMethodJit
         'xmlreader::readinnerxml' => true,
         // leftover of fromString read (#35908 / #27299) — php-src zim_XMLReader_readOuterXml
         'xmlreader::readouterxml' => true,
+        // leftover of fromString/readInnerXml (#35917 / #27299) — php-src zim_XMLReader_readString
+        'xmlreader::readstring' => true,
         // leftover of fromString/open (#35911 / #27299) — php-src zim_XMLReader_expand
         'xmlreader::expand' => true,
     ];
