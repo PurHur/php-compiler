@@ -181,6 +181,10 @@ final class JitDomImportNode
         JITVariable $sourceNode,
         bool $deep
     ): Value {
+        if (JitDomCreateDocumentFragment::TAG_KIND === $sourceNode->compileTimeDomTagName) {
+            return self::materializeImportedFragment($context, $documentVar, $sourceNode, $deep);
+        }
+
         $leaf = self::resolveSourceLeafSpec($sourceNode, $documentVar);
         if (null !== $leaf) {
             self::$lastMaterializedInnerXml = '';
@@ -203,6 +207,11 @@ final class JitDomImportNode
             }
 
             return self::boxObjectResult($context, $object);
+        }
+
+        $fragment = self::resolveSourceFragmentSpec($sourceNode);
+        if (null !== $fragment) {
+            return self::materializeImportedFragment($context, $documentVar, $sourceNode, $deep);
         }
 
         $attrSpec = self::resolveSourceAttrSpec($sourceNode);
@@ -581,9 +590,141 @@ final class JitDomImportNode
                     'content' => JitDomCreateProcessingInstruction::$lastMaterializedData ?? '',
                 ];
             }
-            if (null !== JitDomCreateTextNode::$lastMaterializedData) {
+            if (null !== JitDomCreateTextNode::$lastMaterializedData
+                && !JitDomCreateDocumentFragment::$lastMaterialized
+            ) {
                 return ['kind' => 'text', 'data' => JitDomCreateTextNode::$lastMaterializedData];
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * DocumentFragment import source (#35884 leftover of #35871).
+     *
+     * @return null|array{inner: string}
+     */
+    private static function resolveSourceFragmentSpec(JITVariable $sourceNode): ?array
+    {
+        $tag = $sourceNode->compileTimeDomTagName;
+        if (JitDomCreateDocumentFragment::TAG_KIND === $tag) {
+            return ['inner' => $sourceNode->compileTimeDomInnerXml ?? ''];
+        }
+        if (
+            JitDomCreateDocumentFragment::$lastMaterialized
+            && (null === $tag || '' === $tag)
+            && null === $sourceNode->compileTimeDomTextData
+            && null === $sourceNode->compileTimeDomChildIndex
+            && null === $sourceNode->compileTimeDomNodePath
+            && null === JitDomNodeChildProperty::$lastFetchedTagName
+            && null === JitDomCreateComment::$lastMaterializedData
+            && null === JitDomCreateCDATASection::$lastMaterializedData
+            && null === JitDomCreateProcessingInstruction::$lastMaterializedTarget
+        ) {
+            return ['inner' => $sourceNode->compileTimeDomInnerXml ?? ''];
+        }
+
+        return null;
+    }
+
+    /**
+     * Thin-AOT importNode(DocumentFragment): new fragment + deep-copy children (#35884).
+     */
+    private static function materializeImportedFragment(
+        Context $context,
+        JITVariable $documentVar,
+        JITVariable $sourceNode,
+        bool $deep
+    ): Value {
+        self::$lastMaterializedTagName = JitDomCreateDocumentFragment::TAG_KIND;
+        $inner = $deep ? ($sourceNode->compileTimeDomInnerXml ?? '') : '';
+        if ('' !== $inner) {
+            $inner = self::dedupeAdjacentFragmentInner($inner);
+            $lastText = JitDomCreateTextNode::$lastMaterializedData;
+            if (null !== $lastText && '' !== $lastText && str_ends_with($inner, $lastText.$lastText)) {
+                $inner = substr($inner, 0, -\strlen($lastText));
+            }
+        }
+        self::$lastMaterializedInnerXml = $inner;
+
+        $frag = JitDomCreateDocumentFragment::materialize($context, $documentVar);
+
+        if ($deep && '' !== $inner) {
+            foreach (DomParseSimpleXmlJitHelper::parseSiblingNodesArgv($inner) as $node) {
+                $child = self::materializeFragmentChildFromSpec($context, $node);
+                if (null === $child) {
+                    continue;
+                }
+                JitDomAppendChildLiveSlots::syncNonFragment($context, $frag, $child);
+            }
+            JitDomCreateElement::storeUserScriptInnerXml($context, $frag, $inner);
+        }
+
+        return self::boxObjectResult($context, $frag);
+    }
+
+    /** Collapse doubled child markup from dual-emit appendChild (#35386 / #35884). */
+    private static function dedupeAdjacentFragmentInner(string $inner): string
+    {
+        $chunks = DomParseSimpleXmlJitHelper::directChildMarkupChunks($inner);
+        if (\count($chunks) < 2) {
+            return $inner;
+        }
+        $deduped = [];
+        foreach ($chunks as $chunk) {
+            if ([] === $deduped || $deduped[\count($deduped) - 1] !== $chunk) {
+                $deduped[] = $chunk;
+            }
+        }
+
+        return implode('', $deduped);
+    }
+
+    /**
+     * @param array{kind: string, data: string, content?: string, inner?: string, open?: string} $node
+     */
+    private static function materializeFragmentChildFromSpec(Context $context, array $node): ?Value
+    {
+        $kind = $node['kind'] ?? '';
+        if ('comment' === $kind) {
+            return JitDomCreateComment::materialize($context, $node['data']);
+        }
+        if ('cdata' === $kind) {
+            return JitDomCreateCDATASection::materialize($context, $node['data']);
+        }
+        if ('pi' === $kind) {
+            return JitDomCreateProcessingInstruction::materialize(
+                $context,
+                $node['data'],
+                $node['content'] ?? ''
+            );
+        }
+        if ('text' === $kind) {
+            $data = $node['data'];
+            $last = JitDomCreateTextNode::$lastMaterializedData;
+            if (null !== $last && '' !== $last && $data === $last.$last) {
+                $data = $last;
+            }
+
+            return JitDomCreateTextNode::materialize($context, $data);
+        }
+        if ('element' === $kind) {
+            $tag = $node['data'];
+            if ('#text' === $tag) {
+                return JitDomCreateTextNode::materialize(
+                    $context,
+                    $node['inner'] ?? $node['data'] ?? ''
+                );
+            }
+            $childInner = $node['inner'] ?? '';
+            $text = '' === $childInner
+                ? ''
+                : DomParseSimpleXmlJitHelper::rootTextContentArgv(
+                    '<'.$tag.'>'.$childInner.'</'.$tag.'>'
+                );
+
+            return JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
         }
 
         return null;

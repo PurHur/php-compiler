@@ -10,8 +10,11 @@ use PHPCompiler\ext\dom\DomExceptionConstants;
 use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
 use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomAppendChildUserScript;
+use PHPCompiler\ext\dom\JitDomCreateComment;
+use PHPCompiler\ext\dom\JitDomCreateDocumentFragment;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateElementAttrs;
+use PHPCompiler\ext\dom\JitDomCreateProcessingInstruction;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomCloneNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
@@ -1104,6 +1107,25 @@ final class DomNodeLiveMutationRuntime
             ?? JitDomCloneNode::$lastResultTagName
             ?? null;
         if (null !== $tag && '' !== $tag) {
+            // Character-data / PI / fragment leaves are not elements (#35884).
+            if ('#text' === $tag || '#cdata-section' === $tag) {
+                $text = $arg->compileTimeDomTextData
+                    ?? JitDomCreateTextNode::$lastMaterializedData
+                    ?? '';
+
+                return htmlspecialchars($text, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+            }
+            if ('#comment' === $tag) {
+                return '<!--'.($arg->compileTimeDomTextData
+                    ?? JitDomCreateComment::$lastMaterializedData
+                    ?? '').'-->';
+            }
+            if (JitDomCreateProcessingInstruction::TAG_KIND === $tag
+                || JitDomCreateDocumentFragment::TAG_KIND === $tag
+                || str_starts_with($tag, '#')
+            ) {
+                return null;
+            }
             $inner = $arg->compileTimeDomInnerXml ?? null;
             if (null === $inner || '' === $inner) {
                 $inner = JitDomImportNode::$lastMaterializedInnerXml ?? '';
@@ -1148,6 +1170,11 @@ final class DomNodeLiveMutationRuntime
     private static function compileTimeChildTextData(Variable $arg): ?string
     {
         $tag = $arg->compileTimeDomTagName ?? null;
+        if ('#text' === $tag || '#cdata-section' === $tag) {
+            return $arg->compileTimeDomTextData
+                ?? JitDomCreateTextNode::$lastMaterializedData
+                ?? null;
+        }
         if (null !== $tag && '' !== $tag) {
             return null;
         }
