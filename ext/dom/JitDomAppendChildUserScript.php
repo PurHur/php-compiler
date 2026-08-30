@@ -332,6 +332,52 @@ final class JitDomAppendChildUserScript
     }
 
     /**
+     * Document::prepend() insertBefore path — first element child becomes documentElement (#35801).
+     *
+     * When {@code $refChild} is the current documentElement and {@code $newChild} is an Element
+     * stand-in, php-src updates the document element pointer (ext/dom/parentnode.c).
+     */
+    public static function maybeUpdateDocumentElementOnPrepend(
+        Context $context,
+        Value $document,
+        Value $newChild,
+        Value $refChild
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_doc_prepend_de');
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($docClassId, self::PROP_DOCUMENT_ELEMENT)) {
+            $objectType->defineProperty($docClassId, self::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
+        }
+        $docElSlot = $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, self::PROP_DOCUMENT_ELEMENT);
+        $docElPtr = $context->builder->load($docElSlot);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $voidPtr = $context->getTypeFromString('void*');
+        $existingRoot = $context->builder->pointerCast($docElPtr, $objPtrTy);
+        $docElMissing = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $docElPtr, $voidPtr->constNull()),
+            $context->builder->icmp(Builder::INT_EQ, $existingRoot, $objPtrTy->constNull())
+        );
+        $refIsDe = $context->builder->icmp(Builder::INT_EQ, $refChild, $existingRoot);
+        $isElement = self::isElementStandIn($context, $newChild);
+        $bbSet = BasicBlockHelper::append($context, 'dom_doc_prepend_set_de');
+        $bbSkip = BasicBlockHelper::append($context, 'dom_doc_prepend_skip_de');
+        $context->builder->branchIf(
+            $context->builder->and(
+                $context->builder->and($refIsDe, $isElement),
+                $context->builder->not($docElMissing)
+            ),
+            $bbSet,
+            $bbSkip
+        );
+        $context->builder->positionAtEnd($bbSet);
+        $childJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $newChild);
+        $objectType->propertyStore($docElSlot, $childJit, JITVariable::TYPE_OBJECT);
+        $context->builder->branch($bbSkip);
+        $context->builder->positionAtEnd($bbSkip);
+    }
+
+    /**
      * True when {@code $node} is an Element stand-in (not comment/text/cdata/fragment/PI/entity-ref/doctype).
      *
      * createComment/createTextNode use DOMElement allocations with {@code nodeName}
