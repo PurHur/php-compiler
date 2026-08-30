@@ -81,6 +81,14 @@ final class FilterVarArrayLlvm
         return false;
     }
 
+    /** Map one filter id over every element — peer of filter_var(FILTER_REQUIRE_ARRAY) (#29047). */
+    public static function mapByFilterId(Context $context, Value $srcHt, int $filterId): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+
+        return self::filterById($context, $srcHt, $i64->constInt($filterId, false));
+    }
+
     private static function filterById(Context $context, Value $srcHt, Value $filterId): Value
     {
         $dest = HashTableHelper::alloc($context);
