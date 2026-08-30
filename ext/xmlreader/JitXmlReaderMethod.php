@@ -54,6 +54,8 @@ final class JitXmlReaderMethod
             'movetoelement' => JitXmlReaderUserScript::tryMoveToElement($context, ...$args),
             // leftover of moveToAttribute (#35952 / #35941 / #27299) — php-src zim_XMLReader_moveToNextAttribute
             'movetonextattribute' => JitXmlReaderUserScript::tryMoveToNextAttribute($context, ...$args),
+            // leftover of fromString/read (#35960 / #27299) — php-src zim_XMLReader_isValid
+            'isvalid' => JitXmlReaderUserScript::tryIsValid($context, ...$args),
             default => null,
         };
         if (null === $result) {

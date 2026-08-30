@@ -823,6 +823,27 @@ final class JitXmlReaderUserScript
     }
 
     /**
+     * XMLReader::isValid() leftover of fromString/read (#35960 / #27299 / #6135).
+     * php-src: zim_XMLReader_isValid / xmlTextReaderIsValid — well-formedness without VALIDATE.
+     * {@see foldTokenizedSource} only stamps $lastEvents when tokenize succeeds, so the flag is true.
+     */
+    public static function tryIsValid(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 1) {
+            throw new \LogicException('XMLReader::isValid() called without $this');
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_isvalid_cont');
+        $i1 = $context->getTypeFromString('int1');
+        $trueBox = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $trueBox, $i1->constInt(1, false));
+
+        return JitValueBox::normalizeValuePtr($context, $trueBox);
+    }
+
+    /**
      * XMLReader::moveToAttribute() leftover of getAttribute (#35941 / #35918 / #27299 / #19395).
      * php-src: zim_XMLReader_moveToAttribute / xmlTextReaderMoveToAttribute
      */
