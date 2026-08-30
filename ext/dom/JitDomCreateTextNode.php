@@ -75,6 +75,9 @@ final class JitDomCreateTextNode
     public static function materialize(Context $context, string $data = ''): Value
     {
         self::$lastMaterializedData = $data;
+        JitDomCreateComment::$lastMaterializedData = null;
+        JitDomCreateCDATASection::$lastMaterializedData = null;
+        JitDomCreateProcessingInstruction::clearLastMaterialized();
         JitDomSubstringData::remember($data);
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);

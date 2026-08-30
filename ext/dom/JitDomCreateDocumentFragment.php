@@ -23,6 +23,9 @@ use PHPLLVM\Value;
  */
 final class JitDomCreateDocumentFragment
 {
+    /** True when the last createDocumentFragment() materialized (#35871). */
+    public static bool $lastMaterialized = false;
+
     private const CLASS_STANDIN = 'DOMElement';
 
     private const PROP_NODE_NAME = 'nodeName';
@@ -39,6 +42,7 @@ final class JitDomCreateDocumentFragment
         }
 
         $document = self::loadObjectArg($context, $args[0]);
+        self::$lastMaterialized = true;
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_STANDIN);
         self::ensurePropertyLayout($objectType, $classId);
