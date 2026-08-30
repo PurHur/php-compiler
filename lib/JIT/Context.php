@@ -2443,6 +2443,9 @@ class Context {
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::read');
         if (CompilerVersion::supportsXmlReaderFactories()) {
             XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstring');
+            // leftover of fromString (#35900 / #27299)
+            XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromuri');
+            XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstream');
         }
         // XMLWriter::toMemory / toUri / toStream — leftover of openMemory/openUri (#19606 / #35872 / #35895).
         if (CompilerVersion::supportsXmlWriterFactories()) {

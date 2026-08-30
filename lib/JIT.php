@@ -17947,6 +17947,8 @@ class JIT {
         if (
             !($toCall instanceof JIT\Call\XmlReaderXML)
             && !($toCall instanceof JIT\Call\XmlReaderFromString)
+            && !($toCall instanceof JIT\Call\XmlReaderFromUri)
+            && !($toCall instanceof JIT\Call\XmlReaderFromStream)
         ) {
             return;
         }
@@ -18617,6 +18619,8 @@ class JIT {
                 (
                     $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
                     || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromString
+                    || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromUri
+                    || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromStream
                 )
                 && !(
                     $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
@@ -28985,6 +28989,12 @@ class JIT {
             && JIT\XmlWriterInstanceMethodJit::isUserScriptAot()
         ) {
             JIT\XmlWriterInstanceMethodJit::ensureProxy($this->context, $proxyName);
+        }
+        // Register XMLReader static factory proxies before functionIsRegistered (#35900 / #27299).
+        if (JIT\XmlReaderInstanceMethodJit::isXmlReaderInstanceMethodProxy($proxyName)
+            && JIT\XmlReaderInstanceMethodJit::isUserScriptAot()
+        ) {
+            JIT\XmlReaderInstanceMethodJit::ensureProxy($this->context, $proxyName);
         }
         // Static generator methods register a resume creator under class::method, not an
         // ordinary callable proxy — mirror METHODCALL_INIT (#35147) for Class::g() (#35153 /

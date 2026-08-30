@@ -79,6 +79,60 @@ final class JitXmlReaderUserScript
             return null;
         }
 
+        return self::foldTokenizedSource($context, $lit, $instanceReceiver);
+    }
+
+    /**
+     * XMLReader::fromUri() leftover of fromString (#35900 / #27299).
+     * php-src: zim_xmlreader_fromUri — host PHP 8.2 has no factory; read URI + tokenize.
+     */
+    public static function tryFromUri(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || \count($args) < 1) {
+            return null;
+        }
+        self::$lastCallWasInstance = false;
+        $uri = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (null === $uri || '' === $uri || str_starts_with($uri, '__phpc_')) {
+            return null;
+        }
+        $xml = @file_get_contents($uri);
+        if (false === $xml) {
+            throw new \Error('XMLReader::fromUri(): Unable to open source data');
+        }
+
+        return self::foldTokenizedSource($context, $xml, null);
+    }
+
+    /**
+     * XMLReader::fromStream() leftover of fromString (#35900 / #27299).
+     * php-src: zim_xmlreader_fromStream — recover fopen literal path (#35895) then tokenize.
+     */
+    public static function tryFromStream(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || \count($args) < 1) {
+            return null;
+        }
+        self::$lastCallWasInstance = false;
+        $path = \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::resolveFopenPath($args[0]);
+        if (null === $path || '' === $path || str_starts_with($path, '__phpc_')) {
+            return null;
+        }
+        $xml = @file_get_contents($path);
+        if (false === $xml) {
+            throw new \Error('XMLReader::fromStream(): Unable to open source data');
+        }
+
+        return self::foldTokenizedSource($context, $xml, null);
+    }
+
+    /**
+     * Tokenize compile-time XML and materialize (or reset) a reader (#27299).
+     *
+     * @return Value|null
+     */
+    private static function foldTokenizedSource(Context $context, string $lit, ?JITVariable $instanceReceiver): ?Value
+    {
         try {
             $raw = VmXmlReader::tokenize($lit);
         } catch (\Throwable) {
