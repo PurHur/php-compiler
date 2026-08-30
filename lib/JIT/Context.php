@@ -2305,7 +2305,7 @@ class Context {
                 );
             }
             $this->type->object->lookup('SQLite3Stmt');
-            foreach (['getSQL', 'paramCount'] as $stmtMethod) {
+            foreach (['getSQL', 'paramCount', 'bindValue', 'execute'] as $stmtMethod) {
                 $this->functionProxies['sqlite3stmt::'.strtolower($stmtMethod)] = new Call\Sqlite3StmtMethod(
                     $stmtMethod
                 );

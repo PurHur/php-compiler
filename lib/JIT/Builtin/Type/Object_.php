@@ -3957,19 +3957,42 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_INT_PK, Variable::TYPE_NATIVE_LONG);
             // enableExceptions prior-mode fold (#35975 leftover of #35972).
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_EXCEPTIONS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_FOLD_ID, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $pubStatic = \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC;
+            foreach ([
+                '__construct', 'open', 'exec', 'query', 'prepare', 'querySingle',
+                'close', 'lastInsertRowID', 'changes', 'lastErrorCode', 'lastErrorMsg',
+                'busyTimeout', 'enableExceptions',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+            foreach (['escapeString', 'version'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pubStatic);
+            }
         }
         if ('sqlite3stmt' === $lcname && CompilerVersion::supportsSqlite3()) {
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::STMT_PROP_SQL, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::STMT_PROP_PARAM_COUNT, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::STMT_PROP_FOLD_ID, Variable::TYPE_NATIVE_LONG);
             $this->seedExternalClassConstants($id, Sqlite3Constants::STMT_CLASS_CONSTANTS);
             $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach (['bindParam', 'bindValue', 'clear', 'close', 'execute', 'getSQL', 'paramCount', 'readOnly', 'reset'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
         }
         if ('sqlite3result' === $lcname && CompilerVersion::supportsSqlite3()) {
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_ROW, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_HAS, Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_FETCHED, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_CURSOR, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_ROW_COUNT, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach (['fetchArray', 'numColumns', 'columnName', 'columnType', 'reset', 'finalize'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
         }
     }
 
