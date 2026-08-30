@@ -12130,11 +12130,40 @@ class JIT {
                         );
                         break;
                     }
+                    // `$r =& $a[$k]` / `$r =& $obj->prop[$k]; $r **= n`: dead dest lacks
+                    // writableHt / assignRefLvalueAlias; left was hydrated above. Rebind and
+                    // assignOperand (same as TYPE_MUL) so the shared HT entry updates (#35984).
+                    // assignOperandValue reseats typed dests onto a fresh alloca and orphans
+                    // the by-ref dim box — leaving both $r and $a[$k] at the old value.
+                    if (
+                        (
+                            null === $powDest->writableHt
+                            && null !== $powLeft->writableHt
+                        )
+                        || (
+                            !$powDest->assignRefLvalueAlias
+                            && $powLeft->assignRefLvalueAlias
+                        )
+                        || (
+                            null === $powDest->valueBoxAliasPtr
+                            && null !== $powLeft->valueBoxAliasPtr
+                        )
+                    ) {
+                        $this->context->setVariableOp($powDestOp, $powLeft);
+                        $powDest = $powLeft;
+                    }
+                    $this->assignOperand(
+                        $powDestOp,
+                        new Variable(
+                            $this->context,
+                            Variable::TYPE_VALUE,
+                            Variable::KIND_VALUE,
+                            $powResult
+                        ),
+                        true
+                    );
                     if (null !== $powDest->writableHt) {
-                        JIT\JitValueBox::copyFromPointer($this->context, $powDest->value, $powResult);
                         JIT\HashTableHelper::commitDimWriteLvalue($this->context, $powDest);
-                    } else {
-                        $this->assignOperandValue($powDestOp, $powResult, true);
                     }
                     break;
                 case OpCode::TYPE_POST_INC:
