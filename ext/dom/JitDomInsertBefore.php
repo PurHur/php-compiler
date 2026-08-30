@@ -30,11 +30,17 @@ use PHPLLVM\Value;
  */
 final class JitDomInsertBefore
 {
+    /** newChild compile-time identity captured during invoke for mutation-return propagate (#35425). */
+    public static ?string $lastNewChildCompileTimeTag = null;
+
+    public static ?int $lastNewChildCompileTimeChildIndex = null;
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 2) {
             throw new \LogicException('DOMNode::insertBefore() expects receiver and newChild');
         }
+        self::rememberNewChildCompileTime($args[1], $args[2] ?? null);
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_insert_before_cont');
 
@@ -155,6 +161,50 @@ final class JitDomInsertBefore
         $phi->addIncoming($objResult, $objPred);
 
         return $phi;
+    }
+
+    private static function rememberNewChildCompileTime(
+        JITVariable $newChildVar,
+        ?JITVariable $refChildVar
+    ): void {
+        self::$lastNewChildCompileTimeTag = $newChildVar->compileTimeDomTagName;
+        self::$lastNewChildCompileTimeChildIndex = $newChildVar->compileTimeDomChildIndex;
+        if (null !== self::$lastNewChildCompileTimeTag && '' !== self::$lastNewChildCompileTimeTag) {
+            return;
+        }
+        if (!$refChildVar instanceof JITVariable) {
+            return;
+        }
+        $refIndex = $refChildVar->compileTimeDomChildIndex
+            ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeChildIndex;
+        $refTag = $refChildVar->compileTimeDomTagName
+            ?? \PHPCompiler\ext\dom\JitDomNodeChildProperty::$stickyChildEdgeTagName;
+        if (null === $refIndex) {
+            return;
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
+            return;
+        }
+        $nodes = DomParseSimpleXmlJitHelper::parseSiblingNodesArgv(
+            DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml)
+        );
+        foreach ([$refIndex + 1, $refIndex - 1] as $candidate) {
+            if ($candidate < 0 || $candidate >= \count($nodes)) {
+                continue;
+            }
+            if ('element' !== ($nodes[$candidate]['kind'] ?? '')) {
+                continue;
+            }
+            $tag = $nodes[$candidate]['data'] ?? '';
+            if ('' === $tag || (null !== $refTag && $tag === $refTag)) {
+                continue;
+            }
+            self::$lastNewChildCompileTimeTag = $tag;
+            self::$lastNewChildCompileTimeChildIndex = $candidate;
+
+            return;
+        }
     }
 
     private static function invokeWithObjectRef(
