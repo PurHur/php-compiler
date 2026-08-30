@@ -13641,6 +13641,9 @@ class JIT {
                         $this->context->scope->args,
                         $this->context->scope->argOperands
                     );
+                    if (!$deferredNamedBindingError && $this->isDateTimeMutationJitCall($this->context->scope->toCall)) {
+                        $callArgs = $this->canonicalizeDateMutationCallArgs($callArgs, $callOperands);
+                    }
                     if ($deferredNamedBindingError) {
                         JIT\BasicBlockHelper::ensureOpenInsertBlock(
                             $this->context,
@@ -13709,13 +13712,19 @@ class JIT {
                     ) {
                         $this->context->jitJsonDecodeFlagsOperand = $callOperands[3];
                     }
-                    if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
-                        $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
-                    }
                     $this->rewritePendingDateTimeGetOffsetIfNeeded($callArgs);
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
                     $this->promoteCompileTimeDomOnCallArgs($block, $callOperands, $callArgs);
-                    $this->applyDateTimeLocalInstantsToCallArgs($callArgs, $callOperands);
+                    // Match FUNCCALL_EXEC_RETURN order — densify before promote drops
+                    // compileTimeDateInterval on date_add($dt, $interval) NORETURN (#33781).
+                    if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
+                        $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
+                    }
+                    $this->applyDateTimeLocalInstantsToCallArgs(
+                        $callArgs,
+                        $callOperands,
+                        $this->context->scope->toCall
+                    );
                     $this->applyDateMetaToDatePeriodConstructArgs(
                         $this->context->scope->toCall,
                         $callArgs,
@@ -13822,6 +13831,9 @@ class JIT {
                         $this->context->scope->args,
                         $this->context->scope->argOperands
                     );
+                    if (!$deferredNamedBindingError && $this->isDateTimeMutationJitCall($this->context->scope->toCall)) {
+                        $callArgs = $this->canonicalizeDateMutationCallArgs($callArgs, $callOperands);
+                    }
                     if ($deferredNamedBindingError) {
                         JIT\BasicBlockHelper::ensureOpenInsertBlock(
                             $this->context,
@@ -14109,7 +14121,11 @@ class JIT {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
                     $this->rewritePendingDateTimeGetOffsetIfNeeded($callArgs);
-                    $this->applyDateTimeLocalInstantsToCallArgs($callArgs, $callOperands);
+                    $this->applyDateTimeLocalInstantsToCallArgs(
+                        $callArgs,
+                        $callOperands,
+                        $this->context->scope->toCall
+                    );
                     $this->applyDateMetaToDatePeriodConstructArgs(
                         $this->context->scope->toCall,
                         $callArgs,
@@ -23665,8 +23681,12 @@ class JIT {
      * @param list<JIT\Variable|array{unpack: JIT\Variable}|array{named: string, value: JIT\Variable}> $callArgs
      * @param list<Operand|null> $callOperands
      */
-    private function applyDateTimeLocalInstantsToCallArgs(array $callArgs, array $callOperands): void
-    {
+    private function applyDateTimeLocalInstantsToCallArgs(
+        array $callArgs,
+        array $callOperands,
+        ?JIT\Call $toCall = null
+    ): void {
+        $mutationCall = $this->isDateTimeMutationJitCall($toCall);
         $opOffset = \count($callArgs) - \count($callOperands);
         if ($opOffset < 0) {
             $opOffset = 0;
@@ -23680,7 +23700,16 @@ class JIT {
             }
             $operand = $callOperands[$i - $opOffset] ?? null;
             if ($operand instanceof \PHPCfg\Operand) {
-                $this->applyDateTimeLocalInstantToReceiver($operand, $arg);
+                // Method $this: initJitMethodCall already restored the construct instant.
+                // Procedural date_add/date_sub: FUNCCALL arg Variable may differ from the
+                // named binding by identity — still stamp the arg used in lowering (#33781).
+                if ($mutationCall && 0 === $i) {
+                    $this->syncDateTimeInstantOntoMutationArg($operand, $arg);
+                } elseif ($mutationCall && 1 === $i) {
+                    $this->syncDateIntervalStateOntoMutationArg($operand, $arg);
+                } elseif (!$mutationCall) {
+                    $this->applyDateTimeLocalInstantToReceiver($operand, $arg);
+                }
                 // Unnamed $this (php-cfg temp): restore only the last unserialize local
                 // (#34614). Do NOT use "unique dateTimeLocalInstants" — that stamped
                 // DateTimeImmutable mutate/fluent returns with the construct instant (#34651).
@@ -23859,6 +23888,149 @@ class JIT {
         // Operand names are reused across statements — consume so a later unrelated
         // `(new Sub)->dt->format()` temp does not inherit this construct instant (#35802).
         unset($this->context->dateTimeLocalInstants[$resolved]);
+    }
+
+    /**
+     * Stamp a FUNCCALL DateTime mutation arg from its named local (#33781).
+     *
+     * {@see applyDateTimeLocalInstantToReceiver} requires `$bound === $receiverVar`; outgoing
+     * call args are often a distinct Variable instance from {@see Context::$namedVariableBindings}.
+     */
+    private function syncDateTimeInstantOntoMutationArg(Operand $receiverOp, JIT\Variable $receiverVar): void
+    {
+        if (
+            null !== $receiverVar->objectPropertyClassConstraint
+            || null !== $receiverVar->objectPropertySlot
+        ) {
+            return;
+        }
+        $recvName = JIT\OperandName::resolve($receiverOp);
+        if (null === $recvName || '' === $recvName) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($recvName);
+        $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+        if ($bound instanceof JIT\Variable && $bound !== $receiverVar) {
+            if (null !== $bound->compileTimeDateTimeTimestamp) {
+                $receiverVar->compileTimeDateTimeTimestamp = $bound->compileTimeDateTimeTimestamp;
+                $receiverVar->compileTimeDateTimeMicrosecond = $bound->compileTimeDateTimeMicrosecond;
+                $receiverVar->compileTimeTimezoneName = $bound->compileTimeTimezoneName;
+                $receiverVar->compileTimeDateTimeClassName = $bound->compileTimeDateTimeClassName;
+                if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
+                    $receiverVar->classUserType = $bound->classUserType ?? $bound->compileTimeDateTimeClassName ?? 'DateTime';
+                }
+            }
+        }
+        $instant = $this->context->dateTimeLocalInstants[$resolved] ?? null;
+        if (null === $instant && $bound instanceof JIT\Variable && null !== $bound->compileTimeDateTimeTimestamp) {
+            $instant = [
+                'timestamp' => (int) $bound->compileTimeDateTimeTimestamp,
+                'timezone' => $bound->compileTimeTimezoneName,
+                'microsecond' => (int) ($bound->compileTimeDateTimeMicrosecond ?? 0),
+                'className' => $bound->compileTimeDateTimeClassName ?? $bound->classUserType ?? 'DateTime',
+            ];
+        }
+        if (null === $instant) {
+            return;
+        }
+        $receiverVar->compileTimeDateTimeTimestamp = $instant['timestamp'];
+        $receiverVar->compileTimeDateTimeMicrosecond = (int) ($instant['microsecond'] ?? 0);
+        $receiverVar->compileTimeTimezoneName = $instant['timezone'];
+        $instantClass = $instant['className'] ?? 'DateTime';
+        if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
+            $receiverVar->classUserType = \is_string($instantClass) && '' !== $instantClass
+                ? $instantClass
+                : 'DateTime';
+        }
+        if (null === $receiverVar->compileTimeDateTimeClassName || '' === $receiverVar->compileTimeDateTimeClassName) {
+            $receiverVar->compileTimeDateTimeClassName = $receiverVar->classUserType;
+        }
+        unset($this->context->dateTimeLocalInstants[$resolved]);
+    }
+
+    /** Stamp a FUNCCALL DateInterval mutation arg from its named local (#33781). */
+    private function syncDateIntervalStateOntoMutationArg(Operand $receiverOp, JIT\Variable $receiverVar): void
+    {
+        $recvName = JIT\OperandName::resolve($receiverOp);
+        if (null === $recvName || '' === $recvName) {
+            return;
+        }
+        $resolved = $this->context->resolveRefAliasName($recvName);
+        $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+        if ($bound instanceof JIT\Variable && $bound !== $receiverVar && \is_array($bound->compileTimeDateInterval)) {
+            $receiverVar->compileTimeDateInterval = $bound->compileTimeDateInterval;
+            if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
+                $receiverVar->classUserType = 'DateInterval';
+            }
+
+            return;
+        }
+        $state = $this->context->dateIntervalLocalStates[$resolved] ?? null;
+        if (!\is_array($state)) {
+            $bound = $this->context->namedVariableBindings[$resolved] ?? null;
+            if ($bound instanceof JIT\Variable && \is_array($bound->compileTimeDateInterval)) {
+                $state = $bound->compileTimeDateInterval;
+            }
+        }
+        if (!\is_array($state)) {
+            return;
+        }
+        $receiverVar->compileTimeDateInterval = $state;
+        if (null === $receiverVar->classUserType || '' === $receiverVar->classUserType) {
+            $receiverVar->classUserType = 'DateInterval';
+        }
+    }
+
+    /** Procedural/method DateTime interval mutation — not a format() receiver (#33781). */
+    private function isDateTimeMutationJitCall(?JIT\Call $toCall): bool
+    {
+        if ($toCall instanceof JIT\Call\DateTimeAdd
+            || $toCall instanceof JIT\Call\DateTimeSub
+            || $toCall instanceof JIT\Call\DateTimeModify
+            || $toCall instanceof JIT\Call\ProceduralDateAdd
+            || $toCall instanceof JIT\Call\ProceduralDateSub
+        ) {
+            return true;
+        }
+        if ($toCall instanceof CoreFunc\Internal) {
+            return \in_array(strtolower($toCall->getName()), ['date_add', 'date_sub', 'date_modify'], true);
+        }
+
+        return false;
+    }
+
+    /**
+     * FUNCCALL ARG_SEND temps for `$dt` / `$interval` are often distinct {@see Variable}
+     * instances from {@see Context::$namedVariableBindings} — method `$this` is not.
+     * Lower through the named binding so DateTime stamps reach {@see JitDateMutation} (#33781).
+     *
+     * @param list<Variable>     $callArgs
+     * @param list<Operand|null> $callOperands
+     *
+     * @return list<Variable>
+     */
+    private function canonicalizeDateMutationCallArgs(array $callArgs, array $callOperands): array
+    {
+        foreach ([0, 1] as $idx) {
+            if (!isset($callArgs[$idx], $callOperands[$idx])) {
+                continue;
+            }
+            $arg = $callArgs[$idx];
+            $operand = $callOperands[$idx];
+            if (!$arg instanceof JIT\Variable || !$operand instanceof \PHPCfg\Operand) {
+                continue;
+            }
+            $name = JIT\OperandName::resolve($operand);
+            if (null === $name || '' === $name) {
+                continue;
+            }
+            $bound = $this->context->namedVariableBindings[$this->context->resolveRefAliasName($name)] ?? null;
+            if ($bound instanceof JIT\Variable && $bound !== $arg) {
+                $callArgs[$idx] = $bound;
+            }
+        }
+
+        return $callArgs;
     }
 
     /** Copy construct stamp onto `$i->format()` receivers (#32699). */

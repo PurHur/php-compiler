@@ -59,6 +59,8 @@ final class JitDateMutation
 
     public static function invokeAdd(Context $context, JITVariable ...$args): Value
     {
+        // Route through OOP lowering — procedural-only $function tag was not the
+        // defect; keep date_add() TypeError labels via invokeObjectIntervalMutationForFunction.
         return self::invokeIntervalMutation($context, 'date_add', true, ...$args);
     }
 
