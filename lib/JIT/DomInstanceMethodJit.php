@@ -342,6 +342,8 @@ final class DomInstanceMethodJit
         'dom\\xmldocument::queryselector' => true,
         'dom\\xmldocument::queryselectorall' => true,
         'dom\\htmldocument::getelementbyid' => true,
+        'dom\\xmldocument::getelementbyid' => true,
+        'dom\\document::getelementbyid' => true,
         'dom\\htmldocument::savehtml' => true,
         'domimplementation::createdocument' => true,
         'domimplementation::createdocumenttype' => true,
@@ -472,7 +474,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domdocument::getelementbyid' === $lc) {
+            if ('domdocument::getelementbyid' === $lc
+                || 'dom\\htmldocument::getelementbyid' === $lc
+                || 'dom\\xmldocument::getelementbyid' === $lc
+                || 'dom\\document::getelementbyid' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomDocumentGetElementById();
 
                 return;
@@ -1197,7 +1203,6 @@ final class DomInstanceMethodJit
                 || 'dom\\document::queryselectorall' === $lc
                 || 'dom\\xmldocument::queryselector' === $lc
                 || 'dom\\xmldocument::queryselectorall' === $lc
-                || 'dom\\htmldocument::getelementbyid' === $lc
                 || 'dom\\element::rename' === $lc
                 || 'dom\\htmlelement::rename' === $lc
                 || 'dom\\element::hasattributens' === $lc
@@ -1547,6 +1552,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\xmldocument::queryselector');
             self::ensureProxy($context, 'dom\\xmldocument::queryselectorall');
             self::ensureProxy($context, 'dom\\htmldocument::getelementbyid');
+            self::ensureProxy($context, 'dom\\xmldocument::getelementbyid');
+            self::ensureProxy($context, 'dom\\document::getelementbyid');
             self::ensureProxy($context, 'dom\\htmldocument::savehtml');
             self::ensureProxy($context, 'dom\\attr::rename');
             self::ensureProxy($context, 'dom\\element::rename');
