@@ -119,6 +119,14 @@ final class JitDomXPathEvaluateUserScript
 
             return self::boxString($context, $name);
         }
+        if (preg_match('~^local-name\((.+)\)$~i', $expression, $localWrap)) {
+            $local = self::localNameForXPath($xml, trim($localWrap[1]));
+            if (null === $local) {
+                return null;
+            }
+
+            return self::boxString($context, $local);
+        }
         // namespace-uri([node-set]) — compile-time fold when XML literal is known (#21238).
         if (preg_match('~^namespace-uri\((.+)\)$~i', $expression, $nsWrap)) {
             $uri = self::namespaceUriForXPath($xml, trim($nsWrap[1]));
@@ -207,71 +215,113 @@ final class JitDomXPathEvaluateUserScript
     /** First element name for //tag (#20280). */
     private static function nameForXPath(string $xml, string $inner): ?string
     {
+        $element = self::firstMatchingElementForXPath($xml, $inner);
+        if (null === $element) {
+            return null;
+        }
+
+        return $element['qname'];
+    }
+
+    /** First element local-name for //tag (#20818). */
+    private static function localNameForXPath(string $xml, string $inner): ?string
+    {
+        $element = self::firstMatchingElementForXPath($xml, $inner);
+        if (null === $element) {
+            return null;
+        }
+
+        return $element['local'];
+    }
+
+    /**
+     * First matching element for //tag or /* from compile-time XML (#21238).
+     *
+     * @return array{local: string, prefix: string, qname: string, inScope: array<string, string>}|null
+     */
+    private static function firstMatchingElementForXPath(string $xml, string $inner): ?array
+    {
+        if ('/*' === $inner || '/' === $inner) {
+            foreach (DomParseSimpleXmlJitHelper::walkElementsInScopeNamespaces($xml) as $element) {
+                return $element;
+            }
+
+            return null;
+        }
+
         if (!preg_match('~^//([*\w][\w:-]*)$~', $inner, $matches)) {
             return null;
         }
+
         $tag = $matches[1];
         if ('*' === $tag) {
             return null;
         }
-        $count = DomParseSimpleXmlJitHelper::countXPathNameTestArgv(
-            $xml,
-            $tag,
-            JitDomXPathRegisterUserScript::namespaces()
-        );
-        if (null === $count) {
+
+        $registeredNs = JitDomXPathRegisterUserScript::namespaces();
+        $colon = strpos($tag, ':');
+        if (false !== $colon) {
+            $prefix = substr($tag, 0, $colon);
+            $local = substr($tag, $colon + 1);
+            if ('' === $local) {
+                return null;
+            }
+            if (isset($registeredNs[$prefix])) {
+                $wantUri = $registeredNs[$prefix];
+                foreach (DomParseSimpleXmlJitHelper::walkElementsInScopeNamespaces($xml) as $element) {
+                    if (0 !== strcasecmp($element['local'], $local)) {
+                        continue;
+                    }
+                    $ns = $element['inScope'][$element['prefix']] ?? '';
+                    if ($ns === $wantUri) {
+                        return $element;
+                    }
+                }
+
+                return null;
+            }
+            foreach (DomParseSimpleXmlJitHelper::walkElementsInScopeNamespaces($xml) as $element) {
+                if (0 === strcasecmp($element['qname'], $tag)) {
+                    return $element;
+                }
+            }
+
             return null;
         }
 
-        return $count > 0 ? $tag : '';
+        foreach (DomParseSimpleXmlJitHelper::walkElementsInScopeNamespaces($xml) as $element) {
+            if (0 !== strcasecmp($element['local'], $tag)) {
+                continue;
+            }
+            $ns = $element['inScope'][$element['prefix']] ?? '';
+            if ('' === $ns) {
+                return $element;
+            }
+        }
+
+        return null;
     }
 
     /**
      * First node namespace-uri for //tag or /* from compile-time XML (#21238).
      *
-     * Prefixed paths match QName; unprefixed / * uses the default xmlns in scope.
+     * Prefixed paths resolve via {@see JitDomXPathRegisterUserScript::namespaces()}
+     * (same as {@see DomParseSimpleXmlJitHelper::countXPathNameTestArgv}); literal
+     * QNames in XML (e.g. {@code //x:a}) match the element prefix; unprefixed tests
+     * select null namespace only (#21125).
      */
     private static function namespaceUriForXPath(string $xml, string $inner): ?string
     {
-        $wantQname = null;
-        $wantLocal = null;
-        $firstOnly = false;
-        if ('/*' === $inner || '/' === $inner) {
-            $firstOnly = true;
-        } elseif (preg_match('~^//([*\w][\w:-]*)$~', $inner, $matches)) {
-            $tag = $matches[1];
-            if ('*' === $tag) {
-                return null;
+        $element = self::firstMatchingElementForXPath($xml, $inner);
+        if (null === $element) {
+            if ('/*' === $inner || '/' === $inner || preg_match('~^//([*\w][\w:-]*)$~', $inner)) {
+                return '';
             }
-            $colon = strpos($tag, ':');
-            if (false === $colon) {
-                $wantLocal = $tag;
-                $wantQname = $tag;
-            } else {
-                $wantQname = $tag;
-                $wantLocal = substr($tag, $colon + 1);
-            }
-        } else {
+
             return null;
         }
 
-        foreach (DomParseSimpleXmlJitHelper::walkElementsInScopeNamespaces($xml) as $element) {
-            $qname = $element['qname'];
-            $local = $element['local'];
-            $prefix = $element['prefix'];
-            $match = $firstOnly
-                || (null !== $wantQname && 0 === strcasecmp($qname, $wantQname))
-                || (null !== $wantLocal && 0 === strcasecmp($local, $wantLocal)
-                    && null !== $wantQname && false === strpos($wantQname, ':'));
-            if (!$match) {
-                continue;
-            }
-
-            return $element['inScope'][$prefix] ?? '';
-        }
-
-        // No QName match in literal XML — let runtime ABI handle registerNamespace paths.
-        return null;
+        return $element['inScope'][$element['prefix']] ?? '';
     }
 
     private static function tryCompileTimeComparison(string $xml, string $expression): ?bool
