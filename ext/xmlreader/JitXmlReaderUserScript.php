@@ -64,7 +64,7 @@ final class JitXmlReaderUserScript
     private static ?array $lastAttributes = null;
 
     /**
-     * Per-event nsScope for getAttributeNs() (#35924 leftover of #35918).
+     * Per-event prefix→URI maps for getAttributeNs / lookupNamespace (#35924 / #35930).
      *
      * @var list<array<string, string>>|null
      */
@@ -650,6 +650,33 @@ final class JitXmlReaderUserScript
         }
 
         return null;
+    }
+
+    /**
+     * XMLReader::lookupNamespace() leftover of fromString/getAttribute (#35930 / #27299 / #19396).
+     * php-src: zim_XMLReader_lookupNamespace — compile-time prefix + __xr_pos nsScope.
+     */
+    public static function tryLookupNamespace(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastNsScopes || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 2) {
+            throw new \LogicException('XMLReader::lookupNamespace() expects $this and $prefix');
+        }
+        $prefix = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $prefix) {
+            return null;
+        }
+        if ('' === $prefix) {
+            throw new \ValueError('XMLReader::lookupNamespace(): Argument #1 ($prefix) cannot be empty');
+        }
+        $byPos = [];
+        foreach (self::$lastNsScopes as $scope) {
+            $byPos[] = \array_key_exists($prefix, $scope) ? $scope[$prefix] : null;
+        }
+
+        return self::emitPosNullableStringSwitch($context, $args[0], $byPos, 'lookupNamespace');
     }
 
     /**
