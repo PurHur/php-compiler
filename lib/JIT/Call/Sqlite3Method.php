@@ -12,8 +12,10 @@ use PHPLLVM\Value;
 
 /**
  * SQLite3 thin-AOT methods — __construct / exec / querySingle / close /
- * lastInsertRowID / changes / lastErrorCode / lastErrorMsg / busyTimeout
- * (#35931 leftover of #35914; lastError leftover #35966; busyTimeout leftover #35972).
+ * lastInsertRowID / changes / lastErrorCode / lastErrorMsg / busyTimeout /
+ * enableExceptions
+ * (#35931 leftover of #35914; lastError leftover #35966; busyTimeout leftover #35972;
+ * enableExceptions leftover #35975).
  *
  * php-src: ext/sqlite3/sqlite3.c
  */
@@ -42,6 +44,8 @@ final class Sqlite3Method implements Call
             $this->paramNames = [];
         } elseif ('busytimeout' === $lc) {
             $this->paramNames = ['milliseconds'];
+        } elseif ('enableexceptions' === $lc) {
+            $this->paramNames = ['enable='];
         }
     }
 
@@ -62,8 +66,9 @@ final class Sqlite3Method implements Call
             'lasterrorcode' => JitSqlite3::lastErrorCode($context, ...$args),
             'lasterrormsg' => JitSqlite3::lastErrorMsg($context, ...$args),
             'busytimeout' => JitSqlite3::busyTimeout($context, ...$args),
+            'enableexceptions' => JitSqlite3::enableExceptions($context, ...$args),
             default => throw new \LogicException(
-                'SQLite3::'.$this->method.'() JIT dispatch missing (#35931 / #35972)'
+                'SQLite3::'.$this->method.'() JIT dispatch missing (#35931 / #35975)'
             ),
         };
     }

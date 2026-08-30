@@ -3955,6 +3955,8 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_ROW_COUNT, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_SUM, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_INT_PK, Variable::TYPE_NATIVE_LONG);
+            // enableExceptions prior-mode fold (#35975 leftover of #35972).
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::PROP_EXCEPTIONS, Variable::TYPE_NATIVE_LONG);
             $this->markHasConstructor($id);
         }
         if ('sqlite3stmt' === $lcname && CompilerVersion::supportsSqlite3()) {

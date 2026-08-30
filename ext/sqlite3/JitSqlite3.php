@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\sqlite3;
 
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -26,7 +27,7 @@ use PHPLLVM\Value;
  * php-src: ext/sqlite3/sqlite3.c — zim_SQLite3___construct / zim_SQLite3_exec /
  * zim_SQLite3_querySingle / zim_SQLite3_lastInsertRowID / zim_SQLite3_changes /
  * zim_SQLite3_lastErrorCode / zim_SQLite3_lastErrorMsg (#35966) /
- * zim_SQLite3_busyTimeout (#35972)
+ * zim_SQLite3_busyTimeout (#35972) / zim_SQLite3_enableExceptions (#35975)
  */
 final class JitSqlite3
 {
@@ -45,6 +46,7 @@ final class JitSqlite3
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ROW_COUNT, $i64->constInt(0, false));
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_SUM, $i64->constInt(0, false));
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_INT_PK, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_EXCEPTIONS, $i64->constInt(0, false));
         $context->type->object->markObjectConstructed($obj);
 
         $slot = JitValueBox::alloc($context);
@@ -227,6 +229,42 @@ final class JitSqlite3
         JitLongArg::lower($context, $args[1], 'SQLite3::busyTimeout(): Argument #1 ($milliseconds)');
 
         return self::boxBool($context, true);
+    }
+
+    /**
+     * SQLite3::enableExceptions leftover of busyTimeout (#35975 / #35972).
+     * php-src zim_SQLite3_enableExceptions: return prior mode, then store $enable (default true).
+     */
+    public static function enableExceptions(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'SQLite3::enableExceptions', 0, 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $obj = self::readObject($context, $args[0]);
+        $i64 = $context->getTypeFromString('int64');
+        $prior = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_EXCEPTIONS);
+        $enableI1 = \count($args) >= 2
+            ? JitBoolArg::lower(
+                $context,
+                $args[1],
+                'SQLite3::enableExceptions(): Argument #1 ($enable)'
+            )
+            : $context->getTypeFromString('int1')->constInt(1, false);
+        self::storeLong(
+            $context,
+            $obj,
+            Sqlite3JitSupport::PROP_EXCEPTIONS,
+            $context->builder->zExt($enableI1, $i64)
+        );
+        $priorBool = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $prior,
+            $i64->constInt(0, false)
+        );
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $priorBool);
+
+        return JitValueBox::pointer($context, $slot);
     }
 
     /**
