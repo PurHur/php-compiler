@@ -3274,6 +3274,7 @@ require_once __DIR__.'/../../../ext/standard/JitVsprintfArrayArg.php';
 require_once __DIR__.'/../../../ext/standard/JitWebParams.php';
 require_once __DIR__.'/../../../ext/standard/JitZendScalarCast.php';
 require_once __DIR__.'/../../../ext/standard/JitZlib.php';
+require_once __DIR__.'/../../../ext/standard/JitZlibIncremental.php';
 require_once __DIR__.'/../../../ext/standard/JsonDecodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JsonValidateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JsonEncodeJitHelper.php';
