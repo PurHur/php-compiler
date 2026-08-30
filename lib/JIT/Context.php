@@ -2462,6 +2462,8 @@ class Context {
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::next');
         // leftover of fromString/read (#35959 / #27299)
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::isvalid');
+        // leftover of fromString/read (#35965 / #27299)
+        XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::setparserproperty');
         // leftover of fromString (#35935 / #27299)
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::close');
         // leftover of getAttribute (#35941 / #35918 / #27299)
