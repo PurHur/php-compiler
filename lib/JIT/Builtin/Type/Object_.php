@@ -4439,6 +4439,7 @@ class Object_ extends Type {
         if ('dom\\xmldocument' === $lcname) {
             $this->defineProperty($id, 'documentElement', Variable::TYPE_OBJECT);
             $this->defineMethodVisibility($id, 'createfromstring', \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC);
+            $this->defineMethodVisibility($id, 'createfromfile', \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC);
             $this->defineMethodVisibility($id, 'createattribute', \PHPCfg\Func::FLAG_PUBLIC);
         }
         if ('dom\\htmldocument' === $lcname) {
@@ -4446,6 +4447,7 @@ class Object_ extends Type {
             $this->defineProperty($id, 'documentElement', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'body', Variable::TYPE_OBJECT);
             $this->defineMethodVisibility($id, 'createfromstring', \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC);
+            $this->defineMethodVisibility($id, 'createfromfile', \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC);
         }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;

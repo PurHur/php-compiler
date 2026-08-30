@@ -35,7 +35,9 @@ use PHPCompiler\JIT\Builtin\DomSaveXMLRuntime;
 use PHPCompiler\JIT\Builtin\DomSyncElementIdMapRuntime;
 use PHPCompiler\JIT\Builtin\DomXPathEvaluateRuntime;
 use PHPCompiler\JIT\Builtin\DomXPathQueryRuntime;
+use PHPCompiler\JIT\Builtin\DomHtmlDocumentCreateFromFileRuntime;
 use PHPCompiler\JIT\Builtin\DomHtmlDocumentCreateFromStringRuntime;
+use PHPCompiler\JIT\Builtin\DomXmlDocumentCreateFromFileRuntime;
 use PHPCompiler\JIT\Builtin\DomXmlDocumentCreateFromStringRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -321,6 +323,40 @@ final class JitDomDocumentMethodKernel
             $context->getTypeFromString('__object__*'),
             'PHPCompiler\\ext\\dom\\DomHtmlDocumentCreateFromStringJitHelper::createFromStringArgv',
             '/ext/dom/DomHtmlDocumentCreateFromStringJitHelper.php'
+        );
+    }
+
+    /** Dom\HTMLDocument::createFromFile() — thin AOT leftover of #27300. */
+    public static function ensureHtmlDocumentCreateFromFileBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomHtmlDocumentCreateFromFileRuntime::ABI_NAME,
+            'dom_html_document_create_from_file_user_script',
+            [
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomHtmlDocumentCreateFromFileJitHelper::createFromFileArgv',
+            '/ext/dom/DomHtmlDocumentCreateFromFileJitHelper.php'
+        );
+    }
+
+    /** Dom\XMLDocument::createFromFile() — thin AOT leftover of #27108. */
+    public static function ensureXmlDocumentCreateFromFileBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomXmlDocumentCreateFromFileRuntime::ABI_NAME,
+            'dom_xml_document_create_from_file_user_script',
+            [
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomXmlDocumentCreateFromFileJitHelper::createFromFileArgv',
+            '/ext/dom/DomXmlDocumentCreateFromFileJitHelper.php'
         );
     }
 
