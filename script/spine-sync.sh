@@ -110,17 +110,46 @@ fi
 echo "==> spine-sync 3/6: recount and rewrite footnotes"
 read -r NEW_SPINE NEW_INV < <("$PHP_BIN" script/bootstrap-spine-count.php --json \
   | "$PHP_BIN" -r '$j = json_decode(stream_get_contents(STDIN), true); echo $j["spine"], " ", $j["inventory"], "\n";')
-OLD_PAIR="$(grep -oE 'self-host spine \*\*[0-9]+\*\* / \*\*[0-9]+\*\*' README.md | head -1 \
-  | grep -oE '[0-9]+\*\* / \*\*[0-9]+' | sed 's/\*\*//g')"
-OLD_SPINE="${OLD_PAIR%% /*}"
-OLD_INV="${OLD_PAIR##*/ }"
-OLD_SPINE="$(echo "$OLD_SPINE" | xargs)"
-OLD_INV="$(echo "$OLD_INV" | xargs)"
-echo "    ${OLD_SPINE}/${OLD_INV} -> ${NEW_SPINE}/${NEW_INV}"
-if [[ "$OLD_SPINE" != "$NEW_SPINE" || "$OLD_INV" != "$NEW_INV" ]]; then
-  FOOTNOTE_FILES=(README.md docs/pages/development-status.md docs/self-host-target.md
-    docs/bootstrap-selfhost.md docs/roadmap-wave3.md docs/pages/index.html
-    docs/bootstrap-generations.md docs/pages/missing-implementation.html)
+FOOTNOTE_FILES=(README.md docs/pages/development-status.md docs/self-host-target.md
+  docs/bootstrap-selfhost.md docs/roadmap-wave3.md docs/pages/index.html
+  docs/bootstrap-generations.md docs/pages/missing-implementation.html)
+# Discover every distinct M2-style pair across tracked docs — README alone is
+# not enough when it says N/N while other docs still say N/M (#35784).
+mapfile -t DISCOVERED_PAIRS < <(
+  {
+    grep -hEo '\*\*[0-9]{3,4}\*\*[[:space:]]*/[[:space:]]*\*\*[0-9]{3,4}\*\*' "${FOOTNOTE_FILES[@]}" 2>/dev/null || true
+    grep -hEo '\*\*[0-9]{3,4}/[0-9]{3,4}\*\*' "${FOOTNOTE_FILES[@]}" 2>/dev/null || true
+    grep -hEo 'self-host spine \*\*[0-9]+\*\* / \*\*[0-9]+\*\*' README.md 2>/dev/null || true
+  } | sed -E 's/\*\*//g; s/self-host spine //g; s|[[:space:]]*/[[:space:]]*|/|g' | sort -u
+)
+echo "    canonical ${NEW_SPINE}/${NEW_INV}"
+REWROTE=0
+for OLD_PAIR in "${DISCOVERED_PAIRS[@]}"; do
+  [[ "$OLD_PAIR" == */* ]] || continue
+  OLD_SPINE="${OLD_PAIR%%/*}"
+  OLD_INV="${OLD_PAIR##*/}"
+  [[ "$OLD_SPINE" =~ ^[0-9]+$ && "$OLD_INV" =~ ^[0-9]+$ ]] || continue
+  if [[ "$OLD_SPINE" == "$NEW_SPINE" && "$OLD_INV" == "$NEW_INV" ]]; then
+    continue
+  fi
+  # Only rewrite live M2 spine footnotes:
+  # - N/M where M is the current inventory (stale numerator), or
+  # - N/N within ±500 of the current spine (README collapsed-ratio drift).
+  # Never touch vendor (7410/7412), historic gen (6344/6344), or wave-3
+  # trackers — those share the digit/digit shape (#35784).
+  rewrite_ok=0
+  if [[ "$OLD_INV" == "$NEW_INV" && "$OLD_SPINE" != "$NEW_SPINE" ]]; then
+    rewrite_ok=1
+  elif [[ "$OLD_SPINE" == "$OLD_INV" ]]; then
+    delta=$(( OLD_SPINE > NEW_SPINE ? OLD_SPINE - NEW_SPINE : NEW_SPINE - OLD_SPINE ))
+    if (( delta <= 500 )); then
+      rewrite_ok=1
+    fi
+  fi
+  if [[ "$rewrite_ok" != "1" ]]; then
+    continue
+  fi
+  echo "    rewrite ${OLD_SPINE}/${OLD_INV} -> ${NEW_SPINE}/${NEW_INV}"
   sed -i \
     -e "s/\*\*${OLD_SPINE}\*\* \/ \*\*${OLD_INV}\*\*/**${NEW_SPINE}** \/ **${NEW_INV}**/g" \
     -e "s/\*\*${OLD_SPINE}\/${OLD_INV}\*\*/**${NEW_SPINE}\/${NEW_INV}**/g" \
@@ -132,6 +161,17 @@ if [[ "$OLD_SPINE" != "$NEW_SPINE" || "$OLD_INV" != "$NEW_INV" ]]; then
     -e "s/assertSame(${OLD_SPINE}, \$count/assertSame(${NEW_SPINE}, \$count/" \
     -e "s|Spine ratio ${OLD_SPINE}/${OLD_INV}|Spine ratio ${NEW_SPINE}/${NEW_INV}|" \
     test/unit/BootstrapSelfhostBundleTest.php
+  REWROTE=1
+done
+# Force the M2 assertSame line to the canonical spine count even when no
+# doc pair mentioned the old assert value (README N/N vs docs N/M drift).
+if ! grep -q "assertSame(${NEW_SPINE}, \$count" test/unit/BootstrapSelfhostBundleTest.php; then
+  sed -i -E "s/(assertSame\()[0-9]+(, \\\$count, 'M2 spine)/\1${NEW_SPINE}\2/" \
+    test/unit/BootstrapSelfhostBundleTest.php
+  REWROTE=1
+fi
+if [[ "$REWROTE" == "0" ]]; then
+  echo "    footnotes already at ${NEW_SPINE}/${NEW_INV}"
 fi
 
 echo "==> spine-sync 4/6: verify counts + coverage + deferred + roadmap"
