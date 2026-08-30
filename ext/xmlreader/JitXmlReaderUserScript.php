@@ -871,6 +871,97 @@ final class JitXmlReaderUserScript
     }
 
     /**
+     * XMLReader::setSchema() leftover of fromString (#35971 / #27299 / #19553).
+     * php-src: zim_XMLReader_setSchema / xmlTextReaderSchemaValidate.
+     * Compile-time null filename: clear schema and return true (php-src before first read).
+     */
+    public static function trySetSchema(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::trySchemaNullClear(
+            $context,
+            'setSchema',
+            'filename',
+            ...$args
+        );
+    }
+
+    /**
+     * XMLReader::setRelaxNGSchema() leftover of fromString (#35971 / #27299 / #19553).
+     * php-src: zim_XMLReader_setRelaxNGSchema.
+     */
+    public static function trySetRelaxNGSchema(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::trySchemaNullClear(
+            $context,
+            'setRelaxNGSchema',
+            'filename',
+            ...$args
+        );
+    }
+
+    /**
+     * XMLReader::setRelaxNGSchemaSource() leftover of fromString (#35971 / #27299 / #19940).
+     * php-src: zim_XMLReader_setRelaxNGSchemaSource.
+     */
+    public static function trySetRelaxNGSchemaSource(Context $context, JITVariable ...$args): ?Value
+    {
+        return self::trySchemaNullClear(
+            $context,
+            'setRelaxNGSchemaSource',
+            'source',
+            ...$args
+        );
+    }
+
+    /**
+     * Fold compile-time null/empty schema args. Non-null file/source paths stay unfolded.
+     */
+    private static function trySchemaNullClear(
+        Context $context,
+        string $method,
+        string $paramName,
+        JITVariable ...$args
+    ): ?Value {
+        if (!self::isUserScriptAot() || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 2) {
+            throw new \LogicException('XMLReader::'.$method.'() expects $this and $'.$paramName);
+        }
+        if (self::isCompileTimeNull($args[1])) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_'.strtolower($method).'_cont');
+            self::loadObject($context, $args[0]);
+            $i1 = $context->getTypeFromString('int1');
+            $box = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $box, $i1->constInt(1, false));
+
+            return JitValueBox::normalizeValuePtr($context, $box);
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if ('' === $lit) {
+            throw new \ValueError(
+                'XMLReader::'.$method.'(): Argument #1 ($'.$paramName.') cannot be empty'
+            );
+        }
+
+        return null;
+    }
+
+    private static function isCompileTimeNull(JITVariable $var): bool
+    {
+        if (JITVariable::TYPE_NULL === $var->type || ($var->isNullConstant ?? false)) {
+            return true;
+        }
+        if (null !== $var->compileTimeConstantName
+            && 'null' === strtolower($var->compileTimeConstantName)
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * XMLReader::close() leftover of fromString/open (#35935 / #27299 / #6135).
      * php-src: zim_XMLReader_close / xmlTextReaderClose — return true; cursor past last event.
      * Subsequent read() is false (php-src xmlTextReaderRead on a closed reader).
