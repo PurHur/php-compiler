@@ -969,7 +969,7 @@ final class JitXmlReaderUserScript
             $hits[] = self::lookupMoveToAttributeNsHitAtPos($i, $local, $ns);
         }
 
-        return self::emitMoveToAttributeSwitch($context, $args[0], $hits);
+        return self::emitMoveToAttributeSwitch($context, $args[0], $hits, 'movetoattributens');
     }
 
     /**
