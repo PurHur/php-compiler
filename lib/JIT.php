@@ -12104,12 +12104,37 @@ class JIT {
                         $this->context->getVariableFromOp($block->getOperand($op->arg3))
                     );
                     $this->context->powReturnValueBox = false;
-                    $powDest = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    $powDestOp = $block->getOperand($op->arg1);
+                    $powDest = $this->context->getVariableFromOp($powDestOp);
+                    // In-place `$r **= n` after `$r =& $obj->prop`: php-cfg dest is a dead
+                    // Temporary; assignOperandValue never propertyStore's (leftover of #35964).
+                    $powProp = $powDest;
+                    if (
+                        (null === $powProp->objectPropertySlot || null === $powProp->objectPropertyType)
+                        && null !== $powLeft->objectPropertySlot
+                        && null !== $powLeft->objectPropertyType
+                    ) {
+                        $powProp = $powLeft;
+                    }
+                    if (null !== $powProp->objectPropertySlot && null !== $powProp->objectPropertyType) {
+                        $this->context->setVariableOp($powDestOp, $powProp);
+                        $this->assignOperand(
+                            $powDestOp,
+                            new Variable(
+                                $this->context,
+                                Variable::TYPE_VALUE,
+                                Variable::KIND_VALUE,
+                                $powResult
+                            ),
+                            true
+                        );
+                        break;
+                    }
                     if (null !== $powDest->writableHt) {
                         JIT\JitValueBox::copyFromPointer($this->context, $powDest->value, $powResult);
                         JIT\HashTableHelper::commitDimWriteLvalue($this->context, $powDest);
                     } else {
-                        $this->assignOperandValue($block->getOperand($op->arg1), $powResult, true);
+                        $this->assignOperandValue($powDestOp, $powResult, true);
                     }
                     break;
                 case OpCode::TYPE_POST_INC:
