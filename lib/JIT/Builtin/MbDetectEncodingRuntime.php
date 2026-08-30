@@ -9,7 +9,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link hook for mb_detect_encoding() — MbDetectEncodingJitHelper (#34358 / #3075).
+ * JIT/AOT link hook for mb_detect_encoding() — MbDetectEncodingJitHelper (#34358 / #3075 / #35846).
+ *
+ * All-string NestedJIT ABI ({@code string,string,string}) matches {@see MbScrubRuntime}
+ * ({@code __string__*} params). An {@code int} third arg forced boxed {@code __value__}
+ * params: LLVM call verify failed, and bridge-boxed strings made {@code strlen} silent-0
+ * then hung in isset-length walks (#35846).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_detect_encoding)
  */

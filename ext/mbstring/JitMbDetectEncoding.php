@@ -16,11 +16,13 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT for mb_detect_encoding() (#3075, #34358 leftover).
+ * LLVM JIT/AOT for mb_detect_encoding() (#3075, #34358 / #35846 leftover).
  *
  * Compile-time fold when $string is a literal; runtime haystack via NestedJIT
  * {@see MbDetectEncodingJitHelper} (peer {@see JitMbScrub}). Encodings list +
  * $strict stay compile-time (NestedJIT of MbstringState / arrays aborts).
+ *
+ * Link NestedJIT **before** lowering args — NestedJIT can invalidate prior IR (#34270 / #35846).
  *
  * php-src: ext/mbstring/mbstring.c — PHP_FUNCTION(mb_detect_encoding)
  */
@@ -65,6 +67,14 @@ final class JitMbDetectEncoding
             }
         }
 
+        // Link NestedJIT helpers before lowering args — NestedJIT can invalidate prior IR (#34270 / #35846).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        MbDetectEncodingRuntime::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_detect_encoding_runtime');
+
         $str = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $args[0],
@@ -73,20 +83,13 @@ final class JitMbDetectEncoding
             'string'
         );
 
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        MbDetectEncodingRuntime::ensureLinked($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        }
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'mb_detect_encoding_runtime');
-
         $orderPtr = $context->builder->load($context->constantStringFromString(self::orderCodes($order)));
-        $strictI = self::strictI64($context, $args);
+        $strictPtr = self::strictFlagString($context, $args);
         $resultStr = $context->builder->call(
             MbDetectEncodingRuntime::detectHelper($context),
             $str,
             $orderPtr,
-            $strictI
+            $strictPtr
         );
 
         return self::boxDetectResult($context, $resultStr);
@@ -236,17 +239,22 @@ final class JitMbDetectEncoding
     }
 
     /**
+     * NestedJIT third arg must stay a string ("0"/"1") — int boxes all params (#35846).
+     *
      * @param list<JITVariable> $args
      */
-    private static function strictI64(Context $context, array $args): Value
+    private static function strictFlagString(Context $context, array $args): Value
     {
-        $i64 = $context->getTypeFromString('int64');
         $folded = self::compileTimeStrict($args);
         if (null !== $folded) {
-            return $i64->constInt($folded ? 1 : 0, false);
+            return $context->builder->load($context->constantStringFromString($folded ? '1' : '0'));
         }
         if (isset($args[2]) && JITVariable::TYPE_NATIVE_BOOL === $args[2]->type) {
-            return $context->builder->zExt($context->helper->loadValue($args[2]), $i64);
+            $i1 = $context->helper->loadValue($args[2]);
+            $one = $context->builder->load($context->constantStringFromString('1'));
+            $zero = $context->builder->load($context->constantStringFromString('0'));
+
+            return $context->builder->select($i1, $one, $zero);
         }
         throw new \LogicException(
             'mb_detect_encoding() strict must be a bool in this compiler build'
