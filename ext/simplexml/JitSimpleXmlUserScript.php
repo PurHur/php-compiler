@@ -2034,6 +2034,30 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * json_encode($sxe) — host php-src sxe get_properties_for wire (#35850 leftover of #35795 / #18291).
+     *
+     * Thin AOT encodes TYPE_VALUE objects via get_object_vars (empty baked slots → `{}`).
+     * Fold when the compile-time tree is known. php-src: ext/json/json_encoder.c + ext/simplexml/sxe.c.
+     */
+    public static function tryFoldJsonEncode(Context $context, JITVariable $arg, int $flags): ?Value
+    {
+        $tree = self::compileTimeTree($arg);
+        if (null === $tree) {
+            return null;
+        }
+        try {
+            $encoded = \json_encode($tree, $flags);
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!\is_string($encoded)) {
+            return null;
+        }
+
+        return $context->builder->load($context->constantStringFromString($encoded));
+    }
+
+    /**
      * Compile-time token for a tracked SimpleXMLElement receiver (#20137 dom_import_simplexml).
      */
     public static function compileTimeToken(JITVariable $receiver): ?string
