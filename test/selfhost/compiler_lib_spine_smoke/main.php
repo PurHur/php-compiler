@@ -8156,6 +8156,7 @@ unset($__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/sqlite3/Sqlite3AotFoldState.php';
 require_once __DIR__.'/../../../ext/sqlite3/JitSqlite3.php';
 require_once __DIR__.'/../../../ext/sqlite3/JitSqlite3Stmt.php';
 require_once __DIR__.'/../../../ext/sqlite3/JitSqlite3Result.php';
