@@ -31343,6 +31343,8 @@ class JIT {
     /**
      * After ??= arms persist the store, drop fetch-arm property SSA so the merge
      * block (and nested outer ??) load the stack box (#33760 / #32988).
+     * Keep ASSIGN_REF lvalue aliases so `$r =& $obj->prop; $r ??= …` still
+     * propertyStores (#35987 / leftover of #35898).
      */
     private function reseatCoalesceResultAfterPropertyArms(Operand $coalesceResult): void
     {
@@ -31351,6 +31353,9 @@ class JIT {
             return;
         }
         $mergeSeat = $this->context->getVariableFromOp($coalesceResult);
+        if ($mergeSeat->assignRefLvalueAlias) {
+            return;
+        }
         $mergeSeat->objectPropertySlot = null;
         $mergeSeat->objectPropertyType = null;
         $mergeSeat->objectPropertyReceiver = null;
@@ -31613,6 +31618,12 @@ class JIT {
                 // Property-backed slots carry a fetch-arm-only SSA pointer (objectPropertySlot).
                 // Keep the alloca (already written by the fetch/null arm) but drop the backing so
                 // nullsafe_merge reads the stack box — otherwise Module verify fails (#32988).
+                // Exception: `$r =& $obj->prop; $r ??= …` — ASSIGN_REF GEP already dominates the
+                // coalesce result CV (assignRefLvalueAlias). Dropping the slot made the right-arm
+                // ASSIGN write a stack box only (silent wrong output; #35987 / leftover of #35898).
+                if ($var->assignRefLvalueAlias) {
+                    return;
+                }
                 if (
                     null !== $var->objectPropertySlot
                     || null !== $var->staticPropertyGlobal
