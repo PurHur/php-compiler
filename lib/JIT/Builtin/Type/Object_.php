@@ -3093,6 +3093,16 @@ class Object_ extends Type {
         if (null !== $propset) {
             $slotDecl = $this->instancePropertySlotDeclaringClassIdFor($classId, $propset[3]);
             if ($slotDecl !== $classId) {
+                // Same-name private shadow: the child layout holds both parent-private and
+                // child-private slots — do not redirect to the parent's ClassEntry (#33439).
+                $ownPropset = $this->findInstancePropertySet($classId, $propName, true);
+                if (null !== $ownPropset) {
+                    $ownDecl = $this->instancePropertySlotDeclaringClassIdFor($classId, $ownPropset[3]);
+                    if ($ownDecl === $classId) {
+                        return $classId;
+                    }
+                }
+
                 return $slotDecl;
             }
         }
