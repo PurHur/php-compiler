@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\VmActiveContextJitHelper;
 use PHPCompiler\Web\Superglobals;
 
@@ -56,6 +57,18 @@ final class UnserializeJitHelper
         $ht = VmSessionSerializer::decodeWireHashTable($payload);
 
         return $ht ?? new HashTable();
+    }
+
+    /**
+     * Full unserialize wire → VM Variable via php-in-PHP SSOT (#8191, #9163).
+     *
+     * Thin standalone AOT: {@see VmActiveContextJitHelper::resolve()} when Superglobals has no ctx.
+     */
+    public static function decodeToVariable(string $payload, ?array $options = null): Variable|false
+    {
+        $ctx = self::requireActiveContext();
+
+        return VmUnserializeFormat::decodeToVariableWithContext($ctx, $payload, $options);
     }
 
     private static function requireActiveContext(): Context
