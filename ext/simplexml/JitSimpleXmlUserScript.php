@@ -831,6 +831,40 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * $sxe->prop = $v — host sxe_property_write (#35820 leftover of #35814 / #20539).
+     *
+     * Thin AOT otherwise propertyStore's a TYPE_VALUE box (SIGABRT). Mutate the
+     * compile-time tree so a later asXML() fold sees the write (peer tryOffsetSet).
+     */
+    public static function tryPropSet(
+        Context $context,
+        JITVariable $container,
+        string $propName,
+        JITVariable $value
+    ): ?Value {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml') || '' === $propName) {
+            return null;
+        }
+        $tree = self::lookup($container);
+        if (null === $tree) {
+            return null;
+        }
+        $lit = self::compileTimeOffsetSetValue($context, $value);
+        if (null === $lit) {
+            throw new \LogicException(
+                'SimpleXMLElement property write user-script AOT requires a compile-time value (#35820)'
+            );
+        }
+        try {
+            $tree->{$propName} = $lit;
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::nullValue($context);
+    }
+
+    /**
      * isset($sxe[$dim]) — host has_dimension (php-src sxe_object_has_dimension; #34555).
      *
      * Thin AOT boxes SXE as TYPE_VALUE so ArrayAccess isset is skipped and HT probe
