@@ -21,7 +21,7 @@ final class HashTableLazyStringCompareRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#35626', $source);
         $pos = strpos($source, 'public function implement(): void');
         $this->assertNotFalse($pos);
-        $next = strpos($source, 'private function ensureLibcStrtol', $pos);
+        $next = strpos($source, 'public function ensureMultisortPacked', $pos);
         $this->assertNotFalse($next);
         $body = substr($source, $pos, $next - $pos);
 
@@ -31,11 +31,14 @@ final class HashTableLazyStringCompareRuntimeShrinkTest extends TestCase
             '$this->ensureNaturalCompareAbis',
             'StringNaturalCompare::ensureStandaloneBodies',
             'StringStrcoll::ensureLinked',
+            'implementSortStringKeysLocale',
+            'implementSortStringKeyValuesLocale',
+            'implementSortPackedNatural',
         ] as $forbidden) {
             $this->assertStringNotContainsString(
                 $forbidden,
                 $body,
-                'HashTable::implement must not eagerly '.$forbidden.' (#35626)'
+                'HashTable::implement must not eagerly '.$forbidden.' (#35626 / #35904)'
             );
         }
     }

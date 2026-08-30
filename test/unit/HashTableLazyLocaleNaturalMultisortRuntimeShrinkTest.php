@@ -29,8 +29,8 @@ final class HashTableLazyLocaleNaturalMultisortRuntimeShrinkTest extends TestCas
             $body,
             'HashTable::implement must not eagerly implementMultisortPacked (#35904)'
         );
-        $this->assertStringContainsString('implementSortStringKeysLocale', $body);
-        $this->assertStringContainsString('implementSortPackedNatural', $body);
+        $this->assertStringNotContainsString('$this->implementSortStringKeysLocale', $body);
+        $this->assertStringNotContainsString('$this->implementSortPackedNatural', $body);
     }
 
     public function testRegisterDropsEagerMultisortDecl(): void

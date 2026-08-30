@@ -50,6 +50,7 @@ final class KeySortRuntime
 
     public static function ksortByKeyLocale(Context $context, JITVariable $array): void
     {
+        $context->type->hashtable->ensureSortAbi(self::ABI_KSORT_LOCALE);
         self::invokeKeySortSkipList($context, $array, self::ABI_KSORT_LOCALE);
     }
 
@@ -181,9 +182,9 @@ final class KeySortRuntime
     {
         self::assertAbi($context, self::ABI_KSORT);
         self::assertAbi($context, self::ABI_KSORT_CASE);
-        self::assertAbi($context, self::ABI_KSORT_LOCALE);
         self::assertAbi($context, self::ABI_KRSORT);
         self::assertAbi($context, self::ABI_KRSORT_CASE);
+        // locale ABI is ensureSortAbi on ksortByKeyLocale only (#35904).
     }
 
     private static function assertAbi(Context $context, string $name): void

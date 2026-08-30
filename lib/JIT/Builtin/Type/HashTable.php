@@ -128,32 +128,29 @@ class HashTable extends Type
         // ksort()/krsort() string-key maps — NestedJIT KeySortJitHelper aborts under thin AOT (#27227 / peer #26975).
         $this->registerFn('__hashtable__sortStringKeys', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeysCase', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortStringKeysLocale', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeysReverse', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeysReverseCase', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValues', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortStringKeyValuesLocale', 'void', ['__hashtable__*']);
+        $this->registerFn('__hashtable__sortStringKeyValuesReverse', 'void', ['__hashtable__*']);
+        // natsort strKey ABIs stay eager — lazy first-link during user lowering plants
+        // ret void into {main} (empty stdout; leftover valueToString #35904).
         $this->registerFn('__hashtable__sortStringKeyValuesNatural', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValuesNaturalCase', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortStringKeyValuesReverse', 'void', ['__hashtable__*']);
         // Packed-list sort()/rsort() — NestedJIT SortJitHelper stubs were no-ops (#24010).
         $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortPackedReverse', 'void', ['__hashtable__*']);
         // SORT_STRING|SORT_FLAG_CASE — length-aware ASCII strcasecmp (#34702).
         $this->registerFn('__hashtable__sortPackedStringCase', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortPackedReverseStringCase', 'void', ['__hashtable__*']);
-        // Packed natsort()/natcasesort() — NestedJIT NaturalSortJitHelper aborts under thin AOT (#26975).
-        $this->registerFn('__hashtable__sortPackedNatural', 'void', ['__hashtable__*']);
-        $this->registerFn('__hashtable__sortPackedNaturalCase', 'void', ['__hashtable__*']);
-        // __multisort__packed registerFn deferred to ensureMultisortPacked (#35904) —
-        // hello-world must not emit coupled-multisort LLVM at HashTable init.
+        // locale / packed-natural decls deferred to ensureSortAbi (#35904).
+        // __multisort__packed deferred to ensureMultisortPacked (#35904).
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
 
     /**
      * @param list<string> $paramTypes
      */
-    private function registerFn(string $name, string $returnType, array $paramTypes): void
+    private function registerFn(string $name, string $returnType, array $paramTypes, bool $alwaysInline = true): void
     {
         $params = [];
         foreach ($paramTypes as $t) {
@@ -165,8 +162,66 @@ class HashTable extends Type
             ...$params
         );
         $fn = $this->context->module->addFunction($name, $ft);
-        $fn->addAttributeAtIndex(PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+        if ($alwaysInline) {
+            $fn->addAttributeAtIndex(PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+        }
         $this->context->registerFunction($name, $fn);
+    }
+
+    /**
+     * Register+implement locale/natural/multisort HashTable ABIs on first lookup (#35904).
+     *
+     * Do not call from {@see implement()} — leftover init NestedJIT vs Runtime ABI
+     * drift mints strcoll.1 / strnatcmp.1 (#31894 / #32122).
+     */
+    public function ensureSortAbi(string $name): void
+    {
+        if ('__multisort__packed' === $name) {
+            $this->ensureMultisortPacked();
+
+            return;
+        }
+        $probe = $this->context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $this->context->registerFunction($name, $probe);
+
+            return;
+        }
+
+        $restore = BasicBlockHelper::tryGetInsertBlock($this->context);
+        try {
+            NestedJitCompileScope::run($this->context, function () use ($name, $probe): void {
+                if (null === $probe) {
+                    $this->registerFn($name, 'void', ['__hashtable__*'], false);
+                } else {
+                    $this->context->registerFunction($name, $probe);
+                }
+                switch ($name) {
+                    case '__hashtable__sortStringKeysLocale':
+                        $this->implementSortStringKeysLocale();
+                        break;
+                    case '__hashtable__sortStringKeyValuesLocale':
+                        $this->implementSortStringKeyValuesLocale();
+                        break;
+                    case '__hashtable__sortStringKeyValuesNatural':
+                        $this->implementSortStringKeyValuesNatural();
+                        break;
+                    case '__hashtable__sortStringKeyValuesNaturalCase':
+                        $this->implementSortStringKeyValuesNaturalCase();
+                        break;
+                    case '__hashtable__sortPackedNatural':
+                        $this->implementSortPackedNatural(false);
+                        break;
+                    case '__hashtable__sortPackedNaturalCase':
+                        $this->implementSortPackedNatural(true);
+                        break;
+                    default:
+                        throw new \LogicException('unknown lazy HashTable sort ABI '.$name.' (#35904)');
+                }
+            });
+        } finally {
+            BasicBlockHelper::restoreInsertBlock($this->context, $restore);
+        }
     }
 
     public function implement(): void
@@ -181,6 +236,10 @@ class HashTable extends Type
         // before lookupFunction (peer #35614 Type::String_::implement lazy batch). Thin
         // hello-world must not NestedJIT strcoll/strnatcmp during init — leftover HashTable
         // NestedJIT vs Runtime ABI drift mints strcoll.1 / strnatcmp.1 (#31894 / #32122).
+        // locale/natural/multisort implement* removed from type init (#35904 leftover of
+        // #35626): KeySort / ValueSort / NaturalSort / Multisort Runtime call
+        // ensureSortAbi on first lookup only. Hello-world IR must not contain
+        // __hashtable__sortStringKeysLocale / strcoll from HashTable init.
         // Libc strtol(3) always-on ensureLibcStrtol removed (#35751): numeric-string key
         // lookup calls ensureLibcStrtol before lookupFunction (peer #35626 strcoll batch,
         // #31988 module-local decl). Thin hello-world must not declare strtol during
@@ -223,20 +282,19 @@ class HashTable extends Type
         $this->implementHashtablePtrIsNonEmpty();
         $this->implementSortStringKeys(false);
         $this->implementSortStringKeys(true);
-        $this->implementSortStringKeysLocale();
         $this->implementSortStringKeysReverse(false);
         $this->implementSortStringKeysReverse(true);
         $this->implementSortStringKeyValues();
-        $this->implementSortStringKeyValuesLocale();
+        $this->implementSortStringKeyValuesReverse();
         $this->implementSortStringKeyValuesNatural();
         $this->implementSortStringKeyValuesNaturalCase();
-        $this->implementSortStringKeyValuesReverse();
         $this->implementSortPacked(false, false);
         $this->implementSortPacked(true, false);
         $this->implementSortPacked(false, true);
         $this->implementSortPacked(true, true);
-        $this->implementSortPackedNatural(false);
-        $this->implementSortPackedNatural(true);
+        // locale / packed-natural: ensureSortAbi on first lookup (#35904).
+        // strKey natsort stays eager so valueToString/strnatcmp first-link cannot plant
+        // ret void into user main (empty stdout after natsort).
         // implementMultisortPacked deferred to ensureMultisortPacked (#35904).
         $this->context->builder->clearInsertionPosition();
     }

@@ -653,6 +653,11 @@ final class LibcExtern
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;
         }
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
         $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
         $b = $context->builder;
@@ -679,6 +684,11 @@ final class LibcExtern
         $b->positionAtEnd($done);
         $b->returnValue($dst);
         $context->registerFunction('memset', $fn);
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**
@@ -728,6 +738,13 @@ final class LibcExtern
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;
         }
+        // Restore caller insert — first memcpy body used to be warmed by HashTable
+        // natsort implement* at type init; lazy #35904 first-implements during int echo.
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
         $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
         $b = $context->builder;
@@ -755,6 +772,11 @@ final class LibcExtern
         $b->positionAtEnd($done);
         $b->returnValue($dst);
         $context->registerFunction('memcpy', $fn);
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**
@@ -789,6 +811,11 @@ final class LibcExtern
         $fn = $context->module->getNamedFunction('memmove');
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             return;
+        }
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
         }
         // Non-overlapping-safe forward copy is enough for compiler runtime uses;
         // overlapping dest>src still needs backward copy for full memmove semantics.
@@ -844,6 +871,11 @@ final class LibcExtern
         $b->returnValue($dst);
         $context->registerFunction('memmove', $fn);
         unset($i8, $i8p);
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**
