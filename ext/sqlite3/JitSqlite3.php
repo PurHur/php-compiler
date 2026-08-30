@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\sqlite3;
 
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -24,7 +25,8 @@ use PHPLLVM\Value;
  *
  * php-src: ext/sqlite3/sqlite3.c — zim_SQLite3___construct / zim_SQLite3_exec /
  * zim_SQLite3_querySingle / zim_SQLite3_lastInsertRowID / zim_SQLite3_changes /
- * zim_SQLite3_lastErrorCode / zim_SQLite3_lastErrorMsg (#35966)
+ * zim_SQLite3_lastErrorCode / zim_SQLite3_lastErrorMsg (#35966) /
+ * zim_SQLite3_busyTimeout (#35972)
  */
 final class JitSqlite3
 {
@@ -210,6 +212,21 @@ final class JitSqlite3
         self::readObject($context, $args[0]);
 
         return self::boxString($context, 'not an error');
+    }
+
+    /**
+     * SQLite3::busyTimeout leftover of lastError (#35972 / #35966).
+     * php-src zim_SQLite3_busyTimeout: sqlite3_busy_timeout on an open handle is SQLITE_OK → true.
+     */
+    public static function busyTimeout(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3::busyTimeout', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        self::readObject($context, $args[0]);
+        JitLongArg::lower($context, $args[1], 'SQLite3::busyTimeout(): Argument #1 ($milliseconds)');
+
+        return self::boxBool($context, true);
     }
 
     /**
