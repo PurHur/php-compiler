@@ -15178,6 +15178,36 @@ class JIT {
                             break;
                         }
                         $classId = $this->context->type->object->lookup($declaringClass);
+                        // SimpleXMLElement FETCH_OBJ_W: host-fold at ASSIGN via tryPropSet (#35820).
+                        // propertyStore on a TYPE_VALUE SXE box SIGABRTs (leftover of #35814).
+                        if (
+                            $forWrite
+                            && JIT\UserScriptAotEnv::isActive()
+                        ) {
+                            $sxeWriteLc = strtolower(ltrim($declaringClass, '\\'));
+                            if (
+                                'simplexmlelement' === $sxeWriteLc
+                                || 'simplemxml_element' === $sxeWriteLc
+                            ) {
+                                $sxeReceiver = $this->context->getVariableFromOp($obj);
+                                $lvalue = new Variable(
+                                    $this->context,
+                                    Variable::TYPE_NULL,
+                                    Variable::KIND_VALUE,
+                                    $this->context->getTypeFromString('__value__*')->constNull()
+                                );
+                                $lvalue->magicSetReceiver = $receiver;
+                                $lvalue->magicSetName = $name->value;
+                                $lvalue->objectPropertyClassName = $declaringClass;
+                                $lvalue->compileTimeString = $sxeReceiver->compileTimeString;
+                                if ($forceBranchMerge) {
+                                    $this->assignOperand($result, $lvalue, true);
+                                } else {
+                                    $this->context->scope->variables[$result] = $lvalue;
+                                }
+                                break;
+                            }
+                        }
                         // Static via -> / ?->: visibility Error for inaccessible statics (#30017).
                         // Notice is VM-complete; JIT mid-body Notice SEGVs under MCJIT (pre-existing).
                         $staticAsInstance = JIT\StaticPropertyAsNonStaticJitGuard::emitBeforeInstanceFetch(
@@ -21158,6 +21188,17 @@ class JIT {
         // before temp→stack promotion, which allocates a fresh Variable and drops the markers
         // (AOT silent no-op; Zend/zend_object_handlers.c zend_std_write_property).
         if (null !== $result->magicSetReceiver && null !== $result->magicSetName) {
+            if (JIT\UserScriptAotEnv::isActive()) {
+                $sxePropSet = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryPropSet(
+                    $this->context,
+                    $result,
+                    $result->magicSetName,
+                    $value
+                );
+                if (null !== $sxePropSet) {
+                    return;
+                }
+            }
             $receiverVar = new Variable(
                 $this->context,
                 Variable::TYPE_OBJECT,
