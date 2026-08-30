@@ -2065,6 +2065,44 @@ class Object_ extends Type {
         $this->setInterfaceExtends('IteratorAggregate', ['Traversable']);
     }
 
+    /**
+     * php-src simplexml.stub.php — Stringable, Countable, RecursiveIterator
+     * (Iterator/Traversable via RecursiveIterator). Not ArrayAccess (Zend instanceof is false).
+     * Thin AOT lookup() otherwise yields a class with no interfaces so
+     * `$sxe instanceof Traversable` is false (#35831 leftover of #26863).
+     */
+    private function seedSimpleXmlElementAotInterfaces(int $id, string $lcname): void
+    {
+        $this->ensureZendBuiltinInterfaces();
+        $this->markInterfaceClass('Countable');
+        $this->markInterfaceClass('Stringable');
+        $this->markInterfaceClass('RecursiveIterator');
+        $this->setInterfaceExtends('RecursiveIterator', ['Iterator', 'Traversable']);
+        if ('simplexmliterator' === $lcname) {
+            $this->lookup('SimpleXMLElement');
+            $this->setClassParentName('SimpleXMLIterator', 'SimpleXMLElement');
+        } else {
+            $this->setClassInterfaces('SimpleXMLElement', [
+                'Stringable',
+                'Countable',
+                'RecursiveIterator',
+            ]);
+        }
+        $pub = \PHPCfg\Func::FLAG_PUBLIC;
+        foreach ([
+            '__construct', '__tostring', '__get', '__set', '__isset', '__unset',
+            'rewind', 'valid', 'current', 'key', 'next',
+            'haschildren', 'getchildren', 'count',
+            'asxml', 'savexml', 'xpath', 'registerxpathnamespace',
+            'children', 'attributes', 'getname', 'getnamespaces', 'getdocnamespaces',
+            'addchild', 'addattribute',
+            'offsetget', 'offsetset', 'offsetexists', 'offsetunset',
+        ] as $method) {
+            $this->defineMethodVisibility($id, $method, $pub);
+        }
+        $this->markHasConstructor($id);
+    }
+
     /** PHP 8.4 built-in LazyGhostTrait marker for trait_exists / use Trait (#6096). */
     private function ensureLazyGhostBuiltinTrait(): void
     {
@@ -3780,6 +3818,9 @@ class Object_ extends Type {
                 'exclude_start_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_EXCLUDE_START_DATE,
                 'include_end_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_INCLUDE_END_DATE,
             ]);
+        }
+        if ('simplexmlelement' === $lcname || 'simplexmliterator' === $lcname) {
+            $this->seedSimpleXmlElementAotInterfaces($id, $lcname);
         }
         // DateTimeInterface format strings live on the interface (php_date.c); concrete
         // DateTime/DateTimeImmutable already inherit via VM ClassEntry, but thin AOT
