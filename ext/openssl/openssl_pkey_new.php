@@ -78,15 +78,12 @@ final class openssl_pkey_new extends Internal
 
         $options = 1 === $argc ? $args[0] : null;
         $folded = JitOpensslPkeyNew::foldCompileTimeOptions($options);
-        if (null === $folded) {
-            // Runtime/non-foldable options arrays still need full Hashtable lowering (#34015 follow-up).
-            throw new \LogicException(
-                'openssl_pkey_new() options must be compile-time null/?array for JIT/AOT in this '
-                .'compiler build (issue #34015)'
-            );
+        if (null !== $folded) {
+            return JitOpensslPkeyNew::generate($context, $folded[0], $folded[1], $folded[2]);
         }
 
-        return JitOpensslPkeyNew::generate($context, $folded[0], $folded[1], $folded[2]);
+        // Runtime hashtable / boxed array options (#35866 leftover of #34015).
+        return JitOpensslPkeyNew::generateFromRuntimeOptions($context, $options);
     }
 
     /**
