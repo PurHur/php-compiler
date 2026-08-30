@@ -6142,6 +6142,7 @@
         "lib/JIT/Builtin/ReflectionFunctionVariadicLowering.php",
         "lib/JIT/Builtin/ReflectionInternalFunctionLookupRuntime.php",
         "lib/JIT/Builtin/ReflectionInternalFunctionLowering.php",
+        "lib/JIT/Builtin/ReflectionInternalParamJitHelper.php",
         "lib/JIT/Builtin/ReflectionMethodQueryConstructHelper.php",
         "lib/JIT/Builtin/ReflectionMethodQueryLookupHelper.php",
         "lib/JIT/Builtin/ReflectionMethodQueryLookupRuntime.php",
@@ -6888,6 +6889,7 @@
         "lib/JIT/Call/ReflectionFunctionGetName.php",
         "lib/JIT/Call/ReflectionFunctionGetNamedArguments.php",
         "lib/JIT/Call/ReflectionFunctionGetNumberOfParameters.php",
+        "lib/JIT/Call/ReflectionFunctionGetNumberOfRequiredParameters.php",
         "lib/JIT/Call/ReflectionFunctionGetParameters.php",
         "lib/JIT/Call/ReflectionFunctionGetReturnType.php",
         "lib/JIT/Call/ReflectionFunctionHasReturnType.php",
@@ -6916,6 +6918,7 @@
         "lib/JIT/Call/ReflectionParameterGetType.php",
         "lib/JIT/Call/ReflectionParameterHasType.php",
         "lib/JIT/Call/ReflectionParameterIsDefaultValueAvailable.php",
+        "lib/JIT/Call/ReflectionParameterIsOptional.php",
         "lib/JIT/Call/ReflectionParameterIsSensitiveParameter.php",
         "lib/JIT/Call/ReflectionParameterIsVariadic.php",
         "lib/JIT/Call/ReflectionPropertyConstruct.php",
@@ -8237,9 +8240,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 8003,
+        "inventory_files": 8006,
         "excluded": 0,
-        "eligible": 8003,
+        "eligible": 8006,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
