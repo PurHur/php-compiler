@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class XmlReaderCloseAotTest extends TestCase
 {
-    private const EXPECTED = "true\n";
+    private const EXPECTED = "true\nfalse\n";
 
     public function testVm(): void
     {

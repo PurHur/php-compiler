@@ -766,7 +766,7 @@ final class JitXmlReaderUserScript
     /**
      * XMLReader::close() leftover of fromString/open (#35935 / #27299 / #6135).
      * php-src: zim_XMLReader_close / xmlTextReaderClose — return true; cursor past last event.
-     * Subsequent read() is Zend Error / VM LogicException (not folded here).
+     * Subsequent read() is false (php-src xmlTextReaderRead on a closed reader).
      */
     public static function tryClose(Context $context, JITVariable ...$args): ?Value
     {
