@@ -40,6 +40,35 @@ final class UsortCallbackPolicy
         return null !== $callback->closureCall;
     }
 
+    /**
+     * Reattach Closure invoke metadata lost when a comparator is stored in a local
+     * (`$cmp = function () { … }; uasort($a, $cmp)` — #33627 regression).
+     */
+    public static function prepareJitCallback(Context $context, JITVariable $callback): void
+    {
+        if (null !== $callback->closureCall) {
+            return;
+        }
+        $resolved = ClosureHelper::resolveCall($context, $callback);
+        if (null !== $resolved) {
+            $callback->closureCall = $resolved;
+
+            return;
+        }
+        $candidates = ClosureHelper::closureCandidates($context);
+        if (1 === \count($candidates)) {
+            $callback->closureCall = reset($candidates);
+        }
+    }
+
+    public static function assertJitLowerable(Context $context, JITVariable $callback): void
+    {
+        self::prepareJitCallback($context, $callback);
+        if (!self::isJitLowerable($callback)) {
+            throw new \LogicException(self::jitRejectionMessage());
+        }
+    }
+
     public static function isJitLowerable(JITVariable $callback): bool
     {
         if (self::isClosureJitLowerable($callback)) {
