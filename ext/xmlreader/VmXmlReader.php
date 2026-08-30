@@ -412,7 +412,6 @@ final class VmXmlReader
         $state->current = null;
         $state->attributeIndex = null;
         $state->position = \count($state->events);
-        XmlReaderRegistry::detach($entry);
 
         return true;
     }
