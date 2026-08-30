@@ -9787,6 +9787,20 @@ class JIT {
                     $sxeDimClassLc = null !== $sxeDimClass
                         ? strtolower(ltrim((string) $sxeDimClass, '\\'))
                         : '';
+                    // FETCH_DIM_W on a host SXE tree: do not hashtable-write a TYPE_VALUE
+                    // box (SIGSEGV). Host-fold at ASSIGN via tryOffsetSet (#35810).
+                    if ($forWrite && JIT\UserScriptAotEnv::isActive()) {
+                        $sxeWrite = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryPrepareDimWrite(
+                            $this->context,
+                            $value,
+                            $dim
+                        );
+                        if (null !== $sxeWrite) {
+                            $this->context->setVariableOp($resultOp, $sxeWrite);
+
+                            break;
+                        }
+                    }
                     if (
                         !$forWrite
                         && JIT\UserScriptAotEnv::isActive()
@@ -21438,6 +21452,21 @@ class JIT {
             return;
         }
         if ($result->isArrayAccessWritableOffset) {
+            if (
+                JIT\UserScriptAotEnv::isActive()
+                && null !== $result->writableArrayAccessReceiver
+                && null !== $result->writableArrayAccessKey
+            ) {
+                $sxeSet = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryOffsetSet(
+                    $this->context,
+                    $result->writableArrayAccessReceiver,
+                    $result->writableArrayAccessKey,
+                    $value
+                );
+                if (null !== $sxeSet) {
+                    return;
+                }
+            }
             JIT\ArrayAccessHelper::assignWritableOffset($this->context, $result, $value);
 
             return;

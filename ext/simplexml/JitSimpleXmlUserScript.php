@@ -657,6 +657,84 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * FETCH_DIM_W lvalue for a compile-time SXE tree (#35810 leftover of #26863).
+     *
+     * Thin AOT boxes SimpleXMLElement as TYPE_VALUE; hashtable dim-write SIGSEGVs.
+     * Mark an ArrayAccess-writable slot so ASSIGN host-folds via {@see tryOffsetSet}.
+     */
+    public static function tryPrepareDimWrite(
+        Context $context,
+        JITVariable $container,
+        JITVariable $dim
+    ): ?JITVariable {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $token = $container->compileTimeString;
+        if (null !== $token && isset(self::$xpathListsByToken[$token])) {
+            return null;
+        }
+        if (JITVariable::TYPE_HASHTABLE === $container->type
+            || 0 !== ($container->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            return null;
+        }
+        if (null === self::lookup($container)) {
+            return null;
+        }
+        $slot = JitValueBox::alloc($context);
+        $var = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
+        $var->writableArrayAccessReceiver = $container;
+        $var->writableArrayAccessKey = $dim;
+        $var->isArrayAccessWritableOffset = true;
+
+        return $var;
+    }
+
+    /**
+     * SimpleXMLElement::offsetSet — host sxe_prop_dim_write (#35810 / php-src sxe.c).
+     *
+     * Mutates the compile-time tree so a later asXML()/offsetGet fold sees the write.
+     *
+     * @param JITVariable $args receiver, dim, value
+     */
+    public static function tryOffsetSet(Context $context, JITVariable ...$args): ?Value
+    {
+        if (\count($args) < 3 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $dim = self::compileTimeDim($context, $args[1]);
+        if (null === $dim) {
+            throw new \LogicException(
+                'SimpleXMLElement::offsetSet() user-script AOT requires a compile-time offset (#35810)'
+            );
+        }
+        if ('' === $dim) {
+            // php-src sxe_prop_dim_write — empty attribute name.
+            throw new \ValueError('Cannot create attribute with an empty name');
+        }
+        $value = self::compileTimeOffsetSetValue($context, $args[2]);
+        if (null === $value) {
+            throw new \LogicException(
+                'SimpleXMLElement::offsetSet() user-script AOT requires a compile-time value (#35810)'
+            );
+        }
+        try {
+            $tree[$dim] = $value;
+        } catch (\ValueError $e) {
+            throw $e;
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::nullValue($context);
+    }
+
+    /**
      * isset($sxe[$dim]) — host has_dimension (php-src sxe_object_has_dimension; #34555).
      *
      * Thin AOT boxes SXE as TYPE_VALUE so ArrayAccess isset is skipped and HT probe
@@ -1778,6 +1856,28 @@ final class JitSimpleXmlUserScript
         }
 
         return JitStringBuiltinArg::compileTimeLiteral($dim) ?? $dim->compileTimeString;
+    }
+
+    private static function compileTimeOffsetSetValue(Context $context, JITVariable $value): ?string
+    {
+        if (JITVariable::TYPE_NULL === $value->type || $value->isNullConstant) {
+            return '';
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($value) ?? $value->compileTimeString;
+        if (null !== $lit) {
+            return $lit;
+        }
+        if (null !== ($value->compileTimeLong ?? null)) {
+            return (string) (int) $value->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $value->type && JITVariable::KIND_VALUE === $value->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($value->value->value)) {
+                return (string) (int) $lib->LLVMConstIntGetSExtValue($value->value->value);
+            }
+        }
+
+        return null;
     }
 
     private static function compileTimeBool(Context $context, JITVariable $var): ?bool
