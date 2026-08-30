@@ -1177,7 +1177,8 @@ final class VmXmlReader
             $current->depth + 1,
             false,
             $nameParts,
-            $current->nsScope
+            $current->nsScope,
+            $current->xmlLang
         );
         $event->hasValue = true;
 
@@ -1197,6 +1198,8 @@ final class VmXmlReader
         $len = \strlen($trimmed);
         /** @var list<array<string, string>> */
         $nsStack = [];
+        /** @var list<string> */
+        $langStack = [];
         while ($pos < $len) {
             $pos = self::skipWhitespace($trimmed, $pos);
             if ($pos >= $len) {
@@ -1217,7 +1220,7 @@ final class VmXmlReader
                     continue;
                 }
                 if (str_starts_with(substr($trimmed, $pos), '<![CDATA[')) {
-                    self::tokenizeCdata($trimmed, $pos, $events, 0, $nsStack);
+                    self::tokenizeCdata($trimmed, $pos, $events, 0, $nsStack, $langStack);
 
                     continue;
                 }
@@ -1231,7 +1234,7 @@ final class VmXmlReader
                 throw new \LogicException('XMLReader: unexpected end tag');
             }
 
-            self::tokenizeElement($trimmed, $pos, $events, 0, $nsStack);
+            self::tokenizeElement($trimmed, $pos, $events, 0, $nsStack, $langStack);
         }
 
         return $events;
@@ -1240,8 +1243,9 @@ final class VmXmlReader
     /**
      * @param list<XmlReaderEvent>        $events
      * @param list<array<string, string>> $nsStack
+     * @param list<string>               $langStack
      */
-    private static function tokenizeElement(string $data, int &$pos, array &$events, int $depth, array &$nsStack): void
+    private static function tokenizeElement(string $data, int &$pos, array &$events, int $depth, array &$nsStack, array &$langStack): void
     {
         if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?(\/?)>/s', $data, $open, 0, $pos)) {
             throw new \LogicException('XMLReader: malformed element');
@@ -1258,6 +1262,10 @@ final class VmXmlReader
         $nameParts['uri'] = '' !== $nameParts['prefix']
             ? ($scope[$nameParts['prefix']] ?? '')
             : ($scope[''] ?? '');
+        $parentLang = [] !== $langStack ? $langStack[\count($langStack) - 1] : '';
+        $declaredLang = self::extractXmlLangFromAttrs($attrs);
+        $effectiveLang = null !== $declaredLang ? $declaredLang : $parentLang;
+        $langStack[] = $effectiveLang;
         $events[] = self::makeEvent(
             XmlReaderConstants::ELEMENT,
             $rawName,
@@ -1266,12 +1274,14 @@ final class VmXmlReader
             $depth,
             $selfClose,
             $nameParts,
-            $scope
+            $scope,
+            $effectiveLang
         );
 
         $contentStart = $pos + \strlen($open[0]);
         if ($selfClose) {
             array_pop($nsStack);
+            array_pop($langStack);
             $pos = $contentStart;
 
             return;
@@ -1305,7 +1315,8 @@ final class VmXmlReader
                         $depth + 1,
                         false,
                         ['local' => '#text', 'prefix' => '', 'uri' => ''],
-                        $scope
+                        $scope,
+                        $effectiveLang
                     );
                 }
                 $scan = $textEnd;
@@ -1314,7 +1325,7 @@ final class VmXmlReader
             }
             if ($scan + 1 < $innerEnd && '!' === $data[$scan + 1]) {
                 if (str_starts_with(substr($data, $scan), '<![CDATA[')) {
-                    self::tokenizeCdata($data, $scan, $events, $depth + 1, $nsStack);
+                    self::tokenizeCdata($data, $scan, $events, $depth + 1, $nsStack, $langStack);
 
                     continue;
                 }
@@ -1324,7 +1335,7 @@ final class VmXmlReader
                     continue;
                 }
             }
-            self::tokenizeElement($data, $scan, $events, $depth + 1, $nsStack);
+            self::tokenizeElement($data, $scan, $events, $depth + 1, $nsStack, $langStack);
         }
 
         $events[] = self::makeEvent(
@@ -1335,22 +1346,26 @@ final class VmXmlReader
             $depth,
             false,
             $nameParts,
-            $scope
+            $scope,
+            $effectiveLang
         );
         array_pop($nsStack);
+        array_pop($langStack);
         $pos = $end;
     }
 
     /**
      * @param list<XmlReaderEvent>        $events
      * @param list<array<string, string>> $nsStack
+     * @param list<string>               $langStack
      */
-    private static function tokenizeCdata(string $data, int &$pos, array &$events, int $depth, array &$nsStack): void
+    private static function tokenizeCdata(string $data, int &$pos, array &$events, int $depth, array &$nsStack, array &$langStack): void
     {
         $parsed = VmXml::parseCdataSectionAt($data, $pos);
         if (null === $parsed) {
             throw new \LogicException('XMLReader: malformed CDATA');
         }
+        $xmlLang = [] !== $langStack ? $langStack[\count($langStack) - 1] : '';
         $events[] = self::makeEvent(
             XmlReaderConstants::CDATA,
             '#cdata-section',
@@ -1359,7 +1374,8 @@ final class VmXmlReader
             $depth,
             false,
             ['local' => '#cdata-section', 'prefix' => '', 'uri' => ''],
-            self::mergeNamespaceScope($nsStack)
+            self::mergeNamespaceScope($nsStack),
+            $xmlLang
         );
         $pos = $parsed['end'];
     }
@@ -1404,7 +1420,8 @@ final class VmXmlReader
         int $depth,
         bool $isEmptyElement,
         array $nameParts,
-        array $nsScope = []
+        array $nsScope = [],
+        string $xmlLang = ''
     ): XmlReaderEvent {
         $hasValue = '' !== $value;
         $attrCount = \count($attrs);
@@ -1422,8 +1439,29 @@ final class VmXmlReader
             $nameParts['local'],
             $nameParts['prefix'],
             $nameParts['uri'],
-            $nsScope
+            $nsScope,
+            $xmlLang
         );
+    }
+
+    /**
+     * xml:lang on an element start tag (php-src xmlTextReaderConstXmlLang / libxml2).
+     *
+     * @param array<string, string> $attrs
+     */
+    private static function extractXmlLangFromAttrs(array $attrs): ?string
+    {
+        if (array_key_exists('xml:lang', $attrs)) {
+            return $attrs['xml:lang'];
+        }
+        foreach ($attrs as $name => $value) {
+            $parts = self::splitQName($name);
+            if ('lang' === $parts['local'] && 'xml' === $parts['prefix']) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     /**

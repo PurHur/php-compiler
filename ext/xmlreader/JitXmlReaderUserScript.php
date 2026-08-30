@@ -2283,8 +2283,8 @@ final class JitXmlReaderUserScript
             'hasAttributes' => $ev->hasAttributes,
             'hasValue' => $ev->hasValue,
             'isEmptyElement' => $ev->isEmptyElement,
-            // xmlLang / isDefault / baseURI: string-source folds have no xml:lang / DTD / URI.
-            'xmlLang' => '',
+            // isDefault / baseURI: string-source folds have no DTD default / URI.
+            'xmlLang' => $ev->xmlLang,
             'isDefault' => false,
             'baseURI' => '',
         ];
@@ -2376,7 +2376,7 @@ final class JitXmlReaderUserScript
             // Attribute nodes always report hasValue=true (php-src / libxml), even for "".
             'hasValue' => true,
             'isEmptyElement' => false,
-            'xmlLang' => '',
+            'xmlLang' => $ev['xmlLang'],
             'isDefault' => false,
             'baseURI' => $ev['baseURI'],
         ];

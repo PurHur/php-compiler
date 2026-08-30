@@ -27,6 +27,8 @@ final class XmlReaderEvent
          * @var array<string, string>
          */
         public array $nsScope = [],
+        /** xml:lang on this node or inherited from ancestors (php-src xmlTextReaderConstXmlLang). */
+        public string $xmlLang = '',
     ) {
     }
 }
