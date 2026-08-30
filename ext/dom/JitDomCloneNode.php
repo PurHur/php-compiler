@@ -36,6 +36,9 @@ final class JitDomCloneNode
     /** Tag of the last materialized clone — JIT copies onto the result Variable. */
     public static ?string $lastResultTagName = null;
 
+    /** Deep-clone inner markup for fragment lastChildren / importNode (#35997). */
+    public static ?string $lastResultInnerXml = null;
+
     /**
      * Markup of the most recent replaceChild/removeChild detached child (#35421).
      * documentElement re-fetch clears lastFetched* before the mutation, and the
@@ -53,6 +56,7 @@ final class JitDomCloneNode
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         self::$lastResultTagName = null;
+        self::$lastResultInnerXml = null;
         if (\count($args) < 1) {
             throw new \LogicException('DOMNode::cloneNode() expects a receiver');
         }
@@ -356,6 +360,7 @@ final class JitDomCloneNode
     private static function materialize(Context $context, array $spec): Value
     {
         self::$lastResultTagName = $spec['tag'];
+        self::$lastResultInnerXml = $spec['inner'] ?? '';
         if ('comment' === $spec['kind']) {
             return JitDomCreateComment::materialize($context, $spec['text']);
         }

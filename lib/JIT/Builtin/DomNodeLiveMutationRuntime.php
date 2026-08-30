@@ -13,6 +13,7 @@ use PHPCompiler\ext\dom\JitDomAppendChildUserScript;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateElementAttrs;
 use PHPCompiler\ext\dom\JitDomCreateComment;
+use PHPCompiler\ext\dom\JitDomCreateCDATASection;
 use PHPCompiler\ext\dom\JitDomCreateDocumentFragment;
 use PHPCompiler\ext\dom\JitDomCreateProcessingInstruction;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
@@ -334,28 +335,47 @@ final class DomNodeLiveMutationRuntime
                     DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $arg);
                 }
                 self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
-                JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren(
-                    $context,
-                    $parentObj
-                );
-                JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
+                $fragmentRecvPre = JitDomCreateDocumentFragment::TAG_KIND
+                    === ($receiver->compileTimeDomTagName ?? null);
+                if (!$fragmentRecvPre) {
+                    JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren(
+                        $context,
+                        $parentObj
+                    );
+                    JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
+                }
                 $moved = 1 === \count($extraArgs)
                     && self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0]);
                 $fragmentRecv = JitDomCreateDocumentFragment::TAG_KIND
-                        === ($receiver->compileTimeDomTagName ?? null)
-                    || JitDomCreateDocumentFragment::$lastMaterialized;
-                // Always record fragment children for importNode — even when InnerXml
-                // was refreshed via move-to-end (#35871 / #35881).
+                    === ($receiver->compileTimeDomTagName ?? null);
+                // Record only direct appendChild onto the fragment stand-in (#35881).
+                // $lastMaterialized must not widen this — element/clone inner appends
+                // while a fragment is open polluted lastChildren (#35997).
                 if ($fragmentRecv) {
                     foreach ($extraArgs as $arg) {
                         JitDomCreateDocumentFragment::rememberAppendedChild($arg);
                     }
-                    $receiver->compileTimeDomInnerXml = self::fragmentInnerXmlFromLastChildren();
+                    $fragInner = self::fragmentInnerXmlFromLastChildren();
+                    $receiver->compileTimeDomInnerXml = $fragInner;
+                    // saveXML($fragment) reads INNER_XML, not live child walk (#35997).
+                    JitDomCreateElement::storeUserScriptInnerXml($context, $parentObj, $fragInner);
                 } elseif (!$moved) {
                     // Rebuild already wrote the INNER_XML slot from live children. A follow-up
                     // syncUserScriptInnerXmlFromArgs still concatenates onto compile-time
                     // Variable metadata and doubles fragment markup (#35881 leftover of #35871).
                     self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind, true);
+                }
+                if (
+                    !$fragmentRecv
+                    && JitDomCreateDocumentFragment::$lastMaterialized
+                    && JitDomCreateDocumentFragment::TAG_KIND
+                        !== ($receiver->compileTimeDomTagName ?? null)
+                ) {
+                    // Element already listed in the open fragment gained inner markup (#35997).
+                    JitDomCreateDocumentFragment::refreshRecordedElementInner(
+                        $receiver,
+                        $receiver->compileTimeDomInnerXml ?? ''
+                    );
                 }
                 $context->builder->branch($bbAppendDone);
 
@@ -1119,6 +1139,22 @@ final class DomNodeLiveMutationRuntime
             ?? JitDomImportNode::$lastMaterializedTagName
             ?? JitDomCloneNode::$lastResultTagName
             ?? null;
+        if ('#text' === $tag || '#cdata-section' === $tag) {
+            $text = self::compileTimeChildTextData($arg);
+            if (null === $text) {
+                return null;
+            }
+
+            return htmlspecialchars($text, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        }
+        if ('#comment' === $tag) {
+            $text = self::compileTimeChildTextData($arg);
+            if (null === $text) {
+                return null;
+            }
+
+            return '<!--'.$text.'-->';
+        }
         if (null !== $tag && '' !== $tag) {
             $inner = $arg->compileTimeDomInnerXml ?? null;
             if (null === $inner || '' === $inner) {
@@ -1164,11 +1200,14 @@ final class DomNodeLiveMutationRuntime
     private static function compileTimeChildTextData(Variable $arg): ?string
     {
         $tag = $arg->compileTimeDomTagName ?? null;
-        if (null !== $tag && '' !== $tag) {
+        if (null !== $tag && '' !== $tag && '#text' !== $tag && '#cdata-section' !== $tag) {
             return null;
         }
 
-        return $arg->compileTimeDomTextData;
+        return $arg->compileTimeDomTextData
+            ?? JitDomCreateTextNode::$lastMaterializedData
+            ?? JitDomCreateCDATASection::$lastMaterializedData
+            ?? null;
     }
 
 
@@ -1265,9 +1304,15 @@ final class DomNodeLiveMutationRuntime
         $delta = implode('', $pieces);
         // Keep Variable metadata so createElement trees can cloneNode without loadXML (#35361).
         $priorMeta = $receiver->compileTimeDomInnerXml ?? '';
-        $receiver->compileTimeDomInnerXml = 'prepend' === $kind
-            ? $delta.$priorMeta
-            : $priorMeta.$delta;
+        if ('prepend' === $kind) {
+            $receiver->compileTimeDomInnerXml = str_starts_with($priorMeta, $delta)
+                ? $priorMeta
+                : $delta.$priorMeta;
+        } elseif ('' !== $delta && '' !== $priorMeta && str_ends_with($priorMeta, $delta)) {
+            $receiver->compileTimeDomInnerXml = $priorMeta;
+        } else {
+            $receiver->compileTimeDomInnerXml = $priorMeta.$delta;
+        }
         // Nested firstChild/lastChild + createTextNode: slot often lacks loadXML-seeded
         // inner ("1"), so runtime load+concat yields only the delta (#33000).
         if (

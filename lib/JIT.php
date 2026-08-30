@@ -17512,14 +17512,19 @@ class JIT {
             if ($parent instanceof Variable) {
                 $priorInner = $parent->compileTimeDomInnerXml ?? '';
                 $isFrag = \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::TAG_KIND
-                    === ($parent->compileTimeDomTagName ?? null)
-                    || \PHPCompiler\ext\dom\JitDomCreateDocumentFragment::$lastMaterialized;
+                    === ($parent->compileTimeDomTagName ?? null);
                 if ($isFrag) {
                     // LiveMutation records lastChildren + sets InnerXml (#35881). Do not
                     // concat here — that doubled fragment markup for importNode.
-                } elseif ('' === $priorInner) {
+                } elseif (
+                    '' === $priorInner
+                    && !($toCall instanceof JIT\Call\DomNodeAppendChild
+                        || $toCall instanceof JIT\Call\DomDocumentAppendChild)
+                ) {
                     $this->appendCompileTimeDomInnerXmlChild($parent, $child);
                 }
+                // appendChild on elements/documents: DomNodeLiveMutationRuntime::
+                // syncUserScriptInnerXmlFromArgs owns compile-time inner (#35997).
             }
         }
         // Parent compileTimeDomInnerXml is stamped by DomNodeLiveMutationRuntime::
@@ -17822,7 +17827,12 @@ class JIT {
         if (!$this->context->hasVariableOp($result)) {
             return;
         }
-        $this->context->getVariableFromOp($result)->compileTimeDomTagName = $tag;
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeDomTagName = $tag;
+        $inner = \PHPCompiler\ext\dom\JitDomCloneNode::$lastResultInnerXml;
+        if (null !== $inner && '' !== $inner) {
+            $var->compileTimeDomInnerXml = $inner;
+        }
     }
 
     /** Remember createTextNode('lit') data on the result Variable for splitText (#32362). */
