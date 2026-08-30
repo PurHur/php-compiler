@@ -410,13 +410,20 @@ final class JitDomAttributeNodeNS
             return self::boxNullResult($context);
         }
         $valueLit = DomUserScriptAttributeCacheLlvm::literalValue($ns, $local) ?? '';
-        $prev = DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr, $valueLit);
-        // Live attributes NamedNodeMap (#33128 / #33143): replace pin when
-        // storeLiteral returns a prior Attr (same-name setAttributeNode).
+        // php-src returns the Attr already on *this* element — not orphan cache (#20676).
+        $replacedOnElement = JitDomNamedNodeMap::findPinnedAttrOnElement(
+            $context,
+            $element,
+            $ns,
+            $local
+        );
+        DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr, $valueLit);
+        // Live attributes NamedNodeMap (#33128 / #33143): replace pin when the element
+        // already had an Attr with this (namespace, localName).
         $objPtr = $context->getTypeFromString('__object__*');
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
-            $prev,
+            $replacedOnElement,
             $objPtr->constNull()
         );
         $tag = (string) (self::$boxSeq++);
@@ -433,9 +440,9 @@ final class JitDomAttributeNodeNS
 
         $context->builder->positionAtEnd($objBlock);
         // New Attr object replaces prior pin in-place via remove+append (#33143).
-        JitDomNamedNodeMap::removeAttrPin($context, $element, $prev);
+        JitDomNamedNodeMap::removeAttrPin($context, $element, $replacedOnElement);
         JitDomNamedNodeMap::appendAttrPin($context, $element, $attr);
-        $context->builder->store(self::boxObjectResult($context, $prev), $resultSlot);
+        $context->builder->store(self::boxObjectResult($context, $replacedOnElement), $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
