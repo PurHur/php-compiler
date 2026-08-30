@@ -9472,6 +9472,8 @@ class JIT {
                                 && null === $srcVar->valueBoxAliasPtr
                                 && !$srcVar->borrowedValueEntry
                                 && null === $srcVar->writableHt
+                                && null === $srcVar->objectPropertySlot
+                                && null === $srcVar->staticPropertyGlobal
                             ) {
                                 $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
                                     $this->context,
@@ -9493,18 +9495,23 @@ class JIT {
                     JIT\TypedPropertyUninitGuard::emitBeforeByRef($this->context, $srcVar);
                     JIT\ReadonlyClassGuard::emitBeforePropertyByRef($this->context, $srcVar, $this);
                     $this->aliasAssignRefNamedDestToDimEntry($srcVar);
+                    // Property / static lvalues keep objectPropertySlot / staticPropertyGlobal —
+                    // do not also attach a local valueBoxAliasPtr or `$r = N` may miss propertyStore
+                    // after a forced named-storage assign (#35898).
                     if (
                         Variable::TYPE_VALUE === $srcVar->type
                         && null === $srcVar->valueBoxAliasPtr
                         && !$srcVar->borrowedValueEntry
                         && null === $srcVar->writableHt
+                        && null === $srcVar->objectPropertySlot
+                        && null === $srcVar->staticPropertyGlobal
                     ) {
                         $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
                             $this->context,
                             $srcVar
                         );
                     }
-                    // `$r = &$o->p` / `$r = &$a[0]`: named dest aliases the lvalue (#34649).
+                    // `$r = &$o->p` / `$r = &$a[0]`: named dest aliases the lvalue (#34649 / #35898).
                     $this->markAssignRefLvalueAlias($srcVar);
                     $this->context->bindVariableByName($destName, $srcVar);
                     $this->context->setVariableOp($destOp, $srcVar);
@@ -20241,6 +20248,8 @@ class JIT {
                     null !== $bound->valueBoxAliasPtr
                     || $bound->borrowedValueEntry
                     || null !== $bound->foreachByRefPackedArm
+                    || null !== $bound->objectPropertySlot
+                    || $bound->assignRefLvalueAlias
                 ) {
                     $this->context->scope->variables[$resultOp] = $bound;
 
@@ -21175,6 +21184,8 @@ class JIT {
         // Only reseat forced coalesce/ternary merges. `$obj->prop = $rhs` is also TYPE_VALUE
         // with a live slot (php-cfg PROPERTY_FETCH + ASSIGN) — stripping it made AOT ignore
         // untyped/string instance writes (leftover of #35863 / #35874).
+        // Intentional `$r = &$o->p` aliases use needsNamedStorageAssign (force=true); reseating
+        // would drop objectPropertySlot so `$r = N` writes a local box (#35898 / peer #34649).
         if (
             $force
             && null === $value->objectPropertySlot
@@ -21187,6 +21198,7 @@ class JIT {
                 && Variable::TYPE_VALUE === $mergeDest->type
                 && null === $mergeDest->staticPropertyGlobal
                 && !$mergeDest->functionStaticGlobal
+                && !$mergeDest->assignRefLvalueAlias
             ) {
                 $this->reseatCoalesceResultAfterPropertyArms($resultOp);
             }
