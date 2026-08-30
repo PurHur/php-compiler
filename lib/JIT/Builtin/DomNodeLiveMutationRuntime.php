@@ -10,6 +10,7 @@ use PHPCompiler\ext\dom\DomExceptionConstants;
 use PHPCompiler\ext\dom\DomParseSimpleXmlJitHelper;
 use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomAppendChildUserScript;
+use PHPCompiler\ext\dom\JitDomCreateDocumentFragment;
 use PHPCompiler\ext\dom\JitDomCreateElement;
 use PHPCompiler\ext\dom\JitDomCreateElementAttrs;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
@@ -305,6 +306,13 @@ final class DomNodeLiveMutationRuntime
             // Document ParentNode::append uses invokeDocumentAppend; Element uses LiveSlots.
             if ('append' === $kind && self::canUseObjectMutationBridge($extraArgs)) {
                 $parentObj = self::receiverObject($context, $receiver);
+                // Remember once before doc/el IR arms — both arms are codegen'd (#35881).
+                $fragRecv = self::isDocumentFragmentReceiver($receiver);
+                if ($fragRecv) {
+                    foreach ($extraArgs as $arg) {
+                        JitDomCreateDocumentFragment::rememberAppendedChild($arg);
+                    }
+                }
                 $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parentObj, 'dom_append_recv');
                 $bbDocAppend = BasicBlockHelper::append($context, 'dom_append_doc');
                 $bbElAppend = BasicBlockHelper::append($context, 'dom_append_el');
@@ -338,7 +346,8 @@ final class DomNodeLiveMutationRuntime
                 JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
                 $moved = 1 === \count($extraArgs)
                     && self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0]);
-                if (!$moved) {
+                // Fragment: skip concat sync — JIT.php stamps Variable InnerXml (#35881).
+                if (!$moved && !$fragRecv) {
                     self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind, true);
                 }
                 $context->builder->branch($bbAppendDone);
@@ -353,6 +362,10 @@ final class DomNodeLiveMutationRuntime
             // lists stale (#32838).
             if ('prepend' === $kind && self::canUseObjectMutationBridge($extraArgs)) {
                 $parentObj = self::receiverObject($context, $receiver);
+                $fragRecv = self::isDocumentFragmentReceiver($receiver);
+                if ($fragRecv) {
+                    JitDomCreateDocumentFragment::rememberPrependedChildren($extraArgs);
+                }
                 $isDoc = JitDomParentChildLinkLayout::isDocumentObject($context, $parentObj, 'dom_prepend_recv');
                 $bbDocPrepend = BasicBlockHelper::append($context, 'dom_prepend_doc');
                 $bbElPrepend = BasicBlockHelper::append($context, 'dom_prepend_el');
@@ -416,7 +429,9 @@ final class DomNodeLiveMutationRuntime
                     $parentObj
                 );
                 JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
-                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind, true);
+                if (!$fragRecv) {
+                    self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind, true);
+                }
                 $context->builder->branch($bbPrependDone);
 
                 $context->builder->positionAtEnd($bbPrependDone);
@@ -468,7 +483,8 @@ final class DomNodeLiveMutationRuntime
             self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
             // saveXML($node) must emit element children, not only textContent (#26765).
             // Concat onto loadXML-seeded markup so appendChild keeps prior children (#26757).
-            self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
+            // DocumentFragment: skip concat — rebuild + JIT.php stamp (#35881).
+            self::syncOrRememberFragmentInnerXml($context, $receiver, $extraArgs, $kind);
             // Held `$node->childNodes` must observe length after append/prepend (#27044).
             self::bumpChildNodesLengthSlot($context, $receiver, $extraArgCount, $kind);
 
@@ -1909,8 +1925,15 @@ final class DomNodeLiveMutationRuntime
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
         $moved = 1 === \count($extraArgs)
             && self::trySyncUserScriptInnerXmlMoveToEnd($context, $receiver, $extraArgs[0]);
-        if (!$moved) {
-            self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, 'append', true);
+        // Fragment remember happens once before doc/el IR arms (#35881).
+        if (!$moved && !self::isDocumentFragmentReceiver($receiver)) {
+            self::syncUserScriptInnerXmlFromArgs(
+                $context,
+                $receiver,
+                $extraArgs,
+                'append',
+                true
+            );
         }
     }
 
@@ -1968,6 +1991,55 @@ final class DomNodeLiveMutationRuntime
         self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlFromElementChildren($context, $parentObj);
         JitDomAppendChildLiveSlots::rebuildUserScriptInnerXmlUpward($context, $parentObj);
-        self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, 'prepend', true);
+        // Fragment remember happens once before doc/el IR arms (#35881).
+        if (!self::isDocumentFragmentReceiver($receiver)) {
+            self::syncUserScriptInnerXmlFromArgs(
+                $context,
+                $receiver,
+                $extraArgs,
+                'prepend',
+                true
+            );
+        }
+    }
+
+    /**
+     * DocumentFragment receivers: remember children for importNode and skip concat sync (#35881).
+     *
+     * Used by the non-branched NestedJIT append/prepend path only. LiveSlots doc/el
+     * arms must not call this — both arms are codegen'd and would double-remember.
+     *
+     * @param list<Variable> $extraArgs document order
+     */
+    private static function syncOrRememberFragmentInnerXml(
+        Context $context,
+        Variable $receiver,
+        array $extraArgs,
+        string $kind,
+        bool $skipInnerXmlSlotMerge = false
+    ): void {
+        if (self::isDocumentFragmentReceiver($receiver)) {
+            if ('prepend' === $kind) {
+                JitDomCreateDocumentFragment::rememberPrependedChildren($extraArgs);
+            } else {
+                foreach ($extraArgs as $arg) {
+                    JitDomCreateDocumentFragment::rememberAppendedChild($arg);
+                }
+            }
+
+            return;
+        }
+        self::syncUserScriptInnerXmlFromArgs(
+            $context,
+            $receiver,
+            $extraArgs,
+            $kind,
+            $skipInnerXmlSlotMerge
+        );
+    }
+
+    private static function isDocumentFragmentReceiver(Variable $receiver): bool
+    {
+        return '#document-fragment' === ($receiver->compileTimeDomTagName ?? null);
     }
 }

@@ -346,6 +346,18 @@ final class JitDomSaveXMLUserScript
         if (null !== $cloneTag && null !== $xmlLit
             && $cloneTag !== DomParseSimpleXmlJitHelper::rootTagArgv($xmlLit)
         ) {
+            // Fragment / CharacterData stand-ins must not take serializeElementNode —
+            // unset tagName SIGSEGVs, and importNode stamps #document-fragment while
+            // destination loadXML leaves xmlLit as another root (#35881 / #32334).
+            if (str_starts_with($cloneTag, '#')) {
+                return self::serializeUserScriptNode(
+                    $context,
+                    $objectType,
+                    $node,
+                    $elementClassId
+                );
+            }
+
             return self::serializeElementNode(
                 $context,
                 $objectType,

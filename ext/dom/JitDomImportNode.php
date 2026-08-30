@@ -205,6 +205,12 @@ final class JitDomImportNode
             return self::boxObjectResult($context, $object);
         }
 
+        // DocumentFragment: createDocumentFragment stand-in + remembered children (#35881).
+        // Element materialize with tag #document-fragment left nodeType=1 and wrapped xml.
+        if (self::isFragmentSource($sourceNode)) {
+            return self::materializeImportedFragment($context, $documentVar, $sourceNode, $deep);
+        }
+
         $attrSpec = self::resolveSourceAttrSpec($sourceNode);
         if (null !== $attrSpec) {
             return self::materializeImportedAttr($context, $attrSpec);
@@ -366,6 +372,132 @@ final class JitDomImportNode
         }
 
         return self::boxObjectResult($context, $element);
+    }
+
+    /**
+     * Detached createDocumentFragment / fragment Variable for importNode (#35881).
+     */
+    private static function isFragmentSource(JITVariable $sourceNode): bool
+    {
+        if ('#document-fragment' === ($sourceNode->compileTimeDomTagName ?? null)) {
+            return true;
+        }
+
+        // ARG_SEND may drop the tag; last createDocumentFragment + no element/leaf stamps.
+        return JitDomCreateDocumentFragment::$lastMaterialized
+            && null === $sourceNode->compileTimeDomTagName
+            && null === $sourceNode->compileTimeDomTextData
+            && null === $sourceNode->compileTimeDomChildIndex
+            && null === $sourceNode->compileTimeDomNodePath
+            && ([] !== JitDomCreateDocumentFragment::$lastChildren
+                || null !== $sourceNode->compileTimeDomInnerXml);
+    }
+
+    /**
+     * Deep importNode(DocumentFragment): xmlDocCopyNode of a fragment copies children (#35881).
+     *
+     * Prefer compile-time InnerXml (stamped by JIT.php after LiveMutation skip) via
+     * {@see JitDomDocumentElement::syncChildrenFromXmlPublic}. Fall back to
+     * {@see JitDomCreateDocumentFragment::$lastChildren} when InnerXml is empty.
+     */
+    private static function materializeImportedFragment(
+        Context $context,
+        JITVariable $documentVar,
+        JITVariable $sourceNode,
+        bool $deep
+    ): Value {
+        $snapChildren = $deep ? JitDomCreateDocumentFragment::$lastChildren : [];
+        $inner = '';
+        if ($deep) {
+            $inner = $sourceNode->compileTimeDomInnerXml ?? '';
+            if ('' === $inner && [] !== $snapChildren) {
+                $inner = JitDomCreateDocumentFragment::innerXmlFromChildren($snapChildren);
+            }
+        }
+
+        // Snapshot before invoke() clears $lastChildren.
+        $frag = JitDomCreateDocumentFragment::invoke($context, $documentVar);
+        JitDomCreateDocumentFragment::$lastChildren = $snapChildren;
+        JitDomCreateDocumentFragment::$lastMaterialized = true;
+
+        self::$lastMaterializedTagName = '#document-fragment';
+        self::$lastMaterializedInnerXml = $inner;
+
+        if ($deep && [] !== $snapChildren) {
+            self::appendFragmentChildrenFromSpecs($context, $frag, $snapChildren);
+            $built = JitDomCreateDocumentFragment::innerXmlFromChildren($snapChildren);
+            self::$lastMaterializedInnerXml = $built;
+            // textContent/nodeValue first — storeTextContentSlots also writes INNER_XML
+            // as escaped text only, which would clobber fragment child markup (#35881).
+            JitDomCreateElement::storeTextContentSlots(
+                $context,
+                $frag,
+                DomParseSimpleXmlJitHelper::textContentFromInnerXmlArgv($built)
+            );
+            JitDomCreateElement::storeUserScriptInnerXml($context, $frag, $built);
+        } elseif ($deep && '' !== $inner) {
+            JitDomDocumentElement::syncChildrenFromXmlPublic(
+                $context,
+                $frag,
+                '<__phpc_frag>'.$inner.'</__phpc_frag>'
+            );
+            JitDomCreateElement::storeTextContentSlots(
+                $context,
+                $frag,
+                DomParseSimpleXmlJitHelper::textContentFromInnerXmlArgv($inner)
+            );
+            JitDomCreateElement::storeUserScriptInnerXml($context, $frag, $inner);
+        }
+
+        return self::boxObjectResult($context, $frag);
+    }
+
+    /**
+     * @param list<array{kind: string, tag?: string, data?: string, inner?: string, content?: string}> $children
+     */
+    private static function appendFragmentChildrenFromSpecs(
+        Context $context,
+        Value $frag,
+        array $children
+    ): void {
+        foreach ($children as $spec) {
+            $kind = $spec['kind'] ?? '';
+            if ('text' === $kind) {
+                $child = JitDomCreateTextNode::materialize($context, $spec['data'] ?? '');
+            } elseif ('comment' === $kind) {
+                $child = JitDomCreateComment::materialize($context, $spec['data'] ?? '');
+            } elseif ('cdata' === $kind) {
+                $child = JitDomCreateCDATASection::materialize($context, $spec['data'] ?? '');
+            } elseif ('pi' === $kind) {
+                $child = JitDomCreateProcessingInstruction::materialize(
+                    $context,
+                    $spec['data'] ?? '',
+                    $spec['content'] ?? ''
+                );
+            } elseif ('element' === $kind) {
+                $tag = $spec['tag'] ?? $spec['data'] ?? 'div';
+                $childInner = $spec['inner'] ?? '';
+                $text = '' === $childInner
+                    ? ''
+                    : DomParseSimpleXmlJitHelper::textContentFromInnerXmlArgv($childInner);
+                $child = JitDomCreateElement::materializeElementWithTextContent(
+                    $context,
+                    $tag,
+                    $text
+                );
+                if ('' !== $childInner) {
+                    JitDomCreateElement::storeUserScriptInnerXml($context, $child, $childInner);
+                    JitDomDocumentElement::syncChildrenFromXmlPublic(
+                        $context,
+                        $child,
+                        '<'.$tag.'>'.$childInner.'</'.$tag.'>'
+                    );
+                }
+            } else {
+                continue;
+            }
+            JitDomAppendChildLiveSlots::syncNonFragment($context, $frag, $child);
+        }
     }
 
     /**
