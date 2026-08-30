@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -37,6 +38,12 @@ final class stream_last_errors extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('stream_last_errors() is VM-only in this compiler build (issue #21020)');
+        if (!$this->requireExactJitArgCount($context, $args, 'stream_last_errors', 0)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        return JitStreamErrorStore::lastErrors($context);
     }
 }

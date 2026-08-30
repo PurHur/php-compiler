@@ -3841,6 +3841,16 @@ class Object_ extends Type {
                 'include_end_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_INCLUDE_END_DATE,
             ]);
         }
+        if ('streamerrorcode' === $lcname && CompilerVersion::supportsStreamErrorApi()) {
+            if (!$this->isEnumClassId($id)) {
+                $this->enums[$lcname] = true;
+            }
+            if (!isset($this->classConstants[$id]['OpenFailed'])) {
+                $backing = new VMVariable();
+                $backing->null();
+                $this->defineEnumCaseConst($id, 'OpenFailed', $backing);
+            }
+        }
         if ('simplexmlelement' === $lcname || 'simplexmliterator' === $lcname) {
             $this->seedSimpleXmlElementAotInterfaces($id, $lcname);
         }

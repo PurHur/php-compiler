@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StatPathRuntime;
+use PHPCompiler\JIT\Builtin\StreamErrorStoreRuntime;
 use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ErrorReporter;
@@ -113,6 +115,26 @@ final class JitBuiltinWarning
             $i32->constInt(0, false)
         );
         $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+        if (CompilerVersion::supportsStreamErrorApi()) {
+            StreamErrorStoreRuntime::recordOpenFailed(
+                $context,
+                $pathStr,
+                self::literalString($context, 'No such file or directory')
+            );
+        }
+    }
+
+    private static function literalString(Context $context, string $text): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $cstr = $context->builder->pointerCast($context->constantFromString($text), $charPtr);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(\strlen($text), false),
+            $cstr
+        );
     }
 
     private static function emitLevel(Context $context, string $message, int $level): void
