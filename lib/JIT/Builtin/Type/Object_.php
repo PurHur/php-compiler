@@ -3960,7 +3960,16 @@ class Object_ extends Type {
             $this->markHasConstructor($id);
         }
         if ('sqlite3stmt' === $lcname && CompilerVersion::supportsSqlite3()) {
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::STMT_PROP_SQL, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::STMT_PROP_PARAM_COUNT, Variable::TYPE_NATIVE_LONG);
             $this->seedExternalClassConstants($id, Sqlite3Constants::STMT_CLASS_CONSTANTS);
+            $this->markHasConstructor($id);
+        }
+        if ('sqlite3result' === $lcname && CompilerVersion::supportsSqlite3()) {
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_ROW, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_HAS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_FETCHED, Variable::TYPE_NATIVE_LONG);
+            $this->markHasConstructor($id);
         }
     }
 

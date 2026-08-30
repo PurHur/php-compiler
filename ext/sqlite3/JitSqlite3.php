@@ -33,7 +33,8 @@ use PHPLLVM\Value;
  * zim_SQLite3_lastErrorCode / zim_SQLite3_lastErrorMsg (#35966) /
  * zim_SQLite3_busyTimeout (#35972) / zim_SQLite3_enableExceptions (#35975) /
  * zim_SQLite3_escapeString (#35977) / zim_SQLite3_version (#35991 leftover of #35977) /
- * zim_SQLite3_open (#36001 leftover of #35991)
+ * zim_SQLite3_open (#36001 leftover of #35991) /
+ * zim_SQLite3_prepare / zim_SQLite3_query (#36010 leftover of #36001)
  */
 final class JitSqlite3
 {
@@ -249,6 +250,125 @@ final class JitSqlite3
         );
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * SQLite3::prepare leftover of open (#36010 / #36001).
+     * php-src zim_sqlite3_prepare — return SQLite3Stmt; thin AOT stores SQL on NestedJIT props.
+     */
+    public static function prepare(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3::prepare', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        self::readObject($context, $args[0]);
+        $sqlPtr = JitStringBuiltinArg::lower(
+            $context,
+            $args[1],
+            'SQLite3::prepare',
+            1,
+            'query'
+        );
+        $sqlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        $paramCount = 0;
+        if (null !== $sqlLit) {
+            if ('' === $sqlLit) {
+                return self::boxBool($context, false);
+            }
+            $paramCount = substr_count($sqlLit, '?');
+        }
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(Sqlite3JitSupport::STMT_CLASS);
+        $stmt = $objectType->allocate($classId);
+        $objectType->markObjectConstructed($stmt);
+        $sqlVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $sqlPtr
+        );
+        $objectType->storeInstanceProperty(
+            $stmt,
+            Sqlite3JitSupport::STMT_CLASS,
+            Sqlite3JitSupport::STMT_PROP_SQL,
+            $sqlVar
+        );
+        $i64 = $context->getTypeFromString('int64');
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $stmt,
+            Sqlite3JitSupport::STMT_CLASS,
+            Sqlite3JitSupport::STMT_PROP_PARAM_COUNT,
+            $i64->constInt($paramCount, false)
+        );
+
+        return self::boxObject($context, $stmt);
+    }
+
+    /**
+     * SQLite3::query leftover of open (#36010 / #36001).
+     * php-src zim_sqlite3_query — return SQLite3Result; thin AOT copies folded PROP_ROW/HAS.
+     */
+    public static function query(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3::query', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $db = self::readObject($context, $args[0]);
+        $sqlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        JitStringBuiltinArg::lower(
+            $context,
+            $args[1],
+            'SQLite3::query',
+            1,
+            'query'
+        );
+        if (null !== $sqlLit && '' === $sqlLit) {
+            return self::boxBool($context, false);
+        }
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(Sqlite3JitSupport::RESULT_CLASS);
+        $result = $objectType->allocate($classId);
+        $objectType->markObjectConstructed($result);
+        $i64 = $context->getTypeFromString('int64');
+        $has = self::loadLong($context, $db, Sqlite3JitSupport::PROP_HAS);
+        $row = self::loadLong($context, $db, Sqlite3JitSupport::PROP_ROW);
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $result,
+            Sqlite3JitSupport::RESULT_CLASS,
+            Sqlite3JitSupport::RESULT_PROP_HAS,
+            $has
+        );
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $result,
+            Sqlite3JitSupport::RESULT_CLASS,
+            Sqlite3JitSupport::RESULT_PROP_ROW,
+            $row
+        );
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $result,
+            Sqlite3JitSupport::RESULT_CLASS,
+            Sqlite3JitSupport::RESULT_PROP_FETCHED,
+            $i64->constInt(0, false)
+        );
+
+        return self::boxObject($context, $result);
+    }
+
+    private static function boxObject(Context $context, Value $obj): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $obj
+        );
+
+        return $ptr;
     }
 
     public static function lastInsertRowID(Context $context, JITVariable ...$args): Value

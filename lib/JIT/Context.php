@@ -2296,14 +2296,22 @@ class Context {
                 $zipMethod
             );
         }
-        // SQLite3 construct/exec/querySingle/lastInsertRowID/changes/lastError*/busyTimeout/enableExceptions/escapeString/version/open — NestedJIT leftover of advertise-only AOT (#35931 / #35966 / #35972 / #35975 / #35977 / #35991 / #36001 / #20565).
+        // SQLite3 construct/exec/querySingle/lastInsertRowID/changes/lastError*/busyTimeout/enableExceptions/escapeString/version/open/prepare/query — NestedJIT leftover of advertise-only AOT (#35931 / #35966 / #35972 / #35975 / #35977 / #35991 / #36001 / #36010 / #20565).
         if (CompilerVersion::supportsSqlite3()) {
             $this->type->object->lookup('SQLite3');
-            foreach (['__construct', 'exec', 'querySingle', 'close', 'lastInsertRowID', 'changes', 'lastErrorCode', 'lastErrorMsg', 'busyTimeout', 'enableExceptions', 'escapeString', 'version', 'open'] as $sqliteMethod) {
+            foreach (['__construct', 'exec', 'querySingle', 'close', 'lastInsertRowID', 'changes', 'lastErrorCode', 'lastErrorMsg', 'busyTimeout', 'enableExceptions', 'escapeString', 'version', 'open', 'prepare', 'query'] as $sqliteMethod) {
                 $this->functionProxies['sqlite3::'.strtolower($sqliteMethod)] = new Call\Sqlite3Method(
                     $sqliteMethod
                 );
             }
+            $this->type->object->lookup('SQLite3Stmt');
+            foreach (['getSQL', 'paramCount'] as $stmtMethod) {
+                $this->functionProxies['sqlite3stmt::'.strtolower($stmtMethod)] = new Call\Sqlite3StmtMethod(
+                    $stmtMethod
+                );
+            }
+            $this->type->object->lookup('SQLite3Result');
+            $this->functionProxies['sqlite3result::fetcharray'] = new Call\Sqlite3ResultMethod('fetchArray');
         }
         $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
         $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();
