@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\simplexml\JitSimpleXmlUserScript;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
@@ -72,6 +73,15 @@ final class JitIteratorToArray
         bool $preserveKeys,
         ?string $containerUserType = null
     ): Value {
+        // Before value-box unwrap — SXE host tokens live on the operand Variable (#35852).
+        $sxeHt = JitSimpleXmlUserScript::tryFoldIteratorToArrayHashtable(
+            $context,
+            $iterator,
+            $preserveKeys
+        );
+        if (null !== $sxeHt) {
+            return $sxeHt;
+        }
         if (Variable::TYPE_NULL === $iterator->type || ($iterator->isNullConstant ?? false)) {
             JitIterableArg::emitIterableTypeErrorAndAbort(
                 $context,
@@ -217,6 +227,15 @@ final class JitIteratorToArray
             ?? (Variable::TYPE_OBJECT === $iterator->type
                 ? ($iterator->compileTimeString ?? $iterator->objectPropertyClassName)
                 : null);
+        // SimpleXMLElement Iterator host folds must not enter the runtime protocol loop (#35852).
+        $sxeHt = JitSimpleXmlUserScript::tryFoldIteratorToArrayHashtable(
+            $context,
+            $iterator,
+            $preserveKeys
+        );
+        if (null !== $sxeHt) {
+            return $sxeHt;
+        }
         if (\PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($userType)) {
             return self::materializeFromSplHt($context, $iterator, $preserveKeys);
         }
