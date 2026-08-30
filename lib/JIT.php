@@ -20238,6 +20238,7 @@ class JIT {
         );
         JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
         $this->invalidateScriptGlobalCompileTimeMetadata($globalVar);
+        $globalVar->compileTimeEnumCase = $value->compileTimeEnumCase;
         $this->syncCompileTimeString($globalVar, $value, false);
         $this->syncCompileTimeBcmathNumber($globalVar, $value, false);
         $this->syncCompileTimeDomTagName($globalVar, $value, false);
@@ -21572,6 +21573,7 @@ class JIT {
             JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
             $this->preserveClosureInvokeMetadata($resultOp, $globalTarget, $value);
             $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
+            $globalTarget->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($globalTarget, $value, false);
             $this->syncCompileTimeFloat($globalTarget, $value, false);
             $this->syncCompileTimeBcmathNumber($globalTarget, $value, false);
