@@ -34,4 +34,29 @@ final class Sqlite3JitSupport
 
     /** Non-zero when enableExceptions(true) is in effect (#35975 leftover of #35972). */
     public const PROP_EXCEPTIONS = '__sqliteEx';
+
+    public const STMT_CLASS = 'SQLite3Stmt';
+
+    public const RESULT_CLASS = 'SQLite3Result';
+
+    /** Prepared SQL text on SQLite3Stmt (#36010 leftover of #36001). */
+    public const STMT_PROP_SQL = '__sqliteSql';
+
+    /** First-column int for folded SELECT rows on SQLite3Result (#36010). */
+    public const RESULT_PROP_ROW = '__sqliteRow';
+
+    /** Row count snapshot at query() time (#36010). */
+    public const RESULT_PROP_ROW_COUNT = '__sqliteN';
+
+    /** Last-row first-column int for multi-row folded SELECT (#36010). */
+    public const RESULT_PROP_LAST_ROW = '__sqliteLast';
+
+    /** fetchArray cursor (#36010). */
+    public const RESULT_PROP_CURSOR = '__sqliteCur';
+
+    /** Non-zero after fetchArray exhausts rows (#36010). */
+    public const RESULT_PROP_DONE = '__sqliteDone';
+
+    /** Compile-time column label for ASSOC/BOTH fetchArray (#36010). */
+    public const RESULT_PROP_COL = '__sqliteCol';
 }

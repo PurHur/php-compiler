@@ -3961,6 +3961,17 @@ class Object_ extends Type {
         }
         if ('sqlite3stmt' === $lcname && CompilerVersion::supportsSqlite3()) {
             $this->seedExternalClassConstants($id, Sqlite3Constants::STMT_CLASS_CONSTANTS);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::STMT_PROP_SQL, Variable::TYPE_STRING);
+            $this->markHasConstructor($id);
+        }
+        if ('sqlite3result' === $lcname && CompilerVersion::supportsSqlite3()) {
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_ROW, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_ROW_COUNT, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_LAST_ROW, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_CURSOR, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_DONE, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\sqlite3\Sqlite3JitSupport::RESULT_PROP_COL, Variable::TYPE_STRING);
+            $this->markHasConstructor($id);
         }
     }
 

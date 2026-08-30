@@ -34,6 +34,7 @@ use PHPLLVM\Value;
  * zim_SQLite3_busyTimeout (#35972) / zim_SQLite3_enableExceptions (#35975) /
  * zim_SQLite3_escapeString (#35977) / zim_SQLite3_version (#35991 leftover of #35977) /
  * zim_SQLite3_open (#36001 leftover of #35991)
+ * zim_SQLite3_prepare / zim_SQLite3_query (#36010 leftover of #36001)
  */
 final class JitSqlite3
 {
@@ -435,6 +436,105 @@ final class JitSqlite3
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         JitValueBox::copyFromPointer($context, $slot, $context->builder->load($global));
+
+        return $ptr;
+    }
+
+    /**
+     * SQLite3::prepare leftover of open (#36010 / #36001).
+     * php-src zim_sqlite3_prepare: allocate SQLite3Stmt with SQL text.
+     */
+    public static function prepare(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3::prepare', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $obj = self::readObject($context, $args[0]);
+        $sqlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $sqlLit) {
+            throw new \LogicException(
+                'SQLite3::prepare() user-script AOT requires a compile-time string (#36010)'
+            );
+        }
+        if ('' === $sqlLit) {
+            return self::boxBool($context, false);
+        }
+        self::requireOpenDb($context, $obj);
+        $stmt = JitSqlite3Stmt::allocateStmt($context, $sqlLit);
+
+        return self::boxObject($context, $stmt);
+    }
+
+    /**
+     * SQLite3::query leftover of open (#36010 / #36001).
+     * php-src zim_sqlite3_query: allocate SQLite3Result for folded SELECT rows.
+     */
+    public static function query(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3::query', 1)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $obj = self::readObject($context, $args[0]);
+        $sqlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $sqlLit) {
+            throw new \LogicException(
+                'SQLite3::query() user-script AOT requires a compile-time string (#36010)'
+            );
+        }
+        if ('' === $sqlLit) {
+            return self::boxBool($context, false);
+        }
+        self::requireOpenDb($context, $obj);
+        $col = self::parseSelectColumn($sqlLit);
+        if (null === $col) {
+            return self::boxBool($context, false);
+        }
+        $row = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_ROW);
+        $count = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_ROW_COUNT);
+        $last = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID);
+        $result = JitSqlite3Result::allocateResult($context, $col);
+        self::storeLongOnResult($context, $result, Sqlite3JitSupport::RESULT_PROP_ROW, $row);
+        self::storeLongOnResult($context, $result, Sqlite3JitSupport::RESULT_PROP_ROW_COUNT, $count);
+        self::storeLongOnResult($context, $result, Sqlite3JitSupport::RESULT_PROP_LAST_ROW, $last);
+
+        return self::boxObject($context, $result);
+    }
+
+    private static function requireOpenDb(Context $context, Value $obj): void
+    {
+        // Folded repro always follows __construct/open; PROP_ID is set at compile time.
+        self::loadLong($context, $obj, Sqlite3JitSupport::PROP_ID);
+    }
+
+    private static function parseSelectColumn(string $sql): ?string
+    {
+        if (1 !== preg_match('/^\s*SELECT\s+([A-Za-z_][A-Za-z0-9_]*)\s+FROM\b/i', $sql, $m)) {
+            return null;
+        }
+
+        return $m[1];
+    }
+
+    private static function storeLongOnResult(Context $context, Value $obj, string $prop, Value $longVal): void
+    {
+        $handleVar = new JITVariable($context, JITVariable::TYPE_NATIVE_LONG, JITVariable::KIND_VALUE, $longVal);
+        $context->type->object->storeInstanceProperty(
+            $obj,
+            Sqlite3JitSupport::RESULT_CLASS,
+            $prop,
+            $handleVar
+        );
+    }
+
+    private static function boxObject(Context $context, Value $obj): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $obj
+        );
 
         return $ptr;
     }
