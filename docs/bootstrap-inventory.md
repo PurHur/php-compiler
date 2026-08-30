@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 8020 |
-| Phase A inventory files (M2 ratio SSOT) | 8020 |
+| PHP files on vm.php path | 8022 |
+| Phase A inventory files (M2 ratio SSOT) | 8022 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 25521 |
+| Source constructs flagged (warnings) | 25524 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2238,6 +2238,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simdjson/simdjson_is_valid.php` | 0 | 2 |
 | `ext/simdjson/simdjson_key_functions.php` | 0 | 2 |
 | `ext/simplexml/BuiltinClasses.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlAddAttribute.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlAddChild.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlAsXml.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlAttributes.php` | 0 | 1 |
@@ -6869,6 +6870,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/RuntimeVariableStaticMethodCall.php` | 0 | 1 |
 | `lib/JIT/Call/SensitiveParameterValueConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/SensitiveParameterValueGetValue.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementAddAttribute.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementAddChild.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementAsXml.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementAttributes.php` | 0 | 1 |
@@ -7120,7 +7122,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ShutdownCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/SidecarPathRemap.php` | 0 | 1 |
 | `lib/JIT/SimpleXmlForeachSnapshot.php` | 0 | 3 |
-| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 15 |
+| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 16 |
 | `lib/JIT/SplAutoloadCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/StaticPropertyAsNonStaticJitGuard.php` | 0 | 2 |
 | `lib/JIT/StaticPropertyVisibilityJitGuard.php` | 0 | 2 |
@@ -26112,6 +26114,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/simplexml/JitSimpleXmlAddAttribute.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/simplexml/JitSimpleXmlAddChild.php`
 
 **Warnings** (review for bootstrap subset):
@@ -26198,11 +26205,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 519)
 - new JITVariable (line 542)
 - new JITVariable (line 800)
-- new JITVariable (line 1253)
-- new JITVariable (line 1325)
-- new JITVariable (line 1482)
-- new JITVariable (line 1495)
-- 65 class method(s)
+- new JITVariable (line 1327)
+- new JITVariable (line 1399)
+- new JITVariable (line 1556)
+- new JITVariable (line 1569)
+- 66 class method(s)
 - 1 closure(s)
 
 ### `ext/simplexml/JitSimpleXmlXpath.php`
@@ -56666,6 +56673,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/SimpleXMLElementAddAttribute.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/SimpleXMLElementAddChild.php`
 
 **Warnings** (review for bootstrap subset):
@@ -58261,19 +58273,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitUnlikeCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 258)
-- new Variable (line 1058)
-- new Variable (line 1079)
-- new Variable (line 1098)
-- new Variable (line 1110)
+- new Variable (line 267)
+- new Variable (line 1092)
 - new Variable (line 1113)
-- new Variable (line 1479)
-- new Variable (line 1488)
-- new Variable (line 1508)
-- new Variable (line 1517)
-- new Variable (line 1588)
-- new Variable (line 1600)
-- 32 class method(s)
+- new Variable (line 1132)
+- new Variable (line 1144)
+- new Variable (line 1147)
+- new Variable (line 1513)
+- new Variable (line 1522)
+- new Variable (line 1542)
+- new Variable (line 1551)
+- new Variable (line 1622)
+- new Variable (line 1634)
+- 33 class method(s)
 
 ### `lib/JIT/JitValueBox.php`
 
@@ -58791,20 +58803,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SimpleXmlInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\SimpleXMLElementConstruct (line 50)
-- new Call\SimpleXMLElementAddChild (line 55)
-- new Call\SimpleXMLElementAsXml (line 61)
-- new Call\SimpleXMLElementXpath (line 68)
-- new Call\SimpleXMLElementRegisterXPathNamespace (line 73)
-- new Call\SimpleXMLElementGet (line 78)
-- new Call\SimpleXMLElementOffsetGet (line 83)
-- new Call\SimpleXMLElementCount (line 88)
-- new Call\SimpleXMLElementToString (line 93)
-- new Call\SimpleXMLElementChildren (line 98)
-- new Call\SimpleXMLElementAttributes (line 103)
-- new Call\SimpleXMLElementGetName (line 108)
-- new Call\SimpleXMLElementGetNamespaces (line 113)
-- new Call\SimpleXMLElementGetDocNamespaces (line 118)
+- new Call\SimpleXMLElementConstruct (line 52)
+- new Call\SimpleXMLElementAddChild (line 57)
+- new Call\SimpleXMLElementAddAttribute (line 62)
+- new Call\SimpleXMLElementAsXml (line 68)
+- new Call\SimpleXMLElementXpath (line 75)
+- new Call\SimpleXMLElementRegisterXPathNamespace (line 80)
+- new Call\SimpleXMLElementGet (line 85)
+- new Call\SimpleXMLElementOffsetGet (line 90)
+- new Call\SimpleXMLElementCount (line 95)
+- new Call\SimpleXMLElementToString (line 100)
+- new Call\SimpleXMLElementChildren (line 105)
+- new Call\SimpleXMLElementAttributes (line 110)
+- new Call\SimpleXMLElementGetName (line 115)
+- new Call\SimpleXMLElementGetNamespaces (line 120)
+- new Call\SimpleXMLElementGetDocNamespaces (line 125)
 - 2 class method(s)
 
 ### `lib/JIT/SplAutoloadCallbackPolicy.php`

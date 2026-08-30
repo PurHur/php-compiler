@@ -1032,6 +1032,80 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * Compile-time SimpleXMLElement::addAttribute via host php-src (#35806 / sxe.c zim_simplexmlelement_addAttribute).
+     * Mutates the host tree so a subsequent asXML()/__toString fold sees the attribute (peer addChild #19306).
+     */
+    public static function tryAddAttribute(Context $context, JITVariable ...$args): ?Value
+    {
+        if (\count($args) < 2 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        // Soft-null $qualifiedName — E_DEPRECATED then empty → ValueError (#31554 / sxe.c).
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[1],
+                'SimpleXMLElement::addAttribute',
+                0,
+                'qualifiedName'
+            );
+            throw new \ValueError(
+                'SimpleXMLElement::addAttribute(): Argument #1 ($qualifiedName) cannot be empty'
+            );
+        }
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $name) {
+            return null;
+        }
+        $value = '';
+        if (isset($args[2])) {
+            if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+                // Soft-null $value — coerce to "" after DEP (php-src Z_PARAM_STR; peer #31554).
+                JitStringBuiltinArg::lowerTrimFamilyString(
+                    $context,
+                    $args[2],
+                    'SimpleXMLElement::addAttribute',
+                    1,
+                    'value'
+                );
+                $value = '';
+            } else {
+                $valueLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+                if (null === $valueLit) {
+                    return null;
+                }
+                $value = $valueLit;
+            }
+        }
+        $namespace = null;
+        if (isset($args[3])) {
+            if (JITVariable::TYPE_NULL === $args[3]->type || $args[3]->isNullConstant) {
+                $namespace = null;
+            } else {
+                $namespace = JitStringBuiltinArg::compileTimeLiteral($args[3]) ?? $args[3]->compileTimeString;
+                if (null === $namespace) {
+                    return null;
+                }
+            }
+        }
+        try {
+            if (null !== $namespace && '' !== $namespace) {
+                $tree->addAttribute($name, $value, $namespace);
+            } else {
+                $tree->addAttribute($name, $value);
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::nullValue($context);
+    }
+
+    /**
      * Compile-time SimpleXMLElement::registerXPathNamespace via host php-src (#27534 / #31656).
      * Mutates the host tree so a subsequent literal xpath() fold sees registered prefixes.
      * Soft-null prefix/namespace — E_DEPRECATED then empty-prefix → false (sxe.c).
