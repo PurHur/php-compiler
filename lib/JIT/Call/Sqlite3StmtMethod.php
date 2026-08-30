@@ -29,6 +29,10 @@ final class Sqlite3StmtMethod implements Call
             $this->paramNames = ['expand='];
         } elseif ('paramcount' === $lc) {
             $this->paramNames = [];
+        } elseif ('bindvalue' === $lc) {
+            $this->paramNames = ['param', 'value'];
+        } elseif ('execute' === $lc) {
+            $this->paramNames = [];
         }
     }
 
@@ -42,8 +46,10 @@ final class Sqlite3StmtMethod implements Call
         return match (strtolower($this->method)) {
             'getsql' => JitSqlite3Stmt::getSQL($context, ...$args),
             'paramcount' => JitSqlite3Stmt::paramCount($context, ...$args),
+            'bindvalue' => JitSqlite3Stmt::bindValue($context, ...$args),
+            'execute' => JitSqlite3Stmt::execute($context, ...$args),
             default => throw new \LogicException(
-                'SQLite3Stmt::'.$this->method.'() JIT dispatch missing (#36010)'
+                'SQLite3Stmt::'.$this->method.'() JIT dispatch missing (#36010 / #36018)'
             ),
         };
     }

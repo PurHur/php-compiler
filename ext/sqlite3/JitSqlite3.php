@@ -261,7 +261,7 @@ final class JitSqlite3
         if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3::prepare', 1)) {
             return VmClassMethod::jitArgcDummyReturn($context);
         }
-        self::readObject($context, $args[0]);
+        $db = self::readObject($context, $args[0]);
         $sqlPtr = JitStringBuiltinArg::lower(
             $context,
             $args[1],
@@ -281,6 +281,18 @@ final class JitSqlite3
         $classId = $objectType->lookup(Sqlite3JitSupport::STMT_CLASS);
         $stmt = $objectType->allocate($classId);
         $objectType->markObjectConstructed($stmt);
+        $dbVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $db
+        );
+        $objectType->storeInstanceProperty(
+            $stmt,
+            Sqlite3JitSupport::STMT_CLASS,
+            Sqlite3JitSupport::STMT_PROP_DB,
+            $dbVar
+        );
         $sqlVar = new JITVariable(
             $context,
             JITVariable::TYPE_STRING,
@@ -562,7 +574,7 @@ final class JitSqlite3
     /**
      * @param list<?int> $values first-column ints per VALUES tuple (null = non-numeric)
      */
-    private static function emitInsertFold(Context $context, Value $obj, array $values, ?bool $intPkKnown): void
+    public static function emitInsertFold(Context $context, Value $obj, array $values, ?bool $intPkKnown): void
     {
         $i64 = $context->getTypeFromString('int64');
         $n = count($values);

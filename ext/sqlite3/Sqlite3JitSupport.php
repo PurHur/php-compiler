@@ -42,6 +42,12 @@ final class Sqlite3JitSupport
 
     public const STMT_PROP_PARAM_COUNT = '__sqliteStmtN';
 
+    /** Parent SQLite3 handle for execute() fold (#36018 leftover of #36010). */
+    public const STMT_PROP_DB = '__sqliteStmtDb';
+
+    /** First bound value for compile-time bindValue() (#36018 leftover of #36010). */
+    public const STMT_PROP_BOUND = '__sqliteStmtBound';
+
     /** SQLite3Result NestedJIT (#36010 leftover of #36001). */
     public const RESULT_CLASS = 'SQLite3Result';
 
