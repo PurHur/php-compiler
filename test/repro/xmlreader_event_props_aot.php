@@ -1,0 +1,32 @@
+<?php
+declare(strict_types=1);
+/** AOT: XMLReader virtual event props after read/moveToFirstAttribute (#35983 / #27299). */
+$r = XMLReader::fromString('<root id="1"/>');
+$r->read();
+echo $r->depth, PHP_EOL;
+echo $r->localName, PHP_EOL;
+echo $r->prefix, PHP_EOL;
+echo $r->namespaceURI, PHP_EOL;
+echo $r->attributeCount, PHP_EOL;
+var_export($r->hasAttributes);
+echo PHP_EOL;
+var_export($r->hasValue);
+echo PHP_EOL;
+var_export($r->isEmptyElement);
+echo PHP_EOL;
+echo $r->xmlLang, PHP_EOL;
+var_export($r->isDefault);
+echo PHP_EOL;
+echo $r->nodeType, PHP_EOL;
+echo $r->name, PHP_EOL;
+$r->moveToFirstAttribute();
+echo $r->depth, PHP_EOL;
+echo $r->localName, PHP_EOL;
+echo $r->name, PHP_EOL;
+echo $r->value, PHP_EOL;
+echo $r->nodeType, PHP_EOL;
+var_export($r->hasValue);
+echo PHP_EOL;
+var_export($r->hasAttributes);
+echo PHP_EOL;
+echo $r->attributeCount, PHP_EOL;
