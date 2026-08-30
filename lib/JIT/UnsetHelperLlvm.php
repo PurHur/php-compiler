@@ -57,6 +57,18 @@ final class UnsetHelperLlvm
 
             return;
         }
+        // User-script AOT: SimpleXMLElement dim delete via host tree (sxe_prop_dim_delete).
+        // TYPE_VALUE boxing otherwise hits unset_dim_vb_object and fails module verify (#35817 leftover of #35810).
+        if (UserScriptAotEnv::isActive()) {
+            $sxeUnset = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryOffsetUnset(
+                $context,
+                $container,
+                $dim
+            );
+            if (null !== $sxeUnset) {
+                return;
+            }
+        }
         if (Variable::TYPE_OBJECT === $container->type) {
             if (ArrayAccessHelper::tryCompileOffsetUnset($context, $container, $dim, $containerOp)) {
                 return;

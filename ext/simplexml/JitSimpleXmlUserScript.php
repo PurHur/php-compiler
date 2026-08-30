@@ -735,6 +735,52 @@ final class JitSimpleXmlUserScript
     }
 
     /**
+     * SimpleXMLElement::offsetUnset — host sxe_prop_dim_delete (#35817 leftover of #35810 / php-src sxe.c).
+     *
+     * Thin AOT boxes SXE as TYPE_VALUE; the generic unset-dim diamond emits a terminator
+     * mid-block (`unset_dim_vb_object`) and module verify fails. Mutate the compile-time
+     * tree so a later asXML()/isset fold sees the delete.
+     *
+     * @param JITVariable $args receiver, dim
+     */
+    public static function tryOffsetUnset(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!UserScriptAotEnv::isActive() || \count($args) < 2 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $token = $args[0]->compileTimeString;
+        if (null !== $token && isset(self::$xpathListsByToken[$token])) {
+            return null;
+        }
+        if (JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || 0 !== ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            return null;
+        }
+        $tree = self::lookupExact($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $dim = self::compileTimeDim($context, $args[1]);
+        if (null === $dim) {
+            throw new \LogicException(
+                'SimpleXMLElement::offsetUnset() user-script AOT requires a compile-time offset (#35817 leftover of #35810)'
+            );
+        }
+        if ('' === $dim) {
+            // php-src sxe_prop_dim_delete — empty attribute name is a no-op.
+            return self::nullValue($context);
+        }
+        try {
+            unset($tree[$dim]);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::nullValue($context);
+    }
+
+    /**
      * isset($sxe->prop) — host property existence (php-src sxe.c / __isset; #35814).
      *
      * Thin AOT boxes SXE as TYPE_VALUE so value-box propertyIsSet looks at declared slots

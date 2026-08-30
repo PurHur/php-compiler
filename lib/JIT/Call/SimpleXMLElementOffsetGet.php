@@ -10,11 +10,19 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** SimpleXMLElement::offsetGet() — user-script AOT (#26863). */
+/** SimpleXMLElement::offsetGet() / offsetUnset() — user-script AOT (#26863, #35817 leftover of #35810). */
 final class SimpleXMLElementOffsetGet implements Call
 {
+    public function __construct(private string $method = 'offsetGet')
+    {
+    }
+
     public function call(Context $context, Variable ...$args): Value
     {
+        if ('offsetUnset' === $this->method) {
+            return JitSimpleXmlOffsetGet::invokeUnset($context, ...$args);
+        }
+
         return JitSimpleXmlOffsetGet::invoke($context, ...$args);
     }
 }
