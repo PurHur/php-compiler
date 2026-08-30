@@ -487,6 +487,25 @@ final class VmXmlReader
 
     private const XMLNS_NAMESPACE_URI = 'http://www.w3.org/2000/xmlns/';
 
+    /**
+     * Attribute local-name for getAttributeNs fold (#35924 / #19412).
+     * php-src: xmlTextReaderGetAttributeNs name matching.
+     */
+    public static function attributeLocalNamePublic(string $attrName): string
+    {
+        return self::attributeLocalName($attrName);
+    }
+
+    /**
+     * Attribute namespace URI for getAttributeNs fold (#35924 / #19412).
+     *
+     * @param array<string, string> $nsScope
+     */
+    public static function attributeNamespaceUriPublic(string $attrName, array $nsScope): string
+    {
+        return self::attributeNamespaceUri($attrName, $nsScope);
+    }
+
     private static function attributeLocalName(string $attrName): string
     {
         if ('xmlns' === $attrName) {

@@ -32,6 +32,10 @@ final class JitXmlReaderMethod
             'expand' => JitXmlReaderUserScript::tryExpand($context, ...$args),
             // leftover of fromString/read (#35918 / #27299) — php-src zim_XMLReader_getAttribute
             'getattribute' => JitXmlReaderUserScript::tryGetAttribute($context, ...$args),
+            // leftover of getAttribute (#35924 / #35918 / #27299) — php-src zim_XMLReader_getAttributeNs
+            'getattributens' => JitXmlReaderUserScript::tryGetAttributeNs($context, ...$args),
+            // leftover of getAttribute (#35924 / #35918 / #27299) — php-src zim_XMLReader_getAttributeNo
+            'getattributeno' => JitXmlReaderUserScript::tryGetAttributeNo($context, ...$args),
             default => null,
         };
         if (null === $result) {
