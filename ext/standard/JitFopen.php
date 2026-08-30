@@ -38,6 +38,7 @@ final class JitFopen
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        JitBuiltinWarning::emitStreamOpenFailed($context, $pathStr, 'fopen');
         $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
         $context->builder->branch($doneBlock);
