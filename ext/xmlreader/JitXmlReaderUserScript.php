@@ -77,6 +77,13 @@ final class JitXmlReaderUserScript
      */
     private static ?array $lastAttrNodeTypes = null;
 
+    /**
+     * Per-event next-sibling target index, or -1 when next() would return false (#35926).
+     *
+     * @var list<int>|null
+     */
+    private static ?array $lastNextSibling = null;
+
     /** Set when the last XML()/open lowering was the instance form (#35106 / #35907). */
     public static bool $lastCallWasInstance = false;
 
@@ -266,6 +273,7 @@ final class JitXmlReaderUserScript
         $attributes = [];
         $nsScopes = [];
         $attrNodeTypes = [];
+        $nextSibling = [];
         foreach ($rawEvents as $i => $ev) {
             $inner[] = XmlReaderSubtreeXmlHelper::innerXml($rawEvents, $i);
             $outerXml = XmlReaderSubtreeXmlHelper::outerXml($rawEvents, $i);
@@ -275,6 +283,7 @@ final class JitXmlReaderUserScript
             $attributes[] = $ev->attributes;
             $nsScopes[] = $ev->nsScope;
             $attrNodeTypes[] = $ev->nodeType;
+            $nextSibling[] = self::nextSiblingTarget($rawEvents, $i);
         }
         self::$lastInnerXml = $inner;
         self::$lastOuterXml = $outer;
@@ -283,6 +292,7 @@ final class JitXmlReaderUserScript
         self::$lastAttributes = $attributes;
         self::$lastNsScopes = $nsScopes;
         self::$lastAttrNodeTypes = $attrNodeTypes;
+        self::$lastNextSibling = $nextSibling;
 
         if (null !== $instanceReceiver) {
             return self::resetReceiverForParse($context, $instanceReceiver);
@@ -308,6 +318,38 @@ final class JitXmlReaderUserScript
             XmlReaderConstants::COMMENT => ['kind' => 'comment', 'data' => $ev->value],
             default => ['kind' => 'false'],
         };
+    }
+
+    /**
+     * Target index for {@see VmXmlReader::nextSibling} from $i, or -1 if next() fails (#35926).
+     *
+     * @param list<XmlReaderEvent> $events
+     */
+    private static function nextSiblingTarget(array $events, int $i): int
+    {
+        $n = \count($events);
+        if ($i < 0 || $i >= $n) {
+            return -1;
+        }
+        $current = $events[$i];
+        $depth = $current->depth;
+        $j = $i;
+        if (XmlReaderConstants::ELEMENT === $current->nodeType && !$current->isEmptyElement) {
+            ++$j;
+            while ($j < $n) {
+                $ev = $events[$j];
+                if (XmlReaderConstants::END_ELEMENT === $ev->nodeType && $ev->depth === $depth) {
+                    break;
+                }
+                ++$j;
+            }
+            if ($j >= $n) {
+                return -1;
+            }
+        }
+        ++$j;
+
+        return $j < $n ? $j : -1;
     }
 
     /**
@@ -677,6 +719,48 @@ final class JitXmlReaderUserScript
         }
 
         return self::emitPosNullableStringSwitch($context, $args[0], $byPos, 'lookupNamespace');
+    }
+
+    /**
+     * XMLReader::next() leftover of fromString/read (#35926 / #27299 / #19395).
+     * php-src: zim_XMLReader_next / xmlTextReaderNext.
+     * Optional $name must be compile-time (or omitted); runtime name leaves unfoldered.
+     */
+    public static function tryNext(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || null === self::$lastNextSibling || null === self::$lastEvents) {
+            return null;
+        }
+        if (\count($args) < 1) {
+            throw new \LogicException('XMLReader::next() called without $this');
+        }
+        $name = null;
+        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
+            $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $name) {
+                return null;
+            }
+        }
+        $targets = self::$lastNextSibling;
+        if (null !== $name) {
+            $named = [];
+            $events = self::$lastEvents;
+            foreach ($targets as $i => $_) {
+                $pos = $targets[$i];
+                $hit = -1;
+                while ($pos >= 0) {
+                    if ($name === $events[$pos]['name']) {
+                        $hit = $pos;
+                        break;
+                    }
+                    $pos = $targets[$pos];
+                }
+                $named[$i] = $hit;
+            }
+            $targets = $named;
+        }
+
+        return self::emitNextSwitch($context, $args[0], $targets);
     }
 
     /**
@@ -1099,28 +1183,7 @@ final class JitXmlReaderUserScript
             $context->builder->branchIf($isThis, $apply, $next);
 
             $context->builder->positionAtEnd($apply);
-            $ev = $events[$i];
-            $nodeTypeVar = new JITVariable(
-                $context,
-                JITVariable::TYPE_NATIVE_LONG,
-                JITVariable::KIND_VALUE,
-                $i64->constInt($ev['nodeType'], true)
-            );
-            $objectType->propertyStore(
-                $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
-                $nodeTypeVar,
-                JITVariable::TYPE_NATIVE_LONG
-            );
-            $objectType->propertyStore(
-                $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NAME),
-                self::stringLlvm($context, $ev['name']),
-                JITVariable::TYPE_STRING
-            );
-            $objectType->propertyStore(
-                $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
-                self::stringLlvm($context, $ev['value']),
-                JITVariable::TYPE_STRING
-            );
+            self::storeEventProps($context, $objectType, $obj, $events[$i]);
             $trueBox = JitValueBox::alloc($context);
             JitValueBox::writeBool($context, $trueBox, $i1->constInt(1, false));
             $context->builder->store(JitValueBox::normalizeValuePtr($context, $trueBox), $resultSlot);
@@ -1130,6 +1193,148 @@ final class JitXmlReaderUserScript
         $context->builder->positionAtEnd($merge);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * Jump __xr_pos to precomputed next-sibling (or named) target (#35926).
+     *
+     * @param list<int> $targets per-position destination index, or -1 for false
+     */
+    private static function emitNextSwitch(Context $context, JITVariable $receiver, array $targets): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'xmlreader_next_cont');
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_NAME);
+        self::ensureLayout($objectType, $classId);
+
+        $obj = self::loadObject($context, $receiver);
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $events = self::$lastEvents;
+        if (null === $events) {
+            throw new \LogicException('XMLReader::next() without tokenized events');
+        }
+        $n = \count($targets);
+
+        $posVal = $context->helper->loadValue(
+            $objectType->propertyFetch($obj, self::CLASS_NAME, self::PROP_POS)
+        );
+
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $merge = BasicBlockHelper::append($context, 'xmlreader_next_merge');
+        $fail = BasicBlockHelper::append($context, 'xmlreader_next_fail');
+
+        /** @var list<\PHPLLVM\BasicBlock> */
+        $caseBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $caseBlocks[$i] = BasicBlockHelper::append($context, 'xmlreader_next_case_'.$i);
+        }
+        $inRange = $context->builder->icmp(
+            Builder::INT_SLT,
+            $posVal,
+            $i64->constInt($n, true)
+        );
+        $nonNeg = $context->builder->icmp(
+            Builder::INT_SGE,
+            $posVal,
+            $i64->constInt(0, true)
+        );
+        $ok = $context->builder->and($inRange, $nonNeg);
+        $context->builder->branchIf(
+            $ok,
+            $n > 0 ? $caseBlocks[0] : $fail,
+            $fail
+        );
+
+        $context->builder->positionAtEnd($fail);
+        $falseBox = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $falseBox, $i1->constInt(0, false));
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $falseBox), $resultSlot);
+        $context->builder->branch($merge);
+
+        for ($i = 0; $i < $n; ++$i) {
+            $context->builder->positionAtEnd($caseBlocks[$i]);
+            $isThis = $context->builder->icmp(
+                Builder::INT_EQ,
+                $posVal,
+                $i64->constInt($i, true)
+            );
+            $apply = BasicBlockHelper::append($context, 'xmlreader_next_apply_'.$i);
+            $nextCase = ($i + 1 < $n) ? $caseBlocks[$i + 1] : $fail;
+            $context->builder->branchIf($isThis, $apply, $nextCase);
+
+            $context->builder->positionAtEnd($apply);
+            $dest = $targets[$i];
+            if ($dest < 0) {
+                $objectType->propertyStore(
+                    $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_POS),
+                    new JITVariable(
+                        $context,
+                        JITVariable::TYPE_NATIVE_LONG,
+                        JITVariable::KIND_VALUE,
+                        $i64->constInt($n, true)
+                    ),
+                    JITVariable::TYPE_NATIVE_LONG
+                );
+                $fb = JitValueBox::alloc($context);
+                JitValueBox::writeBool($context, $fb, $i1->constInt(0, false));
+                $context->builder->store(JitValueBox::normalizeValuePtr($context, $fb), $resultSlot);
+                $context->builder->branch($merge);
+                continue;
+            }
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($obj, self::CLASS_NAME, self::PROP_POS),
+                new JITVariable(
+                    $context,
+                    JITVariable::TYPE_NATIVE_LONG,
+                    JITVariable::KIND_VALUE,
+                    $i64->constInt($dest, true)
+                ),
+                JITVariable::TYPE_NATIVE_LONG
+            );
+            self::storeEventProps($context, $objectType, $obj, $events[$dest]);
+            $tb = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $tb, $i1->constInt(1, false));
+            $context->builder->store(JitValueBox::normalizeValuePtr($context, $tb), $resultSlot);
+            $context->builder->branch($merge);
+        }
+
+        $context->builder->positionAtEnd($merge);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * @param array{nodeType: int, name: string, value: string} $ev
+     */
+    private static function storeEventProps(
+        Context $context,
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        Value $obj,
+        array $ev
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $nodeTypeVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $i64->constInt($ev['nodeType'], true)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NODE_TYPE),
+            $nodeTypeVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_NAME),
+            self::stringLlvm($context, $ev['name']),
+            JITVariable::TYPE_STRING
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, VmXmlReader::PROP_VALUE),
+            self::stringLlvm($context, $ev['value']),
+            JITVariable::TYPE_STRING
+        );
     }
 
     private static function loadObject(Context $context, JITVariable $receiver): Value
