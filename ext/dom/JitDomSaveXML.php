@@ -29,6 +29,12 @@ final class JitDomSaveXML
             return JitDomRequireDomNodeArg::boxNullResult($context);
         }
 
+        // Living HTML CFS leftover of saveHtml (#31324): empty LiveSlots <html/>.
+        $livingXml = JitDomHtmlDocumentSaveHtml::tryFoldSaveXml($context, $args);
+        if (null !== $livingXml) {
+            return $livingXml;
+        }
+
         if (JitDomSaveXMLUserScript::shouldUse($context)) {
             $us = JitDomSaveXMLUserScript::tryInvoke($context, ...$args);
             if (null !== $us) {

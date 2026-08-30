@@ -210,4 +210,59 @@ final class JitDomHtmlDocumentSaveHtml
 
         return JitValueBox::normalizeValuePtr($context, $slot);
     }
+
+    /**
+     * Thin AOT HTML CFS materializes documentElement as empty {@code <html>}
+     * (body is a sibling property, not a LiveSlots child). Legacy
+     * {@see JitDomSaveXMLUserScript} then dumps {@code <html/>}.
+     *
+     * Fold document-wide {@see VmDom::saveXML} from the remembered CFS source
+     * (php-src {@code html_document.c} / {@code php_dom.c} xmlDocDumpMemory).
+     *
+     * @param list<JITVariable> $args document [, node [, options]]
+     */
+    public static function tryFoldSaveXml(Context $context, array $args): ?Value
+    {
+        $source = self::$lastCreateFromStringSource;
+        if (null === $source || '' === $source) {
+            return null;
+        }
+        if (!self::optionsAllowUserScriptMaterialize(self::$lastCreateFromStringOptions)) {
+            return null;
+        }
+        $living = JitDomLoadXMLUserScript::lastDocumentClass();
+        $recv = $args[0] ?? null;
+        $recvClass = strtolower((string) ($recv->classUserType ?? ''));
+        $isHtml = 'dom\\htmldocument' === $recvClass
+            || ('' === $recvClass && 'Dom\\HTMLDocument' === $living);
+        if (!$isHtml) {
+            return null;
+        }
+        [$nodeArg] = JitDomSaveSerializationArgs::parse($args);
+        if (JitDomSaveSerializationArgs::isNodeScoped($nodeArg)) {
+            return null;
+        }
+
+        $vm = $context->runtime->vmContext ?? null;
+        if (null === $vm) {
+            return null;
+        }
+        $options = self::$lastCreateFromStringOptions | LibxmlConstants::LIBXML_NOERROR;
+        set_error_handler(static function (): bool {
+            return true;
+        });
+        try {
+            $docVar = VmDomLiving::createFromString($vm, $source, $options);
+            if (VmVariable::TYPE_OBJECT !== $docVar->type) {
+                return null;
+            }
+            $xml = VmDom::saveXML($docVar->toObject());
+
+            return self::boxConstantString($context, $xml);
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            restore_error_handler();
+        }
+    }
 }
