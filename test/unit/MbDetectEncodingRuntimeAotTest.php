@@ -32,6 +32,7 @@ final class MbDetectEncodingRuntimeAotTest extends TestCase
         $this->assertStringNotContainsString('VmMbstring::', $helper);
         $runtime = (string) file_get_contents($root.'/lib/JIT/Builtin/MbDetectEncodingRuntime.php');
         $this->assertStringContainsString('detectHelper', $runtime);
+        $this->assertStringContainsString('phpc_mb_detect_encoding_detect', $runtime);
         $this->assertStringContainsString('MbDetectEncodingJitHelper::detectArgv', $runtime);
         $src = (string) file_get_contents($root.'/ext/mbstring/mb_detect_encoding.php');
         $this->assertStringContainsString('JitMbDetectEncoding::invoke', $src);
