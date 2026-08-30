@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\sqlite3;
 
+use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -48,6 +51,91 @@ final class JitSqlite3Stmt
         );
 
         return self::boxLong($context, $context->helper->loadValue($handleVar));
+    }
+
+    public static function bindValue(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3Stmt::bindValue', 2)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $obj = self::readObject($context, $args[0]);
+        $param = $args[1]->compileTimeLong ?? null;
+        if (null === $param) {
+            JitLongArg::lower($context, $args[1], 'SQLite3Stmt::bindValue(): Argument #1 ($param)');
+        }
+        $valueLit = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null !== $param && null !== $valueLit && JitSqlite3::lastFoldStmtId() > 0) {
+            Sqlite3AotFoldState::bindValue(JitSqlite3::lastFoldStmtId(), (int) $param, $valueLit);
+        }
+
+        return self::boxBool($context, true);
+    }
+
+    public static function execute(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3Stmt::execute', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        if (JitSqlite3::lastFoldStmtId() > 0) {
+            Sqlite3AotFoldState::stmtExecute(JitSqlite3::lastFoldStmtId());
+        }
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(Sqlite3JitSupport::RESULT_CLASS);
+        $result = $objectType->allocate($classId);
+        $objectType->markObjectConstructed($result);
+        $i64 = $context->getTypeFromString('int64');
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $result,
+            Sqlite3JitSupport::RESULT_CLASS,
+            Sqlite3JitSupport::RESULT_PROP_CURSOR,
+            $i64->constInt(0, false)
+        );
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $result,
+            Sqlite3JitSupport::RESULT_CLASS,
+            Sqlite3JitSupport::RESULT_PROP_ROW_COUNT,
+            $i64->constInt(0, false)
+        );
+
+        return self::boxObject($context, $result);
+    }
+
+    private static function boxBool(Context $context, bool $v): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $context->getTypeFromString('int1')->constInt($v ? 1 : 0, false)
+        );
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function boxObject(Context $context, Value $obj): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $obj
+        );
+
+        return $ptr;
+    }
+
+    private static function loadLong(Context $context, Value $obj, string $prop): Value
+    {
+        $handleVar = $context->type->object->propertyFetch(
+            $obj,
+            Sqlite3JitSupport::STMT_CLASS,
+            $prop
+        );
+
+        return $context->helper->loadValue($handleVar);
     }
 
     private static function readObject(Context $context, JITVariable $arg): Value

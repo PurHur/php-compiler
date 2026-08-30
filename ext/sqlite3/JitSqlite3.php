@@ -38,6 +38,22 @@ use PHPLLVM\Value;
  */
 final class JitSqlite3
 {
+    /** Active compile-time fold db (single-script; peer #36010 compliance). */
+    private static int $compileFoldDbId = 0;
+
+    /** Last prepare() fold stmt id (single-script sequential). */
+    private static int $lastFoldStmtId = 0;
+
+    public static function compileFoldDbId(): int
+    {
+        return self::$compileFoldDbId;
+    }
+
+    public static function lastFoldStmtId(): int
+    {
+        return self::$lastFoldStmtId;
+    }
+
     public static function construct(Context $context, JITVariable ...$args): Value
     {
         if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'SQLite3::__construct', 1, 3)) {
@@ -54,6 +70,9 @@ final class JitSqlite3
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_SUM, $i64->constInt(0, false));
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_INT_PK, $i64->constInt(0, false));
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_EXCEPTIONS, $i64->constInt(0, false));
+        $foldId = Sqlite3AotFoldState::newDb();
+        self::$compileFoldDbId = $foldId;
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_FOLD_ID, $i64->constInt($foldId, false));
         $context->type->object->markObjectConstructed($obj);
 
         $slot = JitValueBox::alloc($context);
@@ -87,6 +106,21 @@ final class JitSqlite3
                 self::emitInsertFold($context, $obj, $info['values'], $info['int_pk']);
             } else {
                 self::storeLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES, $i64->constInt(0, false));
+            }
+            if (self::$compileFoldDbId > 0) {
+                Sqlite3AotFoldState::exec(self::$compileFoldDbId, $sqlLit);
+                self::storeLong(
+                    $context,
+                    $obj,
+                    Sqlite3JitSupport::PROP_CHANGES,
+                    $i64->constInt(Sqlite3AotFoldState::changes(self::$compileFoldDbId), false)
+                );
+                self::storeLong(
+                    $context,
+                    $obj,
+                    Sqlite3JitSupport::PROP_LAST_ROWID,
+                    $i64->constInt(Sqlite3AotFoldState::lastInsertRowId(self::$compileFoldDbId), false)
+                );
             }
 
             return self::boxBool($context, true);
@@ -271,11 +305,16 @@ final class JitSqlite3
         );
         $sqlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         $paramCount = 0;
+        $foldStmtId = 0;
         if (null !== $sqlLit) {
             if ('' === $sqlLit) {
                 return self::boxBool($context, false);
             }
             $paramCount = substr_count($sqlLit, '?');
+            if (self::$compileFoldDbId > 0) {
+                $foldStmtId = Sqlite3AotFoldState::prepare(self::$compileFoldDbId, $sqlLit);
+                self::$lastFoldStmtId = $foldStmtId;
+            }
         }
         $objectType = $context->type->object;
         $classId = $objectType->lookup(Sqlite3JitSupport::STMT_CLASS);
@@ -300,6 +339,13 @@ final class JitSqlite3
             Sqlite3JitSupport::STMT_CLASS,
             Sqlite3JitSupport::STMT_PROP_PARAM_COUNT,
             $i64->constInt($paramCount, false)
+        );
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $stmt,
+            Sqlite3JitSupport::STMT_CLASS,
+            Sqlite3JitSupport::STMT_PROP_FOLD_ID,
+            $i64->constInt($foldStmtId, false)
         );
 
         return self::boxObject($context, $stmt);
@@ -331,28 +377,43 @@ final class JitSqlite3
         $result = $objectType->allocate($classId);
         $objectType->markObjectConstructed($result);
         $i64 = $context->getTypeFromString('int64');
-        $has = self::loadLong($context, $db, Sqlite3JitSupport::PROP_HAS);
-        $row = self::loadLong($context, $db, Sqlite3JitSupport::PROP_ROW);
+        $rowCount = 0;
+        if (null !== $sqlLit && self::$compileFoldDbId > 0) {
+            $rows = Sqlite3AotFoldState::queryRows(self::$compileFoldDbId, $sqlLit);
+            $rowCount = count($rows);
+            JitSqlite3Result::registerFoldedRows($rows);
+        } else {
+            $has = self::loadLong($context, $db, Sqlite3JitSupport::PROP_HAS);
+            $row = self::loadLong($context, $db, Sqlite3JitSupport::PROP_ROW);
+            ReflectionSetup::emitSetLongPropertyFromValue(
+                $context,
+                $result,
+                Sqlite3JitSupport::RESULT_CLASS,
+                Sqlite3JitSupport::RESULT_PROP_HAS,
+                $has
+            );
+            ReflectionSetup::emitSetLongPropertyFromValue(
+                $context,
+                $result,
+                Sqlite3JitSupport::RESULT_CLASS,
+                Sqlite3JitSupport::RESULT_PROP_ROW,
+                $row
+            );
+            $rowCount = 1;
+        }
         ReflectionSetup::emitSetLongPropertyFromValue(
             $context,
             $result,
             Sqlite3JitSupport::RESULT_CLASS,
-            Sqlite3JitSupport::RESULT_PROP_HAS,
-            $has
-        );
-        ReflectionSetup::emitSetLongPropertyFromValue(
-            $context,
-            $result,
-            Sqlite3JitSupport::RESULT_CLASS,
-            Sqlite3JitSupport::RESULT_PROP_ROW,
-            $row
-        );
-        ReflectionSetup::emitSetLongPropertyFromValue(
-            $context,
-            $result,
-            Sqlite3JitSupport::RESULT_CLASS,
-            Sqlite3JitSupport::RESULT_PROP_FETCHED,
+            Sqlite3JitSupport::RESULT_PROP_CURSOR,
             $i64->constInt(0, false)
+        );
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $result,
+            Sqlite3JitSupport::RESULT_CLASS,
+            Sqlite3JitSupport::RESULT_PROP_ROW_COUNT,
+            $i64->constInt($rowCount, false)
         );
 
         return self::boxObject($context, $result);

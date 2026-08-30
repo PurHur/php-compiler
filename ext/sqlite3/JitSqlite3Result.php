@@ -16,43 +16,72 @@ use PHPLLVM\Value;
 
 /**
  * NestedJIT SQLite3Result::fetchArray (#36010 leftover of #36001).
- * php-src: ext/sqlite3/sqlite3.c zim_SQLite3Result_fetchArray — NUM mode folded first column.
+ * php-src: ext/sqlite3/sqlite3.c zim_SQLite3Result_fetchArray
  */
 final class JitSqlite3Result
 {
+    /** @var list<array{assoc: array<string, mixed>, num: array<int, mixed>}> */
+    private static array $lastQueryRows = [];
+
+    /**
+     * @param list<array{assoc: array<string, mixed>, num: array<int, mixed>}> $rows
+     */
+    public static function registerFoldedRows(array $rows): string
+    {
+        self::$lastQueryRows = $rows;
+
+        return '__phpc_sq3res_last';
+    }
+
+    public static function attachRowToken(Value $resultObj, string $rowToken): int
+    {
+        return 1;
+    }
+
     public static function fetchArray(Context $context, JITVariable ...$args): Value
     {
         if (!VmClassMethod::requireJitUserArgCountRange($context, $args, 'SQLite3Result::fetchArray', 0, 1)) {
             return VmClassMethod::jitArgcDummyReturn($context);
         }
         $obj = self::readObject($context, $args[0]);
+        $mode = Sqlite3Constants::BOTH;
         if (\count($args) >= 2) {
-            JitLongArg::lower($context, $args[1], 'SQLite3Result::fetchArray(): Argument #1 ($mode)');
+            $modeLit = $args[1]->compileTimeLong ?? null;
+            if (null !== $modeLit) {
+                $mode = (int) $modeLit;
+            } else {
+                JitLongArg::lower($context, $args[1], 'SQLite3Result::fetchArray(): Argument #1 ($mode)');
+            }
         }
         $i64 = $context->getTypeFromString('int64');
         $resultSlot = JitValueBox::alloc($context);
         $resultPtr = JitValueBox::pointer($context, $resultSlot);
 
-        $fetched = self::loadLong($context, $obj, Sqlite3JitSupport::RESULT_PROP_FETCHED);
-        $already = $context->builder->icmp(
-            \PHPLLVM\Builder::INT_NE,
-            $fetched,
-            $i64->constInt(0, false)
-        );
-        $bbFalse = BasicBlockHelper::append($context, 'sqlite3_fetch_false');
-        $bbCheck = BasicBlockHelper::append($context, 'sqlite3_fetch_check');
-        $bbRow = BasicBlockHelper::append($context, 'sqlite3_fetch_row');
-        $bbDone = BasicBlockHelper::append($context, 'sqlite3_fetch_done');
-        $context->builder->branchIf($already, $bbFalse, $bbCheck);
+        $cursor = self::loadLong($context, $obj, Sqlite3JitSupport::RESULT_PROP_CURSOR);
+        $rowCount = self::loadLong($context, $obj, Sqlite3JitSupport::RESULT_PROP_ROW_COUNT);
 
-        $context->builder->positionAtEnd($bbCheck);
-        $has = self::loadLong($context, $obj, Sqlite3JitSupport::RESULT_PROP_HAS);
-        $isHas = $context->builder->icmp(
-            \PHPLLVM\Builder::INT_NE,
-            $has,
-            $i64->constInt(0, false)
+        $bbDone = BasicBlockHelper::append($context, 'sqlite3_fetch_done');
+        $bbFalse = BasicBlockHelper::append($context, 'sqlite3_fetch_false');
+        $bbRow = BasicBlockHelper::append($context, 'sqlite3_fetch_row');
+
+        $atEnd = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_SGE,
+            $cursor,
+            $rowCount
         );
-        $context->builder->branchIf($isHas, $bbRow, $bbFalse);
+        $context->builder->branchIf($atEnd, $bbFalse, $bbRow);
+
+        $context->builder->positionAtEnd($bbRow);
+        $nextCursor = $context->builder->add($cursor, $i64->constInt(1, false));
+        ReflectionSetup::emitSetLongPropertyFromValue(
+            $context,
+            $obj,
+            Sqlite3JitSupport::RESULT_CLASS,
+            Sqlite3JitSupport::RESULT_PROP_CURSOR,
+            $nextCursor
+        );
+        self::emitMultiRowFetch($context, $resultPtr, self::$lastQueryRows, $cursor, $mode, $i64);
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbFalse);
         JitValueBox::writeBool(
@@ -62,32 +91,97 @@ final class JitSqlite3Result
         );
         $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbRow);
-        ReflectionSetup::emitSetLongPropertyFromValue(
-            $context,
-            $obj,
-            Sqlite3JitSupport::RESULT_CLASS,
-            Sqlite3JitSupport::RESULT_PROP_FETCHED,
-            $i64->constInt(1, false)
-        );
-        $row = self::loadLong($context, $obj, Sqlite3JitSupport::RESULT_PROP_ROW);
-        $ht = HashTableHelper::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setLongAt'),
-            $ht,
-            $i64->constInt(0, false),
-            $row
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $resultPtr,
-            $ht
-        );
-        $context->builder->branch($bbDone);
-
         $context->builder->positionAtEnd($bbDone);
 
         return $resultPtr;
+    }
+
+    /**
+     * @param list<array{assoc: array<string, mixed>, num: array<int, mixed>}> $rows
+     */
+    private static function emitMultiRowFetch(
+        Context $context,
+        Value $resultPtr,
+        array $rows,
+        Value $cursor,
+        int $mode,
+        \PHPLLVM\Type $i64
+    ): void {
+        $n = count($rows);
+        if (0 === $n) {
+            return;
+        }
+        $htSlots = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $htSlots[$i] = self::buildRowHashtable($context, $rows[$i], $mode, $i64);
+        }
+        $selected = $htSlots[0];
+        for ($i = 1; $i < $n; ++$i) {
+            $isIdx = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $cursor,
+                $i64->constInt($i, false)
+            );
+            $selected = $context->builder->select($isIdx, $htSlots[$i], $selected);
+        }
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $resultPtr,
+            $selected
+        );
+    }
+
+    /**
+     * @param array{assoc: array<string, mixed>, num: array<int, mixed>} $row
+     */
+    private static function buildRowHashtable(Context $context, array $row, int $mode, \PHPLLVM\Type $i64): Value
+    {
+        $ht = HashTableHelper::alloc($context);
+        $useAssoc = ($mode & Sqlite3Constants::ASSOC) !== 0;
+        $useNum = ($mode & Sqlite3Constants::NUM) !== 0;
+        if ($useNum) {
+            foreach ($row['num'] as $idx => $val) {
+                if (\is_string($val)) {
+                    $str = $context->builder->load($context->constantStringFromString($val));
+                    $context->builder->call(
+                        $context->lookupFunction('__hashtable__setStringAt'),
+                        $ht,
+                        $i64->constInt((int) $idx, false),
+                        $str
+                    );
+                } elseif (\is_int($val)) {
+                    $context->builder->call(
+                        $context->lookupFunction('__hashtable__setLongAt'),
+                        $ht,
+                        $i64->constInt((int) $idx, false),
+                        $i64->constInt($val, true)
+                    );
+                }
+            }
+        }
+        if ($useAssoc) {
+            foreach ($row['assoc'] as $name => $val) {
+                $key = $context->builder->load($context->constantStringFromString((string) $name));
+                if (\is_string($val)) {
+                    $str = $context->builder->load($context->constantStringFromString($val));
+                    $context->builder->call(
+                        $context->lookupFunction('__hashtable__setStringKeyString'),
+                        $ht,
+                        $key,
+                        $str
+                    );
+                } elseif (\is_int($val)) {
+                    $context->builder->call(
+                        $context->lookupFunction('__hashtable__setStringKeyLong'),
+                        $ht,
+                        $key,
+                        $i64->constInt($val, true)
+                    );
+                }
+            }
+        }
+
+        return $ht;
     }
 
     private static function readObject(Context $context, JITVariable $arg): Value

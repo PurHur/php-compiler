@@ -35,6 +35,9 @@ final class Sqlite3JitSupport
     /** Non-zero when enableExceptions(true) is in effect (#35975 leftover of #35972). */
     public const PROP_EXCEPTIONS = '__sqliteEx';
 
+    /** Compile-time fold session id (host libsqlite3 during AOT emit). */
+    public const PROP_FOLD_ID = '__sqliteFoldId';
+
     /** SQLite3Stmt NestedJIT (#36010 leftover of #36001). */
     public const STMT_CLASS = 'SQLite3Stmt';
 
@@ -42,14 +45,20 @@ final class Sqlite3JitSupport
 
     public const STMT_PROP_PARAM_COUNT = '__sqliteStmtN';
 
+    /** Fold stmt id for bindValue/execute (#36010 compliance). */
+    public const STMT_PROP_FOLD_ID = '__sqliteStmtFoldId';
+
     /** SQLite3Result NestedJIT (#36010 leftover of #36001). */
     public const RESULT_CLASS = 'SQLite3Result';
 
-    /** Copied from DB PROP_ROW for folded SELECT fetchArray. */
+    /** Copied from DB PROP_ROW for folded scalar SELECT fetchArray. */
     public const RESULT_PROP_ROW = '__sqliteResRow';
 
     public const RESULT_PROP_HAS = '__sqliteResHas';
 
-    /** Non-zero after first successful fetchArray (php-src advances the cursor). */
-    public const RESULT_PROP_FETCHED = '__sqliteResFetched';
+    /** Row cursor for multi-row fetchArray (#36010 compliance). */
+    public const RESULT_PROP_CURSOR = '__sqliteResCursor';
+
+    /** Packed row count for multi-row result sets. */
+    public const RESULT_PROP_ROW_COUNT = '__sqliteResN';
 }
