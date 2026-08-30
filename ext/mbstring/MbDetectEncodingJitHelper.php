@@ -94,51 +94,44 @@ final class MbDetectEncodingJitHelper
     private static function isValidUtf8(string $string): bool
     {
         $len = self::byteLen($string);
-        $i = 0;
-        while ($i < $len) {
-            $need = 0;
-            if (!self::utf8SequenceValidAt($string, $len, $i, $need)) {
-                return false;
-            }
-            $i += $need + 1;
-        }
-
-        return true;
-    }
-
-    /**
-     * @param-out int $need
-     */
-    private static function utf8SequenceValidAt(string $string, int $len, int $i, ?int &$need = null): bool
-    {
-        $ch = $string[$i];
-        if ($ch <= "\x7F") {
-            $need = 0;
-
+        if (0 === $len) {
             return true;
         }
-        // Lead-byte class via char range — NestedJIT ord()+mask misfires (#34358).
-        if ($ch >= "\xC0" && $ch <= "\xDF") {
-            $need = 1;
-        } elseif ($ch >= "\xE0" && $ch <= "\xEF") {
-            $need = 2;
-        } elseif ($ch >= "\xF0" && $ch <= "\xF7") {
-            $need = 3;
-        } else {
-            $need = 0;
+        // Lone high bytes are never valid UTF-8; NestedJIT mis-lowers the general lead/continuation
+        // walk for this shape under standalone AOT (#35315 leftover).
+        if (1 === $len) {
+            return $string[0] <= "\x7F";
+        }
+        $i = 0;
+        while ($i < $len) {
+            $ch = $string[$i];
+            if ($ch <= "\x7F") {
+                ++$i;
 
-            return false;
-        }
-        if ($i + $need >= $len) {
-            return false;
-        }
-        $j = 1;
-        while ($j <= $need) {
-            $nextCh = $string[$i + $j];
-            if ($nextCh < "\x80" || $nextCh > "\xBF") {
+                continue;
+            }
+            // Lead-byte class via char range — NestedJIT ord()+mask misfires (#34358).
+            if ($ch >= "\xC0" && $ch <= "\xDF") {
+                $need = 1;
+            } elseif ($ch >= "\xE0" && $ch <= "\xEF") {
+                $need = 2;
+            } elseif ($ch >= "\xF0" && $ch <= "\xF7") {
+                $need = 3;
+            } else {
                 return false;
             }
-            ++$j;
+            if ($i + $need >= $len) {
+                return false;
+            }
+            $j = 1;
+            while ($j <= $need) {
+                $nextCh = $string[$i + $j];
+                if ($nextCh < "\x80" || $nextCh > "\xBF") {
+                    return false;
+                }
+                ++$j;
+            }
+            $i += $need + 1;
         }
 
         return true;

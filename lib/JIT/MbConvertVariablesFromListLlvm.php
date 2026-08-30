@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\Builtin\MbConvertEncodingRuntime;
 use PHPCompiler\JIT\ExceptionBridge;
@@ -30,19 +31,22 @@ final class MbConvertVariablesFromListLlvm
         MbConvertEncodingRuntime::ensureLinked($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'mcv_from_list');
 
-        $ht = HashTableReadLlvm::loadHashtablePointer($context, $fromArg);
-        $htMap = $context->structFieldMap['__hashtable__'];
+        $ht = ArrayBuiltinHelper::isNativeArray($fromArg->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $fromArg)
+            : ArrayBuiltinHelper::loadHashTable($context, $fromArg);
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
-        $nextFree = $context->builder->load(
-            $context->builder->structGep($ht, $htMap['nextFreeElement'])
+        // nextFreeElement can trail packed append slots under AOT; numElements matches Zend list length.
+        $count = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
         );
 
         $tag = (string) self::nextSeq();
         $emptyBb = BasicBlockHelper::append($context, 'mcv_fl_empty_'.$tag);
         $workBb = BasicBlockHelper::append($context, 'mcv_fl_work_'.$tag);
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $count, $zero);
         $context->builder->branchIf($isEmpty, $emptyBb, $workBb);
 
         $context->builder->positionAtEnd($emptyBb);
@@ -58,8 +62,8 @@ final class MbConvertVariablesFromListLlvm
         $context->builder->store($emptyStr, $csvSlot);
         $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->builder->store($zero, $idxSlot);
-        $countSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $context->builder->store($zero, $countSlot);
+        $writtenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $writtenSlot);
 
         $head = BasicBlockHelper::append($context, 'mcv_fl_head_'.$tag);
         $body = BasicBlockHelper::append($context, 'mcv_fl_body_'.$tag);
@@ -71,19 +75,19 @@ final class MbConvertVariablesFromListLlvm
 
         $context->builder->positionAtEnd($head);
         $idx = $context->builder->load($idxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
+        $isUndefined = HashTableReadLlvm::packedIndexIsUndefined($context, $ht, $idx);
+        $context->builder->branchIf($isUndefined, $next, $issetWork);
+
+        $context->builder->positionAtEnd($issetWork);
+        $encPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringAt'),
             $ht,
             $idx
         );
-        $context->builder->branchIf($isSet, $issetWork, $next);
-
-        $context->builder->positionAtEnd($issetWork);
-        $encPtr = HashTableReadLlvm::readStringAt($context, $ht, $idx);
         $context->builder->call(
             MbConvertEncodingRuntime::assertFromEncodingHelper($context),
             $encPtr
@@ -91,8 +95,8 @@ final class MbConvertVariablesFromListLlvm
         $context->builder->branch($append);
 
         $context->builder->positionAtEnd($append);
-        $count = $context->builder->load($countSlot);
-        $needsComma = $context->builder->icmp(Builder::INT_SGT, $count, $zero);
+        $written = $context->builder->load($writtenSlot);
+        $needsComma = $context->builder->icmp(Builder::INT_SGT, $written, $zero);
         $commaBb = BasicBlockHelper::append($context, 'mcv_fl_comma_'.$tag);
         $joinBb = BasicBlockHelper::append($context, 'mcv_fl_join_'.$tag);
         $context->builder->branchIf($needsComma, $commaBb, $joinBb);
@@ -109,7 +113,7 @@ final class MbConvertVariablesFromListLlvm
         $ownedEnc = $context->builder->call($context->lookupFunction('__string__separate'), $encPtr);
         $withEnc = JitStringConcat::concat($context, $csvCur, $ownedEnc, false);
         $context->builder->store($withEnc, $csvSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($count, $one), $countSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($written, $one), $writtenSlot);
         $context->builder->branch($next);
 
         $context->builder->positionAtEnd($next);
@@ -118,7 +122,7 @@ final class MbConvertVariablesFromListLlvm
 
         $context->builder->positionAtEnd($done);
         $built = $context->builder->load($csvSlot);
-        $builtCount = $context->builder->load($countSlot);
+        $builtCount = $context->builder->load($writtenSlot);
         $stillEmpty = $context->builder->icmp(Builder::INT_EQ, $builtCount, $zero);
         $emptyAfterBb = BasicBlockHelper::append($context, 'mcv_fl_empty_after_'.$tag);
         $okBb = BasicBlockHelper::append($context, 'mcv_fl_ok_'.$tag);
