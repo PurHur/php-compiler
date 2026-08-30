@@ -2437,12 +2437,15 @@ class Context {
             $this->functionProxies['dom\\xmldocument::createfromfile'] = new Call\DomXmlDocumentCreateFromFile();
             $this->functionProxies['dom\\htmldocument::createfromfile'] = new Call\DomHtmlDocumentCreateFromFile();
         }
-        // XMLReader::XML / fromString / read — avoid ExternalMethod silent NULL on thin AOT (#27299, #28670).
-        // XML() exists on all profiles; fromString is PROFILE≥8.4 only.
+        // XMLReader::XML / fromString / fromUri / fromStream / read — avoid ExternalMethod
+        // silent NULL on thin AOT (#27299, #28670, #35900).
+        // XML() exists on all profiles; factories are PROFILE≥8.4 only.
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::xml');
         XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::read');
         if (CompilerVersion::supportsXmlReaderFactories()) {
             XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstring');
+            XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromuri');
+            XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstream');
         }
         // XMLWriter::toMemory / toUri / toStream — leftover of openMemory/openUri (#19606 / #35872 / #35895).
         if (CompilerVersion::supportsXmlWriterFactories()) {

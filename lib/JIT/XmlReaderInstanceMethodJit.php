@@ -12,6 +12,8 @@ final class XmlReaderInstanceMethodJit
     /** @var array<string, true> */
     private const METHODS = [
         'xmlreader::fromstring' => true,
+        'xmlreader::fromuri' => true,
+        'xmlreader::fromstream' => true,
         'xmlreader::xml' => true,
         'xmlreader::read' => true,
     ];
@@ -39,7 +41,26 @@ final class XmlReaderInstanceMethodJit
             return;
         }
         if ('xmlreader::fromstring' === $lc) {
+            if (!\PHPCompiler\CompilerVersion::supportsXmlReaderFactories()) {
+                return;
+            }
             $context->functionProxies[$lc] = new Call\XmlReaderFromString();
+
+            return;
+        }
+        if ('xmlreader::fromuri' === $lc) {
+            if (!\PHPCompiler\CompilerVersion::supportsXmlReaderFactories()) {
+                return;
+            }
+            $context->functionProxies[$lc] = new Call\XmlReaderFromUri();
+
+            return;
+        }
+        if ('xmlreader::fromstream' === $lc) {
+            if (!\PHPCompiler\CompilerVersion::supportsXmlReaderFactories()) {
+                return;
+            }
+            $context->functionProxies[$lc] = new Call\XmlReaderFromStream();
 
             return;
         }

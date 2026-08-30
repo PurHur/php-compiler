@@ -161,6 +161,14 @@ final class JitXmlWriterUserScript
         return self::materializeFactoryObject($context, $writer);
     }
 
+    /**
+     * Recover compile-time fopen() path for toStream / XMLReader::fromStream (#35895 / #35900).
+     */
+    public static function compileTimeFopenPath(JITVariable $stream): ?string
+    {
+        return self::resolveStreamUri($stream);
+    }
+
     /** Resolve fopen literal path from stream arg token or lastFopenPath. */
     private static function resolveStreamUri(JITVariable $stream): ?string
     {

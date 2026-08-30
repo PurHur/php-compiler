@@ -17935,7 +17935,7 @@ class JIT {
     }
 
     /**
-     * XMLReader::XML()/fromString() — InternalArgInfo types XML()/open() as boolean (instance
+     * XMLReader::XML()/fromString()/fromUri()/fromStream() — InternalArgInfo types XML()/open() as boolean (instance
      * form). Static factory results are objects; retag the CFG operand so `$r->nodeType`
      * does not take the non-object property path (#28670, re-#27299).
      */
@@ -17944,6 +17944,8 @@ class JIT {
         if (
             !($toCall instanceof JIT\Call\XmlReaderXML)
             && !($toCall instanceof JIT\Call\XmlReaderFromString)
+            && !($toCall instanceof JIT\Call\XmlReaderFromUri)
+            && !($toCall instanceof JIT\Call\XmlReaderFromStream)
         ) {
             return;
         }
@@ -18606,7 +18608,7 @@ class JIT {
 
                 return;
             }
-            // XMLReader::XML()/fromString() — CFG types XML() as bool (InternalArgInfo) but the
+            // XMLReader::XML()/fromString()/fromUri()/fromStream() — CFG types XML() as bool (InternalArgInfo) but the
             // static factory returns a __value__ object box. Force VALUE storage + classUserType
             // so ASSIGN/$reader->nodeType do not take the non-object property path (#28670).
             // Instance XML() returns i1 bool after resetting $this — skip (#35106).
@@ -18614,6 +18616,8 @@ class JIT {
                 (
                     $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
                     || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromString
+                    || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromUri
+                    || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromStream
                 )
                 && !(
                     $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML

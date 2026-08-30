@@ -14,14 +14,15 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT: XMLReader::XML / fromString + read() + nodeType/name/value (#27299, #28670).
+ * User-script AOT: XMLReader::XML / fromString / fromUri / fromStream + read()
+ * + nodeType/name/value (#27299, #28670, #35900).
  *
  * Thin standalone previously lowered factories to ExternalMethod NULL and then failed
  * `while ($r->read())` with `object::read()` once PHPCfg widened the receiver. Compile-time
  * tokenize via {@see VmXmlReader::tokenize} and emit a position switch that updates real
  * object slots so property fetches match Zend without NestedJIT of the full pull parser.
  *
- * php-src: ext/xmlreader/php_xmlreader.c — XML / fromString / read / xmlreader props
+ * php-src: ext/xmlreader/php_xmlreader.c — XML / fromString / fromUri / fromStream / read / xmlreader props
  */
 final class JitXmlReaderUserScript
 {
@@ -79,8 +80,70 @@ final class JitXmlReaderUserScript
             return null;
         }
 
+        return self::materializeFromXmlSource($context, $lit, $instanceReceiver);
+    }
+
+    /**
+     * XMLReader::fromUri() leftover of fromString (#35900 / #27299).
+     * Host has no fromUri; tokenize via file_get_contents on a compile-time URI
+     * (php-src zim_xmlreader_fromUri).
+     */
+    public static function tryFromUri(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || \count($args) < 1) {
+            return null;
+        }
+        self::$lastCallWasInstance = false;
+        $uri = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (null === $uri) {
+            return null;
+        }
+        if ('' === $uri) {
+            throw new \ValueError('XMLReader::fromUri(): Argument #1 ($uri) cannot be empty');
+        }
+        $data = @file_get_contents($uri);
+        if (false === $data) {
+            throw new \Error('XMLReader::fromUri(): Unable to open source data');
+        }
+
+        return self::materializeFromXmlSource($context, $data, null);
+    }
+
+    /**
+     * XMLReader::fromStream() leftover of fromString (#35900 / #27299).
+     * Host has no fromStream; recover fopen path (#35895) and tokenize.
+     * php-src zim_xmlreader_fromStream
+     */
+    public static function tryFromStream(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!self::isUserScriptAot() || \count($args) < 1) {
+            return null;
+        }
+        self::$lastCallWasInstance = false;
+        $uri = \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::compileTimeFopenPath($args[0]);
+        if (null === $uri || '' === $uri) {
+            return null;
+        }
+        $data = @file_get_contents($uri);
+        if (false === $data) {
+            throw new \Error('XMLReader::fromStream(): Unable to open source data');
+        }
+
+        return self::materializeFromXmlSource($context, $data, null);
+    }
+
+    /**
+     * Tokenize XML source and emit a reader object (or reset $this for instance XML()).
+     *
+     * @param JITVariable|null $instanceReceiver instance XML() $this, else null
+     */
+    private static function materializeFromXmlSource(
+        Context $context,
+        string $source,
+        ?JITVariable $instanceReceiver
+    ): ?Value {
         try {
-            $raw = VmXmlReader::tokenize($lit);
+            $raw = VmXmlReader::tokenize($source);
         } catch (\Throwable) {
             return null;
         }

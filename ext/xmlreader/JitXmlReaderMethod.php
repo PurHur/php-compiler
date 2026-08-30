@@ -15,6 +15,8 @@ final class JitXmlReaderMethod
     {
         $result = match ($methodLc) {
             'fromstring', 'xml' => JitXmlReaderUserScript::tryFromString($context, ...$args),
+            'fromuri' => JitXmlReaderUserScript::tryFromUri($context, ...$args),
+            'fromstream' => JitXmlReaderUserScript::tryFromStream($context, ...$args),
             'read' => JitXmlReaderUserScript::tryRead($context, ...$args),
             default => null,
         };
