@@ -5721,7 +5721,7 @@ class Object_ extends Type {
         if ('hashcontext' === $lcClass && ('__hcid' === $lcName || '__hchmac' === $lcName)) {
             return Variable::TYPE_NATIVE_LONG;
         }
-        if ('sqlite3' === $lcClass && ('__sqliteid' === $lcName || '__sqliterow' === $lcName || '__sqlitehas' === $lcName)) {
+        if ('sqlite3' === $lcClass && ('__sqliteid' === $lcName || '__sqliterow' === $lcName || '__sqlitehas' === $lcName || '__sqliterid' === $lcName || '__sqlitechg' === $lcName)) {
             return Variable::TYPE_NATIVE_LONG;
         }
         if (

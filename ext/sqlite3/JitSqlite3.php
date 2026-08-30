@@ -13,7 +13,8 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for SQLite3::__construct / exec / querySingle / close (#35914 leftover of #20565).
+ * LLVM lowering for SQLite3::__construct / exec / querySingle / close /
+ * lastInsertRowID / changes (#35931 leftover of #35914 / #20565).
  *
  * Thin standalone AOT has no PHP FFI, so libsqlite3 cannot be NestedJIT'd (FFI::cdef is a
  * null ExternalMethod; int+string helper pairs SIGSEGV — peer HashContext update #3357).
@@ -22,7 +23,7 @@ use PHPLLVM\Value;
  * PDO construct failing closed when the driver cannot open (#27619).
  *
  * php-src: ext/sqlite3/sqlite3.c — zim_SQLite3___construct / zim_SQLite3_exec /
- * zim_SQLite3_querySingle
+ * zim_SQLite3_querySingle / zim_SQLite3_lastInsertRowID / zim_SQLite3_changes
  */
 final class JitSqlite3
 {
@@ -36,6 +37,8 @@ final class JitSqlite3
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ID, $i64->constInt(1, false));
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ROW, $i64->constInt(0, false));
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_HAS, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID, $i64->constInt(0, false));
+        self::storeLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES, $i64->constInt(0, false));
         $context->type->object->markObjectConstructed($obj);
 
         $slot = JitValueBox::alloc($context);
@@ -60,8 +63,13 @@ final class JitSqlite3
             if (null !== $parsed) {
                 self::storeLong($context, $obj, Sqlite3JitSupport::PROP_ROW, $i64->constInt($parsed, true));
                 self::storeLong($context, $obj, Sqlite3JitSupport::PROP_HAS, $i64->constInt(1, false));
+                $rid = self::loadLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID);
+                $newRid = $context->builder->add($rid, $i64->constInt(1, false));
+                self::storeLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID, $newRid);
+                self::storeLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES, $i64->constInt(1, false));
             } else {
                 self::storeLong($context, $obj, Sqlite3JitSupport::PROP_HAS, $i64->constInt(0, false));
+                self::storeLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES, $i64->constInt(0, false));
             }
 
             return self::boxBool($context, true);
@@ -115,6 +123,26 @@ final class JitSqlite3
         self::storeLong($context, $obj, Sqlite3JitSupport::PROP_HAS, $i64->constInt(0, false));
 
         return self::boxBool($context, true);
+    }
+
+    public static function lastInsertRowID(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3::lastInsertRowID', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $obj = self::readObject($context, $args[0]);
+
+        return self::boxLong($context, self::loadLong($context, $obj, Sqlite3JitSupport::PROP_LAST_ROWID));
+    }
+
+    public static function changes(Context $context, JITVariable ...$args): Value
+    {
+        if (!VmClassMethod::requireExactJitUserArgCount($context, $args, 'SQLite3::changes', 0)) {
+            return VmClassMethod::jitArgcDummyReturn($context);
+        }
+        $obj = self::readObject($context, $args[0]);
+
+        return self::boxLong($context, self::loadLong($context, $obj, Sqlite3JitSupport::PROP_CHANGES));
     }
 
     private static function parseLastInsertInt(string $sql): ?int
@@ -171,6 +199,18 @@ final class JitSqlite3
             $context,
             $slot,
             $context->getTypeFromString('int1')->constInt($v ? 1 : 0, false)
+        );
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function boxLong(Context $context, Value $long): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            JitValueBox::pointer($context, $slot),
+            $long
         );
 
         return JitValueBox::pointer($context, $slot);
