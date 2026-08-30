@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
+
 /**
  * NestedJIT leaf for openssl_pkey_new() keygen (#34015 leftover of #33530 / #6295).
  *
@@ -35,5 +38,38 @@ final class OpensslPkeyNewJitHelper
         };
 
         return \is_string($pem) ? $pem : '';
+    }
+
+    /**
+     * Runtime options hashtable → PEM (#35866 leftover of #34015).
+     *
+     * Nested dh/ec/rsa/dsa arrays soft-fail here (thin AOT uses the EVP RSA leaf instead).
+     */
+    public static function generatePemFromOptions(HashTable $options): string
+    {
+        $bits = 2048;
+        $type = OpensslConstants::OPENSSL_KEYTYPE_RSA;
+        $curve = '';
+        foreach ($options->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            if (Variable::TYPE_STRING !== $keyVar->type) {
+                continue;
+            }
+            $key = $keyVar->toString();
+            $valueVar = $valueVar->resolveIndirect();
+            if ('private_key_bits' === $key && Variable::TYPE_INTEGER === $valueVar->type) {
+                $bits = $valueVar->toInt();
+            } elseif ('private_key_type' === $key && Variable::TYPE_INTEGER === $valueVar->type) {
+                $type = $valueVar->toInt();
+            } elseif ('curve_name' === $key && Variable::TYPE_STRING === $valueVar->type) {
+                $curve = $valueVar->toString();
+            } elseif (
+                ('dh' === $key || 'ec' === $key || 'dsa' === $key || 'rsa' === $key)
+                && Variable::TYPE_ARRAY === $valueVar->type
+            ) {
+                return '';
+            }
+        }
+
+        return self::generatePem($bits, $type, $curve);
     }
 }
